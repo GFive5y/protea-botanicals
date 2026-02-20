@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.js - FULL STAGE 6 VERSION WITH PROPER CONTRAST (Super Grok v5.2)
+// src/pages/AdminDashboard.js - FIXED VERSION (Super Grok v5.2)
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import QrCode from "../components/QrCode";
@@ -35,7 +35,8 @@ export default function AdminDashboard() {
   const createBatch = async () => {
     if (!newBatchNumber || !newProductName)
       return alert("Please fill all fields");
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from("batches")
       .insert({
         batch_number: newBatchNumber,
@@ -44,6 +45,12 @@ export default function AdminDashboard() {
         coa_url: `https://example.com/coa/${newBatchNumber}.pdf`,
       })
       .select();
+
+    if (error) {
+      alert("Error creating batch: " + error.message);
+      return;
+    }
+
     fetchBatches();
     setNewBatchNumber("");
     setNewProductName("");
