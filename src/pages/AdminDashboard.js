@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.js - FIXED FOR NETLIFY BUILD (Super Grok v5.3)
+// src/pages/AdminDashboard.js - FIXED CREATE BATCH (Super Grok v5.3)
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import QrCode from "../components/QrCode";
@@ -36,11 +36,12 @@ export default function AdminDashboard() {
     if (!newBatchNumber || !newProductName)
       return alert("Please fill all fields");
 
-    const { error } = await supabase // ← 'data' removed (unused)
+    const { error } = await supabase
       .from("batches")
       .insert({
         batch_number: newBatchNumber,
         product_name: newProductName,
+        product_type: "extract", // ← ADDED THIS LINE (required field)
         lab_certified: true,
         coa_url: `https://example.com/coa/${newBatchNumber}.pdf`,
       })
@@ -54,7 +55,7 @@ export default function AdminDashboard() {
     fetchBatches();
     setNewBatchNumber("");
     setNewProductName("");
-    alert("New batch created! QR code can be generated on the batch list.");
+    alert("✅ New batch created successfully!");
   };
 
   return (
