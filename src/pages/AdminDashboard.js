@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.js - FIXED FOR NETLIFY BUILD (Super Grok v5.2)
+// src/pages/AdminDashboard.js - FIXED VERSION FOR NETLIFY (Super Grok v5.2)
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import QrCode from "../components/QrCode";
