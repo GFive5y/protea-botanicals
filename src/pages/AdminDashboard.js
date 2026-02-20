@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.js - FIXED VERSION FOR NETLIFY (Super Grok v5.2)
+// src/pages/AdminDashboard.js - FIXED FOR NETLIFY BUILD (Super Grok v5.3)
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import QrCode from "../components/QrCode";
@@ -36,7 +36,7 @@ export default function AdminDashboard() {
     if (!newBatchNumber || !newProductName)
       return alert("Please fill all fields");
 
-    const { data, error } = await supabase
+    const { error } = await supabase // ← 'data' removed (unused)
       .from("batches")
       .insert({
         batch_number: newBatchNumber,
