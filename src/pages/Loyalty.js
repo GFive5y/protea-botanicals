@@ -1,4 +1,4 @@
-// src/pages/Loyalty.js - CLEAN FINAL VERSION (Super Grok v5.0)
+// src/pages/Loyalty.js - CLEAN FINAL VERSION
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 
