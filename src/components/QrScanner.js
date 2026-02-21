@@ -1,4 +1,4 @@
-// src/components/QrScanner.js - FINAL MOBILE-FRIENDLY VERSION (Super Grok v5.2)
+// src/components/QrScanner.js - MOBILE-FRIENDLY VERSION WITH PERMISSION HANDLING (Claude AI v4.2)
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 
