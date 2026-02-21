@@ -1,4 +1,4 @@
-// src/pages/AdminDashboard.js - FINAL VERSION WITH ALL REQUIRED FIELDS (Super Grok v5.3)
+// src/pages/AdminDashboard.js - FINAL BATCH CREATION VERSION (Super Grok v5.4)
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import QrCode from "../components/QrCode";
@@ -45,6 +45,7 @@ export default function AdminDashboard() {
         product_type: "extract", // required
         production_date: "2026-01-01", // required
         expiry_date: "2027-01-01", // required
+        units_produced: 1000, // ← ADDED THIS (required)
         lab_certified: true,
         thc_content: 0.5,
         cbd_content: 20.0,
