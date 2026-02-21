@@ -1,26 +1,9 @@
-import { QRCodeSVG } from "qrcode.react";
+// src/components/QrCode.js - FIXED TO REDIRECT TO LIVE SITE
+import QRCode from "qrcode.react";
 
-export default function QrCode({ value, size = 256 }) {
-  return (
-    <div
-      style={{
-        padding: "20px",
-        background: "white",
-        display: "inline-block",
-        borderRadius: "8px",
-      }}
-    >
-      <QRCodeSVG value={value} size={size} level="H" includeMargin={true} />
-      <p
-        style={{
-          textAlign: "center",
-          marginTop: "10px",
-          fontSize: "14px",
-          color: "#000",
-        }}
-      >
-        {value}
-      </p>
-    </div>
-  );
+export default function QrCode({ value, size = 128 }) {
+  // Change to full live URL so phone camera opens the site
+  const fullUrl = `https://protea-botanicals.netlify.app/scan/${value}`;
+
+  return <QRCode value={fullUrl} size={size} level="H" includeMargin={true} />;
 }
