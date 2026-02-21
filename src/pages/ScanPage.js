@@ -1,4 +1,4 @@
-// src/pages/ScanPage.js - FIXED VERSION WITH OPTIONAL CHAINING (Claude AI v4.0)
+// src/pages/ScanPage.js - FIXED TO EXTRACT BATCH NUMBER FROM FULL URL
 import { useState } from "react";
 import QrScanner from "../components/QrScanner";
 import { authenticateQR } from "../services/scanService";
@@ -6,8 +6,15 @@ import { authenticateQR } from "../services/scanService";
 export default function ScanPage() {
   const [result, setResult] = useState(null);
 
-  const handleScanSuccess = async (qrCode) => {
-    const authResult = await authenticateQR(qrCode);
+  const handleScanSuccess = async (scannedValue) => {
+    // Extract batch number from full URL if present
+    let batchNumber = scannedValue;
+
+    if (scannedValue.includes("protea-botanicals.netlify.app/scan/")) {
+      batchNumber = scannedValue.split("/scan/").pop();
+    }
+
+    const authResult = await authenticateQR(batchNumber);
     setResult(authResult);
   };
 
@@ -58,13 +65,10 @@ export default function ScanPage() {
                 <strong>Points Earned:</strong>{" "}
                 <strong>{result.pointsEarned || 0}</strong>
               </p>
-              {result.message && <p>{result.message}</p>}
-              <div style={{ marginTop: "50px", textAlign: "center" }}>
+
+              <div style={{ marginTop: "30px", textAlign: "center" }}>
                 <a
-                  href={
-                    result.batch?.coa_url ||
-                    "https://example.com/coa/PB-001-2026.pdf"
-                  }
+                  href={result.batch?.coa_url || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
