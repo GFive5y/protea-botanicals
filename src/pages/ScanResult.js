@@ -1,8 +1,13 @@
-// src/pages/ScanResult.js v5.2
+// src/pages/ScanResult.js v5.3
 // ─────────────────────────────────────────────────────────────────────────────
+// v5.3: REFACTORED — processScan() now delegates to authenticateQR() from
+//       scanService.js instead of inline Supabase calls. Single source of truth
+//       for claim/transaction/scan logic. ~80 lines of inline DB code removed.
+//       Keeps: rate limiting, dev mock path, all UI states, return URL.
+//       Maps authenticateQR() return types to existing S.* UI states.
+//       Fix: transaction_type 'EARNED' → 'earned' (handled by scanService).
+//
 // v5.2: Source tracking — reads ?source= from URL, records in scans table.
-//       Enables analytics on which QR type (promo/loyalty/verify/direct) drove scan.
-//       4 changes: version comment, useSearchParams import, source extraction, scans INSERT.
 //
 // Standalone page — route: /scan/:qrCode
 //
@@ -16,6 +21,7 @@
 import { useEffect, useState, useCallback, useRef, useContext } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
+import { authenticateQR } from "../services/scanService"; // ★ v5.3: single source of truth
 import { RoleContext } from "../App";
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
@@ -104,107 +110,110 @@ export default function ScanResult() {
       return;
     }
 
-    try {
-      // Look up product
-      const { data: product, error: fe } = await supabase
-        .from("products")
-        .select("id, qr_code, claimed, batches(batch_number)")
-        .eq("qr_code", decodeURIComponent(qrCode))
-        .single();
+    const decodedQrCode = decodeURIComponent(qrCode);
 
-      if (fe || !product) {
-        setStatus(S.INVALID);
-        setDetail(
-          `No product found for "${qrCode}". Make sure you're scanning the inside-packaging QR.`,
-        );
-        return;
-      }
-
-      setBatch(product.batches?.batch_number || qrCode);
-
-      if (product.claimed) {
-        setStatus(S.ALREADY);
-        setDetail(
-          "This QR code has already been redeemed. Each code can only earn points once.",
-        );
-        return;
-      }
-
-      // ── Dev mode: skip Supabase writes, show success with mock data ─────
-      if (user.id === DEV_MOCK_USER.id) {
-        setPoints(POINTS);
-        setTotal(340 + POINTS); // mock running total
-        setStatus(S.SUCCESS);
-        return;
-      }
-
-      // Atomic claim
-      const { error: ce, data: claimed } = await supabase
-        .from("products")
-        .update({
-          claimed: true,
-          claimed_by: user.id,
-          claimed_at: new Date().toISOString(),
-        })
-        .eq("id", product.id)
-        .eq("claimed", false)
-        .select();
-
-      if (ce || !claimed?.length) {
-        setStatus(S.ALREADY);
-        setDetail("This code was just claimed in another session.");
-        return;
-      }
-
-      // Insert transaction
-      await supabase.from("loyalty_transactions").insert({
-        user_id: user.id,
-        transaction_type: "EARNED",
-        points: POINTS,
-        product_id: product.id,
-        description: `Scanned ${product.batches?.batch_number || qrCode}`,
-        transaction_date: new Date().toISOString(),
-      });
-
-      // v5.2: Record scan with source tracking
-      // scans.source column added in v10.0 migration (DEFAULT 'direct')
-      // Note: no scanned_at column — timestamp handled by DB default (created_at)
-      const { error: scanErr } = await supabase.from("scans").insert({
-        product_id: product.id,
-        user_id: user.id,
-        source: source,
-      });
-      if (scanErr) console.error("Scan source tracking error:", scanErr);
-
-      // Increment points via RPC
-      const { error: rpcErr } = await supabase.rpc("increment_loyalty_points", {
-        p_user_id: user.id,
-        p_points: POINTS,
-      });
-
-      if (rpcErr) {
-        const { data: prof } = await supabase
-          .from("user_profiles")
-          .select("loyalty_points")
-          .eq("id", user.id)
+    // ── Dev mode: lightweight product lookup + mock success ───────────────
+    // authenticateQR() checks supabase.auth.getUser() internally, which
+    // will fail for dev mock. Keep this separate path for testing.
+    if (user.id === DEV_MOCK_USER.id) {
+      try {
+        const { data: product, error: fe } = await supabase
+          .from("products")
+          .select("id, qr_code, claimed, batches(batch_number)")
+          .eq("qr_code", decodedQrCode)
           .single();
-        const updated = (prof?.loyalty_points || 0) + POINTS;
-        await supabase
-          .from("user_profiles")
-          .update({ loyalty_points: updated })
-          .eq("id", user.id);
-        setTotal(updated);
-      } else {
+
+        if (fe || !product) {
+          setStatus(S.INVALID);
+          setDetail(
+            `No product found for "${qrCode}". Make sure you're scanning the inside-packaging QR.`,
+          );
+          return;
+        }
+
+        setBatch(product.batches?.batch_number || qrCode);
+
+        if (product.claimed) {
+          setStatus(S.ALREADY);
+          setDetail(
+            "This QR code has already been redeemed. Each code can only earn points once.",
+          );
+          return;
+        }
+      } catch (err) {
+        console.log(
+          "[ScanResult] Dev mock product lookup skipped:",
+          err.message,
+        );
+      }
+
+      setPoints(POINTS);
+      setTotal(340 + POINTS); // mock running total
+      setStatus(S.SUCCESS);
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ★ v5.3: REAL USER — delegate to scanService.authenticateQR()
+    // This replaces ~80 lines of inline product lookup, atomic claim,
+    // transaction insert, scans insert, and RPC increment_loyalty_points.
+    // authenticateQR() also calls ensureProfile() — an improvement.
+    // ══════════════════════════════════════════════════════════════════════
+    try {
+      const result = await authenticateQR(decodedQrCode, source);
+
+      if (result.success) {
+        // Map success to UI
+        setBatch(result.product?.batches?.batch_number || qrCode);
+        setPoints(result.pointsEarned || POINTS);
+
+        // Fetch updated loyalty_points total for celebration display
         const { data: prof } = await supabase
           .from("user_profiles")
           .select("loyalty_points")
           .eq("id", user.id)
           .single();
         setTotal(prof?.loyalty_points || null);
-      }
 
-      setPoints(POINTS);
-      setStatus(S.SUCCESS);
+        setStatus(S.SUCCESS);
+      } else {
+        // Map authenticateQR errorType to existing UI states
+        switch (result.errorType) {
+          case "auth":
+            setStatus(S.NO_AUTH);
+            break;
+          case "already_claimed":
+            setStatus(S.ALREADY);
+            setDetail(
+              result.error ||
+                "This QR code has already been redeemed. Each code can only earn points once.",
+            );
+            if (result.product)
+              setBatch(result.product.batches?.batch_number || qrCode);
+            break;
+          case "not_found":
+            setStatus(S.INVALID);
+            setDetail(
+              result.error ||
+                `No product found for "${qrCode}". Make sure you're scanning the inside-packaging QR.`,
+            );
+            break;
+          case "inactive":
+          case "expired":
+            setStatus(S.INVALID);
+            setDetail(result.error);
+            break;
+          case "network":
+            setStatus(S.ERROR);
+            setDetail(
+              result.error || "Network error. Please check your connection.",
+            );
+            break;
+          default:
+            setStatus(S.ERROR);
+            setDetail(result.error || "Unexpected error. Please try again.");
+        }
+      }
     } catch (err) {
       console.error("[ScanResult]", err);
       setStatus(S.ERROR);
