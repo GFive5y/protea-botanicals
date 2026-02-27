@@ -1,5 +1,8 @@
 // src/pages/AdminAnalytics.js
 // Protea Botanicals — Scan Analytics Dashboard Component
+// v1.1 — Fix: removed products(qr_code) JOIN that caused freeze when schema
+//         cache is stale. Now fetches scans flat + enriches with separate query.
+//         Added error state UI with retry + schema cache reload hint.
 // v1.0 — Source tracking analytics: summary cards, source breakdown, recent scans
 // Imported by AdminDashboard.js (same pattern as AdminQrGenerator)
 
@@ -128,13 +131,24 @@ export default function AdminAnalytics() {
     recentScans: [],
   });
 
+  const [error, setError] = useState(null);
+
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       // ── Total scans ──
-      const { count: totalScans } = await supabase
+      const { count: totalScans, error: totalErr } = await supabase
         .from("scans")
         .select("*", { count: "exact", head: true });
+      if (totalErr) {
+        console.error("Total scans query error:", totalErr);
+        setError(
+          "Could not load scan data. Check RLS policies and schema cache.",
+        );
+        setLoading(false);
+        return;
+      }
 
       // ── Today ──
       const todayStart = new Date();
@@ -187,15 +201,41 @@ export default function AdminAnalytics() {
         }))
         .sort((a, b) => b.count - a.count);
 
-      // ── Recent scans (last 20) with joins ──
+      // ── Recent scans (last 20) — NO JOIN to avoid schema cache freeze ──
+      // v1.0 used products(qr_code) JOIN which can hang if PostgREST
+      // schema cache is stale. Fetch scans flat, then enrich with product data.
+      let recentScans = [];
       const { data: recent, error: recentErr } = await supabase
         .from("scans")
-        .select("id, source, scan_date, product_id, user_id, products(qr_code)")
+        .select("id, source, scan_date, product_id, user_id")
         .order("scan_date", { ascending: false })
         .limit(20);
 
       if (recentErr) {
         console.error("Recent scans fetch error:", recentErr);
+        recentScans = [];
+      } else if (recent && recent.length > 0) {
+        // Enrich with product qr_codes in a single batch query
+        const productIds = [
+          ...new Set(recent.map((s) => s.product_id).filter(Boolean)),
+        ];
+        let productMap = {};
+        if (productIds.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("id, qr_code")
+            .in("id", productIds);
+          (products || []).forEach((p) => {
+            productMap[p.id] = p.qr_code;
+          });
+        }
+        // Attach qr_code to each scan for display
+        recentScans = recent.map((s) => ({
+          ...s,
+          products: s.product_id
+            ? { qr_code: productMap[s.product_id] || null }
+            : null,
+        }));
       }
 
       setData({
@@ -204,10 +244,11 @@ export default function AdminAnalytics() {
         weekScans: weekScans || 0,
         monthScans: monthScans || 0,
         bySource,
-        recentScans: recent || [],
+        recentScans,
       });
     } catch (err) {
       console.error("Scan analytics error:", err);
+      setError("Failed to load analytics. " + (err.message || ""));
     } finally {
       setLoading(false);
     }
@@ -224,6 +265,40 @@ export default function AdminAnalytics() {
         style={{ textAlign: "center", padding: "60px 20px", color: C.muted }}
       >
         Loading scan analytics...
+      </div>
+    );
+  }
+
+  // ─── Error ───
+  if (error) {
+    return (
+      <div style={{ textAlign: "center", padding: "60px 20px" }}>
+        <div style={{ fontSize: "48px", marginBottom: "12px" }}>⚠️</div>
+        <div style={{ fontSize: "14px", color: C.red, marginBottom: "16px" }}>
+          {error}
+        </div>
+        <div style={{ fontSize: "12px", color: C.muted, marginBottom: "20px" }}>
+          Try: Supabase Dashboard → Settings → API →{" "}
+          <strong>Reload Schema Cache</strong>
+        </div>
+        <button
+          onClick={fetchAnalytics}
+          style={{
+            background: C.mid,
+            color: C.white,
+            border: "none",
+            borderRadius: "2px",
+            padding: "10px 20px",
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            fontFamily: FONTS.body,
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }

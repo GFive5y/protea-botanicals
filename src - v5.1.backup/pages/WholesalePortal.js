@@ -1,20 +1,16 @@
-// src/pages/WholesalePortal.js — v1.1 PageShell integration
-// ─────────────────────────────────────────────────────────────────────────────
-// v1.0  Initial build — standalone page with own wrapper, footer, fonts
-// v1.1  PageShell integration — removed duplicate wrapper/footer/font-import,
-//       adjusted padding for 900px PageShell container, imported C from tokens
-// ─────────────────────────────────────────────────────────────────────────────
+// src/pages/WholesalePortal.js
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
-import { C } from "../styles/tokens";
 
-// CSS classes only — font @import removed (PageShell handles Google Fonts)
 const sharedStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500&display=swap');
+  .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .body-font { font-family: 'Jost', sans-serif; }
   .pb-btn {
     font-family: 'Jost', sans-serif;
     padding: 12px 32px;
-    background: ${C.green};
+    background: #1b4332;
     color: white;
     border: none;
     border-radius: 2px;
@@ -24,21 +20,21 @@ const sharedStyles = `
     cursor: pointer;
     transition: background 0.2s;
   }
-  .pb-btn:hover { background: ${C.mid}; }
+  .pb-btn:hover { background: #2d6a4f; }
   .pb-input {
     font-family: 'Jost', sans-serif;
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid ${C.border};
+    border: 1px solid #ddd;
     border-radius: 2px;
     font-size: 14px;
     box-sizing: border-box;
     outline: none;
     transition: border-color 0.2s;
   }
-  .pb-input:focus { border-color: ${C.mid}; }
+  .pb-input:focus { border-color: #2d6a4f; }
   .row-hover { transition: background 0.15s; }
-  .row-hover:hover { background: ${C.warm} !important; }
+  .row-hover:hover { background: #f4f0e8 !important; }
 `;
 
 const WHOLESALE_PRODUCTS = [
@@ -152,24 +148,28 @@ export default function WholesalePortal() {
   };
 
   const statusColor = {
-    pending: C.gold,
-    confirmed: C.mid,
-    shipped: C.blue,
+    pending: "#b5935a",
+    confirmed: "#2d6a4f",
+    shipped: "#2c4a6e",
     delivered: "#555",
   };
 
   return (
-    <>
+    <div
+      style={{
+        fontFamily: "'Georgia', serif",
+        background: "#faf9f6",
+        minHeight: "100vh",
+      }}
+    >
       <style>{sharedStyles}</style>
 
-      {/* Hero — sits inside PageShell's 900px content area */}
+      {/* Hero */}
       <div
         style={{
-          background: `linear-gradient(135deg, ${C.green} 0%, ${C.mid} 100%)`,
-          padding: "64px 24px",
+          background: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%)",
+          padding: "64px 40px",
           textAlign: "center",
-          borderRadius: "2px",
-          marginBottom: "0",
         }}
       >
         <span
@@ -178,7 +178,7 @@ export default function WholesalePortal() {
             fontSize: "11px",
             letterSpacing: "0.35em",
             textTransform: "uppercase",
-            color: C.accent,
+            color: "#52b788",
           }}
         >
           🏪 TRADE ACCOUNT
@@ -188,7 +188,7 @@ export default function WholesalePortal() {
           style={{
             fontSize: "clamp(36px, 6vw, 56px)",
             fontWeight: 300,
-            color: C.cream,
+            color: "#faf9f6",
             margin: "12px 0",
           }}
         >
@@ -209,13 +209,15 @@ export default function WholesalePortal() {
       {/* Tabs */}
       <div
         style={{
-          background: C.warm,
+          background: "#f4f0e8",
           borderBottom: "1px solid #e0d8cc",
-          padding: "0",
+          padding: "0 40px",
         }}
       >
         <div
           style={{
+            maxWidth: "960px",
+            margin: "0 auto",
             display: "flex",
             gap: "0",
           }}
@@ -234,9 +236,9 @@ export default function WholesalePortal() {
                 border: "none",
                 borderBottom:
                   activeTab === key
-                    ? `2px solid ${C.green}`
+                    ? "2px solid #1b4332"
                     : "2px solid transparent",
-                color: activeTab === key ? C.green : C.muted,
+                color: activeTab === key ? "#1b4332" : "#888",
                 fontSize: "11px",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
@@ -251,18 +253,23 @@ export default function WholesalePortal() {
         </div>
       </div>
 
-      <div style={{ padding: "48px 0" }}>
+      <div
+        style={{ maxWidth: "960px", margin: "0 auto", padding: "48px 24px" }}
+      >
         {success && (
           <div
             style={{
               background: "#e8f5e9",
-              border: `1px solid ${C.mid}`,
+              border: "1px solid #2d6a4f",
               borderRadius: "2px",
               padding: "16px 24px",
               marginBottom: "24px",
             }}
           >
-            <p className="body-font" style={{ color: C.mid, fontSize: "14px" }}>
+            <p
+              className="body-font"
+              style={{ color: "#2d6a4f", fontSize: "14px" }}
+            >
               ✓ {success}
             </p>
           </div>
@@ -281,7 +288,7 @@ export default function WholesalePortal() {
             <div
               style={{
                 background: "white",
-                border: `1px solid #e8e0d4`,
+                border: "1px solid #e8e0d4",
                 borderRadius: "2px",
                 overflow: "hidden",
                 boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
@@ -298,7 +305,7 @@ export default function WholesalePortal() {
                   style={{
                     fontSize: "24px",
                     fontWeight: 400,
-                    color: C.text,
+                    color: "#1a1a1a",
                   }}
                 >
                   Product Catalogue
@@ -326,7 +333,7 @@ export default function WholesalePortal() {
                       className="shop-font"
                       style={{
                         fontSize: "18px",
-                        color: C.text,
+                        color: "#1a1a1a",
                         fontWeight: 400,
                       }}
                     >
@@ -347,7 +354,7 @@ export default function WholesalePortal() {
                     className="shop-font"
                     style={{
                       fontSize: "18px",
-                      color: C.mid,
+                      color: "#2d6a4f",
                       fontWeight: 600,
                       whiteSpace: "nowrap",
                     }}
@@ -366,8 +373,8 @@ export default function WholesalePortal() {
                       style={{
                         width: "28px",
                         height: "28px",
-                        background: C.warm,
-                        border: `1px solid ${C.border}`,
+                        background: "#f4f0e8",
+                        border: "1px solid #e0d8cc",
                         borderRadius: "2px",
                         cursor: "pointer",
                         fontSize: "16px",
@@ -390,7 +397,7 @@ export default function WholesalePortal() {
                       style={{
                         width: "28px",
                         height: "28px",
-                        background: C.green,
+                        background: "#1b4332",
                         border: "none",
                         borderRadius: "2px",
                         cursor: "pointer",
@@ -419,7 +426,7 @@ export default function WholesalePortal() {
             >
               <div
                 style={{
-                  background: `linear-gradient(135deg, ${C.green}, ${C.mid})`,
+                  background: "linear-gradient(135deg, #1b4332, #2d6a4f)",
                   padding: "24px 28px",
                 }}
               >
@@ -483,7 +490,7 @@ export default function WholesalePortal() {
                     >
                       <span
                         className="shop-font"
-                        style={{ fontSize: "18px", color: C.text }}
+                        style={{ fontSize: "18px", color: "#1a1a1a" }}
                       >
                         Total
                       </span>
@@ -491,7 +498,7 @@ export default function WholesalePortal() {
                         className="shop-font"
                         style={{
                           fontSize: "22px",
-                          color: C.mid,
+                          color: "#2d6a4f",
                           fontWeight: 600,
                         }}
                       >
@@ -531,7 +538,7 @@ export default function WholesalePortal() {
             >
               <h2
                 className="shop-font"
-                style={{ fontSize: "24px", fontWeight: 400, color: C.text }}
+                style={{ fontSize: "24px", fontWeight: 400, color: "#1a1a1a" }}
               >
                 Order History
               </h2>
@@ -563,7 +570,7 @@ export default function WholesalePortal() {
                   <div>
                     <p
                       className="shop-font"
-                      style={{ fontSize: "17px", color: C.text }}
+                      style={{ fontSize: "17px", color: "#1a1a1a" }}
                     >
                       Order #{order.id.slice(-6).toUpperCase()}
                     </p>
@@ -590,7 +597,7 @@ export default function WholesalePortal() {
                   >
                     <span
                       className="shop-font"
-                      style={{ fontSize: "18px", color: C.mid }}
+                      style={{ fontSize: "18px", color: "#2d6a4f" }}
                     >
                       R{order.total?.toLocaleString()}
                     </span>
@@ -616,6 +623,40 @@ export default function WholesalePortal() {
           </div>
         )}
       </div>
-    </>
+
+      <footer
+        style={{
+          background: "#1a1a1a",
+          padding: "40px 24px",
+          textAlign: "center",
+        }}
+      >
+        <span
+          className="shop-font"
+          style={{ fontSize: "18px", color: "#faf9f6", letterSpacing: "0.2em" }}
+        >
+          PROTEA
+        </span>
+        <span
+          className="shop-font"
+          style={{ fontSize: "18px", color: "#52b788", letterSpacing: "0.2em" }}
+        >
+          {" "}
+          BOTANICALS
+        </span>
+        <p
+          className="body-font"
+          onClick={() => navigate("/")}
+          style={{
+            fontSize: "11px",
+            color: "#555",
+            marginTop: "12px",
+            cursor: "pointer",
+          }}
+        >
+          ← Back to Home
+        </p>
+      </footer>
+    </div>
   );
 }

@@ -300,11 +300,27 @@ export default function AdminDashboard() {
     setBatches(data || []);
   }, []);
   const fetchStockists = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("wholesale_partners")
-      .select("id, business_name, contact_name");
-    if (error) console.error("fetchStockists error:", error);
-    setStockists(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("wholesale_partners")
+        .select("id, business_name, contact_name");
+      // PGRST205 = table not found in schema cache — safe to skip
+      if (error) {
+        if (error.code === "PGRST205") {
+          console.warn(
+            "wholesale_partners table not available — skipping stockists",
+          );
+        } else {
+          console.error("fetchStockists error:", error);
+        }
+        setStockists([]);
+        return;
+      }
+      setStockists(data || []);
+    } catch (err) {
+      console.warn("fetchStockists exception — skipping:", err.message);
+      setStockists([]);
+    }
   }, []);
   const fetchUsers = useCallback(async () => {
     const { data, error } = await supabase.from("user_profiles").select("*");
