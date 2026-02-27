@@ -1,12 +1,16 @@
 // supabase/functions/ai-copilot/index.ts
-// Protea Botanicals — AI Co-Pilot Edge Function
-// Version: v1.1
-// ★ v1.1: Added tools-only mode — works WITHOUT API keys.
-//   Tool results returned directly with smart formatting.
-//   AI providers (Grok/Claude) used only when keys are available.
+// Protea Botanicals — AI Assistant Edge Function
+// Version: v2.0
+// ★ v2.0: FULL REWRITE — Claude as brain with native tool use.
+//   - Rich system prompt (18 strains, terpenes, loyalty rules, brand knowledge)
+//   - Role-based tool visibility (shared/customer/admin)
+//   - Conversation history support (messages[] array)
+//   - User context injection (role, points, tier, page)
+//   - Tool execution loop (max 5 rounds)
+//   - Returns { reply, model, usage, error }
 //
 // Deploy:  npx supabase functions deploy ai-copilot --no-verify-jwt
-// Secrets: npx supabase secrets set XAI_API_KEY=xxx ANTHROPIC_API_KEY=xxx
+// Secrets: npx supabase secrets set ANTHROPIC_API_KEY=xxx
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
@@ -19,7 +23,7 @@ const CORS_HEADERS = {
     "Content-Type, Authorization, x-client-info, apikey",
 };
 
-// ─── Supabase client for tool execution ──────────────────────────────────
+// ─── Supabase client (service role for read-only tool queries) ───────────
 function getSupabaseClient() {
   return createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -27,282 +31,197 @@ function getSupabaseClient() {
   );
 }
 
-// ─── File Registry (from Handover v10.0) ─────────────────────────────────
-const FILE_REGISTRY: Record<
-  string,
-  { version: string; lock: string; purpose: string; key: string }
-> = {
-  "App.js": {
-    version: "v3.5",
-    lock: "🔒 LOCKED",
-    purpose:
-      "Root component, routing, RequireAuth/RequireRole guards, RoleContext, CoPilot overlay",
-    key: "Routes, guards, context providers",
-  },
-  "Account.js": {
-    version: "v5.5",
-    lock: "🔒 LOCKED",
-    purpose: "Login/Register with role-based redirect + smart returnUrl",
-    key: "signInWithPassword, role redirect logic",
-  },
-  "supabaseClient.js": {
-    version: "v5.1",
-    lock: "🔒 LOCKED",
-    purpose: "Supabase client singleton + LockManager no-op",
-    key: "createClient(), supabase export",
-  },
-  "scanService.js": {
-    version: "v5.1",
-    lock: "🔒 LOCKED",
-    purpose: "QR scan processing — validate, award points, record scan",
-    key: "processScan(), awardLoyaltyPoints()",
-  },
-  "ScanResult.js": {
-    version: "v5.1",
-    lock: "🔒 LOCKED",
-    purpose: "Post-scan UI with celebration modal + product info",
-    key: "Animated result display",
-  },
-  "Landing.js": {
-    version: "v5.2",
-    lock: "🔒 LOCKED",
-    purpose: "Public landing page with auth detection + header visibility fix",
-    key: "Hero, features, CTA",
-  },
-  "tokens.js": {
-    version: "v2",
-    lock: "🔒 LOCKED",
-    purpose: "Design system tokens — colors, fonts, spacing, radii",
-    key: "All style constants",
-  },
-  "PageShell.js": {
-    version: "v1.0",
-    lock: "🔒 LOCKED",
-    purpose: "Shared layout wrapper — max-width 1200px, padding, background",
-    key: "Layout container",
-  },
-  "AdminDashboard.js": {
-    version: "v3.5",
-    lock: "🔒 LOCKED",
-    purpose: "5-tab admin panel: Overview, Users, Products, Scans, Smart QR",
-    key: "Tab system, bulk QR, smart QR link",
-  },
-  "WholesalePortal.js": {
-    version: "v1.1",
-    lock: "🔒 LOCKED",
-    purpose: "Wholesale partner dashboard with PageShell integration",
-    key: "Order form, partner info",
-  },
-  "Redeem.js": {
-    version: "v1.1",
-    lock: "🔒 LOCKED",
-    purpose: "Loyalty point redemption with PageShell",
-    key: "Voucher display, redeem flow",
-  },
-  "Shop.js": {
-    version: "v2.3",
-    lock: "🔒 LOCKED",
-    purpose: "36 vape products (18 strains × 2 formats) + 6 Coming Soon",
-    key: "Product grid, R800/R1600 pricing",
-  },
-  "ProductVerification.js": {
-    version: "v2.2",
-    lock: "🔒 LOCKED",
-    purpose: "18 Eybna strain profiles with terpene data + COA links",
-    key: "Strain lookup, terpene display",
-  },
-  "AdminQrGenerator.js": {
-    version: "v1.0",
-    lock: "🔒 LOCKED",
-    purpose: "Smart QR generator — 4 types: product, promo, loyalty, custom",
-    key: "QR type selector, URL builder, download",
-  },
-  "CoPilot.js": {
-    version: "v1.0",
-    lock: "🔓 OPEN",
-    purpose: "AI Co-Pilot floating chat widget",
-    key: "Chat UI, provider toggle, message handling",
-  },
-  "copilotService.js": {
-    version: "v1.0",
-    lock: "🔓 OPEN",
-    purpose: "Client service layer for Co-Pilot Edge Function",
-    key: "sendMessage(), checkBackendHealth()",
-  },
-  "AgeGate.js": {
-    version: "v1.0",
-    lock: "🔓 OPEN",
-    purpose: "4-step age verification modal (not yet integrated)",
-    key: "Modal flow, age check",
-  },
-  "PromoBanner.js": {
-    version: "v1.0",
-    lock: "🔓 OPEN",
-    purpose: "Animated promotional banner (not yet integrated)",
-    key: "Banner animation, dismiss",
-  },
-  "Loyalty.js": {
-    version: "v5.0",
-    lock: "🔓 OPEN",
-    purpose: "Loyalty dashboard — points, history, rewards",
-    key: "Points display, transaction history",
-  },
-  "QrCode.js": {
-    version: "v1",
-    lock: "🔓 OPEN",
-    purpose: "QR code display component using qrcode.react",
-    key: "QRCodeSVG render",
-  },
-};
+// ─── Tool Definitions (Anthropic native format) ──────────────────────────
 
-// ─── Route Registry (from App.js v3.5) ───────────────────────────────────
-const ROUTE_TABLE = [
+const SHARED_TOOLS = [
   {
-    path: "/",
-    component: "Landing.js",
-    guards: "None (public)",
-    layout: "No NavBar",
-    purpose: "Public landing page",
-  },
-  {
-    path: "/account",
-    component: "Account.js",
-    guards: "None (public)",
-    layout: "NavBar + PageShell",
-    purpose: "Login/Register",
-  },
-  {
-    path: "/scan/:qrCode",
-    component: "ScanResult.js",
-    guards: "None (public)",
-    layout: "Standalone",
-    purpose: "QR scan processing",
-  },
-  {
-    path: "/verify/:id",
-    component: "ProductVerification.js",
-    guards: "None (public)",
-    layout: "NavBar",
-    purpose: "Public product/COA verification",
-  },
-  {
-    path: "/shop",
-    component: "Shop.js",
-    guards: "None (public)",
-    layout: "NavBar",
-    purpose: "Product catalog (36 vapes)",
-  },
-  {
-    path: "/cart",
-    component: "CartPage.js",
-    guards: "None (public)",
-    layout: "NavBar",
-    purpose: "Shopping cart",
-  },
-  {
-    path: "/loyalty",
-    component: "Loyalty.js",
-    guards: "RequireAuth",
-    layout: "NavBar + PageShell",
-    purpose: "Loyalty dashboard",
-  },
-  {
-    path: "/redeem",
-    component: "Redeem.js",
-    guards: "RequireAuth",
-    layout: "NavBar + PageShell",
-    purpose: "Redeem loyalty points",
-  },
-  {
-    path: "/checkout",
-    component: "CheckoutPage.js",
-    guards: "RequireAuth",
-    layout: "NavBar + PageShell",
-    purpose: "Payment checkout",
-  },
-  {
-    path: "/order-success",
-    component: "OrderSuccess.js",
-    guards: "None",
-    layout: "NavBar + PageShell",
-    purpose: "Order confirmation",
-  },
-  {
-    path: "/wholesale",
-    component: "WholesalePortal.js",
-    guards: "RequireAuth + RequireRole(retailer)",
-    layout: "NavBar + PageShell",
-    purpose: "Wholesale partner portal",
-  },
-  {
-    path: "/admin",
-    component: "AdminDashboard.js",
-    guards: "RequireAuth + RequireRole(admin)",
-    layout: "NavBar + PageShell(1200)",
-    purpose: "Admin dashboard (5 tabs)",
-  },
-  {
-    path: "/admin/qr",
-    component: "AdminQrGenerator.js",
-    guards: "RequireAuth + RequireRole(admin)",
-    layout: "NavBar + PageShell(1200)",
-    purpose: "Smart QR generator",
-  },
-  {
-    path: "*",
-    component: "NotFound.js",
-    guards: "None",
-    layout: "NavBar",
-    purpose: "404 page",
+    name: "lookup_product",
+    description:
+      "Search for a product by QR code, batch number, or strain name. Returns product details including status, points value, and scan count.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        search: {
+          type: "string" as const,
+          description:
+            "QR code (e.g. PB-001-2026-0001), batch ID, or strain name to search for",
+        },
+      },
+      required: ["search"],
+    },
   },
 ];
 
-// ─── Lessons Learned ─────────────────────────────────────────────────────
-const LESSONS_LEARNED = [
+const CUSTOMER_TOOLS = [
   {
-    id: "LL-006",
-    lesson:
-      "onAuthStateChange is unreliable for redirect — use redirect after signInWithPassword response instead",
+    name: "lookup_loyalty",
+    description:
+      "Look up a customer's loyalty points, tier, and recent transaction history. Use when a customer asks about their points, tier status, or transaction history.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        user_id: {
+          type: "string" as const,
+          description:
+            "The user UUID. If not provided, uses the current user from context.",
+        },
+      },
+      required: [],
+    },
+  },
+];
+
+const ADMIN_TOOLS = [
+  {
+    name: "get_system_health",
+    description:
+      "Check Supabase connection status and get row counts for all database tables. Use when admin asks about system health, status, or database overview.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
   },
   {
-    id: "LL-011",
-    lesson:
-      "Supabase v2.x ignores lock:false parameter — LockManager is a no-op",
+    name: "query_analytics",
+    description:
+      "Get scan analytics data — counts by source (qr, manual, promo), recent scan activity, and trends. Use when admin asks about QR performance, scan stats, or campaign analytics.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        period_days: {
+          type: "number" as const,
+          description: "Number of days to look back (default 30)",
+        },
+      },
+      required: [],
+    },
   },
   {
-    id: "LL-012",
-    lesson:
-      "RequireAuth must check loading && !role before redirect to avoid flash",
+    name: "list_users",
+    description:
+      "List all registered users with their roles, loyalty points, and tier. Use when admin asks about users, user list, or user management.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        limit: {
+          type: "number" as const,
+          description: "Max users to return (default 20, max 100)",
+        },
+      },
+      required: [],
+    },
   },
   {
-    id: "LL-014",
-    lesson:
-      "DB role values must match code exactly (customer, retailer, admin)",
-  },
-  {
-    id: "LL-015",
-    lesson: "Password gates are redundant when RequireRole guards are in place",
-  },
-  {
-    id: "LL-016",
-    lesson:
-      "Always diff against the ACTUAL file version, not the handover description",
-  },
-  {
-    id: "LL-017",
-    lesson:
-      "Two QR tools are complementary: Bulk Generator creates DB records, Smart Generator creates URLs",
+    name: "query_database",
+    description:
+      "Run a read-only SELECT query on any allowed table. Allowed tables: batches, products, scans, user_profiles, loyalty_transactions, redemptions, wholesale_partners, orders, order_items. Use for custom data lookups the admin requests.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        table: { type: "string" as const, description: "Table name to query" },
+        select: {
+          type: "string" as const,
+          description: "Columns to select (default: *)",
+        },
+        filters: {
+          type: "object" as const,
+          description: "Key-value pairs for WHERE clause (equality filters)",
+          additionalProperties: true,
+        },
+        order_by: {
+          type: "string" as const,
+          description: "Column to order by (descending)",
+        },
+        limit: {
+          type: "number" as const,
+          description: "Max rows (default 20, max 100)",
+        },
+      },
+      required: ["table"],
+    },
   },
 ];
 
 // ─── Tool Execution ──────────────────────────────────────────────────────
+
 async function executeTool(
   name: string,
-  args: Record<string, unknown>,
+  input: Record<string, unknown>,
+  userContext: Record<string, unknown> | null,
 ): Promise<string> {
   const supabase = getSupabaseClient();
 
   switch (name) {
+    case "lookup_product": {
+      const search = (input.search as string) || "";
+      // Try QR code exact match first
+      let { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("qr_code", search)
+        .limit(5);
+
+      if (!error && data && data.length === 0) {
+        // Try partial match on qr_code
+        const result = await supabase
+          .from("products")
+          .select("*")
+          .ilike("qr_code", `%${search}%`)
+          .limit(5);
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error) return JSON.stringify({ error: error.message });
+      return JSON.stringify({
+        found: data?.length ?? 0,
+        products: data?.map((p: Record<string, unknown>) => ({
+          qr_code: p.qr_code,
+          status: p.status,
+          claimed: p.claimed,
+          points_value: p.points_value,
+          qr_type: p.qr_type,
+          scan_count: p.scan_count,
+          last_scan_at: p.last_scan_at,
+        })),
+      });
+    }
+
+    case "lookup_loyalty": {
+      const userId =
+        (input.user_id as string) || (userContext?.user_id as string);
+      if (!userId) {
+        return JSON.stringify({
+          error: "No user_id available. User may not be logged in.",
+        });
+      }
+
+      // Get profile
+      const { data: profile, error: profileErr } = await supabase
+        .from("user_profiles")
+        .select("loyalty_points, loyalty_tier, full_name, role")
+        .eq("id", userId)
+        .single();
+
+      if (profileErr) return JSON.stringify({ error: profileErr.message });
+
+      // Get recent transactions
+      const { data: transactions, error: txErr } = await supabase
+        .from("loyalty_transactions")
+        .select("points, transaction_type, description, transaction_date")
+        .eq("user_id", userId)
+        .order("transaction_date", { ascending: false })
+        .limit(10);
+
+      return JSON.stringify({
+        loyalty_points: profile?.loyalty_points ?? 0,
+        loyalty_tier: profile?.loyalty_tier ?? "bronze",
+        full_name: profile?.full_name ?? null,
+        recent_transactions: txErr ? [] : (transactions ?? []),
+      });
+    }
+
     case "get_system_health": {
       const tables = [
         "batches",
@@ -319,23 +238,78 @@ async function executeTool(
           .select("*", { count: "exact", head: true });
         counts[table] = error ? `Error: ${error.message}` : (count ?? 0);
       }
-      return JSON.stringify(
-        {
-          status: "connected",
-          project: "uvicrqapgzcdvozxrreo",
-          tables: counts,
-        },
-        null,
-        2,
-      );
+      return JSON.stringify({
+        status: "connected",
+        project: "uvicrqapgzcdvozxrreo",
+        tables: counts,
+      });
     }
 
-    case "query_supabase": {
-      const table = args.table as string;
-      const select = (args.select as string) || "*";
-      const filters = (args.filters as Record<string, unknown>) || {};
-      const order = args.order as string | undefined;
-      const limit = Math.min((args.limit as number) || 20, 100);
+    case "query_analytics": {
+      const days = Math.min((input.period_days as number) || 30, 90);
+      const since = new Date(
+        Date.now() - days * 24 * 60 * 60 * 1000,
+      ).toISOString();
+
+      // Total scans in period
+      const { count: totalScans } = await supabase
+        .from("scans")
+        .select("*", { count: "exact", head: true })
+        .gte("scan_date", since);
+
+      // Scans by source
+      const { data: scans } = await supabase
+        .from("scans")
+        .select("source, scan_date")
+        .gte("scan_date", since)
+        .order("scan_date", { ascending: false })
+        .limit(500);
+
+      const sourceCounts: Record<string, number> = {};
+      if (scans) {
+        for (const s of scans) {
+          const src =
+            ((s as Record<string, unknown>).source as string) || "unknown";
+          sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+        }
+      }
+
+      // Recent scans (last 10)
+      const { data: recent } = await supabase
+        .from("scans")
+        .select("product_id, user_id, scan_date, source")
+        .order("scan_date", { ascending: false })
+        .limit(10);
+
+      return JSON.stringify({
+        period_days: days,
+        total_scans: totalScans ?? 0,
+        scans_by_source: sourceCounts,
+        recent_scans: recent ?? [],
+      });
+    }
+
+    case "list_users": {
+      const limit = Math.min((input.limit as number) || 20, 100);
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, role, loyalty_points, loyalty_tier")
+        .order("loyalty_points", { ascending: false })
+        .limit(limit);
+
+      if (error) return JSON.stringify({ error: error.message });
+      return JSON.stringify({
+        user_count: data?.length ?? 0,
+        users: data ?? [],
+      });
+    }
+
+    case "query_database": {
+      const table = input.table as string;
+      const select = (input.select as string) || "*";
+      const filters = (input.filters as Record<string, unknown>) || {};
+      const orderBy = input.order_by as string | undefined;
+      const limit = Math.min((input.limit as number) || 20, 100);
 
       const ALLOWED = [
         "batches",
@@ -347,11 +321,10 @@ async function executeTool(
         "wholesale_partners",
         "orders",
         "order_items",
-        "inventory",
       ];
       if (!ALLOWED.includes(table)) {
         return JSON.stringify({
-          error: `Table "${table}" not in allowlist. Allowed: ${ALLOWED.join(", ")}`,
+          error: `Table "${table}" not allowed. Allowed: ${ALLOWED.join(", ")}`,
         });
       }
 
@@ -359,112 +332,13 @@ async function executeTool(
       for (const [key, val] of Object.entries(filters)) {
         query = query.eq(key, val);
       }
-      if (order) {
-        query = query.order(order, { ascending: false });
+      if (orderBy) {
+        query = query.order(orderBy, { ascending: false });
       }
 
       const { data, error } = await query;
       if (error) return JSON.stringify({ error: error.message });
-      return JSON.stringify(
-        { table, rowCount: data?.length ?? 0, data },
-        null,
-        2,
-      );
-    }
-
-    case "explain_file": {
-      const name = args.name as string;
-      const key = name.endsWith(".js") ? name : `${name}.js`;
-      const info = FILE_REGISTRY[key];
-      if (!info) {
-        return JSON.stringify({
-          error: `File "${name}" not found. Known files: ${Object.keys(FILE_REGISTRY).join(", ")}`,
-        });
-      }
-      return JSON.stringify({ file: key, ...info }, null, 2);
-    }
-
-    case "decode_error": {
-      const trace = args.trace as string;
-      const hints: string[] = [];
-      if (trace.includes("onAuthStateChange"))
-        hints.push(LESSONS_LEARNED[0].lesson);
-      if (trace.includes("lock") || trace.includes("Lock"))
-        hints.push(LESSONS_LEARNED[1].lesson);
-      if (trace.includes("RequireAuth") || trace.includes("redirect"))
-        hints.push(LESSONS_LEARNED[2].lesson);
-      if (trace.includes("role")) hints.push(LESSONS_LEARNED[3].lesson);
-      return JSON.stringify(
-        {
-          trace: trace.substring(0, 500),
-          matchedLessons:
-            hints.length > 0
-              ? hints
-              : ["No direct match — check console for full stack trace."],
-          allLessons: LESSONS_LEARNED,
-        },
-        null,
-        2,
-      );
-    }
-
-    case "list_routes": {
-      return JSON.stringify(
-        { routeCount: ROUTE_TABLE.length, routes: ROUTE_TABLE },
-        null,
-        2,
-      );
-    }
-
-    case "list_files": {
-      const files = Object.entries(FILE_REGISTRY).map(([name, info]) => ({
-        file: name,
-        version: info.version,
-        lock: info.lock,
-        purpose: info.purpose,
-      }));
-      return JSON.stringify({ fileCount: files.length, files }, null, 2);
-    }
-
-    case "help": {
-      return JSON.stringify(
-        {
-          commands: [
-            {
-              command: "system health",
-              description: "Check Supabase connection + table row counts",
-            },
-            {
-              command: "list routes",
-              description: "Show all routes with guards and layouts",
-            },
-            {
-              command: "list files",
-              description:
-                "Show all project files with version and lock status",
-            },
-            {
-              command: "explain <file>",
-              description:
-                'Get details about a specific file (e.g. "explain App.js")',
-            },
-            {
-              command: "show <table>",
-              description:
-                'Query a Supabase table (e.g. "show products", "show user_profiles")',
-            },
-            { command: "count <table>", description: "Count rows in a table" },
-            {
-              command: "<error text>",
-              description:
-                "Paste an error to get diagnosis + matching Lessons Learned",
-            },
-          ],
-          tip: "AI summarization available when Grok/Claude API keys are configured.",
-        },
-        null,
-        2,
-      );
+      return JSON.stringify({ table, row_count: data?.length ?? 0, data });
     }
 
     default:
@@ -472,134 +346,149 @@ async function executeTool(
   }
 }
 
-// ─── Smart formatting for tools-only mode ────────────────────────────────
-function formatToolResult(name: string, resultJson: string): string {
-  try {
-    const data = JSON.parse(resultJson);
+// ─── Build tools list based on user role ─────────────────────────────────
 
-    switch (name) {
-      case "get_system_health": {
-        let msg = `✅ Supabase connected (${data.project})\n\n📊 Table row counts:\n`;
-        for (const [table, count] of Object.entries(data.tables)) {
-          msg += `  • ${table}: ${count} rows\n`;
-        }
-        return msg;
-      }
+function getToolsForRole(
+  role: string | null,
+): Array<{
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}> {
+  const tools = [...SHARED_TOOLS];
 
-      case "list_routes": {
-        let msg = `🗺 ${data.routeCount} routes:\n\n`;
-        for (const r of data.routes) {
-          msg += `  ${r.path}\n    → ${r.component} | ${r.guards} | ${r.layout}\n\n`;
-        }
-        return msg;
-      }
-
-      case "list_files": {
-        let msg = `📁 ${data.fileCount} project files:\n\n`;
-        for (const f of data.files) {
-          msg += `  ${f.lock} ${f.file} (${f.version})\n    ${f.purpose}\n\n`;
-        }
-        return msg;
-      }
-
-      case "explain_file": {
-        if (data.error) return `❌ ${data.error}`;
-        return `📄 ${data.file} (${data.version}) ${data.lock}\n\nPurpose: ${data.purpose}\nKey: ${data.key}`;
-      }
-
-      case "query_supabase": {
-        if (data.error) return `❌ Query error: ${data.error}`;
-        let msg = `📋 ${data.table}: ${data.rowCount} rows returned\n\n`;
-        if (data.data && data.data.length > 0) {
-          // Show first 5 rows formatted
-          const rows = data.data.slice(0, 5);
-          for (const row of rows) {
-            const summary = Object.entries(row)
-              .slice(0, 5)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(" | ");
-            msg += `  • ${summary}\n`;
-          }
-          if (data.rowCount > 5) msg += `\n  ... and ${data.rowCount - 5} more`;
-        } else {
-          msg += "  (no rows)";
-        }
-        return msg;
-      }
-
-      case "decode_error": {
-        let msg = `🔍 Error analysis:\n\n`;
-        if (data.matchedLessons.length > 0) {
-          msg += `Matching Lessons Learned:\n`;
-          for (const lesson of data.matchedLessons) {
-            msg += `  ⚡ ${lesson}\n`;
-          }
-        }
-        return msg;
-      }
-
-      case "help": {
-        let msg = `🤖 Co-Pilot Commands:\n\n`;
-        for (const cmd of data.commands) {
-          msg += `  "${cmd.command}"\n    → ${cmd.description}\n\n`;
-        }
-        msg += `\n${data.tip}`;
-        return msg;
-      }
-
-      default:
-        return resultJson;
-    }
-  } catch {
-    return resultJson;
+  if (role === "customer" || role === "retailer" || role === "admin") {
+    tools.push(...CUSTOMER_TOOLS);
   }
+  if (role === "admin") {
+    tools.push(...ADMIN_TOOLS);
+  }
+
+  return tools;
 }
 
-// ─── AI Provider Calls ───────────────────────────────────────────────────
+// ─── System Prompt ───────────────────────────────────────────────────────
 
-async function callClaude(
-  systemPrompt: string,
-  messages: Array<{ role: string; content: string }>,
-) {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) return null;
+function buildSystemPrompt(
+  userContext: Record<string, unknown> | null,
+): string {
+  const role = (userContext?.role as string) || "guest";
+  const points = userContext?.loyalty_points ?? null;
+  const tier = userContext?.loyalty_tier ?? null;
+  const page = userContext?.current_page ?? "/";
+  const name = userContext?.full_name ?? null;
 
-  try {
-    const anthropicMessages = messages.map((m) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: m.content,
-    }));
+  return `You are the Protea Botanicals AI Assistant — a friendly, knowledgeable cannabis vape consultant for a South African premium brand.
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        system: systemPrompt,
-        messages: anthropicMessages,
-        max_tokens: 2000,
-        temperature: 0.3,
-      }),
-    });
+## Your Personality
+- Warm, professional, and approachable
+- You know cannabis strains, terpenes, and effects deeply
+- You speak naturally — never dump raw data or tool outputs
+- Keep responses concise (2-4 short paragraphs max unless the user asks for detail)
+- Use the brand voice: premium, botanical, sophisticated
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("[ai-copilot] Claude API error:", response.status, errText);
-      return null;
-    }
-    const data = await response.json();
-    return data.content?.[0]?.text || null;
-  } catch {
-    return null;
-  }
+## Current User Context
+- Role: ${role}
+- ${name ? `Name: ${name}` : "Name: not provided"}
+- ${points !== null ? `Loyalty Points: ${points}` : "Not logged in"}
+- ${tier ? `Tier: ${tier}` : ""}
+- Current Page: ${page}
+
+## Product Catalog — 18 Eybna Terpene Strains
+All vapes use the same base distillate: 93.55% D9-THC (Ecogreen Analytics COA JB26-046-01, SANAS T1045 accredited).
+Terpenes sourced from Eybna GmbH, Berlin. Two formats: 1ml Cartridge (R800) and 2ml Pen (R1,600).
+
+### Pure Terpenes Line
+- **Pineapple Express** — Sativa-Dominant Hybrid. Tropical, citrus, pine. Energising, creative, uplifting. Dominant terpenes: Myrcene, Limonene, Pinene, Caryophyllene.
+- **Wedding Cake** — Indica-Hybrid. Sweet vanilla, earthy, peppery. Relaxing, euphoric, calming. Dominant terpenes: Caryophyllene, Limonene, Myrcene, Linalool.
+
+### Palate Line
+- **Gelato #41** — Indica-Dominant Hybrid. Sweet, citrus, earthy. Euphoric, creative, relaxing. Dominant terpenes: Limonene, Caryophyllene, Myrcene, Humulene.
+- **Peaches & Cream** — Indica-Hybrid. Sweet peach, creamy, floral. Soothing, happy, mellow. Dominant terpenes: Myrcene, Limonene, Linalool, Caryophyllene.
+- **Purple Punch** — Indica. Grape, blueberry, vanilla. Deeply relaxing, sleepy, soothing. Dominant terpenes: Myrcene, Caryophyllene, Pinene, Limonene.
+- **Mimosa** — Sativa-Hybrid. Citrus, tropical, floral. Uplifting, energetic, happy. Dominant terpenes: Limonene, Myrcene, Pinene, Linalool.
+
+### Live Line
+- **Cinnamon Kush Cake** — Indica-Dominant. Cinnamon, sweet, earthy. Deeply relaxing, warm, sedating. Dominant terpenes: Caryophyllene, Myrcene, Limonene, Humulene.
+- **RNTZ** — Hybrid. Sweet, fruity, creamy. Balanced, euphoric, giggly. Dominant terpenes: Limonene, Caryophyllene, Myrcene, Linalool.
+- **Blue Zushi** — Indica-Hybrid. Berry, sweet, earthy. Calming, creative, mellow. Dominant terpenes: Myrcene, Limonene, Caryophyllene, Pinene.
+- **MAC** (Miracle Alien Cookies) — Hybrid. Citrus, diesel, floral. Uplifting, creative, balanced. Dominant terpenes: Limonene, Caryophyllene, Myrcene, Terpinolene.
+
+### Enhancer Line
+- **Sweet Watermelon** — Sativa-Hybrid. Watermelon, sweet, fresh. Uplifting, refreshing, social. Dominant terpenes: Myrcene, Limonene, Pinene, Caryophyllene.
+- **Pear Jam** — Indica-Hybrid. Sweet pear, jam, honey. Relaxing, comforting, warm. Dominant terpenes: Myrcene, Caryophyllene, Limonene, Linalool.
+- **Melon Lychee** — Sativa-Hybrid. Melon, lychee, tropical. Refreshing, uplifting, creative. Dominant terpenes: Limonene, Myrcene, Terpinolene, Pinene.
+- **Tutti Frutti** — Sativa-Hybrid. Mixed fruit, candy, sweet. Energetic, happy, social. Dominant terpenes: Limonene, Myrcene, Pinene, Caryophyllene.
+
+### Live Plus+ Line
+- **ZKZ** — Balanced Hybrid. Earthy, sweet, piney. Balanced, calm, focused. Dominant terpenes: Myrcene, Pinene, Caryophyllene, Limonene.
+- **Purple Crack** — Sativa-Hybrid. Berry, citrus, earthy. Energising, focused, euphoric. Dominant terpenes: Myrcene, Limonene, Pinene, Caryophyllene.
+- **Lemonhead+** — Sativa-Hybrid. Lemon, citrus, sweet. Uplifting, focused, clear-headed. Dominant terpenes: Limonene, Pinene, Myrcene, Terpinolene.
+- **Sherblato+** — Indica-Hybrid. Berry, creamy, sweet. Relaxing, euphoric, dreamy. Dominant terpenes: Caryophyllene, Limonene, Myrcene, Linalool.
+
+## Terpene Knowledge
+- **Myrcene**: Earthy, musky. Relaxation, sedation, enhanced absorption.
+- **Limonene**: Citrus. Mood elevation, stress relief, energising.
+- **Caryophyllene**: Peppery, spicy. Anti-inflammatory, calming, pain relief.
+- **Pinene**: Pine, fresh. Alertness, memory retention, anti-inflammatory.
+- **Linalool**: Floral, lavender. Calming, anti-anxiety, sleep aid.
+- **Humulene**: Earthy, woody. Appetite suppressant, anti-inflammatory.
+- **Terpinolene**: Herbal, floral. Uplifting, antioxidant, mildly sedating.
+
+## Loyalty Programme
+- Earn 10 points per QR scan (inside packaging)
+- Tiers: Bronze (0-99), Silver (100-499), Gold (500-999), Platinum (1000+)
+- Points can be redeemed for discounts and rewards
+- Each QR code is single-use to prevent fraud
+
+## Pricing
+- 1ml Cartridge: R800
+- 2ml Pen: R1,600
+- Same distillate and terpene quality in both formats
+
+## Lab Certification
+- Distillate tested by Ecogreen Analytics (Pty) Ltd, Somerset West
+- Lab ID: JB26-046-01, Sample: D9DSOL160126
+- SANAS T1045 accredited, SAHPRA licensed
+- D9-THC: 93.55%, Total Cannabinoids: 98.53%
+- Residual solvents, heavy metals, pesticides: testing pending
+
+## Website Structure
+- / — Landing page (public)
+- /shop — Product catalog (36 vapes)
+- /verify/:strain — Product verification + COA
+- /scan/:qrCode — QR scan for loyalty points
+- /loyalty — Loyalty dashboard (requires login)
+- /account — Login/Register
+- /admin — Admin dashboard (admin only)
+- /wholesale — Wholesale portal (retailer only)
+
+## Role-Specific Behaviour
+${
+  role === "admin"
+    ? `- You are speaking with an ADMIN. You can help with system health checks, analytics, user management, and database queries.
+- You have admin tools available: get_system_health, query_analytics, list_users, query_database.`
+    : role === "retailer"
+      ? `- You are speaking with a WHOLESALE PARTNER. Help with orders, product info, and business queries.`
+      : role === "customer"
+        ? `- You are speaking with a CUSTOMER. Help with strain recommendations, loyalty points, product questions.
+- You can check their loyalty points with the lookup_loyalty tool.`
+        : `- This is a GUEST (not logged in). Help with general product info, strain recommendations, and explain the loyalty programme.
+- Encourage them to create an account to earn loyalty points.`
+}
+
+## Important Rules
+- NEVER reveal raw JSON or tool output — always summarise naturally
+- If you use a tool, incorporate the results into a natural response
+- For strain recommendations, explain WHY a strain fits (terpenes, effects)
+- Always be honest about pending lab tests (solvents, metals, pesticides)
+- Prices are in South African Rand (R)
+- Do not make medical claims — use "may help with" language`;
 }
 
 // ─── Main Handler ────────────────────────────────────────────────────────
 serve(async (req: Request) => {
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -613,15 +502,20 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { message, provider = "grok", history = [] } = body;
+    const { messages, userContext = null } = body;
 
-    // Health check
-    if (message === "__health_check__") {
+    // ── Health check ─────────────────────────────────────────────────
+    if (
+      messages &&
+      messages.length === 1 &&
+      messages[0]?.content === "__health_check__"
+    ) {
       return new Response(
         JSON.stringify({
-          status: "ok",
-          provider,
-          timestamp: new Date().toISOString(),
+          reply: "ok",
+          model: "health-check",
+          usage: null,
+          error: null,
         }),
         {
           status: 200,
@@ -630,133 +524,179 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── Step 1: Match tools ──────────────────────────────────────────
-    const toolCalls: Array<{ name: string; args: string; result: string }> = [];
-    const lowerMsg = message.toLowerCase().trim();
-
-    // Help
-    if (lowerMsg === "help" || lowerMsg === "?" || lowerMsg === "commands") {
-      const result = await executeTool("help", {});
-      toolCalls.push({ name: "help", args: "", result });
+    // ── Validate input ───────────────────────────────────────────────
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({
+          reply: null,
+          model: null,
+          usage: null,
+          error: "No messages provided.",
+        }),
+        {
+          status: 400,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    // System health
-    if (
-      lowerMsg.includes("health") ||
-      lowerMsg.includes("status") ||
-      lowerMsg.includes("connection") ||
-      lowerMsg.includes("ping")
-    ) {
-      const result = await executeTool("get_system_health", {});
-      toolCalls.push({ name: "get_system_health", args: "", result });
+    // ── Get API key ──────────────────────────────────────────────────
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          reply:
+            "The AI assistant is not configured yet. Please set the ANTHROPIC_API_KEY in Supabase secrets.",
+          model: null,
+          usage: null,
+          error: "ANTHROPIC_API_KEY not set",
+        }),
+        {
+          status: 200,
+          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    // Routes
-    if (
-      lowerMsg.includes("route") ||
-      lowerMsg.includes("routes") ||
-      lowerMsg.includes("url") ||
-      lowerMsg.includes("pages")
-    ) {
-      const result = await executeTool("list_routes", {});
-      toolCalls.push({ name: "list_routes", args: "", result });
-    }
+    // ── Build system prompt + tools ──────────────────────────────────
+    const role = (userContext?.role as string) || null;
+    const systemPrompt = buildSystemPrompt(userContext);
+    const tools = getToolsForRole(role);
 
-    // Files
-    if (
-      lowerMsg === "list files" ||
-      lowerMsg === "files" ||
-      lowerMsg.includes("file registry") ||
-      lowerMsg.includes("all files")
-    ) {
-      const result = await executeTool("list_files", {});
-      toolCalls.push({ name: "list_files", args: "", result });
-    }
-
-    // Query table
-    const tableMatch = lowerMsg.match(
-      /(?:query|show|list|count|how many|check|get)\s+(batches|products|scans|user_profiles|loyalty_transactions|redemptions|wholesale_partners|orders|order_items|inventory)/,
-    );
-    if (tableMatch) {
-      const result = await executeTool("query_supabase", {
-        table: tableMatch[1],
-        limit: 10,
-      });
-      toolCalls.push({ name: "query_supabase", args: tableMatch[1], result });
-    }
-
-    // Explain file
-    const fileMatch = lowerMsg.match(
-      /(?:explain|what does|tell me about|describe|info on|what is)\s+(\w+\.?j?s?)/,
-    );
-    if (
-      fileMatch &&
-      !["the", "this", "that", "my", "a", "an"].includes(fileMatch[1])
-    ) {
-      const fileName = fileMatch[1].endsWith(".js")
-        ? fileMatch[1]
-        : `${fileMatch[1]}.js`;
-      const result = await executeTool("explain_file", { name: fileName });
-      toolCalls.push({ name: "explain_file", args: fileName, result });
-    }
-
-    // Error decode
-    if (
-      (lowerMsg.includes("error") ||
-        lowerMsg.includes("failed") ||
-        lowerMsg.includes("crash") ||
-        lowerMsg.includes("bug")) &&
-      message.length > 30
-    ) {
-      const result = await executeTool("decode_error", { trace: message });
-      toolCalls.push({ name: "decode_error", args: "trace", result });
-    }
-
-    // No tool matched — show help
-    if (toolCalls.length === 0) {
-      const result = await executeTool("help", {});
-      toolCalls.push({ name: "help", args: "", result });
-    }
-
-    // ── Step 2: Try AI provider (graceful fallback) ──────────────────
-    const toolResultsStr = toolCalls
-      .map((tc) => `[${tc.name}]: ${tc.result}`)
-      .join("\n\n");
-
-    const systemPrompt = `You are the Protea Botanicals Co-Pilot. React 18 CRA + Supabase v2.97.0. v10.0 status. Be concise.\n\n--- TOOL RESULTS ---\n${toolResultsStr}\n--- END ---\n\nSummarize the tool results clearly for the developer.`;
-
-    const conversationMessages = [
-      ...history.slice(-10).map((m: { role: string; content: string }) => ({
-        role: m.role,
+    // ── Format conversation for Anthropic API ────────────────────────
+    const anthropicMessages = messages.map(
+      (m: { role: string; content: string }) => ({
+        role:
+          m.role === "assistant" ? ("assistant" as const) : ("user" as const),
         content: m.content,
-      })),
-      { role: "user", content: message },
-    ];
+      }),
+    );
 
-    let answer: string | null = null;
+    // ── Tool loop (max 5 iterations) ─────────────────────────────────
+    let currentMessages = [...anthropicMessages];
+    let finalReply = "";
+    let totalUsage = { input_tokens: 0, output_tokens: 0 };
+    const MAX_TOOL_ROUNDS = 5;
 
-    if (provider === "claude") {
-      answer = await callClaude(systemPrompt, conversationMessages);
-    } else {
-      answer = await callGrok(systemPrompt, conversationMessages);
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      // Call Claude
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          system: systemPrompt,
+          messages: currentMessages,
+          tools: tools.length > 0 ? tools : undefined,
+          max_tokens: 2000,
+          temperature: 0.4,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(
+          "[ai-copilot] Anthropic API error:",
+          response.status,
+          errText,
+        );
+        return new Response(
+          JSON.stringify({
+            reply: null,
+            model: null,
+            usage: null,
+            error: `AI provider error (${response.status}). Please try again.`,
+          }),
+          {
+            status: 200,
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const data = await response.json();
+
+      // Accumulate usage
+      if (data.usage) {
+        totalUsage.input_tokens += data.usage.input_tokens || 0;
+        totalUsage.output_tokens += data.usage.output_tokens || 0;
+      }
+
+      // Check stop reason
+      if (data.stop_reason === "end_turn" || data.stop_reason !== "tool_use") {
+        // Extract text from content blocks
+        finalReply = (data.content || [])
+          .filter((block: { type: string }) => block.type === "text")
+          .map((block: { text: string }) => block.text)
+          .join("\n");
+        break;
+      }
+
+      // ── Handle tool use ────────────────────────────────────────────
+      if (data.stop_reason === "tool_use") {
+        const toolUseBlocks = (data.content || []).filter(
+          (block: { type: string }) => block.type === "tool_use",
+        );
+        const textBlocks = (data.content || []).filter(
+          (block: { type: string }) => block.type === "text",
+        );
+
+        // Add Claude's response (with tool_use blocks) to conversation
+        currentMessages.push({
+          role: "assistant" as const,
+          content: data.content,
+        });
+
+        // Execute each tool and add results
+        const toolResults = [];
+        for (const toolBlock of toolUseBlocks) {
+          console.log(
+            `[ai-copilot] Tool call: ${toolBlock.name}`,
+            JSON.stringify(toolBlock.input),
+          );
+          const result = await executeTool(
+            toolBlock.name,
+            toolBlock.input || {},
+            userContext,
+          );
+          toolResults.push({
+            type: "tool_result" as const,
+            tool_use_id: toolBlock.id,
+            content: result,
+          });
+        }
+
+        // Add tool results as user message
+        currentMessages.push({
+          role: "user" as const,
+          content: toolResults,
+        } as any);
+
+        // If this is the last round, extract any text we got
+        if (round === MAX_TOOL_ROUNDS - 1) {
+          finalReply =
+            textBlocks
+              .map((block: { text: string }) => block.text)
+              .join("\n") ||
+            "I found the information but ran into a limit. Please try a simpler question.";
+        }
+        // Otherwise, continue loop — Claude will process tool results
+      }
     }
 
-    // ── Step 3: Fallback to formatted tool results ───────────────────
-    if (!answer) {
-      // No AI available — format tool results directly
-      answer = toolCalls
-        .map((tc) => formatToolResult(tc.name, tc.result))
-        .join("\n─────────────────\n");
-      answer +=
-        "\n\n💡 Tip: Add API keys for AI-powered summaries (see COPILOT_SETUP.md)";
-    }
-
+    // ── Return response ──────────────────────────────────────────────
     return new Response(
       JSON.stringify({
-        answer,
-        provider: answer ? provider : "tools-only",
-        toolCalls: toolCalls.map((tc) => ({ name: tc.name, args: tc.args })),
-        timestamp: new Date().toISOString(),
+        reply:
+          finalReply ||
+          "I wasn't able to generate a response. Please try again.",
+        model: "claude-sonnet-4-20250514",
+        usage: totalUsage,
+        error: null,
       }),
       {
         status: 200,
@@ -767,9 +707,10 @@ serve(async (req: Request) => {
     console.error("[ai-copilot] Error:", error);
     return new Response(
       JSON.stringify({
+        reply: null,
+        model: null,
+        usage: null,
         error: error.message || "Internal server error",
-        answer: `⚠ Co-Pilot error: ${error.message}. Check Edge Function logs.`,
-        toolCalls: [],
       }),
       {
         status: 500,

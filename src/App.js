@@ -1,4 +1,4 @@
-// src/App.js — Protea Botanicals v3.4
+// src/App.js — Protea Botanicals v3.5
 // ─────────────────────────────────────────────────────────────────────────────
 // ★ v3.4 CHANGELOG (Admin QR Generator — 3 changes only):
 //   1. ADD: import AdminQrGenerator from "./pages/AdminQrGenerator"
@@ -828,9 +828,9 @@ export default function App() {
             <Route path="/404" element={<NotFound />} />
             <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>
+          <CoPilot />
         </BrowserRouter>
       </CartProvider>
-      <CoPilot />
     </RoleContext.Provider>
   );
 }
