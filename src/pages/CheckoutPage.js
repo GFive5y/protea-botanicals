@@ -61,7 +61,10 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (formData && formRef.current) {
       console.log("[Checkout] Auto-submitting signed form to PayFast");
-      clearCart();
+      // Clear cart in localStorage directly — avoids React re-render flash (R0 bug)
+      try {
+        localStorage.removeItem("protea_cart");
+      } catch (e) {}
       formRef.current.submit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
