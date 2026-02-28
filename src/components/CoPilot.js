@@ -1,6 +1,7 @@
-// src/components/CoPilot.js v2.0
+// src/components/CoPilot.js v2.1
 // Protea Botanicals — AI Assistant Sidebar Panel
 // v2.0: Slide-in sidebar, conversation history, role-aware, branded design
+// v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
 
 import React, {
   useState,
@@ -45,37 +46,101 @@ function getWelcome(role) {
   }
 }
 
-function getSuggestions(role) {
-  switch (role) {
-    case "admin":
-      return [
-        "System health check",
-        "Scan analytics this week",
-        "Show all users",
-        "How are promo QR codes performing?",
-      ];
-    case "retailer":
-      return [
-        "Check my orders",
-        "What strains are available?",
-        "Best sellers for my shop?",
-        "Wholesale pricing",
-      ];
-    case "customer":
-      return [
-        "What strain helps with sleep?",
-        "Check my loyalty points",
-        "Difference between Cart and Pen?",
-        "How does QR scanning work?",
-      ];
-    default:
-      return [
-        "What strains do you have?",
-        "How does the loyalty programme work?",
-        "Tell me about your products",
-        "What makes Protea different?",
-      ];
-  }
+// Page-specific prompts — shown based on current route
+const PAGE_SUGGESTIONS = {
+  "/": [
+    "What products do you offer?",
+    "How does the loyalty programme work?",
+    "Tell me about your strains",
+    "What makes Protea different?",
+  ],
+  "/shop": [
+    "How do I place an order?",
+    "Do you offer delivery?",
+    "Cart or Pen — what's the difference?",
+    "What payment methods do you accept?",
+  ],
+  "/loyalty": [
+    "Check my loyalty points",
+    "How do I earn more points?",
+    "What rewards can I redeem?",
+    "What tier am I on?",
+  ],
+  "/verify": [
+    "Tell me about this strain",
+    "What are the terpenes in this?",
+    "Is this good for sleep or focus?",
+    "How was this product tested?",
+  ],
+  "/scan": [
+    "How do I scan a QR code?",
+    "What happens after I scan?",
+    "Why should I scan my product?",
+    "How many points per scan?",
+  ],
+  "/redeem": [
+    "How do I redeem my points?",
+    "What rewards are available?",
+    "Where can I use my voucher?",
+    "How long until my voucher expires?",
+  ],
+  "/wholesale": [
+    "What's your wholesale pricing?",
+    "Minimum order quantity?",
+    "How do I become a stockist?",
+    "What strains are available wholesale?",
+  ],
+  "/admin": [
+    "System health check",
+    "Scan analytics this week",
+    "Show all users",
+    "How are promo QR codes performing?",
+  ],
+};
+
+// Role-based fallbacks (used when no page match)
+const ROLE_SUGGESTIONS = {
+  admin: [
+    "System health check",
+    "Scan analytics this week",
+    "Show all users",
+    "How are promo QR codes performing?",
+  ],
+  retailer: [
+    "Check my orders",
+    "What strains are available?",
+    "Best sellers for my shop?",
+    "Wholesale pricing",
+  ],
+  customer: [
+    "What strain helps with sleep?",
+    "Check my loyalty points",
+    "Difference between Cart and Pen?",
+    "How does QR scanning work?",
+  ],
+};
+
+const DEFAULT_SUGGESTIONS = [
+  "What strains do you have?",
+  "How does the loyalty programme work?",
+  "Tell me about your products",
+  "What makes Protea different?",
+];
+
+function getSuggestions(role, pathname) {
+  // Admin always gets admin prompts regardless of page
+  if (role === "admin") return ROLE_SUGGESTIONS.admin;
+
+  // Check for exact page match first
+  if (PAGE_SUGGESTIONS[pathname]) return PAGE_SUGGESTIONS[pathname];
+
+  // Check for prefix match (e.g. /verify/purple-punch → /verify)
+  const prefix = "/" + (pathname.split("/")[1] || "");
+  if (prefix !== pathname && PAGE_SUGGESTIONS[prefix])
+    return PAGE_SUGGESTIONS[prefix];
+
+  // Fall back to role-based, then default
+  return ROLE_SUGGESTIONS[role] || DEFAULT_SUGGESTIONS;
 }
 
 function renderMessageContent(text) {
@@ -449,7 +514,7 @@ export default function CoPilot() {
                 marginTop: "8px",
               }}
             >
-              {getSuggestions(role).map((s, i) => (
+              {getSuggestions(role, location.pathname).map((s, i) => (
                 <button
                   key={i}
                   onClick={() => handleSend(s)}

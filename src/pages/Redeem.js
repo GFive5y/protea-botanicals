@@ -1,16 +1,19 @@
-// src/pages/Redeem.js — v1.1 PageShell integration
+// src/pages/Redeem.js — v1.2 WP3 Cream Redesign
 // ─────────────────────────────────────────────────────────────────────────────
 // v1.0  Initial build — standalone page with own wrapper, footer, fonts
 // v1.1  PageShell integration — removed duplicate wrapper/footer/font-import,
 //       adjusted padding for 900px PageShell container, imported C from tokens,
 //       simplified loading state
+// v1.2  WP3 Cream Redesign — white cards (#e8e0d4 border), gold points cost,
+//       refined hero, EARNED/SPENT badges, dark footer, mobile responsive.
+//       ALL data logic preserved exactly from v1.1.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { C } from "../styles/tokens";
 
-// CSS classes only — font @import removed (PageShell handles Google Fonts)
+// CSS classes — font @import removed (PageShell handles Google Fonts)
 const sharedStyles = `
   .pb-btn {
     font-family: 'Jost', sans-serif;
@@ -27,8 +30,11 @@ const sharedStyles = `
   }
   .pb-btn:hover { background: ${C.mid}; }
   .pb-btn:disabled { background: #ccc; cursor: not-allowed; }
-  .reward-card { transition: transform 0.2s, box-shadow 0.2s; }
-  .reward-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.08) !important; }
+  .reward-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+  .reward-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
+  @keyframes redeemFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  .redeem-footer-link { transition: color 0.2s; }
+  .redeem-footer-link:hover { color: #52b788 !important; }
 `;
 
 const REWARDS = [
@@ -36,43 +42,43 @@ const REWARDS = [
     id: 1,
     name: "10% Off Next Order",
     cost: 200,
-    icon: "◇",
+    icon: "🏷️",
     desc: "Receive a unique discount code for 10% off your next purchase.",
   },
   {
     id: 2,
     name: "Free Terpene Sample",
     cost: 350,
-    icon: "❋",
+    icon: "🌿",
     desc: "Choose any 2ml terpene sample from our collection, shipped free.",
   },
   {
     id: 3,
     name: "Premium Cart Upgrade",
     cost: 500,
-    icon: "◈",
+    icon: "✨",
     desc: "Upgrade your next cart purchase to premium 2ml at no extra cost.",
   },
   {
     id: 4,
     name: "Free Delivery",
     cost: 150,
-    icon: "○",
+    icon: "📦",
     desc: "Free delivery on your next online order, no minimum spend.",
   },
   {
     id: 5,
     name: "R100 Store Credit",
     cost: 400,
-    icon: "△",
+    icon: "💎",
     desc: "R100 credit applied directly to your account for any purchase.",
   },
   {
     id: 6,
     name: "VIP Tasting Bundle",
     cost: 1000,
-    icon: "◉",
-    desc: "Exclusive curated bundle of our top 5 products, reserved for Reserve members.",
+    icon: "⭐",
+    desc: "Exclusive curated bundle of our top 5 products, reserved for VIP members.",
   },
 ];
 
@@ -158,33 +164,34 @@ export default function Redeem() {
     <>
       <style>{sharedStyles}</style>
 
-      {/* Hero — sits inside PageShell's 900px content area */}
+      {/* ─── HERO ─── */}
       <div
         style={{
           background: `linear-gradient(135deg, ${C.green} 0%, ${C.mid} 100%)`,
-          padding: "64px 24px",
+          padding: "clamp(40px, 6vw, 64px) 24px",
           textAlign: "center",
           borderRadius: "2px",
+          animation: "redeemFadeUp 0.4s ease",
         }}
       >
         <span
           className="body-font"
           style={{
-            fontSize: "11px",
+            fontSize: "10px",
             letterSpacing: "0.35em",
             textTransform: "uppercase",
             color: C.accent,
           }}
         >
-          LOYALTY REWARDS
+          Loyalty Rewards
         </span>
         <h1
           className="shop-font"
           style={{
-            fontSize: "clamp(36px, 6vw, 56px)",
+            fontSize: "clamp(30px, 5vw, 48px)",
             fontWeight: 300,
             color: C.cream,
-            margin: "12px 0",
+            margin: "12px 0 8px",
           }}
         >
           Redeem Points
@@ -193,79 +200,52 @@ export default function Redeem() {
           className="body-font"
           style={{
             color: "rgba(255,255,255,0.6)",
-            fontSize: "15px",
+            fontSize: "14px",
             fontWeight: 300,
+            marginBottom: 16,
           }}
         >
           Exchange your loyalty points for exclusive rewards.
         </p>
+        {/* Points display in hero */}
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
+          <span
+            className="shop-font"
+            style={{
+              fontSize: "clamp(36px, 8vw, 56px)",
+              fontWeight: 300,
+              color: C.accent,
+              lineHeight: 1,
+            }}
+          >
+            {points.toLocaleString()}
+          </span>
+          <span
+            className="body-font"
+            style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}
+          >
+            points available
+          </span>
+        </div>
       </div>
 
-      <div style={{ padding: "48px 0" }}>
-        {/* Points Balance */}
-        <div
-          style={{
-            background: `linear-gradient(135deg, ${C.green}, ${C.mid})`,
-            borderRadius: "2px",
-            padding: "32px 40px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "16px",
-            marginBottom: "40px",
-            boxShadow: "0 4px 16px rgba(27,67,50,0.2)",
-          }}
-        >
-          <div>
-            <p
-              className="body-font"
-              style={{
-                color: C.accent,
-                fontSize: "11px",
-                letterSpacing: "0.25em",
-                textTransform: "uppercase",
-                marginBottom: "8px",
-              }}
-            >
-              Available Points
-            </p>
-            <p
-              className="shop-font"
-              style={{
-                color: "white",
-                fontSize: "56px",
-                fontWeight: 300,
-                lineHeight: 1,
-              }}
-            >
-              {points.toLocaleString()}
-            </p>
-          </div>
-          <button
-            className="pb-btn"
-            style={{
-              background: "rgba(255,255,255,0.15)",
-              border: "1px solid rgba(255,255,255,0.3)",
-            }}
-            onClick={() => navigate("/loyalty")}
-          >
-            View History
-          </button>
-        </div>
-
-        {/* Messages */}
+      <div style={{ padding: "40px 0 0" }}>
+        {/* ─── MESSAGES ─── */}
         {success && (
           <div
             style={{
-              background: "#e8f5e9",
-              border: `1px solid ${C.mid}`,
+              background: "rgba(82,183,136,0.08)",
+              border: "1px solid rgba(82,183,136,0.25)",
               borderRadius: "2px",
-              padding: "16px 24px",
-              marginBottom: "24px",
+              padding: "14px 24px",
+              marginBottom: "20px",
+              animation: "redeemFadeUp 0.3s ease",
             }}
           >
-            <p className="body-font" style={{ color: C.mid, fontSize: "14px" }}>
+            <p
+              className="body-font"
+              style={{ color: C.green, fontSize: "14px", margin: 0 }}
+            >
               ✓ {success}
             </p>
           </div>
@@ -273,64 +253,110 @@ export default function Redeem() {
         {error && (
           <div
             style={{
-              background: "#fdecea",
-              border: `1px solid ${C.error}`,
+              background: "rgba(181,147,90,0.08)",
+              border: "1px solid rgba(181,147,90,0.25)",
               borderRadius: "2px",
-              padding: "16px 24px",
-              marginBottom: "24px",
+              padding: "14px 24px",
+              marginBottom: "20px",
             }}
           >
             <p
               className="body-font"
-              style={{ color: C.error, fontSize: "14px" }}
+              style={{ color: "#b5935a", fontSize: "14px", margin: 0 }}
             >
               {error}
             </p>
           </div>
         )}
 
-        {/* Rewards Grid */}
+        {/* ─── SECTION LABEL ─── */}
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "0.35em",
+            textTransform: "uppercase",
+            color: "#52b788",
+            marginBottom: 16,
+          }}
+        >
+          Available Rewards
+        </div>
+
+        {/* ─── REWARDS GRID ─── */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: "20px",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: "16px",
+            marginBottom: 40,
           }}
         >
-          {REWARDS.map((reward) => {
+          {REWARDS.map((reward, i) => {
             const canAfford = points >= reward.cost;
             return (
               <div
                 key={reward.id}
-                className="reward-card"
+                className={canAfford ? "reward-card" : ""}
                 style={{
                   background: "white",
                   border: `1px solid ${canAfford ? "#e8e0d4" : "#f0ebe2"}`,
                   borderRadius: "2px",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
                   overflow: "hidden",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
                   opacity: canAfford ? 1 : 0.6,
+                  animation: `redeemFadeUp ${0.3 + i * 0.07}s ease`,
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
-                <div
-                  style={{
-                    background: canAfford
-                      ? `linear-gradient(135deg, ${C.green}, ${C.mid})`
-                      : "linear-gradient(135deg, #555, #777)",
-                    padding: "32px",
-                    textAlign: "center",
-                  }}
-                >
-                  <span
+                {/* Card content */}
+                <div style={{ padding: "24px 24px 0" }}>
+                  {/* Icon + Category */}
+                  <div
                     style={{
-                      fontSize: "40px",
-                      color: canAfford ? C.accent : "#aaa",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
                     }}
                   >
-                    {reward.icon}
-                  </span>
-                </div>
-                <div style={{ padding: "24px" }}>
+                    <span style={{ fontSize: 32 }}>{reward.icon}</span>
+                    {canAfford && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          letterSpacing: "0.2em",
+                          textTransform: "uppercase",
+                          color: "#52b788",
+                          background: "rgba(82,183,136,0.08)",
+                          padding: "3px 10px",
+                          borderRadius: 2,
+                        }}
+                      >
+                        Available
+                      </span>
+                    )}
+                    {!canAfford && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          letterSpacing: "0.2em",
+                          textTransform: "uppercase",
+                          color: "#888",
+                          background: "rgba(136,136,136,0.08)",
+                          padding: "3px 10px",
+                          borderRadius: 2,
+                        }}
+                      >
+                        {reward.cost - points} pts needed
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Name */}
                   <h3
                     className="shop-font"
                     style={{
@@ -338,10 +364,13 @@ export default function Redeem() {
                       fontWeight: 400,
                       color: C.text,
                       marginBottom: "8px",
+                      lineHeight: 1.3,
                     }}
                   >
                     {reward.name}
                   </h3>
+
+                  {/* Description */}
                   <p
                     className="body-font"
                     style={{
@@ -354,45 +383,179 @@ export default function Redeem() {
                   >
                     {reward.desc}
                   </p>
-                  <div
+                </div>
+
+                {/* Cost + button footer */}
+                <div
+                  style={{
+                    padding: "16px 24px",
+                    borderTop: "1px solid #f4f0e8",
+                    marginTop: "auto",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    className="shop-font"
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                      fontSize: "22px",
+                      color: "#b5935a",
+                      fontWeight: 600,
                     }}
                   >
+                    {reward.cost}{" "}
                     <span
-                      className="shop-font"
-                      style={{
-                        fontSize: "22px",
-                        color: C.mid,
-                        fontWeight: 600,
-                      }}
+                      style={{ fontSize: 12, fontWeight: 400, color: "#888" }}
                     >
-                      {reward.cost} pts
+                      pts
                     </span>
-                    <button
-                      className="pb-btn"
-                      style={{
-                        padding: "8px 20px",
-                        background: canAfford ? C.green : "#ccc",
-                      }}
-                      disabled={!canAfford || redeeming === reward.id}
-                      onClick={() => handleRedeem(reward)}
-                    >
-                      {redeeming === reward.id ? "..." : "Redeem"}
-                    </button>
-                  </div>
+                  </span>
+                  <button
+                    className="pb-btn"
+                    style={{
+                      padding: "8px 20px",
+                      background: canAfford ? C.green : "#ccc",
+                    }}
+                    disabled={!canAfford || redeeming === reward.id}
+                    onClick={() => handleRedeem(reward)}
+                  >
+                    {redeeming === reward.id
+                      ? "..."
+                      : canAfford
+                        ? "Redeem"
+                        : "Locked"}
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
 
-        <div style={{ textAlign: "center", marginTop: "48px" }}>
+        {/* ─── LOYALTY CTA ─── */}
+        <div
+          style={{
+            background: "#f4f0e8",
+            borderRadius: 2,
+            padding: "clamp(20px, 3vw, 32px)",
+            textAlign: "center",
+            marginBottom: 40,
+          }}
+        >
+          <p
+            className="shop-font"
+            style={{
+              fontSize: 20,
+              fontWeight: 400,
+              color: "#1a1a1a",
+              margin: "0 0 12px",
+            }}
+          >
+            Want to check your full transaction history?
+          </p>
+          <button
+            className="pb-btn"
+            style={{
+              background: "transparent",
+              color: "#1b4332",
+              border: "1px solid #1b4332",
+            }}
+            onClick={() => navigate("/loyalty")}
+            onMouseEnter={(e) => {
+              e.target.style.background = "#1b4332";
+              e.target.style.color = "#fff";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "transparent";
+              e.target.style.color = "#1b4332";
+            }}
+          >
+            View Loyalty Dashboard
+          </button>
+        </div>
+
+        {/* ─── EARN MORE CTA ─── */}
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
           <button className="pb-btn" onClick={() => navigate("/scan")}>
             Earn More Points
           </button>
+        </div>
+
+        {/* ─── SECTION DIVIDER ─── */}
+        <div
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(90deg, transparent, #e8e0d4, transparent)",
+            margin: "0 0 40px",
+          }}
+        />
+
+        {/* ─── DARK FOOTER ─── */}
+        <div
+          style={{
+            background: "#060e09",
+            marginLeft: "calc(-50vw + 50%)",
+            marginRight: "calc(-50vw + 50%)",
+            width: "100vw",
+            padding: "40px 20px",
+            textAlign: "center",
+            marginBottom: -40,
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              fontSize: 18,
+              fontWeight: 300,
+              color: "#fff",
+              margin: "0 0 16px",
+              letterSpacing: "0.1em",
+            }}
+          >
+            Protea Botanicals
+          </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 24,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { label: "Home", to: "/" },
+              { label: "Shop", to: "/shop" },
+              { label: "Loyalty", to: "/loyalty" },
+              { label: "Rewards", to: "/redeem" },
+            ].map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="redeem-footer-link"
+                style={{
+                  color: "rgba(255,255,255,0.5)",
+                  textDecoration: "none",
+                  fontSize: 11,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  fontFamily: "'Jost', sans-serif",
+                }}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.25)",
+              fontSize: 10,
+              marginTop: 20,
+              letterSpacing: "0.1em",
+            }}
+          >
+            © 2026 Protea Botanicals. All rights reserved.
+          </p>
         </div>
       </div>
     </>

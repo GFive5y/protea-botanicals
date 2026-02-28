@@ -1,13 +1,15 @@
 // src/pages/Loyalty.js
 // Protea Botanicals — Loyalty Programme Page
+// v5.2 — WP3 Cream Redesign: white cards (#e8e0d4 border), Cormorant+Jost typography,
+//        green/gold accents, EARNED/SPENT badges, dark footer. Mobile responsive.
+//        ALL data logic preserved exactly from v5.1.
 // v5.1 — Timestamp fix: fallback to created_at for legacy entries with NULL transaction_date.
 //        Show "Date unknown" instead of blank. Version aligned with registry.
 // v4.0 — Production-ready: ALWAYS fetches real Supabase data, NO dev mock override
-// Design: branded green/cream/gold theme matching v3 visuals exactly
 // Tiers: Bronze (0–99), Silver (100–499), Gold (500+)
 
 import { useEffect, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 
 // ─── TIER CONFIGURATION ───
@@ -16,7 +18,8 @@ const TIERS = [
     name: "Bronze",
     min: 0,
     max: 99,
-    color: "#cd7f32",
+    color: "#b5935a",
+    bg: "rgba(181,147,90,0.12)",
     nextTier: "Silver",
     nextMin: 100,
   },
@@ -25,6 +28,7 @@ const TIERS = [
     min: 100,
     max: 499,
     color: "#888888",
+    bg: "rgba(136,136,136,0.12)",
     nextTier: "Gold",
     nextMin: 500,
   },
@@ -32,7 +36,8 @@ const TIERS = [
     name: "Gold",
     min: 500,
     max: Infinity,
-    color: "#b5935a",
+    color: "#e8c870",
+    bg: "rgba(232,200,112,0.15)",
     nextTier: null,
     nextMin: null,
   },
@@ -71,9 +76,18 @@ function formatDate(dateStr, fallbackDateStr) {
   }
 }
 
-// ─── STYLES ───
-const fonts = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');
+// ─── INJECTED STYLES ───
+const injectedStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Jost:wght@300;400;500;600&display=swap');
+  @keyframes loyaltyFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes loyaltyProgressFill { from { width: 0%; } }
+  @keyframes loyaltySpin { to { transform: rotate(360deg); } }
+  .loyalty-txn-row { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+  .loyalty-txn-row:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; transform: translateY(-1px); }
+  .loyalty-tab-btn { transition: color 0.2s, border-color 0.2s; cursor: pointer; }
+  .loyalty-tab-btn:hover { color: #1b4332 !important; }
+  .loyalty-footer-link { transition: color 0.2s; }
+  .loyalty-footer-link:hover { color: #52b788 !important; }
 `;
 
 export default function Loyalty() {
@@ -195,11 +209,9 @@ export default function Loyalty() {
   if (loading) {
     return (
       <>
-        <style>{fonts}</style>
+        <style>{injectedStyles}</style>
         <div
           style={{
-            minHeight: "100vh",
-            background: "#faf9f6",
             fontFamily: "'Jost', sans-serif",
             padding: "40px 20px",
             maxWidth: 800,
@@ -209,36 +221,48 @@ export default function Loyalty() {
           <div style={{ marginBottom: 32 }}>
             <div
               style={{
-                width: 180,
-                height: 14,
-                background: "#e0dbd2",
+                width: 140,
+                height: 10,
+                background: "#e8e0d4",
                 borderRadius: 2,
                 marginBottom: 12,
               }}
             />
             <div
               style={{
-                width: 260,
-                height: 36,
-                background: "#e0dbd2",
+                width: 240,
+                height: 28,
+                background: "#e8e0d4",
                 borderRadius: 2,
               }}
             />
           </div>
           <div
             style={{
-              background: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%)",
-              borderRadius: 12,
+              background: "#fff",
+              border: "1px solid #e8e0d4",
+              borderRadius: 2,
               padding: "40px 32px",
               marginBottom: 40,
+              textAlign: "center",
             }}
           >
             <div
               style={{
-                width: 120,
-                height: 60,
-                background: "rgba(255,255,255,0.15)",
-                borderRadius: 4,
+                width: 100,
+                height: 48,
+                background: "#e8e0d4",
+                borderRadius: 2,
+                margin: "0 auto 12px",
+              }}
+            />
+            <div
+              style={{
+                width: 80,
+                height: 12,
+                background: "#e8e0d4",
+                borderRadius: 2,
+                margin: "0 auto",
               }}
             />
           </div>
@@ -246,36 +270,39 @@ export default function Loyalty() {
             <div
               key={i}
               style={{
-                padding: "20px 0",
-                borderBottom: "1px solid #e0dbd2",
+                background: "#fff",
+                border: "1px solid #e8e0d4",
+                borderRadius: 2,
+                padding: "16px 18px",
+                marginBottom: 8,
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
+                gap: 14,
               }}
             >
               <div
                 style={{
-                  width: 70,
-                  height: 26,
-                  background: "#e0dbd2",
-                  borderRadius: 4,
+                  width: 60,
+                  height: 22,
+                  background: "#e8e0d4",
+                  borderRadius: 2,
                 }}
               />
               <div style={{ flex: 1 }}>
                 <div
                   style={{
-                    width: "60%",
-                    height: 14,
-                    background: "#e0dbd2",
+                    width: "55%",
+                    height: 12,
+                    background: "#e8e0d4",
                     borderRadius: 2,
-                    marginBottom: 8,
+                    marginBottom: 6,
                   }}
                 />
                 <div
                   style={{
                     width: "30%",
-                    height: 12,
-                    background: "#e0dbd2",
+                    height: 10,
+                    background: "#e8e0d4",
                     borderRadius: 2,
                   }}
                 />
@@ -291,11 +318,9 @@ export default function Loyalty() {
   if (error) {
     return (
       <>
-        <style>{fonts}</style>
+        <style>{injectedStyles}</style>
         <div
           style={{
-            minHeight: "100vh",
-            background: "#faf9f6",
             fontFamily: "'Jost', sans-serif",
             padding: "40px 20px",
             maxWidth: 800,
@@ -305,11 +330,12 @@ export default function Loyalty() {
         >
           <div
             style={{
-              background: "#fce4ec",
-              border: "1px solid #e0dbd2",
-              borderRadius: 8,
-              padding: "32px 24px",
-              marginTop: 60,
+              background: "#fff",
+              border: "1px solid #e8e0d4",
+              borderRadius: 2,
+              padding: "40px 24px",
+              marginTop: 40,
+              boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
             }}
           >
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
@@ -317,13 +343,14 @@ export default function Loyalty() {
               style={{
                 fontFamily: "'Cormorant Garamond', Georgia, serif",
                 fontSize: 24,
+                fontWeight: 400,
                 color: "#1a1a1a",
                 marginBottom: 12,
               }}
             >
               Unable to Load Loyalty Data
             </h2>
-            <p style={{ color: "#888888", fontSize: 15, marginBottom: 24 }}>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 24 }}>
               {error}
             </p>
             <button
@@ -357,47 +384,33 @@ export default function Loyalty() {
   // ─── MAIN RENDER ───
   return (
     <>
-      <style>{fonts}</style>
-      <style>{`
-        @keyframes glowPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0); }
-          50% { box-shadow: 0 0 20px 4px rgba(82, 183, 136, 0.3); }
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes progressFill {
-          from { width: 0%; }
-        }
-      `}</style>
+      <style>{injectedStyles}</style>
 
       <div
         style={{
-          minHeight: "100vh",
-          background: "#faf9f6",
           fontFamily: "'Jost', sans-serif",
-          padding: "40px 20px 80px",
+          padding: "40px 20px 0",
           maxWidth: 800,
           margin: "0 auto",
+          color: "#1a1a1a",
         }}
       >
         {/* ─── FRESH SCAN BANNER ─── */}
         {freshScan && (
           <div
             style={{
-              background: "#e8f5e9",
-              border: "1px solid #52b788",
-              borderRadius: 8,
+              background: "rgba(82,183,136,0.08)",
+              border: "1px solid rgba(82,183,136,0.25)",
+              borderRadius: 2,
               padding: "14px 20px",
               marginBottom: 24,
               display: "flex",
               alignItems: "center",
               gap: 10,
-              animation: "slideDown 0.4s ease-out",
+              animation: "loyaltyFadeUp 0.4s ease",
             }}
           >
-            <span style={{ fontSize: 20 }}>✅</span>
+            <span style={{ fontSize: 18, color: "#52b788" }}>✓</span>
             <span style={{ color: "#1b4332", fontWeight: 500, fontSize: 14 }}>
               Points added! Your loyalty balance has been updated.
             </span>
@@ -408,7 +421,7 @@ export default function Loyalty() {
         <div style={{ marginBottom: 32 }}>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 600,
               letterSpacing: "0.35em",
               textTransform: "uppercase",
@@ -421,11 +434,11 @@ export default function Loyalty() {
           <h1
             style={{
               fontFamily: "'Cormorant Garamond', Georgia, serif",
-              fontSize: 38,
-              fontWeight: 600,
+              fontSize: "clamp(30px, 5vw, 40px)",
+              fontWeight: 300,
               color: "#1a1a1a",
               margin: 0,
-              lineHeight: 1.1,
+              lineHeight: 1.2,
             }}
           >
             Your Rewards
@@ -435,24 +448,27 @@ export default function Loyalty() {
         {/* ─── POINTS CARD ─── */}
         <div
           style={{
-            background: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%)",
-            borderRadius: 12,
-            padding: "36px 32px 28px",
-            marginBottom: 40,
+            background: "#fff",
+            border: "1px solid #e8e0d4",
+            borderRadius: 2,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+            padding: "clamp(28px, 4vw, 40px) clamp(24px, 3vw, 32px)",
+            marginBottom: 32,
             position: "relative",
             overflow: "hidden",
+            animation: "loyaltyFadeUp 0.5s ease",
           }}
         >
-          {/* Decorative circle */}
+          {/* Decorative corner */}
           <div
             style={{
               position: "absolute",
-              top: -40,
-              right: -40,
-              width: 160,
-              height: 160,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.04)",
+              top: 0,
+              right: 0,
+              width: 120,
+              height: 120,
+              background:
+                "linear-gradient(135deg, transparent 50%, rgba(82,183,136,0.04) 50%)",
             }}
           />
 
@@ -461,14 +477,14 @@ export default function Loyalty() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "flex-start",
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           >
             <div
               style={{
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 600,
-                letterSpacing: "0.3em",
+                letterSpacing: "0.35em",
                 textTransform: "uppercase",
                 color: "#52b788",
               }}
@@ -477,11 +493,11 @@ export default function Loyalty() {
             </div>
             <div
               style={{
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 600,
-                letterSpacing: "0.3em",
+                letterSpacing: "0.35em",
                 textTransform: "uppercase",
-                color: "rgba(255,255,255,0.6)",
+                color: "#888",
               }}
             >
               Current Tier
@@ -493,15 +509,17 @@ export default function Loyalty() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 20,
+              marginBottom: 24,
+              flexWrap: "wrap",
+              gap: 12,
             }}
           >
             <div
               style={{
                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: 72,
-                fontWeight: 700,
-                color: "#faf9f6",
+                fontSize: "clamp(48px, 10vw, 72px)",
+                fontWeight: 300,
+                color: "#52b788",
                 lineHeight: 1,
               }}
             >
@@ -509,17 +527,24 @@ export default function Loyalty() {
             </div>
             <div
               style={{
-                border: "1.5px solid rgba(255,255,255,0.4)",
-                borderRadius: 4,
-                padding: "8px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                color: "#faf9f6",
+                display: "inline-block",
+                padding: "7px 20px",
+                borderRadius: 2,
+                background: tier.bg,
+                border: `1px solid ${tier.color}`,
               }}
             >
-              {tier.name}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: tier.color,
+                }}
+              >
+                {tier.name}
+              </span>
             </div>
           </div>
 
@@ -532,47 +557,82 @@ export default function Loyalty() {
               marginBottom: 6,
             }}
           >
-            <span style={{ fontSize: 13, color: "#52b788", fontWeight: 500 }}>
+            <span style={{ fontSize: 12, color: "#52b788", fontWeight: 500 }}>
               {tier.name}
             </span>
             {tier.nextTier && (
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+              <span style={{ fontSize: 12, color: "#888" }}>
                 {tier.pointsToNext} pts to {tier.nextTier}
               </span>
             )}
             {!tier.nextTier && (
-              <span style={{ fontSize: 13, color: "#b5935a" }}>
-                Maximum tier reached ✨
+              <span style={{ fontSize: 12, color: "#e8c870", fontWeight: 500 }}>
+                ✦ Maximum tier reached
               </span>
             )}
           </div>
           <div
             style={{
-              background: "rgba(255,255,255,0.15)",
-              borderRadius: 4,
-              height: 8,
+              background: "#f4f0e8",
+              borderRadius: 2,
+              height: 5,
               overflow: "hidden",
             }}
           >
             <div
               style={{
-                background: "linear-gradient(90deg, #52b788, #b5935a)",
+                background: "linear-gradient(90deg, #52b788, #2d6a4f)",
                 height: "100%",
-                borderRadius: 4,
+                borderRadius: 2,
                 width: `${tier.progress}%`,
                 transition: "width 1s ease-out",
-                animation: "progressFill 1.2s ease-out",
+                animation: "loyaltyProgressFill 1.2s ease-out",
               }}
             />
           </div>
+        </div>
+
+        {/* ─── REFRESH BUTTON ─── */}
+        <div style={{ marginBottom: 28, textAlign: "center" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchLoyaltyData();
+            }}
+            style={{
+              background: "transparent",
+              color: "#1b4332",
+              border: "1px solid #1b4332",
+              borderRadius: 2,
+              padding: "10px 28px",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              fontFamily: "'Jost', sans-serif",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = "#1b4332";
+              e.target.style.color = "#fff";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "transparent";
+              e.target.style.color = "#1b4332";
+            }}
+          >
+            Refresh Loyalty Data
+          </button>
         </div>
 
         {/* ─── TABS ─── */}
         <div
           style={{
             display: "flex",
-            gap: 32,
-            borderBottom: "2px solid #e0dbd2",
+            gap: 0,
+            borderBottom: "1px solid #e8e0d4",
             marginBottom: 24,
           }}
         >
@@ -583,6 +643,7 @@ export default function Loyalty() {
             <button
               key={tab.key}
               type="button"
+              className="loyalty-tab-btn"
               onClick={() => setActiveTab(tab.key)}
               style={{
                 background: "none",
@@ -591,16 +652,14 @@ export default function Loyalty() {
                   activeTab === tab.key
                     ? "2px solid #1b4332"
                     : "2px solid transparent",
-                padding: "12px 0",
-                marginBottom: -2,
+                padding: "12px 24px",
+                marginBottom: -1,
                 fontSize: 12,
-                fontWeight: 600,
-                letterSpacing: "0.2em",
+                fontWeight: activeTab === tab.key ? 600 : 400,
+                letterSpacing: "0.15em",
                 textTransform: "uppercase",
                 color: activeTab === tab.key ? "#1b4332" : "#888888",
-                cursor: "pointer",
                 fontFamily: "'Jost', sans-serif",
-                transition: "color 0.2s, border-color 0.2s",
               }}
             >
               {tab.label}
@@ -611,26 +670,48 @@ export default function Loyalty() {
         {/* ─── TRANSACTION HISTORY TAB ─── */}
         {activeTab === "history" && (
           <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.35em",
+                textTransform: "uppercase",
+                color: "#52b788",
+                marginBottom: 14,
+              }}
+            >
+              Recent Activity
+            </div>
+
             {transactions.length === 0 ? (
               <div
                 style={{
+                  background: "#fff",
+                  border: "1px solid #e8e0d4",
+                  borderRadius: 2,
                   textAlign: "center",
                   padding: "48px 20px",
-                  color: "#888888",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
                 }}
               >
                 <div style={{ fontSize: 48, marginBottom: 16 }}>📦</div>
-                <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
+                <p
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 500,
+                    marginBottom: 8,
+                    color: "#1a1a1a",
+                  }}
+                >
                   No transactions yet
                 </p>
-                <p style={{ fontSize: 14 }}>
+                <p style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>
                   Scan a product QR code to start earning points!
                 </p>
                 <button
                   type="button"
                   onClick={() => navigate("/scan")}
                   style={{
-                    marginTop: 20,
                     background: "#1b4332",
                     color: "#fff",
                     border: "none",
@@ -648,248 +729,302 @@ export default function Loyalty() {
                 </button>
               </div>
             ) : (
-              transactions.map((txn, i) => {
-                // Normalise transaction type (handle legacy "scan", "earned", "EARNED", "SPENT" etc.)
-                const rawType = (txn.transaction_type || "").toUpperCase();
-                const isEarned =
-                  rawType === "EARNED" ||
-                  rawType === "SCAN" ||
-                  rawType === "EARNED_POINTS";
-                const isSpent = rawType === "SPENT" || rawType === "REDEEMED";
-                const type = isSpent ? "SPENT" : "EARNED";
-                const displayPoints = txn.points || 0;
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {transactions.map((txn, i) => {
+                  // Normalise transaction type (handle legacy "scan", "earned", "EARNED", "SPENT" etc.)
+                  const rawType = (txn.transaction_type || "").toUpperCase();
+                  const isEarned =
+                    rawType === "EARNED" ||
+                    rawType === "SCAN" ||
+                    rawType === "EARNED_POINTS";
+                  const isSpent = rawType === "SPENT" || rawType === "REDEEMED";
+                  const type = isSpent ? "SPENT" : "EARNED";
+                  const displayPoints = txn.points || 0;
 
-                // Description fallback for legacy entries
-                let description = txn.description || "";
-                if (!description && rawType === "SCAN") {
-                  description = "Scanned QR code";
-                }
-                if (!description) {
-                  description = isSpent ? "Points redeemed" : "Points earned";
-                }
+                  // Description fallback for legacy entries
+                  let description = txn.description || "";
+                  if (!description && rawType === "SCAN") {
+                    description = "Scanned QR code";
+                  }
+                  if (!description) {
+                    description = isSpent ? "Points redeemed" : "Points earned";
+                  }
 
-                return (
-                  <div
-                    key={txn.id || i}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 16,
-                      padding: "18px 0",
-                      borderBottom:
-                        i < transactions.length - 1
-                          ? "1px solid #e0dbd2"
-                          : "none",
-                      animation:
-                        freshScan && i === 0
-                          ? "glowPulse 2s ease-in-out 3"
-                          : "none",
-                      borderRadius: freshScan && i === 0 ? 8 : 0,
-                    }}
-                  >
-                    {/* Type badge */}
+                  const isFresh = freshScan && i === 0;
+
+                  return (
                     <div
+                      key={txn.id || i}
+                      className="loyalty-txn-row"
                       style={{
-                        background: type === "EARNED" ? "#2d6a4f" : "#c0392b",
-                        color: "#fff",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.1em",
-                        padding: "5px 12px",
-                        borderRadius: 4,
-                        textTransform: "uppercase",
-                        whiteSpace: "nowrap",
-                        minWidth: 65,
-                        textAlign: "center",
+                        background: "#fff",
+                        border: "1px solid #e8e0d4",
+                        borderLeft: isFresh
+                          ? "3px solid #52b788"
+                          : "1px solid #e8e0d4",
+                        borderRadius: 2,
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                        padding: "14px 18px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        animation: `loyaltyFadeUp ${0.3 + i * 0.04}s ease`,
+                        flexWrap: "wrap",
                       }}
                     >
-                      {type}
-                    </div>
-
-                    {/* Description + date */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Left: badge + description */}
                       <div
                         style={{
-                          fontSize: 15,
-                          fontWeight: 400,
-                          color: "#1a1a1a",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          flex: 1,
+                          minWidth: 0,
                         }}
                       >
-                        {description}
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "3px 10px",
+                            borderRadius: 2,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: "0.15em",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                            minWidth: 55,
+                            textAlign: "center",
+                            background:
+                              type === "EARNED"
+                                ? "rgba(82,183,136,0.12)"
+                                : "rgba(181,147,90,0.12)",
+                            color: type === "EARNED" ? "#52b788" : "#b5935a",
+                          }}
+                        >
+                          {type}
+                        </span>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 400,
+                              color: "#1a1a1a",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {description}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#888888",
+                              marginTop: 2,
+                            }}
+                          >
+                            {/* v5.1: fallback to created_at for legacy NULL transaction_date */}
+                            {formatDate(txn.transaction_date, txn.created_at)}
+                          </div>
+                        </div>
                       </div>
+                      {/* Right: points */}
                       <div
-                        style={{ fontSize: 13, color: "#888888", marginTop: 2 }}
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 600,
+                          fontFamily: "'Cormorant Garamond', Georgia, serif",
+                          color: type === "EARNED" ? "#52b788" : "#b5935a",
+                          whiteSpace: "nowrap",
+                        }}
                       >
-                        {/* v5.1: fallback to created_at for legacy NULL transaction_date */}
-                        {formatDate(txn.transaction_date, txn.created_at)}
+                        {type === "EARNED" ? "+" : "-"}
+                        {displayPoints} pts
                       </div>
                     </div>
-
-                    {/* Points */}
-                    <div
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 600,
-                        color: type === "EARNED" ? "#1b4332" : "#c0392b",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {type === "EARNED" ? "+" : "-"}
-                      {displayPoints}
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
 
         {/* ─── SPEND POINTS TAB ─── */}
         {activeTab === "spend" && (
-          <div style={{ textAlign: "center", padding: "32px 0" }}>
-            <h2
-              style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: 28,
-                fontWeight: 600,
-                color: "#1a1a1a",
-                marginBottom: 12,
-              }}
-            >
-              Redeem Your Points
-            </h2>
-            <p style={{ fontSize: 15, color: "#888888", marginBottom: 28 }}>
-              You have <strong style={{ color: "#1a1a1a" }}>{points}</strong>{" "}
-              points available.
-            </p>
-
-            {/* Quick stats */}
+          <div style={{ animation: "loyaltyFadeUp 0.3s ease" }}>
             <div
               style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: 16,
-                marginBottom: 28,
+                background: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%)",
+                borderRadius: 2,
+                padding: "clamp(28px, 4vw, 40px)",
+                textAlign: "center",
+                marginBottom: 24,
               }}
             >
               <div
                 style={{
-                  border: "1px solid #e0dbd2",
-                  borderRadius: 8,
-                  padding: "16px 28px",
-                  minWidth: 100,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.35em",
+                  textTransform: "uppercase",
+                  color: "#52b788",
+                  marginBottom: 8,
                 }}
               >
-                <div
-                  style={{
-                    fontFamily: "'Cormorant Garamond', Georgia, serif",
-                    fontSize: 32,
-                    fontWeight: 700,
-                    color: "#1a1a1a",
-                  }}
-                >
-                  {points}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    color: "#888888",
-                    marginTop: 2,
-                  }}
-                >
-                  Points
-                </div>
+                Rewards Store
               </div>
+              <h2
+                style={{
+                  fontFamily: "'Cormorant Garamond', Georgia, serif",
+                  fontSize: "clamp(22px, 4vw, 30px)",
+                  fontWeight: 300,
+                  color: "#fff",
+                  margin: "0 0 8px",
+                }}
+              >
+                Redeem Your Points
+              </h2>
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.6)",
+                  fontSize: 14,
+                  marginBottom: 16,
+                  maxWidth: 400,
+                  marginLeft: "auto",
+                  marginRight: "auto",
+                }}
+              >
+                You have <strong style={{ color: "#52b788" }}>{points}</strong>{" "}
+                points available.
+              </p>
+
               <div
                 style={{
-                  border: "1px solid #e0dbd2",
-                  borderRadius: 8,
-                  padding: "16px 28px",
-                  minWidth: 100,
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 16,
+                  marginBottom: 20,
+                  flexWrap: "wrap",
                 }}
               >
                 <div
                   style={{
-                    fontFamily: "'Cormorant Garamond', Georgia, serif",
-                    fontSize: 32,
-                    fontWeight: 700,
-                    color: tier.color,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: 2,
+                    padding: "12px 24px",
+                    minWidth: 80,
                   }}
                 >
-                  {tier.name}
+                  <div
+                    style={{
+                      fontFamily: "'Cormorant Garamond', Georgia, serif",
+                      fontSize: 28,
+                      fontWeight: 300,
+                      color: "#faf9f6",
+                    }}
+                  >
+                    {points}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.2em",
+                      textTransform: "uppercase",
+                      color: "rgba(255,255,255,0.5)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Points
+                  </div>
                 </div>
                 <div
                   style={{
-                    fontSize: 11,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    color: "#888888",
-                    marginTop: 2,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: 2,
+                    padding: "12px 24px",
+                    minWidth: 80,
                   }}
                 >
-                  Tier
+                  <div
+                    style={{
+                      fontFamily: "'Cormorant Garamond', Georgia, serif",
+                      fontSize: 28,
+                      fontWeight: 300,
+                      color: tier.color,
+                    }}
+                  >
+                    {tier.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.2em",
+                      textTransform: "uppercase",
+                      color: "rgba(255,255,255,0.5)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Tier
+                  </div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => navigate("/redeem")}
+                style={{
+                  background:
+                    points >= 50 ? "#52b788" : "rgba(255,255,255,0.15)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 2,
+                  padding: "12px 36px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  cursor: points >= 50 ? "pointer" : "not-allowed",
+                  fontFamily: "'Jost', sans-serif",
+                  transition: "transform 0.2s",
+                }}
+                disabled={points < 50}
+                onMouseEnter={(e) => {
+                  if (points >= 50)
+                    e.target.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = "translateY(0)";
+                }}
+              >
+                Browse Rewards →
+              </button>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.4)",
+                  marginTop: 10,
+                }}
+              >
+                Minimum 50 points to redeem. Points never expire.
+              </p>
             </div>
 
-            {/* Redeem CTA */}
-            <button
-              type="button"
-              onClick={() => navigate("/redeem")}
-              style={{
-                background:
-                  points >= 50
-                    ? "linear-gradient(135deg, #b5935a 0%, #d4a96a 100%)"
-                    : "#e0dbd2",
-                color: points >= 50 ? "#fff" : "#888888",
-                border: "none",
-                borderRadius: 2,
-                padding: "14px 40px",
-                fontSize: 12,
-                fontWeight: 600,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                cursor: points >= 50 ? "pointer" : "not-allowed",
-                fontFamily: "'Jost', sans-serif",
-                width: "100%",
-                maxWidth: 400,
-                transition: "transform 0.2s",
-              }}
-              disabled={points < 50}
-              onMouseEnter={(e) => {
-                if (points >= 50) e.target.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = "translateY(0)";
-              }}
-            >
-              View Rewards Catalogue →
-            </button>
-            <p style={{ fontSize: 13, color: "#888888", marginTop: 12 }}>
-              Minimum 50 points to redeem. Points never expire.
-            </p>
-
-            {/* Progress to next tier */}
             {tier.nextTier && (
               <div
                 style={{
-                  marginTop: 36,
-                  border: "1px solid #e0dbd2",
-                  borderRadius: 8,
+                  background: "#fff",
+                  border: "1px solid #e8e0d4",
+                  borderRadius: 2,
                   padding: "20px 24px",
-                  textAlign: "left",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: 600,
-                    letterSpacing: "0.3em",
+                    letterSpacing: "0.35em",
                     textTransform: "uppercase",
                     color: "#52b788",
                     marginBottom: 10,
@@ -902,26 +1037,26 @@ export default function Loyalty() {
                     display: "flex",
                     justifyContent: "space-between",
                     marginBottom: 8,
-                    fontSize: 14,
+                    fontSize: 13,
                     color: "#1a1a1a",
                   }}
                 >
                   <span>{tier.pointsToNext} more points needed</span>
-                  <span style={{ color: "#888888" }}>{tier.progress}%</span>
+                  <span style={{ color: "#888" }}>{tier.progress}%</span>
                 </div>
                 <div
                   style={{
-                    background: "#e0dbd2",
-                    borderRadius: 4,
-                    height: 8,
+                    background: "#f4f0e8",
+                    borderRadius: 2,
+                    height: 5,
                     overflow: "hidden",
                   }}
                 >
                   <div
                     style={{
-                      background: "linear-gradient(90deg, #52b788, #b5935a)",
+                      background: "linear-gradient(90deg, #52b788, #2d6a4f)",
                       height: "100%",
-                      borderRadius: 4,
+                      borderRadius: 2,
                       width: `${tier.progress}%`,
                       transition: "width 1s ease-out",
                     }}
@@ -931,6 +1066,83 @@ export default function Loyalty() {
             )}
           </div>
         )}
+
+        {/* ─── SECTION DIVIDER ─── */}
+        <div
+          style={{
+            height: 1,
+            background:
+              "linear-gradient(90deg, transparent, #e8e0d4, transparent)",
+            margin: "40px 0",
+          }}
+        />
+
+        {/* ─── DARK FOOTER ─── */}
+        <div
+          style={{
+            background: "#060e09",
+            marginLeft: "calc(-50vw + 50%)",
+            marginRight: "calc(-50vw + 50%)",
+            width: "100vw",
+            padding: "40px 20px",
+            textAlign: "center",
+            marginBottom: -40,
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              fontSize: 18,
+              fontWeight: 300,
+              color: "#fff",
+              margin: "0 0 16px",
+              letterSpacing: "0.1em",
+            }}
+          >
+            Protea Botanicals
+          </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 24,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { label: "Home", to: "/" },
+              { label: "Shop", to: "/shop" },
+              { label: "Loyalty", to: "/loyalty" },
+              { label: "Rewards", to: "/redeem" },
+            ].map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="loyalty-footer-link"
+                style={{
+                  color: "rgba(255,255,255,0.5)",
+                  textDecoration: "none",
+                  fontSize: 11,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  fontFamily: "'Jost', sans-serif",
+                }}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.25)",
+              fontSize: 10,
+              marginTop: 20,
+              letterSpacing: "0.1em",
+            }}
+          >
+            © 2026 Protea Botanicals. All rights reserved.
+          </p>
+        </div>
       </div>
     </>
   );

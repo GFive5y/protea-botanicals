@@ -1,1363 +1,1225 @@
-// src/pages/Shop.js v2.4
-// v2.4: "Add to Cart" now functional — calls CartContext.addToCart(product)
-//       instead of navigate("/account"). Shows toast notification on add.
-//       Added useCart import and toast state. No other changes.
-// v2.3: Added 26 new vape products for 13 new strains (1ml Cart + 2ml Pen each).
-//       Updated ALL vape pricing: R800 (1ml Cart), R1600 (2ml Pen).
-//       Added 2ml Pens for Cinnamon Kush Cake & Sweet Watermelon (previously missing).
-//       Total vape products: 36. Coming Soon cards: 6. Grand total: 42.
-//       Price display now uses toLocaleString() for R1,600 formatting.
-// v2.2: Replaced 12 non-vape placeholder products with 6 "Coming Soon" category cards.
-// v2.1: Removed custom nav — NavBar in App.js now handles navigation + auth state.
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useCart } from "../contexts/CartContext"; // v2.4
+// src/pages/Shop.js v2.7
+// v2.7: CART INTEGRATION — Import useCart from CartContext, call addToCart(product)
+//       on "Add to Cart" click. Toast now says "added to cart" (not "coming soon").
+//       Cart badge in NavBar updates in real time.
+// v2.6: ADD TO CART FIX — Removed navigate("/account") which chain-redirected to /loyalty
+//       via role-based redirect. Now shows inline toast "added — cart coming soon".
+//       No navigation away from shop page. Ready for CartContext integration (WP next).
+// v2.5: STRAIN DATA FIX — All 18 strains now extracted DIRECTLY from ProductVerification.js v2.3.
+//       69 field mismatches corrected (types, colors, gradients, icons, lines, taglines).
+//       Cinnamon Kush Cake → Live Line (was wrongly Pure Terpenes).
+//       Sweet Watermelon → Enhancer Line (was wrongly Palate).
+//       ZKZ → Live Plus+ Line (was wrongly Live).
+//       All typeColors, accentColors, gradients, icons now 1:1 with PV.js.
+// v2.4: WP2 UX/UI REDESIGN — Cream background matching Landing + ProductVerification aesthetic.
+//       Premium botanical feel: cream bg (#faf9f6), white cards, subtle accents.
+//       Category filter bar, refined product cards with strain gradients as accents.
+//       Mobile responsive @768px + @480px. All 36 vapes + 6 Coming Soon preserved.
+// v2.3: 36 vape products (18 strains × 2 formats) + 6 Coming Soon category cards.
+//       Pricing: R800 (1ml Cart), R1,600 (2ml Pen).
+// v2.1: Removed custom nav — NavBar in App.js handles navigation + auth state.
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useCart } from "../contexts/CartContext";
 
-const CATEGORIES = [
-  { id: "all", label: "All Products", icon: "◎" },
-  { id: "vapes", label: "Vapes & Cartridges", icon: "◈" },
-  { id: "wellness", label: "Health & Wellness", icon: "❋" },
-  { id: "edibles", label: "Edibles", icon: "⬡" },
-  { id: "creams", label: "Creams & Salves", icon: "◉" },
-  { id: "candles", label: "Candles", icon: "○" },
-  { id: "terpenes", label: "Terpenes", icon: "◇" },
-  { id: "accessories", label: "Accessories", icon: "△" },
+// ── Strain Data (EXTRACTED DIRECTLY from ProductVerification.js v2.3) ────────
+// Source of truth: PV.js STRAINS object — every field is a 1:1 copy.
+const STRAINS = [
+  // ── Pure Terpenes Line (2 strains) ──
+  {
+    id: "pineapple-express",
+    name: "Pineapple Express",
+    line: "Pure Terpenes Line",
+    lineShort: "Pure Terpenes",
+    type: "Sativa-Dominant Hybrid",
+    typeColor: "#52b788",
+    accentColor: "#e8a020",
+    gradientFrom: "#1b4332",
+    gradientTo: "#2d6a4f",
+    icon: "⬡",
+    tagline: "Vibrant. Tropical. Energising.",
+    effects: ["Euphoric", "Creative", "Uplifting"],
+  },
+  {
+    id: "wedding-cake",
+    name: "Wedding Cake",
+    line: "Pure Terpenes Line",
+    lineShort: "Pure Terpenes",
+    type: "Indica-Dominant Hybrid",
+    typeColor: "#c9a84c",
+    accentColor: "#e8c870",
+    gradientFrom: "#1a2e1a",
+    gradientTo: "#3a5a2a",
+    icon: "⬡",
+    tagline: "Rich. Vanilla. Deeply Euphoric.",
+    effects: ["Euphoric", "Relaxing", "Happy"],
+  },
+
+  // ── Palate Line (4 strains) ──
+  {
+    id: "gelato-41",
+    name: "Gelato #41",
+    line: "Palate Line",
+    lineShort: "Palate",
+    type: "Indica-Dominant Hybrid",
+    typeColor: "#9b6b9e",
+    accentColor: "#c084d4",
+    gradientFrom: "#2a1a3e",
+    gradientTo: "#5a2d7a",
+    icon: "◉",
+    tagline: "Sweet. Creamy. Deeply Relaxing.",
+    effects: ["Relaxing", "Euphoric", "Creative"],
+  },
+  {
+    id: "peaches-and-cream",
+    name: "Peaches & Cream",
+    line: "Palate Line",
+    lineShort: "Palate",
+    type: "Indica-Dominant Hybrid",
+    typeColor: "#e8946a",
+    accentColor: "#f0a878",
+    gradientFrom: "#2e1a1a",
+    gradientTo: "#6a3a2a",
+    icon: "◉",
+    tagline: "Lush. Creamy. Blissful.",
+    effects: ["Relaxing", "Happy", "Euphoric"],
+  },
+  {
+    id: "purple-punch",
+    name: "Purple Punch",
+    line: "Palate Line",
+    lineShort: "Palate",
+    type: "Indica",
+    typeColor: "#7b4f9e",
+    accentColor: "#a06cc8",
+    gradientFrom: "#1a0e2e",
+    gradientTo: "#4a2070",
+    icon: "◉",
+    tagline: "Grape. Berry. Knockout Calm.",
+    effects: ["Sedating", "Relaxing", "Sleepy"],
+  },
+  {
+    id: "mimosa",
+    name: "Mimosa",
+    line: "Palate Line",
+    lineShort: "Palate",
+    type: "Sativa-Dominant Hybrid",
+    typeColor: "#e8b830",
+    accentColor: "#f0d060",
+    gradientFrom: "#2e2a0e",
+    gradientTo: "#6a5a1a",
+    icon: "◉",
+    tagline: "Bright. Citrus. Morning Energy.",
+    effects: ["Energising", "Uplifting", "Focused"],
+  },
+
+  // ── Live Line (4 strains) ──
+  {
+    id: "cinnamon-kush-cake",
+    name: "Cinnamon Kush Cake",
+    line: "Live Line",
+    lineShort: "Live",
+    type: "Indica-Dominant",
+    typeColor: "#c0764a",
+    accentColor: "#d4894a",
+    gradientFrom: "#2a1a0e",
+    gradientTo: "#7c3a10",
+    icon: "◈",
+    tagline: "Warm. Spiced. Evening Comfort.",
+    effects: ["Deeply Relaxing", "Sedating", "Body Calm"],
+  },
+  {
+    id: "rntz",
+    name: "RNTZ",
+    line: "Live Line",
+    lineShort: "Live",
+    type: "Balanced Hybrid",
+    typeColor: "#d4644a",
+    accentColor: "#e87860",
+    gradientFrom: "#2e0e0e",
+    gradientTo: "#6a2020",
+    icon: "◈",
+    tagline: "Sweet. Fruity. Perfectly Balanced.",
+    effects: ["Euphoric", "Relaxing", "Happy"],
+  },
+  {
+    id: "blue-zushi",
+    name: "Blue Zushi",
+    line: "Live Line",
+    lineShort: "Live",
+    type: "Indica-Dominant Hybrid",
+    typeColor: "#4a6ebe",
+    accentColor: "#6a8ed8",
+    gradientFrom: "#0e1a2e",
+    gradientTo: "#1a3a6a",
+    icon: "◈",
+    tagline: "Exotic. Gassy. Deep Relaxation.",
+    effects: ["Deeply Relaxing", "Euphoric", "Sleepy"],
+  },
+  {
+    id: "mac",
+    name: "MAC",
+    line: "Live Line",
+    lineShort: "Live",
+    type: "Balanced Hybrid",
+    typeColor: "#8ab84a",
+    accentColor: "#a0d060",
+    gradientFrom: "#1a2e0e",
+    gradientTo: "#3a5a1a",
+    icon: "◈",
+    tagline: "Citrus. Floral. Alien Potency.",
+    effects: ["Creative", "Uplifting", "Focused"],
+  },
+
+  // ── Enhancer Line (4 strains) ──
+  {
+    id: "sweet-watermelon",
+    name: "Sweet Watermelon",
+    line: "Enhancer Line",
+    lineShort: "Enhancer",
+    type: "Sativa-Hybrid",
+    typeColor: "#e05a7a",
+    accentColor: "#f07090",
+    gradientFrom: "#1a1a2e",
+    gradientTo: "#6a1a3a",
+    icon: "◎",
+    tagline: "Fresh. Juicy. Uplifting.",
+    effects: ["Uplifting", "Refreshing", "Happy"],
+  },
+  {
+    id: "pear-jam",
+    name: "Pear Jam",
+    line: "Enhancer Line",
+    lineShort: "Enhancer",
+    type: "Hybrid",
+    typeColor: "#8aba4a",
+    accentColor: "#a8d468",
+    gradientFrom: "#1a2e1a",
+    gradientTo: "#3a6a2a",
+    icon: "◎",
+    tagline: "Ripe. Jammy. Smooth.",
+    effects: ["Relaxing", "Happy", "Smooth"],
+  },
+  {
+    id: "melon-lychee",
+    name: "Melon Lychee",
+    line: "Enhancer Line",
+    lineShort: "Enhancer",
+    type: "Sativa-Hybrid",
+    typeColor: "#50b890",
+    accentColor: "#6ad4a8",
+    gradientFrom: "#0e2e2a",
+    gradientTo: "#1a5a4a",
+    icon: "◎",
+    tagline: "Tropical. Exotic. Refreshing.",
+    effects: ["Uplifting", "Refreshing", "Happy"],
+  },
+  {
+    id: "tutti-frutti",
+    name: "Tutti Frutti",
+    line: "Enhancer Line",
+    lineShort: "Enhancer",
+    type: "Sativa-Hybrid",
+    typeColor: "#e06a90",
+    accentColor: "#f080a8",
+    gradientFrom: "#2e1a2a",
+    gradientTo: "#6a2a5a",
+    icon: "◎",
+    tagline: "Candy. Fruity. Playful.",
+    effects: ["Uplifting", "Happy", "Energising"],
+  },
+
+  // ── Live Plus+ Line (4 strains) ──
+  {
+    id: "zkz",
+    name: "ZKZ",
+    line: "Live Plus+ Line",
+    lineShort: "Live Plus+",
+    type: "Balanced Hybrid",
+    typeColor: "#4a9eba",
+    accentColor: "#5ab8d4",
+    gradientFrom: "#0a1a2e",
+    gradientTo: "#1a4a6e",
+    icon: "◇",
+    tagline: "Sweet. Candy. Award-Winning.",
+    effects: ["Euphoric", "Relaxing", "Happy"],
+  },
+  {
+    id: "purple-crack",
+    name: "Purple Crack",
+    line: "Live Plus+ Line",
+    lineShort: "Live Plus+",
+    type: "Sativa-Dominant Hybrid",
+    typeColor: "#9a5ab8",
+    accentColor: "#b478d0",
+    gradientFrom: "#1a0e2e",
+    gradientTo: "#3a1a6a",
+    icon: "◇",
+    tagline: "Berry. Electric. Intense Focus.",
+    effects: ["Focused", "Energising", "Uplifting"],
+  },
+  {
+    id: "lemonhead-plus",
+    name: "Lemonhead+",
+    line: "Live Plus+ Line",
+    lineShort: "Live Plus+",
+    type: "Sativa-Dominant",
+    typeColor: "#d4c020",
+    accentColor: "#e8d840",
+    gradientFrom: "#2e2e0a",
+    gradientTo: "#5a5a1a",
+    icon: "◇",
+    tagline: "Zesty. Sharp. Pure Sativa Energy.",
+    effects: ["Energising", "Focused", "Uplifting"],
+  },
+  {
+    id: "sherblato-plus",
+    name: "Sherblato+",
+    line: "Live Plus+ Line",
+    lineShort: "Live Plus+",
+    type: "Indica-Dominant Hybrid",
+    typeColor: "#c06090",
+    accentColor: "#d878a8",
+    gradientFrom: "#2e0e1e",
+    gradientTo: "#6a1a4a",
+    icon: "◇",
+    tagline: "Creamy. Sweet. Luxurious Calm.",
+    effects: ["Relaxing", "Euphoric", "Sleepy"],
+  },
 ];
 
-const PRODUCTS = [
-  // ═══════════════════════════════════════════════════════════════════════════
-  // VAPES — 1ml Cartridges (R800) ═════════════════════════════════════════════
-  // ═══════════════════════════════════════════════════════════════════════════
+// ── Product Catalog (36 vapes + 6 Coming Soon) ──────────────────────────────
+const VAPE_PRODUCTS = [];
+STRAINS.forEach((s) => {
+  VAPE_PRODUCTS.push({
+    id: `${s.id}-1ml`,
+    strainId: s.id,
+    name: s.name,
+    strain: s,
+    format: "1ml Cartridge",
+    formatShort: "1ml Cart",
+    price: 800,
+    thc: "93.55%",
+    badge: "510 Thread",
+  });
+  VAPE_PRODUCTS.push({
+    id: `${s.id}-2ml`,
+    strainId: s.id,
+    name: s.name,
+    strain: s,
+    format: "2ml Disposable Pen",
+    formatShort: "2ml Pen",
+    price: 1600,
+    thc: "93.55%",
+    badge: "All-in-One",
+  });
+});
 
-  // ── Original 5 strains (1ml) — prices updated v2.3 ───────────────────────
-  {
-    id: 101,
-    name: "Pineapple Express — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Bright pineapple and citrus with earthy pine. Energising and creative. 93.55% THC distillate, CO₂ extracted.",
-    badge: "Best Seller",
-    verifyId: "pineapple-express",
-    line: "Pure Terpenes Line",
-    type: "Sativa-Dominant",
-    typeColor: "#52b788",
-    gradientFrom: "#1b4332",
-    gradientTo: "#2d6a4f",
-    icon: "⬡",
-    thc: "93.55%",
-    effects: ["Uplifting", "Creative", "Energising"],
-  },
-  {
-    id: 102,
-    name: "Gelato #41 — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Sweet cream, lavender and earthy pine. Euphoric body relaxation with creative uplift. Perfect for evenings.",
-    badge: "Popular",
-    verifyId: "gelato-41",
-    line: "Palate Line",
-    type: "Indica-Dominant",
-    typeColor: "#9b6b9e",
-    gradientFrom: "#2a1a3e",
-    gradientTo: "#5a2d7a",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Relaxing", "Euphoric", "Happy"],
-  },
-  {
-    id: 103,
-    name: "Cinnamon Kush Cake — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Warm spiced cinnamon bun with deep kush notes. Deep body sedation and sleep support. Night-time use.",
-    badge: null,
-    verifyId: "cinnamon-kush-cake",
-    line: "Live Line",
-    type: "Indica",
-    typeColor: "#c0764a",
-    gradientFrom: "#2a1a0e",
-    gradientTo: "#7c3a10",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Sedating", "Body Calm", "Sleep Aid"],
-  },
-  {
-    id: 104,
-    name: "Sweet Watermelon — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Vibrant juicy watermelon with tropical citrus. Light, social and uplifting. Great for daytime use.",
-    badge: null,
-    verifyId: "sweet-watermelon",
-    line: "Enhancer Line",
-    type: "Sativa-Hybrid",
-    typeColor: "#e05a7a",
-    gradientFrom: "#1a1a2e",
-    gradientTo: "#6a1a3a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Uplifting", "Social", "Refreshing"],
-  },
-  {
-    id: 105,
-    name: "ZKZ — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Award-winning candy sweetness with ripe strawberry and fruity notes. Balanced euphoria and relaxation.",
-    badge: "Premium",
-    verifyId: "zkz",
-    line: "Live Plus+ Line",
-    type: "Balanced Hybrid",
-    typeColor: "#4a9eba",
-    gradientFrom: "#0a1a2e",
-    gradientTo: "#1a4a6e",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Euphoric", "Balanced", "Happy"],
-  },
-
-  // ── 13 New strains (1ml) — added v2.3 ────────────────────────────────────
-  {
-    id: 109,
-    name: "Wedding Cake — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Rich vanilla and tangy pepper over an earthy kush base. Powerful euphoria with full-body relaxation.",
-    badge: "New",
-    verifyId: "wedding-cake",
-    line: "Pure Terpenes Line",
-    type: "Indica-Dominant",
-    typeColor: "#c9a84c",
-    gradientFrom: "#1a2e1a",
-    gradientTo: "#3a5a2a",
-    icon: "⬡",
-    thc: "93.55%",
-    effects: ["Euphoric", "Relaxing", "Happy"],
-  },
-  {
-    id: 110,
-    name: "Peaches & Cream — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Lush stone fruit sweetness wrapped in velvety cream. Smooth calming body effect building into deep contentment.",
-    badge: "New",
-    verifyId: "peaches-and-cream",
-    line: "Palate Line",
-    type: "Indica-Dominant",
-    typeColor: "#e8946a",
-    gradientFrom: "#2e1a1a",
-    gradientTo: "#6a3a2a",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Relaxing", "Happy", "Calm"],
-  },
-  {
-    id: 111,
-    name: "Purple Punch — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Grape candy sweetness with blueberry muffin richness. Deeply sedating body effect for rest and recovery.",
-    badge: "New",
-    verifyId: "purple-punch",
-    line: "Palate Line",
-    type: "Indica",
-    typeColor: "#7b4f9e",
-    gradientFrom: "#1a0e2e",
-    gradientTo: "#4a2070",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Sedating", "Relaxing", "Sleepy"],
-  },
-  {
-    id: 112,
-    name: "Mimosa — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Sparkling tangerine and tropical citrus with a subtle berry undertone. Perfect uplifting daytime profile.",
-    badge: "New",
-    verifyId: "mimosa",
-    line: "Palate Line",
-    type: "Sativa-Dominant",
-    typeColor: "#e8b830",
-    gradientFrom: "#2e2a0e",
-    gradientTo: "#6a5a1a",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Energising", "Uplifting", "Focused"],
-  },
-  {
-    id: 113,
-    name: "RNTZ — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Candy-sweet fruit medley with creamy finish. Zkittlez x Gelato cross — euphoric clarity meets smooth relaxation.",
-    badge: "New",
-    verifyId: "rntz",
-    line: "Live Line",
-    type: "Balanced Hybrid",
-    typeColor: "#d4644a",
-    gradientFrom: "#2e0e0e",
-    gradientTo: "#6a2020",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Euphoric", "Balanced", "Happy"],
-  },
-  {
-    id: 114,
-    name: "Blue Zushi — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Rare exotic blend of sweet berry and distinctive fuel-forward gas. Powerful enveloping body high for connoisseurs.",
-    badge: "New",
-    verifyId: "blue-zushi",
-    line: "Live Line",
-    type: "Indica-Dominant",
-    typeColor: "#4a6ebe",
-    gradientFrom: "#0e1a2e",
-    gradientTo: "#1a3a6a",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Deeply Relaxing", "Euphoric", "Sleepy"],
-  },
-  {
-    id: 115,
-    name: "MAC — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Sharp citrus and sour floral aroma with diesel earthiness. Cerebral creative energy transitioning to calm focus.",
-    badge: "New",
-    verifyId: "mac",
-    line: "Live Line",
-    type: "Balanced Hybrid",
-    typeColor: "#8ab84a",
-    gradientFrom: "#1a2e0e",
-    gradientTo: "#3a5a1a",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Creative", "Uplifting", "Focused"],
-  },
-  {
-    id: 116,
-    name: "Pear Jam — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Ripe pear preserves with jammy sweetness and soft floral finish. Smooth, satisfying and effortlessly social.",
-    badge: "New",
-    verifyId: "pear-jam",
-    line: "Enhancer Line",
-    type: "Hybrid",
-    typeColor: "#8aba4a",
-    gradientFrom: "#1a2e1a",
-    gradientTo: "#3a6a2a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Relaxing", "Happy", "Smooth"],
-  },
-  {
-    id: 117,
-    name: "Melon Lychee — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Exotic honeydew melon with fragrant lychee and a hint of rose. One of the most refreshing enhancer profiles available.",
-    badge: "New",
-    verifyId: "melon-lychee",
-    line: "Enhancer Line",
-    type: "Sativa-Hybrid",
-    typeColor: "#50b890",
-    gradientFrom: "#0e2e2a",
-    gradientTo: "#1a5a4a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Uplifting", "Refreshing", "Social"],
-  },
-  {
-    id: 118,
-    name: "Tutti Frutti — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Playful candy medley of mixed tropical fruits and sweet confectionery notes. Fun, fruity and energising.",
-    badge: "New",
-    verifyId: "tutti-frutti",
-    line: "Enhancer Line",
-    type: "Sativa-Hybrid",
-    typeColor: "#e06a90",
-    gradientFrom: "#2e1a2a",
-    gradientTo: "#6a2a5a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Uplifting", "Happy", "Energising"],
-  },
-  {
-    id: 119,
-    name: "Purple Crack — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Explosive sativa energy meets deep berry richness. High-intensity focus with sweet grape and earthy pine notes.",
-    badge: "New",
-    verifyId: "purple-crack",
-    line: "Live Plus+ Line",
-    type: "Sativa-Dominant",
-    typeColor: "#9a5ab8",
-    gradientFrom: "#1a0e2e",
-    gradientTo: "#3a1a6a",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Focused", "Energising", "Alert"],
-  },
-  {
-    id: 120,
-    name: "Lemonhead+ — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Bright sour citrus with a sharp zesty bite. Fresh lemon peel with herbal pine — maximum daytime energy and clarity.",
-    badge: "New",
-    verifyId: "lemonhead-plus",
-    line: "Live Plus+ Line",
-    type: "Sativa-Dominant",
-    typeColor: "#d4c020",
-    gradientFrom: "#2e2e0a",
-    gradientTo: "#5a5a1a",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Energising", "Focused", "Creative"],
-  },
-  {
-    id: 121,
-    name: "Sherblato+ — 1ml Cart",
-    category: "vapes",
-    price: 800,
-    desc: "Creamy sherbert sweetness fused with rich Gelato dessert complexity. Premium evening indulgence at its finest.",
-    badge: "New",
-    verifyId: "sherblato-plus",
-    line: "Live Plus+ Line",
-    type: "Indica-Dominant",
-    typeColor: "#c06090",
-    gradientFrom: "#2e0e1e",
-    gradientTo: "#6a1a4a",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Relaxing", "Euphoric", "Sleepy"],
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // VAPES — 2ml Disposable Pens (R1600) ═══════════════════════════════════════
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // ── Original 3 strains (2ml) — prices updated v2.3 ───────────────────────
-  {
-    id: 106,
-    name: "Pineapple Express — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable vape pen with Pineapple Express profile. Ceramic coil, no burn taste. Lab verified.",
-    badge: "Best Seller",
-    verifyId: "pineapple-express",
-    line: "Pure Terpenes Line",
-    type: "Sativa-Dominant",
-    typeColor: "#52b788",
-    gradientFrom: "#1b4332",
-    gradientTo: "#2d6a4f",
-    icon: "⬡",
-    thc: "93.55%",
-    effects: ["Uplifting", "Creative", "Energising"],
-  },
-  {
-    id: 107,
-    name: "Gelato #41 — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Gelato #41 profile. Consistent dosing, ceramic coil.",
-    badge: "Popular",
-    verifyId: "gelato-41",
-    line: "Palate Line",
-    type: "Indica-Dominant",
-    typeColor: "#9b6b9e",
-    gradientFrom: "#2a1a3e",
-    gradientTo: "#5a2d7a",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Relaxing", "Euphoric", "Happy"],
-  },
-  {
-    id: 108,
-    name: "ZKZ — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with award-winning ZKZ candy profile. Premium Live Plus+ terpenes.",
-    badge: "Premium",
-    verifyId: "zkz",
-    line: "Live Plus+ Line",
-    type: "Balanced Hybrid",
-    typeColor: "#4a9eba",
-    gradientFrom: "#0a1a2e",
-    gradientTo: "#1a4a6e",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Euphoric", "Balanced", "Happy"],
-  },
-
-  // ── 2ml Pens for Cinnamon Kush Cake & Sweet Watermelon (previously missing) ─
-  {
-    id: 122,
-    name: "Cinnamon Kush Cake — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Cinnamon Kush Cake profile. Warm spiced comfort, ceramic coil. Lab verified.",
-    badge: null,
-    verifyId: "cinnamon-kush-cake",
-    line: "Live Line",
-    type: "Indica",
-    typeColor: "#c0764a",
-    gradientFrom: "#2a1a0e",
-    gradientTo: "#7c3a10",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Sedating", "Body Calm", "Sleep Aid"],
-  },
-  {
-    id: 123,
-    name: "Sweet Watermelon — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Sweet Watermelon profile. Vibrant and refreshing, ceramic coil. Lab verified.",
-    badge: null,
-    verifyId: "sweet-watermelon",
-    line: "Enhancer Line",
-    type: "Sativa-Hybrid",
-    typeColor: "#e05a7a",
-    gradientFrom: "#1a1a2e",
-    gradientTo: "#6a1a3a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Uplifting", "Social", "Refreshing"],
-  },
-
-  // ── 13 New strains (2ml) — added v2.3 ────────────────────────────────────
-  {
-    id: 124,
-    name: "Wedding Cake — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Wedding Cake profile. Rich vanilla and pepper, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "wedding-cake",
-    line: "Pure Terpenes Line",
-    type: "Indica-Dominant",
-    typeColor: "#c9a84c",
-    gradientFrom: "#1a2e1a",
-    gradientTo: "#3a5a2a",
-    icon: "⬡",
-    thc: "93.55%",
-    effects: ["Euphoric", "Relaxing", "Happy"],
-  },
-  {
-    id: 125,
-    name: "Peaches & Cream — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Peaches & Cream profile. Lush and creamy, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "peaches-and-cream",
-    line: "Palate Line",
-    type: "Indica-Dominant",
-    typeColor: "#e8946a",
-    gradientFrom: "#2e1a1a",
-    gradientTo: "#6a3a2a",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Relaxing", "Happy", "Calm"],
-  },
-  {
-    id: 126,
-    name: "Purple Punch — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Purple Punch profile. Grape candy knockout, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "purple-punch",
-    line: "Palate Line",
-    type: "Indica",
-    typeColor: "#7b4f9e",
-    gradientFrom: "#1a0e2e",
-    gradientTo: "#4a2070",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Sedating", "Relaxing", "Sleepy"],
-  },
-  {
-    id: 127,
-    name: "Mimosa — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Mimosa profile. Bright citrus morning energy, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "mimosa",
-    line: "Palate Line",
-    type: "Sativa-Dominant",
-    typeColor: "#e8b830",
-    gradientFrom: "#2e2a0e",
-    gradientTo: "#6a5a1a",
-    icon: "◉",
-    thc: "93.55%",
-    effects: ["Energising", "Uplifting", "Focused"],
-  },
-  {
-    id: 128,
-    name: "RNTZ — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with RNTZ (Runtz) profile. Candy-sweet balanced hybrid, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "rntz",
-    line: "Live Line",
-    type: "Balanced Hybrid",
-    typeColor: "#d4644a",
-    gradientFrom: "#2e0e0e",
-    gradientTo: "#6a2020",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Euphoric", "Balanced", "Happy"],
-  },
-  {
-    id: 129,
-    name: "Blue Zushi — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Blue Zushi profile. Exotic berry and gas, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "blue-zushi",
-    line: "Live Line",
-    type: "Indica-Dominant",
-    typeColor: "#4a6ebe",
-    gradientFrom: "#0e1a2e",
-    gradientTo: "#1a3a6a",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Deeply Relaxing", "Euphoric", "Sleepy"],
-  },
-  {
-    id: 130,
-    name: "MAC — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with MAC profile. Sour citrus and diesel creativity, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "mac",
-    line: "Live Line",
-    type: "Balanced Hybrid",
-    typeColor: "#8ab84a",
-    gradientFrom: "#1a2e0e",
-    gradientTo: "#3a5a1a",
-    icon: "◈",
-    thc: "93.55%",
-    effects: ["Creative", "Uplifting", "Focused"],
-  },
-  {
-    id: 131,
-    name: "Pear Jam — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Pear Jam profile. Ripe jammy sweetness, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "pear-jam",
-    line: "Enhancer Line",
-    type: "Hybrid",
-    typeColor: "#8aba4a",
-    gradientFrom: "#1a2e1a",
-    gradientTo: "#3a6a2a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Relaxing", "Happy", "Smooth"],
-  },
-  {
-    id: 132,
-    name: "Melon Lychee — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Melon Lychee profile. Tropical exotic refreshment, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "melon-lychee",
-    line: "Enhancer Line",
-    type: "Sativa-Hybrid",
-    typeColor: "#50b890",
-    gradientFrom: "#0e2e2a",
-    gradientTo: "#1a5a4a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Uplifting", "Refreshing", "Social"],
-  },
-  {
-    id: 133,
-    name: "Tutti Frutti — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Tutti Frutti profile. Playful candy fruit medley, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "tutti-frutti",
-    line: "Enhancer Line",
-    type: "Sativa-Hybrid",
-    typeColor: "#e06a90",
-    gradientFrom: "#2e1a2a",
-    gradientTo: "#6a2a5a",
-    icon: "◎",
-    thc: "93.55%",
-    effects: ["Uplifting", "Happy", "Energising"],
-  },
-  {
-    id: 134,
-    name: "Purple Crack — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Purple Crack profile. Berry electric focus, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "purple-crack",
-    line: "Live Plus+ Line",
-    type: "Sativa-Dominant",
-    typeColor: "#9a5ab8",
-    gradientFrom: "#1a0e2e",
-    gradientTo: "#3a1a6a",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Focused", "Energising", "Alert"],
-  },
-  {
-    id: 135,
-    name: "Lemonhead+ — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Lemonhead+ profile. Sharp zesty sativa energy, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "lemonhead-plus",
-    line: "Live Plus+ Line",
-    type: "Sativa-Dominant",
-    typeColor: "#d4c020",
-    gradientFrom: "#2e2e0a",
-    gradientTo: "#5a5a1a",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Energising", "Focused", "Creative"],
-  },
-  {
-    id: 136,
-    name: "Sherblato+ — 2ml Pen",
-    category: "vapes",
-    price: 1600,
-    desc: "Full 2ml disposable pen with Sherblato+ profile. Creamy dessert luxury, ceramic coil. Lab verified.",
-    badge: "New",
-    verifyId: "sherblato-plus",
-    line: "Live Plus+ Line",
-    type: "Indica-Dominant",
-    typeColor: "#c06090",
-    gradientFrom: "#2e0e1e",
-    gradientTo: "#6a1a4a",
-    icon: "◇",
-    thc: "93.55%",
-    effects: ["Relaxing", "Euphoric", "Sleepy"],
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // COMING SOON — Category placeholders (v2.2) ════════════════════════════════
-  // ═══════════════════════════════════════════════════════════════════════════
+const COMING_SOON = [
   {
     id: "cs-wellness",
-    name: "Health & Wellness",
-    category: "wellness",
-    comingSoon: true,
-    icon: "❋",
-    gradientFrom: "#2c4a6e",
-    gradientTo: "#4a7fb5",
-    teaser:
-      "CBD tinctures, sleep support capsules and wellness formulations. Lab-tested, pharmaceutical-grade botanical extracts for daily wellbeing.",
+    category: "Wellness",
+    icon: "🌿",
+    description:
+      "CBD tinctures, balms & wellness supplements crafted from premium botanicals.",
   },
   {
     id: "cs-edibles",
-    name: "Edibles",
-    category: "edibles",
-    comingSoon: true,
-    icon: "⬡",
-    gradientFrom: "#5a2d0c",
-    gradientTo: "#8b4513",
-    teaser:
-      "Precisely dosed gummies, chocolates and infused treats. Consistent potency, premium ingredients, third-party tested.",
+    category: "Edibles",
+    icon: "🍯",
+    description:
+      "Artisan-crafted edibles — gummies, chocolates & infused treats.",
   },
   {
     id: "cs-creams",
-    name: "Creams & Salves",
-    category: "creams",
-    comingSoon: true,
-    icon: "◉",
-    gradientFrom: "#4a2040",
-    gradientTo: "#8b4a7a",
-    teaser:
-      "CBD-infused topicals for recovery, skincare and targeted relief. Formulated with botanical extracts and essential oils.",
+    category: "Topicals",
+    icon: "✦",
+    description:
+      "Luxurious CBD creams, serums & body care for targeted relief.",
   },
   {
     id: "cs-candles",
-    name: "Candles",
-    category: "candles",
-    comingSoon: true,
-    icon: "○",
-    gradientFrom: "#5a4a1a",
-    gradientTo: "#b5935a",
-    teaser:
-      "Hand-poured soy wax candles infused with Eybna terpene profiles. Aromatherapy meets premium cannabis culture.",
+    category: "Candles",
+    icon: "🕯",
+    description: "Terpene-infused candles for aromatherapy and ambiance.",
   },
   {
     id: "cs-terpenes",
-    name: "Terpenes",
-    category: "terpenes",
-    comingSoon: true,
-    icon: "◇",
-    gradientFrom: "#1a4a2a",
-    gradientTo: "#52b788",
-    teaser:
-      "Pure pharmaceutical-grade terpene isolates and custom blends by Eybna. COA included with every product.",
+    category: "Terpenes",
+    icon: "💧",
+    description:
+      "Eybna botanical terpene blends for connoisseurs and formulators.",
   },
   {
     id: "cs-accessories",
-    name: "Accessories",
-    category: "accessories",
-    comingSoon: true,
-    icon: "△",
-    gradientFrom: "#2a2a2a",
-    gradientTo: "#555555",
-    teaser:
-      "510 batteries, carrying cases, and premium accessories designed for the Protea Botanicals product range.",
+    category: "Accessories",
+    icon: "⚙",
+    description: "Premium vaping accessories, storage & lifestyle essentials.",
   },
 ];
 
+const FILTER_OPTIONS = [
+  { key: "all", label: "All Products" },
+  { key: "vapes", label: "Vapes" },
+  { key: "pure-terpenes", label: "Pure Terpenes", line: "Pure Terpenes Line" },
+  { key: "palate", label: "Palate", line: "Palate Line" },
+  { key: "live", label: "Live", line: "Live Line" },
+  { key: "enhancer", label: "Enhancer", line: "Enhancer Line" },
+  { key: "live-plus", label: "Live Plus+", line: "Live Plus+ Line" },
+  { key: "coming-soon", label: "Coming Soon" },
+];
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+const shopStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap');
+  .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .body-font { font-family: 'Jost', sans-serif; }
+  .shop-card {
+    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04); overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .shop-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  .shop-btn {
+    font-family: 'Jost', sans-serif; padding: 11px 28px; background: #1b4332;
+    color: white; border: none; border-radius: 2px; font-size: 11px;
+    letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer;
+    transition: background 0.2s; font-weight: 500; display: inline-block;
+    text-decoration: none; text-align: center;
+  }
+  .shop-btn:hover { background: #2d6a4f; }
+  .shop-btn-outline {
+    font-family: 'Jost', sans-serif; padding: 10px 24px; background: transparent;
+    border: 1px solid #1b4332; color: #1b4332; border-radius: 2px;
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s; font-weight: 500;
+    text-decoration: none; text-align: center; display: inline-block;
+  }
+  .shop-btn-outline:hover { background: #1b4332; color: white; }
+  .shop-filter-btn {
+    font-family: 'Jost', sans-serif; padding: 8px 20px; border: 1px solid #d8d0c4;
+    border-radius: 2px; background: white; color: #666; font-size: 11px;
+    letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer;
+    transition: all 0.2s; font-weight: 400; white-space: nowrap;
+  }
+  .shop-filter-btn:hover { border-color: #1b4332; color: #1b4332; }
+  .shop-filter-btn.active { background: #1b4332; color: white; border-color: #1b4332; }
+  .shop-effect-tag {
+    font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 3px 10px; border-radius: 2px;
+    font-weight: 400;
+  }
+  .shop-format-badge {
+    font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 4px 12px; border-radius: 2px;
+    font-weight: 500;
+  }
+  .cs-card {
+    background: #f9f7f2; border: 1px dashed #d8d0c4; border-radius: 2px;
+    padding: 40px 28px; text-align: center; transition: border-color 0.2s;
+  }
+  .cs-card:hover { border-color: #b5935a; }
+  .shop-footer-link {
+    font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #555; text-decoration: none; transition: color 0.2s;
+  }
+  .shop-footer-link:hover { color: #52b788; }
+  .section-divider {
+    width: 100%; height: 1px;
+    background: linear-gradient(to right, transparent, #e0d8cc, transparent); margin: 48px 0;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up   { animation: fadeUp 0.6s ease forwards; }
+  .fade-up-2 { animation: fadeUp 0.6s 0.1s ease forwards; opacity: 0; }
+  .fade-up-3 { animation: fadeUp 0.6s 0.2s ease forwards; opacity: 0; }
+  @media (max-width: 768px) {
+    .shop-hero-inner { padding: 40px 20px 44px !important; }
+    .shop-body-inner { padding: 32px 20px !important; }
+    .shop-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; }
+    .shop-filter-bar { gap: 6px !important; padding: 0 16px !important; }
+    .shop-filter-btn { padding: 6px 14px !important; font-size: 10px !important; }
+    .shop-hero-title { font-size: 42px !important; }
+    .shop-footer-outer { padding: 36px 20px !important; }
+    .shop-footer-wrap { flex-direction: column !important; text-align: center; }
+    .shop-footer-nav { justify-content: center !important; }
+    .shop-stats-row { flex-direction: column !important; gap: 12px !important; }
+  }
+  @media (max-width: 480px) {
+    .shop-hero-inner { padding: 32px 16px 36px !important; }
+    .shop-body-inner { padding: 24px 16px !important; }
+    .shop-grid { grid-template-columns: 1fr !important; }
+    .shop-hero-title { font-size: 32px !important; }
+  }
+`;
+
+// ── Component ────────────────────────────────────────────────────────────────
 export default function Shop() {
-  const [activeCategory, setActiveCategory] = useState("all");
-  const [hoveredProduct, setHoveredProduct] = useState(null);
-  const [toast, setToast] = useState(null); // v2.4: toast state
   const navigate = useNavigate();
-  const { addToCart } = useCart(); // v2.4
+  const { addToCart } = useCart();
+  const [filter, setFilter] = useState("all");
+  const [cartToast, setCartToast] = useState(null);
 
-  const filtered =
-    activeCategory === "all"
-      ? PRODUCTS
-      : PRODUCTS.filter((p) => p.category === activeCategory);
-
-  // v2.4: Add to cart with toast feedback
   const handleAddToCart = (product) => {
     addToCart(product);
-    setToast(product.name);
-    setTimeout(() => setToast(null), 2500);
+    setCartToast(product.name + " — " + product.formatShort);
+    setTimeout(() => setCartToast(null), 2200);
   };
+
+  // Filter logic
+  const showVapes =
+    filter === "all" ||
+    filter === "vapes" ||
+    FILTER_OPTIONS.find((f) => f.key === filter)?.line;
+  const showCS = filter === "all" || filter === "coming-soon";
+  const lineFilter = FILTER_OPTIONS.find((f) => f.key === filter)?.line;
+
+  const filteredVapes = lineFilter
+    ? VAPE_PRODUCTS.filter((p) => p.strain.line === lineFilter)
+    : showVapes
+      ? VAPE_PRODUCTS
+      : [];
+
+  const filteredCS = showCS ? COMING_SOON : [];
+
+  const totalShowing = filteredVapes.length + filteredCS.length;
 
   return (
     <div
       style={{
-        fontFamily: "'Georgia', serif",
-        background: "#faf9f6",
+        fontFamily: "'Jost', sans-serif",
         minHeight: "100vh",
+        background: "#faf9f6",
+        color: "#1a1a1a",
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500&display=swap');
-        .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
-        .body-font { font-family: 'Jost', sans-serif; }
-        .cat-btn { transition: all 0.2s ease; }
-        .cat-btn:hover { background: #2d6a4f !important; color: white !important; }
-        .product-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-        .product-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,0.1) !important; }
-        .verify-btn { transition: all 0.2s; }
-        .verify-btn:hover { background: #2d6a4f !important; color: white !important; }
-        @keyframes toast-slide-in {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes toast-slide-out {
-          from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(100%); opacity: 0; }
-        }
-      `}</style>
+      <style>{shopStyles}</style>
 
-      {/* v2.4: Toast notification */}
-      {toast && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            background: "#1b4332",
-            color: "#fff",
-            padding: "14px 24px",
-            borderRadius: "2px",
-            fontFamily: "Jost, sans-serif",
-            fontSize: "13px",
-            fontWeight: "500",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-            animation: "toast-slide-in 0.3s ease",
-            maxWidth: "340px",
-          }}
-        >
-          <span style={{ fontSize: "16px" }}>✓</span>
-          <span>{toast} added to cart</span>
-          <button
-            onClick={() => navigate("/cart")}
-            style={{
-              background: "rgba(255,255,255,0.15)",
-              border: "none",
-              color: "#b5935a",
-              padding: "4px 10px",
-              borderRadius: "2px",
-              fontSize: "10px",
-              fontWeight: "600",
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              marginLeft: "4px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            View Cart
-          </button>
-        </div>
-      )}
-
-      {/* v2.1: Custom nav removed — NavBar in App.js handles navigation + auth state */}
-
-      {/* Hero */}
+      {/* ── HERO ── */}
       <div
         style={{
-          background: "linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%)",
-          padding: "64px 40px",
-          textAlign: "center",
-        }}
-      >
-        <span
-          className="body-font"
-          style={{
-            fontSize: "11px",
-            letterSpacing: "0.35em",
-            textTransform: "uppercase",
-            color: "#52b788",
-          }}
-        >
-          PREMIUM SELECTION
-        </span>
-        <h1
-          className="shop-font"
-          style={{
-            fontSize: "clamp(36px, 6vw, 64px)",
-            fontWeight: 300,
-            color: "#faf9f6",
-            margin: "12px 0",
-          }}
-        >
-          Our Products
-        </h1>
-        <p
-          className="body-font"
-          style={{
-            color: "rgba(255,255,255,0.6)",
-            fontSize: "15px",
-            fontWeight: 300,
-          }}
-        >
-          Lab certified. CO₂ extracted. QR verified.
-        </p>
-      </div>
-
-      {/* Category Filter */}
-      <div
-        style={{
-          background: "#f4f0e8",
-          padding: "24px 40px",
-          borderBottom: "1px solid #e0d8cc",
+          background:
+            "linear-gradient(160deg, #1b4332 0%, #2d6a4f 60%, #1b4332dd 100%)",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
         <div
           style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            maxWidth: "900px",
+            position: "absolute",
+            inset: 0,
+            backgroundImage:
+              "radial-gradient(circle at 70% 30%, rgba(255,255,255,0.04) 0%, transparent 60%)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: -80,
+            right: -80,
+            width: 300,
+            height: 300,
+            borderRadius: "50%",
+            background: "rgba(82,183,136,0.06)",
+            pointerEvents: "none",
+          }}
+        />
+
+        <div
+          className="shop-hero-inner"
+          style={{
+            maxWidth: 1100,
             margin: "0 auto",
+            padding: "56px 40px 52px",
           }}
         >
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              className="cat-btn body-font"
-              onClick={() => setActiveCategory(cat.id)}
+          <div className="fade-up" style={{ marginBottom: 12 }}>
+            <span
+              className="body-font"
               style={{
-                padding: "8px 20px",
-                background: activeCategory === cat.id ? "#2d6a4f" : "white",
-                color: activeCategory === cat.id ? "white" : "#555",
-                border: `1px solid ${activeCategory === cat.id ? "#2d6a4f" : "#ddd"}`,
-                borderRadius: "2px",
-                fontSize: "12px",
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-                fontWeight: activeCategory === cat.id ? 500 : 300,
+                fontSize: 10,
+                letterSpacing: "0.4em",
+                textTransform: "uppercase",
+                color: "#52b788",
+                fontWeight: 500,
               }}
             >
-              {cat.icon} {cat.label}
+              Protea Botanicals · Online Store
+            </span>
+          </div>
+
+          <h1
+            className="shop-font fade-up-2 shop-hero-title"
+            style={{
+              fontSize: "clamp(48px, 8vw, 72px)",
+              fontWeight: 300,
+              color: "#faf9f6",
+              lineHeight: 1,
+              marginBottom: 14,
+              letterSpacing: "0.03em",
+            }}
+          >
+            Shop
+          </h1>
+
+          <p
+            className="body-font fade-up-3"
+            style={{
+              fontSize: "clamp(14px, 2vw, 16px)",
+              color: "rgba(255,255,255,0.5)",
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              marginBottom: 0,
+              fontWeight: 300,
+              maxWidth: 600,
+            }}
+          >
+            Premium cannabis vapes · 18 Eybna terpene strains · Lab verified
+          </p>
+
+          {/* Stats row */}
+          <div
+            className="shop-stats-row"
+            style={{
+              display: "flex",
+              gap: 32,
+              marginTop: 28,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { value: "18", label: "Strains" },
+              { value: "93.55%", label: "D9-THC" },
+              { value: "5", label: "Eybna Lines" },
+              { value: "R800+", label: "From" },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{ display: "flex", flexDirection: "column" }}
+              >
+                <span
+                  className="shop-font"
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 300,
+                    color: "#faf9f6",
+                    lineHeight: 1,
+                  }}
+                >
+                  {s.value}
+                </span>
+                <span
+                  className="body-font"
+                  style={{
+                    fontSize: 9,
+                    letterSpacing: "0.25em",
+                    textTransform: "uppercase",
+                    color: "rgba(255,255,255,0.35)",
+                    marginTop: 4,
+                    fontWeight: 400,
+                  }}
+                >
+                  {s.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── FILTER BAR ── */}
+      <div style={{ background: "#f4f0e8", borderBottom: "1px solid #e8e0d4" }}>
+        <div
+          className="shop-filter-bar"
+          style={{
+            maxWidth: 1100,
+            margin: "0 auto",
+            padding: "16px 40px",
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {FILTER_OPTIONS.map((f) => (
+            <button
+              key={f.key}
+              className={`shop-filter-btn${filter === f.key ? " active" : ""}`}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Products Grid */}
+      {/* ── BODY ── */}
       <div
-        style={{ maxWidth: "1100px", margin: "0 auto", padding: "60px 24px" }}
+        className="shop-body-inner"
+        style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 40px" }}
       >
+        {/* Result count */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 28,
           }}
         >
-          {filtered.map((product) =>
-            product.comingSoon ? (
-              /* ── Coming Soon card (v2.2) ── */
-              <div
-                key={product.id}
-                className="product-card"
-                style={{
-                  background: "white",
-                  border: "1px solid #e8e0d4",
-                  borderRadius: "2px",
-                  overflow: "hidden",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
-                  position: "relative",
-                }}
-              >
-                <div
+          <span
+            className="body-font"
+            style={{ fontSize: 13, color: "#888", fontWeight: 300 }}
+          >
+            Showing {totalShowing} {totalShowing === 1 ? "product" : "products"}
+            {filter !== "all" && (
+              <>
+                {" "}
+                ·{" "}
+                <span
                   style={{
-                    height: "200px",
-                    background: `linear-gradient(135deg, ${product.gradientFrom}, ${product.gradientTo})`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
-                    overflow: "hidden",
+                    color: "#1b4332",
+                    fontWeight: 500,
+                    cursor: "pointer",
                   }}
+                  onClick={() => setFilter("all")}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: -30,
-                      right: -30,
-                      width: 110,
-                      height: 110,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.05)",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -20,
-                      left: -20,
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.04)",
-                    }}
-                  />
-                  <span style={{ fontSize: "52px", opacity: 0.4 }}>
-                    {product.icon}
-                  </span>
-                </div>
-                <div
-                  className="body-font"
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "16px",
-                    background: "#b5935a",
-                    color: "white",
-                    fontSize: "10px",
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    padding: "4px 10px",
-                    borderRadius: "2px",
-                  }}
-                >
-                  Coming Soon
-                </div>
-                <div style={{ padding: "24px" }}>
-                  <h3
-                    className="shop-font"
-                    style={{
-                      fontSize: "20px",
-                      fontWeight: 400,
-                      color: "#1a1a1a",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    {product.name}
-                  </h3>
-                  <p
-                    className="body-font"
-                    style={{
-                      fontSize: "13px",
-                      color: "#888",
-                      lineHeight: 1.6,
-                      fontWeight: 300,
-                      marginBottom: "20px",
-                    }}
-                  >
-                    {product.teaser}
-                  </p>
+                  Clear filter
+                </span>
+              </>
+            )}
+          </span>
+        </div>
+
+        {/* ── VAPE GRID ── */}
+        {filteredVapes.length > 0 && (
+          <>
+            {(filter === "all" || filter === "coming-soon") &&
+              filteredCS.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
                   <span
                     className="body-font"
                     style={{
-                      fontSize: "12px",
-                      color: "#b5935a",
-                      letterSpacing: "0.15em",
+                      fontSize: 10,
+                      letterSpacing: "0.35em",
                       textTransform: "uppercase",
+                      color: "#52b788",
                       fontWeight: 500,
                     }}
                   >
-                    Launching Soon
+                    Vape Collection
                   </span>
                 </div>
-              </div>
-            ) : (
-              /* ── Vape product card ── */
-              <div
-                key={product.id}
-                className="product-card"
+              )}
+            <div
+              className="shop-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 24,
+                marginBottom: 48,
+              }}
+            >
+              {filteredVapes.map((product) => (
+                <VapeCard
+                  key={product.id}
+                  product={product}
+                  navigate={navigate}
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ── COMING SOON GRID ── */}
+        {filteredCS.length > 0 && (
+          <>
+            {filteredVapes.length > 0 && <div className="section-divider" />}
+            <div style={{ marginBottom: 16 }}>
+              <span
+                className="body-font"
                 style={{
-                  background: "white",
-                  border: "1px solid #e8e0d4",
-                  borderRadius: "2px",
-                  overflow: "hidden",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
-                  position: "relative",
+                  fontSize: 10,
+                  letterSpacing: "0.35em",
+                  textTransform: "uppercase",
+                  color: "#b5935a",
+                  fontWeight: 500,
                 }}
               >
-                {/* Strain hero */}
-                <div
-                  style={{
-                    height: "200px",
-                    background: `linear-gradient(135deg, ${product.gradientFrom}, ${product.gradientTo})`,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: -30,
-                      right: -30,
-                      width: 110,
-                      height: 110,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.05)",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: -20,
-                      left: -20,
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.04)",
-                    }}
-                  />
+                Coming Soon
+              </span>
+            </div>
+            <div
+              className="shop-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 24,
+                marginBottom: 48,
+              }}
+            >
+              {filteredCS.map((cs) => (
+                <div key={cs.id} className="cs-card">
+                  <div style={{ fontSize: 36, marginBottom: 16 }}>
+                    {cs.icon}
+                  </div>
                   <span
+                    className="shop-format-badge"
                     style={{
-                      fontSize: "44px",
-                      color: "rgba(255,255,255,0.45)",
-                      marginBottom: "8px",
+                      background: "rgba(181,147,90,0.12)",
+                      color: "#b5935a",
+                      border: "1px solid rgba(181,147,90,0.25)",
+                      marginBottom: 12,
+                      display: "inline-block",
                     }}
                   >
-                    {product.icon}
+                    Coming Soon
                   </span>
-                  {/* THC badge */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "12px",
-                      left: "12px",
-                      background: "rgba(0,0,0,0.4)",
-                      backdropFilter: "blur(6px)",
-                      borderRadius: "2px",
-                      padding: "4px 10px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <span
-                      className="body-font"
-                      style={{
-                        fontSize: "9px",
-                        color: "#52b788",
-                        letterSpacing: "0.12em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      THC
-                    </span>
-                    <span
-                      className="shop-font"
-                      style={{
-                        fontSize: "15px",
-                        color: "white",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {product.thc}
-                    </span>
-                  </div>
-                  {/* Type badge */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "12px",
-                      right: "12px",
-                      background: `${product.typeColor}25`,
-                      border: `1px solid ${product.typeColor}55`,
-                      borderRadius: "2px",
-                      padding: "3px 8px",
-                    }}
-                  >
-                    <span
-                      className="body-font"
-                      style={{
-                        fontSize: "9px",
-                        color: product.typeColor,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {product.type}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Badge */}
-                {product.badge && (
-                  <div
-                    className="body-font"
-                    style={{
-                      position: "absolute",
-                      top: "16px",
-                      right: "16px",
-                      background:
-                        product.badge === "New"
-                          ? "#2d6a4f"
-                          : product.badge === "Popular"
-                            ? "#b5935a"
-                            : product.badge === "Best Seller"
-                              ? "#1b4332"
-                              : product.badge === "Premium"
-                                ? "#2c4a6e"
-                                : product.badge === "Gift"
-                                  ? "#9b6b9e"
-                                  : "#4a7fb5",
-                      color: "white",
-                      fontSize: "10px",
-                      letterSpacing: "0.2em",
-                      textTransform: "uppercase",
-                      padding: "4px 10px",
-                      borderRadius: "2px",
-                    }}
-                  >
-                    {product.badge}
-                  </div>
-                )}
-
-                {/* Content */}
-                <div style={{ padding: "24px" }}>
-                  {product.line && (
-                    <p
-                      className="body-font"
-                      style={{
-                        fontSize: "9px",
-                        letterSpacing: "0.25em",
-                        color: "#bbb",
-                        textTransform: "uppercase",
-                        marginBottom: "5px",
-                      }}
-                    >
-                      {product.line}
-                    </p>
-                  )}
                   <h3
                     className="shop-font"
                     style={{
-                      fontSize: "20px",
-                      fontWeight: 400,
+                      fontSize: 24,
+                      fontWeight: 300,
                       color: "#1a1a1a",
-                      marginBottom: "8px",
+                      margin: "12px 0 8px",
                     }}
                   >
-                    {product.name}
+                    {cs.category}
                   </h3>
-                  {product.effects && (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "5px",
-                        flexWrap: "wrap",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      {product.effects.map((e) => (
-                        <span
-                          key={e}
-                          className="body-font"
-                          style={{
-                            fontSize: "9px",
-                            letterSpacing: "0.1em",
-                            textTransform: "uppercase",
-                            padding: "3px 8px",
-                            borderRadius: "2px",
-                            background: `${product.typeColor}15`,
-                            color: product.typeColor,
-                            border: `1px solid ${product.typeColor}35`,
-                          }}
-                        >
-                          {e}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                   <p
                     className="body-font"
                     style={{
-                      fontSize: "13px",
+                      fontSize: 13,
                       color: "#888",
-                      lineHeight: 1.6,
                       fontWeight: 300,
-                      marginBottom: "20px",
+                      lineHeight: 1.6,
+                      margin: 0,
                     }}
                   >
-                    {product.desc}
+                    {cs.description}
                   </p>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <span
-                      className="shop-font"
-                      style={{
-                        fontSize: "22px",
-                        color: "#2d6a4f",
-                        fontWeight: 600,
-                      }}
-                    >
-                      R{product.price.toLocaleString()}
-                    </span>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      {product.verifyId && (
-                        <button
-                          className="body-font verify-btn"
-                          onClick={() =>
-                            navigate(`/verify/${product.verifyId}`)
-                          }
-                          style={{
-                            padding: "8px 12px",
-                            background: "transparent",
-                            color: "#2d6a4f",
-                            border: "1px solid #2d6a4f",
-                            borderRadius: "2px",
-                            fontSize: "10px",
-                            letterSpacing: "0.12em",
-                            textTransform: "uppercase",
-                            cursor: "pointer",
-                          }}
-                        >
-                          View Profile
-                        </button>
-                      )}
-                      {/* v2.4: functional Add to Cart */}
-                      <button
-                        className="body-font"
-                        style={{
-                          padding: "8px 20px",
-                          background: "#1b4332",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "2px",
-                          fontSize: "11px",
-                          letterSpacing: "0.15em",
-                          textTransform: "uppercase",
-                          cursor: "pointer",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.target.style.background = "#2d6a4f")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.target.style.background = "#1b4332")
-                        }
-                        onClick={() => handleAddToCart(product)}
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            ),
-          )}
-        </div>
+              ))}
+            </div>
+          </>
+        )}
 
-        {filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "80px", color: "#aaa" }}>
-            <div style={{ fontSize: "40px", marginBottom: "16px" }}>◎</div>
-            <p className="body-font">No products in this category yet.</p>
+        {/* Empty state */}
+        {totalShowing === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+            <p
+              className="body-font"
+              style={{ color: "#888", fontSize: 15, fontWeight: 300 }}
+            >
+              No products match this filter.
+            </p>
+            <button
+              className="shop-btn"
+              style={{ marginTop: 16 }}
+              onClick={() => setFilter("all")}
+            >
+              Show All Products
+            </button>
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <footer
-        style={{
-          background: "#1a1a1a",
-          padding: "40px 24px",
-          textAlign: "center",
-        }}
-      >
-        <span
-          className="shop-font"
-          style={{ fontSize: "18px", color: "#faf9f6", letterSpacing: "0.2em" }}
-        >
-          PROTEA
-        </span>
-        <span
-          className="shop-font"
-          style={{ fontSize: "18px", color: "#52b788", letterSpacing: "0.2em" }}
-        >
-          {" "}
-          BOTANICALS
-        </span>
-        <p
-          className="body-font"
-          onClick={() => navigate("/")}
+      {/* ── LOYALTY CTA BANNER ── */}
+      <div style={{ background: "linear-gradient(135deg, #1b4332, #2d6a4f)" }}>
+        <div
           style={{
-            fontSize: "11px",
-            color: "#555",
-            marginTop: "12px",
-            cursor: "pointer",
+            maxWidth: 1100,
+            margin: "0 auto",
+            padding: "48px 40px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 24,
           }}
         >
-          ← Back to Home
+          <div>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.35em",
+                textTransform: "uppercase",
+                color: "#52b788",
+                fontWeight: 500,
+              }}
+            >
+              Protea Rewards
+            </span>
+            <h2
+              className="shop-font"
+              style={{
+                fontSize: 32,
+                fontWeight: 300,
+                color: "#faf9f6",
+                margin: "8px 0 4px",
+              }}
+            >
+              Earn Points on Every Purchase
+            </h2>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 14,
+                color: "rgba(255,255,255,0.5)",
+                fontWeight: 300,
+                margin: 0,
+              }}
+            >
+              Scan your product QR code to earn loyalty points and unlock
+              exclusive rewards.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <button
+              className="shop-btn"
+              style={{ background: "white", color: "#1b4332" }}
+              onClick={() => navigate("/loyalty")}
+            >
+              My Points
+            </button>
+            <button
+              className="shop-btn"
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.3)",
+                color: "white",
+              }}
+              onClick={() => navigate("/redeem")}
+            >
+              Redeem Rewards
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CART TOAST ── */}
+      {cartToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 28,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#1b4332",
+            color: "white",
+            padding: "14px 32px",
+            borderRadius: 2,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            animation: "fadeUp 0.3s ease forwards",
+            maxWidth: "90vw",
+          }}
+        >
+          <span style={{ fontSize: 16 }}>✓</span>
+          <span
+            className="body-font"
+            style={{ fontSize: 13, fontWeight: 400, letterSpacing: "0.05em" }}
+          >
+            {cartToast} added to cart
+          </span>
+        </div>
+      )}
+
+      {/* ── FOOTER ── */}
+      <div
+        className="shop-footer-outer"
+        style={{ background: "#060e09", padding: "48px 40px 36px" }}
+      >
+        <div
+          className="shop-footer-wrap"
+          style={{
+            maxWidth: 1100,
+            margin: "0 auto",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 32,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <span
+              className="shop-font"
+              style={{
+                fontSize: 20,
+                color: "#faf9f6",
+                fontWeight: 300,
+                letterSpacing: "0.08em",
+              }}
+            >
+              Protea Botanicals
+            </span>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 12,
+                color: "#555",
+                fontWeight: 300,
+                marginTop: 8,
+              }}
+            >
+              Premium Cannabis · South Africa
+            </p>
+          </div>
+          <nav
+            className="shop-footer-nav"
+            style={{ display: "flex", gap: 24, flexWrap: "wrap" }}
+          >
+            <Link to="/" className="shop-footer-link">
+              Home
+            </Link>
+            <Link to="/shop" className="shop-footer-link">
+              Shop
+            </Link>
+            <Link to="/loyalty" className="shop-footer-link">
+              Loyalty
+            </Link>
+            <Link to="/redeem" className="shop-footer-link">
+              Rewards
+            </Link>
+          </nav>
+        </div>
+        <div
+          style={{
+            maxWidth: 1100,
+            margin: "24px auto 0",
+            borderTop: "1px solid #1a2a1a",
+            paddingTop: 20,
+          }}
+        >
+          <p
+            className="body-font"
+            style={{
+              fontSize: 10,
+              color: "#444",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              textAlign: "center",
+              margin: 0,
+            }}
+          >
+            © 2026 Protea Botanicals · Lab Verified · QR Authenticated
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Vape Product Card ────────────────────────────────────────────────────────
+function VapeCard({ product, navigate, onAddToCart }) {
+  const s = product.strain;
+  const is2ml = product.format.includes("2ml");
+
+  return (
+    <div className="shop-card">
+      {/* Strain gradient accent strip */}
+      <div
+        style={{
+          height: 6,
+          background: `linear-gradient(to right, ${s.gradientFrom}, ${s.gradientTo})`,
+        }}
+      />
+
+      <div style={{ padding: "20px 24px 24px" }}>
+        {/* Top row: line + format badges */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 14,
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          <span
+            className="shop-format-badge"
+            style={{
+              background: "rgba(82,183,136,0.08)",
+              color: "#52b788",
+              border: "1px solid rgba(82,183,136,0.2)",
+            }}
+          >
+            {s.lineShort}
+          </span>
+          <span
+            className="shop-format-badge"
+            style={{
+              background: is2ml
+                ? "rgba(181,147,90,0.08)"
+                : "rgba(27,67,50,0.06)",
+              color: is2ml ? "#b5935a" : "#1b4332",
+              border: `1px solid ${is2ml ? "rgba(181,147,90,0.2)" : "rgba(27,67,50,0.15)"}`,
+            }}
+          >
+            {product.badge} · {product.formatShort}
+          </span>
+        </div>
+
+        {/* Strain name + icon */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 10,
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ fontSize: 16, color: s.accentColor }}>{s.icon}</span>
+          <h3
+            className="shop-font"
+            style={{
+              fontSize: 24,
+              fontWeight: 400,
+              color: "#1a1a1a",
+              margin: 0,
+              lineHeight: 1.2,
+            }}
+          >
+            {s.name}
+          </h3>
+        </div>
+
+        {/* Tagline */}
+        <p
+          className="body-font"
+          style={{
+            fontSize: 12,
+            color: "#888",
+            fontWeight: 300,
+            letterSpacing: "0.12em",
+            margin: "4px 0 14px",
+            textTransform: "uppercase",
+          }}
+        >
+          {s.tagline}
         </p>
-      </footer>
+
+        {/* Type + THC badges */}
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginBottom: 14,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            className="shop-effect-tag"
+            style={{
+              background: `${s.typeColor}12`,
+              color: s.typeColor,
+              border: `1px solid ${s.typeColor}30`,
+            }}
+          >
+            {s.type}
+          </span>
+          <span
+            className="shop-effect-tag"
+            style={{
+              background: "rgba(82,183,136,0.08)",
+              color: "#2d6a4f",
+              border: "1px solid rgba(82,183,136,0.2)",
+            }}
+          >
+            THC {product.thc}
+          </span>
+        </div>
+
+        {/* Effect tags */}
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            marginBottom: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          {s.effects.map((e) => (
+            <span
+              key={e}
+              className="shop-effect-tag"
+              style={{
+                background: "#f4f0e8",
+                color: "#666",
+                border: "1px solid #e8e0d4",
+              }}
+            >
+              {e}
+            </span>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: "#f0ebe0", marginBottom: 18 }} />
+
+        {/* Price + actions */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div>
+            <span
+              className="shop-font"
+              style={{
+                fontSize: 28,
+                fontWeight: 400,
+                color: "#b5935a",
+                letterSpacing: "0.02em",
+              }}
+            >
+              R{product.price.toLocaleString()}
+            </span>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 11,
+                color: "#aaa",
+                marginLeft: 6,
+                fontWeight: 300,
+              }}
+            >
+              {product.formatShort}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link
+              to={`/verify/${s.id}`}
+              className="shop-btn-outline"
+              style={{ padding: "8px 16px", fontSize: 10 }}
+            >
+              View Profile
+            </Link>
+            <button
+              className="shop-btn"
+              style={{ padding: "8px 18px", fontSize: 10 }}
+              onClick={() => onAddToCart(product)}
+            >
+              Add to Cart
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,11 @@
-// AdminDashboard.js v3.6 — Smart QR Tab + Analytics Tab
+// AdminDashboard.js v3.7 — Smart QR Tab + Analytics Tab + Stock Control Tab
 // Protea Botanicals — February 28 2026
+// ★ v3.7 changes (3 only — same pattern as v3.5/v3.6):
+//   1. ADD: import StockControl from "../components/StockControl"
+//   2. ADD: "Stock" TabBtn in tab navigation
+//   3. ADD: "stock" tab content rendering <StockControl />
+//   NO OTHER CHANGES.
+//
 // ★ v3.6 changes (3 only — same pattern as AdminQrGenerator):
 //   1. ADD: import AdminAnalytics
 //   2. ADD: "Analytics" TabBtn in tab navigation
@@ -26,6 +32,8 @@ import { QRCodeSVG } from "qrcode.react";
 import AdminQrGenerator from "./AdminQrGenerator";
 // ★ v3.6: Import Analytics component
 import AdminAnalytics from "./AdminAnalytics";
+// ★ v3.7: Import Stock Control component
+import StockControl from "../components/StockControl";
 // ─── Design Tokens (from tokens.js v2) ───
 const C = {
   green: "#1b4332",
@@ -224,7 +232,7 @@ function TabBtn({ active, label, onClick }) {
 }
 // ─── Helper: format date ───
 function fmtDate(d) {
-  if (!d) return "—";
+  if (!d) return "\u2014";
   return new Date(d).toLocaleDateString("en-ZA", {
     year: "numeric",
     month: "short",
@@ -304,11 +312,10 @@ export default function AdminDashboard() {
       const { data, error } = await supabase
         .from("wholesale_partners")
         .select("id, business_name, contact_name");
-      // PGRST205 = table not found in schema cache — safe to skip
       if (error) {
         if (error.code === "PGRST205") {
           console.warn(
-            "wholesale_partners table not available — skipping stockists",
+            "wholesale_partners table not available \u2014 skipping stockists",
           );
         } else {
           console.error("fetchStockists error:", error);
@@ -318,7 +325,7 @@ export default function AdminDashboard() {
       }
       setStockists(data || []);
     } catch (err) {
-      console.warn("fetchStockists exception — skipping:", err.message);
+      console.warn("fetchStockists exception \u2014 skipping:", err.message);
       setStockists([]);
     }
   }, []);
@@ -378,7 +385,6 @@ export default function AdminDashboard() {
       const unclaimed = (total || 0) - (claimed || 0);
       const claimRate =
         total > 0 ? (((claimed || 0) / total) * 100).toFixed(1) : 0;
-      // Points distributed (sum of points_value for claimed codes)
       const { data: pointsData } = await supabase
         .from("products")
         .select("points_value")
@@ -387,7 +393,6 @@ export default function AdminDashboard() {
         (sum, p) => sum + (p.points_value || 10),
         0,
       );
-      // Active stockists
       const { data: stockistData } = await supabase
         .from("products")
         .select("stockist_id")
@@ -395,7 +400,6 @@ export default function AdminDashboard() {
       const activeStockists = new Set(
         (stockistData || []).map((p) => p.stockist_id),
       ).size;
-      // Average time to claim (uses claimed_at column from migration)
       const { data: timeData } = await supabase
         .from("products")
         .select("distributed_at, claimed_at")
@@ -429,7 +433,7 @@ export default function AdminDashboard() {
       console.error("Analytics error:", err);
     }
   }, []);
-  // ─── Initial Load — v3.4: no auth gate, loads immediately ───
+  // ─── Initial Load ───
   useEffect(() => {
     fetchBatches();
     fetchStockists();
@@ -731,14 +735,12 @@ export default function AdminDashboard() {
       btoa(unescape(encodeURIComponent(svgData)));
   };
   // ═══════════════════════════════════════════════════════════════
-  // RENDER: MAIN DASHBOARD
-  // v3.4: No password gate — RequireRole in App.js handles auth
-  // v3.4: No internal header — NavBar in App.js handles navigation
+  // RENDER
   // ═══════════════════════════════════════════════════════════════
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
   return (
     <div style={{ fontFamily: FONTS.body }}>
-      {/* ─── Dashboard Header (branded, no logout — NavBar handles that) ─── */}
+      {/* ─── Dashboard Header ─── */}
       <div
         style={{
           background: C.green,
@@ -768,7 +770,7 @@ export default function AdminDashboard() {
           Admin Dashboard
         </h1>
       </div>
-      {/* ─── Tab Navigation — ★ v3.5: Smart QR | ★ v3.6: Analytics ─── */}
+      {/* ─── Tab Navigation — ★ v3.5: Smart QR | ★ v3.6: Analytics | ★ v3.7: Stock ─── */}
       <div
         style={{
           background: C.white,
@@ -795,7 +797,7 @@ export default function AdminDashboard() {
           label="QR Generator"
           onClick={() => setTab("generator")}
         />
-        {/* ★ v3.5: Smart QR tab for campaign/marketing QR codes */}
+        {/* ★ v3.5: Smart QR tab */}
         <TabBtn
           active={tab === "smart_qr"}
           label="Smart QR"
@@ -806,11 +808,17 @@ export default function AdminDashboard() {
           label="Users"
           onClick={() => setTab("users")}
         />
-        {/* ★ v3.6: Analytics tab for scan source tracking */}
+        {/* ★ v3.6: Analytics tab */}
         <TabBtn
           active={tab === "analytics"}
           label="Analytics"
           onClick={() => setTab("analytics")}
+        />
+        {/* ★ v3.7: Stock Control tab */}
+        <TabBtn
+          active={tab === "stock"}
+          label="Stock"
+          onClick={() => setTab("stock")}
         />
       </div>
       {/* ─── Content ─── */}
@@ -827,7 +835,7 @@ export default function AdminDashboard() {
               fontSize: "13px",
             }}
           >
-            ⚠️ {error}
+            {"\u26A0\uFE0F"} {error}
             <button
               onClick={() => setError("")}
               style={{
@@ -839,7 +847,7 @@ export default function AdminDashboard() {
                 fontSize: "16px",
               }}
             >
-              ×
+              {"\u00D7"}
             </button>
           </div>
         )}
@@ -865,26 +873,26 @@ export default function AdminDashboard() {
               }}
             >
               <StatCard
-                icon="📦"
+                icon={"\uD83D\uDCE6"}
                 label="Total QR Codes"
                 value={analytics.total}
                 color={C.green}
               />
               <StatCard
-                icon="✅"
+                icon={"\u2705"}
                 label="Claimed"
                 value={analytics.claimed}
                 sub={`${analytics.claimRate}% claim rate`}
                 color={C.accent}
               />
               <StatCard
-                icon="📤"
+                icon={"\uD83D\uDCE4"}
                 label="Distributed"
                 value={analytics.distributed}
                 color={C.gold}
               />
               <StatCard
-                icon="🏪"
+                icon={"\uD83C\uDFEA"}
                 label="In Stock"
                 value={analytics.inStock || 0}
                 color={C.blue}
@@ -899,30 +907,30 @@ export default function AdminDashboard() {
               }}
             >
               <StatCard
-                icon="🎯"
+                icon={"\uD83C\uDFAF"}
                 label="Points Distributed"
                 value={analytics.totalPointsDistributed}
                 color={C.gold}
               />
               <StatCard
-                icon="🏬"
+                icon={"\uD83C\uDFEC"}
                 label="Active Stockists"
                 value={analytics.activeStockists}
                 color={C.brown}
               />
               <StatCard
-                icon="⏱️"
+                icon={"\u23F1\uFE0F"}
                 label="Avg Time to Claim"
                 value={
                   analytics.avgTimeToClaim
                     ? `${analytics.avgTimeToClaim}h`
-                    : "—"
+                    : "\u2014"
                 }
                 sub="hours from distribution"
                 color={C.blue}
               />
               <StatCard
-                icon="👥"
+                icon={"\uD83D\uDC65"}
                 label="Total Users"
                 value={analytics.userCount || 0}
                 color={C.green}
@@ -959,6 +967,13 @@ export default function AdminDashboard() {
               </button>
               <button onClick={exportCSV} style={makeBtn(C.gold, C.white)}>
                 EXPORT CSV
+              </button>
+              {/* ★ v3.7: Stock Control quick action */}
+              <button
+                onClick={() => setTab("stock")}
+                style={makeBtn(C.mid, C.white)}
+              >
+                STOCK CONTROL
               </button>
               <button
                 onClick={() => {
@@ -1016,7 +1031,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
-            {/* ─── Filters ─── */}
+            {/* Filters */}
             <div
               style={{
                 background: C.white,
@@ -1111,7 +1126,7 @@ export default function AdminDashboard() {
                 ? "(filtered)"
                 : ""}
             </div>
-            {/* ─── Table ─── */}
+            {/* Table */}
             {loading ? (
               <div
                 style={{ textAlign: "center", padding: "40px", color: C.muted }}
@@ -1193,7 +1208,7 @@ export default function AdminDashboard() {
                             {p.qr_code}
                           </td>
                           <td style={{ padding: "10px 12px" }}>
-                            {p.batches?.batch_number || "—"}
+                            {p.batches?.batch_number || "\u2014"}
                           </td>
                           <td style={{ padding: "10px 12px" }}>
                             <TypeBadge type={p.qr_type || "product"} />
@@ -1210,14 +1225,16 @@ export default function AdminDashboard() {
                                 REVOKED
                               </span>
                             ) : (
-                              <span style={{ color: C.accent }}>✓</span>
+                              <span style={{ color: C.accent }}>
+                                {"\u2713"}
+                              </span>
                             )}
                           </td>
                           <td
                             style={{ padding: "10px 12px", fontSize: "12px" }}
                           >
                             {stockists.find((s) => s.id === p.stockist_id)
-                              ?.business_name || "—"}
+                              ?.business_name || "\u2014"}
                           </td>
                           <td
                             style={{
@@ -1302,7 +1319,7 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
-            {/* ─── Pagination ─── */}
+            {/* Pagination */}
             {totalPages > 1 && (
               <div
                 style={{
@@ -1323,7 +1340,7 @@ export default function AdminDashboard() {
                     fontSize: "10px",
                   }}
                 >
-                  ← PREV
+                  {"\u2190"} PREV
                 </button>
                 <span style={{ fontSize: "13px", color: C.muted }}>
                   Page {page + 1} of {totalPages}
@@ -1340,7 +1357,7 @@ export default function AdminDashboard() {
                     fontSize: "10px",
                   }}
                 >
-                  NEXT →
+                  NEXT {"\u2192"}
                 </button>
               </div>
             )}
@@ -1360,7 +1377,6 @@ export default function AdminDashboard() {
               Bulk QR Code Generator
             </h2>
             <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
-              {/* Generator Form */}
               <div
                 style={{
                   flex: "1 1 400px",
@@ -1395,7 +1411,7 @@ export default function AdminDashboard() {
                     <option value="">Select batch...</option>
                     {batches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.batch_number} —{" "}
+                        {b.batch_number} {"\u2014"}{" "}
                         {b.product_name || b.strain || "Unknown"}
                       </option>
                     ))}
@@ -1484,7 +1500,7 @@ export default function AdminDashboard() {
                     onChange={(e) => setBulkStockist(e.target.value)}
                     style={inputStyle}
                   >
-                    <option value="">No stockist — In Stock</option>
+                    <option value="">No stockist {"\u2014"} In Stock</option>
                     {stockists.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.business_name || s.contact_name}
@@ -1528,7 +1544,6 @@ export default function AdminDashboard() {
                     : `GENERATE ${bulkCount} QR CODES`}
                 </button>
               </div>
-              {/* Result / Preview Panel */}
               <div style={{ flex: "1 1 300px" }}>
                 {bulkResult ? (
                   <div
@@ -1546,7 +1561,7 @@ export default function AdminDashboard() {
                         marginTop: 0,
                       }}
                     >
-                      ✅ Generation Complete
+                      {"\u2705"} Generation Complete
                     </h3>
                     <p style={{ fontSize: "14px", margin: "8px 0" }}>
                       <strong>{bulkResult.count}</strong> QR codes generated for
@@ -1559,7 +1574,7 @@ export default function AdminDashboard() {
                         fontFamily: "monospace",
                       }}
                     >
-                      {bulkResult.firstCode} → {bulkResult.lastCode}
+                      {bulkResult.firstCode} {"\u2192"} {bulkResult.lastCode}
                     </p>
                     <div
                       style={{
@@ -1673,19 +1688,21 @@ export default function AdminDashboard() {
                         <div>
                           <TypeBadge type="product" />{" "}
                           <span style={{ marginLeft: "8px" }}>
-                            Standard loyalty scan — always 10 points
+                            Standard loyalty scan {"\u2014"} always 10 points
                           </span>
                         </div>
                         <div>
                           <TypeBadge type="promo" />{" "}
                           <span style={{ marginLeft: "8px" }}>
-                            Promotional — custom points (events, campaigns)
+                            Promotional {"\u2014"} custom points (events,
+                            campaigns)
                           </span>
                         </div>
                         <div>
                           <TypeBadge type="voucher" />{" "}
                           <span style={{ marginLeft: "8px" }}>
-                            Redeemable discount — tied to redemptions table
+                            Redeemable discount {"\u2014"} tied to redemptions
+                            table
                           </span>
                         </div>
                       </div>
@@ -1833,10 +1850,14 @@ export default function AdminDashboard() {
             <AdminAnalytics />
           </div>
         )}
+        {/* ══════ ★ v3.7: STOCK CONTROL TAB ══════ */}
+        {tab === "stock" && (
+          <div>
+            <StockControl />
+          </div>
+        )}
       </div>
-      {/* ═══════════════════════════════════════════════════════════════
-          HIDDEN QR RENDER CONTAINER (outside table for performance)
-          ═══════════════════════════════════════════════════════════════ */}
+      {/* Hidden QR Render Container */}
       <div
         ref={qrContainerRef}
         style={{
@@ -1856,9 +1877,6 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
-      {/* ═══════════════════════════════════════════════════════════════
-          MODALS
-          ═══════════════════════════════════════════════════════════════ */}
       {/* ─── Create Modal ─── */}
       {showCreateModal && (
         <ModalOverlay onClose={() => setShowCreateModal(false)}>

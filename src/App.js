@@ -1,10 +1,27 @@
-// src/App.js — Protea Botanicals v3.5
+// src/App.js — Protea Botanicals v3.7
 // ─────────────────────────────────────────────────────────────────────────────
-// ★ v3.4 CHANGELOG (Admin QR Generator — 3 changes only):
-//   1. ADD: import AdminQrGenerator from "./pages/AdminQrGenerator"
-//   2. ADD: /admin/qr route with NavBar + PageShell(1200) + RequireAuth + RequireRole(admin)
-//   3. Version bump v3.3 → v3.4
+// ★ v3.7 CHANGELOG (Phase 2F — Shop Admin Scoping):
+//   1. ADD: import ShopDashboard from "./pages/ShopDashboard"
+//   2. ADD: AdminDashboardRouter component — uses tenant context to serve
+//      ShopDashboard (for shop admins) or AdminDashboard (for HQ admins)
+//   3. MODIFY: /admin route uses AdminDashboardRouter instead of AdminDashboard
+//   4. Version bump v3.6 → v3.7
 //   NO OTHER CHANGES. All existing routes, auth, NavBar, cart — untouched.
+//
+// ★ v3.6 CHANGELOG (Phase 2A — Multi-Tenant Foundation):
+//   1. ADD: import TenantProvider from "./services/tenantService"
+//   2. ADD: TenantProvider wrapping BrowserRouter (inside CartProvider)
+//   3. ADD: RequireHQ component — checks hq_access from user_profiles
+//   4. ADD: import HQDashboard from "./pages/HQDashboard"
+//   5. ADD: /hq route with NavBar + PageShell(1400) + RequireAuth + RequireHQ
+//   6. ADD: "HQ" NavLink visible only when isHQ is true
+//   7. ADD: import useTenant for NavBar HQ link visibility
+//   8. Version bump v3.5 → v3.6
+//   NO OTHER CHANGES. All existing routes, auth, NavBar, cart — untouched.
+//
+// ★ v3.5 CHANGELOG: AI Co-Pilot sidebar
+// ★ v3.4 CHANGELOG: Admin QR Generator
+// (see older changelogs below)
 //
 // CHANGELOG v3.2.1 → v3.3 (Cart + Checkout):
 //   1. ADD: CartProvider wrapping BrowserRouter for global cart state.
@@ -56,13 +73,14 @@
 //                       AdminDashboard, WholesalePortal, NotFound,
 //                       Account, Shop, ProductVerification, Redeem, Welcome,
 //                       CartPage, CheckoutPage, OrderSuccess,
-//                       AdminQrGenerator  ← ★ v3.4
+//                       AdminQrGenerator, HQDashboard, ShopDashboard  ← ★ v3.7
 //
 // Route tiers:
 //   STANDALONE (no nav):  /  /scan  /scan/:qrCode
 //   WITH nav, NO shell:   /shop  /verify/:productId  /cart
-//   WITH nav + shell:     /loyalty  /account  /wholesale  /admin  /admin/qr ← ★ v3.4
+//   WITH nav + shell:     /loyalty  /account  /wholesale  /admin  /admin/qr
 //                         /redeem  /welcome  /checkout  /order-success
+//                         /hq  ← ★ v3.6
 //
 // KEY FIX: /scan and /scan/:qrCode are STANDALONE — this removes the admin
 // nav bar that was appearing on the scan pages.
@@ -107,11 +125,20 @@ import AdminQrGenerator from "./pages/AdminQrGenerator";
 // ★ v3.5: AI Co-Pilot
 import CoPilot from "./components/CoPilot";
 
+// ★ v3.6: HQ Dashboard (Phase 2A)
+import HQDashboard from "./pages/HQDashboard";
+
+// ★ v3.7: Shop Dashboard (Phase 2F)
+import ShopDashboard from "./pages/ShopDashboard";
+
 // ── Layout shell ──────────────────────────────────────────────────────────────
 import PageShell from "./components/PageShell"; // v3.2.1: shared layout wrapper
 
 // ── Cart context ──────────────────────────────────────────────────────────────
 import { CartProvider, useCart } from "./contexts/CartContext"; // v3.3
+
+// ★ v3.6: Tenant context (Phase 2A)
+import { TenantProvider, useTenant } from "./services/tenantService";
 
 // ── RoleContext ───────────────────────────────────────────────────────────────
 export const RoleContext = createContext(null);
@@ -122,13 +149,14 @@ const LS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INLINE NAV BAR — v3.3: Added cart icon with badge count
+// INLINE NAV BAR — v3.6: Added HQ link for hq_access users
 // Shows user email + role badge when logged in; Sign In when logged out.
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBar() {
   const { role, setRole, isDevMode, setIsDevMode, userEmail, loading } =
     useContext(RoleContext);
   const { getCartCount } = useCart(); // v3.3
+  const { isHQ } = useTenant(); // ★ v3.6
   const navigate = useNavigate();
 
   const isLoggedIn = !!role;
@@ -241,6 +269,8 @@ function NavBar() {
           {isLoggedIn && <NavLink to="/scan">Scan QR</NavLink>}
           {role === "admin" && <NavLink to="/admin">Admin</NavLink>}
           {role === "retailer" && <NavLink to="/wholesale">Wholesale</NavLink>}
+          {/* ★ v3.6: HQ link — only visible to users with hq_access */}
+          {isHQ && <NavLink to="/hq">HQ</NavLink>}
         </nav>
 
         {/* Right: cart icon + user identity or Sign In */}
@@ -311,8 +341,27 @@ function NavBar() {
                   gap: "8px",
                 }}
               >
-                {/* Role badge — only for admin/retailer */}
-                {roleLabel && (
+                {/* ★ v3.6: HQ badge — distinct from admin badge */}
+                {isHQ && (
+                  <span
+                    style={{
+                      background: "rgba(82,183,136,0.2)",
+                      color: "#52b788",
+                      padding: "2px 8px",
+                      borderRadius: "2px",
+                      fontFamily: "Jost, sans-serif",
+                      fontSize: "9px",
+                      fontWeight: "700",
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    HQ
+                  </span>
+                )}
+
+                {/* Role badge — only for admin/retailer (skip if HQ badge shown) */}
+                {roleLabel && !isHQ && (
                   <span
                     style={{
                       background:
@@ -545,7 +594,133 @@ function RequireRole({ allowedRoles, children }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP ROOT — v3.3: CartProvider wraps everything
+// ★ v3.6: HQ GUARD — RequireHQ
+// Checks hq_access flag from TenantProvider. Non-HQ users → /admin or /loyalty.
+// Must be used INSIDE RequireAuth (user must be logged in first).
+// ─────────────────────────────────────────────────────────────────────────────
+function RequireHQ({ children }) {
+  const { isHQ, loading: tenantLoading } = useTenant();
+  const { role } = useContext(RoleContext);
+
+  // Wait for tenant data to load
+  if (tenantLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+          fontFamily: "Jost, sans-serif",
+          color: "#1b4332",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            width: "32px",
+            height: "32px",
+            border: "3px solid #e0dbd2",
+            borderTopColor: "#1b4332",
+            borderRadius: "50%",
+            animation: "protea-spin 0.8s linear infinite",
+          }}
+        />
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: "600",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            color: "#888",
+          }}
+        >
+          Loading HQ…
+        </span>
+      </div>
+    );
+  }
+
+  // Not HQ — redirect to admin (if admin) or loyalty (if customer)
+  if (!isHQ) {
+    const fallback = role === "admin" ? "/admin" : "/loyalty";
+    console.log("[RequireHQ] No HQ access → redirecting to", fallback);
+    return <Navigate to={fallback} replace />;
+  }
+
+  return children;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ v3.7: ADMIN DASHBOARD ROUTER — Phase 2F
+// Routes admin users to the correct dashboard based on tenant context:
+//   - HQ users (isHQ=true) → AdminDashboard (original, full access)
+//   - Shop users (isHQ=false, tenantType='shop') → ShopDashboard (scoped)
+//   - Fallback → AdminDashboard (backwards compatible)
+// ─────────────────────────────────────────────────────────────────────────────
+function AdminDashboardRouter() {
+  const { isHQ, tenantType, loading: tenantLoading } = useTenant();
+
+  // Wait for tenant context to load
+  if (tenantLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "40vh",
+          fontFamily: "Jost, sans-serif",
+          color: "#1b4332",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            width: "32px",
+            height: "32px",
+            border: "3px solid #e0dbd2",
+            borderTopColor: "#1b4332",
+            borderRadius: "50%",
+            animation: "protea-spin 0.8s linear infinite",
+          }}
+        />
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: "600",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            color: "#888",
+          }}
+        >
+          Loading dashboard…
+        </span>
+      </div>
+    );
+  }
+
+  // HQ users see the original AdminDashboard (full, unscoped)
+  if (isHQ) {
+    console.log("[AdminDashboardRouter] HQ user → AdminDashboard");
+    return <AdminDashboard />;
+  }
+
+  // Shop admin users see the scoped ShopDashboard
+  if (tenantType === "shop") {
+    console.log("[AdminDashboardRouter] Shop admin → ShopDashboard");
+    return <ShopDashboard />;
+  }
+
+  // Fallback: original AdminDashboard (backwards compatible for edge cases)
+  console.log("[AdminDashboardRouter] Fallback → AdminDashboard");
+  return <AdminDashboard />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APP ROOT — v3.6: TenantProvider wraps inside CartProvider
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   // v3.1 preserved: role + devMode state
@@ -672,164 +847,188 @@ export default function App() {
     >
       {/* v3.3: CartProvider wraps BrowserRouter so NavBar can access cart count */}
       <CartProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* ── STANDALONE — no nav ─────────────────────────────────────── */}
-            <Route path="/" element={<Landing />} />
-            {/* v3.4: /shop gets NavBar but no PageShell (has full-bleed hero) */}
-            <Route
-              path="/shop"
-              element={
-                <>
-                  <NavBar />
-                  <Shop />
-                </>
-              }
-            />
-            {/* v3.4: /verify gets NavBar but no PageShell (dark full-bleed theme) */}
-            <Route
-              path="/verify/:productId"
-              element={
-                <>
-                  <NavBar />
-                  <ProductVerification />
-                </>
-              }
-            />
+        {/* ★ v3.6: TenantProvider wraps BrowserRouter so components can access tenant */}
+        <TenantProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* ── STANDALONE — no nav ─────────────────────────────────────── */}
+              <Route path="/" element={<Landing />} />
+              {/* v3.4: /shop gets NavBar but no PageShell (has full-bleed hero) */}
+              <Route
+                path="/shop"
+                element={
+                  <>
+                    <NavBar />
+                    <Shop />
+                  </>
+                }
+              />
+              {/* v3.4: /verify gets NavBar but no PageShell (dark full-bleed theme) */}
+              <Route
+                path="/verify/:productId"
+                element={
+                  <>
+                    <NavBar />
+                    <ProductVerification />
+                  </>
+                }
+              />
 
-            {/* v3.3: /cart gets NavBar but no PageShell (like /shop — full-bleed) */}
-            <Route
-              path="/cart"
-              element={
-                <>
-                  <NavBar />
-                  <CartPage />
-                </>
-              }
-            />
+              {/* v3.3: /cart gets NavBar but no PageShell (like /shop — full-bleed) */}
+              <Route
+                path="/cart"
+                element={
+                  <>
+                    <NavBar />
+                    <CartPage />
+                  </>
+                }
+              />
 
-            {/* ✅ FIXED in v3: scan routes standalone — no admin nav */}
-            <Route path="/scan" element={<ScanPage />} />
-            <Route path="/scan/:qrCode" element={<ScanResult />} />
+              {/* ✅ FIXED in v3: scan routes standalone — no admin nav */}
+              <Route path="/scan" element={<ScanPage />} />
+              <Route path="/scan/:qrCode" element={<ScanResult />} />
 
-            {/* ── WITH nav + auth guard ───────────────────────────────────── */}
-            {/* v3.2: /loyalty and /redeem require authentication */}
-            <Route
-              path="/loyalty"
-              element={
-                <WithNav>
-                  <RequireAuth>
-                    <Loyalty />
-                  </RequireAuth>
-                </WithNav>
-              }
-            />
-            <Route
-              path="/redeem"
-              element={
-                <WithNav>
-                  <RequireAuth>
-                    <Redeem />
-                  </RequireAuth>
-                </WithNav>
-              }
-            />
-
-            {/* v3.3: /checkout requires auth (must be logged in to pay) */}
-            <Route
-              path="/checkout"
-              element={
-                <WithNav>
-                  <RequireAuth>
-                    <CheckoutPage />
-                  </RequireAuth>
-                </WithNav>
-              }
-            />
-
-            {/* v3.3: /order-success — post-payment confirmation */}
-            <Route
-              path="/order-success"
-              element={
-                <WithNav>
-                  <OrderSuccess />
-                </WithNav>
-              }
-            />
-
-            {/* v3.2: /wholesale requires auth + retailer role */}
-            <Route
-              path="/wholesale"
-              element={
-                <WithNav>
-                  <RequireAuth>
-                    <RequireRole allowedRoles={["retailer", "admin"]}>
-                      <WholesalePortal />
-                    </RequireRole>
-                  </RequireAuth>
-                </WithNav>
-              }
-            />
-
-            {/* v3.2: /admin requires auth + admin role */}
-            {/* v3.4: /admin gets wider layout (1200px) for tables */}
-            <Route
-              path="/admin"
-              element={
-                <>
-                  <NavBar />
-                  <PageShell maxWidth={1200}>
+              {/* ── WITH nav + auth guard ───────────────────────────────────── */}
+              {/* v3.2: /loyalty and /redeem require authentication */}
+              <Route
+                path="/loyalty"
+                element={
+                  <WithNav>
                     <RequireAuth>
-                      <RequireRole allowedRoles={["admin"]}>
-                        <AdminDashboard />
+                      <Loyalty />
+                    </RequireAuth>
+                  </WithNav>
+                }
+              />
+              <Route
+                path="/redeem"
+                element={
+                  <WithNav>
+                    <RequireAuth>
+                      <Redeem />
+                    </RequireAuth>
+                  </WithNav>
+                }
+              />
+
+              {/* v3.3: /checkout requires auth (must be logged in to pay) */}
+              <Route
+                path="/checkout"
+                element={
+                  <WithNav>
+                    <RequireAuth>
+                      <CheckoutPage />
+                    </RequireAuth>
+                  </WithNav>
+                }
+              />
+
+              {/* v3.3: /order-success — post-payment confirmation */}
+              <Route
+                path="/order-success"
+                element={
+                  <WithNav>
+                    <OrderSuccess />
+                  </WithNav>
+                }
+              />
+
+              {/* v3.2: /wholesale requires auth + retailer role */}
+              <Route
+                path="/wholesale"
+                element={
+                  <WithNav>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["retailer", "admin"]}>
+                        <WholesalePortal />
                       </RequireRole>
                     </RequireAuth>
-                  </PageShell>
-                </>
-              }
-            />
+                  </WithNav>
+                }
+              />
 
-            {/* ★ v3.4: /admin/qr — Admin QR Code Generator */}
-            <Route
-              path="/admin/qr"
-              element={
-                <>
-                  <NavBar />
-                  <PageShell maxWidth={1200}>
-                    <RequireAuth>
-                      <RequireRole allowedRoles={["admin"]}>
-                        <AdminQrGenerator />
-                      </RequireRole>
-                    </RequireAuth>
-                  </PageShell>
-                </>
-              }
-            />
+              {/* ★ v3.7: /admin uses AdminDashboardRouter to serve correct dashboard */}
+              {/* HQ admin → AdminDashboard (original). Shop admin → ShopDashboard (scoped). */}
+              <Route
+                path="/admin"
+                element={
+                  <>
+                    <NavBar />
+                    <PageShell maxWidth={1200}>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["admin"]}>
+                          <AdminDashboardRouter />
+                        </RequireRole>
+                      </RequireAuth>
+                    </PageShell>
+                  </>
+                }
+              />
 
-            {/* ── WITH nav, NO auth required ──────────────────────────────── */}
-            <Route
-              path="/account"
-              element={
-                <WithNav>
-                  <Account />
-                </WithNav>
-              }
-            />
-            <Route
-              path="/welcome"
-              element={
-                <WithNav>
-                  <Welcome />
-                </WithNav>
-              }
-            />
+              {/* ★ v3.4: /admin/qr — Admin QR Code Generator */}
+              <Route
+                path="/admin/qr"
+                element={
+                  <>
+                    <NavBar />
+                    <PageShell maxWidth={1200}>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["admin"]}>
+                          <AdminQrGenerator />
+                        </RequireRole>
+                      </RequireAuth>
+                    </PageShell>
+                  </>
+                }
+              />
 
-            {/* Fallback */}
-            <Route path="/404" element={<NotFound />} />
-            <Route path="*" element={<Navigate to="/404" replace />} />
-          </Routes>
-          <CoPilot />
-        </BrowserRouter>
+              {/* ★ v3.6: /hq — HQ Command Centre (Phase 2A) */}
+              {/* Requires auth + admin role + hq_access flag */}
+              {/* Uses 1400px max-width for wide dashboard layouts */}
+              <Route
+                path="/hq/*"
+                element={
+                  <>
+                    <NavBar />
+                    <PageShell maxWidth={1400}>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["admin"]}>
+                          <RequireHQ>
+                            <HQDashboard />
+                          </RequireHQ>
+                        </RequireRole>
+                      </RequireAuth>
+                    </PageShell>
+                  </>
+                }
+              />
+
+              {/* ── WITH nav, NO auth required ──────────────────────────────── */}
+              <Route
+                path="/account"
+                element={
+                  <WithNav>
+                    <Account />
+                  </WithNav>
+                }
+              />
+              <Route
+                path="/welcome"
+                element={
+                  <WithNav>
+                    <Welcome />
+                  </WithNav>
+                }
+              />
+
+              {/* Fallback */}
+              <Route path="/404" element={<NotFound />} />
+              <Route path="*" element={<Navigate to="/404" replace />} />
+            </Routes>
+            <CoPilot />
+          </BrowserRouter>
+        </TenantProvider>
       </CartProvider>
     </RoleContext.Provider>
   );
