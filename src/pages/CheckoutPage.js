@@ -1,7 +1,20 @@
-// src/pages/CheckoutPage.js — Protea Botanicals v1.0
+// src/pages/CheckoutPage.js — Protea Botanicals v2.0
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ v2.0 CHANGELOG (Phase 2G — PayFast Production Integration):
+//   1. REMOVE: Hardcoded PayFast sandbox credentials
+//   2. ADD: Calls payfast-checkout Edge Function for server-side:
+//      - Order creation in DB (orders + order_items tables)
+//      - MD5 signature generation (passphrase kept server-side)
+//      - Returns signed form data for PayFast redirect
+//   3. ADD: Error handling with user-facing error states
+//   4. ADD: Order reference stored in localStorage AND URL param
+//   5. ADD: Supabase auth token sent to edge function
+//   6. KEEP: Same visual design, same cart integration, same layout
+//   Version bump v1.0 → v2.0
+//
+// v1.0: Mock checkout with hardcoded sandbox form POST
 // ─────────────────────────────────────────────────────────────────────────────
 // Checkout page with order summary and PayFast payment redirect.
-// Uses PayFast sandbox test credentials (merchant_id: 10000100).
 // Rendered inside PageShell via WithNav + RequireAuth.
 // Per LL-017: no own wrapper, footer, or font import (PageShell provides).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,88 +23,124 @@ import { useState, useRef, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { RoleContext } from "../App";
+import { supabase } from "../services/supabaseClient";
 import { C } from "../styles/tokens";
 
-// ── PayFast config ──────────────────────────────────────────────────────────
-// Sandbox test credentials — replace with real credentials for production
-const PAYFAST_CONFIG = {
-  sandbox: true,
-  merchant_id: "10000100",
-  merchant_key: "46f0cd694581a",
-  get baseUrl() {
-    return this.sandbox
-      ? "https://sandbox.payfast.co.za/eng/process"
-      : "https://www.payfast.co.za/eng/process";
-  },
-};
+// Edge function called via supabase.functions.invoke() — handles auth automatically
 
 export default function CheckoutPage() {
   const { cartItems, getCartTotal, clearCart } = useCart();
   const { userEmail } = useContext(RoleContext);
   const navigate = useNavigate();
   const formRef = useRef(null);
+
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState(null); // Signed PayFast form fields
+  const [payfastUrl, setPayfastUrl] = useState(null);
 
   const total = getCartTotal();
 
-  // Redirect to cart if empty
+  // Redirect to cart if empty (and not mid-submit)
   useEffect(() => {
-    if (cartItems.length === 0 && !submitting) {
+    if (cartItems.length === 0 && !submitting && !formData) {
       navigate("/cart", { replace: true });
     }
-  }, [cartItems, navigate, submitting]);
+  }, [cartItems, navigate, submitting, formData]);
 
-  // Build item name for PayFast (max 255 chars)
-  const itemName =
-    cartItems.length === 1
-      ? cartItems[0].name
-      : `Protea Botanicals Order (${cartItems.reduce((s, i) => s + i.quantity, 0)} items)`;
-
-  // Generate simple order reference
-  const orderRef = `PB-${Date.now().toString(36).toUpperCase()}`;
-
-  const handlePayFast = () => {
-    setSubmitting(true);
-    console.log("[Checkout] Submitting to PayFast:", {
-      total,
-      items: cartItems.length,
-      orderRef,
-    });
-
-    // Store order reference for success page
-    try {
-      localStorage.setItem(
-        "protea_last_order",
-        JSON.stringify({
-          ref: orderRef,
-          total,
-          items: cartItems.map((i) => ({
-            name: i.name,
-            qty: i.quantity,
-            price: i.price,
-          })),
-          date: new Date().toISOString(),
-        }),
-      );
-    } catch (e) {
-      console.warn("[Checkout] Could not save order to localStorage:", e);
-    }
-
-    // Clear cart before redirect (PayFast will redirect back)
-    clearCart();
-
-    // Submit the hidden form
-    if (formRef.current) {
+  // Auto-submit form once we have signed data from edge function
+  useEffect(() => {
+    if (formData && formRef.current) {
+      console.log("[Checkout] Auto-submitting signed form to PayFast");
+      clearCart();
       formRef.current.submit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData]);
+
+  // ── Handle PayFast checkout via Edge Function ─────────────────────────────
+  const handlePayFast = async () => {
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      // Get current auth session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setError(
+          "You must be logged in to checkout. Please sign in and try again.",
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      console.log("[Checkout] Calling payfast-checkout edge function...");
+
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        "payfast-checkout",
+        {
+          body: {
+            items: cartItems.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              gradientFrom: item.gradientFrom,
+              gradientTo: item.gradientTo,
+              icon: item.icon,
+            })),
+            total: total,
+            user_email: userEmail || session.user?.email || "",
+            origin_url: window.location.origin,
+          },
+        },
+      );
+
+      if (fnError || !result?.success) {
+        throw new Error(
+          result?.error ||
+            fnError?.message ||
+            "Checkout failed. Please try again.",
+        );
+      }
+
+      console.log("[Checkout] Order created:", result.order_ref);
+
+      // Store order reference for success page (belt-and-braces with URL param)
+      try {
+        localStorage.setItem(
+          "protea_last_order",
+          JSON.stringify({
+            ref: result.order_ref,
+            order_id: result.order_id,
+            total,
+            items: cartItems.map((i) => ({
+              name: i.name,
+              qty: i.quantity,
+              price: i.price,
+            })),
+            date: new Date().toISOString(),
+          }),
+        );
+      } catch (e) {
+        console.warn("[Checkout] Could not save order to localStorage:", e);
+      }
+
+      // Set form data — triggers auto-submit via useEffect
+      setPayfastUrl(result.payfast_url);
+      setFormData(result.form_data);
+    } catch (err) {
+      console.error("[Checkout] Error:", err);
+      setError(err.message || "Something went wrong. Please try again.");
+      setSubmitting(false);
     }
   };
 
-  if (cartItems.length === 0 && !submitting) {
+  if (cartItems.length === 0 && !submitting && !formData) {
     return null; // useEffect will redirect
   }
-
-  // Current origin for return URLs
-  const origin = window.location.origin;
 
   return (
     <>
@@ -136,6 +185,38 @@ export default function CheckoutPage() {
       >
         Review your items then pay securely via PayFast.
       </p>
+
+      {/* Error banner */}
+      {error && (
+        <div
+          className="body-font"
+          style={{
+            background: "rgba(192,57,43,0.08)",
+            border: "1px solid rgba(192,57,43,0.25)",
+            borderRadius: "2px",
+            padding: "14px 18px",
+            marginBottom: "24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontSize: "13px", color: "#c0392b" }}>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#c0392b",
+              cursor: "pointer",
+              fontSize: "16px",
+              padding: "0 0 0 12px",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Two-column layout */}
       <div
@@ -323,25 +404,24 @@ export default function CheckoutPage() {
             </span>
           </div>
 
-          {/* Sandbox notice */}
-          {PAYFAST_CONFIG.sandbox && (
-            <div
-              className="body-font"
-              style={{
-                background: "rgba(230,126,34,0.1)",
-                border: "1px solid rgba(230,126,34,0.3)",
-                borderRadius: "2px",
-                padding: "10px 14px",
-                fontSize: "11px",
-                color: "#e67e22",
-                marginBottom: "16px",
-                textAlign: "center",
-                fontWeight: 500,
-              }}
-            >
-              ⚠ SANDBOX MODE — No real payments will be processed
-            </div>
-          )}
+          {/* Loyalty points hint */}
+          <div
+            className="body-font"
+            style={{
+              background: "rgba(82,183,136,0.08)",
+              border: "1px solid rgba(82,183,136,0.2)",
+              borderRadius: "2px",
+              padding: "10px 14px",
+              fontSize: "11px",
+              color: "#2d6a4f",
+              marginBottom: "16px",
+              textAlign: "center",
+              fontWeight: 500,
+            }}
+          >
+            🌿 You'll earn <strong>{Math.floor(total / 100)}</strong> loyalty
+            point{Math.floor(total / 100) !== 1 ? "s" : ""} with this purchase
+          </div>
 
           {/* Pay button */}
           <button
@@ -369,80 +449,121 @@ export default function CheckoutPage() {
               if (!submitting) e.target.style.background = "#1b4332";
             }}
           >
-            {submitting ? "Redirecting to PayFast…" : "Pay with PayFast"}
+            {submitting ? "Processing…" : "Pay with PayFast"}
           </button>
 
-          <p
-            className="body-font"
+          {/* Submitting state detail */}
+          {submitting && (
+            <div
+              className="body-font"
+              style={{
+                textAlign: "center",
+                marginTop: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  border: "2px solid #e0dbd2",
+                  borderTopColor: "#1b4332",
+                  borderRadius: "50%",
+                  animation: "protea-spin 0.8s linear infinite",
+                }}
+              />
+              <style>{`@keyframes protea-spin { to { transform: rotate(360deg); } }`}</style>
+              <span style={{ fontSize: "11px", color: C.muted }}>
+                Creating your order & redirecting to PayFast…
+              </span>
+            </div>
+          )}
+
+          {!submitting && (
+            <p
+              className="body-font"
+              style={{
+                fontSize: "11px",
+                color: C.muted,
+                textAlign: "center",
+                marginTop: "14px",
+                lineHeight: 1.5,
+              }}
+            >
+              You'll be securely redirected to PayFast to complete payment.
+            </p>
+          )}
+
+          {/* Secure payment badges */}
+          <div
             style={{
-              fontSize: "11px",
-              color: C.muted,
-              textAlign: "center",
-              marginTop: "14px",
-              lineHeight: 1.5,
+              display: "flex",
+              justifyContent: "center",
+              gap: "16px",
+              marginTop: "16px",
+              opacity: 0.5,
             }}
           >
-            You'll be securely redirected to PayFast to complete payment.
-          </p>
+            <span
+              className="body-font"
+              style={{
+                fontSize: "9px",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: C.muted,
+              }}
+            >
+              🔒 SSL Secured
+            </span>
+            <span
+              className="body-font"
+              style={{
+                fontSize: "9px",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: C.muted,
+              }}
+            >
+              Visa · Mastercard · EFT
+            </span>
+          </div>
 
           {/* Back to cart link */}
-          <p
-            className="body-font"
-            onClick={() => navigate("/cart")}
-            style={{
-              fontSize: "11px",
-              color: "#2d6a4f",
-              textAlign: "center",
-              marginTop: "12px",
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-          >
-            ← Back to Cart
-          </p>
+          {!submitting && (
+            <p
+              className="body-font"
+              onClick={() => navigate("/cart")}
+              style={{
+                fontSize: "11px",
+                color: "#2d6a4f",
+                textAlign: "center",
+                marginTop: "12px",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              ← Back to Cart
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Hidden PayFast form — submitted via JS */}
-      <form
-        ref={formRef}
-        action={PAYFAST_CONFIG.baseUrl}
-        method="POST"
-        style={{ display: "none" }}
-      >
-        <input
-          type="hidden"
-          name="merchant_id"
-          value={PAYFAST_CONFIG.merchant_id}
-        />
-        <input
-          type="hidden"
-          name="merchant_key"
-          value={PAYFAST_CONFIG.merchant_key}
-        />
-        <input
-          type="hidden"
-          name="return_url"
-          value={`${origin}/order-success`}
-        />
-        <input type="hidden" name="cancel_url" value={`${origin}/cart`} />
-        <input
-          type="hidden"
-          name="notify_url"
-          value={`${origin}/api/payfast-notify`}
-        />
-        <input type="hidden" name="amount" value={total.toFixed(2)} />
-        <input type="hidden" name="item_name" value={itemName} />
-        <input
-          type="hidden"
-          name="item_description"
-          value={`Order ${orderRef}`}
-        />
-        <input type="hidden" name="m_payment_id" value={orderRef} />
-        {userEmail && (
-          <input type="hidden" name="email_address" value={userEmail} />
-        )}
-      </form>
+      {/* Hidden PayFast form — populated by edge function, submitted via useEffect */}
+      {formData && payfastUrl && (
+        <form
+          ref={formRef}
+          action={payfastUrl}
+          method="POST"
+          style={{ display: "none" }}
+        >
+          {Object.entries(formData).map(([key, value]) => (
+            <input key={key} type="hidden" name={key} value={value} />
+          ))}
+        </form>
+      )}
 
       {/* Responsive override for mobile */}
       <style>{`
