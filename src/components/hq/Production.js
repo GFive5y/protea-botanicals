@@ -1,4 +1,4 @@
-// src/components/hq/Production.js — Protea Botanicals v1.0
+// src/components/hq/Production.js — Protea Botanicals v1.2
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCTION TAB — Phase 2C
 //
@@ -13,11 +13,19 @@
 //   - Status progression: planned → in_progress → completed → cancelled
 //   - Record actual fill quantity when completing
 //   - Cost tracking per batch (from input costs)
+//   - ★ v1.1: Auto-deduct raw materials from inventory on batch completion
+//     (Task A-1 — Automation WP). Creates stock_movements records and sets
+//     production_inputs.deducted_from_stock = true for idempotency.
+//   - ★ v1.2: Auto-create finished goods in inventory on batch completion
+//     (Task A-2 — Automation WP). Finds or creates an inventory_item with
+//     category "finished_product", increments quantity_on_hand by actual_quantity,
+//     and creates a stock_movements record (type: "production_in").
 //
 // Tables used:
 //   - production_batches (CRUD)
 //   - production_inputs (CRUD, linked to batches)
-//   - inventory_items (read, for input selection)
+//   - inventory_items (read + update/insert for auto-deduction & finished goods)
+//   - stock_movements (insert for audit trail)
 //
 // Design: Cream aesthetic (Section 7 of handover).
 // RLS: Uses is_hq_user() — HQ can do everything.
@@ -924,7 +932,7 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
     0,
   );
 
-  // ── Status change ──────────────────────────────────────────────────
+  // ── Status change (v1.1: includes auto-deduction on completion) ────
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
     try {
@@ -941,6 +949,254 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
         .update(updates)
         .eq("id", batch.id);
       if (error) throw error;
+
+      // ── TASK A-1: Auto-deduct raw materials from inventory ─────
+      // When batch is completed, deduct used materials from inventory
+      // and create stock_movements records for audit trail.
+      // Uses deducted_from_stock flag for idempotency.
+      if (newStatus === "completed") {
+        const batchInputs = batch.production_inputs || [];
+        const deductionErrors = [];
+        let deductedCount = 0;
+
+        for (const inp of batchInputs) {
+          // Skip manual entries (no inventory link) and already-deducted
+          if (!inp.inventory_item_id || inp.deducted_from_stock) continue;
+
+          try {
+            // 1. Read current quantity_on_hand (LL-046)
+            const { data: item, error: readErr } = await supabase
+              .from("inventory_items")
+              .select("quantity_on_hand")
+              .eq("id", inp.inventory_item_id)
+              .single();
+
+            if (readErr) {
+              console.error(
+                `[Production] Read inventory error for ${inp.input_name}:`,
+                readErr,
+              );
+              deductionErrors.push(`${inp.input_name}: ${readErr.message}`);
+              continue;
+            }
+
+            // 2. Subtract quantity_used from quantity_on_hand
+            //    (allows negative — shows over-use, per WP risk register)
+            const newQty =
+              (item.quantity_on_hand || 0) - (inp.quantity_used || 0);
+            const { error: updateErr } = await supabase
+              .from("inventory_items")
+              .update({ quantity_on_hand: newQty })
+              .eq("id", inp.inventory_item_id);
+
+            if (updateErr) {
+              console.error(
+                `[Production] Update inventory error for ${inp.input_name}:`,
+                updateErr,
+              );
+              deductionErrors.push(`${inp.input_name}: ${updateErr.message}`);
+              continue;
+            }
+
+            // 3. Create stock_movements record (client-side UUID per LL-048)
+            const { error: moveErr } = await supabase
+              .from("stock_movements")
+              .insert({
+                id: crypto.randomUUID(),
+                item_id: inp.inventory_item_id,
+                quantity: -(inp.quantity_used || 0),
+                movement_type: "production_out",
+                reference: batch.batch_code,
+                notes: `Auto-deducted for batch ${batch.batch_code}`,
+                tenant_id: HQ_TENANT_ID,
+              });
+
+            if (moveErr) {
+              console.error(
+                `[Production] Stock movement error for ${inp.input_name}:`,
+                moveErr,
+              );
+              deductionErrors.push(
+                `${inp.input_name} movement: ${moveErr.message}`,
+              );
+              // Continue to mark as deducted — inventory already updated
+            }
+
+            // 4. Mark input as deducted (idempotency flag — LL-064)
+            const { error: flagErr } = await supabase
+              .from("production_inputs")
+              .update({ deducted_from_stock: true })
+              .eq("id", inp.id);
+
+            if (flagErr) {
+              console.error(
+                `[Production] Flag update error for ${inp.input_name}:`,
+                flagErr,
+              );
+              deductionErrors.push(
+                `${inp.input_name} flag: ${flagErr.message}`,
+              );
+            } else {
+              deductedCount++;
+              console.log(
+                `[Production] ✓ Deducted ${inp.quantity_used} ${inp.unit} of ${inp.input_name} from inventory`,
+              );
+            }
+          } catch (deductErr) {
+            console.error(
+              `[Production] Deduction error for ${inp.input_name}:`,
+              deductErr,
+            );
+            deductionErrors.push(
+              `${inp.input_name}: ${deductErr.message || "Unknown error"}`,
+            );
+          }
+        }
+
+        // Report results (batch status is already updated regardless)
+        if (deductionErrors.length > 0) {
+          console.warn("[Production] Some deductions failed:", deductionErrors);
+          alert(
+            "Batch marked as completed, but some inventory deductions failed:\n\n" +
+              deductionErrors.join("\n") +
+              "\n\nAlready-deducted items won't be deducted again on retry.",
+          );
+        } else if (deductedCount > 0) {
+          console.log(
+            `[Production] ✓ All ${deductedCount} inventory items deducted for batch ${batch.batch_code}`,
+          );
+        }
+
+        // ── TASK A-2: Auto-create finished goods in inventory ────────
+        // After deducting raw materials, create (or increment) a finished
+        // product inventory item and record a production_in movement.
+        const filledQty = parseInt(actualQty) || 0;
+        if (filledQty > 0) {
+          try {
+            // Build finished product identity
+            const fpName = `${batch.strain_name} ${batch.size_ml}ml ${batch.product_type}`;
+            const fpSku =
+              `FP-${batch.strain_name.replace(/\s+/g, "-").toUpperCase()}-${batch.size_ml}ML`.substring(
+                0,
+                50,
+              );
+
+            console.log(
+              `[Production] A-2: Creating/updating finished product: "${fpName}" qty: ${filledQty}`,
+            );
+
+            // Check if finished product already exists in inventory
+            const { data: existing, error: findErr } = await supabase
+              .from("inventory_items")
+              .select("id, quantity_on_hand")
+              .eq("category", "finished_product")
+              .eq("tenant_id", HQ_TENANT_ID)
+              .ilike("name", fpName)
+              .limit(1);
+
+            if (findErr) {
+              console.error(
+                "[Production] A-2: Find finished product error:",
+                findErr,
+              );
+              throw findErr;
+            }
+
+            let finishedItemId;
+
+            if (existing && existing.length > 0) {
+              // INCREMENT existing finished product
+              finishedItemId = existing[0].id;
+              const newQty = (existing[0].quantity_on_hand || 0) + filledQty;
+              const { error: updErr } = await supabase
+                .from("inventory_items")
+                .update({ quantity_on_hand: newQty })
+                .eq("id", finishedItemId);
+
+              if (updErr) {
+                console.error(
+                  "[Production] A-2: Update finished product error:",
+                  updErr,
+                );
+                throw updErr;
+              }
+              console.log(
+                `[Production] A-2: ✓ Incremented "${fpName}" by ${filledQty} → ${newQty} total`,
+              );
+            } else {
+              // CREATE new finished product inventory item (client-side UUID per LL-048)
+              finishedItemId = crypto.randomUUID();
+
+              // Calculate cost per unit from batch inputs
+              const batchTotalCost = (batch.production_inputs || []).reduce(
+                (sum, inp) => sum + (inp.total_cost || 0),
+                0,
+              );
+              const costPerUnit =
+                filledQty > 0 && batchTotalCost > 0
+                  ? parseFloat((batchTotalCost / filledQty).toFixed(2))
+                  : null;
+
+              const { error: createErr } = await supabase
+                .from("inventory_items")
+                .insert({
+                  id: finishedItemId,
+                  tenant_id: HQ_TENANT_ID,
+                  name: fpName,
+                  sku: fpSku,
+                  category: "finished_product",
+                  quantity_on_hand: filledQty,
+                  unit: "pcs",
+                  cost_price: costPerUnit,
+                  is_active: true,
+                });
+
+              if (createErr) {
+                console.error(
+                  "[Production] A-2: Create finished product error:",
+                  createErr,
+                );
+                throw createErr;
+              }
+              console.log(
+                `[Production] A-2: ✓ Created new finished product "${fpName}" with ${filledQty} pcs`,
+              );
+            }
+
+            // Record stock movement for the finished goods (production_in)
+            const { error: moveErr } = await supabase
+              .from("stock_movements")
+              .insert({
+                id: crypto.randomUUID(),
+                item_id: finishedItemId,
+                quantity: filledQty,
+                movement_type: "production_in",
+                reference: batch.batch_code,
+                notes: `Finished goods from batch ${batch.batch_code}: ${filledQty} × ${batch.size_ml}ml ${batch.product_type}`,
+                tenant_id: HQ_TENANT_ID,
+              });
+
+            if (moveErr) {
+              console.error("[Production] A-2: Stock movement error:", moveErr);
+              // Non-fatal — inventory was already updated
+            } else {
+              console.log(
+                `[Production] A-2: ✓ Stock movement recorded: +${filledQty} production_in for ${batch.batch_code}`,
+              );
+            }
+          } catch (fpErr) {
+            console.error("[Production] A-2: Finished goods error:", fpErr);
+            alert(
+              "Batch completed and raw materials deducted, but finished goods creation failed:\n\n" +
+                (fpErr.message || JSON.stringify(fpErr)) +
+                "\n\nYou can manually add the finished product in Stock Control.",
+            );
+          }
+        } else {
+          console.log("[Production] A-2: Skipped — actual quantity is 0");
+        }
+      }
+
       onRefresh();
     } catch (err) {
       console.error("[Production] Status update error:", err);

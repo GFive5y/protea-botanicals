@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PayFast Diagnostic — Protea Botanicals</title>
+    <style>
+      body {
+        font-family: monospace;
+        background: #1a1a2e;
+        color: #e0e0e0;
+        padding: 30px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      h1 {
+        color: #52b788;
+      }
+      h2 {
+        color: #b5935a;
+        margin-top: 30px;
+      }
+      .box {
+        background: #16213e;
+        border: 1px solid #444;
+        padding: 16px;
+        margin: 12px 0;
+        border-radius: 4px;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-size: 12px;
+      }
+      button {
+        background: #52b788;
+        color: #1a1a2e;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 4px;
+        margin: 6px 6px 6px 0;
+        font-size: 13px;
+      }
+      button:hover {
+        background: #3a9a6e;
+      }
+      button.orange {
+        background: #b5935a;
+      }
+      button.orange:hover {
+        background: #9a7d4d;
+      }
+      .sig {
+        color: #52b788;
+        font-weight: bold;
+      }
+      .param {
+        color: #e8c547;
+      }
+      .warn {
+        color: #e74c3c;
+      }
+    </style>
+    <!-- Load MD5 from CDN so we don't need a custom implementation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.19.0/js/md5.min.js"></script>
+  </head>
+  <body>
+    <h1>PayFast Signature Diagnostic</h1>
+    <p>
+      This page MUST be accessed via
+      <strong>http://localhost:3001/payfast-test.html</strong>
+    </p>
+    <p id="protocol-check"></p>
+
+    <div class="box">
+      <strong>PayFast Sandbox Credentials:</strong><br />
+      Merchant ID: 10000100 | Merchant Key: 46f0cd694581a<br />
+      Passphrase: jt7NOE43FZo (sandbox default for 10000100)
+    </div>
+
+    <div id="results"></div>
+
+    <!-- 6 hidden forms, one per test -->
+    <form
+      id="form1"
+      method="POST"
+      action="https://sandbox.payfast.co.za/eng/process"
+    ></form>
+    <form
+      id="form2"
+      method="POST"
+      action="https://sandbox.payfast.co.za/eng/process"
+    ></form>
+    <form
+      id="form3"
+      method="POST"
+      action="https://sandbox.payfast.co.za/eng/process"
+    ></form>
+    <form
+      id="form4"
+      method="POST"
+      action="https://sandbox.payfast.co.za/eng/process"
+    ></form>
+    <form
+      id="form5"
+      method="POST"
+      action="https://sandbox.payfast.co.za/eng/process"
+    ></form>
+    <form
+      id="form6"
+      method="POST"
+      action="https://sandbox.payfast.co.za/eng/process"
+    ></form>
+
+    <script>
+      // ── Protocol check ──────────────────────────────────────────────────────────
+      const el = document.getElementById("protocol-check");
+      if (window.location.protocol === "file:") {
+        el.innerHTML =
+          '<span class="warn">⛔ ERROR: You opened this from a file. Form POST will NOT work. Access via http://localhost:3001/payfast-test.html instead.</span>';
+      } else {
+        el.innerHTML =
+          '<span class="sig">✅ Running from ' +
+          window.location.origin +
+          " — form POST will work.</span>";
+      }
+
+      // ── PayFast field order ─────────────────────────────────────────────────────
+      const FIELD_ORDER = [
+        "merchant_id",
+        "merchant_key",
+        "return_url",
+        "cancel_url",
+        "notify_url",
+        "name_first",
+        "name_last",
+        "email_address",
+        "cell_number",
+        "m_payment_id",
+        "amount",
+        "item_name",
+        "item_description",
+        "custom_int1",
+        "custom_int2",
+        "custom_int3",
+        "custom_int4",
+        "custom_int5",
+        "custom_str1",
+        "custom_str2",
+        "custom_str3",
+        "custom_str4",
+        "custom_str5",
+        "email_confirmation",
+        "confirmation_address",
+        "payment_method",
+        "subscription_type",
+        "billing_date",
+        "recurring_amount",
+        "frequency",
+        "cycles",
+      ];
+
+      // ── Signature generator ─────────────────────────────────────────────────────
+      function genSig(data, passphrase) {
+        // Build ordered param string, SKIP empty values
+        const pairs = [];
+        for (const key of FIELD_ORDER) {
+          if (
+            data[key] !== undefined &&
+            data[key] !== null &&
+            String(data[key]).trim() !== ""
+          ) {
+            pairs.push(
+              key +
+                "=" +
+                encodeURIComponent(String(data[key]).trim()).replace(
+                  /%20/g,
+                  "+",
+                ),
+            );
+          }
+        }
+        let paramStr = pairs.join("&");
+        if (passphrase && passphrase.trim() !== "") {
+          paramStr +=
+            "&passphrase=" +
+            encodeURIComponent(passphrase.trim()).replace(/%20/g, "+");
+        }
+        return { signature: md5(paramStr), paramStr: paramStr };
+      }
+
+      // ── Populate hidden form ────────────────────────────────────────────────────
+      function fillForm(formId, data) {
+        const form = document.getElementById(formId);
+        form.innerHTML = "";
+        Object.keys(data).forEach(function (key) {
+          var inp = document.createElement("input");
+          inp.type = "hidden";
+          inp.name = key;
+          inp.value = data[key];
+          form.appendChild(inp);
+        });
+      }
+
+      // ── Submit handler ──────────────────────────────────────────────────────────
+      function submitForm(id) {
+        document.getElementById("form" + id).submit();
+      }
+
+      // ── Build all tests ─────────────────────────────────────────────────────────
+      var html = "";
+
+      // PayFast's own example from their docs (minimal)
+      var tests = [
+        {
+          name: "TEST 1 — PayFast minimum required fields + passphrase",
+          data: {
+            merchant_id: "10000100",
+            merchant_key: "46f0cd694581a",
+            amount: "100.00",
+            item_name: "Test Product 001",
+          },
+          pass: "jt7NOE43FZo",
+        },
+        {
+          name: "TEST 2 — Minimum fields, NO passphrase",
+          data: {
+            merchant_id: "10000100",
+            merchant_key: "46f0cd694581a",
+            amount: "100.00",
+            item_name: "Test Product 001",
+          },
+          pass: "",
+        },
+        {
+          name: "TEST 3 — With return/cancel URLs + passphrase",
+          data: {
+            merchant_id: "10000100",
+            merchant_key: "46f0cd694581a",
+            return_url: "http://localhost:3001/order-success",
+            cancel_url: "http://localhost:3001/checkout",
+            amount: "100.00",
+            item_name: "Test Product 001",
+          },
+          pass: "jt7NOE43FZo",
+        },
+        {
+          name: "TEST 4 — With return/cancel URLs, NO passphrase",
+          data: {
+            merchant_id: "10000100",
+            merchant_key: "46f0cd694581a",
+            return_url: "http://localhost:3001/order-success",
+            cancel_url: "http://localhost:3001/checkout",
+            amount: "100.00",
+            item_name: "Test Product 001",
+          },
+          pass: "",
+        },
+        {
+          name: "TEST 5 — Full realistic (like your checkout) + passphrase",
+          data: {
+            merchant_id: "10000100",
+            merchant_key: "46f0cd694581a",
+            return_url: "http://localhost:3001/order-success?ref=PB-TEST-001",
+            cancel_url: "http://localhost:3001/checkout",
+            notify_url:
+              "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1/payfast-itn",
+            email_address: "customer@protea.dev",
+            m_payment_id: "test-diag-" + Date.now(),
+            amount: "800.00",
+            item_name: "Protea Botanicals Order (1 item)",
+            item_description: "1x Blue Dream 1g Cartridge",
+          },
+          pass: "jt7NOE43FZo",
+        },
+        {
+          name: "TEST 6 — Full realistic, NO passphrase",
+          data: {
+            merchant_id: "10000100",
+            merchant_key: "46f0cd694581a",
+            return_url: "http://localhost:3001/order-success?ref=PB-TEST-001",
+            cancel_url: "http://localhost:3001/checkout",
+            notify_url:
+              "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1/payfast-itn",
+            email_address: "customer@protea.dev",
+            m_payment_id: "test-diag-" + Date.now(),
+            amount: "800.00",
+            item_name: "Protea Botanicals Order (1 item)",
+            item_description: "1x Blue Dream 1g Cartridge",
+          },
+          pass: "",
+        },
+      ];
+
+      tests.forEach(function (t, i) {
+        var idx = i + 1;
+        var result = genSig(t.data, t.pass);
+        var formData = Object.assign({}, t.data, {
+          signature: result.signature,
+        });
+        fillForm("form" + idx, formData);
+
+        html += "<h2>" + t.name + "</h2>";
+        html += '<div class="box">';
+        html +=
+          "<div><strong>Passphrase:</strong> " +
+          (t.pass ? '"' + t.pass + '"' : "(empty)") +
+          "</div>";
+        html +=
+          "<div><strong>Fields:</strong> " +
+          Object.keys(t.data).join(", ") +
+          "</div>";
+        html +=
+          '<div style="margin-top:8px"><strong>Param string:</strong></div>';
+        html += '<pre class="param">' + result.paramStr + "</pre>";
+        html +=
+          '<div><strong>Signature:</strong> <span class="sig">' +
+          result.signature +
+          "</span></div>";
+        html +=
+          '<div style="margin-top:8px"><strong>Form data being submitted:</strong></div>';
+        html += "<pre>" + JSON.stringify(formData, null, 2) + "</pre>";
+        html +=
+          "<button " +
+          (idx % 2 === 0 ? 'class="orange" ' : "") +
+          'onclick="submitForm(' +
+          idx +
+          ')">Submit TEST ' +
+          idx +
+          " to PayFast →</button>";
+        html += "</div>";
+      });
+
+      html += '<h2 style="color:#52b788; margin-top:40px;">Instructions</h2>';
+      html += '<div class="box">';
+      html +=
+        "<p>Click each Submit button one at a time (use browser Back after each).</p>";
+      html +=
+        "<p>Look for which test shows the PayFast <strong>payment page</strong> vs the 400 error.</p>";
+      html += "<p>The error message tells us what's wrong:</p>";
+      html += "<ul>";
+      html +=
+        '<li><strong>"signature mismatch"</strong> → wrong passphrase or field order</li>';
+      html +=
+        '<li><strong>"No payment data received"</strong> → form POST blocked (wrong protocol)</li>';
+      html +=
+        "<li><strong>Payment page appears</strong> → that combination works! ✅</li>";
+      html += "</ul></div>";
+
+      document.getElementById("results").innerHTML = html;
+    </script>
+  </body>
+</html>

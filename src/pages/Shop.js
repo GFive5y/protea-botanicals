@@ -1,4 +1,10 @@
-// src/pages/Shop.js v2.7
+// src/pages/Shop.js v2.8
+// v2.8: LIVE INVENTORY — Task A-4 (Automation WP). Shop page now queries
+//       inventory_items (category: "finished_product") instead of using hardcoded
+//       VAPE_PRODUCTS array. STRAINS array kept as visual metadata lookup (DEC-019).
+//       Each inventory item is matched to a strain for gradients, effects, icons.
+//       inventory_item_id added to product objects for Task A-5 cart deduction.
+//       Products with no strain match use generic styling. Empty inventory = no vapes shown.
 // v2.7: CART INTEGRATION — Import useCart from CartContext, call addToCart(product)
 //       on "Add to Cart" click. Toast now says "added to cart" (not "coming soon").
 //       Cart badge in NavBar updates in real time.
@@ -18,12 +24,14 @@
 // v2.3: 36 vape products (18 strains × 2 formats) + 6 Coming Soon category cards.
 //       Pricing: R800 (1ml Cart), R1,600 (2ml Pen).
 // v2.1: Removed custom nav — NavBar in App.js handles navigation + auth state.
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
+import { supabase } from "../services/supabaseClient";
 
 // ── Strain Data (EXTRACTED DIRECTLY from ProductVerification.js v2.3) ────────
-// Source of truth: PV.js STRAINS object — every field is a 1:1 copy.
+// Source of truth for VISUAL METADATA ONLY (DEC-019).
+// Inventory determines WHAT shows; this array determines HOW it looks.
 const STRAINS = [
   // ── Pure Terpenes Line (2 strains) ──
   {
@@ -288,33 +296,72 @@ const STRAINS = [
   },
 ];
 
-// ── Product Catalog (36 vapes + 6 Coming Soon) ──────────────────────────────
-const VAPE_PRODUCTS = [];
-STRAINS.forEach((s) => {
-  VAPE_PRODUCTS.push({
-    id: `${s.id}-1ml`,
-    strainId: s.id,
-    name: s.name,
-    strain: s,
-    format: "1ml Cartridge",
-    formatShort: "1ml Cart",
-    price: 800,
-    thc: "93.55%",
-    badge: "510 Thread",
-  });
-  VAPE_PRODUCTS.push({
-    id: `${s.id}-2ml`,
-    strainId: s.id,
-    name: s.name,
-    strain: s,
-    format: "2ml Disposable Pen",
-    formatShort: "2ml Pen",
-    price: 1600,
-    thc: "93.55%",
-    badge: "All-in-One",
-  });
-});
+// ── Strain matching helpers ─────────────────────────────────────────────────
+// Sort by name length descending for greedy matching (longer names first)
+// Prevents "MAC" matching "Macadamia" before "Macadamia" can match itself
+const STRAINS_BY_LENGTH = [...STRAINS].sort(
+  (a, b) => b.name.length - a.name.length,
+);
 
+// Default strain visual metadata for inventory items that don't match any known strain
+const DEFAULT_STRAIN = {
+  id: "unknown",
+  name: "Unknown",
+  line: "Other",
+  lineShort: "Other",
+  type: "Hybrid",
+  typeColor: "#888888",
+  accentColor: "#aaaaaa",
+  gradientFrom: "#2a2a2a",
+  gradientTo: "#4a4a4a",
+  icon: "●",
+  tagline: "Premium Cannabis Product.",
+  effects: [],
+};
+
+// Match an inventory_item to a strain + build a shop product object
+function buildProductFromInventory(item) {
+  // Match strain by checking if item name starts with a known strain name
+  const lowerName = item.name.toLowerCase();
+  const matchedStrain = STRAINS_BY_LENGTH.find((s) =>
+    lowerName.startsWith(s.name.toLowerCase()),
+  );
+
+  // Determine format from item name
+  const is2ml = /2\.?0?\s*ml/i.test(item.name);
+
+  // Build the product-display name from the matched strain, or extract from item name
+  const displayName = matchedStrain
+    ? matchedStrain.name
+    : item.name
+        .replace(/\d+\.?\d*\s*ml\s*/i, "")
+        .replace(/cartridge|disposable|pen|pod/i, "")
+        .trim() || item.name;
+
+  // Use matched strain or build a fallback with the extracted name
+  const strain = matchedStrain || {
+    ...DEFAULT_STRAIN,
+    id: item.id,
+    name: displayName,
+  };
+
+  return {
+    id: item.id,
+    inventory_item_id: item.id,
+    strainId: strain.id,
+    name: displayName,
+    strain: strain,
+    format: is2ml ? "2ml Disposable Pen" : "1ml Cartridge",
+    formatShort: is2ml ? "2ml Pen" : "1ml Cart",
+    price: is2ml ? 1600 : 800,
+    thc: "93.55%",
+    badge: is2ml ? "All-in-One" : "510 Thread",
+    quantity_on_hand: item.quantity_on_hand,
+    sku: item.sku,
+  };
+}
+
+// ── Coming Soon Categories ──────────────────────────────────────────────────
 const COMING_SOON = [
   {
     id: "cs-wellness",
@@ -462,13 +509,54 @@ export default function Shop() {
   const [filter, setFilter] = useState("all");
   const [cartToast, setCartToast] = useState(null);
 
+  // ── v2.8: Live inventory state ─────────────────────────────────────
+  const [liveProducts, setLiveProducts] = useState([]);
+  const [loadingInventory, setLoadingInventory] = useState(true);
+
+  // ── v2.8: Fetch finished products from inventory ───────────────────
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoadingInventory(true);
+      try {
+        const { data, error } = await supabase
+          .from("inventory_items")
+          .select("id, name, sku, category, unit, quantity_on_hand, cost_price")
+          .eq("category", "finished_product")
+          .eq("is_active", true)
+          .gt("quantity_on_hand", 0)
+          .order("name");
+
+        if (error) {
+          console.error("[Shop] Inventory fetch error:", error);
+          setLiveProducts([]);
+          return;
+        }
+
+        // Match each inventory item to strain visual metadata + build product
+        const products = (data || []).map((item) =>
+          buildProductFromInventory(item),
+        );
+        setLiveProducts(products);
+        console.log(
+          `[Shop] Loaded ${products.length} products from ${(data || []).length} inventory items`,
+        );
+      } catch (err) {
+        console.error("[Shop] Fetch error:", err);
+        setLiveProducts([]);
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
   const handleAddToCart = (product) => {
     addToCart(product);
     setCartToast(product.name + " — " + product.formatShort);
     setTimeout(() => setCartToast(null), 2200);
   };
 
-  // Filter logic
+  // Filter logic (uses liveProducts instead of hardcoded VAPE_PRODUCTS)
   const showVapes =
     filter === "all" ||
     filter === "vapes" ||
@@ -477,9 +565,9 @@ export default function Shop() {
   const lineFilter = FILTER_OPTIONS.find((f) => f.key === filter)?.line;
 
   const filteredVapes = lineFilter
-    ? VAPE_PRODUCTS.filter((p) => p.strain.line === lineFilter)
+    ? liveProducts.filter((p) => p.strain.line === lineFilter)
     : showVapes
-      ? VAPE_PRODUCTS
+      ? liveProducts
       : [];
 
   const filteredCS = showCS ? COMING_SOON : [];
@@ -674,69 +762,123 @@ export default function Shop() {
             className="body-font"
             style={{ fontSize: 13, color: "#888", fontWeight: 300 }}
           >
-            Showing {totalShowing} {totalShowing === 1 ? "product" : "products"}
-            {filter !== "all" && (
+            {loadingInventory ? (
+              "Loading products..."
+            ) : (
               <>
-                {" "}
-                ·{" "}
-                <span
-                  style={{
-                    color: "#1b4332",
-                    fontWeight: 500,
-                    cursor: "pointer",
-                  }}
-                  onClick={() => setFilter("all")}
-                >
-                  Clear filter
-                </span>
+                Showing {totalShowing}{" "}
+                {totalShowing === 1 ? "product" : "products"}
+                {filter !== "all" && (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span
+                      style={{
+                        color: "#1b4332",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setFilter("all")}
+                    >
+                      Clear filter
+                    </span>
+                  </>
+                )}
               </>
             )}
           </span>
         </div>
 
         {/* ── VAPE GRID ── */}
-        {filteredVapes.length > 0 && (
-          <>
-            {(filter === "all" || filter === "coming-soon") &&
-              filteredCS.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <span
-                    className="body-font"
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: "0.35em",
-                      textTransform: "uppercase",
-                      color: "#52b788",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Vape Collection
-                  </span>
-                </div>
-              )}
-            <div
-              className="shop-grid"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                gap: 24,
-                marginBottom: 48,
-              }}
-            >
-              {filteredVapes.map((product) => (
-                <VapeCard
-                  key={product.id}
-                  product={product}
-                  navigate={navigate}
-                  onAddToCart={handleAddToCart}
-                />
-              ))}
+        {loadingInventory ? (
+          <div
+            style={{ textAlign: "center", padding: "60px 20px", color: "#888" }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>
+              🌿
             </div>
+            <p
+              className="body-font"
+              style={{ fontSize: 13, fontWeight: 300, margin: 0 }}
+            >
+              Loading inventory...
+            </p>
+          </div>
+        ) : (
+          <>
+            {filteredVapes.length > 0 && (
+              <>
+                {(filter === "all" || filter === "coming-soon") &&
+                  filteredCS.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <span
+                        className="body-font"
+                        style={{
+                          fontSize: 10,
+                          letterSpacing: "0.35em",
+                          textTransform: "uppercase",
+                          color: "#52b788",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Vape Collection
+                      </span>
+                    </div>
+                  )}
+                <div
+                  className="shop-grid"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(300px, 1fr))",
+                    gap: 24,
+                    marginBottom: 48,
+                  }}
+                >
+                  {filteredVapes.map((product) => (
+                    <VapeCard
+                      key={product.id}
+                      product={product}
+                      navigate={navigate}
+                      onAddToCart={handleAddToCart}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* No vapes in stock message (only when filtering vapes) */}
+            {filteredVapes.length === 0 && showVapes && !showCS && (
+              <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                <div
+                  style={{
+                    fontSize: 48,
+                    marginBottom: 16,
+                    opacity: 0.3,
+                  }}
+                >
+                  🌿
+                </div>
+                <p
+                  className="body-font"
+                  style={{ color: "#888", fontSize: 15, fontWeight: 300 }}
+                >
+                  No vape products currently in stock. Check back soon!
+                </p>
+                <button
+                  className="shop-btn"
+                  style={{ marginTop: 16 }}
+                  onClick={() => setFilter("all")}
+                >
+                  Show All Products
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {/* ── COMING SOON GRID ── */}
-        {filteredCS.length > 0 && (
+        {filteredCS.length > 0 && !loadingInventory && (
           <>
             {filteredVapes.length > 0 && <div className="section-divider" />}
             <div style={{ marginBottom: 16 }}>
@@ -809,7 +951,7 @@ export default function Shop() {
         )}
 
         {/* Empty state */}
-        {totalShowing === 0 && (
+        {totalShowing === 0 && !loadingInventory && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
             <p

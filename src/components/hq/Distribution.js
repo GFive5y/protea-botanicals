@@ -1,4 +1,4 @@
-// src/components/hq/Distribution.js — Protea Botanicals v1.0
+// src/components/hq/Distribution.js — Protea Botanicals v1.1
 // ─────────────────────────────────────────────────────────────────────────────
 // DISTRIBUTION TAB — Phase 2D
 //
@@ -12,14 +12,18 @@
 //   - Status progression: preparing → shipped → in_transit → delivered → confirmed
 //   - Courier & tracking number
 //   - Cost tracking per shipment
-//   - Future: shop-side receipt confirmation, auto-deduct HQ inventory
+//   - ★ v1.1: Auto-transfer inventory on delivery (Task A-3 — Automation WP).
+//     When shipment marked "delivered": deducts from HQ inventory, creates
+//     stock_movements (shipment_out), and if destination is a registered shop
+//     tenant, creates/increments shop inventory + stock_movements (shipment_in).
 //
 // Tables used:
 //   - shipments (CRUD)
 //   - shipment_items (CRUD, linked to shipments)
 //   - tenants (read, for destination shop selection)
-//   - inventory_items (read, for item selection)
+//   - inventory_items (read + update/insert for auto-transfer)
 //   - production_batches (read, for batch linking)
+//   - stock_movements (insert for audit trail)
 //
 // Design: Cream aesthetic (Section 7 of handover).
 // RLS: Uses is_hq_user() — HQ can do everything.
@@ -992,7 +996,7 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
   const totalCost = items.reduce((sum, i) => sum + (i.total_cost || 0), 0);
   const nextStatuses = NEXT_STATUSES[shipment.status] || [];
 
-  // ── Status change ──────────────────────────────────────────────────
+  // ── Status change (v1.1: includes auto-transfer on delivery) ───────
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
     try {
@@ -1009,6 +1013,230 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
         .update(updates)
         .eq("id", shipment.id);
       if (error) throw error;
+
+      // ── TASK A-3: Auto-transfer inventory on delivery ──────────
+      // When shipment is delivered:
+      //   1. Deduct shipped items from HQ inventory (shipment_out)
+      //   2. If destination is a registered shop tenant, create/increment
+      //      shop inventory (shipment_in)
+      if (newStatus === "delivered") {
+        const shipItems = shipment.shipment_items || [];
+        const transferErrors = [];
+        let transferredCount = 0;
+        const destTenantId = shipment.destination_tenant_id;
+
+        console.log(
+          `[Distribution] A-3: Processing delivery for ${shipment.shipment_number} → ${shipment.destination_name}`,
+        );
+
+        for (const si of shipItems) {
+          const qty = si.quantity || 0;
+          if (qty <= 0) continue;
+
+          try {
+            // ── STEP 1: Deduct from HQ inventory ─────────────────
+            if (si.inventory_item_id) {
+              // Read current HQ quantity
+              const { data: hqItem, error: hqReadErr } = await supabase
+                .from("inventory_items")
+                .select("quantity_on_hand")
+                .eq("id", si.inventory_item_id)
+                .single();
+
+              if (hqReadErr) {
+                console.error(
+                  `[Distribution] A-3: Read HQ inventory error for ${si.item_name}:`,
+                  hqReadErr,
+                );
+                transferErrors.push(
+                  `${si.item_name} (HQ read): ${hqReadErr.message}`,
+                );
+              } else if (hqItem) {
+                const newHqQty = (hqItem.quantity_on_hand || 0) - qty;
+                const { error: hqUpdErr } = await supabase
+                  .from("inventory_items")
+                  .update({ quantity_on_hand: newHqQty })
+                  .eq("id", si.inventory_item_id);
+
+                if (hqUpdErr) {
+                  console.error(
+                    `[Distribution] A-3: Update HQ inventory error for ${si.item_name}:`,
+                    hqUpdErr,
+                  );
+                  transferErrors.push(
+                    `${si.item_name} (HQ update): ${hqUpdErr.message}`,
+                  );
+                } else {
+                  console.log(
+                    `[Distribution] A-3: ✓ HQ deducted ${qty} ${si.unit} of ${si.item_name}`,
+                  );
+                }
+
+                // HQ stock movement (shipment_out)
+                const { error: hqMoveErr } = await supabase
+                  .from("stock_movements")
+                  .insert({
+                    id: crypto.randomUUID(),
+                    item_id: si.inventory_item_id,
+                    quantity: -qty,
+                    movement_type: "shipment_out",
+                    reference: shipment.shipment_number,
+                    notes: `Shipped to ${shipment.destination_name} (${shipment.shipment_number})`,
+                    tenant_id: HQ_TENANT_ID,
+                  });
+
+                if (hqMoveErr) {
+                  console.error(
+                    `[Distribution] A-3: HQ stock movement error for ${si.item_name}:`,
+                    hqMoveErr,
+                  );
+                  transferErrors.push(
+                    `${si.item_name} (HQ movement): ${hqMoveErr.message}`,
+                  );
+                }
+              }
+            } else {
+              console.log(
+                `[Distribution] A-3: Skipping HQ deduction for "${si.item_name}" (no inventory_item_id)`,
+              );
+            }
+
+            // ── STEP 2: Add to shop inventory (if registered tenant) ─
+            if (destTenantId) {
+              // Find or create matching item at shop tenant
+              const { data: shopItems, error: shopFindErr } = await supabase
+                .from("inventory_items")
+                .select("id, quantity_on_hand")
+                .eq("tenant_id", destTenantId)
+                .ilike("name", si.item_name)
+                .limit(1);
+
+              if (shopFindErr) {
+                console.error(
+                  `[Distribution] A-3: Find shop inventory error for ${si.item_name}:`,
+                  shopFindErr,
+                );
+                transferErrors.push(
+                  `${si.item_name} (shop find): ${shopFindErr.message}`,
+                );
+              } else {
+                let shopItemId;
+
+                if (shopItems && shopItems.length > 0) {
+                  // INCREMENT existing shop item
+                  shopItemId = shopItems[0].id;
+                  const newShopQty = (shopItems[0].quantity_on_hand || 0) + qty;
+                  const { error: shopUpdErr } = await supabase
+                    .from("inventory_items")
+                    .update({ quantity_on_hand: newShopQty })
+                    .eq("id", shopItemId);
+
+                  if (shopUpdErr) {
+                    console.error(
+                      `[Distribution] A-3: Update shop inventory error for ${si.item_name}:`,
+                      shopUpdErr,
+                    );
+                    transferErrors.push(
+                      `${si.item_name} (shop update): ${shopUpdErr.message}`,
+                    );
+                  } else {
+                    console.log(
+                      `[Distribution] A-3: ✓ Shop incremented "${si.item_name}" by ${qty} → ${newShopQty}`,
+                    );
+                  }
+                } else {
+                  // CREATE new shop inventory item (client-side UUID per LL-048)
+                  shopItemId = crypto.randomUUID();
+                  const { error: shopCreateErr } = await supabase
+                    .from("inventory_items")
+                    .insert({
+                      id: shopItemId,
+                      tenant_id: destTenantId,
+                      name: si.item_name,
+                      sku: si.sku || null,
+                      category: "finished_product",
+                      quantity_on_hand: qty,
+                      unit: si.unit || "pcs",
+                      cost_price: si.unit_cost || null,
+                      is_active: true,
+                    });
+
+                  if (shopCreateErr) {
+                    console.error(
+                      `[Distribution] A-3: Create shop inventory error for ${si.item_name}:`,
+                      shopCreateErr,
+                    );
+                    transferErrors.push(
+                      `${si.item_name} (shop create): ${shopCreateErr.message}`,
+                    );
+                  } else {
+                    console.log(
+                      `[Distribution] A-3: ✓ Created shop item "${si.item_name}" with ${qty} ${si.unit}`,
+                    );
+                  }
+                }
+
+                // Shop stock movement (shipment_in)
+                if (shopItemId) {
+                  const { error: shopMoveErr } = await supabase
+                    .from("stock_movements")
+                    .insert({
+                      id: crypto.randomUUID(),
+                      item_id: shopItemId,
+                      quantity: qty,
+                      movement_type: "shipment_in",
+                      reference: shipment.shipment_number,
+                      notes: `Received from HQ (${shipment.shipment_number})`,
+                      tenant_id: destTenantId,
+                    });
+
+                  if (shopMoveErr) {
+                    console.error(
+                      `[Distribution] A-3: Shop stock movement error for ${si.item_name}:`,
+                      shopMoveErr,
+                    );
+                    transferErrors.push(
+                      `${si.item_name} (shop movement): ${shopMoveErr.message}`,
+                    );
+                  }
+                }
+              }
+            } else {
+              console.log(
+                `[Distribution] A-3: No destination tenant — skipping shop inventory for "${si.item_name}"`,
+              );
+            }
+
+            transferredCount++;
+          } catch (itemErr) {
+            console.error(
+              `[Distribution] A-3: Transfer error for ${si.item_name}:`,
+              itemErr,
+            );
+            transferErrors.push(
+              `${si.item_name}: ${itemErr.message || "Unknown error"}`,
+            );
+          }
+        }
+
+        // Report results
+        if (transferErrors.length > 0) {
+          console.warn(
+            "[Distribution] A-3: Some transfers failed:",
+            transferErrors,
+          );
+          alert(
+            "Shipment marked as delivered, but some inventory transfers failed:\n\n" +
+              transferErrors.join("\n") +
+              "\n\nYou may need to manually adjust inventory.",
+          );
+        } else if (transferredCount > 0) {
+          console.log(
+            `[Distribution] A-3: ✓ All ${transferredCount} items transferred for ${shipment.shipment_number}`,
+          );
+        }
+      }
+
       onRefresh();
     } catch (err) {
       console.error("[Distribution] Status update error:", err);

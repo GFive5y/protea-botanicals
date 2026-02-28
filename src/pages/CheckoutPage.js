@@ -1,5 +1,12 @@
-// src/pages/CheckoutPage.js — Protea Botanicals v2.0
+// src/pages/CheckoutPage.js — Protea Botanicals v2.1
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v2.1 CHANGELOG (Task A-5 — Automation WP):
+//   ADD: After order is created via edge function, loop through cart items
+//        and deduct from inventory_items + create stock_movements (sale_out).
+//        Only items with inventory_item_id are deducted (Shop.js v2.8 provides
+//        this field for live inventory items). Errors are non-blocking.
+//   KEEP: Everything else identical to v2.0.
+//
 // ★ v2.0 CHANGELOG (Phase 2G — PayFast Production Integration):
 //   1. REMOVE: Hardcoded PayFast sandbox credentials
 //   2. ADD: Calls payfast-checkout Edge Function for server-side:
@@ -10,7 +17,6 @@
 //   4. ADD: Order reference stored in localStorage AND URL param
 //   5. ADD: Supabase auth token sent to edge function
 //   6. KEEP: Same visual design, same cart integration, same layout
-//   Version bump v1.0 → v2.0
 //
 // v1.0: Mock checkout with hardcoded sandbox form POST
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +31,9 @@ import { useCart } from "../contexts/CartContext";
 import { RoleContext } from "../App";
 import { supabase } from "../services/supabaseClient";
 import { C } from "../styles/tokens";
+
+// HQ tenant ID for stock movements (LL-046, same as Production.js / Distribution.js)
+const HQ_TENANT_ID = "43b34c33-6864-4f02-98dd-df1d340475c3";
 
 // Edge function called via supabase.functions.invoke() — handles auth automatically
 
@@ -126,6 +135,110 @@ export default function CheckoutPage() {
         );
       } catch (e) {
         console.warn("[Checkout] Could not save order to localStorage:", e);
+      }
+
+      // ── TASK A-5: Deduct inventory on order creation ───────────
+      // After order is created in DB, deduct from inventory and
+      // create stock_movements (sale_out). Non-blocking — if this
+      // fails, the order still proceeds to PayFast.
+      console.log(
+        "[Checkout] A-5: Deducting inventory for order",
+        result.order_ref,
+      );
+      const deductionErrors = [];
+      let deductedCount = 0;
+
+      for (const item of cartItems) {
+        const qty = item.quantity || 0;
+        if (!item.inventory_item_id || qty <= 0) {
+          console.log(
+            `[Checkout] A-5: Skipping "${item.name}" (no inventory_item_id)`,
+          );
+          continue;
+        }
+
+        try {
+          // Read current quantity
+          const { data: invItem, error: readErr } = await supabase
+            .from("inventory_items")
+            .select("quantity_on_hand")
+            .eq("id", item.inventory_item_id)
+            .single();
+
+          if (readErr) {
+            console.error(
+              `[Checkout] A-5: Read error for "${item.name}":`,
+              readErr,
+            );
+            deductionErrors.push(`${item.name} (read): ${readErr.message}`);
+            continue;
+          }
+
+          // Subtract quantity (allows negative per DEC-020)
+          const newQty = (invItem.quantity_on_hand || 0) - qty;
+          const { error: updErr } = await supabase
+            .from("inventory_items")
+            .update({ quantity_on_hand: newQty })
+            .eq("id", item.inventory_item_id);
+
+          if (updErr) {
+            console.error(
+              `[Checkout] A-5: Update error for "${item.name}":`,
+              updErr,
+            );
+            deductionErrors.push(`${item.name} (update): ${updErr.message}`);
+            continue;
+          }
+
+          console.log(
+            `[Checkout] A-5: ✓ Deducted ${qty} of "${item.name}" → ${newQty} remaining`,
+          );
+
+          // Create stock movement record (sale_out)
+          const { error: moveErr } = await supabase
+            .from("stock_movements")
+            .insert({
+              id: crypto.randomUUID(),
+              item_id: item.inventory_item_id,
+              quantity: -qty,
+              movement_type: "sale_out",
+              reference: result.order_ref,
+              notes: `Customer order ${result.order_ref}: ${qty} × ${item.name}`,
+              tenant_id: HQ_TENANT_ID,
+            });
+
+          if (moveErr) {
+            console.error(
+              `[Checkout] A-5: Stock movement error for "${item.name}":`,
+              moveErr,
+            );
+            deductionErrors.push(`${item.name} (movement): ${moveErr.message}`);
+          }
+
+          deductedCount++;
+        } catch (itemErr) {
+          console.error(
+            `[Checkout] A-5: Unexpected error for "${item.name}":`,
+            itemErr,
+          );
+          deductionErrors.push(
+            `${item.name}: ${itemErr.message || "Unknown error"}`,
+          );
+        }
+      }
+
+      // Report results (non-blocking — order proceeds regardless)
+      if (deductionErrors.length > 0) {
+        console.warn(
+          "[Checkout] A-5: Some deductions failed:",
+          deductionErrors,
+        );
+      } else if (deductedCount > 0) {
+        console.log(
+          `[Checkout] A-5: ✓ All ${deductedCount} items deducted for order ${result.order_ref}`,
+        );
+      } else {
+        console.log("[Checkout] A-5: No inventory items to deduct");
       }
 
       // Set form data — triggers auto-submit via useEffect
