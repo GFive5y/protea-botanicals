@@ -1,7 +1,10 @@
-// src/components/CoPilot.js v2.1
+// src/components/CoPilot.js v2.2
 // Protea Botanicals — AI Assistant Sidebar Panel
 // v2.0: Slide-in sidebar, conversation history, role-aware, branded design
 // v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
+// v2.2: WP-002 — Replace static floating button with AnimatedAICharacter
+//       Import AnimatedAICharacter, pass isOpen + isThinking + onClick.
+//       No other changes to chat panel, messages, or sidebar logic.
 
 import React, {
   useState,
@@ -13,6 +16,7 @@ import React, {
 import { useLocation } from "react-router-dom";
 import { RoleContext } from "../App";
 import { sendMessage, buildUserContext } from "../services/copilotService";
+import AnimatedAICharacter from "./AnimatedAICharacter";
 
 const C = {
   green: "#1b4332",
@@ -288,34 +292,15 @@ export default function CoPilot() {
 
   return (
     <>
-      {!shouldHide && (
-        <button
-          onClick={() => setIsOpen((prev) => !prev)}
-          aria-label={isOpen ? "Close assistant" : "Open assistant"}
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            right: "24px",
-            zIndex: 10001,
-            width: "56px",
-            height: "56px",
-            borderRadius: "50%",
-            background: isOpen
-              ? C.mid
-              : `linear-gradient(135deg, ${C.green} 0%, ${C.mid} 100%)`,
-            color: C.white,
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "24px",
-            boxShadow: "0 4px 20px rgba(27,67,50,0.35)",
-            transition: "all 0.3s ease",
-          }}
-        >
-          {isOpen ? "\u2715" : "\uD83C\uDF3F"}
-        </button>
+      {/* ── v2.2: AnimatedAICharacter replaces static 🌿 button ── */}
+      {/* Hidden on scan sub-pages AND when chat panel is open */}
+      {!shouldHide && !isOpen && (
+        <AnimatedAICharacter
+          isOpen={false}
+          isThinking={false}
+          onClick={() => setIsOpen(true)}
+          size={70}
+        />
       )}
 
       {isOpen && (

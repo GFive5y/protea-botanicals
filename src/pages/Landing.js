@@ -1,4 +1,8 @@
-// src/pages/Landing.js v5.3
+// src/pages/Landing.js v5.4
+// v5.4: Video background on "Understanding THC" section — slow golden distillate
+//       loop behind text with cream overlay for readability. File: public/videos/distillate-bg.mp4
+//       Changes: contentSections map section gets position:relative + overflow:hidden,
+//       video + overlay injected when sec.id==='thc', content div gets z-index:2.
 // v5.3: Integrated AgeGate (21+ overlay on first visit) + PromoBanner (?promo= URL param).
 //       Wraps page in <AgeGate>, reads ?promo= via useSearchParams, passes to <PromoBanner>.
 // v5.2: Fixed invisible header text when not scrolled (dark text on transparent bg,
@@ -612,7 +616,66 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── CONTENT SECTIONS ── */}
+        {/* ── v5.4: DISTILLATE VIDEO DIVIDER — pure visual, no text ── */}
+        <section
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            height: "700px",
+            background: "#1a1a1a",
+          }}
+        >
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              minWidth: "100%",
+              minHeight: "100%",
+              width: "auto",
+              height: "auto",
+              transform: "translate(-50%, -50%)",
+              objectFit: "cover",
+              zIndex: 0,
+            }}
+          >
+            <source src="/videos/distillate-bg.mp4" type="video/mp4" />
+          </video>
+          {/* Top fade */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "35px",
+              background:
+                "linear-gradient(to bottom, #faf9f6 0%, rgba(250,249,246,0) 100%)",
+              zIndex: 1,
+              pointerEvents: "none",
+            }}
+          />
+          {/* Bottom fade */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: "35px",
+              background:
+                "linear-gradient(to top, #faf9f6 0%, rgba(250,249,246,0) 100%)",
+              zIndex: 1,
+              pointerEvents: "none",
+            }}
+          />
+        </section>
+
+        {/* ── CONTENT SECTIONS (all text, no video) ── */}
         {contentSections.map((sec, idx) => (
           <section
             key={sec.id}
@@ -623,6 +686,8 @@ export default function Landing() {
               background: idx % 2 === 0 ? "#faf9f6" : "#f4f0e8",
               display: "flex",
               justifyContent: "center",
+              position: "relative",
+              overflow: "hidden",
             }}
             ref={(el) => {
               if (el) {
