@@ -1,18 +1,20 @@
-// src/pages/MoleculesPage.js v1.3
+// src/pages/MoleculesPage.js v1.4
 // Dedicated molecule education page — all 6 cannabinoids.
-// D9-THC, D8-THC, D10-THC, THCa: Full animated molecules with controls.
-// Others: Placeholder hexagon + educational content + "Coming Soon" badge.
+// D9-THC, D8-THC, D10-THC, THCa, CBD: Full animated molecules with controls.
+// CBN: Placeholder hexagon + educational content + "Coming Soon" badge.
 // Route: /molecules — linked from Landing.js THC section.
 // Uses PageShell if available, fallback to standalone layout.
 // v1.1: Added Delta-10-THC live molecule integration.
 // v1.2: Added Delta-8-THC live molecule integration.
 // v1.3: Added THCa live molecule integration.
+// v1.4: Added CBD live molecule integration.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Delta9THCMolecule from "../components/Delta9THCMolecule";
 import Delta8THCMolecule from "../components/Delta8THCMolecule";
 import Delta10THCMolecule from "../components/Delta10THCMolecule";
 import THCaMolecule from "../components/THCaMolecule";
+import CBDMolecule from "../components/CBDMolecule";
 
 const MOLECULES = [
   {
@@ -78,8 +80,8 @@ const MOLECULES = [
     name: "CBD",
     fullName: "Cannabidiol",
     formula: "C₂₁H₃₀O₂",
-    status: "coming",
-    color: "#14B8A6",
+    status: "live",
+    color: "#52b788",
     rings: 2,
     description:
       "The most abundant non-psychoactive cannabinoid. CBD interacts with the endocannabinoid system without producing a 'high'. Widely studied for its potential therapeutic applications including anxiety reduction, seizure management and anti-inflammatory properties. Our distillate contains 0.98% CBD.",
@@ -336,7 +338,9 @@ export default function MoleculesPage() {
                 }}
               >
                 {active.status === "live" ? (
-                  active.id === "thca" ? (
+                  active.id === "cbd" ? (
+                    <CBDMolecule showControls={true} compact={false} />
+                  ) : active.id === "thca" ? (
                     <THCaMolecule showControls={true} compact={false} />
                   ) : active.id === "d8-thc" ? (
                     <Delta8THCMolecule showControls={true} compact={false} />
