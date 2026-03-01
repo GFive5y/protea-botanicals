@@ -1,10 +1,10 @@
-// src/components/CoPilot.js v2.2
+// src/components/CoPilot.js v2.3
 // Protea Botanicals — AI Assistant Sidebar Panel
 // v2.0: Slide-in sidebar, conversation history, role-aware, branded design
 // v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
 // v2.2: WP-002 — Replace static floating button with AnimatedAICharacter
-//       Import AnimatedAICharacter, pass isOpen + isThinking + onClick.
-//       No other changes to chat panel, messages, or sidebar logic.
+// v2.3: WP-003 — Frosted glass panel, gradient fade borders, Lottie bot
+//       in header when open, aggressive fade-in transition, no hard edges.
 
 import React, {
   useState,
@@ -16,7 +16,9 @@ import React, {
 import { useLocation } from "react-router-dom";
 import { RoleContext } from "../App";
 import { sendMessage, buildUserContext } from "../services/copilotService";
-import AnimatedAICharacter from "./AnimatedAICharacter";
+import LottieCharacter from "./LottieCharacter";
+import Lottie from "lottie-react";
+import chatbotIdle from "../assets/lottie/chatbot-idle.json";
 
 const C = {
   green: "#1b4332",
@@ -189,6 +191,7 @@ export default function CoPilot() {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const headerLottieRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -292,17 +295,17 @@ export default function CoPilot() {
 
   return (
     <>
-      {/* ── v2.2: AnimatedAICharacter replaces static 🌿 button ── */}
-      {/* Hidden on scan sub-pages AND when chat panel is open */}
-      {!shouldHide && !isOpen && (
-        <AnimatedAICharacter
-          isOpen={false}
-          isThinking={false}
+      {/* ── v2.3: Lottie floating character (bottom-right, hides when panel open) ── */}
+      {!shouldHide && (
+        <LottieCharacter
+          isOpen={isOpen}
+          isThinking={loading}
           onClick={() => setIsOpen(true)}
-          size={70}
+          size={120}
         />
       )}
 
+      {/* ── Backdrop overlay — frosted, aggressive fade-in ── */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
@@ -310,12 +313,16 @@ export default function CoPilot() {
             position: "fixed",
             inset: 0,
             zIndex: 9999,
-            background: "rgba(0,0,0,0.15)",
-            transition: "opacity 0.3s ease",
+            background: "rgba(0,0,0,0.05)",
+            backdropFilter: "none",
+            WebkitBackdropFilter: "none",
+            transition: "opacity 0.15s ease",
+            animation: "copilot-backdrop-in 0.15s ease-out",
           }}
         />
       )}
 
+      {/* ── Main panel — frosted glass ── */}
       <div
         style={{
           position: "fixed",
@@ -325,88 +332,151 @@ export default function CoPilot() {
           width: `${PANEL_WIDTH}px`,
           maxWidth: "90vw",
           zIndex: 10000,
-          background: C.cream,
-          borderLeft: `1px solid ${C.border}`,
+          // Frosted glass: semi-transparent with blur
+          background: "rgba(250, 249, 246, 0.55)",
+          backdropFilter: "blur(12px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(12px) saturate(1.2)",
+          // No hard border — subtle gradient shadow instead
+          borderLeft: "none",
           display: "flex",
           flexDirection: "column",
           fontFamily: FONTS.body,
           transform: isOpen
             ? "translateX(0)"
             : `translateX(${PANEL_WIDTH + 10}px)`,
-          transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: isOpen ? "-8px 0 30px rgba(0,0,0,0.1)" : "none",
+          transition: "transform 0.25s cubic-bezier(0.2, 0, 0, 1)",
+          // Soft shadow instead of hard border
+          boxShadow: isOpen
+            ? "-20px 0 60px rgba(0,0,0,0.12), -4px 0 20px rgba(0,0,0,0.06)"
+            : "none",
         }}
       >
-        {/* Header */}
+        {/* ── Left edge gradient fade (replaces hard border) ── */}
         <div
           style={{
-            background: C.green,
-            padding: "16px 20px",
+            position: "absolute",
+            top: 0,
+            left: -30,
+            bottom: 0,
+            width: 30,
+            background:
+              "linear-gradient(to right, transparent, rgba(250,249,246,0.3))",
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* ── Header with Lottie bot ── */}
+        <div
+          style={{
+            // Frosted header — slightly more opaque green
+            background: "rgba(27, 67, 50, 0.88)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            padding: "12px 20px 12px 12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexShrink: 0,
+            // Bottom fade instead of hard border
+            boxShadow: "0 4px 20px rgba(27, 67, 50, 0.15)",
           }}
         >
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {/* Lottie bot in header when panel is open */}
             <div
               style={{
-                fontSize: "10px",
-                letterSpacing: "0.3em",
-                textTransform: "uppercase",
-                color: C.accent,
-                marginBottom: "2px",
+                width: 52,
+                height: 52,
+                flexShrink: 0,
+                opacity: isOpen ? 1 : 0,
+                transform: isOpen ? "scale(1)" : "scale(0.5)",
+                transition:
+                  "opacity 0.3s ease 0.15s, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s",
               }}
             >
-              Protea Botanicals
+              <Lottie
+                lottieRef={headerLottieRef}
+                animationData={chatbotIdle}
+                loop={true}
+                autoplay={true}
+                style={{ width: 60, height: 60, marginTop: -2, marginLeft: -4 }}
+              />
             </div>
-            <div
-              style={{
-                fontFamily: FONTS.heading,
-                fontSize: "18px",
-                fontWeight: 600,
-                color: C.white,
-              }}
-            >
-              AI Assistant
+            <div>
+              <div
+                style={{
+                  fontSize: "9px",
+                  letterSpacing: "0.3em",
+                  textTransform: "uppercase",
+                  color: C.accent,
+                  marginBottom: "1px",
+                  opacity: 0.8,
+                }}
+              >
+                Protea Botanicals
+              </div>
+              <div
+                style={{
+                  fontFamily: FONTS.heading,
+                  fontSize: "17px",
+                  fontWeight: 600,
+                  color: C.white,
+                }}
+              >
+                AI Assistant
+              </div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <button
               onClick={handleClearChat}
               title="Clear conversation"
               style={{
-                background: "rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.08)",
                 border: "none",
-                color: "rgba(255,255,255,0.6)",
+                color: "rgba(255,255,255,0.5)",
                 cursor: "pointer",
                 padding: "6px 8px",
-                borderRadius: "2px",
+                borderRadius: "6px",
                 fontSize: "12px",
                 fontFamily: FONTS.body,
+                transition: "background 0.15s",
               }}
+              onMouseEnter={(e) =>
+                (e.target.style.background = "rgba(255,255,255,0.15)")
+              }
+              onMouseLeave={(e) =>
+                (e.target.style.background = "rgba(255,255,255,0.08)")
+              }
             >
               🗑
             </button>
             <button
               onClick={() => setIsOpen(false)}
               style={{
-                background: "rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.08)",
                 border: "none",
-                color: "rgba(255,255,255,0.7)",
+                color: "rgba(255,255,255,0.6)",
                 cursor: "pointer",
                 padding: "6px 10px",
-                borderRadius: "2px",
+                borderRadius: "6px",
                 fontSize: "16px",
                 lineHeight: 1,
+                transition: "background 0.15s",
               }}
+              onMouseEnter={(e) =>
+                (e.target.style.background = "rgba(255,255,255,0.15)")
+              }
+              onMouseLeave={(e) =>
+                (e.target.style.background = "rgba(255,255,255,0.08)")
+              }
             >
               ✕
             </button>
           </div>
         </div>
 
-        {/* Messages */}
+        {/* ── Messages area — frosted, transparent ── */}
         <div
           style={{
             flex: 1,
@@ -415,6 +485,9 @@ export default function CoPilot() {
             display: "flex",
             flexDirection: "column",
             gap: "12px",
+            // Subtle inner top fade from header
+            background:
+              "linear-gradient(to bottom, rgba(27,67,50,0.04) 0%, transparent 40px)",
           }}
         >
           {messages.map((msg, i) => (
@@ -433,12 +506,16 @@ export default function CoPilot() {
                     msg.role === "user"
                       ? "16px 16px 4px 16px"
                       : "16px 16px 16px 4px",
+                  // Frosted message bubbles
                   background:
                     msg.role === "user"
-                      ? C.green
+                      ? "rgba(27, 67, 50, 0.85)"
                       : msg.isError
-                        ? "#fff0ee"
-                        : C.white,
+                        ? "rgba(255, 240, 238, 0.85)"
+                        : "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: msg.role === "user" ? "none" : "blur(10px)",
+                  WebkitBackdropFilter:
+                    msg.role === "user" ? "none" : "blur(10px)",
                   color:
                     msg.role === "user"
                       ? C.white
@@ -447,11 +524,14 @@ export default function CoPilot() {
                         : C.text,
                   fontSize: "13px",
                   lineHeight: "1.6",
+                  // Soft borders instead of hard lines
                   border:
                     msg.role === "user"
                       ? "none"
-                      : `1px solid ${msg.isError ? "#f0c0b0" : C.border}`,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                      : msg.isError
+                        ? "1px solid rgba(240, 192, 176, 0.4)"
+                        : "1px solid rgba(224, 219, 210, 0.4)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                 }}
               >
                 {msg.role === "user"
@@ -465,8 +545,10 @@ export default function CoPilot() {
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
               <div
                 style={{
-                  background: C.white,
-                  border: `1px solid ${C.border}`,
+                  background: "rgba(255, 255, 255, 0.65)",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                  border: "1px solid rgba(224, 219, 210, 0.4)",
                   padding: "12px 20px",
                   borderRadius: "16px 16px 16px 4px",
                   display: "flex",
@@ -504,8 +586,10 @@ export default function CoPilot() {
                   key={i}
                   onClick={() => handleSend(s)}
                   style={{
-                    background: C.white,
-                    border: `1px solid ${C.border}`,
+                    background: "rgba(255, 255, 255, 0.55)",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                    border: "1px solid rgba(224, 219, 210, 0.4)",
                     borderRadius: "20px",
                     padding: "8px 14px",
                     fontSize: "12px",
@@ -516,13 +600,13 @@ export default function CoPilot() {
                     lineHeight: 1.3,
                   }}
                   onMouseEnter={(e) => {
+                    e.target.style.background = "rgba(212, 237, 218, 0.6)";
                     e.target.style.borderColor = C.accent;
-                    e.target.style.background = C.lightGreen;
                     e.target.style.color = C.green;
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.borderColor = C.border;
-                    e.target.style.background = C.white;
+                    e.target.style.background = "rgba(255, 255, 255, 0.55)";
+                    e.target.style.borderColor = "rgba(224, 219, 210, 0.4)";
                     e.target.style.color = C.mid;
                   }}
                 >
@@ -534,13 +618,18 @@ export default function CoPilot() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
+        {/* ── Input area — frosted bottom bar ── */}
         <div
           style={{
-            borderTop: `1px solid ${C.border}`,
+            // Top fade instead of hard border
+            borderTop: "none",
             padding: "12px 16px",
-            background: C.white,
+            background: "rgba(255, 255, 255, 0.5)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
             flexShrink: 0,
+            // Top shadow fade
+            boxShadow: "0 -4px 16px rgba(0,0,0,0.03)",
           }}
         >
           <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
@@ -555,20 +644,27 @@ export default function CoPilot() {
               style={{
                 flex: 1,
                 padding: "10px 14px",
-                border: `1px solid ${C.border}`,
+                border: "1px solid rgba(224, 219, 210, 0.5)",
                 borderRadius: "20px",
                 fontSize: "13px",
                 fontFamily: FONTS.body,
-                background: C.cream,
+                background: "rgba(250, 249, 246, 0.6)",
                 resize: "none",
                 outline: "none",
                 lineHeight: "1.4",
                 maxHeight: "100px",
                 overflowY: "auto",
                 boxSizing: "border-box",
+                transition: "border-color 0.15s, background 0.15s",
               }}
-              onFocus={(e) => (e.target.style.borderColor = C.accent)}
-              onBlur={(e) => (e.target.style.borderColor = C.border)}
+              onFocus={(e) => {
+                e.target.style.borderColor = C.accent;
+                e.target.style.background = "rgba(255, 255, 255, 0.8)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "rgba(224, 219, 210, 0.5)";
+                e.target.style.background = "rgba(250, 249, 246, 0.6)";
+              }}
             />
             <button
               onClick={() => handleSend()}
@@ -577,7 +673,10 @@ export default function CoPilot() {
                 width: "38px",
                 height: "38px",
                 borderRadius: "50%",
-                background: loading || !input.trim() ? C.border : C.green,
+                background:
+                  loading || !input.trim()
+                    ? "rgba(224, 219, 210, 0.5)"
+                    : C.green,
                 color: C.white,
                 border: "none",
                 cursor: loading || !input.trim() ? "not-allowed" : "pointer",
@@ -595,7 +694,7 @@ export default function CoPilot() {
           <div
             style={{
               fontSize: "10px",
-              color: C.muted,
+              color: "rgba(136, 136, 136, 0.6)",
               textAlign: "center",
               marginTop: "8px",
               letterSpacing: "0.05em",
@@ -606,7 +705,16 @@ export default function CoPilot() {
         </div>
       </div>
 
-      <style>{`@keyframes copilot-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }`}</style>
+      <style>{`
+        @keyframes copilot-dot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes copilot-backdrop-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
     </>
   );
 }
