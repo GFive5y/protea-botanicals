@@ -61,28 +61,19 @@ const AROMATIC_CIRCLE = { cx: 153.9, cy: 67.4, r: 21.15 };
 const DBL_RECT = { x: 44.977, y: 100.049, w: 1.1, h: 24.801 };
 
 // Ring zone polygon
-const RING =
-  "154.0,37.4 180.5,52.1 179.9,82.4 154.0,98.1 128.0,82.4 128.0,52.4";
+const RING = "154.0,37.4 180.5,52.1 179.9,82.4 154.0,98.1 128.0,82.4 128.0,52.4";
 const ZONE_NAMES = ["Ring", "Left Chain", "Right Chain"];
 
 const TIERS = {
-  light: { opacity: 0.22 },
+  light:  { opacity: 0.22 },
   medium: { opacity: 0.38 },
-  dark: { opacity: 0.55 },
-  solid: { opacity: 0.78 },
+  dark:   { opacity: 0.55 },
+  solid:  { opacity: 0.78 },
 };
 
 function lighten(hex, amt) {
-  const r = parseInt(hex.slice(1, 3), 16),
-    g = parseInt(hex.slice(3, 5), 16),
-    b = parseInt(hex.slice(5, 7), 16);
-  return `#${[r, g, b]
-    .map((c) =>
-      Math.min(255, Math.round(c + (255 - c) * amt))
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")}`;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `#${[r,g,b].map(c => Math.min(255,Math.round(c+(255-c)*amt)).toString(16).padStart(2,"0")).join("")}`;
 }
 
 // ═══ GEOMETRY RENDERER ═══
@@ -93,22 +84,10 @@ function Geo({ color }) {
         <path key={i} d={d} fill={color} stroke="none" />
       ))}
       {/* Aromatic circle */}
-      <circle
-        cx={AROMATIC_CIRCLE.cx}
-        cy={AROMATIC_CIRCLE.cy}
-        r={AROMATIC_CIRCLE.r}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.15"
-      />
+      <circle cx={AROMATIC_CIRCLE.cx} cy={AROMATIC_CIRCLE.cy} r={AROMATIC_CIRCLE.r}
+        fill="none" stroke={color} strokeWidth="1.15" />
       {/* Double bond inner line */}
-      <rect
-        x={DBL_RECT.x}
-        y={DBL_RECT.y}
-        width={DBL_RECT.w}
-        height={DBL_RECT.h}
-        fill={color}
-      />
+      <rect x={DBL_RECT.x} y={DBL_RECT.y} width={DBL_RECT.w} height={DBL_RECT.h} fill={color} />
     </g>
   );
 }
@@ -118,44 +97,22 @@ function AtomLabels({ color }) {
   return (
     <g fill={color} fontWeight="bold">
       {/* OH (ring top) */}
-      <text x="147.7" y="13.7" fontFamily="Helvetica, Arial" fontSize="16">
-        OH
-      </text>
+      <text x="147.7" y="13.7" fontFamily="Helvetica, Arial" fontSize="16">OH</text>
       {/* HO (ring lower-left) */}
-      <text x="84.2" y="103.7" fontFamily="Helvetica, Arial" fontSize="16">
-        HO
-      </text>
+      <text x="84.2" y="103.7" fontFamily="Helvetica, Arial" fontSize="16">HO</text>
       {/* CH3 (top of left chain) */}
-      <text x="44.3" y="13.7" fontFamily="Helvetica, Arial" fontSize="16">
-        CH
-      </text>
-      <text x="67.4" y="16.7" fontFamily="Helvetica, Arial" fontSize="12">
-        3
-      </text>
+      <text x="44.3" y="13.7" fontFamily="Helvetica, Arial" fontSize="16">CH</text>
+      <text x="67.4" y="16.7" fontFamily="Helvetica, Arial" fontSize="12">3</text>
       {/* CH3 (lower-right branch) */}
-      <text x="70.3" y="148.7" fontFamily="Helvetica, Arial" fontSize="16">
-        CH
-      </text>
-      <text x="93.4" y="151.7" fontFamily="Helvetica, Arial" fontSize="12">
-        3
-      </text>
+      <text x="70.3" y="148.7" fontFamily="Helvetica, Arial" fontSize="16">CH</text>
+      <text x="93.4" y="151.7" fontFamily="Helvetica, Arial" fontSize="12">3</text>
       {/* H3C (lower-left branch) */}
-      <text x="0" y="148.7" fontFamily="Helvetica, Arial" fontSize="16">
-        H
-      </text>
-      <text x="11.6" y="151.7" fontFamily="Helvetica, Arial" fontSize="12">
-        3
-      </text>
-      <text x="18.2" y="148.7" fontFamily="Helvetica, Arial" fontSize="16">
-        C
-      </text>
+      <text x="0" y="148.7" fontFamily="Helvetica, Arial" fontSize="16">H</text>
+      <text x="11.6" y="151.7" fontFamily="Helvetica, Arial" fontSize="12">3</text>
+      <text x="18.2" y="148.7" fontFamily="Helvetica, Arial" fontSize="16">C</text>
       {/* CH3 (end of right chain) */}
-      <text x="304.1" y="103.7" fontFamily="Helvetica, Arial" fontSize="16">
-        CH
-      </text>
-      <text x="327.2" y="106.7" fontFamily="Helvetica, Arial" fontSize="12">
-        3
-      </text>
+      <text x="304.1" y="103.7" fontFamily="Helvetica, Arial" fontSize="16">CH</text>
+      <text x="327.2" y="106.7" fontFamily="Helvetica, Arial" fontSize="12">3</text>
     </g>
   );
 }
@@ -175,8 +132,7 @@ function MoleculeRenderer({ color, opacity, animate }) {
   }, []);
 
   const doSweep = useCallback((dir, done) => {
-    const dur = 1800,
-      t0 = performance.now();
+    const dur = 1800, t0 = performance.now();
     const tick = (now) => {
       if (!alive.current) return;
       const p = Math.min((now - t0) / dur, 1);
@@ -189,55 +145,39 @@ function MoleculeRenderer({ color, opacity, animate }) {
 
   useEffect(() => {
     alive.current = true;
-    if (!animate) {
-      setZone(null);
-      setSweep(0);
-      return;
-    }
-    const rm =
-      typeof window !== "undefined" &&
+    if (!animate) { setZone(null); setSweep(0); return; }
+    const rm = typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (rm) return;
     let last = -1;
     const go = () => {
       if (!alive.current) return;
       let n;
-      do {
-        n = Math.floor(Math.random() * 3);
-      } while (n === last);
-      last = n;
-      setZone(n);
-      setSweep(0);
+      do { n = Math.floor(Math.random() * 3); } while (n === last);
+      last = n; setZone(n); setSweep(0);
       if (n >= 1) {
         doSweep(n, () => {
           const t1 = setTimeout(() => {
             if (!alive.current) return;
-            setZone(null);
-            setSweep(0);
+            setZone(null); setSweep(0);
             const t2 = setTimeout(go, 800 + Math.random() * 1000);
             timers.current.push(t2);
           }, 600);
           timers.current.push(t1);
         });
       } else {
-        const t1 = setTimeout(
-          () => {
-            if (!alive.current) return;
-            setZone(null);
-            const t2 = setTimeout(go, 800 + Math.random() * 1000);
-            timers.current.push(t2);
-          },
-          1500 + Math.random() * 500,
-        );
+        const t1 = setTimeout(() => {
+          if (!alive.current) return;
+          setZone(null);
+          const t2 = setTimeout(go, 800 + Math.random() * 1000);
+          timers.current.push(t2);
+        }, 1500 + Math.random() * 500);
         timers.current.push(t1);
       }
     };
     const t0 = setTimeout(go, 400);
     timers.current.push(t0);
-    return () => {
-      alive.current = false;
-      clear();
-    };
+    return () => { alive.current = false; clear(); };
   }, [animate, doSweep, clear]);
 
   const bright = lighten(color, 0.45);
@@ -256,21 +196,11 @@ function MoleculeRenderer({ color, opacity, animate }) {
         </filter>
         {/* Left chain sweep clip */}
         <clipPath id="cbg-lc">
-          <rect
-            x={128 - 128 * (zone === 1 ? sweep : 0)}
-            y="0"
-            width={128 * (zone === 1 ? sweep : 0)}
-            height="156"
-          />
+          <rect x={128 - 128 * (zone === 1 ? sweep : 0)} y="0" width={128 * (zone === 1 ? sweep : 0)} height="156" />
         </clipPath>
         {/* Right chain sweep clip */}
         <clipPath id="cbg-rc">
-          <rect
-            x="180"
-            y="0"
-            width={154 * (zone === 2 ? sweep : 0)}
-            height="156"
-          />
+          <rect x="180" y="0" width={154 * (zone === 2 ? sweep : 0)} height="156" />
         </clipPath>
       </defs>
 
@@ -282,15 +212,8 @@ function MoleculeRenderer({ color, opacity, animate }) {
 
       {/* Ring glow overlay */}
       {zone === 0 && (
-        <polygon
-          points={RING}
-          fill="none"
-          stroke={bright}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-          filter="url(#cbg-glo)"
-          opacity="0.95"
-        />
+        <polygon points={RING} fill="none" stroke={bright}
+          strokeWidth="1.2" strokeLinejoin="round" filter="url(#cbg-glo)" opacity="0.95" />
       )}
 
       {/* Left chain sweep */}
@@ -313,11 +236,7 @@ function MoleculeRenderer({ color, opacity, animate }) {
 }
 
 // ═══ EXPORTED COMPONENT ═══
-export default function CBGMolecule({
-  onClick,
-  showControls = true,
-  compact = false,
-}) {
+export default function CBGMolecule({ onClick, showControls = true, compact = false }) {
   const [tier, setTier] = useState("dark");
   const [color, setColor] = useState("#8B5CF6");
   const [hovered, setHovered] = useState(false);
@@ -345,128 +264,68 @@ export default function CBGMolecule({
           position: "relative",
         }}
       >
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: compact ? "8px" : "12px",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "'Cormorant Garamond', Georgia, serif",
-              fontSize: compact ? "14px" : "15px",
-              fontWeight: 300,
-              color: "#1a1a1a",
-              letterSpacing: "0.06em",
-            }}
-          >
+        <div style={{ textAlign: "center", marginBottom: compact ? "8px" : "12px" }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', Georgia, serif",
+            fontSize: compact ? "14px" : "15px", fontWeight: 300, color: "#1a1a1a",
+            letterSpacing: "0.06em",
+          }}>
             Cannabigerol
           </div>
-          <div
-            style={{
-              fontFamily: "'Jost', sans-serif",
-              fontSize: "9px",
-              letterSpacing: "0.25em",
-              textTransform: "uppercase",
-              color: "#aaa",
-              marginTop: "2px",
-            }}
-          >
+          <div style={{
+            fontFamily: "'Jost', sans-serif",
+            fontSize: "9px", letterSpacing: "0.25em",
+            textTransform: "uppercase", color: "#aaa", marginTop: "2px",
+          }}>
             Living Molecule
           </div>
         </div>
 
-        <MoleculeRenderer
-          color={color}
-          opacity={TIERS[tier].opacity}
-          animate={true}
-        />
+        <MoleculeRenderer color={color} opacity={TIERS[tier].opacity} animate={true} />
 
         {onClick && hovered && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "8px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              fontFamily: "'Jost', sans-serif",
-              fontSize: "9px",
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "#6d28d9",
-              opacity: 0.7,
-              whiteSpace: "nowrap",
-              background: "rgba(250,249,246,0.85)",
-              padding: "2px 10px",
-              borderRadius: "2px",
-            }}
-          >
+          <div style={{
+            position: "absolute", bottom: "8px", left: "50%", transform: "translateX(-50%)",
+            fontFamily: "'Jost', sans-serif", fontSize: "9px",
+            letterSpacing: "0.2em", textTransform: "uppercase",
+            color: "#6d28d9", opacity: 0.7, whiteSpace: "nowrap",
+            background: "rgba(250,249,246,0.85)", padding: "2px 10px",
+            borderRadius: "2px",
+          }}>
             Explore All Molecules →
           </div>
         )}
       </div>
 
       {showControls && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "16px",
-            marginTop: "16px",
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: "16px", marginTop: "16px", flexWrap: "wrap",
+        }}>
           <div style={{ display: "flex", gap: "4px" }}>
-            {Object.keys(TIERS).map((k) => (
-              <button
-                key={k}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTier(k);
-                }}
-                style={{
-                  padding: "4px 10px",
-                  fontSize: "9px",
-                  fontFamily: "'Jost', sans-serif",
-                  fontWeight: tier === k ? 600 : 400,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  border: `1px solid ${tier === k ? color : "#e8e0d4"}`,
-                  borderRadius: "2px",
-                  background: tier === k ? color : "transparent",
-                  color: tier === k ? "#fff" : "#888",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
+            {Object.keys(TIERS).map(k => (
+              <button key={k} onClick={(e) => { e.stopPropagation(); setTier(k); }} style={{
+                padding: "4px 10px", fontSize: "9px",
+                fontFamily: "'Jost', sans-serif", fontWeight: tier === k ? 600 : 400,
+                letterSpacing: "0.12em", textTransform: "uppercase",
+                border: `1px solid ${tier === k ? color : "#e8e0d4"}`,
+                borderRadius: "2px",
+                background: tier === k ? color : "transparent",
+                color: tier === k ? "#fff" : "#888",
+                cursor: "pointer", transition: "all 0.2s",
+              }}>
                 {k}
               </button>
             ))}
           </div>
-          <div
-            style={{ width: "1px", height: "16px", background: "#e8e0d4" }}
-          />
+          <div style={{ width: "1px", height: "16px", background: "#e8e0d4" }} />
           <div style={{ display: "flex", gap: "4px" }}>
-            {colors.map((c) => (
-              <button
-                key={c.hex}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setColor(c.hex);
-                }}
-                title={c.name}
+            {colors.map(c => (
+              <button key={c.hex} onClick={(e) => { e.stopPropagation(); setColor(c.hex); }} title={c.name}
                 style={{
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "2px",
-                  border:
-                    color === c.hex
-                      ? `2px solid ${c.hex}`
-                      : "1px solid #e8e0d4",
-                  background: c.hex,
-                  cursor: "pointer",
-                  padding: 0,
+                  width: "20px", height: "20px", borderRadius: "2px",
+                  border: color === c.hex ? `2px solid ${c.hex}` : "1px solid #e8e0d4",
+                  background: c.hex, cursor: "pointer", padding: 0,
                   boxShadow: color === c.hex ? `0 0 6px ${c.hex}44` : "none",
                   transition: "all 0.2s",
                 }}
