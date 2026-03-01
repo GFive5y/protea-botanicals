@@ -1,6 +1,6 @@
-// src/pages/MoleculesPage.js v1.4
-// Dedicated molecule education page — all 6 cannabinoids.
-// D9-THC, D8-THC, D10-THC, THCa, CBD: Full animated molecules with controls.
+// src/pages/MoleculesPage.js v1.5
+// Dedicated molecule education page — 7 cannabinoids.
+// D9-THC, D8-THC, D10-THC, THCa, CBD, CBG: Full animated molecules with controls.
 // CBN: Placeholder hexagon + educational content + "Coming Soon" badge.
 // Route: /molecules — linked from Landing.js THC section.
 // Uses PageShell if available, fallback to standalone layout.
@@ -8,6 +8,7 @@
 // v1.2: Added Delta-8-THC live molecule integration.
 // v1.3: Added THCa live molecule integration.
 // v1.4: Added CBD live molecule integration.
+// v1.5: Added CBG as 7th molecule (live).
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Delta9THCMolecule from "../components/Delta9THCMolecule";
@@ -15,6 +16,7 @@ import Delta8THCMolecule from "../components/Delta8THCMolecule";
 import Delta10THCMolecule from "../components/Delta10THCMolecule";
 import THCaMolecule from "../components/THCaMolecule";
 import CBDMolecule from "../components/CBDMolecule";
+import CBGMolecule from "../components/CBGMolecule";
 
 const MOLECULES = [
   {
@@ -114,6 +116,26 @@ const MOLECULES = [
     purity: "0.78%",
     boilingPoint: "185°C",
     discoveredBy: "Robert S. Cahn (1930)",
+  },
+  {
+    id: "cbg",
+    name: "CBG",
+    fullName: "Cannabigerol",
+    formula: "C₂₁H₃₂O₂",
+    status: "live",
+    color: "#F97316",
+    rings: 1,
+    description:
+      "Known as the 'mother cannabinoid', CBG is the precursor from which all other cannabinoids are synthesised. Found in small quantities in most cannabis strains, CBG is non-psychoactive and is being studied for its potential anti-inflammatory, neuroprotective and antibacterial properties.",
+    effects: [
+      "Anti-inflammatory",
+      "Neuroprotective",
+      "Antibacterial",
+      "Appetite stimulant",
+    ],
+    purity: "0.45%",
+    boilingPoint: "~52°C (decarboxylation)",
+    discoveredBy: "Yechiel Gaoni & Raphael Mechoulam (1964)",
   },
   {
     id: "d10-thc",
@@ -338,7 +360,9 @@ export default function MoleculesPage() {
                 }}
               >
                 {active.status === "live" ? (
-                  active.id === "cbd" ? (
+                  active.id === "cbg" ? (
+                    <CBGMolecule showControls={true} compact={false} />
+                  ) : active.id === "cbd" ? (
                     <CBDMolecule showControls={true} compact={false} />
                   ) : active.id === "thca" ? (
                     <THCaMolecule showControls={true} compact={false} />
