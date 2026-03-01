@@ -1,7 +1,6 @@
-// src/pages/MoleculesPage.js v1.5
-// Dedicated molecule education page — 7 cannabinoids.
-// D9-THC, D8-THC, D10-THC, THCa, CBD, CBG: Full animated molecules with controls.
-// CBN: Placeholder hexagon + educational content + "Coming Soon" badge.
+// src/pages/MoleculesPage.js v1.6
+// Dedicated molecule education page — 7 cannabinoids, ALL LIVE.
+// D9-THC, D8-THC, D10-THC, THCa, CBD, CBN, CBG: Full animated molecules.
 // Route: /molecules — linked from Landing.js THC section.
 // Uses PageShell if available, fallback to standalone layout.
 // v1.1: Added Delta-10-THC live molecule integration.
@@ -17,6 +16,7 @@ import Delta10THCMolecule from "../components/Delta10THCMolecule";
 import THCaMolecule from "../components/THCaMolecule";
 import CBDMolecule from "../components/CBDMolecule";
 import CBGMolecule from "../components/CBGMolecule";
+import CBNMolecule from "../components/CBNMolecule";
 
 const MOLECULES = [
   {
@@ -102,7 +102,7 @@ const MOLECULES = [
     name: "CBN",
     fullName: "Cannabinol",
     formula: "C₂₁H₂₆O₂",
-    status: "coming",
+    status: "live",
     color: "#8B5CF6",
     rings: 3,
     description:
@@ -360,7 +360,9 @@ export default function MoleculesPage() {
                 }}
               >
                 {active.status === "live" ? (
-                  active.id === "cbg" ? (
+                  active.id === "cbn" ? (
+                    <CBNMolecule showControls={true} compact={false} />
+                  ) : active.id === "cbg" ? (
                     <CBGMolecule showControls={true} compact={false} />
                   ) : active.id === "cbd" ? (
                     <CBDMolecule showControls={true} compact={false} />
