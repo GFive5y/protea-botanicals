@@ -1,14 +1,18 @@
-// src/pages/MoleculesPage.js v1.1
+// src/pages/MoleculesPage.js v1.3
 // Dedicated molecule education page — all 6 cannabinoids.
-// D9-THC, D10-THC: Full animated molecules with controls.
+// D9-THC, D8-THC, D10-THC, THCa: Full animated molecules with controls.
 // Others: Placeholder hexagon + educational content + "Coming Soon" badge.
 // Route: /molecules — linked from Landing.js THC section.
 // Uses PageShell if available, fallback to standalone layout.
 // v1.1: Added Delta-10-THC live molecule integration.
+// v1.2: Added Delta-8-THC live molecule integration.
+// v1.3: Added THCa live molecule integration.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Delta9THCMolecule from "../components/Delta9THCMolecule";
+import Delta8THCMolecule from "../components/Delta8THCMolecule";
 import Delta10THCMolecule from "../components/Delta10THCMolecule";
+import THCaMolecule from "../components/THCaMolecule";
 
 const MOLECULES = [
   {
@@ -39,7 +43,7 @@ const MOLECULES = [
     name: "Δ8-THC",
     fullName: "Delta-8-Tetrahydrocannabinol",
     formula: "C₂₁H₃₀O₂",
-    status: "coming",
+    status: "live",
     color: "#3B82F6",
     rings: 3,
     description:
@@ -54,7 +58,7 @@ const MOLECULES = [
     name: "THCa",
     fullName: "Tetrahydrocannabinolic Acid",
     formula: "C₂₂H₃₀O₄",
-    status: "coming",
+    status: "live",
     color: "#EAB308",
     rings: 3,
     description:
@@ -332,7 +336,11 @@ export default function MoleculesPage() {
                 }}
               >
                 {active.status === "live" ? (
-                  active.id === "d10-thc" ? (
+                  active.id === "thca" ? (
+                    <THCaMolecule showControls={true} compact={false} />
+                  ) : active.id === "d8-thc" ? (
+                    <Delta8THCMolecule showControls={true} compact={false} />
+                  ) : active.id === "d10-thc" ? (
                     <Delta10THCMolecule showControls={true} compact={false} />
                   ) : (
                     <Delta9THCMolecule showControls={true} compact={false} />
