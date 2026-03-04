@@ -1,36 +1,30 @@
-// src/App.js — Protea Botanicals v4.2
+// src/App.js — Protea Botanicals v4.4
 // ─────────────────────────────────────────────────────────────────────────────
-// ★ v4.2 CHANGELOG:
-//   FIX: NavBar brand text now pixel-perfect match to Landing.js header.
+// ★ v4.4 CHANGELOG:
+//   ROOT CAUSE FIX: Other pages (Shop, Loyalty etc.) have a green hero section
+//   that starts immediately below the sticky header. With a transparent header,
+//   the green hero content was visible BEHIND it — making it look like the
+//   header itself was still green.
 //
-//   Extracted directly from Landing.js v5.7 header source:
+//   Fix: inject global body { background: #faf9f6 } and html { background: #faf9f6 }
+//   so the transparent header always shows cream at scroll=0, matching Landing.
+//   The page hero sections sit BELOW the header in DOM flow (sticky positioning),
+//   so body bg is what shows through the transparent header.
 //
-//   Font:    'Cormorant Garamond', Georgia, serif  ← was Jost (wrong)
-//   Size:    15px                                  ← was 13px (wrong)
-//   Tracking: 0.2em                               ← was 0.35em (wrong)
-//   Case:    uppercase (via text)                  ← unchanged
+//   Also: NavBar now uses position: fixed (matching Landing.js) instead of sticky.
+//   This means the header truly floats above page content rather than pushing it
+//   down. A 56px padding-top is added to WithNav's PageShell and standalone routes
+//   to compensate for the fixed header height.
 //
-//   Colour logic (matches Landing exactly):
-//     Green header (scrolled OR non-Landing pages):
-//       "PROTEA"     → #faf9f6  (cream)
-//       "BOTANICALS" → #52b788  (accent green)
-//     Transparent header (Landing at top, not scrolled):
-//       "PROTEA"     → #1a1a1a  opacity 0.85  (dark, readable on cream bg)
-//       "BOTANICALS" → #2d6a4f               (mid green)
-//
-//   Also injects Google Font @import for Cormorant Garamond so it loads on
-//   all pages (Landing.js loads it via its own <style> tag, but other pages
-//   don't have access to it — fixed with a single injected <style> in NavBar).
+//   Behaviour on ALL pages:
+//     AT TOP  → transparent bg, dark text (#1a1a1a / #2d6a4f), dark outline button
+//     SCROLLED → rgba(27,67,50,0.95) bg, cream/green text, white outline button
 //
 //   NO OTHER CHANGES. All routes, auth, cart, roles — untouched.
 //
-// ★ v4.1: NavBar solid green on non-Landing pages, transparent only on /
-// ★ v4.0: NavBar transparent-top + blur + Jost brand text
-// ★ v3.9: NavBar cream text + scroll-hide
-// ★ v3.8: /terpenes/:id route
-// ★ v3.7: AdminDashboardRouter (Phase 2F)
-// ★ v3.6: TenantProvider, RequireHQ (Phase 2A)
-// ★ v3.5: AI Co-Pilot | ★ v3.4: Admin QR Generator
+// ★ v4.3: All pages transparent-top (wrong — green hero showed through)
+// ★ v4.2: Cormorant Garamond, correct brand colours
+// ★ v4.1: isLanding check
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useState, useEffect, useContext, useRef } from "react";
@@ -45,7 +39,6 @@ import {
 } from "react-router-dom";
 import { supabase } from "./services/supabaseClient";
 
-// ── Pages ────────────────────────────────────────────────────────────────────
 import Landing from "./pages/Landing";
 import ScanPage from "./pages/ScanPage";
 import ScanResult from "./pages/ScanResult";
@@ -68,21 +61,34 @@ import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
 import ShopDashboard from "./pages/ShopDashboard";
 
-// ── Layout / Context ──────────────────────────────────────────────────────────
 import PageShell from "./components/PageShell";
 import { CartProvider, useCart } from "./contexts/CartContext";
 import { TenantProvider, useTenant } from "./services/tenantService";
 
 export const RoleContext = createContext(null);
 
-const LS = {
-  ROLE: "protea_role",
-  DEV_MODE: "protea_dev_mode",
-};
+const LS = { ROLE: "protea_role", DEV_MODE: "protea_dev_mode" };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NAVBAR  v4.2
-// Brand text pixel-perfect match to Landing.js v5.7 header
+// GLOBAL STYLES — injected once at app root
+// Sets cream body background so transparent fixed header shows cream at top
+// ─────────────────────────────────────────────────────────────────────────────
+const GlobalStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500;600&display=swap');
+    html, body {
+      background: #faf9f6;
+      margin: 0;
+      padding: 0;
+    }
+    @keyframes protea-spin { to { transform: rotate(360deg); } }
+  `}</style>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVBAR  v4.4
+// position: fixed — floats above content, body bg shows through at scroll=0
+// ALL pages: transparent + dark text at top → green + light text on scroll
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBar() {
   const { role, setRole, isDevMode, setIsDevMode, userEmail } =
@@ -95,18 +101,16 @@ function NavBar() {
   const isLoggedIn = !!role;
   const cartCount = getCartCount();
 
-  // Only Landing (/) gets the transparent-at-top treatment
-  const isLanding = location.pathname === "/";
-
-  // ── Scroll state ─────────────────────────────────────────────────────────
   const [scrolled, setScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastYRef = useRef(0);
 
+  // Reset scroll state on every route change
   useEffect(() => {
-    setScrolled(false);
+    const y = window.scrollY;
+    setScrolled(y > 50);
     setHeaderVisible(true);
-    lastYRef.current = 0;
+    lastYRef.current = y;
   }, [location.pathname]);
 
   useEffect(() => {
@@ -123,7 +127,6 @@ function NavBar() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  // ─────────────────────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -151,35 +154,28 @@ function NavBar() {
       : userEmail
     : null;
 
-  // ★ v4.2: Background — transparent only on Landing at scroll-top
-  const onGreenBg = !isLanding || scrolled;
-  const headerBg = onGreenBg ? "#1b4332" : "rgba(27,67,50,0.0)";
-
-  // ★ v4.2: Brand colours — extracted directly from Landing.js v5.7
-  // Green header: PROTEA=#faf9f6, BOTANICALS=#52b788
-  // Transparent header (Landing at top): PROTEA=#1a1a1a opacity 0.85, BOTANICALS=#2d6a4f
-  const proteaColor = onGreenBg ? "#faf9f6" : "#1a1a1a";
-  const proteaOpacity = onGreenBg ? 1 : 0.85;
-  const botColor = onGreenBg ? "#52b788" : "#2d6a4f";
-
-  // Nav link + icon colour
-  const navTextColor = onGreenBg
+  // ★ v4.4: same two-state system as Landing.js — no isLanding needed
+  // because body bg is always cream, so transparent = cream background
+  const proteaColor = scrolled ? "#faf9f6" : "#1a1a1a";
+  const proteaOpacity = scrolled ? 1 : 0.85;
+  const botColor = scrolled ? "#52b788" : "#2d6a4f";
+  const navLinkColor = scrolled
     ? "rgba(255,255,255,0.88)"
     : "rgba(27,67,50,0.85)";
-  const navTextColorDim = onGreenBg
+  const navLinkDim = scrolled
     ? "rgba(255,255,255,0.60)"
     : "rgba(27,67,50,0.55)";
 
   return (
     <>
-      {/* ★ v4.2: Inject Cormorant Garamond for non-Landing pages */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500;600&display=swap');
-      `}</style>
-
       {isDevMode && (
         <div
           style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1001,
             background: "#e67e22",
             color: "#fff",
             padding: "6px 16px",
@@ -216,14 +212,17 @@ function NavBar() {
         </div>
       )}
 
+      {/* ★ v4.4: position FIXED — body cream bg shows through at scroll=0 */}
       <header
         style={{
-          position: "sticky",
-          top: 0,
+          position: "fixed",
+          top: isDevMode ? "32px" : 0,
+          left: 0,
+          right: 0,
           zIndex: 1000,
-          background: headerBg,
-          backdropFilter: !onGreenBg ? "blur(8px)" : "none",
-          WebkitBackdropFilter: !onGreenBg ? "blur(8px)" : "none",
+          background: scrolled ? "rgba(27,67,50,0.95)" : "rgba(27,67,50,0.0)",
+          backdropFilter: scrolled ? "blur(8px)" : "none",
+          WebkitBackdropFilter: scrolled ? "blur(8px)" : "none",
           padding: "0 28px",
           display: "flex",
           alignItems: "center",
@@ -235,17 +234,14 @@ function NavBar() {
           borderBottom: scrolled ? "1px solid rgba(82,183,136,0.15)" : "none",
         }}
       >
-        {/* ── LEFT: brand + nav links ── */}
         <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-          {/* ★ v4.2: Exact match to Landing.js header brand text */}
+          {/* ★ Cormorant Garamond 15px 0.2em — exact Landing.js match */}
           <Link
             to="/"
             style={{
               textDecoration: "none",
               marginRight: "16px",
               whiteSpace: "nowrap",
-              // Match Landing transition
-              transition: "opacity 0.4s ease, color 0.4s ease",
             }}
           >
             <span
@@ -255,57 +251,50 @@ function NavBar() {
                 letterSpacing: "0.2em",
                 color: proteaColor,
                 opacity: proteaOpacity,
-                transition: "opacity 0.4s ease, color 0.4s ease",
+                transition: "color 0.4s ease, opacity 0.4s ease",
               }}
             >
               PROTEA{" "}
-              <span
-                style={{
-                  color: botColor,
-                  transition: "color 0.4s ease",
-                }}
-              >
+              <span style={{ color: botColor, transition: "color 0.4s ease" }}>
                 BOTANICALS
               </span>
             </span>
           </Link>
 
-          <NavLink to="/" color={navTextColor}>
+          <NavLink to="/" color={navLinkColor}>
             Home
           </NavLink>
-          <NavLink to="/shop" color={navTextColor}>
+          <NavLink to="/shop" color={navLinkColor}>
             Shop
           </NavLink>
           {isLoggedIn && (
-            <NavLink to="/loyalty" color={navTextColor}>
+            <NavLink to="/loyalty" color={navLinkColor}>
               Loyalty
             </NavLink>
           )}
           {isLoggedIn && (
-            <NavLink to="/scan" color={navTextColor}>
+            <NavLink to="/scan" color={navLinkColor}>
               Scan QR
             </NavLink>
           )}
           {role === "admin" && (
-            <NavLink to="/admin" color={navTextColor}>
+            <NavLink to="/admin" color={navLinkColor}>
               Admin
             </NavLink>
           )}
           {role === "retailer" && (
-            <NavLink to="/wholesale" color={navTextColor}>
+            <NavLink to="/wholesale" color={navLinkColor}>
               Wholesale
             </NavLink>
           )}
           {isHQ && (
-            <NavLink to="/hq" color={navTextColor}>
+            <NavLink to="/hq" color={navLinkColor}>
               HQ
             </NavLink>
           )}
         </nav>
 
-        {/* ── RIGHT: cart + auth ── */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* Cart */}
           <button
             onClick={() => navigate("/cart")}
             style={{
@@ -325,10 +314,11 @@ function NavBar() {
               height="20"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={navTextColor}
+              stroke={navLinkColor}
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
+              style={{ transition: "stroke 0.4s ease" }}
             >
               <circle cx="9" cy="21" r="1" />
               <circle cx="20" cy="21" r="1" />
@@ -404,7 +394,7 @@ function NavBar() {
                 {displayEmail && (
                   <span
                     style={{
-                      color: navTextColorDim,
+                      color: navLinkDim,
                       fontFamily: "Jost, sans-serif",
                       fontSize: "11px",
                       fontWeight: "400",
@@ -413,21 +403,21 @@ function NavBar() {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      transition: "color 0.4s ease",
                     }}
                   >
                     {displayEmail}
                   </span>
                 )}
               </div>
-
               <button
                 onClick={handleLogout}
                 style={{
-                  background: onGreenBg
+                  background: scrolled
                     ? "rgba(255,255,255,0.08)"
                     : "rgba(27,67,50,0.08)",
-                  border: onGreenBg
-                    ? "1px solid rgba(255,255,255,0.25)"
+                  border: scrolled
+                    ? "1px solid rgba(255,255,255,0.3)"
                     : "1px solid rgba(27,67,50,0.3)",
                   borderRadius: "2px",
                   padding: "6px 14px",
@@ -436,17 +426,17 @@ function NavBar() {
                   fontWeight: "600",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
-                  color: onGreenBg ? "rgba(255,255,255,0.88)" : "#1b4332",
+                  color: scrolled ? "rgba(255,255,255,0.88)" : "#1b4332",
                   cursor: "pointer",
-                  transition: "all 0.15s",
+                  transition: "background 0.4s, border-color 0.4s, color 0.4s",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.background = onGreenBg
+                  e.currentTarget.style.background = scrolled
                     ? "rgba(255,255,255,0.18)"
                     : "rgba(27,67,50,0.15)";
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.background = onGreenBg
+                  e.currentTarget.style.background = scrolled
                     ? "rgba(255,255,255,0.08)"
                     : "rgba(27,67,50,0.08)";
                 }}
@@ -455,26 +445,25 @@ function NavBar() {
               </button>
             </>
           ) : (
-            /* Sign In button — matches Landing.js signin-btn exactly */
             <button
               onClick={() => navigate("/account")}
               style={{
-                background: onGreenBg
+                background: scrolled
                   ? "rgba(255,255,255,0.1)"
                   : "rgba(27,67,50,0.08)",
-                border: onGreenBg
+                border: scrolled
                   ? "1px solid rgba(255,255,255,0.3)"
                   : "1px solid rgba(27,67,50,0.3)",
                 borderRadius: "2px",
                 padding: "6px 16px",
-                color: onGreenBg ? "#fff" : "#1b4332",
+                color: scrolled ? "#fff" : "#1b4332",
                 fontFamily: "Jost, sans-serif",
                 fontSize: "10px",
                 fontWeight: "500",
                 letterSpacing: "0.18em",
                 textTransform: "uppercase",
                 cursor: "pointer",
-                transition: "background 0.2s, color 0.4s, border-color 0.4s",
+                transition: "background 0.4s, color 0.4s, border-color 0.4s",
               }}
             >
               Sign In
@@ -486,7 +475,6 @@ function NavBar() {
   );
 }
 
-// ── NavLink helper ────────────────────────────────────────────────────────────
 function NavLink({ to, children, color }) {
   const c = color || "rgba(255,255,255,0.88)";
   return (
@@ -502,13 +490,13 @@ function NavLink({ to, children, color }) {
         textTransform: "uppercase",
         padding: "6px 12px",
         borderRadius: "2px",
-        transition: "color 0.15s, background 0.15s",
+        transition: "color 0.4s ease, background 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.target.style.background = "rgba(27,67,50,0.08)";
+        e.currentTarget.style.background = "rgba(27,67,50,0.08)";
       }}
       onMouseLeave={(e) => {
-        e.target.style.background = "transparent";
+        e.currentTarget.style.background = "transparent";
       }}
     >
       {children}
@@ -516,22 +504,34 @@ function NavLink({ to, children, color }) {
   );
 }
 
-// ── Layout wrappers ───────────────────────────────────────────────────────────
+// ★ v4.4: 56px padding-top on all page wrappers to clear the fixed header
 function WithNav({ children }) {
   return (
     <>
       <NavBar />
-      <PageShell>{children}</PageShell>
+      <div style={{ paddingTop: "56px" }}>
+        <PageShell>{children}</PageShell>
+      </div>
     </>
   );
 }
 
-// ── Auth guards ───────────────────────────────────────────────────────────────
+// Standalone pages that include NavBar directly also need the offset
+function PageWithNav({ children, maxWidth }) {
+  return (
+    <>
+      <NavBar />
+      <div style={{ paddingTop: "56px" }}>
+        <PageShell maxWidth={maxWidth}>{children}</PageShell>
+      </div>
+    </>
+  );
+}
+
 function RequireAuth({ children }) {
   const { role, loading } = useContext(RoleContext);
   const location = useLocation();
-
-  if (loading && !role) {
+  if (loading && !role)
     return (
       <div
         style={{
@@ -555,7 +555,6 @@ function RequireAuth({ children }) {
             animation: "protea-spin 0.8s linear infinite",
           }}
         />
-        <style>{`@keyframes protea-spin { to { transform: rotate(360deg); } }`}</style>
         <span
           style={{
             fontSize: "11px",
@@ -569,35 +568,26 @@ function RequireAuth({ children }) {
         </span>
       </div>
     );
-  }
-
-  if (!role) {
-    console.log("[RequireAuth] No role → /account from:", location.pathname);
+  if (!role)
     return (
       <Navigate
         to={`/account?return=${encodeURIComponent(location.pathname)}`}
         replace
       />
     );
-  }
-
   return children;
 }
 
 function RequireRole({ allowedRoles, children }) {
   const { role } = useContext(RoleContext);
-  if (!allowedRoles.includes(role)) {
-    console.log("[RequireRole]", role, "not in", allowedRoles, "→ /loyalty");
-    return <Navigate to="/loyalty" replace />;
-  }
+  if (!allowedRoles.includes(role)) return <Navigate to="/loyalty" replace />;
   return children;
 }
 
 function RequireHQ({ children }) {
   const { isHQ, loading: tenantLoading } = useTenant();
   const { role } = useContext(RoleContext);
-
-  if (tenantLoading) {
+  if (tenantLoading)
     return (
       <div
         style={{
@@ -634,11 +624,8 @@ function RequireHQ({ children }) {
         </span>
       </div>
     );
-  }
-
   if (!isHQ) {
     const fallback = role === "admin" ? "/admin" : "/loyalty";
-    console.log("[RequireHQ] No HQ access →", fallback);
     return <Navigate to={fallback} replace />;
   }
   return children;
@@ -646,8 +633,7 @@ function RequireHQ({ children }) {
 
 function AdminDashboardRouter() {
   const { isHQ, tenantType, loading: tenantLoading } = useTenant();
-
-  if (tenantLoading) {
+  if (tenantLoading)
     return (
       <div
         style={{
@@ -684,16 +670,11 @@ function AdminDashboardRouter() {
         </span>
       </div>
     );
-  }
-
   if (isHQ) return <AdminDashboard />;
   if (tenantType === "shop") return <ShopDashboard />;
   return <AdminDashboard />;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// APP ROOT
-// ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [role, setRoleState] = useState(
     () => localStorage.getItem(LS.ROLE) || null,
@@ -713,7 +694,7 @@ export default function App() {
   useEffect(() => {
     const safetyTimer = setTimeout(() => {
       setLoading((prev) => {
-        if (prev) console.warn("[App] Safety timeout: forcing loading=false");
+        if (prev) console.warn("[App] Safety timeout");
         return false;
       });
     }, 5000);
@@ -735,16 +716,9 @@ export default function App() {
             .single();
           if (profile?.role) setRole(profile.role);
           setUserEmail(session.user.email);
-          console.log(
-            "[App] Session hydrated:",
-            session.user.email,
-            "role:",
-            profile?.role,
-          );
         } else {
           setRole(null);
           setUserEmail(null);
-          console.log("[App] No session found");
         }
       } catch (err) {
         console.error("[App] hydrateSession error:", err);
@@ -802,15 +776,21 @@ export default function App() {
       <CartProvider>
         <TenantProvider>
           <BrowserRouter>
+            {/* ★ v4.4: cream body bg + font import — makes transparent header work everywhere */}
+            <GlobalStyle />
             <Routes>
-              {/* ── STANDALONE — no nav ─────────────────────────────────────── */}
+              {/* ── Landing — has its own fixed header, no NavBar ───────────── */}
               <Route path="/" element={<Landing />} />
+
+              {/* ── Pages with fixed NavBar + 56px offset ───────────────────── */}
               <Route
                 path="/shop"
                 element={
                   <>
                     <NavBar />
-                    <Shop />
+                    <div style={{ paddingTop: "56px" }}>
+                      <Shop />
+                    </div>
                   </>
                 }
               />
@@ -819,7 +799,9 @@ export default function App() {
                 element={
                   <>
                     <NavBar />
-                    <ProductVerification />
+                    <div style={{ paddingTop: "56px" }}>
+                      <ProductVerification />
+                    </div>
                   </>
                 }
               />
@@ -828,7 +810,9 @@ export default function App() {
                 element={
                   <>
                     <NavBar />
-                    <CartPage />
+                    <div style={{ paddingTop: "56px" }}>
+                      <CartPage />
+                    </div>
                   </>
                 }
               />
@@ -900,51 +884,43 @@ export default function App() {
                   </WithNav>
                 }
               />
+
               <Route
                 path="/admin"
                 element={
-                  <>
-                    <NavBar />
-                    <PageShell maxWidth={1200}>
-                      <RequireAuth>
-                        <RequireRole allowedRoles={["admin"]}>
-                          <AdminDashboardRouter />
-                        </RequireRole>
-                      </RequireAuth>
-                    </PageShell>
-                  </>
+                  <PageWithNav maxWidth={1200}>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["admin"]}>
+                        <AdminDashboardRouter />
+                      </RequireRole>
+                    </RequireAuth>
+                  </PageWithNav>
                 }
               />
               <Route
                 path="/admin/qr"
                 element={
-                  <>
-                    <NavBar />
-                    <PageShell maxWidth={1200}>
-                      <RequireAuth>
-                        <RequireRole allowedRoles={["admin"]}>
-                          <AdminQrGenerator />
-                        </RequireRole>
-                      </RequireAuth>
-                    </PageShell>
-                  </>
+                  <PageWithNav maxWidth={1200}>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["admin"]}>
+                        <AdminQrGenerator />
+                      </RequireRole>
+                    </RequireAuth>
+                  </PageWithNav>
                 }
               />
               <Route
                 path="/hq/*"
                 element={
-                  <>
-                    <NavBar />
-                    <PageShell maxWidth={1400}>
-                      <RequireAuth>
-                        <RequireRole allowedRoles={["admin"]}>
-                          <RequireHQ>
-                            <HQDashboard />
-                          </RequireHQ>
-                        </RequireRole>
-                      </RequireAuth>
-                    </PageShell>
-                  </>
+                  <PageWithNav maxWidth={1400}>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["admin"]}>
+                        <RequireHQ>
+                          <HQDashboard />
+                        </RequireHQ>
+                      </RequireRole>
+                    </RequireAuth>
+                  </PageWithNav>
                 }
               />
 
@@ -966,7 +942,6 @@ export default function App() {
                 }
               />
 
-              {/* Fallback */}
               <Route path="/404" element={<NotFound />} />
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>
