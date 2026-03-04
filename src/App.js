@@ -1,35 +1,32 @@
-// src/App.js — Protea Botanicals v3.8
+// src/App.js — Protea Botanicals v3.9
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v3.9 CHANGELOG:
+//   1. FIX: NavBar brand "Protea Botanicals" colour #b5935a → #faf9f6 (cream)
+//      Matches Landing.js header treatment. No more gold logo.
+//   2. ADD: NavBar scroll-hide behaviour — identical to Landing.js v5.7.
+//      Header slides up (translateY -100%) when user scrolls down past 80px,
+//      reappears when user scrolls up. Uses position:sticky + CSS transition.
+//      State: headerVisible (bool), scrolled (bool).
+//      Effect: passive scroll listener using lastYRef.
+//   NO OTHER CHANGES. All routes, auth, cart, roles — untouched.
+//
 // ★ v3.8 CHANGELOG:
 //   1. ADD: /terpenes/:id route — individual terpene detail page.
-//      TerpenePage reads the :id param and auto-opens that terpene's modal.
 //   NO OTHER CHANGES.
 //
 // ★ v3.7 CHANGELOG (Phase 2F — Shop Admin Scoping):
-//   1. ADD: import ShopDashboard from "./pages/ShopDashboard"
-//   2. ADD: AdminDashboardRouter component — uses tenant context to serve
-//      ShopDashboard (for shop admins) or AdminDashboard (for HQ admins)
-//   3. MODIFY: /admin route uses AdminDashboardRouter instead of AdminDashboard
-//   4. Version bump v3.6 → v3.7
-//   NO OTHER CHANGES. All existing routes, auth, NavBar, cart — untouched.
+//   1. ADD: AdminDashboardRouter
+//   NO OTHER CHANGES.
 //
 // ★ v3.6 CHANGELOG (Phase 2A — Multi-Tenant Foundation):
-//   1. ADD: import TenantProvider from "./services/tenantService"
-//   2. ADD: TenantProvider wrapping BrowserRouter (inside CartProvider)
-//   3. ADD: RequireHQ component — checks hq_access from user_profiles
-//   4. ADD: import HQDashboard from "./pages/HQDashboard"
-//   5. ADD: /hq route with NavBar + PageShell(1400) + RequireAuth + RequireHQ
-//   6. ADD: "HQ" NavLink visible only when isHQ is true
-//   7. ADD: import useTenant for NavBar HQ link visibility
-//   8. Version bump v3.5 → v3.6
-//   NO OTHER CHANGES. All existing routes, auth, NavBar, cart — untouched.
+//   1. ADD: TenantProvider, RequireHQ, /hq route, HQ NavLink
+//   NO OTHER CHANGES.
 //
 // ★ v3.5 CHANGELOG: AI Co-Pilot sidebar
 // ★ v3.4 CHANGELOG: Admin QR Generator
-// (see older changelogs below)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createContext, useState, useEffect, useContext } from "react";
+import { createContext, useState, useEffect, useContext, useRef } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -41,7 +38,7 @@ import {
 } from "react-router-dom";
 import { supabase } from "./services/supabaseClient";
 
-// ── Pages ─────────────────────────────────────────────────────────────────────
+// ── Pages ────────────────────────────────────────────────────────────────────
 import Landing from "./pages/Landing";
 import ScanPage from "./pages/ScanPage";
 import ScanResult from "./pages/ScanResult";
@@ -53,36 +50,27 @@ import NotFound from "./pages/NotFound";
 import TerpenePage from "./pages/TerpenePage";
 import MoleculesPage from "./pages/MoleculesPage";
 
-// Optional pages — comment out any that don't exist yet to avoid import errors
 import Shop from "./pages/Shop";
 import ProductVerification from "./pages/ProductVerification";
 import Redeem from "./pages/Redeem";
 import Welcome from "./pages/Welcome";
 
-// v3.3: Cart + Checkout pages
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccess from "./pages/OrderSuccess";
 
-// ★ v3.4: Admin QR Generator
 import AdminQrGenerator from "./pages/AdminQrGenerator";
-
-// ★ v3.5: AI Co-Pilot
 import CoPilot from "./components/CoPilot";
-
-// ★ v3.6: HQ Dashboard (Phase 2A)
 import HQDashboard from "./pages/HQDashboard";
-
-// ★ v3.7: Shop Dashboard (Phase 2F)
 import ShopDashboard from "./pages/ShopDashboard";
 
-// ── Layout shell ──────────────────────────────────────────────────────────────
+// ── Layout shell ─────────────────────────────────────────────────────────────
 import PageShell from "./components/PageShell";
 
-// ── Cart context ──────────────────────────────────────────────────────────────
+// ── Cart context ─────────────────────────────────────────────────────────────
 import { CartProvider, useCart } from "./contexts/CartContext";
 
-// ★ v3.6: Tenant context (Phase 2A)
+// ★ v3.6: Tenant context
 import { TenantProvider, useTenant } from "./services/tenantService";
 
 // ── RoleContext ───────────────────────────────────────────────────────────────
@@ -94,10 +82,11 @@ const LS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INLINE NAV BAR
+// NAVBAR
+// v3.9: cream brand text + scroll-hide (translateY) behaviour
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBar() {
-  const { role, setRole, isDevMode, setIsDevMode, userEmail, loading } =
+  const { role, setRole, isDevMode, setIsDevMode, userEmail } =
     useContext(RoleContext);
   const { getCartCount } = useCart();
   const { isHQ } = useTenant();
@@ -105,6 +94,27 @@ function NavBar() {
 
   const isLoggedIn = !!role;
   const cartCount = getCartCount();
+
+  // ── v3.9: scroll-hide ──────────────────────────────────────────────────────
+  const [scrolled, setScrolled] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastYRef = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 50);
+      if (y > 80) {
+        setHeaderVisible(y < lastYRef.current);
+      } else {
+        setHeaderVisible(true);
+      }
+      lastYRef.current = y;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -173,21 +183,31 @@ function NavBar() {
         </div>
       )}
 
+      {/* ★ v3.9: sticky position + scroll-hide transform */}
       <header
         style={{
-          background: "#1b4332",
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+          background: scrolled ? "rgba(27,67,50,0.97)" : "#1b4332",
+          backdropFilter: scrolled ? "blur(8px)" : "none",
           padding: "0 24px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           height: "56px",
+          transform: headerVisible ? "translateY(0)" : "translateY(-100%)",
+          transition:
+            "background 0.4s ease, backdrop-filter 0.4s ease, transform 0.35s ease",
+          borderBottom: scrolled ? "1px solid rgba(82,183,136,0.15)" : "none",
         }}
       >
         <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+          {/* ★ v3.9: #faf9f6 cream — was #b5935a gold */}
           <Link
             to="/"
             style={{
-              color: "#b5935a",
+              color: "#faf9f6",
               textDecoration: "none",
               fontFamily: "'Cormorant Garamond', serif",
               fontSize: "16px",
@@ -210,6 +230,7 @@ function NavBar() {
         </nav>
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {/* Cart icon */}
           <button
             onClick={() => navigate("/cart")}
             style={{
