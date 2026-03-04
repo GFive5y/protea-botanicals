@@ -1,4 +1,12 @@
-// src/pages/Shop.js v2.8
+// src/pages/Shop.js v2.9
+// v2.9: STRAIN MODAL (DEC-018) — "View Profile" link in VapeCard replaced
+//       with frosted glass in-page overlay modal. No page navigation on click.
+//       Scroll position on Shop page preserved. Modal shows: strain hero,
+//       description, aroma/flavour, terpene profile, COA summary, Eybna info.
+//       STRAINS_DETAIL + DISTILLATE_COA extracted inline from
+//       ProductVerification.js v2.3 (ProductVerification.js unchanged — locked).
+//       StrainModal component added to this file.
+//       Body scroll locks while modal is open. Backdrop click closes modal.
 // v2.8: LIVE INVENTORY — Task A-4 (Automation WP). Shop page now queries
 //       inventory_items (category: "finished_product") instead of using hardcoded
 //       VAPE_PRODUCTS array. STRAINS array kept as visual metadata lookup (DEC-019).
@@ -8,26 +16,605 @@
 // v2.7: CART INTEGRATION — Import useCart from CartContext, call addToCart(product)
 //       on "Add to Cart" click. Toast now says "added to cart" (not "coming soon").
 //       Cart badge in NavBar updates in real time.
-// v2.6: ADD TO CART FIX — Removed navigate("/account") which chain-redirected to /loyalty
-//       via role-based redirect. Now shows inline toast "added — cart coming soon".
-//       No navigation away from shop page. Ready for CartContext integration (WP next).
-// v2.5: STRAIN DATA FIX — All 18 strains now extracted DIRECTLY from ProductVerification.js v2.3.
-//       69 field mismatches corrected (types, colors, gradients, icons, lines, taglines).
-//       Cinnamon Kush Cake → Live Line (was wrongly Pure Terpenes).
-//       Sweet Watermelon → Enhancer Line (was wrongly Palate).
-//       ZKZ → Live Plus+ Line (was wrongly Live).
-//       All typeColors, accentColors, gradients, icons now 1:1 with PV.js.
-// v2.4: WP2 UX/UI REDESIGN — Cream background matching Landing + ProductVerification aesthetic.
-//       Premium botanical feel: cream bg (#faf9f6), white cards, subtle accents.
-//       Category filter bar, refined product cards with strain gradients as accents.
-//       Mobile responsive @768px + @480px. All 36 vapes + 6 Coming Soon preserved.
-// v2.3: 36 vape products (18 strains × 2 formats) + 6 Coming Soon category cards.
-//       Pricing: R800 (1ml Cart), R1,600 (2ml Pen).
-// v2.1: Removed custom nav — NavBar in App.js handles navigation + auth state.
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
+
+// ── Distillate COA (extracted from ProductVerification.js v2.3 — DO NOT EDIT) ──
+const DISTILLATE_COA = {
+  labId: "JB26-046-01",
+  sampleId: "D9DSOL160126",
+  lab: "Ecogreen Analytics (Pty) Ltd.",
+  labLocation: "Somerset West, Western Cape",
+  accreditation: "SANAS T1045 · SAHPRA Licensed · ILAC-MRA",
+  reportedDate: "2026/01/23",
+  method: "HPLC with UV detection (ME-EA-001)",
+  cannabinoids: [
+    { name: "D9-THC", value: 93.5527, highlight: true },
+    { name: "D8-THC", value: 3.088 },
+    { name: "CBD", value: 0.9756 },
+    { name: "CBN", value: 0.7809 },
+    { name: "CBG", value: 0.0868 },
+    { name: "CBDA", value: 0.043 },
+    { name: "THCA", value: 0.0001 },
+  ],
+  totals: [
+    { name: "Total THC", value: "93.55%" },
+    { name: "Total CBD", value: "1.01%" },
+    { name: "Total Cannabinoids", value: "98.53%" },
+  ],
+};
+
+// ── Strain Detail Data (extracted from ProductVerification.js v2.3 — DO NOT EDIT) ─
+// Visual metadata lives in STRAINS array below (DEC-019).
+// This object holds CONTENT data: description, terpenes, aroma, flavour, Eybna info.
+const STRAINS_DETAIL = {
+  "pineapple-express": {
+    description:
+      "Bright pineapple and citrus notes blend with earthy pine for a vibrant, tropical, and refreshing aroma experience. A combination of exotic sweet pineapple flavor with cedar and pine notes, as well as fine fruity undertones. One of the most recognised sativa profiles in the world.",
+    dominantTerpenes: [
+      {
+        name: "Myrcene",
+        role: "Earthy base · Relaxing undercurrent",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Spicy pine · Anti-inflammatory",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Citrus lift · Mood elevation",
+        color: "#e8a020",
+      },
+      {
+        name: "Ocimene",
+        role: "Sweet tropical · Floral brightness",
+        color: "#4a9eba",
+      },
+    ],
+    aroma: "Pineapple · Citrus · Cedar · Pine · Tropical Fruit",
+    flavour: "Sweet Pineapple · Earthy Pine · Fresh Citrus",
+    eybnaLine: "Pure Terpenes Line",
+    lineCode: "6-11-0002",
+    eybnaDescription:
+      "Eybna's Pure Terpenes Line captures strain-authentic aromatic profiles using only botanical-derived terpenes, without any additives or cutting agents.",
+  },
+  "gelato-41": {
+    description:
+      "Gelato #41 combines Sunset Sherbert and Thin Mint genetics, delivering a sweet and earthy aroma with notes of lavender and pine. Dominated by caryophyllene, limonene and myrcene, this dessert-forward strain delivers creative euphoria that melts into deep body relaxation.",
+    dominantTerpenes: [
+      {
+        name: "Caryophyllene",
+        role: "Peppery spice · Anti-inflammatory",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Citrus zest · Stress relief",
+        color: "#e8c020",
+      },
+      {
+        name: "Myrcene",
+        role: "Musky floral · Calming sedation",
+        color: "#2d6a4f",
+      },
+      { name: "Linalool", role: "Lavender · Sleep support", color: "#9b6b9e" },
+    ],
+    aroma: "Sweet Cream · Lavender · Earthy Pine · Berry · Vanilla",
+    flavour: "Creamy Dessert · Citrus · Sweet Earth · Mint Finish",
+    eybnaLine: "Palate Line",
+    lineCode: "8-13-0002",
+    eybnaDescription:
+      "Eybna's Palate Line elevates classic strain profiles with enhanced flavour clarity and aromatic depth, designed for a premium sensory experience.",
+  },
+  "cinnamon-kush-cake": {
+    description:
+      "Sweet and spicy cinnamon bun with deep kush notes. An indica-dominant strain that delivers warm, spiced comfort with a vanilla and earthy peppermint base. The Live Line captures the aromatic peak of the cannabis plant at harvest, expressing its most pure and pungent flavours.",
+    dominantTerpenes: [
+      {
+        name: "Caryophyllene",
+        role: "Warm spice · Analgesic properties",
+        color: "#c0764a",
+      },
+      {
+        name: "Myrcene",
+        role: "Earthy kush · Sedative body effect",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Linalool",
+        role: "Floral sweetness · Sleep support",
+        color: "#9b6b9e",
+      },
+      {
+        name: "Terpinolene",
+        role: "Vanilla pine · Herbal warmth",
+        color: "#b5935a",
+      },
+    ],
+    aroma: "Cinnamon · Vanilla · Kush · Earthy Spice · Baked Dough",
+    flavour: "Spiced Cinnamon Bun · Earthy Peppermint · Vanilla Kush",
+    eybnaLine: "Live Line",
+    lineCode: "7-803-0002",
+    eybnaDescription:
+      "Eybna's Live Line is composed exclusively of botanical-derived terpenes that capture the aromatic peak of the cannabis plant just before harvest — the most pure and pungent expression of each profile.",
+  },
+  "sweet-watermelon": {
+    description:
+      "A vibrant tropical flavour that balances sweet and tart notes with a refreshing, juicy finish. Sweet Watermelon from Eybna's Enhancer Line is designed to amplify and elevate extract profiles with a bright, clean fruit character that enhances the overall sensory experience.",
+    dominantTerpenes: [
+      {
+        name: "Limonene",
+        role: "Fresh citrus lift · Mood boost",
+        color: "#e8c020",
+      },
+      {
+        name: "Ocimene",
+        role: "Sweet tropical · Floral notes",
+        color: "#52b788",
+      },
+      {
+        name: "Myrcene",
+        role: "Fruity base · Smooth body effect",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Linalool",
+        role: "Floral sweetness · Gentle calm",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Sweet Watermelon · Fresh Citrus · Tropical Fruit · Floral",
+    flavour: "Juicy Watermelon · Sweet Tart · Fresh Finish",
+    eybnaLine: "Enhancer Line",
+    lineCode: "10-520-0002",
+    eybnaDescription:
+      "Eybna's Enhancer Line is formulated to amplify and brighten the natural terpene presence in cannabis extracts, adding vibrant fruit and floral dimension to any base profile.",
+  },
+  zkz: {
+    description:
+      "An award-winning, California-bred strain that is a cross between famously fruity genetics, producing a unique sensory experience. ZKZ is known for its sweet and candy-like flavour, characterised by strong fruity notes and ripe strawberry. One of the most celebrated profiles in the premium cannabis market.",
+    dominantTerpenes: [
+      {
+        name: "Limonene",
+        role: "Sweet candy citrus · Euphoria",
+        color: "#e8c020",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Fruity spice · Anti-anxiety",
+        color: "#b5935a",
+      },
+      {
+        name: "Linalool",
+        role: "Floral sweetness · Balance",
+        color: "#9b6b9e",
+      },
+      { name: "Myrcene", role: "Ripe berry · Smooth body", color: "#2d6a4f" },
+    ],
+    aroma: "Candy · Ripe Strawberry · Sweet Fruit · Citrus · Berry",
+    flavour: "Sweet Candy · Fruity · Ripe Strawberry · Citrus Finish",
+    eybnaLine: "Live Plus+ Line",
+    lineCode: "14-501-0002",
+    eybnaDescription:
+      "Eybna's Live Plus+ Line represents the pinnacle of terpene formulation — combining live terpene accuracy with enhanced aromatic intensity for the most complex, multi-layered sensory profiles available.",
+  },
+  "wedding-cake": {
+    description:
+      "Wedding Cake, also known as Pink Cookies, is a cross of Triangle Kush and Animal Mints that delivers a rich, tangy vanilla profile with earthy pepper undertones. Known for its dessert-like sweetness layered over a peppery kush base, this indica-dominant hybrid produces powerful euphoria paired with full-body relaxation.",
+    dominantTerpenes: [
+      {
+        name: "Caryophyllene",
+        role: "Peppery warmth · Anti-inflammatory",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Tangy sweetness · Mood elevation",
+        color: "#e8c020",
+      },
+      {
+        name: "Myrcene",
+        role: "Earthy vanilla · Body relaxation",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Linalool",
+        role: "Floral depth · Calming finish",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Vanilla · Pepper · Earthy Kush · Sweet Dough · Tangy Citrus",
+    flavour: "Rich Vanilla · Peppery Earth · Sweet Cream · Tangy Finish",
+    eybnaLine: "Pure Terpenes Line",
+    lineCode: "6-23-0002",
+    eybnaDescription:
+      "Eybna's Pure Terpenes Line captures strain-authentic aromatic profiles using only botanical-derived terpenes, without any additives or cutting agents.",
+  },
+  "peaches-and-cream": {
+    description:
+      "A luxurious indica-dominant hybrid that wraps ripe stone fruit sweetness in a velvety cream finish. Peaches & Cream from Eybna's Palate Line delivers a rich, dessert-forward sensory experience with a smooth, calming body effect that builds gradually into deep contentment.",
+    dominantTerpenes: [
+      {
+        name: "Myrcene",
+        role: "Ripe peach · Sedating warmth",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Creamy spice · Anti-anxiety",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Stone fruit brightness · Uplift",
+        color: "#e8a020",
+      },
+      {
+        name: "Linalool",
+        role: "Floral cream · Smooth calm",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Ripe Peach · Vanilla Cream · Sweet Fruit · Floral · Honey",
+    flavour: "Juicy Peach · Smooth Cream · Sweet Vanilla · Soft Finish",
+    eybnaLine: "Palate Line",
+    lineCode: "8-09-0002",
+    eybnaDescription:
+      "Eybna's Palate Line elevates classic strain profiles with enhanced flavour clarity and aromatic depth, designed for a premium sensory experience.",
+  },
+  "purple-punch": {
+    description:
+      "A pure indica born from Larry OG and Granddaddy Purple, Purple Punch delivers a one-two combination of grape candy sweetness and blueberry muffin richness. This strain is renowned for its deeply sedating body effect that melts tension and guides you gently into rest.",
+    dominantTerpenes: [
+      { name: "Myrcene", role: "Grape musk · Deep sedation", color: "#2d6a4f" },
+      {
+        name: "Caryophyllene",
+        role: "Berry spice · Pain relief",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Sweet candy lift · Mood balance",
+        color: "#e8c020",
+      },
+      {
+        name: "Pinene",
+        role: "Pine clarity · Mental freshness",
+        color: "#4a9e6a",
+      },
+    ],
+    aroma: "Grape Candy · Blueberry · Vanilla · Earthy Kush · Berry",
+    flavour: "Sweet Grape · Blueberry Muffin · Berry Punch · Vanilla",
+    eybnaLine: "Palate Line",
+    lineCode: "8-08-0002",
+    eybnaDescription:
+      "Eybna's Palate Line elevates classic strain profiles with enhanced flavour clarity and aromatic depth, designed for a premium sensory experience.",
+  },
+  mimosa: {
+    description:
+      "A sparkling cross of Clementine and Purple Punch, Mimosa bursts with bright tangerine and tropical citrus notes over a subtle berry undertone. This sativa-dominant hybrid is the perfect wake-and-bake profile — uplifting, focused and brimming with daytime energy.",
+    dominantTerpenes: [
+      {
+        name: "Limonene",
+        role: "Bright citrus · Energising uplift",
+        color: "#e8c020",
+      },
+      {
+        name: "Myrcene",
+        role: "Tropical fruit · Smooth base",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Subtle spice · Anti-anxiety",
+        color: "#b5935a",
+      },
+      {
+        name: "Linalool",
+        role: "Berry floral · Gentle balance",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Tangerine · Tropical Citrus · Berry · Champagne · Floral",
+    flavour: "Bright Orange · Sweet Citrus · Berry Undertone · Clean Finish",
+    eybnaLine: "Palate Line",
+    lineCode: "8-06-0002",
+    eybnaDescription:
+      "Eybna's Palate Line elevates classic strain profiles with enhanced flavour clarity and aromatic depth, designed for a premium sensory experience.",
+  },
+  rntz: {
+    description:
+      "RNTZ (Runtz) is a celebrated cross of Zkittlez and Gelato that has taken the global cannabis scene by storm. Known for its candy-sweet fruit medley and creamy finish, this balanced hybrid delivers euphoric mental clarity alongside smooth physical relaxation — a true 50/50 experience.",
+    dominantTerpenes: [
+      {
+        name: "Caryophyllene",
+        role: "Sweet spice · Stress relief",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Candy citrus · Mood elevation",
+        color: "#e8c020",
+      },
+      {
+        name: "Linalool",
+        role: "Creamy floral · Gentle calm",
+        color: "#9b6b9e",
+      },
+      {
+        name: "Myrcene",
+        role: "Fruity body · Smooth finish",
+        color: "#2d6a4f",
+      },
+    ],
+    aroma: "Candy Fruit · Sweet Cream · Tropical · Citrus · Berry",
+    flavour: "Sweet Candy · Creamy Fruit · Citrus Zest · Smooth Finish",
+    eybnaLine: "Live Line",
+    lineCode: "9-513-0002",
+    eybnaDescription:
+      "Eybna's Live Line is composed exclusively of botanical-derived terpenes that capture the aromatic peak of the cannabis plant just before harvest — the most pure and pungent expression of each profile.",
+  },
+  "blue-zushi": {
+    description:
+      "Blue Zushi is a rare and highly sought-after exotic strain known for its complex aroma that blends sweet berry notes with a distinctive fuel-forward gas character. This indica-dominant hybrid delivers a powerful, enveloping body high with a euphoric mental haze that makes it a connoisseur favourite.",
+    dominantTerpenes: [
+      {
+        name: "Myrcene",
+        role: "Berry musk · Deep body sedation",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Gassy spice · Pain relief",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Sweet berry lift · Euphoria",
+        color: "#e8c020",
+      },
+      {
+        name: "Ocimene",
+        role: "Exotic floral · Aromatic depth",
+        color: "#4a9eba",
+      },
+    ],
+    aroma: "Sweet Berry · Fuel Gas · Exotic Fruit · Earth · Candy",
+    flavour: "Berry Candy · Gassy Undertone · Sweet Cream · Earthy Finish",
+    eybnaLine: "Live Line",
+    lineCode: "7-806-0002",
+    eybnaDescription:
+      "Eybna's Live Line is composed exclusively of botanical-derived terpenes that capture the aromatic peak of the cannabis plant just before harvest — the most pure and pungent expression of each profile.",
+  },
+  mac: {
+    description:
+      "Miracle Alien Cookies (MAC) is a legendary cross of Alien Cookies with a Colombian and Starfighter hybrid. Renowned for its sharp citrus and sour floral aroma underscored by a diesel earthiness, MAC delivers a cerebral rush of creative energy that transitions into a calm, focused body state.",
+    dominantTerpenes: [
+      {
+        name: "Limonene",
+        role: "Sour citrus · Creative energy",
+        color: "#e8c020",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Diesel spice · Anti-inflammatory",
+        color: "#b5935a",
+      },
+      {
+        name: "Myrcene",
+        role: "Earthy base · Grounding calm",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Terpinolene",
+        role: "Floral pine · Herbal complexity",
+        color: "#7a9a5a",
+      },
+    ],
+    aroma: "Sour Citrus · Diesel · Floral · Earthy Pine · Herbal",
+    flavour: "Sharp Citrus · Sour Cream · Diesel Earth · Floral Finish",
+    eybnaLine: "Live Line",
+    lineCode: "7-804-0002",
+    eybnaDescription:
+      "Eybna's Live Line is composed exclusively of botanical-derived terpenes that capture the aromatic peak of the cannabis plant just before harvest — the most pure and pungent expression of each profile.",
+  },
+  "pear-jam": {
+    description:
+      "A luscious fruit-forward enhancer profile that captures the essence of ripe pear preserves with a jammy sweetness and soft floral finish. Pear Jam from Eybna's Enhancer Line adds rich, natural fruit dimension to extract profiles — smooth, sweet and effortlessly satisfying.",
+    dominantTerpenes: [
+      {
+        name: "Myrcene",
+        role: "Ripe pear · Smooth body feel",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Limonene",
+        role: "Sweet fruit lift · Brightness",
+        color: "#e8c020",
+      },
+      {
+        name: "Ocimene",
+        role: "Jammy floral · Aromatic sweetness",
+        color: "#52b788",
+      },
+      {
+        name: "Linalool",
+        role: "Soft floral · Gentle relaxation",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Ripe Pear · Sweet Jam · Floral · Honey · Green Fruit",
+    flavour: "Juicy Pear · Jammy Sweetness · Soft Floral · Clean Finish",
+    eybnaLine: "Enhancer Line",
+    lineCode: "10-566-0002",
+    eybnaDescription:
+      "Eybna's Enhancer Line is formulated to amplify and brighten the natural terpene presence in cannabis extracts, adding vibrant fruit and floral dimension to any base profile.",
+  },
+  "melon-lychee": {
+    description:
+      "An exotic tropical fusion that pairs sweet honeydew melon with fragrant lychee and a hint of rose. Melon Lychee from Eybna's Enhancer Line delivers one of the most refreshing and aromatic enhancer profiles available — perfect for adding bright, tropical complexity to any extract.",
+    dominantTerpenes: [
+      {
+        name: "Ocimene",
+        role: "Tropical lychee · Sweet floral",
+        color: "#52b788",
+      },
+      {
+        name: "Limonene",
+        role: "Melon brightness · Mood boost",
+        color: "#e8c020",
+      },
+      {
+        name: "Myrcene",
+        role: "Sweet melon base · Smoothness",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Linalool",
+        role: "Rose floral · Gentle balance",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Honeydew Melon · Lychee · Rose · Tropical Fruit · Floral",
+    flavour: "Sweet Melon · Fragrant Lychee · Tropical · Floral Finish",
+    eybnaLine: "Enhancer Line",
+    lineCode: "10-564-0002",
+    eybnaDescription:
+      "Eybna's Enhancer Line is formulated to amplify and brighten the natural terpene presence in cannabis extracts, adding vibrant fruit and floral dimension to any base profile.",
+  },
+  "tutti-frutti": {
+    description:
+      "A vibrant, candy-inspired enhancer that delivers a playful medley of mixed tropical fruits and sweet confectionery notes. Tutti Frutti from Eybna's Enhancer Line is designed for those who want their extract to pop with colour, sweetness and an unmistakably fun, fruit-forward character.",
+    dominantTerpenes: [
+      {
+        name: "Limonene",
+        role: "Candy citrus · Energising burst",
+        color: "#e8c020",
+      },
+      {
+        name: "Myrcene",
+        role: "Mixed fruit · Sweet body feel",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Ocimene",
+        role: "Tropical candy · Floral pop",
+        color: "#52b788",
+      },
+      {
+        name: "Terpinolene",
+        role: "Fruity herbal · Playful lift",
+        color: "#b5935a",
+      },
+    ],
+    aroma: "Mixed Fruit Candy · Tropical · Sweet Berry · Citrus · Bubblegum",
+    flavour: "Tutti Frutti Candy · Sweet Tropical · Berry Mix · Playful Finish",
+    eybnaLine: "Enhancer Line",
+    lineCode: "10-521-0002",
+    eybnaDescription:
+      "Eybna's Enhancer Line is formulated to amplify and brighten the natural terpene presence in cannabis extracts, adding vibrant fruit and floral dimension to any base profile.",
+  },
+  "purple-crack": {
+    description:
+      "Purple Crack brings together the explosive sativa energy of Green Crack with the deep berry richness of a purple lineage. The result is a high-intensity, focus-driven profile with sweet grape and earthy pine notes. From the Live Plus+ Line, this is peak terpene complexity for daytime productivity.",
+    dominantTerpenes: [
+      {
+        name: "Myrcene",
+        role: "Berry grape · Grounding base",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Earthy spice · Anti-anxiety",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Citrus spark · Mental clarity",
+        color: "#e8c020",
+      },
+      {
+        name: "Pinene",
+        role: "Pine focus · Alertness boost",
+        color: "#4a9e6a",
+      },
+    ],
+    aroma: "Sweet Grape · Pine · Earthy Berry · Citrus · Mango",
+    flavour: "Berry Burst · Earthy Pine · Sweet Citrus · Crisp Finish",
+    eybnaLine: "Live Plus+ Line",
+    lineCode: "14-09-0002",
+    eybnaDescription:
+      "Eybna's Live Plus+ Line represents the pinnacle of terpene formulation — combining live terpene accuracy with enhanced aromatic intensity for the most complex, multi-layered sensory profiles available.",
+  },
+  "lemonhead-plus": {
+    description:
+      "Lemonhead+ is an intensified lemon-forward profile that hits with bright, sour citrus and a sharp zesty bite. Built on the Live Plus+ platform, this sativa-dominant profile captures the unmistakable punch of fresh lemon peel with herbal and pine undertones — engineered for maximum daytime energy and mental clarity.",
+    dominantTerpenes: [
+      {
+        name: "Limonene",
+        role: "Sour lemon blast · Peak energy",
+        color: "#e8c020",
+      },
+      {
+        name: "Caryophyllene",
+        role: "Zesty pepper · Anti-stress",
+        color: "#b5935a",
+      },
+      {
+        name: "Myrcene",
+        role: "Citrus base · Smooth grounding",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Terpinolene",
+        role: "Herbal pine · Bright complexity",
+        color: "#7a9a5a",
+      },
+    ],
+    aroma: "Fresh Lemon · Sour Citrus · Pine · Herbal · Zesty Peel",
+    flavour: "Sharp Lemon · Sour Zest · Herbal Pine · Clean Bright Finish",
+    eybnaLine: "Live Plus+ Line",
+    lineCode: "15-05-0002",
+    eybnaDescription:
+      "Eybna's Live Plus+ Line represents the pinnacle of terpene formulation — combining live terpene accuracy with enhanced aromatic intensity for the most complex, multi-layered sensory profiles available.",
+  },
+  "sherblato-plus": {
+    description:
+      "Sherblato+ fuses the creamy sherbert sweetness of Sunset Sherbert with the rich dessert complexity of Gelato. The Live Plus+ formulation intensifies every layer — sweet berry cream, vanilla frosting and a subtle fuel note on the exhale. This is premium evening indulgence at its most sophisticated.",
+    dominantTerpenes: [
+      {
+        name: "Caryophyllene",
+        role: "Creamy spice · Deep relaxation",
+        color: "#b5935a",
+      },
+      {
+        name: "Limonene",
+        role: "Berry sweetness · Euphoric lift",
+        color: "#e8c020",
+      },
+      {
+        name: "Myrcene",
+        role: "Sherbert cream · Body sedation",
+        color: "#2d6a4f",
+      },
+      {
+        name: "Linalool",
+        role: "Vanilla floral · Sleep support",
+        color: "#9b6b9e",
+      },
+    ],
+    aroma: "Berry Cream · Vanilla Frosting · Sweet Sherbert · Fuel · Candy",
+    flavour: "Creamy Sherbert · Sweet Berry · Vanilla · Smooth Exhale",
+    eybnaLine: "Live Plus+ Line",
+    lineCode: "15-10-0002",
+    eybnaDescription:
+      "Eybna's Live Plus+ Line represents the pinnacle of terpene formulation — combining live terpene accuracy with enhanced aromatic intensity for the most complex, multi-layered sensory profiles available.",
+  },
+};
 
 // ── Strain Data (EXTRACTED DIRECTLY from ProductVerification.js v2.3) ────────
 // Source of truth for VISUAL METADATA ONLY (DEC-019).
@@ -297,13 +884,10 @@ const STRAINS = [
 ];
 
 // ── Strain matching helpers ─────────────────────────────────────────────────
-// Sort by name length descending for greedy matching (longer names first)
-// Prevents "MAC" matching "Macadamia" before "Macadamia" can match itself
 const STRAINS_BY_LENGTH = [...STRAINS].sort(
   (a, b) => b.name.length - a.name.length,
 );
 
-// Default strain visual metadata for inventory items that don't match any known strain
 const DEFAULT_STRAIN = {
   id: "unknown",
   name: "Unknown",
@@ -319,38 +903,29 @@ const DEFAULT_STRAIN = {
   effects: [],
 };
 
-// Match an inventory_item to a strain + build a shop product object
 function buildProductFromInventory(item) {
-  // Match strain by checking if item name starts with a known strain name
   const lowerName = item.name.toLowerCase();
   const matchedStrain = STRAINS_BY_LENGTH.find((s) =>
     lowerName.startsWith(s.name.toLowerCase()),
   );
-
-  // Determine format from item name
   const is2ml = /2\.?0?\s*ml/i.test(item.name);
-
-  // Build the product-display name from the matched strain, or extract from item name
   const displayName = matchedStrain
     ? matchedStrain.name
     : item.name
         .replace(/\d+\.?\d*\s*ml\s*/i, "")
         .replace(/cartridge|disposable|pen|pod/i, "")
         .trim() || item.name;
-
-  // Use matched strain or build a fallback with the extracted name
   const strain = matchedStrain || {
     ...DEFAULT_STRAIN,
     id: item.id,
     name: displayName,
   };
-
   return {
     id: item.id,
     inventory_item_id: item.id,
     strainId: strain.id,
     name: displayName,
-    strain: strain,
+    strain,
     format: is2ml ? "2ml Disposable Pen" : "1ml Cartridge",
     formatShort: is2ml ? "2ml Pen" : "1ml Cart",
     price: is2ml ? 1600 : 800,
@@ -453,13 +1028,11 @@ const shopStyles = `
   .shop-filter-btn.active { background: #1b4332; color: white; border-color: #1b4332; }
   .shop-effect-tag {
     font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.1em;
-    text-transform: uppercase; padding: 3px 10px; border-radius: 2px;
-    font-weight: 400;
+    text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 400;
   }
   .shop-format-badge {
     font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.15em;
-    text-transform: uppercase; padding: 4px 12px; border-radius: 2px;
-    font-weight: 500;
+    text-transform: uppercase; padding: 4px 12px; border-radius: 2px; font-weight: 500;
   }
   .cs-card {
     background: #f9f7f2; border: 1px dashed #d8d0c4; border-radius: 2px;
@@ -474,6 +1047,54 @@ const shopStyles = `
   .section-divider {
     width: 100%; height: 1px;
     background: linear-gradient(to right, transparent, #e0d8cc, transparent); margin: 48px 0;
+  }
+  /* ── Modal styles ── */
+  .strain-modal-overlay {
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(6, 14, 9, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    animation: modalFadeIn 0.25s ease forwards;
+  }
+  .strain-modal-card {
+    background: #faf9f6; border-radius: 4px; width: 100%; max-width: 780px;
+    max-height: 88vh; overflow-y: auto; position: relative;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    animation: modalSlideUp 0.3s ease forwards;
+  }
+  .strain-modal-card::-webkit-scrollbar { width: 4px; }
+  .strain-modal-card::-webkit-scrollbar-track { background: #f0ebe3; }
+  .strain-modal-card::-webkit-scrollbar-thumb { background: #c8bfb0; border-radius: 2px; }
+  .modal-close-btn {
+    position: absolute; top: 16px; right: 16px; z-index: 10;
+    width: 36px; height: 36px; border-radius: 2px;
+    background: rgba(0,0,0,0.25); border: none; color: white;
+    font-size: 18px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    transition: background 0.2s; font-family: 'Jost', sans-serif;
+    line-height: 1;
+  }
+  .modal-close-btn:hover { background: rgba(0,0,0,0.5); }
+  .modal-terpene-card {
+    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
+    padding: 20px 18px; position: relative; overflow: hidden;
+  }
+  .modal-view-profile-link {
+    font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: rgba(255,255,255,0.6); text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .modal-view-profile-link:hover { color: white; border-color: rgba(255,255,255,0.5); }
+  @keyframes modalFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes modalSlideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(24px); }
@@ -493,14 +1114,643 @@ const shopStyles = `
     .shop-footer-wrap { flex-direction: column !important; text-align: center; }
     .shop-footer-nav { justify-content: center !important; }
     .shop-stats-row { flex-direction: column !important; gap: 12px !important; }
+    .strain-modal-card { max-height: 92vh; }
+    .modal-footer-row { flex-direction: column !important; gap: 10px !important; }
+    .modal-footer-row .shop-btn { width: 100%; text-align: center; }
   }
   @media (max-width: 480px) {
     .shop-hero-inner { padding: 32px 16px 36px !important; }
     .shop-body-inner { padding: 24px 16px !important; }
     .shop-grid { grid-template-columns: 1fr !important; }
     .shop-hero-title { font-size: 32px !important; }
+    .strain-modal-overlay { padding: 0; align-items: flex-end; }
+    .strain-modal-card { border-radius: 4px 4px 0 0; max-height: 94vh; }
   }
 `;
+
+// ── StrainModal Component ─────────────────────────────────────────────────────
+function StrainModal({ strain, product, onClose, onAddToCart }) {
+  const detail = STRAINS_DETAIL[strain.id] || {};
+
+  // Lock body scroll while open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  // Close on Escape key
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const handleBackdrop = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div className="strain-modal-overlay" onClick={handleBackdrop}>
+      <div className="strain-modal-card">
+        {/* Close button */}
+        <button
+          className="modal-close-btn"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ✕
+        </button>
+
+        {/* ── A. Hero strip ── */}
+        <div
+          style={{
+            background: `linear-gradient(160deg, ${strain.gradientFrom} 0%, ${strain.gradientTo} 60%, ${strain.gradientFrom}dd 100%)`,
+            padding: "36px 32px 32px",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          {/* subtle radial glow */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage:
+                "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 60%)",
+              pointerEvents: "none",
+            }}
+          />
+          <div style={{ marginBottom: 10 }}>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.4em",
+                textTransform: "uppercase",
+                color: strain.accentColor,
+                fontWeight: 500,
+              }}
+            >
+              {detail.eybnaLine || strain.line} · Product Profile
+            </span>
+          </div>
+          <h2
+            className="shop-font"
+            style={{
+              fontSize: "clamp(36px, 6vw, 56px)",
+              fontWeight: 300,
+              color: "#faf9f6",
+              lineHeight: 1,
+              marginBottom: 10,
+              letterSpacing: "0.03em",
+            }}
+          >
+            {strain.name}
+          </h2>
+          <p
+            className="body-font"
+            style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.45)",
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              marginBottom: 16,
+              fontWeight: 300,
+            }}
+          >
+            {strain.tagline}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                padding: "4px 12px",
+                borderRadius: 2,
+                color: strain.typeColor,
+                background: `${strain.typeColor}18`,
+                border: `1px solid ${strain.typeColor}40`,
+                fontWeight: 400,
+              }}
+            >
+              {strain.type}
+            </span>
+            {strain.effects.map((e) => (
+              <span
+                key={e}
+                className="body-font"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  padding: "4px 12px",
+                  borderRadius: 2,
+                  color: "rgba(255,255,255,0.5)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.05)",
+                  fontWeight: 400,
+                }}
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Modal body ── */}
+        <div style={{ padding: "32px 32px 0" }}>
+          {/* ── B. About ── */}
+          {detail.description && (
+            <div style={{ marginBottom: 28 }}>
+              <span
+                className="body-font"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.35em",
+                  textTransform: "uppercase",
+                  color: strain.accentColor,
+                }}
+              >
+                About This Strain
+              </span>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.85,
+                  color: "#555",
+                  fontWeight: 300,
+                  marginTop: 10,
+                }}
+              >
+                {detail.description}
+              </p>
+            </div>
+          )}
+
+          {/* ── C. Aroma & Flavour ── */}
+          {(detail.aroma || detail.flavour) && (
+            <>
+              <div
+                style={{
+                  height: 1,
+                  background:
+                    "linear-gradient(to right, transparent, #e0d8cc, transparent)",
+                  margin: "4px 0 24px",
+                }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  gap: 40,
+                  marginBottom: 28,
+                  flexWrap: "wrap",
+                }}
+              >
+                {[
+                  ["Aroma", detail.aroma],
+                  ["Flavour", detail.flavour],
+                ].map(
+                  ([label, val]) =>
+                    val && (
+                      <div key={label}>
+                        <p
+                          className="body-font"
+                          style={{
+                            fontSize: 10,
+                            letterSpacing: "0.3em",
+                            color: strain.accentColor,
+                            textTransform: "uppercase",
+                            marginBottom: 8,
+                          }}
+                        >
+                          {label}
+                        </p>
+                        <p
+                          className="body-font"
+                          style={{
+                            fontSize: 13,
+                            color: "#666",
+                            fontWeight: 300,
+                          }}
+                        >
+                          {val}
+                        </p>
+                      </div>
+                    ),
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── D. Terpene Profile ── */}
+          {detail.dominantTerpenes && detail.dominantTerpenes.length > 0 && (
+            <>
+              <div
+                style={{
+                  height: 1,
+                  background:
+                    "linear-gradient(to right, transparent, #e0d8cc, transparent)",
+                  margin: "4px 0 24px",
+                }}
+              />
+              <div style={{ marginBottom: 28 }}>
+                <span
+                  className="body-font"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.35em",
+                    textTransform: "uppercase",
+                    color: strain.accentColor,
+                  }}
+                >
+                  Terpene Profile
+                </span>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(160px, 1fr))",
+                    gap: 12,
+                    marginTop: 14,
+                  }}
+                >
+                  {detail.dominantTerpenes.map((t, i) => (
+                    <div key={t.name} className="modal-terpene-card">
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 3,
+                          background: t.color,
+                        }}
+                      />
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <h4
+                          className="shop-font"
+                          style={{
+                            fontSize: 18,
+                            fontWeight: 400,
+                            color: "#1a1a1a",
+                            margin: 0,
+                          }}
+                        >
+                          {t.name}
+                        </h4>
+                        <span
+                          className="body-font"
+                          style={{
+                            fontSize: 9,
+                            letterSpacing: "0.2em",
+                            color: "#ccc",
+                            textTransform: "uppercase",
+                            paddingTop: 3,
+                          }}
+                        >
+                          #{i + 1}
+                        </span>
+                      </div>
+                      <p
+                        className="body-font"
+                        style={{
+                          fontSize: 12,
+                          color: "#888",
+                          lineHeight: 1.6,
+                          fontWeight: 300,
+                          margin: 0,
+                        }}
+                      >
+                        {t.role}
+                      </p>
+                      <div
+                        style={{
+                          marginTop: 12,
+                          height: 2,
+                          background: "#f0ebe3",
+                          borderRadius: 2,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${90 - i * 12}%`,
+                            height: "100%",
+                            background: t.color,
+                            opacity: 0.7,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── E. COA Summary ── */}
+          <div
+            style={{
+              height: 1,
+              background:
+                "linear-gradient(to right, transparent, #e0d8cc, transparent)",
+              margin: "4px 0 24px",
+            }}
+          />
+          <div style={{ marginBottom: 28 }}>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.35em",
+                textTransform: "uppercase",
+                color: "#52b788",
+              }}
+            >
+              Certificate of Analysis
+            </span>
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e8e0d4",
+                borderRadius: 2,
+                borderLeft: "3px solid #52b788",
+                padding: "20px 24px",
+                marginTop: 14,
+              }}
+            >
+              {/* THC highlight */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 10,
+                  marginBottom: 16,
+                }}
+              >
+                <span
+                  className="shop-font"
+                  style={{
+                    fontSize: 40,
+                    fontWeight: 300,
+                    color: "#1b4332",
+                    lineHeight: 1,
+                  }}
+                >
+                  93.55%
+                </span>
+                <span
+                  className="body-font"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.25em",
+                    textTransform: "uppercase",
+                    color: "#888",
+                  }}
+                >
+                  D9-THC
+                </span>
+              </div>
+              {/* Totals row */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 32,
+                  flexWrap: "wrap",
+                  marginBottom: 16,
+                }}
+              >
+                {DISTILLATE_COA.totals.map((t) => (
+                  <div key={t.name}>
+                    <p
+                      className="body-font"
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: "0.25em",
+                        color: "#aaa",
+                        textTransform: "uppercase",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {t.name}
+                    </p>
+                    <p
+                      className="shop-font"
+                      style={{
+                        fontSize: 22,
+                        color: "#1b4332",
+                        fontWeight: 300,
+                      }}
+                    >
+                      {t.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {/* Lab info */}
+              <div
+                style={{
+                  borderTop: "1px solid #f0ebe3",
+                  paddingTop: 14,
+                  display: "flex",
+                  gap: 28,
+                  flexWrap: "wrap",
+                }}
+              >
+                {[
+                  ["Lab", DISTILLATE_COA.lab],
+                  ["Lab ID", DISTILLATE_COA.labId],
+                  ["Accreditation", DISTILLATE_COA.accreditation],
+                ].map(([label, val]) => (
+                  <div key={label}>
+                    <p
+                      className="body-font"
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: "0.2em",
+                        color: "#bbb",
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                      }}
+                    >
+                      {label}
+                    </p>
+                    <p
+                      className="body-font"
+                      style={{ fontSize: 12, color: "#666", fontWeight: 300 }}
+                    >
+                      {val}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── F. Eybna Line ── */}
+          {detail.eybnaDescription && (
+            <>
+              <div
+                style={{
+                  height: 1,
+                  background:
+                    "linear-gradient(to right, transparent, #e0d8cc, transparent)",
+                  margin: "4px 0 24px",
+                }}
+              />
+              <div
+                style={{
+                  background: "white",
+                  border: "1px solid #e8e0d4",
+                  borderRadius: 2,
+                  padding: "18px 22px",
+                  marginBottom: 28,
+                  display: "flex",
+                  gap: 16,
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <p
+                    className="body-font"
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: "0.2em",
+                      color: "#bbb",
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Terpene Supplier
+                  </p>
+                  <p
+                    className="body-font"
+                    style={{ fontSize: 13, color: "#555", marginBottom: 4 }}
+                  >
+                    <strong style={{ color: "#1a1a1a" }}>Eybna GmbH</strong> ·
+                    Berlin, Germany
+                  </p>
+                  <p
+                    className="body-font"
+                    style={{
+                      fontSize: 13,
+                      color: "#777",
+                      lineHeight: 1.7,
+                      fontWeight: 300,
+                    }}
+                  >
+                    {detail.eybnaDescription}
+                  </p>
+                  {detail.lineCode && (
+                    <p
+                      className="body-font"
+                      style={{
+                        fontSize: 11,
+                        color: "#bbb",
+                        marginTop: 6,
+                        fontWeight: 300,
+                      }}
+                    >
+                      Product Code: {detail.lineCode} · Pharmaceutical-grade
+                      botanical-derived terpenes.
+                    </p>
+                  )}
+                </div>
+                <span
+                  className="body-font"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    padding: "4px 12px",
+                    borderRadius: 2,
+                    background: "rgba(82,183,136,0.1)",
+                    color: "#52b788",
+                    border: "1px solid rgba(82,183,136,0.2)",
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ✓ Certified Supplier
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── G. Footer ── */}
+        <div
+          style={{
+            background: `linear-gradient(135deg, ${strain.gradientFrom}, ${strain.gradientTo})`,
+            padding: "24px 32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <Link
+            to={`/verify/${strain.id}`}
+            className="modal-view-profile-link"
+            onClick={onClose}
+          >
+            Full verification page →
+          </Link>
+          <div
+            className="modal-footer-row"
+            style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+          >
+            <button
+              className="shop-btn"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.25)",
+                padding: "10px 22px",
+              }}
+              onClick={onClose}
+            >
+              Close
+            </button>
+            {product && (
+              <button
+                className="shop-btn"
+                style={{
+                  background: "#52b788",
+                  color: "#0e1a14",
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  onAddToCart(product);
+                  onClose();
+                }}
+              >
+                Add to Cart — R{product.price.toLocaleString()}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function Shop() {
@@ -508,6 +1758,8 @@ export default function Shop() {
   const { addToCart } = useCart();
   const [filter, setFilter] = useState("all");
   const [cartToast, setCartToast] = useState(null);
+  const [selectedStrain, setSelectedStrain] = useState(null); // v2.9: modal state
+  const [selectedProduct, setSelectedProduct] = useState(null); // v2.9: product for modal CTA
 
   // ── v2.8: Live inventory state ─────────────────────────────────────
   const [liveProducts, setLiveProducts] = useState([]);
@@ -532,7 +1784,6 @@ export default function Shop() {
           return;
         }
 
-        // Match each inventory item to strain visual metadata + build product
         const products = (data || []).map((item) =>
           buildProductFromInventory(item),
         );
@@ -556,7 +1807,24 @@ export default function Shop() {
     setTimeout(() => setCartToast(null), 2200);
   };
 
-  // Filter logic (uses liveProducts instead of hardcoded VAPE_PRODUCTS)
+  // v2.9: Open modal with strain + product context
+  const handleViewProfile = (product) => {
+    const detail = STRAINS_DETAIL[product.strainId];
+    if (detail) {
+      setSelectedStrain(product.strain);
+      setSelectedProduct(product);
+    } else {
+      // Fallback: no detail data — navigate to verify page
+      navigate(`/verify/${product.strainId}`);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setSelectedStrain(null);
+    setSelectedProduct(null);
+  };
+
+  // Filter logic
   const showVapes =
     filter === "all" ||
     filter === "vapes" ||
@@ -571,7 +1839,6 @@ export default function Shop() {
       : [];
 
   const filteredCS = showCS ? COMING_SOON : [];
-
   const totalShowing = filteredVapes.length + filteredCS.length;
 
   return (
@@ -668,7 +1935,6 @@ export default function Shop() {
             Premium cannabis vapes · 18 Eybna terpene strains · Lab verified
           </p>
 
-          {/* Stats row */}
           <div
             className="shop-stats-row"
             style={{
@@ -841,22 +2107,16 @@ export default function Shop() {
                       product={product}
                       navigate={navigate}
                       onAddToCart={handleAddToCart}
+                      onViewProfile={handleViewProfile}
                     />
                   ))}
                 </div>
               </>
             )}
 
-            {/* No vapes in stock message (only when filtering vapes) */}
             {filteredVapes.length === 0 && showVapes && !showCS && (
               <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                <div
-                  style={{
-                    fontSize: 48,
-                    marginBottom: 16,
-                    opacity: 0.3,
-                  }}
-                >
+                <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>
                   🌿
                 </div>
                 <p
@@ -1076,6 +2336,16 @@ export default function Shop() {
         </div>
       )}
 
+      {/* ── v2.9: STRAIN MODAL ── */}
+      {selectedStrain && (
+        <StrainModal
+          strain={selectedStrain}
+          product={selectedProduct}
+          onClose={handleCloseModal}
+          onAddToCart={handleAddToCart}
+        />
+      )}
+
       {/* ── FOOTER ── */}
       <div
         className="shop-footer-outer"
@@ -1162,8 +2432,9 @@ export default function Shop() {
   );
 }
 
-// ── Vape Product Card ────────────────────────────────────────────────────────
-function VapeCard({ product, navigate, onAddToCart }) {
+// ── Vape Product Card ─────────────────────────────────────────────────────────
+// v2.9: "View Profile" is now a button (not Link) — opens StrainModal via onViewProfile prop.
+function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
   const s = product.strain;
   const is2ml = product.format.includes("2ml");
 
@@ -1345,13 +2616,14 @@ function VapeCard({ product, navigate, onAddToCart }) {
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Link
-              to={`/verify/${s.id}`}
+            {/* v2.9: button instead of Link — opens StrainModal */}
+            <button
               className="shop-btn-outline"
               style={{ padding: "8px 16px", fontSize: 10 }}
+              onClick={() => onViewProfile(product)}
             >
               View Profile
-            </Link>
+            </button>
             <button
               className="shop-btn"
               style={{ padding: "8px 18px", fontSize: 10 }}
