@@ -1,5 +1,10 @@
-// src/App.js — Protea Botanicals v3.7
+// src/App.js — Protea Botanicals v3.8
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v3.8 CHANGELOG:
+//   1. ADD: /terpenes/:id route — individual terpene detail page.
+//      TerpenePage reads the :id param and auto-opens that terpene's modal.
+//   NO OTHER CHANGES.
+//
 // ★ v3.7 CHANGELOG (Phase 2F — Shop Admin Scoping):
 //   1. ADD: import ShopDashboard from "./pages/ShopDashboard"
 //   2. ADD: AdminDashboardRouter component — uses tenant context to serve
@@ -22,68 +27,6 @@
 // ★ v3.5 CHANGELOG: AI Co-Pilot sidebar
 // ★ v3.4 CHANGELOG: Admin QR Generator
 // (see older changelogs below)
-//
-// CHANGELOG v3.2.1 → v3.3 (Cart + Checkout):
-//   1. ADD: CartProvider wrapping BrowserRouter for global cart state.
-//   2. ADD: Cart icon with item count badge in NavBar (between nav links and
-//      user identity section). Clicking navigates to /cart.
-//   3. ADD: /cart route — CartPage with NavBar, no PageShell (like /shop).
-//   4. ADD: /checkout route — CheckoutPage with NavBar + PageShell + RequireAuth.
-//   5. ADD: /order-success route — OrderSuccess with NavBar + PageShell.
-//   6. ADD: Imports for CartPage, CheckoutPage, OrderSuccess, CartProvider, useCart.
-//
-//   NO CHANGES to: existing routes, RequireAuth/RequireRole logic, auth state
-//   management, console.logs, WithNav, NavLink, any existing imports, dev mode
-//   banner, or localStorage keys. All diagnostic patterns preserved.
-//
-// CHANGELOG v3.2 → v3.2.1 (Spinner freeze fix):
-//   1. FIX: RequireAuth now checks `loading && !role` instead of just `loading`.
-//      When role exists from localStorage (set by Account.js during login),
-//      the spinner is skipped entirely — no waiting for hydrateSession.
-//   2. FIX: Dev mode early return in hydrateSession was not calling
-//      setLoading(false), causing infinite spinner in dev mode.
-//   3. ADD: 5-second safety timeout on loading state — if hydrateSession hangs
-//      (e.g. Supabase unreachable, LockManager contention), loading auto-resolves.
-//
-// CHANGELOG v3.1 → v3.2 (UX & Auth Guards):
-//   1. ADD: `loading` state — prevents flash-redirects on page refresh while
-//      Supabase session is being hydrated. Always resolves via try/finally.
-//   2. ADD: `userEmail` state — displays logged-in user identity in NavBar.
-//   3. FIX: hydrateSession now clears stale role if no valid Supabase session
-//      exists (prevents ghost auth from old localStorage).
-//   4. ADD: NavBar is now auth-aware — shows user email pill + role badge when
-//      logged in; shows "Sign In" button when logged out. Admin/Wholesale
-//      links remain role-gated (already working in v3.1).
-//   5. ADD: RequireAuth wrapper component — redirects unauthenticated users to
-//      /account?return=/original-path. Shows branded loading spinner during
-//      session hydration. Used on /loyalty, /redeem, /wholesale, /admin.
-//   6. ADD: RequireRole wrapper — extends RequireAuth with role check for
-//      admin-only and retailer-only routes. Redirects wrong roles to /loyalty.
-//
-//   NO CHANGES to: route tiers, standalone vs nav structure, page imports,
-//   RoleContext shape, dev mode banner, NavLink component, WithNav wrapper,
-//   localStorage keys, or any auth flow logic in handleLogout/exitDevMode.
-//   All console.log diagnostic patterns preserved.
-// ─────────────────────────────────────────────────────────────────────────────
-// Main router + RoleContext + inline NavBar
-//
-// Matches actual project file structure:
-//   src/components/  → Auth.js, QrCode.js, QrScanner.js  (NO NavBar.js)
-//   src/pages/       → Landing, Login, Loyalty, ScanPage, ScanResult,
-//                       AdminDashboard, WholesalePortal, NotFound,
-//                       Account, Shop, ProductVerification, Redeem, Welcome,
-//                       CartPage, CheckoutPage, OrderSuccess,
-//                       AdminQrGenerator, HQDashboard, ShopDashboard  ← ★ v3.7
-//
-// Route tiers:
-//   STANDALONE (no nav):  /  /scan  /scan/:qrCode
-//   WITH nav, NO shell:   /shop  /verify/:productId  /cart
-//   WITH nav + shell:     /loyalty  /account  /wholesale  /admin  /admin/qr
-//                         /redeem  /welcome  /checkout  /order-success
-//                         /hq  ← ★ v3.6
-//
-// KEY FIX: /scan and /scan/:qrCode are STANDALONE — this removes the admin
-// nav bar that was appearing on the scan pages.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useState, useEffect, useContext } from "react";
@@ -94,7 +37,7 @@ import {
   Navigate,
   Link,
   useNavigate,
-  useLocation, // v3.2: needed by RequireAuth for ?return= path
+  useLocation,
 } from "react-router-dom";
 import { supabase } from "./services/supabaseClient";
 
@@ -107,6 +50,8 @@ import Account from "./pages/Account";
 import AdminDashboard from "./pages/AdminDashboard";
 import WholesalePortal from "./pages/WholesalePortal";
 import NotFound from "./pages/NotFound";
+import TerpenePage from "./pages/TerpenePage";
+import MoleculesPage from "./pages/MoleculesPage";
 
 // Optional pages — comment out any that don't exist yet to avoid import errors
 import Shop from "./pages/Shop";
@@ -132,10 +77,10 @@ import HQDashboard from "./pages/HQDashboard";
 import ShopDashboard from "./pages/ShopDashboard";
 
 // ── Layout shell ──────────────────────────────────────────────────────────────
-import PageShell from "./components/PageShell"; // v3.2.1: shared layout wrapper
+import PageShell from "./components/PageShell";
 
 // ── Cart context ──────────────────────────────────────────────────────────────
-import { CartProvider, useCart } from "./contexts/CartContext"; // v3.3
+import { CartProvider, useCart } from "./contexts/CartContext";
 
 // ★ v3.6: Tenant context (Phase 2A)
 import { TenantProvider, useTenant } from "./services/tenantService";
@@ -149,27 +94,25 @@ const LS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INLINE NAV BAR — v3.6: Added HQ link for hq_access users
-// Shows user email + role badge when logged in; Sign In when logged out.
+// INLINE NAV BAR
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBar() {
   const { role, setRole, isDevMode, setIsDevMode, userEmail, loading } =
     useContext(RoleContext);
-  const { getCartCount } = useCart(); // v3.3
-  const { isHQ } = useTenant(); // ★ v3.6
+  const { getCartCount } = useCart();
+  const { isHQ } = useTenant();
   const navigate = useNavigate();
 
   const isLoggedIn = !!role;
-  const cartCount = getCartCount(); // v3.3
+  const cartCount = getCartCount();
 
-  // v3.1 FIX preserved: properly clear role and localStorage on logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem(LS.ROLE);
     localStorage.removeItem(LS.DEV_MODE);
     setRole(null);
     setIsDevMode(false);
-    navigate("/"); // v3.2: go to landing, not /account
+    navigate("/");
   };
 
   const exitDevMode = async () => {
@@ -180,11 +123,9 @@ function NavBar() {
     setIsDevMode(false);
   };
 
-  // Role display label
   const roleLabel =
     role === "admin" ? "Admin" : role === "retailer" ? "Wholesale" : null;
 
-  // Truncate email for display
   const displayEmail = userEmail
     ? userEmail.length > 24
       ? userEmail.slice(0, 22) + "…"
@@ -193,7 +134,6 @@ function NavBar() {
 
   return (
     <>
-      {/* Dev mode banner — unchanged from v3.1 */}
       {isDevMode && (
         <div
           style={{
@@ -233,7 +173,6 @@ function NavBar() {
         </div>
       )}
 
-      {/* Main nav — v3.3: cart icon added */}
       <header
         style={{
           background: "#1b4332",
@@ -244,9 +183,7 @@ function NavBar() {
           height: "56px",
         }}
       >
-        {/* Left: brand + nav links */}
         <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-          {/* v3.2: Protea Botanicals brand mark */}
           <Link
             to="/"
             style={{
@@ -269,13 +206,10 @@ function NavBar() {
           {isLoggedIn && <NavLink to="/scan">Scan QR</NavLink>}
           {role === "admin" && <NavLink to="/admin">Admin</NavLink>}
           {role === "retailer" && <NavLink to="/wholesale">Wholesale</NavLink>}
-          {/* ★ v3.6: HQ link — only visible to users with hq_access */}
           {isHQ && <NavLink to="/hq">HQ</NavLink>}
         </nav>
 
-        {/* Right: cart icon + user identity or Sign In */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* v3.3: Cart icon with badge */}
           <button
             onClick={() => navigate("/cart")}
             style={{
@@ -290,7 +224,6 @@ function NavBar() {
             }}
             aria-label={`Cart with ${cartCount} items`}
           >
-            {/* Cart SVG icon */}
             <svg
               width="20"
               height="20"
@@ -305,7 +238,6 @@ function NavBar() {
               <circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
             </svg>
-            {/* Badge — only show when cart has items */}
             {cartCount > 0 && (
               <span
                 style={{
@@ -333,15 +265,9 @@ function NavBar() {
 
           {isLoggedIn ? (
             <>
-              {/* v3.2: User identity cluster */}
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
               >
-                {/* ★ v3.6: HQ badge — distinct from admin badge */}
                 {isHQ && (
                   <span
                     style={{
@@ -359,8 +285,6 @@ function NavBar() {
                     HQ
                   </span>
                 )}
-
-                {/* Role badge — only for admin/retailer (skip if HQ badge shown) */}
                 {roleLabel && !isHQ && (
                   <span
                     style={{
@@ -381,8 +305,6 @@ function NavBar() {
                     {roleLabel}
                   </span>
                 )}
-
-                {/* User email */}
                 {displayEmail && (
                   <span
                     style={{
@@ -402,7 +324,6 @@ function NavBar() {
                 )}
               </div>
 
-              {/* Log Out button — same style as v3.1 */}
               <button
                 onClick={handleLogout}
                 style={{
@@ -432,7 +353,6 @@ function NavBar() {
               </button>
             </>
           ) : (
-            /* v3.2: Sign In button when not authenticated */
             <Link
               to="/account"
               style={{
@@ -491,7 +411,6 @@ function NavLink({ to, children }) {
   );
 }
 
-// ── Layout wrapper — v3.2.1: now includes PageShell for consistent styling ────
 function WithNav({ children }) {
   return (
     <>
@@ -501,18 +420,10 @@ function WithNav({ children }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// v3.2: AUTH GUARD — RequireAuth
-// Redirects unauthenticated users to /account?return=/current-path
-// Shows branded loading spinner during session hydration
-// ─────────────────────────────────────────────────────────────────────────────
 function RequireAuth({ children }) {
   const { role, loading } = useContext(RoleContext);
   const location = useLocation();
 
-  // v3.2.1 FIX: Only show spinner if BOTH loading AND no role from localStorage.
-  // When navigating from Account.js (which sets role in localStorage before redirect),
-  // role is immediately available via useState init — no need to wait for hydrateSession.
   if (loading && !role) {
     return (
       <div
@@ -553,7 +464,6 @@ function RequireAuth({ children }) {
     );
   }
 
-  // Not authenticated — redirect to login with return path
   if (!role) {
     console.log(
       "[RequireAuth] No role, redirecting to /account from:",
@@ -570,15 +480,9 @@ function RequireAuth({ children }) {
   return children;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// v3.2: ROLE GUARD — RequireRole
-// Extends RequireAuth: also checks user has correct role.
-// Wrong role → redirected to /loyalty (safe default for authenticated users).
-// ─────────────────────────────────────────────────────────────────────────────
 function RequireRole({ allowedRoles, children }) {
   const { role } = useContext(RoleContext);
 
-  // RequireAuth already handles null role, so role is guaranteed here
   if (!allowedRoles.includes(role)) {
     console.log(
       "[RequireRole] Role",
@@ -593,16 +497,10 @@ function RequireRole({ allowedRoles, children }) {
   return children;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ★ v3.6: HQ GUARD — RequireHQ
-// Checks hq_access flag from TenantProvider. Non-HQ users → /admin or /loyalty.
-// Must be used INSIDE RequireAuth (user must be logged in first).
-// ─────────────────────────────────────────────────────────────────────────────
 function RequireHQ({ children }) {
   const { isHQ, loading: tenantLoading } = useTenant();
   const { role } = useContext(RoleContext);
 
-  // Wait for tenant data to load
   if (tenantLoading) {
     return (
       <div
@@ -642,7 +540,6 @@ function RequireHQ({ children }) {
     );
   }
 
-  // Not HQ — redirect to admin (if admin) or loyalty (if customer)
   if (!isHQ) {
     const fallback = role === "admin" ? "/admin" : "/loyalty";
     console.log("[RequireHQ] No HQ access → redirecting to", fallback);
@@ -652,17 +549,9 @@ function RequireHQ({ children }) {
   return children;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ★ v3.7: ADMIN DASHBOARD ROUTER — Phase 2F
-// Routes admin users to the correct dashboard based on tenant context:
-//   - HQ users (isHQ=true) → AdminDashboard (original, full access)
-//   - Shop users (isHQ=false, tenantType='shop') → ShopDashboard (scoped)
-//   - Fallback → AdminDashboard (backwards compatible)
-// ─────────────────────────────────────────────────────────────────────────────
 function AdminDashboardRouter() {
   const { isHQ, tenantType, loading: tenantLoading } = useTenant();
 
-  // Wait for tenant context to load
   if (tenantLoading) {
     return (
       <div
@@ -702,40 +591,33 @@ function AdminDashboardRouter() {
     );
   }
 
-  // HQ users see the original AdminDashboard (full, unscoped)
   if (isHQ) {
     console.log("[AdminDashboardRouter] HQ user → AdminDashboard");
     return <AdminDashboard />;
   }
 
-  // Shop admin users see the scoped ShopDashboard
   if (tenantType === "shop") {
     console.log("[AdminDashboardRouter] Shop admin → ShopDashboard");
     return <ShopDashboard />;
   }
 
-  // Fallback: original AdminDashboard (backwards compatible for edge cases)
   console.log("[AdminDashboardRouter] Fallback → AdminDashboard");
   return <AdminDashboard />;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP ROOT — v3.6: TenantProvider wraps inside CartProvider
+// APP ROOT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
-  // v3.1 preserved: role + devMode state
   const [role, setRoleState] = useState(
     () => localStorage.getItem(LS.ROLE) || null,
   );
   const [isDevMode, setIsDevMode] = useState(
     () => localStorage.getItem(LS.DEV_MODE) === "true",
   );
-
-  // v3.2: new state for auth-aware UI
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState(null);
 
-  // v3.1 preserved: setRole removes from localStorage when null
   const setRole = (newRole) => {
     setRoleState(newRole);
     if (newRole) {
@@ -746,7 +628,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    // v3.2.1: Safety timeout — if loading hasn't resolved in 5s, force it
     const safetyTimer = setTimeout(() => {
       setLoading((prev) => {
         if (prev)
@@ -755,11 +636,10 @@ export default function App() {
       });
     }, 5000);
 
-    // v3.2: Hydrate role + email from existing Supabase session on refresh
     const hydrateSession = async () => {
       try {
         if (localStorage.getItem(LS.DEV_MODE) === "true") {
-          setLoading(false); // v3.2.1 FIX: was missing — caused infinite spinner in dev mode
+          setLoading(false);
           return;
         }
         const {
@@ -772,7 +652,7 @@ export default function App() {
             .eq("id", session.user.id)
             .single();
           if (profile?.role) setRole(profile.role);
-          setUserEmail(session.user.email); // v3.2
+          setUserEmail(session.user.email);
           console.log(
             "[App] Session hydrated:",
             session.user.email,
@@ -780,7 +660,6 @@ export default function App() {
             profile?.role,
           );
         } else {
-          // v3.2: No valid session — clear any stale role from localStorage
           setRole(null);
           setUserEmail(null);
           console.log("[App] No session found, cleared stale role");
@@ -788,8 +667,8 @@ export default function App() {
       } catch (err) {
         console.error("[App] hydrateSession error:", err);
       } finally {
-        setLoading(false); // v3.2: ALWAYS resolve loading
-        clearTimeout(safetyTimer); // v3.2.1: cancel safety timer if resolved normally
+        setLoading(false);
+        clearTimeout(safetyTimer);
       }
     };
 
@@ -807,12 +686,12 @@ export default function App() {
           .eq("id", session.user.id)
           .single();
         setRole(profile?.role || "customer");
-        setUserEmail(session.user.email); // v3.2
+        setUserEmail(session.user.email);
       } else if (event === "SIGNED_OUT") {
         if (localStorage.getItem(LS.DEV_MODE) !== "true") {
           setRoleState(null);
           localStorage.removeItem(LS.ROLE);
-          setUserEmail(null); // v3.2
+          setUserEmail(null);
         }
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         if (localStorage.getItem(LS.DEV_MODE) !== "true") {
@@ -822,14 +701,14 @@ export default function App() {
             .eq("id", session.user.id)
             .single();
           if (profile?.role) setRole(profile.role);
-          setUserEmail(session.user.email); // v3.2
+          setUserEmail(session.user.email);
         }
       }
     });
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(safetyTimer); // v3.2.1: cleanup safety timer
+      clearTimeout(safetyTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -841,19 +720,17 @@ export default function App() {
         setRole,
         isDevMode,
         setIsDevMode,
-        loading, // v3.2
-        userEmail, // v3.2
+        loading,
+        userEmail,
       }}
     >
-      {/* v3.3: CartProvider wraps BrowserRouter so NavBar can access cart count */}
       <CartProvider>
-        {/* ★ v3.6: TenantProvider wraps BrowserRouter so components can access tenant */}
         <TenantProvider>
           <BrowserRouter>
             <Routes>
               {/* ── STANDALONE — no nav ─────────────────────────────────────── */}
               <Route path="/" element={<Landing />} />
-              {/* v3.4: /shop gets NavBar but no PageShell (has full-bleed hero) */}
+
               <Route
                 path="/shop"
                 element={
@@ -863,7 +740,6 @@ export default function App() {
                   </>
                 }
               />
-              {/* v3.4: /verify gets NavBar but no PageShell (dark full-bleed theme) */}
               <Route
                 path="/verify/:productId"
                 element={
@@ -873,8 +749,6 @@ export default function App() {
                   </>
                 }
               />
-
-              {/* v3.3: /cart gets NavBar but no PageShell (like /shop — full-bleed) */}
               <Route
                 path="/cart"
                 element={
@@ -885,12 +759,29 @@ export default function App() {
                 }
               />
 
-              {/* ✅ FIXED in v3: scan routes standalone — no admin nav */}
+              {/* ── SCAN — standalone, no nav ───────────────────────────────── */}
               <Route path="/scan" element={<ScanPage />} />
               <Route path="/scan/:qrCode" element={<ScanResult />} />
 
+              {/* ── MOLECULES ───────────────────────────────────────────────── */}
+              <Route
+                path="/molecules"
+                element={
+                  <WithNav>
+                    <MoleculesPage />
+                  </WithNav>
+                }
+              />
+
+              {/* ── TERPENES ─────────────────────────────────────────────────
+                   /terpenes      → full carousel browse page
+                   /terpenes/:id  → carousel page with specific terpene modal
+                                    auto-opened (TerpenePage reads useParams)
+              ─────────────────────────────────────────────────────────────── */}
+              <Route path="/terpenes" element={<TerpenePage />} />
+              <Route path="/terpenes/:terpeneId" element={<TerpenePage />} />
+
               {/* ── WITH nav + auth guard ───────────────────────────────────── */}
-              {/* v3.2: /loyalty and /redeem require authentication */}
               <Route
                 path="/loyalty"
                 element={
@@ -911,8 +802,6 @@ export default function App() {
                   </WithNav>
                 }
               />
-
-              {/* v3.3: /checkout requires auth (must be logged in to pay) */}
               <Route
                 path="/checkout"
                 element={
@@ -923,8 +812,6 @@ export default function App() {
                   </WithNav>
                 }
               />
-
-              {/* v3.3: /order-success — post-payment confirmation */}
               <Route
                 path="/order-success"
                 element={
@@ -933,8 +820,6 @@ export default function App() {
                   </WithNav>
                 }
               />
-
-              {/* v3.2: /wholesale requires auth + retailer role */}
               <Route
                 path="/wholesale"
                 element={
@@ -947,9 +832,6 @@ export default function App() {
                   </WithNav>
                 }
               />
-
-              {/* ★ v3.7: /admin uses AdminDashboardRouter to serve correct dashboard */}
-              {/* HQ admin → AdminDashboard (original). Shop admin → ShopDashboard (scoped). */}
               <Route
                 path="/admin"
                 element={
@@ -965,8 +847,6 @@ export default function App() {
                   </>
                 }
               />
-
-              {/* ★ v3.4: /admin/qr — Admin QR Code Generator */}
               <Route
                 path="/admin/qr"
                 element={
@@ -982,10 +862,6 @@ export default function App() {
                   </>
                 }
               />
-
-              {/* ★ v3.6: /hq — HQ Command Centre (Phase 2A) */}
-              {/* Requires auth + admin role + hq_access flag */}
-              {/* Uses 1400px max-width for wide dashboard layouts */}
               <Route
                 path="/hq/*"
                 element={

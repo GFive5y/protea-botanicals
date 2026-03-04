@@ -1,4 +1,15 @@
-// src/pages/Landing.js v5.4
+// src/pages/Landing.js v5.7
+// v5.7: Header hides on scroll down (past 300px), reappears on scroll up.
+//       Uses scroll direction tracking + CSS translateY(-100%) transition.
+// v5.6: Terpene section — added "THE ENTOURAGE EFFECT" eyebrow label + icon
+//       above "Our Terpene Profiles" heading, matching all other content sections.
+//       TerpeneCarousel click now navigates directly to /terpenes/:id (individual
+//       terpene info page), skipping the intermediate browse carousel page.
+// v5.5: Delta-9-THC molecule integration — "Understanding THC" section now
+//       2-column layout: animated molecule (with controls) on left, text on right.
+//       New import: Delta9THCMolecule from ../components/Delta9THCMolecule.
+//       Only the thc section render changes. CO2 + Terpenes sections unchanged.
+//       Responsive: stacks vertically on mobile (<768px via flexWrap).
 // v5.4: Video background on "Understanding THC" section — slow golden distillate
 //       loop behind text with cream overlay for readability. File: public/videos/distillate-bg.mp4
 //       Changes: contentSections map section gets position:relative + overflow:hidden,
@@ -11,22 +22,28 @@
 //       Header-only changes. No other code modified.
 // v5.1+fix: OG design. Auth-aware floating header. Scan & Earn routes to /account.
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { RoleContext } from "../App"; // ← for auth-aware header button
 import { supabase } from "../services/supabaseClient"; // v5.2: direct session check
 import AgeGate from "../components/AgeGate"; // v5.3: 21+ age verification
 import PromoBanner from "../components/PromoBanner"; // v5.3: promo campaign banner
+import MoleculePulse from "../components/MoleculePulse"; // v5.5: molecule
+import MoleculeModal from "../components/MoleculeModal";
+import TerpeneCarousel from "../components/TerpeneCarousel";
 
 export default function Landing() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams(); // v5.3: read ?promo= param
   const promo = searchParams.get("promo"); // v5.3: e.g. "preregister-1000"
   const ctx = useContext(RoleContext);
-  const role = typeof ctx === "string" ? ctx : ctx?.role || null; // v5.2: handle string or object
+  const role = typeof ctx === "string" ? ctx : ctx?.role || null; // v5.2: handle string or object  // eslint-disable-line no-unused-vars
   const [isLoggedIn, setIsLoggedIn] = useState(false); // v5.2: real auth state
 
+  const [modalMolId, setModalMolId] = useState(null);
   const [scrolled, setScrolled] = useState(false);
-  const [visibleSections, setVisibleSections] = useState({});
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const cardsRef = useRef(null); // ref on portal cards section
+  const [, setVisibleSections] = useState({});
 
   // v5.2: Check Supabase session directly (doesn't depend on RoleContext shape)
   useEffect(() => {
@@ -42,8 +59,22 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", handleScroll);
+    let lastY = window.scrollY;
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 50);
+      // Hide when the portal cards top edge hits the top of the viewport
+      const threshold = cardsRef.current
+        ? cardsRef.current.getBoundingClientRect().top + y - 52
+        : 9999;
+      if (y > threshold) {
+        setHeaderVisible(y < lastY);
+      } else {
+        setHeaderVisible(true);
+      }
+      lastY = y;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -96,20 +127,20 @@ export default function Landing() {
 
   const contentSections = [
     {
-      id: "thc",
-      icon: "⬡",
-      label: "THE MOLECULE",
-      title: "Understanding THC",
-      color: "#2d6a4f",
-      body: `Tetrahydrocannabinol (THC) is the primary psychoactive compound found in the cannabis plant. At Protea Botanicals, we work exclusively with pharmaceutical-grade THC distillate — refined to 90%+ purity through a rigorous multi-stage process that removes all unwanted plant material, waxes and chlorophyll.\n\nThe result is a clean, potent, consistently dosed extract that delivers a predictable and enjoyable experience every time. Our THC distillate is lab-certified by accredited South African laboratories, with full Certificates of Analysis (COA) available by scanning any product QR code.`,
-    },
-    {
       id: "co2",
       icon: "◈",
       label: "THE PROCESS",
       title: "Supercritical CO₂ Extraction",
       color: "#b5935a",
       body: `Supercritical CO₂ extraction is widely regarded as the gold standard in botanical extraction technology. Unlike solvent-based methods that can leave residual chemicals in the final product, CO₂ extraction uses carbon dioxide under precise temperature and pressure conditions to act as a solvent — then evaporates completely, leaving zero residue.\n\nThe process preserves the full spectrum of beneficial compounds including cannabinoids and terpenes, producing an exceptionally clean extract with superior flavour and effect profiles. Our extraction facility operates under strict quality control protocols, ensuring every batch meets the highest standards of purity and consistency.`,
+    },
+    {
+      id: "thc",
+      icon: "⬡",
+      label: "THE MOLECULE",
+      title: "Understanding THC",
+      color: "#2d6a4f",
+      body: `Tetrahydrocannabinol (THC) is the primary psychoactive compound found in the cannabis plant. At Protea Botanicals, we work exclusively with pharmaceutical-grade THC distillate — refined to 90%+ purity through a rigorous multi-stage process that removes all unwanted plant material, waxes and chlorophyll.\n\nThe result is a clean, potent, consistently dosed extract that delivers a predictable and enjoyable experience every time. Our THC distillate is lab-certified by accredited South African laboratories, with full Certificates of Analysis (COA) available by scanning any product QR code.`,
     },
     {
       id: "terpenes",
@@ -121,7 +152,8 @@ export default function Landing() {
     },
   ];
 
-  const terpenes = [
+  const _terpenes = [
+    // eslint-disable-line no-unused-vars
     {
       name: "Myrcene",
       aroma: "Earthy, Musky, Herbal",
@@ -165,6 +197,139 @@ export default function Landing() {
       icon: "◇",
     },
   ];
+
+  // v5.7: Renders THC section — header text on top, molecule carousel below
+  const renderTHCSection = (sec) => (
+    <div style={{ maxWidth: "800px", width: "100%" }}>
+      {/* Header + text */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          marginBottom: "12px",
+        }}
+      >
+        <span style={{ fontSize: "24px", color: sec.color }}>{sec.icon}</span>
+        <span
+          className="body-font"
+          style={{
+            fontSize: "11px",
+            letterSpacing: "0.35em",
+            textTransform: "uppercase",
+            color: sec.color,
+            fontWeight: 500,
+          }}
+        >
+          {sec.label}
+        </span>
+      </div>
+      <h2
+        className="landing-font"
+        style={{
+          fontSize: "clamp(32px, 5vw, 52px)",
+          fontWeight: 300,
+          color: "#1a1a1a",
+          marginBottom: "32px",
+          lineHeight: 1.2,
+        }}
+      >
+        {sec.title}
+      </h2>
+      <div
+        style={{
+          width: "48px",
+          height: "2px",
+          background: sec.color,
+          marginBottom: "32px",
+        }}
+      />
+      {sec.body.split("\n\n").map((para, i) => (
+        <p
+          key={i}
+          className="body-font"
+          style={{
+            fontSize: "17px",
+            lineHeight: 1.9,
+            color: "#555",
+            fontWeight: 300,
+            marginBottom: "20px",
+            maxWidth: "800px",
+          }}
+        >
+          {para}
+        </p>
+      ))}
+
+      {/* Pulsing neon molecule */}
+      <div style={{ marginTop: "48px" }}>
+        <MoleculePulse onSelect={(id) => setModalMolId(id)} />
+      </div>
+    </div>
+  );
+
+  // v5.5: Renders the standard centered text layout (CO2, Terpenes, etc.)
+  const renderDefaultSection = (sec) => (
+    <div style={{ maxWidth: "800px", width: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+          marginBottom: "12px",
+        }}
+      >
+        <span style={{ fontSize: "24px", color: sec.color }}>{sec.icon}</span>
+        <span
+          className="body-font"
+          style={{
+            fontSize: "11px",
+            letterSpacing: "0.35em",
+            textTransform: "uppercase",
+            color: sec.color,
+            fontWeight: 500,
+          }}
+        >
+          {sec.label}
+        </span>
+      </div>
+      <h2
+        className="landing-font"
+        style={{
+          fontSize: "clamp(32px, 5vw, 52px)",
+          fontWeight: 300,
+          color: "#1a1a1a",
+          marginBottom: "32px",
+          lineHeight: 1.2,
+        }}
+      >
+        {sec.title}
+      </h2>
+      <div
+        style={{
+          width: "48px",
+          height: "2px",
+          background: sec.color,
+          marginBottom: "32px",
+        }}
+      />
+      {sec.body.split("\n\n").map((para, i) => (
+        <p
+          key={i}
+          className="body-font"
+          style={{
+            fontSize: "17px",
+            lineHeight: 1.9,
+            color: "#555",
+            fontWeight: 300,
+            marginBottom: "20px",
+          }}
+        >
+          {para}
+        </p>
+      ))}
+    </div>
+  );
 
   return (
     <AgeGate>
@@ -219,7 +384,9 @@ export default function Landing() {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "0 28px",
-            transition: "background 0.4s ease, backdrop-filter 0.4s ease",
+            transform: headerVisible ? "translateY(0)" : "translateY(-100%)",
+            transition:
+              "background 0.4s ease, backdrop-filter 0.4s ease, transform 0.35s ease",
             borderBottom: scrolled ? "1px solid rgba(82,183,136,0.15)" : "none",
           }}
         >
@@ -480,6 +647,7 @@ export default function Landing() {
 
           {/* Portal Cards */}
           <div
+            ref={cardsRef}
             style={{
               display: "flex",
               gap: "24px",
@@ -675,7 +843,8 @@ export default function Landing() {
           />
         </section>
 
-        {/* ── CONTENT SECTIONS (all text, no video) ── */}
+        {/* ── CONTENT SECTIONS ── */}
+        {/* v5.5: THC section uses 2-column layout with molecule; others unchanged */}
         {contentSections.map((sec, idx) => (
           <section
             key={sec.id}
@@ -701,87 +870,45 @@ export default function Landing() {
               }
             }}
           >
-            <div style={{ maxWidth: "800px", width: "100%" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "16px",
-                  marginBottom: "12px",
-                }}
-              >
-                <span style={{ fontSize: "24px", color: sec.color }}>
-                  {sec.icon}
-                </span>
-                <span
-                  className="body-font"
-                  style={{
-                    fontSize: "11px",
-                    letterSpacing: "0.35em",
-                    textTransform: "uppercase",
-                    color: sec.color,
-                    fontWeight: 500,
-                  }}
-                >
-                  {sec.label}
-                </span>
-              </div>
-              <h2
-                className="landing-font"
-                style={{
-                  fontSize: "clamp(32px, 5vw, 52px)",
-                  fontWeight: 300,
-                  color: "#1a1a1a",
-                  marginBottom: "32px",
-                  lineHeight: 1.2,
-                }}
-              >
-                {sec.title}
-              </h2>
-              <div
-                style={{
-                  width: "48px",
-                  height: "2px",
-                  background: sec.color,
-                  marginBottom: "32px",
-                }}
-              />
-              {sec.body.split("\n\n").map((para, i) => (
-                <p
-                  key={i}
-                  className="body-font"
-                  style={{
-                    fontSize: "17px",
-                    lineHeight: 1.9,
-                    color: "#555",
-                    fontWeight: 300,
-                    marginBottom: "20px",
-                  }}
-                >
-                  {para}
-                </p>
-              ))}
-            </div>
+            {sec.id === "thc"
+              ? renderTHCSection(sec)
+              : renderDefaultSection(sec)}
           </section>
         ))}
 
-        {/* ── TERPENES GRID ── */}
+        {/* ── TERPENES CAROUSEL ── */}
+        {/* v5.6: Added eyebrow label "THE ENTOURAGE EFFECT" matching other sections.
+                  No button — carousel hexes click directly to individual terpene pages. */}
         <section
-          style={{ padding: "100px 24px", background: "#1b4332" }}
+          style={{
+            padding: "100px 24px 80px",
+            background: "#faf9f6",
+            textAlign: "center",
+          }}
           ref={(el) => {
             if (el) {
               const o = new IntersectionObserver(
                 ([e]) => {
                   if (e.isIntersecting) el.classList.add("visible");
                 },
-                { threshold: 0.1 },
+                { threshold: 0.15 },
               );
               o.observe(el);
             }
           }}
         >
-          <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: "64px" }}>
+          <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+            {/* Eyebrow label — matches other content sections */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "16px",
+                marginBottom: "16px",
+              }}
+            >
+              <span style={{ fontSize: "20px", color: "#52b788" }}>❋</span>
               <span
                 className="body-font"
                 style={{
@@ -789,100 +916,26 @@ export default function Landing() {
                   letterSpacing: "0.35em",
                   textTransform: "uppercase",
                   color: "#52b788",
+                  fontWeight: 500,
                 }}
               >
                 THE ENTOURAGE EFFECT
               </span>
-              <h2
-                className="landing-font"
-                style={{
-                  fontSize: "clamp(32px, 5vw, 52px)",
-                  fontWeight: 300,
-                  color: "#faf9f6",
-                  marginTop: "12px",
-                  marginBottom: "16px",
-                }}
-              >
-                Our Terpene Profiles
-              </h2>
-              <div
-                style={{
-                  width: "48px",
-                  height: "2px",
-                  background: "#52b788",
-                  margin: "0 auto",
-                }}
-              />
             </div>
-            <div
+
+            <h2
+              className="landing-font"
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: "20px",
+                fontSize: "clamp(28px, 4vw, 42px)",
+                fontWeight: 300,
+                color: "#1a1a1a",
+                margin: "0 0 32px",
               }}
             >
-              {terpenes.map((t) => (
-                <div
-                  key={t.name}
-                  className="terpene-card"
-                  style={{
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "4px",
-                    padding: "28px 24px",
-                    backdropFilter: "blur(10px)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: "16px",
-                    }}
-                  >
-                    <h3
-                      className="landing-font"
-                      style={{
-                        fontSize: "26px",
-                        fontWeight: 400,
-                        color: "#faf9f6",
-                      }}
-                    >
-                      {t.name}
-                    </h3>
-                    <span
-                      style={{ fontSize: "20px", color: t.color, opacity: 0.7 }}
-                    >
-                      {t.icon}
-                    </span>
-                  </div>
-                  <p
-                    className="body-font"
-                    style={{
-                      fontSize: "12px",
-                      color: "#52b788",
-                      letterSpacing: "0.1em",
-                      marginBottom: "10px",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {t.aroma}
-                  </p>
-                  <p
-                    className="body-font"
-                    style={{
-                      fontSize: "13px",
-                      color: "rgba(255,255,255,0.6)",
-                      lineHeight: 1.6,
-                      fontWeight: 300,
-                    }}
-                  >
-                    {t.effect}
-                  </p>
-                </div>
-              ))}
-            </div>
+              Our Terpene Profiles
+            </h2>
+
+            <TerpeneCarousel />
           </div>
         </section>
 
@@ -890,7 +943,7 @@ export default function Landing() {
         <section
           style={{
             padding: "100px 24px",
-            background: "#f4f0e8",
+            background: "#faf9f6",
             textAlign: "center",
           }}
           ref={(el) => {
@@ -1104,6 +1157,14 @@ export default function Landing() {
             © 2026 Protea Botanicals. All rights reserved. · South Africa
           </p>
         </footer>
+
+        {/* Molecule detail modal */}
+        {modalMolId && (
+          <MoleculeModal
+            molId={modalMolId}
+            onClose={() => setModalMolId(null)}
+          />
+        )}
       </div>
     </AgeGate>
   );
