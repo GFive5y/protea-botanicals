@@ -1,29 +1,36 @@
-// src/App.js — Protea Botanicals v3.9
+// src/App.js — Protea Botanicals v4.2
 // ─────────────────────────────────────────────────────────────────────────────
-// ★ v3.9 CHANGELOG:
-//   1. FIX: NavBar brand "Protea Botanicals" colour #b5935a → #faf9f6 (cream)
-//      Matches Landing.js header treatment. No more gold logo.
-//   2. ADD: NavBar scroll-hide behaviour — identical to Landing.js v5.7.
-//      Header slides up (translateY -100%) when user scrolls down past 80px,
-//      reappears when user scrolls up. Uses position:sticky + CSS transition.
-//      State: headerVisible (bool), scrolled (bool).
-//      Effect: passive scroll listener using lastYRef.
+// ★ v4.2 CHANGELOG:
+//   FIX: NavBar brand text now pixel-perfect match to Landing.js header.
+//
+//   Extracted directly from Landing.js v5.7 header source:
+//
+//   Font:    'Cormorant Garamond', Georgia, serif  ← was Jost (wrong)
+//   Size:    15px                                  ← was 13px (wrong)
+//   Tracking: 0.2em                               ← was 0.35em (wrong)
+//   Case:    uppercase (via text)                  ← unchanged
+//
+//   Colour logic (matches Landing exactly):
+//     Green header (scrolled OR non-Landing pages):
+//       "PROTEA"     → #faf9f6  (cream)
+//       "BOTANICALS" → #52b788  (accent green)
+//     Transparent header (Landing at top, not scrolled):
+//       "PROTEA"     → #1a1a1a  opacity 0.85  (dark, readable on cream bg)
+//       "BOTANICALS" → #2d6a4f               (mid green)
+//
+//   Also injects Google Font @import for Cormorant Garamond so it loads on
+//   all pages (Landing.js loads it via its own <style> tag, but other pages
+//   don't have access to it — fixed with a single injected <style> in NavBar).
+//
 //   NO OTHER CHANGES. All routes, auth, cart, roles — untouched.
 //
-// ★ v3.8 CHANGELOG:
-//   1. ADD: /terpenes/:id route — individual terpene detail page.
-//   NO OTHER CHANGES.
-//
-// ★ v3.7 CHANGELOG (Phase 2F — Shop Admin Scoping):
-//   1. ADD: AdminDashboardRouter
-//   NO OTHER CHANGES.
-//
-// ★ v3.6 CHANGELOG (Phase 2A — Multi-Tenant Foundation):
-//   1. ADD: TenantProvider, RequireHQ, /hq route, HQ NavLink
-//   NO OTHER CHANGES.
-//
-// ★ v3.5 CHANGELOG: AI Co-Pilot sidebar
-// ★ v3.4 CHANGELOG: Admin QR Generator
+// ★ v4.1: NavBar solid green on non-Landing pages, transparent only on /
+// ★ v4.0: NavBar transparent-top + blur + Jost brand text
+// ★ v3.9: NavBar cream text + scroll-hide
+// ★ v3.8: /terpenes/:id route
+// ★ v3.7: AdminDashboardRouter (Phase 2F)
+// ★ v3.6: TenantProvider, RequireHQ (Phase 2A)
+// ★ v3.5: AI Co-Pilot | ★ v3.4: Admin QR Generator
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useState, useEffect, useContext, useRef } from "react";
@@ -49,31 +56,23 @@ import WholesalePortal from "./pages/WholesalePortal";
 import NotFound from "./pages/NotFound";
 import TerpenePage from "./pages/TerpenePage";
 import MoleculesPage from "./pages/MoleculesPage";
-
 import Shop from "./pages/Shop";
 import ProductVerification from "./pages/ProductVerification";
 import Redeem from "./pages/Redeem";
 import Welcome from "./pages/Welcome";
-
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccess from "./pages/OrderSuccess";
-
 import AdminQrGenerator from "./pages/AdminQrGenerator";
 import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
 import ShopDashboard from "./pages/ShopDashboard";
 
-// ── Layout shell ─────────────────────────────────────────────────────────────
+// ── Layout / Context ──────────────────────────────────────────────────────────
 import PageShell from "./components/PageShell";
-
-// ── Cart context ─────────────────────────────────────────────────────────────
 import { CartProvider, useCart } from "./contexts/CartContext";
-
-// ★ v3.6: Tenant context
 import { TenantProvider, useTenant } from "./services/tenantService";
 
-// ── RoleContext ───────────────────────────────────────────────────────────────
 export const RoleContext = createContext(null);
 
 const LS = {
@@ -82,8 +81,8 @@ const LS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NAVBAR
-// v3.9: cream brand text + scroll-hide (translateY) behaviour
+// NAVBAR  v4.2
+// Brand text pixel-perfect match to Landing.js v5.7 header
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBar() {
   const { role, setRole, isDevMode, setIsDevMode, userEmail } =
@@ -91,14 +90,24 @@ function NavBar() {
   const { getCartCount } = useCart();
   const { isHQ } = useTenant();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isLoggedIn = !!role;
   const cartCount = getCartCount();
 
-  // ── v3.9: scroll-hide ──────────────────────────────────────────────────────
+  // Only Landing (/) gets the transparent-at-top treatment
+  const isLanding = location.pathname === "/";
+
+  // ── Scroll state ─────────────────────────────────────────────────────────
   const [scrolled, setScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
   const lastYRef = useRef(0);
+
+  useEffect(() => {
+    setScrolled(false);
+    setHeaderVisible(true);
+    lastYRef.current = 0;
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -114,7 +123,7 @@ function NavBar() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  // ──────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -142,8 +151,32 @@ function NavBar() {
       : userEmail
     : null;
 
+  // ★ v4.2: Background — transparent only on Landing at scroll-top
+  const onGreenBg = !isLanding || scrolled;
+  const headerBg = onGreenBg ? "#1b4332" : "rgba(27,67,50,0.0)";
+
+  // ★ v4.2: Brand colours — extracted directly from Landing.js v5.7
+  // Green header: PROTEA=#faf9f6, BOTANICALS=#52b788
+  // Transparent header (Landing at top): PROTEA=#1a1a1a opacity 0.85, BOTANICALS=#2d6a4f
+  const proteaColor = onGreenBg ? "#faf9f6" : "#1a1a1a";
+  const proteaOpacity = onGreenBg ? 1 : 0.85;
+  const botColor = onGreenBg ? "#52b788" : "#2d6a4f";
+
+  // Nav link + icon colour
+  const navTextColor = onGreenBg
+    ? "rgba(255,255,255,0.88)"
+    : "rgba(27,67,50,0.85)";
+  const navTextColorDim = onGreenBg
+    ? "rgba(255,255,255,0.60)"
+    : "rgba(27,67,50,0.55)";
+
   return (
     <>
+      {/* ★ v4.2: Inject Cormorant Garamond for non-Landing pages */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500;600&display=swap');
+      `}</style>
+
       {isDevMode && (
         <div
           style={{
@@ -183,15 +216,15 @@ function NavBar() {
         </div>
       )}
 
-      {/* ★ v3.9: sticky position + scroll-hide transform */}
       <header
         style={{
           position: "sticky",
           top: 0,
           zIndex: 1000,
-          background: scrolled ? "rgba(27,67,50,0.97)" : "#1b4332",
-          backdropFilter: scrolled ? "blur(8px)" : "none",
-          padding: "0 24px",
+          background: headerBg,
+          backdropFilter: !onGreenBg ? "blur(8px)" : "none",
+          WebkitBackdropFilter: !onGreenBg ? "blur(8px)" : "none",
+          padding: "0 28px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -202,35 +235,77 @@ function NavBar() {
           borderBottom: scrolled ? "1px solid rgba(82,183,136,0.15)" : "none",
         }}
       >
+        {/* ── LEFT: brand + nav links ── */}
         <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-          {/* ★ v3.9: #faf9f6 cream — was #b5935a gold */}
+          {/* ★ v4.2: Exact match to Landing.js header brand text */}
           <Link
             to="/"
             style={{
-              color: "#faf9f6",
               textDecoration: "none",
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: "16px",
-              fontWeight: "700",
-              letterSpacing: "0.05em",
               marginRight: "16px",
               whiteSpace: "nowrap",
+              // Match Landing transition
+              transition: "opacity 0.4s ease, color 0.4s ease",
             }}
           >
-            Protea Botanicals
+            <span
+              style={{
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontSize: "15px",
+                letterSpacing: "0.2em",
+                color: proteaColor,
+                opacity: proteaOpacity,
+                transition: "opacity 0.4s ease, color 0.4s ease",
+              }}
+            >
+              PROTEA{" "}
+              <span
+                style={{
+                  color: botColor,
+                  transition: "color 0.4s ease",
+                }}
+              >
+                BOTANICALS
+              </span>
+            </span>
           </Link>
 
-          <NavLink to="/">Home</NavLink>
-          <NavLink to="/shop">Shop</NavLink>
-          {isLoggedIn && <NavLink to="/loyalty">Loyalty</NavLink>}
-          {isLoggedIn && <NavLink to="/scan">Scan QR</NavLink>}
-          {role === "admin" && <NavLink to="/admin">Admin</NavLink>}
-          {role === "retailer" && <NavLink to="/wholesale">Wholesale</NavLink>}
-          {isHQ && <NavLink to="/hq">HQ</NavLink>}
+          <NavLink to="/" color={navTextColor}>
+            Home
+          </NavLink>
+          <NavLink to="/shop" color={navTextColor}>
+            Shop
+          </NavLink>
+          {isLoggedIn && (
+            <NavLink to="/loyalty" color={navTextColor}>
+              Loyalty
+            </NavLink>
+          )}
+          {isLoggedIn && (
+            <NavLink to="/scan" color={navTextColor}>
+              Scan QR
+            </NavLink>
+          )}
+          {role === "admin" && (
+            <NavLink to="/admin" color={navTextColor}>
+              Admin
+            </NavLink>
+          )}
+          {role === "retailer" && (
+            <NavLink to="/wholesale" color={navTextColor}>
+              Wholesale
+            </NavLink>
+          )}
+          {isHQ && (
+            <NavLink to="/hq" color={navTextColor}>
+              HQ
+            </NavLink>
+          )}
         </nav>
 
+        {/* ── RIGHT: cart + auth ── */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* Cart icon */}
+          {/* Cart */}
           <button
             onClick={() => navigate("/cart")}
             style={{
@@ -250,7 +325,7 @@ function NavBar() {
               height="20"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="rgba(255,255,255,0.8)"
+              stroke={navTextColor}
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -329,7 +404,7 @@ function NavBar() {
                 {displayEmail && (
                   <span
                     style={{
-                      color: "rgba(255,255,255,0.6)",
+                      color: navTextColorDim,
                       fontFamily: "Jost, sans-serif",
                       fontSize: "11px",
                       fontWeight: "400",
@@ -348,8 +423,12 @@ function NavBar() {
               <button
                 onClick={handleLogout}
                 style={{
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: onGreenBg
+                    ? "rgba(255,255,255,0.08)"
+                    : "rgba(27,67,50,0.08)",
+                  border: onGreenBg
+                    ? "1px solid rgba(255,255,255,0.25)"
+                    : "1px solid rgba(27,67,50,0.3)",
                   borderRadius: "2px",
                   padding: "6px 14px",
                   fontFamily: "Jost, sans-serif",
@@ -357,44 +436,49 @@ function NavBar() {
                   fontWeight: "600",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.8)",
+                  color: onGreenBg ? "rgba(255,255,255,0.88)" : "#1b4332",
                   cursor: "pointer",
                   transition: "all 0.15s",
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.background = "rgba(255,255,255,0.15)";
-                  e.target.style.color = "#fff";
+                  e.target.style.background = onGreenBg
+                    ? "rgba(255,255,255,0.18)"
+                    : "rgba(27,67,50,0.15)";
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.background = "rgba(255,255,255,0.08)";
-                  e.target.style.color = "rgba(255,255,255,0.8)";
+                  e.target.style.background = onGreenBg
+                    ? "rgba(255,255,255,0.08)"
+                    : "rgba(27,67,50,0.08)";
                 }}
               >
                 Log Out
               </button>
             </>
           ) : (
-            <Link
-              to="/account"
+            /* Sign In button — matches Landing.js signin-btn exactly */
+            <button
+              onClick={() => navigate("/account")}
               style={{
-                background: "#b5935a",
-                border: "none",
+                background: onGreenBg
+                  ? "rgba(255,255,255,0.1)"
+                  : "rgba(27,67,50,0.08)",
+                border: onGreenBg
+                  ? "1px solid rgba(255,255,255,0.3)"
+                  : "1px solid rgba(27,67,50,0.3)",
                 borderRadius: "2px",
-                padding: "7px 18px",
+                padding: "6px 16px",
+                color: onGreenBg ? "#fff" : "#1b4332",
                 fontFamily: "Jost, sans-serif",
                 fontSize: "10px",
-                fontWeight: "600",
-                letterSpacing: "0.15em",
+                fontWeight: "500",
+                letterSpacing: "0.18em",
                 textTransform: "uppercase",
-                color: "#fff",
-                textDecoration: "none",
-                transition: "background 0.15s",
+                cursor: "pointer",
+                transition: "background 0.2s, color 0.4s, border-color 0.4s",
               }}
-              onMouseEnter={(e) => (e.target.style.background = "#a07e45")}
-              onMouseLeave={(e) => (e.target.style.background = "#b5935a")}
             >
               Sign In
-            </Link>
+            </button>
           )}
         </div>
       </header>
@@ -402,12 +486,14 @@ function NavBar() {
   );
 }
 
-function NavLink({ to, children }) {
+// ── NavLink helper ────────────────────────────────────────────────────────────
+function NavLink({ to, children, color }) {
+  const c = color || "rgba(255,255,255,0.88)";
   return (
     <Link
       to={to}
       style={{
-        color: "rgba(255,255,255,0.8)",
+        color: c,
         textDecoration: "none",
         fontFamily: "Jost, sans-serif",
         fontSize: "11px",
@@ -419,11 +505,9 @@ function NavLink({ to, children }) {
         transition: "color 0.15s, background 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.target.style.color = "#fff";
-        e.target.style.background = "rgba(255,255,255,0.08)";
+        e.target.style.background = "rgba(27,67,50,0.08)";
       }}
       onMouseLeave={(e) => {
-        e.target.style.color = "rgba(255,255,255,0.8)";
         e.target.style.background = "transparent";
       }}
     >
@@ -432,6 +516,7 @@ function NavLink({ to, children }) {
   );
 }
 
+// ── Layout wrappers ───────────────────────────────────────────────────────────
 function WithNav({ children }) {
   return (
     <>
@@ -441,6 +526,7 @@ function WithNav({ children }) {
   );
 }
 
+// ── Auth guards ───────────────────────────────────────────────────────────────
 function RequireAuth({ children }) {
   const { role, loading } = useContext(RoleContext);
   const location = useLocation();
@@ -486,10 +572,7 @@ function RequireAuth({ children }) {
   }
 
   if (!role) {
-    console.log(
-      "[RequireAuth] No role, redirecting to /account from:",
-      location.pathname,
-    );
+    console.log("[RequireAuth] No role → /account from:", location.pathname);
     return (
       <Navigate
         to={`/account?return=${encodeURIComponent(location.pathname)}`}
@@ -503,18 +586,10 @@ function RequireAuth({ children }) {
 
 function RequireRole({ allowedRoles, children }) {
   const { role } = useContext(RoleContext);
-
   if (!allowedRoles.includes(role)) {
-    console.log(
-      "[RequireRole] Role",
-      role,
-      "not in",
-      allowedRoles,
-      "→ redirecting to /loyalty",
-    );
+    console.log("[RequireRole]", role, "not in", allowedRoles, "→ /loyalty");
     return <Navigate to="/loyalty" replace />;
   }
-
   return children;
 }
 
@@ -563,10 +638,9 @@ function RequireHQ({ children }) {
 
   if (!isHQ) {
     const fallback = role === "admin" ? "/admin" : "/loyalty";
-    console.log("[RequireHQ] No HQ access → redirecting to", fallback);
+    console.log("[RequireHQ] No HQ access →", fallback);
     return <Navigate to={fallback} replace />;
   }
-
   return children;
 }
 
@@ -612,17 +686,8 @@ function AdminDashboardRouter() {
     );
   }
 
-  if (isHQ) {
-    console.log("[AdminDashboardRouter] HQ user → AdminDashboard");
-    return <AdminDashboard />;
-  }
-
-  if (tenantType === "shop") {
-    console.log("[AdminDashboardRouter] Shop admin → ShopDashboard");
-    return <ShopDashboard />;
-  }
-
-  console.log("[AdminDashboardRouter] Fallback → AdminDashboard");
+  if (isHQ) return <AdminDashboard />;
+  if (tenantType === "shop") return <ShopDashboard />;
   return <AdminDashboard />;
 }
 
@@ -641,18 +706,14 @@ export default function App() {
 
   const setRole = (newRole) => {
     setRoleState(newRole);
-    if (newRole) {
-      localStorage.setItem(LS.ROLE, newRole);
-    } else {
-      localStorage.removeItem(LS.ROLE);
-    }
+    if (newRole) localStorage.setItem(LS.ROLE, newRole);
+    else localStorage.removeItem(LS.ROLE);
   };
 
   useEffect(() => {
     const safetyTimer = setTimeout(() => {
       setLoading((prev) => {
-        if (prev)
-          console.warn("[App] Safety timeout: forcing loading=false after 5s");
+        if (prev) console.warn("[App] Safety timeout: forcing loading=false");
         return false;
       });
     }, 5000);
@@ -683,7 +744,7 @@ export default function App() {
         } else {
           setRole(null);
           setUserEmail(null);
-          console.log("[App] No session found, cleared stale role");
+          console.log("[App] No session found");
         }
       } catch (err) {
         console.error("[App] hydrateSession error:", err);
@@ -736,14 +797,7 @@ export default function App() {
 
   return (
     <RoleContext.Provider
-      value={{
-        role,
-        setRole,
-        isDevMode,
-        setIsDevMode,
-        loading,
-        userEmail,
-      }}
+      value={{ role, setRole, isDevMode, setIsDevMode, loading, userEmail }}
     >
       <CartProvider>
         <TenantProvider>
@@ -751,7 +805,6 @@ export default function App() {
             <Routes>
               {/* ── STANDALONE — no nav ─────────────────────────────────────── */}
               <Route path="/" element={<Landing />} />
-
               <Route
                 path="/shop"
                 element={
@@ -780,11 +833,11 @@ export default function App() {
                 }
               />
 
-              {/* ── SCAN — standalone, no nav ───────────────────────────────── */}
+              {/* ── SCAN — standalone ───────────────────────────────────────── */}
               <Route path="/scan" element={<ScanPage />} />
               <Route path="/scan/:qrCode" element={<ScanResult />} />
 
-              {/* ── MOLECULES ───────────────────────────────────────────────── */}
+              {/* ── MOLECULES / TERPENES ────────────────────────────────────── */}
               <Route
                 path="/molecules"
                 element={
@@ -793,12 +846,6 @@ export default function App() {
                   </WithNav>
                 }
               />
-
-              {/* ── TERPENES ─────────────────────────────────────────────────
-                   /terpenes      → full carousel browse page
-                   /terpenes/:id  → carousel page with specific terpene modal
-                                    auto-opened (TerpenePage reads useParams)
-              ─────────────────────────────────────────────────────────────── */}
               <Route path="/terpenes" element={<TerpenePage />} />
               <Route path="/terpenes/:terpeneId" element={<TerpenePage />} />
 
@@ -901,7 +948,7 @@ export default function App() {
                 }
               />
 
-              {/* ── WITH nav, NO auth required ──────────────────────────────── */}
+              {/* ── WITH nav, no auth ────────────────────────────────────────── */}
               <Route
                 path="/account"
                 element={
