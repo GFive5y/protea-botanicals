@@ -6,7 +6,7 @@
 // v3.0: Two-row infinite carousel: top row drifts RIGHT, bottom row drifts LEFT.
 //       Edge fade mask for smooth disappear/appear. Hover pauses + enlarges.
 //       Click opens frosted modal with full profile.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 // ═══ TERPENE DATA ═══
@@ -889,7 +889,7 @@ function ConveyorRow({
 }
 
 // ═══ MODAL ═══
-function TerpeneModal({ terpene, onClose }) {
+function TerpeneModal({ terpene, onClose, fromUrl }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -897,18 +897,19 @@ function TerpeneModal({ terpene, onClose }) {
     };
   }, []);
   useEffect(() => {
+    if (fromUrl) return;
     const h = (e) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
+  }, [onClose, fromUrl]);
 
   if (!terpene) return null;
 
   return (
     <div
-      onClick={onClose}
+      onClick={fromUrl ? undefined : onClose}
       style={{
         position: "fixed",
         inset: 0,
@@ -918,6 +919,7 @@ function TerpeneModal({ terpene, onClose }) {
         justifyContent: "center",
         padding: "24px",
         animation: "terp-modal-bg 0.35s ease forwards",
+        pointerEvents: fromUrl ? "none" : "auto",
       }}
     >
       <div
@@ -933,6 +935,7 @@ function TerpeneModal({ terpene, onClose }) {
           overflowY: "auto",
           position: "relative",
           animation: "terp-modal-box 0.4s ease 0.1s both",
+          pointerEvents: "auto",
         }}
       >
         <button
@@ -1166,7 +1169,8 @@ export default function TerpenePage() {
     if (terpeneId) {
       const match = TERPENES.find((t) => t.id === terpeneId);
       if (match) {
-        setModalId(terpeneId);
+        const timer = setTimeout(() => setModalId(terpeneId), 80);
+        return () => clearTimeout(timer);
       }
     }
   }, [terpeneId]);
@@ -1329,6 +1333,7 @@ export default function TerpenePage() {
       {modalTerp && (
         <TerpeneModal
           terpene={modalTerp}
+          fromUrl={!!terpeneId}
           onClose={() => {
             setModalId(null);
             if (terpeneId) navigate(-1); // go back to Landing at same scroll position

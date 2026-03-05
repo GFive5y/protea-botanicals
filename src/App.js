@@ -55,6 +55,7 @@ import AdminQrGenerator from "./pages/AdminQrGenerator";
 import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
 import ShopDashboard from "./pages/ShopDashboard";
+import TerpenePage from "./pages/TerpenePage"; // ← ADD THIS
 
 import PageShell from "./components/PageShell";
 import { CartProvider, useCart } from "./contexts/CartContext";
@@ -771,7 +772,6 @@ export default function App() {
             <Routes>
               {/* ── STANDALONE — no nav ─────────────────────────────── */}
               <Route path="/" element={<Landing />} />
-
               {/* ★ v3.8: /shop + /verify + /cart get NavBar with 56px spacer */}
               <Route
                 path="/shop"
@@ -794,6 +794,17 @@ export default function App() {
                     </div>
                   </>
                 }
+              />{" "}
+              <Route
+                path="/terpenes/:terpeneId"
+                element={
+                  <>
+                    <NavBar />
+                    <div style={{ paddingTop: "56px" }}>
+                      <TerpenePage />
+                    </div>
+                  </>
+                }
               />
               <Route
                 path="/cart"
@@ -806,11 +817,9 @@ export default function App() {
                   </>
                 }
               />
-
               {/* Scan routes — standalone, no nav */}
               <Route path="/scan" element={<ScanPage />} />
               <Route path="/scan/:qrCode" element={<ScanResult />} />
-
               {/* ── WITH nav + auth guard ───────────────────────────── */}
               <Route
                 path="/loyalty"
@@ -915,7 +924,6 @@ export default function App() {
                   </>
                 }
               />
-
               {/* ── WITH nav, no auth required ──────────────────────── */}
               <Route
                 path="/account"
@@ -933,7 +941,6 @@ export default function App() {
                   </WithNav>
                 }
               />
-
               {/* Fallback */}
               <Route path="/404" element={<NotFound />} />
               <Route path="*" element={<Navigate to="/404" replace />} />
