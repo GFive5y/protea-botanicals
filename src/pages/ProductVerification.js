@@ -1922,7 +1922,7 @@ export default function ProductVerification() {
         <div
           className="pv-cta-banner"
           style={{
-            background: "linear-gradient(135deg, #1b4332, #2d6a4f)",
+            background: `linear-gradient(135deg, ${strain.gradientFrom}, ${strain.gradientTo})`,
             borderRadius: 2,
             padding: "52px 48px",
             display: "flex",
@@ -1939,7 +1939,7 @@ export default function ProductVerification() {
               style={{
                 fontSize: "10px",
                 letterSpacing: "0.35em",
-                color: "#52b788",
+                color: strain.accentColor,
                 textTransform: "uppercase",
                 marginBottom: 12,
               }}
