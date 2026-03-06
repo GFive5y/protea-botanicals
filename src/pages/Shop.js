@@ -1,27 +1,21 @@
-// src/pages/Shop.js v2.9
-// v2.9: STRAIN MODAL (DEC-018) — "View Profile" link in VapeCard replaced
-//       with frosted glass in-page overlay modal. No page navigation on click.
-//       Scroll position on Shop page preserved. Modal shows: strain hero,
-//       description, aroma/flavour, terpene profile, COA summary, Eybna info.
-//       STRAINS_DETAIL + DISTILLATE_COA extracted inline from
-//       ProductVerification.js v2.3 (ProductVerification.js unchanged — locked).
-//       StrainModal component added to this file.
-//       Body scroll locks while modal is open. Backdrop click closes modal.
-// v2.8: LIVE INVENTORY — Task A-4 (Automation WP). Shop page now queries
-//       inventory_items (category: "finished_product") instead of using hardcoded
-//       VAPE_PRODUCTS array. STRAINS array kept as visual metadata lookup (DEC-019).
-//       Each inventory item is matched to a strain for gradients, effects, icons.
-//       inventory_item_id added to product objects for Task A-5 cart deduction.
-//       Products with no strain match use generic styling. Empty inventory = no vapes shown.
-// v2.7: CART INTEGRATION — Import useCart from CartContext, call addToCart(product)
-//       on "Add to Cart" click. Toast now says "added to cart" (not "coming soon").
-//       Cart badge in NavBar updates in real time.
+// src/pages/Shop.js v3.0
+// v3.0: FULL VERIFICATION IN MODAL (DEC-025) — StrainModal now contains the
+//       complete ProductVerification page content: SVG donut chart, full COA
+//       with lab details + additional testing, "What These Numbers Mean" cards,
+//       Eybna attribution. No navigation required — everything stays in-shop
+//       with Add to Cart pinned in footer. "Full verification page →" kept as
+//       fallback direct URL link.
+//       CannabinoidDonut component extracted from ProductVerification.js v2.3.
+//       DISTILLATE_COA updated to include otherTests array.
+// v2.9: STRAIN MODAL (DEC-018) — frosted glass in-page overlay modal.
+// v2.8: LIVE INVENTORY — queries inventory_items (category: "finished_product").
+// v2.7: CART INTEGRATION — useCart, addToCart, cart badge in NavBar.
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
 
-// ── Distillate COA (extracted from ProductVerification.js v2.3 — DO NOT EDIT) ──
+// ── Distillate COA (Ecogreen Analytics — Lab ID: JB26-046-01) ───────────────
 const DISTILLATE_COA = {
   labId: "JB26-046-01",
   sampleId: "D9DSOL160126",
@@ -32,23 +26,28 @@ const DISTILLATE_COA = {
   method: "HPLC with UV detection (ME-EA-001)",
   cannabinoids: [
     { name: "D9-THC", value: 93.5527, highlight: true },
-    { name: "D8-THC", value: 3.088 },
-    { name: "CBD", value: 0.9756 },
-    { name: "CBN", value: 0.7809 },
-    { name: "CBG", value: 0.0868 },
-    { name: "CBDA", value: 0.043 },
-    { name: "THCA", value: 0.0001 },
+    { name: "D8-THC", value: 3.088, highlight: false },
+    { name: "CBD", value: 0.9756, highlight: false },
+    { name: "CBN", value: 0.7809, highlight: false },
+    { name: "CBG", value: 0.0868, highlight: false },
+    { name: "CBDA", value: 0.043, highlight: false },
+    { name: "THCA", value: 0.0001, highlight: false },
   ],
   totals: [
     { name: "Total THC", value: "93.55%" },
     { name: "Total CBD", value: "1.01%" },
     { name: "Total Cannabinoids", value: "98.53%" },
   ],
+  otherTests: [
+    { name: "Residual Solvents", status: "pending" },
+    { name: "Heavy Metals", status: "pending" },
+    { name: "Pesticides", status: "pending" },
+    { name: "Mycotoxins", status: "pending" },
+    { name: "Microbials", status: "pending" },
+  ],
 };
 
-// ── Strain Detail Data (extracted from ProductVerification.js v2.3 — DO NOT EDIT) ─
-// Visual metadata lives in STRAINS array below (DEC-019).
-// This object holds CONTENT data: description, terpenes, aroma, flavour, Eybna info.
+// ── Strain Detail Data ────────────────────────────────────────────────────────
 const STRAINS_DETAIL = {
   "pineapple-express": {
     description:
@@ -616,11 +615,8 @@ const STRAINS_DETAIL = {
   },
 };
 
-// ── Strain Data (EXTRACTED DIRECTLY from ProductVerification.js v2.3) ────────
-// Source of truth for VISUAL METADATA ONLY (DEC-019).
-// Inventory determines WHAT shows; this array determines HOW it looks.
+// ── Strain Visual Metadata ────────────────────────────────────────────────────
 const STRAINS = [
-  // ── Pure Terpenes Line (2 strains) ──
   {
     id: "pineapple-express",
     name: "Pineapple Express",
@@ -649,8 +645,6 @@ const STRAINS = [
     tagline: "Rich. Vanilla. Deeply Euphoric.",
     effects: ["Euphoric", "Relaxing", "Happy"],
   },
-
-  // ── Palate Line (4 strains) ──
   {
     id: "gelato-41",
     name: "Gelato #41",
@@ -707,8 +701,6 @@ const STRAINS = [
     tagline: "Bright. Citrus. Morning Energy.",
     effects: ["Energising", "Uplifting", "Focused"],
   },
-
-  // ── Live Line (4 strains) ──
   {
     id: "cinnamon-kush-cake",
     name: "Cinnamon Kush Cake",
@@ -765,8 +757,6 @@ const STRAINS = [
     tagline: "Citrus. Floral. Alien Potency.",
     effects: ["Creative", "Uplifting", "Focused"],
   },
-
-  // ── Enhancer Line (4 strains) ──
   {
     id: "sweet-watermelon",
     name: "Sweet Watermelon",
@@ -823,8 +813,6 @@ const STRAINS = [
     tagline: "Candy. Fruity. Playful.",
     effects: ["Uplifting", "Happy", "Energising"],
   },
-
-  // ── Live Plus+ Line (4 strains) ──
   {
     id: "zkz",
     name: "ZKZ",
@@ -883,11 +871,10 @@ const STRAINS = [
   },
 ];
 
-// ── Strain matching helpers ─────────────────────────────────────────────────
+// ── Strain matching helpers ───────────────────────────────────────────────────
 const STRAINS_BY_LENGTH = [...STRAINS].sort(
   (a, b) => b.name.length - a.name.length,
 );
-
 const DEFAULT_STRAIN = {
   id: "unknown",
   name: "Unknown",
@@ -936,7 +923,7 @@ function buildProductFromInventory(item) {
   };
 }
 
-// ── Coming Soon Categories ──────────────────────────────────────────────────
+// ── Coming Soon Categories ────────────────────────────────────────────────────
 const COMING_SOON = [
   {
     id: "cs-wellness",
@@ -991,7 +978,164 @@ const FILTER_OPTIONS = [
   { key: "coming-soon", label: "Coming Soon" },
 ];
 
-// ── Styles ───────────────────────────────────────────────────────────────────
+// ── SVG Donut Chart ───────────────────────────────────────────────────────────
+function CannabinoidDonut({ cannabinoids, accentColor }) {
+  const total = cannabinoids.reduce((sum, c) => sum + c.value, 0);
+  const size = 200;
+  const strokeWidth = 28;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const sliceColors = [
+    accentColor,
+    "#8b9a7b",
+    "#b5935a",
+    "#7b8a9e",
+    "#a0a0a0",
+    "#c0b8a8",
+    "#d0d0d0",
+  ];
+  let cumulativePercent = 0;
+  const slices = cannabinoids.map((c, i) => {
+    const percent = (c.value / total) * 100;
+    const dashLength = (percent / 100) * circumference;
+    const dashGap = circumference - dashLength;
+    const offset = -(cumulativePercent / 100) * circumference;
+    cumulativePercent += percent;
+    return {
+      ...c,
+      percent,
+      dashLength,
+      dashGap,
+      offset,
+      color: sliceColors[i] || "#ccc",
+    };
+  });
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 32,
+        flexWrap: "wrap",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: size,
+          height: size,
+          flexShrink: 0,
+        }}
+      >
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          style={{ transform: "rotate(-90deg)" }}
+        >
+          {slices.map((s) => (
+            <circle
+              key={s.name}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${s.dashLength} ${s.dashGap}`}
+              strokeDashoffset={s.offset}
+              style={{ transition: "all 1s ease" }}
+            />
+          ))}
+        </svg>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span
+            className="shop-font"
+            style={{
+              fontSize: 30,
+              fontWeight: 300,
+              color: "#1a1a1a",
+              lineHeight: 1,
+            }}
+          >
+            {cannabinoids[0].value.toFixed(1)}%
+          </span>
+          <span
+            className="body-font"
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: "#888",
+              textTransform: "uppercase",
+              marginTop: 4,
+            }}
+          >
+            D9-THC
+          </span>
+        </div>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          minWidth: 160,
+        }}
+      >
+        {slices.map((s) => (
+          <div
+            key={s.name}
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                background: s.color,
+                flexShrink: 0,
+              }}
+            />
+            <span
+              className="body-font"
+              style={{
+                fontSize: 12,
+                color: "#1a1a1a",
+                fontWeight: s.highlight ? 600 : 300,
+                flex: 1,
+              }}
+            >
+              {s.name}
+            </span>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 12,
+                color: s.highlight ? accentColor : "#888",
+                fontWeight: s.highlight ? 600 : 400,
+              }}
+            >
+              {s.value.toFixed(2)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
 const shopStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap');
   .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
@@ -1046,23 +1190,25 @@ const shopStyles = `
   .shop-footer-link:hover { color: #52b788; }
   .section-divider {
     width: 100%; height: 1px;
-    background: linear-gradient(to right, transparent, #e0d8cc, transparent); margin: 48px 0;
+    background: linear-gradient(to right, transparent, #e0d8cc, transparent); margin: 36px 0;
   }
-  /* ── Modal styles ── */
+
+  /* ── Modal ── */
   .strain-modal-overlay {
     position: fixed; inset: 0; z-index: 9000;
-    background: rgba(6, 14, 9, 0.72);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(6, 14, 9, 0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     display: flex; align-items: center; justify-content: center;
     padding: 20px;
     animation: modalFadeIn 0.25s ease forwards;
   }
   .strain-modal-card {
-    background: #faf9f6; border-radius: 4px; width: 100%; max-width: 780px;
-    max-height: 88vh; overflow-y: auto; position: relative;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    background: #faf9f6; border-radius: 4px; width: 100%; max-width: 820px;
+    max-height: 90vh; overflow-y: auto; position: relative;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.55);
     animation: modalSlideUp 0.3s ease forwards;
+    display: flex; flex-direction: column;
   }
   .strain-modal-card::-webkit-scrollbar { width: 4px; }
   .strain-modal-card::-webkit-scrollbar-track { background: #f0ebe3; }
@@ -1070,28 +1216,32 @@ const shopStyles = `
   .modal-close-btn {
     position: absolute; top: 16px; right: 16px; z-index: 10;
     width: 36px; height: 36px; border-radius: 2px;
-    background: rgba(0,0,0,0.25); border: none; color: white;
+    background: rgba(0,0,0,0.3); border: none; color: white;
     font-size: 18px; cursor: pointer; display: flex;
     align-items: center; justify-content: center;
-    transition: background 0.2s; font-family: 'Jost', sans-serif;
-    line-height: 1;
+    transition: background 0.2s; font-family: 'Jost', sans-serif; line-height: 1;
   }
-  .modal-close-btn:hover { background: rgba(0,0,0,0.5); }
+  .modal-close-btn:hover { background: rgba(0,0,0,0.55); }
+  .modal-card {
+    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
   .modal-terpene-card {
     background: white; border: 1px solid #e8e0d4; border-radius: 2px;
     padding: 20px 18px; position: relative; overflow: hidden;
   }
-  .modal-view-profile-link {
+  .modal-verify-link {
     font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 0.2em;
-    text-transform: uppercase; color: rgba(255,255,255,0.6); text-decoration: none;
+    text-transform: uppercase; color: rgba(255,255,255,0.55); text-decoration: none;
     border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px;
     transition: color 0.2s, border-color 0.2s;
   }
-  .modal-view-profile-link:hover { color: white; border-color: rgba(255,255,255,0.5); }
-  @keyframes modalFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+  .modal-verify-link:hover { color: white; border-color: rgba(255,255,255,0.5); }
+  .what-numbers-card {
+    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
+    padding: 24px 22px;
   }
+  @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes modalSlideUp {
     from { opacity: 0; transform: translateY(20px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -1114,7 +1264,7 @@ const shopStyles = `
     .shop-footer-wrap { flex-direction: column !important; text-align: center; }
     .shop-footer-nav { justify-content: center !important; }
     .shop-stats-row { flex-direction: column !important; gap: 12px !important; }
-    .strain-modal-card { max-height: 92vh; }
+    .strain-modal-card { max-height: 94vh; }
     .modal-footer-row { flex-direction: column !important; gap: 10px !important; }
     .modal-footer-row .shop-btn { width: 100%; text-align: center; }
   }
@@ -1128,11 +1278,10 @@ const shopStyles = `
   }
 `;
 
-// ── StrainModal Component ─────────────────────────────────────────────────────
+// ── StrainModal Component — v3.0 full verification content ────────────────────
 function StrainModal({ strain, product, onClose, onAddToCart }) {
   const detail = STRAINS_DETAIL[strain.id] || {};
 
-  // Lock body scroll while open
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -1141,7 +1290,6 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
     };
   }, []);
 
-  // Close on Escape key
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
@@ -1154,10 +1302,20 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
     if (e.target === e.currentTarget) onClose();
   };
 
+  const divider = (
+    <div
+      style={{
+        height: 1,
+        background:
+          "linear-gradient(to right, transparent, #e0d8cc, transparent)",
+        margin: "4px 0 28px",
+      }}
+    />
+  );
+
   return (
     <div className="strain-modal-overlay" onClick={handleBackdrop}>
       <div className="strain-modal-card">
-        {/* Close button */}
         <button
           className="modal-close-btn"
           onClick={onClose}
@@ -1173,9 +1331,9 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
             padding: "36px 32px 32px",
             position: "relative",
             overflow: "hidden",
+            flexShrink: 0,
           }}
         >
-          {/* subtle radial glow */}
           <div
             style={{
               position: "absolute",
@@ -1185,7 +1343,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               pointerEvents: "none",
             }}
           />
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 8 }}>
             <span
               className="body-font"
               style={{
@@ -1197,6 +1355,53 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               }}
             >
               {detail.eybnaLine || strain.line} · Product Profile
+            </span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 12px",
+                borderRadius: 2,
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                fontFamily: "'Jost', sans-serif",
+                fontWeight: 500,
+                background: "rgba(82,183,136,0.15)",
+                color: "#52b788",
+                border: "1px solid rgba(82,183,136,0.3)",
+              }}
+            >
+              ✓ Lab Verified
+            </span>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 12px",
+                borderRadius: 2,
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                fontFamily: "'Jost', sans-serif",
+                fontWeight: 500,
+                background: "rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.6)",
+                border: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
+              QR Authenticated
             </span>
           </div>
           <h2
@@ -1264,8 +1469,8 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
           </div>
         </div>
 
-        {/* ── Modal body ── */}
-        <div style={{ padding: "32px 32px 0" }}>
+        {/* ── Modal scrollable body ── */}
+        <div style={{ padding: "32px 32px 0", overflowY: "auto" }}>
           {/* ── B. About ── */}
           {detail.description && (
             <div style={{ marginBottom: 28 }}>
@@ -1292,251 +1497,194 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               >
                 {detail.description}
               </p>
+              {(detail.aroma || detail.flavour) && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 40,
+                    marginTop: 20,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {[
+                    ["Aroma", detail.aroma],
+                    ["Flavour", detail.flavour],
+                  ].map(
+                    ([label, val]) =>
+                      val && (
+                        <div key={label}>
+                          <p
+                            className="body-font"
+                            style={{
+                              fontSize: 10,
+                              letterSpacing: "0.3em",
+                              color: strain.accentColor,
+                              textTransform: "uppercase",
+                              marginBottom: 6,
+                            }}
+                          >
+                            {label}
+                          </p>
+                          <p
+                            className="body-font"
+                            style={{
+                              fontSize: 13,
+                              color: "#666",
+                              fontWeight: 300,
+                            }}
+                          >
+                            {val}
+                          </p>
+                        </div>
+                      ),
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* ── C. Aroma & Flavour ── */}
-          {(detail.aroma || detail.flavour) && (
-            <>
-              <div
-                style={{
-                  height: 1,
-                  background:
-                    "linear-gradient(to right, transparent, #e0d8cc, transparent)",
-                  margin: "4px 0 24px",
-                }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  gap: 40,
-                  marginBottom: 28,
-                  flexWrap: "wrap",
-                }}
-              >
-                {[
-                  ["Aroma", detail.aroma],
-                  ["Flavour", detail.flavour],
-                ].map(
-                  ([label, val]) =>
-                    val && (
-                      <div key={label}>
-                        <p
-                          className="body-font"
-                          style={{
-                            fontSize: 10,
-                            letterSpacing: "0.3em",
-                            color: strain.accentColor,
-                            textTransform: "uppercase",
-                            marginBottom: 8,
-                          }}
-                        >
-                          {label}
-                        </p>
-                        <p
-                          className="body-font"
-                          style={{
-                            fontSize: 13,
-                            color: "#666",
-                            fontWeight: 300,
-                          }}
-                        >
-                          {val}
-                        </p>
-                      </div>
-                    ),
-                )}
-              </div>
-            </>
-          )}
+          {divider}
 
-          {/* ── D. Terpene Profile ── */}
-          {detail.dominantTerpenes && detail.dominantTerpenes.length > 0 && (
-            <>
-              <div
-                style={{
-                  height: 1,
-                  background:
-                    "linear-gradient(to right, transparent, #e0d8cc, transparent)",
-                  margin: "4px 0 24px",
-                }}
-              />
-              <div style={{ marginBottom: 28 }}>
+          {/* ── C. Certificate of Analysis ── */}
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div>
                 <span
                   className="body-font"
                   style={{
                     fontSize: 10,
                     letterSpacing: "0.35em",
                     textTransform: "uppercase",
-                    color: strain.accentColor,
+                    color: "#52b788",
                   }}
                 >
-                  Terpene Profile
+                  Certificate of Analysis
                 </span>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(160px, 1fr))",
-                    gap: 12,
-                    marginTop: 14,
-                  }}
-                >
-                  {detail.dominantTerpenes.map((t, i) => (
-                    <div key={t.name} className="modal-terpene-card">
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: 3,
-                          background: t.color,
-                        }}
-                      />
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          marginBottom: 8,
-                        }}
-                      >
-                        <h4
-                          className="shop-font"
-                          style={{
-                            fontSize: 18,
-                            fontWeight: 400,
-                            color: "#1a1a1a",
-                            margin: 0,
-                          }}
-                        >
-                          {t.name}
-                        </h4>
-                        <span
-                          className="body-font"
-                          style={{
-                            fontSize: 9,
-                            letterSpacing: "0.2em",
-                            color: "#ccc",
-                            textTransform: "uppercase",
-                            paddingTop: 3,
-                          }}
-                        >
-                          #{i + 1}
-                        </span>
-                      </div>
-                      <p
-                        className="body-font"
-                        style={{
-                          fontSize: 12,
-                          color: "#888",
-                          lineHeight: 1.6,
-                          fontWeight: 300,
-                          margin: 0,
-                        }}
-                      >
-                        {t.role}
-                      </p>
-                      <div
-                        style={{
-                          marginTop: 12,
-                          height: 2,
-                          background: "#f0ebe3",
-                          borderRadius: 2,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${90 - i * 12}%`,
-                            height: "100%",
-                            background: t.color,
-                            opacity: 0.7,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── E. COA Summary ── */}
-          <div
-            style={{
-              height: 1,
-              background:
-                "linear-gradient(to right, transparent, #e0d8cc, transparent)",
-              margin: "4px 0 24px",
-            }}
-          />
-          <div style={{ marginBottom: 28 }}>
-            <span
-              className="body-font"
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.35em",
-                textTransform: "uppercase",
-                color: "#52b788",
-              }}
-            >
-              Certificate of Analysis
-            </span>
-            <div
-              style={{
-                background: "white",
-                border: "1px solid #e8e0d4",
-                borderRadius: 2,
-                borderLeft: "3px solid #52b788",
-                padding: "20px 24px",
-                marginTop: 14,
-              }}
-            >
-              {/* THC highlight */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 10,
-                  marginBottom: 16,
-                }}
-              >
-                <span
+                <h3
                   className="shop-font"
                   style={{
-                    fontSize: 40,
+                    fontSize: "clamp(22px, 3vw, 32px)",
                     fontWeight: 300,
-                    color: "#1b4332",
-                    lineHeight: 1,
+                    color: "#1a1a1a",
+                    marginTop: 6,
                   }}
                 >
-                  93.55%
-                </span>
-                <span
+                  Distillate Lab Results
+                </h3>
+              </div>
+              <div className="modal-card" style={{ padding: "10px 18px" }}>
+                <p
                   className="body-font"
                   style={{
-                    fontSize: 10,
-                    letterSpacing: "0.25em",
+                    fontSize: 9,
+                    color: "#aaa",
+                    letterSpacing: "0.15em",
                     textTransform: "uppercase",
-                    color: "#888",
+                    marginBottom: 3,
                   }}
                 >
-                  D9-THC
-                </span>
+                  Lab ID
+                </p>
+                <p
+                  className="body-font"
+                  style={{ fontSize: 13, color: "#52b788", fontWeight: 500 }}
+                >
+                  {DISTILLATE_COA.labId}
+                </p>
+                <p
+                  className="body-font"
+                  style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}
+                >
+                  {DISTILLATE_COA.reportedDate}
+                </p>
               </div>
-              {/* Totals row */}
+            </div>
+
+            {/* Lab details */}
+            <div
+              className="modal-card"
+              style={{
+                padding: "16px 22px",
+                marginBottom: 16,
+                display: "flex",
+                gap: 28,
+                flexWrap: "wrap",
+                borderLeft: "3px solid #52b788",
+              }}
+            >
+              {[
+                ["Laboratory", DISTILLATE_COA.lab],
+                ["Location", DISTILLATE_COA.labLocation],
+                ["Accreditation", DISTILLATE_COA.accreditation],
+                ["Method", DISTILLATE_COA.method],
+              ].map(([label, val]) => (
+                <div key={label}>
+                  <p
+                    className="body-font"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.25em",
+                      color: "#aaa",
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {label}
+                  </p>
+                  <p
+                    className="body-font"
+                    style={{ fontSize: 12, color: "#555", fontWeight: 300 }}
+                  >
+                    {val}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Donut chart */}
+            <div
+              className="modal-card"
+              style={{ padding: "32px 28px", marginBottom: 16 }}
+            >
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.3em",
+                  color: "#aaa",
+                  textTransform: "uppercase",
+                  marginBottom: 28,
+                  textAlign: "center",
+                }}
+              >
+                Cannabinoid Profile
+              </p>
+              <CannabinoidDonut
+                cannabinoids={DISTILLATE_COA.cannabinoids}
+                accentColor={strain.accentColor}
+              />
               <div
                 style={{
+                  borderTop: "1px solid #e8e0d4",
+                  marginTop: 28,
+                  paddingTop: 24,
                   display: "flex",
                   gap: 32,
                   flexWrap: "wrap",
-                  marginBottom: 16,
+                  justifyContent: "center",
                 }}
               >
                 {DISTILLATE_COA.totals.map((t) => (
-                  <div key={t.name}>
+                  <div key={t.name} style={{ textAlign: "center" }}>
                     <p
                       className="body-font"
                       style={{
@@ -1544,7 +1692,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                         letterSpacing: "0.25em",
                         color: "#aaa",
                         textTransform: "uppercase",
-                        marginBottom: 4,
+                        marginBottom: 6,
                       }}
                     >
                       {t.name}
@@ -1552,7 +1700,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                     <p
                       className="shop-font"
                       style={{
-                        fontSize: 22,
+                        fontSize: 28,
                         color: "#1b4332",
                         fontWeight: 300,
                       }}
@@ -1562,168 +1710,422 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                   </div>
                 ))}
               </div>
-              {/* Lab info */}
-              <div
+            </div>
+
+            {/* Additional testing */}
+            <div>
+              <p
+                className="body-font"
                 style={{
-                  borderTop: "1px solid #f0ebe3",
-                  paddingTop: 14,
-                  display: "flex",
-                  gap: 28,
-                  flexWrap: "wrap",
+                  fontSize: 10,
+                  letterSpacing: "0.3em",
+                  color: "#aaa",
+                  textTransform: "uppercase",
+                  marginBottom: 12,
                 }}
               >
-                {[
-                  ["Lab", DISTILLATE_COA.lab],
-                  ["Lab ID", DISTILLATE_COA.labId],
-                  ["Accreditation", DISTILLATE_COA.accreditation],
-                ].map(([label, val]) => (
-                  <div key={label}>
-                    <p
+                Additional Testing
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {DISTILLATE_COA.otherTests.map((t) => (
+                  <div
+                    key={t.name}
+                    className="modal-card"
+                    style={{
+                      padding: "14px 16px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      className="body-font"
+                      style={{ fontSize: 12, color: "#555" }}
+                    >
+                      {t.name}
+                    </span>
+                    <span
                       className="body-font"
                       style={{
                         fontSize: 9,
-                        letterSpacing: "0.2em",
-                        color: "#bbb",
+                        letterSpacing: "0.15em",
                         textTransform: "uppercase",
-                        marginBottom: 3,
+                        fontWeight: 500,
+                        padding: "3px 8px",
+                        borderRadius: 2,
+                        background: "rgba(181,147,90,0.1)",
+                        color: "#b5935a",
+                        border: "1px solid rgba(181,147,90,0.2)",
                       }}
                     >
-                      {label}
-                    </p>
-                    <p
-                      className="body-font"
-                      style={{ fontSize: 12, color: "#666", fontWeight: 300 }}
-                    >
-                      {val}
-                    </p>
+                      Pending
+                    </span>
                   </div>
                 ))}
               </div>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 11,
+                  color: "#bbb",
+                  marginTop: 12,
+                  fontStyle: "italic",
+                  fontWeight: 300,
+                }}
+              >
+                Additional testing for residual solvents, heavy metals,
+                pesticides and microbials will be completed on subsequent
+                batches and published here.
+              </p>
             </div>
           </div>
 
-          {/* ── F. Eybna Line ── */}
-          {detail.eybnaDescription && (
-            <>
-              <div
+          {divider}
+
+          {/* ── D. Terpene Profile ── */}
+          {detail.dominantTerpenes && detail.dominantTerpenes.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <span
+                className="body-font"
                 style={{
-                  height: 1,
-                  background:
-                    "linear-gradient(to right, transparent, #e0d8cc, transparent)",
-                  margin: "4px 0 24px",
-                }}
-              />
-              <div
-                style={{
-                  background: "white",
-                  border: "1px solid #e8e0d4",
-                  borderRadius: 2,
-                  padding: "18px 22px",
-                  marginBottom: 28,
-                  display: "flex",
-                  gap: 16,
-                  alignItems: "flex-start",
-                  flexWrap: "wrap",
+                  fontSize: 10,
+                  letterSpacing: "0.35em",
+                  textTransform: "uppercase",
+                  color: strain.accentColor,
                 }}
               >
-                <div style={{ flex: 1 }}>
-                  <p
-                    className="body-font"
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: "0.2em",
-                      color: "#bbb",
-                      textTransform: "uppercase",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Terpene Supplier
-                  </p>
-                  <p
-                    className="body-font"
-                    style={{ fontSize: 13, color: "#555", marginBottom: 4 }}
-                  >
-                    <strong style={{ color: "#1a1a1a" }}>Eybna GmbH</strong> ·
-                    Berlin, Germany
-                  </p>
-                  <p
-                    className="body-font"
-                    style={{
-                      fontSize: 13,
-                      color: "#777",
-                      lineHeight: 1.7,
-                      fontWeight: 300,
-                    }}
-                  >
-                    {detail.eybnaDescription}
-                  </p>
-                  {detail.lineCode && (
+                Eybna {detail.eybnaLine}
+              </span>
+              <h3
+                className="shop-font"
+                style={{
+                  fontSize: "clamp(22px, 3vw, 32px)",
+                  fontWeight: 300,
+                  color: "#1a1a1a",
+                  marginTop: 6,
+                  marginBottom: 10,
+                }}
+              >
+                Terpene Profile
+              </h3>
+              {detail.eybnaDescription && (
+                <p
+                  className="body-font"
+                  style={{
+                    fontSize: 13,
+                    color: "#888",
+                    fontWeight: 300,
+                    marginBottom: 18,
+                    maxWidth: 540,
+                  }}
+                >
+                  {detail.eybnaDescription}
+                </p>
+              )}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                {detail.dominantTerpenes.map((t, i) => (
+                  <div key={t.name} className="modal-terpene-card">
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 3,
+                        background: t.color,
+                      }}
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <h4
+                        className="shop-font"
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 400,
+                          color: "#1a1a1a",
+                          margin: 0,
+                        }}
+                      >
+                        {t.name}
+                      </h4>
+                      <span
+                        className="body-font"
+                        style={{
+                          fontSize: 9,
+                          letterSpacing: "0.2em",
+                          color: "#ccc",
+                          textTransform: "uppercase",
+                          paddingTop: 3,
+                        }}
+                      >
+                        #{i + 1}
+                      </span>
+                    </div>
                     <p
                       className="body-font"
                       style={{
-                        fontSize: 11,
-                        color: "#bbb",
-                        marginTop: 6,
+                        fontSize: 12,
+                        color: "#888",
+                        lineHeight: 1.6,
                         fontWeight: 300,
+                        margin: 0,
                       }}
+                    >
+                      {t.role}
+                    </p>
+                    <div
+                      style={{
+                        marginTop: 12,
+                        height: 2,
+                        background: "#f0ebe3",
+                        borderRadius: 2,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${90 - i * 12}%`,
+                          height: "100%",
+                          background: t.color,
+                          opacity: 0.7,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Eybna attribution */}
+              {detail.eybnaDescription && (
+                <div
+                  className="modal-card"
+                  style={{
+                    padding: "16px 20px",
+                    display: "flex",
+                    gap: 14,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <p
+                      className="body-font"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: "0.2em",
+                        color: "#bbb",
+                        textTransform: "uppercase",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Terpene Supplier
+                    </p>
+                    <p
+                      className="body-font"
+                      style={{ fontSize: 13, color: "#555", marginBottom: 3 }}
+                    >
+                      <strong style={{ color: "#1a1a1a" }}>Eybna GmbH</strong> ·
+                      Berlin, Germany
+                    </p>
+                    <p
+                      className="body-font"
+                      style={{ fontSize: 11, color: "#bbb", fontWeight: 300 }}
                     >
                       Product Code: {detail.lineCode} · Pharmaceutical-grade
                       botanical-derived terpenes.
                     </p>
-                  )}
+                  </div>
+                  <span
+                    className="body-font"
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      padding: "4px 12px",
+                      borderRadius: 2,
+                      background: "rgba(82,183,136,0.1)",
+                      color: "#52b788",
+                      border: "1px solid rgba(82,183,136,0.2)",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ✓ Certified Supplier
+                  </span>
                 </div>
-                <span
-                  className="body-font"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    padding: "4px 12px",
-                    borderRadius: 2,
-                    background: "rgba(82,183,136,0.1)",
-                    color: "#52b788",
-                    border: "1px solid rgba(82,183,136,0.2)",
-                    fontWeight: 500,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  ✓ Certified Supplier
-                </span>
-              </div>
-            </>
+              )}
+            </div>
           )}
+
+          {divider}
+
+          {/* ── E. What These Numbers Mean ── */}
+          <div style={{ marginBottom: 28 }}>
+            <span
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.35em",
+                textTransform: "uppercase",
+                color: "#aaa",
+              }}
+            >
+              Understanding Your Product
+            </span>
+            <h3
+              className="shop-font"
+              style={{
+                fontSize: "clamp(20px, 3vw, 30px)",
+                fontWeight: 300,
+                color: "#1a1a1a",
+                marginTop: 6,
+                marginBottom: 18,
+              }}
+            >
+              What These Numbers Mean
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: 14,
+              }}
+            >
+              {[
+                {
+                  icon: "◈",
+                  title: "93.55% Total THC",
+                  color: "#52b788",
+                  body: "This is pharmaceutical-grade distillate. Most commercial cannabis products range from 60–80% THC. Our distillate exceeds 93%, meaning less product is needed for a consistent, controlled effect.",
+                },
+                {
+                  icon: "◉",
+                  title: "The Entourage Effect",
+                  color: strain.accentColor,
+                  body: "The minor cannabinoids CBN (0.78%), CBD (0.98%) and CBG (0.09%) work synergistically with THC and terpenes to shape the overall experience — this is the entourage effect.",
+                },
+                {
+                  icon: "✻",
+                  title: "Terpene Blending",
+                  color: "#b5935a",
+                  body: `The ${strain.name} terpene profile from Eybna is blended with the distillate to recreate the authentic strain experience. Terpenes determine aroma, flavour and modulate the effect profile.`,
+                },
+                {
+                  icon: "△",
+                  title: "CO₂ Extracted",
+                  color: "#4a9eba",
+                  body: "Our distillate is produced using supercritical CO₂ extraction — the cleanest method available. Zero solvent residue, no heavy metals from equipment, no pesticides from source material.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="what-numbers-card">
+                  <div
+                    style={{
+                      fontSize: 22,
+                      color: item.color,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+                  <h4
+                    className="shop-font"
+                    style={{
+                      fontSize: 18,
+                      color: "#1a1a1a",
+                      marginBottom: 10,
+                      fontWeight: 400,
+                    }}
+                  >
+                    {item.title}
+                  </h4>
+                  <p
+                    className="body-font"
+                    style={{
+                      fontSize: 12,
+                      color: "#777",
+                      lineHeight: 1.75,
+                      fontWeight: 300,
+                      margin: 0,
+                    }}
+                  >
+                    {item.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* spacer before sticky footer */}
+          <div style={{ height: 8 }} />
         </div>
 
-        {/* ── G. Footer ── */}
+        {/* ── F. Sticky footer: Add to Cart ── */}
         <div
           style={{
             background: `linear-gradient(135deg, ${strain.gradientFrom}, ${strain.gradientTo})`,
-            padding: "24px 32px",
+            padding: "20px 32px",
+            flexShrink: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: 16,
+            gap: 14,
           }}
         >
           <Link
             to={`/verify/${strain.id}`}
-            className="modal-view-profile-link"
+            className="modal-verify-link"
             onClick={onClose}
           >
             Full verification page →
           </Link>
           <div
             className="modal-footer-row"
-            style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
           >
+            {product && (
+              <span
+                className="body-font"
+                style={{
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.5)",
+                  fontWeight: 300,
+                }}
+              >
+                R{product.price.toLocaleString()} · {product.formatShort}
+              </span>
+            )}
             <button
               className="shop-btn"
               style={{
                 background: "rgba(255,255,255,0.12)",
                 color: "white",
                 border: "1px solid rgba(255,255,255,0.25)",
-                padding: "10px 22px",
+                padding: "10px 20px",
               }}
               onClick={onClose}
             >
@@ -1736,13 +2138,14 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                   background: "#52b788",
                   color: "#0e1a14",
                   fontWeight: 600,
+                  padding: "10px 24px",
                 }}
                 onClick={() => {
                   onAddToCart(product);
                   onClose();
                 }}
               >
-                Add to Cart — R{product.price.toLocaleString()}
+                Add to Cart
               </button>
             )}
           </div>
@@ -1752,20 +2155,17 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
   );
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function Shop() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const [filter, setFilter] = useState("all");
   const [cartToast, setCartToast] = useState(null);
-  const [selectedStrain, setSelectedStrain] = useState(null); // v2.9: modal state
-  const [selectedProduct, setSelectedProduct] = useState(null); // v2.9: product for modal CTA
-
-  // ── v2.8: Live inventory state ─────────────────────────────────────
+  const [selectedStrain, setSelectedStrain] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [liveProducts, setLiveProducts] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
 
-  // ── v2.8: Fetch finished products from inventory ───────────────────
   useEffect(() => {
     const fetchProducts = async () => {
       setLoadingInventory(true);
@@ -1777,20 +2177,12 @@ export default function Shop() {
           .eq("is_active", true)
           .gt("quantity_on_hand", 0)
           .order("name");
-
         if (error) {
           console.error("[Shop] Inventory fetch error:", error);
           setLiveProducts([]);
           return;
         }
-
-        const products = (data || []).map((item) =>
-          buildProductFromInventory(item),
-        );
-        setLiveProducts(products);
-        console.log(
-          `[Shop] Loaded ${products.length} products from ${(data || []).length} inventory items`,
-        );
+        setLiveProducts((data || []).map(buildProductFromInventory));
       } catch (err) {
         console.error("[Shop] Fetch error:", err);
         setLiveProducts([]);
@@ -1807,14 +2199,12 @@ export default function Shop() {
     setTimeout(() => setCartToast(null), 2200);
   };
 
-  // v2.9: Open modal with strain + product context
   const handleViewProfile = (product) => {
     const detail = STRAINS_DETAIL[product.strainId];
     if (detail) {
       setSelectedStrain(product.strain);
       setSelectedProduct(product);
     } else {
-      // Fallback: no detail data — navigate to verify page
       navigate(`/verify/${product.strainId}`);
     }
   };
@@ -1824,20 +2214,17 @@ export default function Shop() {
     setSelectedProduct(null);
   };
 
-  // Filter logic
   const showVapes =
     filter === "all" ||
     filter === "vapes" ||
     FILTER_OPTIONS.find((f) => f.key === filter)?.line;
   const showCS = filter === "all" || filter === "coming-soon";
   const lineFilter = FILTER_OPTIONS.find((f) => f.key === filter)?.line;
-
   const filteredVapes = lineFilter
     ? liveProducts.filter((p) => p.strain.line === lineFilter)
     : showVapes
       ? liveProducts
       : [];
-
   const filteredCS = showCS ? COMING_SOON : [];
   const totalShowing = filteredVapes.length + filteredCS.length;
 
@@ -1882,7 +2269,6 @@ export default function Shop() {
             pointerEvents: "none",
           }}
         />
-
         <div
           className="shop-hero-inner"
           style={{
@@ -1905,7 +2291,6 @@ export default function Shop() {
               Protea Botanicals · Online Store
             </span>
           </div>
-
           <h1
             className="shop-font fade-up-2 shop-hero-title"
             style={{
@@ -1919,7 +2304,6 @@ export default function Shop() {
           >
             Shop
           </h1>
-
           <p
             className="body-font fade-up-3"
             style={{
@@ -1934,7 +2318,6 @@ export default function Shop() {
           >
             Premium cannabis vapes · 18 Eybna terpene strains · Lab verified
           </p>
-
           <div
             className="shop-stats-row"
             style={{
@@ -2015,7 +2398,6 @@ export default function Shop() {
         className="shop-body-inner"
         style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 40px" }}
       >
-        {/* Result count */}
         <div
           style={{
             display: "flex",
@@ -2055,7 +2437,6 @@ export default function Shop() {
           </span>
         </div>
 
-        {/* ── VAPE GRID ── */}
         {loadingInventory ? (
           <div
             style={{ textAlign: "center", padding: "60px 20px", color: "#888" }}
@@ -2074,23 +2455,22 @@ export default function Shop() {
           <>
             {filteredVapes.length > 0 && (
               <>
-                {(filter === "all" || filter === "coming-soon") &&
-                  filteredCS.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <span
-                        className="body-font"
-                        style={{
-                          fontSize: 10,
-                          letterSpacing: "0.35em",
-                          textTransform: "uppercase",
-                          color: "#52b788",
-                          fontWeight: 500,
-                        }}
-                      >
-                        Vape Collection
-                      </span>
-                    </div>
-                  )}
+                {filter === "all" && filteredCS.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <span
+                      className="body-font"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: "0.35em",
+                        textTransform: "uppercase",
+                        color: "#52b788",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Vape Collection
+                    </span>
+                  </div>
+                )}
                 <div
                   className="shop-grid"
                   style={{
@@ -2113,7 +2493,6 @@ export default function Shop() {
                 </div>
               </>
             )}
-
             {filteredVapes.length === 0 && showVapes && !showCS && (
               <div style={{ textAlign: "center", padding: "60px 20px" }}>
                 <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>
@@ -2137,7 +2516,6 @@ export default function Shop() {
           </>
         )}
 
-        {/* ── COMING SOON GRID ── */}
         {filteredCS.length > 0 && !loadingInventory && (
           <>
             {filteredVapes.length > 0 && <div className="section-divider" />}
@@ -2210,7 +2588,6 @@ export default function Shop() {
           </>
         )}
 
-        {/* Empty state */}
         {totalShowing === 0 && !loadingInventory && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
@@ -2231,7 +2608,7 @@ export default function Shop() {
         )}
       </div>
 
-      {/* ── LOYALTY CTA BANNER ── */}
+      {/* ── LOYALTY CTA ── */}
       <div style={{ background: "linear-gradient(135deg, #1b4332, #2d6a4f)" }}>
         <div
           style={{
@@ -2336,7 +2713,7 @@ export default function Shop() {
         </div>
       )}
 
-      {/* ── v2.9: STRAIN MODAL ── */}
+      {/* ── STRAIN MODAL ── */}
       {selectedStrain && (
         <StrainModal
           strain={selectedStrain}
@@ -2432,24 +2809,19 @@ export default function Shop() {
   );
 }
 
-// ── Vape Product Card ─────────────────────────────────────────────────────────
-// v2.9: "View Profile" is now a button (not Link) — opens StrainModal via onViewProfile prop.
+// ── VapeCard ──────────────────────────────────────────────────────────────────
 function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
   const s = product.strain;
   const is2ml = product.format.includes("2ml");
-
   return (
     <div className="shop-card">
-      {/* Strain gradient accent strip */}
       <div
         style={{
           height: 6,
           background: `linear-gradient(to right, ${s.gradientFrom}, ${s.gradientTo})`,
         }}
       />
-
       <div style={{ padding: "20px 24px 24px" }}>
-        {/* Top row: line + format badges */}
         <div
           style={{
             display: "flex",
@@ -2483,8 +2855,6 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
             {product.badge} · {product.formatShort}
           </span>
         </div>
-
-        {/* Strain name + icon */}
         <div
           style={{
             display: "flex",
@@ -2507,8 +2877,6 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
             {s.name}
           </h3>
         </div>
-
-        {/* Tagline */}
         <p
           className="body-font"
           style={{
@@ -2522,8 +2890,6 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
         >
           {s.tagline}
         </p>
-
-        {/* Type + THC badges */}
         <div
           style={{
             display: "flex",
@@ -2553,8 +2919,6 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
             THC {product.thc}
           </span>
         </div>
-
-        {/* Effect tags */}
         <div
           style={{
             display: "flex",
@@ -2577,11 +2941,7 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
             </span>
           ))}
         </div>
-
-        {/* Divider */}
         <div style={{ height: 1, background: "#f0ebe0", marginBottom: 18 }} />
-
-        {/* Price + actions */}
         <div
           style={{
             display: "flex",
@@ -2616,7 +2976,6 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            {/* v2.9: button instead of Link — opens StrainModal */}
             <button
               className="shop-btn-outline"
               style={{ padding: "8px 16px", fontSize: 10 }}
