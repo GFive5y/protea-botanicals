@@ -1,11 +1,11 @@
-// src/components/TerpeneCarousel.js v1.2
-// v1.2: onClick navigates directly to /terpenes/:id (individual terpene info page)
-//       instead of /terpenes?t=id (which landed on the browse carousel page).
-//       No other changes.
+// src/components/TerpeneCarousel.js v1.3
+// v1.3: REMOVE useNavigate. ADD onSelect prop — onClick calls onSelect(t.id)
+//       instead of navigating to /terpenes/:id. Landing.js lifts the state
+//       and renders TerpeneModal in-place (DEC-024).
+// v1.2: onClick navigated directly to /terpenes/:id (ABANDONED — DEC-024).
 // v1.1: 800px wide, 32px gap, no border, 1.15× hover scale.
 // Two-row conveyor: top drifts right, bottom drifts left.
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 const TERPENES = [
   {
@@ -299,14 +299,14 @@ function TerpIcon({ type, color, size = 28 }) {
     wave: (
       <g>
         <path
-          d={`M${s * 0.12},${s * 0.33} C${s * 0.28},${s * 0.18} ${s * 0.42},${s * 0.5} ${s * 0.58},${s * 0.33} C${s * 0.74},${s * 0.18} ${s * 0.88},${s * 0.38} ${s * 0.88},${s * 0.38}`}
+          d={`M${s * 0.12},${s * 0.33} C${s * 0.28},${s * 0.18} ${s * 0.42},${s * 0.5}  ${s * 0.58},${s * 0.33} C${s * 0.74},${s * 0.18} ${s * 0.88},${s * 0.38} ${s * 0.88},${s * 0.38}`}
           fill="none"
           stroke={color}
           strokeWidth={sw}
           strokeLinecap="round"
         />
         <path
-          d={`M${s * 0.12},${s * 0.55} C${s * 0.28},${s * 0.4} ${s * 0.42},${s * 0.72} ${s * 0.58},${s * 0.55} C${s * 0.74},${s * 0.4} ${s * 0.88},${s * 0.6} ${s * 0.88},${s * 0.6}`}
+          d={`M${s * 0.12},${s * 0.55} C${s * 0.28},${s * 0.4}  ${s * 0.42},${s * 0.72} ${s * 0.58},${s * 0.55} C${s * 0.74},${s * 0.4}  ${s * 0.88},${s * 0.6}  ${s * 0.88},${s * 0.6}`}
           fill="none"
           stroke={color}
           strokeWidth={sw}
@@ -593,9 +593,16 @@ function MiniHex({ terp, isHovered, isAnyHovered, onHover, onLeave, onClick }) {
 }
 
 // ═══ CONVEYOR ROW ═══
-function ConveyorRow({ items, direction, speed, hoveredId, setHoveredId }) {
+// v1.3: accepts onSelect prop — no navigate()
+function ConveyorRow({
+  items,
+  direction,
+  speed,
+  hoveredId,
+  setHoveredId,
+  onSelect,
+}) {
   const [paused, setPaused] = useState(false);
-  const navigate = useNavigate();
   const stripW = items.length * ITEM_W;
   const tripled = [...items, ...items, ...items];
 
@@ -629,8 +636,8 @@ function ConveyorRow({ items, direction, speed, hoveredId, setHoveredId }) {
             isAnyHovered={hoveredId !== null}
             onHover={() => setHoveredId(t.id)}
             onLeave={() => {}}
-            // v1.2: Navigate directly to individual terpene info page
-            onClick={() => navigate(`/terpenes/${t.id}`)}
+            // v1.3: call onSelect callback — no route navigation
+            onClick={() => onSelect(t.id)}
           />
         ))}
       </div>
@@ -639,7 +646,8 @@ function ConveyorRow({ items, direction, speed, hoveredId, setHoveredId }) {
 }
 
 // ═══ MAIN EXPORT ═══
-export default function TerpeneCarousel() {
+// v1.3: accepts onSelect(terpeneId) prop from parent (Landing.js)
+export default function TerpeneCarousel({ onSelect }) {
   const [hoveredId, setHoveredId] = useState(null);
 
   const stripW_top = ROW_TOP.length * ITEM_W;
@@ -656,20 +664,20 @@ export default function TerpeneCarousel() {
     >
       <style>{`
         @keyframes tc-scroll-right {
-          0% { transform: translateX(-${stripW_top}px); }
+          0%   { transform: translateX(-${stripW_top}px); }
           100% { transform: translateX(0px); }
         }
         @keyframes tc-scroll-left {
-          0% { transform: translateX(0px); }
+          0%   { transform: translateX(0px); }
           100% { transform: translateX(-${stripW_bot}px); }
         }
         @keyframes tc-pulse {
           0%, 100% { opacity: 0.15; }
-          50% { opacity: 0.35; }
+          50%       { opacity: 0.35; }
         }
         @keyframes tc-fade {
           from { opacity: 0; transform: translateY(2px); }
-          to { opacity: 0.6; transform: translateY(0); }
+          to   { opacity: 0.6; transform: translateY(0); }
         }
       `}</style>
 
@@ -679,6 +687,7 @@ export default function TerpeneCarousel() {
         speed={SPEED_TOP}
         hoveredId={hoveredId}
         setHoveredId={setHoveredId}
+        onSelect={onSelect}
       />
 
       <div style={{ height: "0px" }} />
@@ -689,6 +698,7 @@ export default function TerpeneCarousel() {
         speed={SPEED_BOT}
         hoveredId={hoveredId}
         setHoveredId={setHoveredId}
+        onSelect={onSelect}
       />
     </div>
   );

@@ -1,51 +1,45 @@
-// src/pages/Landing.js v5.7
+// src/pages/Landing.js v5.8
+// v5.8: Terpene modal fix (DEC-024).
+//       TerpeneCarousel hex click no longer navigates to /terpenes/:id.
+//       Instead: activeTerp state lifts to Landing, TerpeneModal overlays
+//       Landing in-place (same pattern as MoleculeModal). URL stays at /.
+//       NavBar stays cream. Background stays Landing content, frosted.
+//       Changes: import TerpeneModal + TERPENES, add activeTerp state,
+//       pass onSelect to TerpeneCarousel, render TerpeneModal overlay.
 // v5.7: Header hides on scroll down (past 300px), reappears on scroll up.
-//       Uses scroll direction tracking + CSS translateY(-100%) transition.
-// v5.6: Terpene section — added "THE ENTOURAGE EFFECT" eyebrow label + icon
-//       above "Our Terpene Profiles" heading, matching all other content sections.
-//       TerpeneCarousel click now navigates directly to /terpenes/:id (individual
-//       terpene info page), skipping the intermediate browse carousel page.
-// v5.5: Delta-9-THC molecule integration — "Understanding THC" section now
-//       2-column layout: animated molecule (with controls) on left, text on right.
-//       New import: Delta9THCMolecule from ../components/Delta9THCMolecule.
-//       Only the thc section render changes. CO2 + Terpenes sections unchanged.
-//       Responsive: stacks vertically on mobile (<768px via flexWrap).
-// v5.4: Video background on "Understanding THC" section — slow golden distillate
-//       loop behind text with cream overlay for readability. File: public/videos/distillate-bg.mp4
-//       Changes: contentSections map section gets position:relative + overflow:hidden,
-//       video + overlay injected when sec.id==='thc', content div gets z-index:2.
-// v5.3: Integrated AgeGate (21+ overlay on first visit) + PromoBanner (?promo= URL param).
-//       Wraps page in <AgeGate>, reads ?promo= via useSearchParams, passes to <PromoBanner>.
-// v5.2: Fixed invisible header text when not scrolled (dark text on transparent bg,
-//       white text on green scroll bg). Fixed auth detection — uses supabase.auth
-//       .getSession() directly to detect login state (RoleContext doesn't expose email).
-//       Header-only changes. No other code modified.
-// v5.1+fix: OG design. Auth-aware floating header. Scan & Earn routes to /account.
+// v5.6: Terpene section — added "THE ENTOURAGE EFFECT" eyebrow label.
+// v5.5: Delta-9-THC molecule integration.
+// v5.4: Video background on distillate section.
+// v5.3: AgeGate + PromoBanner.
+// v5.2: Auth-aware header, fixed invisible text when not scrolled.
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useContext, useRef } from "react";
-import { RoleContext } from "../App"; // ← for auth-aware header button
-import { supabase } from "../services/supabaseClient"; // v5.2: direct session check
-import AgeGate from "../components/AgeGate"; // v5.3: 21+ age verification
-import PromoBanner from "../components/PromoBanner"; // v5.3: promo campaign banner
-import MoleculePulse from "../components/MoleculePulse"; // v5.5: molecule
+import { RoleContext } from "../App";
+import { supabase } from "../services/supabaseClient";
+import AgeGate from "../components/AgeGate";
+import PromoBanner from "../components/PromoBanner";
+import MoleculePulse from "../components/MoleculePulse";
 import MoleculeModal from "../components/MoleculeModal";
 import TerpeneCarousel from "../components/TerpeneCarousel";
+// v5.8: shared modal + data (DEC-024)
+import TerpeneModal, { TERPENES } from "../components/TerpeneModal";
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // v5.3: read ?promo= param
-  const promo = searchParams.get("promo"); // v5.3: e.g. "preregister-1000"
+  const [searchParams] = useSearchParams();
+  const promo = searchParams.get("promo");
   const ctx = useContext(RoleContext);
-  const role = typeof ctx === "string" ? ctx : ctx?.role || null; // v5.2: handle string or object  // eslint-disable-line no-unused-vars
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // v5.2: real auth state
+  const role = typeof ctx === "string" ? ctx : ctx?.role || null; // eslint-disable-line no-unused-vars
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [modalMolId, setModalMolId] = useState(null);
+  // v5.8: terpene modal state — id of active terpene, null = closed
+  const [activeTerp, setActiveTerp] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
-  const cardsRef = useRef(null); // ref on portal cards section
+  const cardsRef = useRef(null);
   const [, setVisibleSections] = useState({});
 
-  // v5.2: Check Supabase session directly (doesn't depend on RoleContext shape)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsLoggedIn(!!session);
@@ -63,7 +57,6 @@ export default function Landing() {
     const handleScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 50);
-      // Hide when the portal cards top edge hits the top of the viewport
       const threshold = cardsRef.current
         ? cardsRef.current.getBoundingClientRect().top + y - 52
         : 9999;
@@ -198,10 +191,8 @@ export default function Landing() {
     },
   ];
 
-  // v5.7: Renders THC section — header text on top, molecule carousel below
   const renderTHCSection = (sec) => (
     <div style={{ maxWidth: "800px", width: "100%" }}>
-      {/* Header + text */}
       <div
         style={{
           display: "flex",
@@ -260,15 +251,12 @@ export default function Landing() {
           {para}
         </p>
       ))}
-
-      {/* Pulsing neon molecule */}
       <div style={{ marginTop: "48px" }}>
         <MoleculePulse onSelect={(id) => setModalMolId(id)} />
       </div>
     </div>
   );
 
-  // v5.5: Renders the standard centered text layout (CO2, Terpenes, etc.)
   const renderDefaultSection = (sec) => (
     <div style={{ maxWidth: "800px", width: "100%" }}>
       <div
@@ -365,11 +353,9 @@ export default function Landing() {
 
         <div className="grain" />
 
-        {/* v5.3: Promo campaign banner — shows when ?promo= param present */}
         <PromoBanner promo={promo} onNavigate={navigate} />
 
-        {/* ── Slim fixed header with auth-aware button ── */}
-        {/* v5.2: Text/button colors toggle dark↔white based on scroll state */}
+        {/* ── Floating header ── */}
         <header
           style={{
             position: "fixed",
@@ -784,7 +770,7 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── v5.4: DISTILLATE VIDEO DIVIDER — pure visual, no text ── */}
+        {/* ── DISTILLATE VIDEO DIVIDER ── */}
         <section
           style={{
             position: "relative",
@@ -813,7 +799,6 @@ export default function Landing() {
           >
             <source src="/videos/distillate-bg.mp4" type="video/mp4" />
           </video>
-          {/* Top fade */}
           <div
             style={{
               position: "absolute",
@@ -827,7 +812,6 @@ export default function Landing() {
               pointerEvents: "none",
             }}
           />
-          {/* Bottom fade */}
           <div
             style={{
               position: "absolute",
@@ -844,7 +828,6 @@ export default function Landing() {
         </section>
 
         {/* ── CONTENT SECTIONS ── */}
-        {/* v5.5: THC section uses 2-column layout with molecule; others unchanged */}
         {contentSections.map((sec, idx) => (
           <section
             key={sec.id}
@@ -877,8 +860,7 @@ export default function Landing() {
         ))}
 
         {/* ── TERPENES CAROUSEL ── */}
-        {/* v5.6: Added eyebrow label "THE ENTOURAGE EFFECT" matching other sections.
-                  No button — carousel hexes click directly to individual terpene pages. */}
+        {/* v5.8: onSelect lifts terpene id to Landing — no navigation (DEC-024) */}
         <section
           style={{
             padding: "100px 24px 80px",
@@ -898,7 +880,6 @@ export default function Landing() {
           }}
         >
           <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-            {/* Eyebrow label — matches other content sections */}
             <div
               style={{
                 display: "flex",
@@ -922,7 +903,6 @@ export default function Landing() {
                 THE ENTOURAGE EFFECT
               </span>
             </div>
-
             <h2
               className="landing-font"
               style={{
@@ -935,7 +915,8 @@ export default function Landing() {
               Our Terpene Profiles
             </h2>
 
-            <TerpeneCarousel />
+            {/* v5.8: pass onSelect — carousel no longer navigates */}
+            <TerpeneCarousel onSelect={(id) => setActiveTerp(id)} />
           </div>
         </section>
 
@@ -1163,6 +1144,14 @@ export default function Landing() {
           <MoleculeModal
             molId={modalMolId}
             onClose={() => setModalMolId(null)}
+          />
+        )}
+
+        {/* v5.8: Terpene modal — in-place overlay on Landing, no navigation (DEC-024) */}
+        {activeTerp && (
+          <TerpeneModal
+            terpene={TERPENES.find((t) => t.id === activeTerp)}
+            onClose={() => setActiveTerp(null)}
           />
         )}
       </div>
