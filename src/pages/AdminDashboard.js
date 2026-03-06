@@ -30,8 +30,9 @@ import { supabase } from "../services/supabaseClient";
 import { QRCodeSVG } from "qrcode.react";
 // ★ v3.5: Import Smart QR Generator component
 import AdminQrGenerator from "./AdminQrGenerator";
-// ★ v3.6: Import Analytics component
 import AdminAnalytics from "./AdminAnalytics";
+// ★ v3.6: Import Analytics component
+
 // ★ v3.7: Import Stock Control component
 import StockControl from "../components/StockControl";
 // ─── Design Tokens (from tokens.js v2) ───
