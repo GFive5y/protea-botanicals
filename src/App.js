@@ -661,7 +661,7 @@ function AdminDashboardRouter() {
   return <AdminDashboard />;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ────────localStorage.getItem─────────────────────────────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -727,15 +727,16 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session?.user) {
-        setIsDevMode(false);
-        localStorage.removeItem(LS.DEV_MODE);
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-        setRole(profile?.role || "customer");
         setUserEmail(session.user.email);
+        const storedRole = localStorage.getItem(LS.ROLE);
+        if (!storedRole) {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("role")
+            .eq("id", session.user.id)
+            .single();
+          setRole(profile?.role || "customer");
+        }
       } else if (event === "SIGNED_OUT") {
         if (localStorage.getItem(LS.DEV_MODE) !== "true") {
           setRoleState(null);
