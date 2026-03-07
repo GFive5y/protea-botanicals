@@ -74,7 +74,7 @@ export default function Account() {
       retailer: "/wholesale",
       customer: "/loyalty",
     };
-    const roleDefaults = ["/loyalty", "/wholesale", "/admin"];
+    const roleDefaults = ["/wholesale", "/admin", "/loyalty"];
     const useReturnUrl = returnUrl && !roleDefaults.includes(returnUrl);
     const dest = useReturnUrl
       ? returnUrl
@@ -137,13 +137,14 @@ export default function Account() {
           if (profile?.role) setRole(profile.role);
 
           // v5.6: If no ?return= URL, show account view instead of redirecting
-          const roleDefaults = ["/loyalty", "/wholesale", "/admin"];
+          const roleDefaults = ["/wholesale", "/admin"];
           const shouldRedirect = returnUrl && !roleDefaults.includes(returnUrl);
 
           if (shouldRedirect) {
             doRedirect(profile);
           } else {
             // Stay on /account — show logged-in view
+            redirectedRef.current = true; // ← ADD THIS LINE
             setLoggedInUser(user);
             setLoggedInProfile(profile);
           }
@@ -163,22 +164,16 @@ export default function Account() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. Global onAuthStateChange — BACKUP for OAuth and edge cases
+  // 2. Global onAuthStateChange — BACKUP for OAuth only (no redirect here)
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("onAuthStateChange:", event);
-      if (event === "SIGNED_IN" && session?.user) {
-        const profile = await ensureProfile(
-          session.user.id,
-          session.user.email,
-        );
-        doRedirect(profile);
-      }
+      // Redirect only handled by handlePostAuth (direct) and session check above.
+      // This listener is kept only for future OAuth flows.
     });
     return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── SIGN IN ───
@@ -889,9 +884,14 @@ export default function Account() {
               <button
                 type="button"
                 disabled={loading}
-                onClick={() =>
-                  handleDevLogin("wholesale@protea.dev", "wholesale123")
-                }
+                onClick={() => {
+                  window.history.replaceState(
+                    null,
+                    "",
+                    "/account?return=/loyalty",
+                  );
+                  handleDevLogin("customer@protea.dev", "customer123");
+                }}
                 style={{
                   padding: "10px 16px",
                   background: "#7c3a10",
