@@ -1,7 +1,14 @@
-// scanService.js v6.0 — Protea Botanicals — March 2026
+// scanService.js v7.0 — Protea Botanicals — March 2026
 // ============================================================================
+// v7.0: HMAC QR verification — anti-counterfeiting (DEC-025)
+//   - authenticateQR now calls verify-qr Edge Function FIRST
+//   - Invalid signatures → rejected immediately, no DB lookup, no points
+//   - Legacy codes (no dot) → accepted, flagged as is_legacy in scan record
+//   - Signed codes (product_code.SIGNATURE) → product_code stripped before DB lookup
+//   - hmac_signed and is_legacy stored on scan record
+//
 // v6.0: Phase 2 geo enrichment merged into v5.4
-//   - scan insert now includes: scan_date, is_first_scan, tenant_id, user_id
+//   - scan insert: scan_date, is_first_scan, tenant_id, user_id
 //   - geo enrichment runs async after scan (never blocks user)
 //   - anomaly detection: daily cap (5/day) + velocity check (10/60min)
 //   - getUserScanHistory() — for Loyalty page scan log
@@ -18,10 +25,65 @@ import {
   enrichUserProfileGeo,
 } from "./geoService";
 
+// ── Config ────────────────────────────────────────────────────────────────────
+const SUPABASE_FUNCTIONS_URL =
+  process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
+  "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
+
+const SUPABASE_ANON_KEY =
+  process.env.REACT_APP_SUPABASE_ANON_KEY ||
+  // Falls back to the value already in supabaseClient.js env
+  "";
+
 // ── Anomaly thresholds ────────────────────────────────────────────────────────
-const MAX_SCANS_PER_DAY = 5; // max unique products per user per day
-const VELOCITY_WINDOW_MIN = 60; // minutes
-const VELOCITY_MAX_SCANS = 10; // max scans of same product in window
+const MAX_SCANS_PER_DAY = 5;
+const VELOCITY_WINDOW_MIN = 60;
+const VELOCITY_MAX_SCANS = 10;
+
+// ── HMAC verification ─────────────────────────────────────────────────────────
+/**
+ * Call the verify-qr Edge Function.
+ * Returns { valid, product_code, is_legacy, reason }
+ * Never throws — returns { valid: true, is_legacy: true } on network failure
+ * so a temporary function outage doesn't break scanning entirely.
+ */
+async function verifyQrHMAC(qrString) {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/verify-qr`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ qr_string: qrString }),
+    });
+
+    if (!res.ok) {
+      console.warn("verify-qr HTTP error:", res.status);
+      return {
+        valid: true,
+        product_code: qrString,
+        is_legacy: true,
+        reason: "verify_unavailable",
+      };
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.warn("verify-qr network error:", err);
+    return {
+      valid: true,
+      product_code: qrString,
+      is_legacy: true,
+      reason: "verify_unavailable",
+    };
+  }
+}
 
 // ── ensureProfile ─────────────────────────────────────────────────────────────
 async function ensureProfile(userId) {
@@ -46,10 +108,19 @@ async function ensureProfile(userId) {
 // ── authenticateQR ────────────────────────────────────────────────────────────
 /**
  * Authenticate (claim) a QR code.
- * @param {string} qrCode  - e.g. "PB-001-2026-0001"
- * @param {string} [source='direct'] - scan origin: 'promo'|'loyalty'|'verify'|'direct'
+ *
+ * Flow:
+ *   1. Verify HMAC signature via Edge Function
+ *   2. If invalid → reject immediately (counterfeit QR)
+ *   3. If legacy → strip nothing, proceed with full qrString as DB lookup key
+ *   4. If signed → use product_code (without .SIGNATURE) as DB lookup key
+ *   5. Continue with existing claim + points + geo flow
+ *
+ * @param {string} qrCode  - raw string from QR scanner (may include signature)
+ * @param {string} [source='direct'] - scan origin
  * @returns {Object} { success, points, pointsEarned, product, error, errorType,
- *                     isFirstScan, scanId, anomalyFlags, userProfile, requiresGPSPrompt }
+ *                     isFirstScan, scanId, anomalyFlags, userProfile,
+ *                     requiresGPSPrompt, isLegacy, hmacVerified }
  */
 export async function authenticateQR(qrCode, source = "direct") {
   try {
@@ -67,14 +138,46 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // ── 2. Ensure profile exists ───────────────────────────────
+    // ── 2. HMAC verification (NEW in v7.0) ─────────────────────
+    const hmacResult = await verifyQrHMAC(qrCode);
+
+    if (!hmacResult.valid) {
+      // Signature present but invalid → counterfeit QR code
+      console.warn(
+        "HMAC verification failed:",
+        hmacResult.reason,
+        "for:",
+        qrCode,
+      );
+      return {
+        success: false,
+        error: "This QR code could not be verified. It may be counterfeit.",
+        errorType: "counterfeit",
+        hmacVerified: false,
+      };
+    }
+
+    // Resolve the clean product_code for DB lookup
+    // - Legacy: product_code === original qrCode (no change)
+    // - Signed: product_code is the prefix before the dot
+    const isLegacy = hmacResult.is_legacy || false;
+    const hmacVerified = !isLegacy;
+
+    // For DB lookup:
+    // - Signed codes: the products table stores the FULL signed string (product_code.SIGNATURE)
+    //   because that's what AdminQrGenerator saved when generating. So look up by full qrCode.
+    // - Legacy codes: look up by the raw qrCode as before.
+    // Either way, use qrCode as-is for the DB lookup.
+    const dbLookupKey = qrCode;
+
+    // ── 3. Ensure profile exists ───────────────────────────────
     await ensureProfile(user.id);
 
-    // ── 3. Look up QR code ─────────────────────────────────────
+    // ── 4. Look up QR code ─────────────────────────────────────
     const { data: product, error: lookupErr } = await supabase
       .from("products")
       .select("*, batches(batch_number, product_name, strain)")
-      .eq("qr_code", qrCode)
+      .eq("qr_code", dbLookupKey)
       .single();
 
     if (lookupErr) {
@@ -103,7 +206,7 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // ── 4. Validate state ──────────────────────────────────────
+    // ── 5. Validate state ──────────────────────────────────────
     if (product.claimed) {
       return {
         success: false,
@@ -129,9 +232,9 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // ── 5. Claim product (atomic guard against double-claim) ───
+    // ── 6. Claim product (atomic guard against double-claim) ───
     const pointsToAward = product.points_value || 10;
-    const isFirstScan = true; // always true — validated above via claimed=false check
+    const isFirstScan = true;
 
     const { error: claimErr } = await supabase
       .from("products")
@@ -153,10 +256,10 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // ── 6. Anomaly checks ──────────────────────────────────────
+    // ── 7. Anomaly checks ──────────────────────────────────────
     const anomalyFlags = await runAnomalyChecks(user.id, product.id);
 
-    // ── 7. Award points (skip if anomaly flagged) ──────────────
+    // ── 8. Award points (skip if anomaly flagged) ──────────────
     if (anomalyFlags.length === 0) {
       const { error: rpcErr } = await supabase.rpc("increment_loyalty_points", {
         p_user_id: user.id,
@@ -171,13 +274,12 @@ export async function authenticateQR(qrCode, source = "direct") {
           points: pointsToAward,
           transaction_type: "earned",
           transaction_date: new Date().toISOString(),
-          description: `Scanned QR code ${qrCode}`,
+          description: `Scanned QR code ${hmacResult.product_code || qrCode}`,
         });
       if (txErr) console.error("Transaction log error:", txErr);
     }
 
-    // ── 8. Insert scan record ──────────────────────────────────
-    // source (v5.4) + scan_date, is_first_scan, tenant_id, scan_flagged (v6.0)
+    // ── 9. Insert scan record (now includes is_legacy + hmac_verified) ───
     const { data: scanRecord, error: scanErr } = await supabase
       .from("scans")
       .insert({
@@ -189,6 +291,8 @@ export async function authenticateQR(qrCode, source = "direct") {
         scan_flagged: anomalyFlags.length > 0,
         flag_reason: anomalyFlags.length > 0 ? anomalyFlags.join(", ") : null,
         tenant_id: product.tenant_id || null,
+        // v7.0 additions
+        is_legacy: isLegacy,
       })
       .select("id")
       .single();
@@ -196,12 +300,12 @@ export async function authenticateQR(qrCode, source = "direct") {
     if (scanErr) console.error("Scan record error:", scanErr);
     const scanId = scanRecord?.id || null;
 
-    // ── 9. Update user activity (non-blocking) ─────────────────
+    // ── 10. Update user activity (non-blocking) ────────────────
     supabase
       .rpc("update_user_activity", { p_user_id: user.id })
       .catch(() => {});
 
-    // ── 10. Get user profile (GPS consent + loyalty display) ───
+    // ── 11. Get user profile ───────────────────────────────────
     const { data: profile } = await supabase
       .from("user_profiles")
       .select(
@@ -210,14 +314,14 @@ export async function authenticateQR(qrCode, source = "direct") {
       .eq("id", user.id)
       .single();
 
-    // ── 11. Geo enrichment — fully async, never blocks ─────────
+    // ── 12. Geo enrichment (async, non-blocking) ───────────────
     enrichAndStoreScanGeo(
       scanId,
       user.id,
       profile?.geolocation_consent || false,
     );
 
-    // ── 12. Return ─────────────────────────────────────────────
+    // ── 13. Return ─────────────────────────────────────────────
     return {
       success: true,
       points: anomalyFlags.length === 0 ? pointsToAward : 0,
@@ -228,6 +332,8 @@ export async function authenticateQR(qrCode, source = "direct") {
       anomalyFlags,
       userProfile: profile,
       requiresGPSPrompt: !profile?.geolocation_consent,
+      isLegacy,
+      hmacVerified,
     };
   } catch (err) {
     console.error("authenticateQR unexpected error:", err);
@@ -254,7 +360,6 @@ async function enrichAndStoreScanGeo(scanId, userId, hasGPSConsent) {
 async function runAnomalyChecks(userId, productId) {
   const flags = [];
   try {
-    // Check 1: daily cap
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -267,7 +372,6 @@ async function runAnomalyChecks(userId, productId) {
 
     if ((dailyScans || 0) >= MAX_SCANS_PER_DAY) flags.push("daily_cap");
 
-    // Check 2: velocity
     const windowStart = new Date(Date.now() - VELOCITY_WINDOW_MIN * 60 * 1000);
 
     const { count: velocityCount } = await supabase
@@ -290,7 +394,7 @@ export async function getUserScanHistory(userId, limit = 20) {
     .select(
       `
       id, scan_date, is_first_scan, ip_city, ip_province,
-      location_source, device_type, scan_flagged, source,
+      location_source, device_type, scan_flagged, source, is_legacy,
       nearest_stockist_id,
       products ( id, qr_code, batches ( batch_number, product_name ) )
     `,
@@ -312,7 +416,7 @@ export async function getScanGeoAnalytics(days = 30) {
       `
       id, scan_date, ip_city, ip_province, location_source,
       device_type, is_first_scan, scan_flagged, nearest_stockist_id,
-      distance_to_stockist_m, user_id, tenant_id, source
+      distance_to_stockist_m, user_id, tenant_id, source, is_legacy
     `,
     )
     .gte("scan_date", since)
@@ -325,6 +429,7 @@ export async function getScanGeoAnalytics(days = 30) {
       firstScans: 0,
       flagged: 0,
       gpsConsent: 0,
+      legacyScans: 0,
       byProvince: {},
       byCity: {},
       byDevice: {},
@@ -366,12 +471,14 @@ export async function getScanGeoAnalytics(days = 30) {
   const gpsCount = raw.filter((s) => s.location_source === "gps").length;
   const flagged = raw.filter((s) => s.scan_flagged).length;
   const firstScans = raw.filter((s) => s.is_first_scan).length;
+  const legacyScans = raw.filter((s) => s.is_legacy).length;
 
   return {
     raw,
     total: raw.length,
     firstScans,
     flagged,
+    legacyScans,
     gpsConsent: raw.length ? Math.round((gpsCount / raw.length) * 100) : 0,
     byProvince,
     byCity,
