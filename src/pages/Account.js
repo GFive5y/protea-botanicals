@@ -1,41 +1,29 @@
-// src/pages/Account.js — Protea Botanicals v5.5
+// src/pages/Account.js — Protea Botanicals v5.6
 // ============================================================================
-// CHANGELOG v5.4 → v5.5:
-//   1. FIX: doRedirect now uses role-based routing when no ?return= URL.
-//      Previously hardcoded "/loyalty" for all roles. Now: admin→/admin,
-//      retailer→/wholesale, customer→/loyalty.
-//   2. Smart returnUrl: ignores ?return= when it points to a role homepage
-//      (/loyalty, /wholesale, /admin) — uses role-based route instead.
-//      Still honors ?return= for specific paths like /scan/:qrCode or /redeem.
-//   ONE FUNCTION CHANGE (doRedirect) — all other v5.4 features preserved.
-//
-// CHANGELOG v5.3 → v5.4:
-//   1. handleSignOut now clears protea_role from localStorage on logout.
-//      This prevents stale role data persisting after sign-out, which
-//      caused partial-session confusion on next visit.
-//   ONE LINE CHANGE — all v5.3 features preserved exactly.
-//
-// CHANGELOG v5.2 → v5.3:
-//   1. CRITICAL FIX: handleSignIn and handleDevLogin now handle redirect
-//      DIRECTLY after successful signInWithPassword() instead of relying
-//      solely on onAuthStateChange. This fixes the "SIGNING IN..." hang
-//      caused by Supabase emitting TOKEN_REFRESHED or INITIAL_SESSION
-//      instead of SIGNED_IN when a stale session exists.
-//   2. onAuthStateChange kept as BACKUP (catches edge cases like OAuth).
-//   3. Added console.log breadcrumbs for easier future debugging.
+// CHANGELOG v5.5 → v5.6:
+//   1. ADD: "My Account" view for already-logged-in users visiting /account
+//      with no ?return= URL. Instead of redirecting, shows profile page with
+//      ProfileCompletion component embedded.
+//   2. ADD: import ProfileCompletion from "../components/ProfileCompletion"
+//   3. ADD: loggedInUser + loggedInProfile state (set during session check)
+//   4. ADD: AccountView component — shows email, role, loyalty points,
+//      ProfileCompletion widget, and Sign Out button.
+//   LOGIC UNCHANGED: ?return= URL still redirects immediately as before.
+//   LOGIN/SIGNUP/REDIRECT: all v5.5 logic preserved exactly.
 // ============================================================================
 
 import { useState, useEffect, useContext, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { RoleContext } from "../App";
+import ProfileCompletion from "../components/ProfileCompletion";
 
 // Ensure a user_profiles row exists (shared with Loyalty.js logic)
 async function ensureProfile(userId, email) {
   console.log("ensureProfile: checking for", userId);
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("id, role, loyalty_points")
+    .select("id, role, loyalty_points, loyalty_tier, profile_complete")
     .eq("id", userId)
     .single();
 
@@ -44,7 +32,7 @@ async function ensureProfile(userId, email) {
     const { data: created, error: insertErr } = await supabase
       .from("user_profiles")
       .insert({ id: userId, role: "customer", loyalty_points: 0 })
-      .select("id, role, loyalty_points")
+      .select("id, role, loyalty_points, loyalty_tier, profile_complete")
       .single();
     if (insertErr) console.error("ensureProfile insert failed:", insertErr);
     return created;
@@ -63,8 +51,12 @@ export default function Account() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [showForceLogout, setShowForceLogout] = useState(false); // v5.2
+  const [showForceLogout, setShowForceLogout] = useState(false);
   const redirectedRef = useRef(false);
+
+  // v5.6: logged-in account view state
+  const [loggedInUser, setLoggedInUser] = useState(null);
+  const [loggedInProfile, setLoggedInProfile] = useState(null);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -77,31 +69,21 @@ export default function Account() {
     redirectedRef.current = true;
     console.log("doRedirect: navigating with profile", profile);
     if (profile?.role) setRole(profile.role);
-    // v5.5: Route by role when no ?return= URL present
     const roleRoute = {
       admin: "/admin",
       retailer: "/wholesale",
       customer: "/loyalty",
     };
-    // v5.5: Ignore returnUrl when it points to a role homepage — use role route instead.
-    // Still honors returnUrl for specific paths like /scan/PB-001-2026-0001 or /redeem.
     const roleDefaults = ["/loyalty", "/wholesale", "/admin"];
     const useReturnUrl = returnUrl && !roleDefaults.includes(returnUrl);
     const dest = useReturnUrl
       ? returnUrl
       : roleRoute[profile?.role] || "/loyalty";
-    console.log(
-      "doRedirect: returnUrl =",
-      returnUrl,
-      "| useReturnUrl =",
-      useReturnUrl,
-      "| destination =",
-      dest,
-    );
+    console.log("doRedirect: destination =", dest);
     navigate(dest, { replace: true });
   };
 
-  // v5.3: Shared post-auth handler — called directly after successful sign-in
+  // v5.3: Shared post-auth handler
   const handlePostAuth = async () => {
     try {
       const {
@@ -109,7 +91,6 @@ export default function Account() {
         error: userErr,
       } = await supabase.auth.getUser();
       if (userErr) {
-        console.error("handlePostAuth: getUser failed", userErr);
         setError(
           "Sign-in succeeded but session could not be verified. Please try again.",
         );
@@ -117,35 +98,28 @@ export default function Account() {
         return;
       }
       if (user) {
-        console.log("handlePostAuth: user confirmed", user.email);
         const profile = await ensureProfile(user.id, user.email);
         doRedirect(profile);
       } else {
-        console.warn("handlePostAuth: no user after successful auth");
         setError(
           "Sign-in succeeded but no session was created. Please try again.",
         );
         setLoading(false);
       }
     } catch (e) {
-      console.error("handlePostAuth: unexpected error", e);
       setError("Something went wrong after sign-in. Please try again.");
       setLoading(false);
     }
   };
 
-  // 1. Check existing session on mount — v5.2: with timeouts
+  // 1. Check existing session on mount
   useEffect(() => {
     let mounted = true;
 
-    // v5.2: Show "Force Sign Out" button after 3 seconds
     const forceLogoutTimer = setTimeout(() => {
-      if (mounted && checkingSession) {
-        setShowForceLogout(true);
-      }
+      if (mounted && checkingSession) setShowForceLogout(true);
     }, 3000);
 
-    // v5.2: Force checkingSession=false after 5 seconds (kills infinite spinner)
     const timeoutTimer = setTimeout(() => {
       if (mounted && checkingSession) {
         console.warn("Account.js: Session check timed out after 5s");
@@ -159,11 +133,20 @@ export default function Account() {
           data: { user },
         } = await supabase.auth.getUser();
         if (user && mounted) {
-          console.log("Session check: found existing user", user.email);
           const profile = await ensureProfile(user.id, user.email);
-          doRedirect(profile);
-        } else {
-          console.log("Session check: no existing session");
+          if (profile?.role) setRole(profile.role);
+
+          // v5.6: If no ?return= URL, show account view instead of redirecting
+          const roleDefaults = ["/loyalty", "/wholesale", "/admin"];
+          const shouldRedirect = returnUrl && !roleDefaults.includes(returnUrl);
+
+          if (shouldRedirect) {
+            doRedirect(profile);
+          } else {
+            // Stay on /account — show logged-in view
+            setLoggedInUser(user);
+            setLoggedInProfile(profile);
+          }
         }
       } catch (e) {
         console.error("Session check error:", e);
@@ -198,28 +181,23 @@ export default function Account() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── SIGN IN ─── v5.3: direct redirect after success
+  // ─── SIGN IN ───
   const handleSignIn = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      console.log("handleSignIn: attempting with", email);
       const { error: err } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (err) {
-        console.error("handleSignIn: auth error", err.message);
         setError(err.message);
         setLoading(false);
         return;
       }
-      // v5.3: Handle redirect directly instead of waiting for onAuthStateChange
-      console.log("handleSignIn: auth succeeded, handling post-auth");
       await handlePostAuth();
     } catch (err) {
-      console.error("handleSignIn: unexpected error", err);
       setError("Unexpected error. Please try again.");
       setLoading(false);
     }
@@ -253,29 +231,22 @@ export default function Account() {
     }
   };
 
-  // ─── DEV LOGIN (real Supabase auth) ─── v5.3: direct redirect after success
+  // ─── DEV LOGIN ───
   const handleDevLogin = async (devEmail, devPw) => {
     setLoading(true);
     setError("");
     try {
-      console.log("handleDevLogin: attempting with", devEmail);
       const { error: err } = await supabase.auth.signInWithPassword({
         email: devEmail,
         password: devPw,
       });
       if (err) {
-        console.error("handleDevLogin: auth error", err.message);
-        setError(
-          `Dev login failed: ${err.message}. Ensure account exists in Supabase Auth.`,
-        );
+        setError(`Dev login failed: ${err.message}.`);
         setLoading(false);
         return;
       }
-      // v5.3: Handle redirect directly instead of waiting for onAuthStateChange
-      console.log("handleDevLogin: auth succeeded, handling post-auth");
       await handlePostAuth();
     } catch (err) {
-      console.error("handleDevLogin: unexpected error", err);
       setError("Dev login failed unexpectedly.");
       setLoading(false);
     }
@@ -283,18 +254,19 @@ export default function Account() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem("protea_role"); // v5.4: clear stale role on logout
+    localStorage.removeItem("protea_role");
     setRole(null);
     redirectedRef.current = false;
+    setLoggedInUser(null);
+    setLoggedInProfile(null);
     navigate("/", { replace: true });
   };
 
-  // v5.2: Force sign out — nuclear option that clears everything
   const handleForceSignOut = async () => {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.error("Force sign out error:", e);
+      console.error(e);
     }
     localStorage.clear();
     sessionStorage.clear();
@@ -304,11 +276,13 @@ export default function Account() {
     setShowForceLogout(false);
     setLoading(false);
     setError("");
+    setLoggedInUser(null);
+    setLoggedInProfile(null);
   };
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Show spinner while checking existing session — v5.2: with escape hatch
+  // ── Spinner while checking session ──────────────────────────────────────
   if (checkingSession) {
     return (
       <div
@@ -341,8 +315,6 @@ export default function Account() {
         >
           Checking session...
         </p>
-
-        {/* v5.2: Force Sign Out — appears after 3 seconds */}
         {showForceLogout && (
           <div style={{ marginTop: "20px", textAlign: "center" }}>
             <p
@@ -375,12 +347,289 @@ export default function Account() {
             </button>
           </div>
         )}
-
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
+  // ── v5.6: Logged-in Account View ─────────────────────────────────────────
+  if (loggedInUser) {
+    return (
+      <>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`}</style>
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "#faf9f6",
+            fontFamily: "'Jost',sans-serif",
+            padding: "40px 20px",
+          }}
+        >
+          <div style={{ maxWidth: 600, margin: "0 auto" }}>
+            {/* Header */}
+            <div style={{ marginBottom: 32 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: ".35em",
+                  textTransform: "uppercase",
+                  color: "#52b788",
+                  marginBottom: 8,
+                }}
+              >
+                Protea Botanicals
+              </div>
+              <h1
+                style={{
+                  fontFamily: "'Cormorant Garamond',Georgia,serif",
+                  fontSize: 32,
+                  fontWeight: 600,
+                  color: "#1a1a1a",
+                  margin: 0,
+                }}
+              >
+                My Account
+              </h1>
+            </div>
+
+            {/* Account summary card */}
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #e8e0d4",
+                borderRadius: 2,
+                padding: "20px 24px",
+                marginBottom: 24,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: "0.3em",
+                  textTransform: "uppercase",
+                  color: "#52b788",
+                  marginBottom: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Account Details
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #f0ebe3",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#888",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Email
+                  </span>
+                  <span
+                    style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}
+                  >
+                    {loggedInUser.email}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #f0ebe3",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#888",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Role
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#1b4332",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.15em",
+                      background: "rgba(82,183,136,0.12)",
+                      padding: "3px 10px",
+                      borderRadius: 2,
+                    }}
+                  >
+                    {loggedInProfile?.role || "customer"}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid #f0ebe3",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#888",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Loyalty Points
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'Cormorant Garamond',Georgia,serif",
+                      fontSize: 22,
+                      fontWeight: 600,
+                      color: "#b5935a",
+                    }}
+                  >
+                    {(loggedInProfile?.loyalty_points || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: "#888",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    Tier
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#b5935a",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.15em",
+                    }}
+                  >
+                    {loggedInProfile?.loyalty_tier || "Bronze"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Completion — the main addition */}
+            <ProfileCompletion
+              userId={loggedInUser.id}
+              onComplete={(completed) => {
+                if (completed) {
+                  setLoggedInProfile((prev) => ({
+                    ...prev,
+                    profile_complete: true,
+                  }));
+                }
+              }}
+            />
+
+            {/* Navigation shortcuts */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                marginTop: 24,
+                marginBottom: 24,
+              }}
+            >
+              <button
+                onClick={() => navigate("/loyalty")}
+                style={{
+                  padding: "12px 16px",
+                  background: "#fff",
+                  border: "1px solid #e8e0d4",
+                  borderRadius: 2,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  color: "#1b4332",
+                  cursor: "pointer",
+                  fontFamily: "'Jost',sans-serif",
+                }}
+              >
+                📊 View Loyalty
+              </button>
+              <button
+                onClick={() => navigate("/shop")}
+                style={{
+                  padding: "12px 16px",
+                  background: "#fff",
+                  border: "1px solid #e8e0d4",
+                  borderRadius: 2,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  color: "#1b4332",
+                  cursor: "pointer",
+                  fontFamily: "'Jost',sans-serif",
+                }}
+              >
+                🛒 Browse Shop
+              </button>
+            </div>
+
+            {/* Sign out */}
+            <div
+              style={{
+                textAlign: "center",
+                paddingTop: 16,
+                borderTop: "1px solid #e8e0d4",
+              }}
+            >
+              <button
+                onClick={handleSignOut}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#888",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  fontFamily: "'Jost',sans-serif",
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Login / Sign Up form (unchanged from v5.5) ────────────────────────────
   return (
     <>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`}</style>
@@ -395,7 +644,6 @@ export default function Account() {
           margin: "0 auto",
         }}
       >
-        {/* Return-URL banner */}
         {returnUrl && (
           <div
             style={{
@@ -416,7 +664,6 @@ export default function Account() {
           </div>
         )}
 
-        {/* Header */}
         <div style={{ marginBottom: 32, textAlign: "center" }}>
           <div
             style={{
@@ -443,7 +690,6 @@ export default function Account() {
           </h1>
         </div>
 
-        {/* Messages */}
         {error && (
           <div
             style={{
@@ -475,7 +721,6 @@ export default function Account() {
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSignIn}>
           <div style={{ marginBottom: 16 }}>
             <label
@@ -587,7 +832,6 @@ export default function Account() {
           </button>
         </form>
 
-        {/* ─── DEV TEST PANEL (development only) ─── */}
         {isDev && (
           <div
             style={{
@@ -621,7 +865,6 @@ export default function Account() {
             >
               Real Supabase auth. Accounts must exist in Auth dashboard.
             </p>
-
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <button
                 type="button"
@@ -682,7 +925,6 @@ export default function Account() {
                 🔧 Admin → /admin
               </button>
             </div>
-
             <p
               style={{
                 fontSize: 11,
