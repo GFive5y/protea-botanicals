@@ -1,22 +1,29 @@
-// scanService.js v5.4 FINAL — Protea Botanicals — February 27 2026
+// scanService.js v6.0 — Protea Botanicals — March 2026
 // ============================================================================
-// v5.4: Added source tracking (Step 5 from paused work queue)
-//   - authenticateQR() now accepts optional `source` parameter (default: 'direct')
-//   - After claiming product, inserts a row into `scans` table with source column
-//   - Enables analytics: which QR type (promo, loyalty, verify, direct) drove the scan
-//   - DB column `scans.source` added in v10.0 migration (ALTER TABLE scans ADD source TEXT)
+// v6.0: Phase 2 geo enrichment merged into v5.4
+//   - scan insert now includes: scan_date, is_first_scan, tenant_id, user_id
+//   - geo enrichment runs async after scan (never blocks user)
+//   - anomaly detection: daily cap (5/day) + velocity check (10/60min)
+//   - getUserScanHistory() — for Loyalty page scan log
+//   - getScanGeoAnalytics() — for HQ GeoAnalyticsDashboard
 //
-// v5.3: THIS FILE FIXES THE LOYALTY RECENT ACTIVITY BUG
-//   - transaction_date: new Date().toISOString()  ← correct column name
-//   - transaction_type: 'earned'                  ← matches CHECK constraint
+// v5.4: Source tracking (source column on scans)
+// v5.3: Fixed transaction_date column + 'earned' transaction_type
 // ============================================================================
 
 import { supabase } from "./supabaseClient";
+import {
+  enrichScanGeo,
+  updateScanWithGeo,
+  enrichUserProfileGeo,
+} from "./geoService";
 
-/**
- * Ensure user has a profile row in user_profiles.
- * Creates one with role='customer' and loyalty_points=0 if missing.
- */
+// ── Anomaly thresholds ────────────────────────────────────────────────────────
+const MAX_SCANS_PER_DAY = 5; // max unique products per user per day
+const VELOCITY_WINDOW_MIN = 60; // minutes
+const VELOCITY_MAX_SCANS = 10; // max scans of same product in window
+
+// ── ensureProfile ─────────────────────────────────────────────────────────────
 async function ensureProfile(userId) {
   const { data, error } = await supabase
     .from("user_profiles")
@@ -36,15 +43,17 @@ async function ensureProfile(userId) {
   }
 }
 
+// ── authenticateQR ────────────────────────────────────────────────────────────
 /**
  * Authenticate (claim) a QR code.
- * @param {string} qrCode - e.g. "PB-001-2026-0001"
- * @param {string} [source='direct'] - How the user reached this scan (e.g. 'promo', 'loyalty', 'verify', 'direct')
- * @returns {Object} { success, points, pointsEarned, product, error, errorType }
+ * @param {string} qrCode  - e.g. "PB-001-2026-0001"
+ * @param {string} [source='direct'] - scan origin: 'promo'|'loyalty'|'verify'|'direct'
+ * @returns {Object} { success, points, pointsEarned, product, error, errorType,
+ *                     isFirstScan, scanId, anomalyFlags, userProfile, requiresGPSPrompt }
  */
 export async function authenticateQR(qrCode, source = "direct") {
   try {
-    // 1. Check auth
+    // ── 1. Check auth ──────────────────────────────────────────
     const {
       data: { user },
       error: authErr,
@@ -58,10 +67,10 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // 2. Ensure profile exists
+    // ── 2. Ensure profile exists ───────────────────────────────
     await ensureProfile(user.id);
 
-    // 3. Look up QR code
+    // ── 3. Look up QR code ─────────────────────────────────────
     const { data: product, error: lookupErr } = await supabase
       .from("products")
       .select("*, batches(batch_number, product_name, strain)")
@@ -94,7 +103,7 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // 4. Validate state
+    // ── 4. Validate state ──────────────────────────────────────
     if (product.claimed) {
       return {
         success: false,
@@ -120,8 +129,9 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // 5. Claim the product (atomic guard against double-claim)
+    // ── 5. Claim product (atomic guard against double-claim) ───
     const pointsToAward = product.points_value || 10;
+    const isFirstScan = true; // always true — validated above via claimed=false check
 
     const { error: claimErr } = await supabase
       .from("products")
@@ -143,42 +153,81 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // 6. Award points via RPC
-    const { error: rpcErr } = await supabase.rpc("increment_loyalty_points", {
-      p_user_id: user.id,
-      p_points: pointsToAward,
-    });
-    if (rpcErr) console.error("RPC increment_loyalty_points error:", rpcErr);
+    // ── 6. Anomaly checks ──────────────────────────────────────
+    const anomalyFlags = await runAnomalyChecks(user.id, product.id);
 
-    // 7. Log transaction — THE FIX (v5.3)
-    // CRITICAL: transaction_date (not created_at), 'earned' (not 'scan_reward')
-    const { error: txErr } = await supabase
-      .from("loyalty_transactions")
-      .insert({
-        user_id: user.id,
-        points: pointsToAward,
-        transaction_type: "earned", // ✅ valid CHECK value
-        transaction_date: new Date().toISOString(), // ✅ correct column
-        description: `Scanned QR code ${qrCode}`,
+    // ── 7. Award points (skip if anomaly flagged) ──────────────
+    if (anomalyFlags.length === 0) {
+      const { error: rpcErr } = await supabase.rpc("increment_loyalty_points", {
+        p_user_id: user.id,
+        p_points: pointsToAward,
       });
-    if (txErr) console.error("Transaction log error:", txErr);
+      if (rpcErr) console.error("RPC increment_loyalty_points error:", rpcErr);
 
-    // 7b. Record scan with source tracking (v5.4)
-    // scans.source column added in v10.0 migration, DEFAULT 'direct'
-    // Note: no scanned_at column — timestamp handled by DB default (created_at)
-    const { error: scanErr } = await supabase.from("scans").insert({
-      product_id: product.id,
-      user_id: user.id,
-      source: source || "direct",
-    });
+      const { error: txErr } = await supabase
+        .from("loyalty_transactions")
+        .insert({
+          user_id: user.id,
+          points: pointsToAward,
+          transaction_type: "earned",
+          transaction_date: new Date().toISOString(),
+          description: `Scanned QR code ${qrCode}`,
+        });
+      if (txErr) console.error("Transaction log error:", txErr);
+    }
+
+    // ── 8. Insert scan record ──────────────────────────────────
+    // source (v5.4) + scan_date, is_first_scan, tenant_id, scan_flagged (v6.0)
+    const { data: scanRecord, error: scanErr } = await supabase
+      .from("scans")
+      .insert({
+        product_id: product.id,
+        user_id: user.id,
+        source: source || "direct",
+        scan_date: new Date().toISOString(),
+        is_first_scan: isFirstScan,
+        scan_flagged: anomalyFlags.length > 0,
+        flag_reason: anomalyFlags.length > 0 ? anomalyFlags.join(", ") : null,
+        tenant_id: product.tenant_id || null,
+      })
+      .select("id")
+      .single();
+
     if (scanErr) console.error("Scan record error:", scanErr);
+    const scanId = scanRecord?.id || null;
 
-    // 8. Return success
+    // ── 9. Update user activity (non-blocking) ─────────────────
+    supabase
+      .rpc("update_user_activity", { p_user_id: user.id })
+      .catch(() => {});
+
+    // ── 10. Get user profile (GPS consent + loyalty display) ───
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select(
+        "geolocation_consent, province, city, loyalty_tier, loyalty_points, profile_complete",
+      )
+      .eq("id", user.id)
+      .single();
+
+    // ── 11. Geo enrichment — fully async, never blocks ─────────
+    enrichAndStoreScanGeo(
+      scanId,
+      user.id,
+      profile?.geolocation_consent || false,
+    );
+
+    // ── 12. Return ─────────────────────────────────────────────
     return {
       success: true,
-      points: pointsToAward,
-      pointsEarned: pointsToAward, // Alias for ScanResult.js compatibility
+      points: anomalyFlags.length === 0 ? pointsToAward : 0,
+      pointsEarned: anomalyFlags.length === 0 ? pointsToAward : 0,
       product,
+      isFirstScan,
+      scanId,
+      anomalyFlags,
+      userProfile: profile,
+      requiresGPSPrompt: !profile?.geolocation_consent,
     };
   } catch (err) {
     console.error("authenticateQR unexpected error:", err);
@@ -188,4 +237,149 @@ export async function authenticateQR(qrCode, source = "direct") {
       errorType: "network",
     };
   }
+}
+
+// ── Background geo enrichment ─────────────────────────────────────────────────
+async function enrichAndStoreScanGeo(scanId, userId, hasGPSConsent) {
+  try {
+    const geoData = await enrichScanGeo({ hasGPSConsent });
+    if (scanId) await updateScanWithGeo(scanId, geoData);
+    if (userId) await enrichUserProfileGeo(userId, geoData);
+  } catch {
+    // Non-blocking — geo failure never surfaces to user
+  }
+}
+
+// ── Anomaly detection ─────────────────────────────────────────────────────────
+async function runAnomalyChecks(userId, productId) {
+  const flags = [];
+  try {
+    // Check 1: daily cap
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { count: dailyScans } = await supabase
+      .from("scans")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_first_scan", true)
+      .gte("scan_date", today.toISOString());
+
+    if ((dailyScans || 0) >= MAX_SCANS_PER_DAY) flags.push("daily_cap");
+
+    // Check 2: velocity
+    const windowStart = new Date(Date.now() - VELOCITY_WINDOW_MIN * 60 * 1000);
+
+    const { count: velocityCount } = await supabase
+      .from("scans")
+      .select("id", { count: "exact", head: true })
+      .eq("product_id", productId)
+      .gte("scan_date", windowStart.toISOString());
+
+    if ((velocityCount || 0) >= VELOCITY_MAX_SCANS) flags.push("velocity");
+  } catch {
+    // Non-critical
+  }
+  return flags;
+}
+
+// ── getUserScanHistory ────────────────────────────────────────────────────────
+export async function getUserScanHistory(userId, limit = 20) {
+  const { data, error } = await supabase
+    .from("scans")
+    .select(
+      `
+      id, scan_date, is_first_scan, ip_city, ip_province,
+      location_source, device_type, scan_flagged, source,
+      nearest_stockist_id,
+      products ( id, qr_code, batches ( batch_number, product_name ) )
+    `,
+    )
+    .eq("user_id", userId)
+    .order("scan_date", { ascending: false })
+    .limit(limit);
+
+  return error ? [] : data || [];
+}
+
+// ── getScanGeoAnalytics ───────────────────────────────────────────────────────
+export async function getScanGeoAnalytics(days = 30) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("scans")
+    .select(
+      `
+      id, scan_date, ip_city, ip_province, location_source,
+      device_type, is_first_scan, scan_flagged, nearest_stockist_id,
+      distance_to_stockist_m, user_id, tenant_id, source
+    `,
+    )
+    .gte("scan_date", since)
+    .order("scan_date", { ascending: false });
+
+  if (error)
+    return {
+      raw: [],
+      total: 0,
+      firstScans: 0,
+      flagged: 0,
+      gpsConsent: 0,
+      byProvince: {},
+      byCity: {},
+      byDevice: {},
+      byStockist: {},
+      bySource: {},
+      topProvince: "—",
+      topCity: "—",
+    };
+
+  const raw = data || [];
+
+  const byProvince = raw.reduce((acc, s) => {
+    const p = s.ip_province || "Unknown";
+    acc[p] = (acc[p] || 0) + 1;
+    return acc;
+  }, {});
+  const byCity = raw.reduce((acc, s) => {
+    const c = s.ip_city || "Unknown";
+    acc[c] = (acc[c] || 0) + 1;
+    return acc;
+  }, {});
+  const byDevice = raw.reduce((acc, s) => {
+    const d = s.device_type || "unknown";
+    acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {});
+  const byStockist = raw.reduce((acc, s) => {
+    if (s.nearest_stockist_id) {
+      acc[s.nearest_stockist_id] = (acc[s.nearest_stockist_id] || 0) + 1;
+    }
+    return acc;
+  }, {});
+  const bySource = raw.reduce((acc, s) => {
+    const src = s.source || "direct";
+    acc[src] = (acc[src] || 0) + 1;
+    return acc;
+  }, {});
+
+  const gpsCount = raw.filter((s) => s.location_source === "gps").length;
+  const flagged = raw.filter((s) => s.scan_flagged).length;
+  const firstScans = raw.filter((s) => s.is_first_scan).length;
+
+  return {
+    raw,
+    total: raw.length,
+    firstScans,
+    flagged,
+    gpsConsent: raw.length ? Math.round((gpsCount / raw.length) * 100) : 0,
+    byProvince,
+    byCity,
+    byDevice,
+    byStockist,
+    bySource,
+    topProvince:
+      Object.entries(byProvince).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+    topCity: Object.entries(byCity).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+  };
 }

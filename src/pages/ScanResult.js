@@ -1,680 +1,1082 @@
-// src/pages/ScanResult.js v5.3
-// ─────────────────────────────────────────────────────────────────────────────
-// v5.3: REFACTORED — processScan() now delegates to authenticateQR() from
-//       scanService.js instead of inline Supabase calls. Single source of truth
-//       for claim/transaction/scan logic. ~80 lines of inline DB code removed.
-//       Keeps: rate limiting, dev mock path, all UI states, return URL.
-//       Maps authenticateQR() return types to existing S.* UI states.
-//       Fix: transaction_type 'EARNED' → 'earned' (handled by scanService).
-//
-// v5.2: Source tracking — reads ?source= from URL, records in scans table.
-//
-// Standalone page — route: /scan/:qrCode
-//
-// Key fix: NO_AUTH state "Sign In" button passes ?return=/scan/:qrCode
-// so after login the user lands back here to claim their points.
-//
-// Dev mode fix: reads localStorage 'protea_dev_mode' to mock a user
-// session for testing without real Supabase auth.
-// ─────────────────────────────────────────────────────────────────────────────
+// src/pages/ScanResult.js v3.0
+// Phase 2: Geo enrichment display — GPS consent prompt, nearest stockist card,
+//          location attribution, anomaly alerts, enhanced scan result UX.
+// v2.x: Basic authentication result + COA + loyalty points.
 
-import { useEffect, useState, useCallback, useRef, useContext } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { authenticateQR } from "../services/scanService";
+import {
+  requestGPSLocation,
+  findNearestStockist,
+  saveGPSConsent,
+} from "../services/geoService";
 import { supabase } from "../services/supabaseClient";
-import { authenticateQR } from "../services/scanService"; // ★ v5.3: single source of truth
-import { RoleContext } from "../App";
 
-const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
+// ── Styles ────────────────────────────────────────────────────────────────────
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap');
+  .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .body-font { font-family: 'Jost', sans-serif; }
+  .sr-btn {
+    font-family: 'Jost', sans-serif; padding: 12px 28px; border: none;
+    border-radius: 2px; font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+    font-weight: 500; text-decoration: none; display: inline-block; text-align: center;
+  }
+  .sr-btn-green { background: #1b4332; color: white; }
+  .sr-btn-green:hover { background: #2d6a4f; }
+  .sr-btn-outline { background: transparent; border: 1px solid #1b4332; color: #1b4332; }
+  .sr-btn-outline:hover { background: #1b4332; color: white; }
+  .sr-btn-gold { background: #b5935a; color: white; }
+  .sr-btn-gold:hover { background: #9a7a48; }
+  .sr-card {
+    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+  .sr-badge {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px;
+    border-radius: 2px; font-family: 'Jost', sans-serif; font-size: 10px;
+    letter-spacing: 0.15em; text-transform: uppercase; font-weight: 500;
+  }
+  .gps-prompt {
+    animation: slideUp 0.4s ease forwards;
+    border-left: 3px solid #b5935a;
+  }
+  .stockist-card {
+    animation: slideUp 0.4s 0.2s ease forwards; opacity: 0;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .pulse { animation: pulse 1.5s infinite; }
+  @media (max-width: 600px) {
+    .sr-inner { padding: 24px 16px !important; }
+    .sr-hero-inner { padding: 32px 16px 36px !important; }
+    .sr-cta-row { flex-direction: column !important; }
+    .sr-cta-row .sr-btn { width: 100%; text-align: center; }
+  }
+`;
 
-const POINTS = Number(process.env.REACT_APP_POINTS_PER_SCAN) || 10;
-const RATE_MS = 5000;
-
-const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  cream: "#faf9f6",
-  text: "#1a1a1a",
-  muted: "#888888",
-  error: "#c0392b",
-  border: "#e0dbd2",
-};
-
-const S = {
-  LOADING: "loading",
-  SUCCESS: "success",
-  ALREADY: "already",
-  INVALID: "invalid",
-  NO_AUTH: "no_auth",
-  RATE: "rate",
-  ERROR: "error",
-};
-
-// ── Dev mock user for testing ─────────────────────────────────────────────────
-const DEV_MOCK_USER = {
-  id: "dev-mock-user-id",
-  email: "customer@protea.dev",
-};
-
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function ScanResult() {
   const { qrCode } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // v5.2: read ?source= param
-  const source = searchParams.get("source") || "direct"; // v5.2: e.g. "promo", "loyalty", "verify"
-  const { isDevMode } = useContext(RoleContext);
 
-  const [status, setStatus] = useState(S.LOADING);
-  const [detail, setDetail] = useState("");
-  const [points, setPoints] = useState(0);
-  const [batchNum, setBatch] = useState("");
-  const [newTotal, setTotal] = useState(null);
-  const processedRef = useRef(false);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [gpsState, setGpsState] = useState("idle");
+  // 'idle' | 'prompting' | 'requesting' | 'granted' | 'denied' | 'updating'
+  const [stockist, setStockist] = useState(null);
+  const [stockistLoading, setStockistLoading] = useState(false);
+  const [scanLocation, setScanLocation] = useState(null);
+  const [user, setUser] = useState(null);
 
-  const processScan = useCallback(async () => {
-    if (processedRef.current) return;
-    processedRef.current = true;
-
-    // Rate limit
-    const key = `scan_rl_${qrCode}`;
-    const last = Number(sessionStorage.getItem(key) || 0);
-    if (Date.now() - last < RATE_MS) {
-      setStatus(S.RATE);
-      return;
-    }
-    sessionStorage.setItem(key, Date.now());
-
-    // ── Auth check — real Supabase OR dev mock ────────────────────────────
-    let user = null;
-    const {
-      data: { user: realUser },
-    } = await supabase.auth.getUser();
-
-    if (realUser) {
-      user = realUser;
-    } else if (
-      isDevMode ||
-      localStorage.getItem("protea_dev_mode") === "true"
-    ) {
-      // Dev mode: use mock user so the full scan flow can be tested
-      user = DEV_MOCK_USER;
-    }
-
-    if (!user) {
-      setStatus(S.NO_AUTH);
-      return;
-    }
-
-    if (!qrCode) {
-      setStatus(S.INVALID);
-      return;
-    }
-
-    const decodedQrCode = decodeURIComponent(qrCode);
-
-    // ── Dev mode: lightweight product lookup + mock success ───────────────
-    // authenticateQR() checks supabase.auth.getUser() internally, which
-    // will fail for dev mock. Keep this separate path for testing.
-    if (user.id === DEV_MOCK_USER.id) {
-      try {
-        const { data: product, error: fe } = await supabase
-          .from("products")
-          .select("id, qr_code, claimed, batches(batch_number)")
-          .eq("qr_code", decodedQrCode)
-          .single();
-
-        if (fe || !product) {
-          setStatus(S.INVALID);
-          setDetail(
-            `No product found for "${qrCode}". Make sure you're scanning the inside-packaging QR.`,
-          );
-          return;
-        }
-
-        setBatch(product.batches?.batch_number || qrCode);
-
-        if (product.claimed) {
-          setStatus(S.ALREADY);
-          setDetail(
-            "This QR code has already been redeemed. Each code can only earn points once.",
-          );
-          return;
-        }
-      } catch (err) {
-        console.log(
-          "[ScanResult] Dev mock product lookup skipped:",
-          err.message,
-        );
-      }
-
-      setPoints(POINTS);
-      setTotal(340 + POINTS); // mock running total
-      setStatus(S.SUCCESS);
-      return;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ★ v5.3: REAL USER — delegate to scanService.authenticateQR()
-    // This replaces ~80 lines of inline product lookup, atomic claim,
-    // transaction insert, scans insert, and RPC increment_loyalty_points.
-    // authenticateQR() also calls ensureProfile() — an improvement.
-    // ══════════════════════════════════════════════════════════════════════
-    try {
-      const result = await authenticateQR(decodedQrCode, source);
-
-      if (result.success) {
-        // Map success to UI
-        setBatch(result.product?.batches?.batch_number || qrCode);
-        setPoints(result.pointsEarned || POINTS);
-
-        // Fetch updated loyalty_points total for celebration display
-        const { data: prof } = await supabase
-          .from("user_profiles")
-          .select("loyalty_points")
-          .eq("id", user.id)
-          .single();
-        setTotal(prof?.loyalty_points || null);
-
-        setStatus(S.SUCCESS);
-      } else {
-        // Map authenticateQR errorType to existing UI states
-        switch (result.errorType) {
-          case "auth":
-            setStatus(S.NO_AUTH);
-            break;
-          case "already_claimed":
-            setStatus(S.ALREADY);
-            setDetail(
-              result.error ||
-                "This QR code has already been redeemed. Each code can only earn points once.",
-            );
-            if (result.product)
-              setBatch(result.product.batches?.batch_number || qrCode);
-            break;
-          case "not_found":
-            setStatus(S.INVALID);
-            setDetail(
-              result.error ||
-                `No product found for "${qrCode}". Make sure you're scanning the inside-packaging QR.`,
-            );
-            break;
-          case "inactive":
-          case "expired":
-            setStatus(S.INVALID);
-            setDetail(result.error);
-            break;
-          case "network":
-            setStatus(S.ERROR);
-            setDetail(
-              result.error || "Network error. Please check your connection.",
-            );
-            break;
-          default:
-            setStatus(S.ERROR);
-            setDetail(result.error || "Unexpected error. Please try again.");
-        }
-      }
-    } catch (err) {
-      console.error("[ScanResult]", err);
-      setStatus(S.ERROR);
-      setDetail(err.message || "Unexpected error. Please try again.");
-    }
-  }, [qrCode, isDevMode, source]);
-
+  // ── Authenticate QR on mount ──────────────────────────────────────────────
   useEffect(() => {
-    processScan();
-  }, [processScan]);
+    let cancelled = false;
+    async function run() {
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+      if (!cancelled) setUser(u);
 
-  // ── Return URL for post-login bounce-back ──────────────────────────────────
-  const returnUrl = `/scan/${encodeURIComponent(qrCode || "")}`;
+      const res = await authenticateQR(qrCode);
+      if (!cancelled) {
+        setResult(res);
+        setLoading(false);
 
-  // ── SUCCESS — full-screen celebration ────────────────────────────────────
-  if (status === S.SUCCESS) {
+        // Show GPS prompt 2 seconds after result — never before
+        if (res.authentic && u && res.requiresGPSPrompt) {
+          setTimeout(() => {
+            if (!cancelled) setGpsState("prompting");
+          }, 2000);
+        }
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [qrCode]);
+
+  // ── GPS grant handler ──────────────────────────────────────────────────────
+  const handleGrantGPS = useCallback(async () => {
+    setGpsState("requesting");
+    const gps = await requestGPSLocation();
+    if (!gps) {
+      setGpsState("denied");
+      return;
+    }
+    setGpsState("updating");
+    setScanLocation({ lat: gps.lat, lng: gps.lng, source: "gps" });
+
+    // Save consent
+    if (user) await saveGPSConsent(user.id, true);
+
+    // Find nearest stockist with precise GPS
+    setStockistLoading(true);
+    const near = await findNearestStockist(gps.lat, gps.lng);
+    setStockist(near);
+    setStockistLoading(false);
+    setGpsState("granted");
+  }, [user]);
+
+  const handleDenyGPS = useCallback(async () => {
+    setGpsState("denied");
+    if (user) await saveGPSConsent(user.id, false);
+  }, [user]);
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loading) {
     return (
-      <>
-        <style>
-          {FONTS}
-          {`
-          @keyframes pb-pop { 0%{transform:scale(0.7);opacity:0;} 70%{transform:scale(1.05);} 100%{transform:scale(1);opacity:1;} }
-          @keyframes pb-float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
-          @keyframes pb-confetti { 0%{transform:translateY(-20px) rotate(0deg);opacity:1;} 100%{transform:translateY(100vh) rotate(720deg);opacity:0;} }
-          .pb-confetti { position:fixed; width:8px; height:8px; animation:pb-confetti linear forwards; pointer-events:none; }
-        `}
-        </style>
-
-        {[...Array(24)].map((_, i) => (
-          <div
-            key={i}
-            className="pb-confetti"
-            style={{
-              left: `${4 + ((i * 4.1) % 96)}%`,
-              top: "-10px",
-              background: ["#52b788", "#b5935a", "#1b4332", "#fff", "#e67e22"][
-                i % 5
-              ],
-              animationDuration: `${1.5 + (i % 5) * 0.3}s`,
-              animationDelay: `${(i % 8) * 0.1}s`,
-              borderRadius: i % 3 === 0 ? "50%" : "1px",
-            }}
-          />
-        ))}
-
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9000,
-            background: `linear-gradient(145deg, ${C.green} 0%, #0d2e1f 100%)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "24px",
-            fontFamily: "Jost, sans-serif",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "480px",
-              width: "100%",
-              background: "#fff",
-              padding: "48px 40px",
-              textAlign: "center",
-              animation: "pb-pop 0.45s cubic-bezier(0.34,1.56,0.64,1) both",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "64px",
-                marginBottom: "4px",
-                lineHeight: 1,
-                animation: "pb-float 2s ease-in-out infinite",
-              }}
-            >
-              🏆
-            </div>
-            <div
-              style={{
-                fontSize: "11px",
-                letterSpacing: "0.4em",
-                textTransform: "uppercase",
-                color: C.accent,
-                fontWeight: "600",
-                marginBottom: "12px",
-              }}
-            >
-              Points Earned
-            </div>
-            <div
-              style={{
-                fontFamily: "Cormorant Garamond, serif",
-                fontSize: "72px",
-                fontWeight: "700",
-                color: C.green,
-                lineHeight: 1,
-                marginBottom: "4px",
-              }}
-            >
-              +{points}
-            </div>
-            <div
-              style={{ fontSize: "16px", color: C.muted, marginBottom: "24px" }}
-            >
-              loyalty points
-            </div>
-
-            {batchNum && (
-              <div
-                style={{
-                  background: C.cream,
-                  border: `1px solid ${C.border}`,
-                  padding: "10px 16px",
-                  fontSize: "12px",
-                  color: C.muted,
-                  marginBottom: "16px",
-                }}
-              >
-                Verified: <strong style={{ color: C.text }}>{batchNum}</strong>
-              </div>
-            )}
-
-            {newTotal !== null && (
-              <div
-                style={{
-                  background: `linear-gradient(90deg, ${C.green}, ${C.mid})`,
-                  padding: "14px 20px",
-                  marginBottom: "28px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    letterSpacing: "0.3em",
-                    textTransform: "uppercase",
-                    color: C.accent,
-                    marginBottom: "4px",
-                  }}
-                >
-                  Your New Total
-                </div>
-                <div
-                  style={{
-                    fontFamily: "Cormorant Garamond, serif",
-                    fontSize: "36px",
-                    fontWeight: "700",
-                    color: "#fff",
-                    lineHeight: 1,
-                  }}
-                >
-                  {newTotal}
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      color: C.accent,
-                      marginLeft: "6px",
-                      fontFamily: "Jost, sans-serif",
-                    }}
-                  >
-                    pts
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={() =>
-                navigate("/loyalty", { state: { freshScan: true } })
-              }
-              style={{
-                background: C.green,
-                color: "#fff",
-                border: "none",
-                padding: "14px 32px",
-                width: "100%",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "11px",
-                fontWeight: "600",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                cursor: "pointer",
-                marginBottom: "12px",
-              }}
-            >
-              View My Loyalty Points →
-            </button>
-            <button
-              onClick={() => navigate("/scan")}
-              style={{
-                background: "none",
-                border: `1px solid ${C.border}`,
-                padding: "10px 24px",
-                width: "100%",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "11px",
-                color: C.muted,
-                cursor: "pointer",
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-              }}
-            >
-              Scan Another Product
-            </button>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── ALL OTHER STATES ───────────────────────────────────────────────────────
-  const configs = {
-    [S.LOADING]: {
-      spinner: true,
-      title: "Verifying QR Code…",
-      desc: "Checking authenticity and claiming your points.",
-      bg: "#fff",
-      border: C.border,
-      actions: [],
-    },
-    [S.ALREADY]: {
-      icon: "🔒",
-      title: "Already Redeemed",
-      desc: detail || "This QR code has already been claimed.",
-      bg: "#fff8f0",
-      border: "#f0c8a0",
-      actions: [
-        {
-          label: "Scan Another Code",
-          color: C.gold,
-          onClick: () => navigate("/scan"),
-        },
-        {
-          label: "View Loyalty Points",
-          color: C.mid,
-          onClick: () => navigate("/loyalty"),
-          outline: true,
-        },
-      ],
-    },
-    [S.NO_AUTH]: {
-      icon: "🔐",
-      title: "Sign In to Earn Points",
-      desc: "Your QR code is still valid — sign in and you'll be taken straight back to claim your points.",
-      bg: "#f5f0fa",
-      border: "#c8aae8",
-      actions: [
-        // ✅ KEY FIX: passes ?return= so login bounces back here
-        {
-          label: "Sign In",
-          color: "#5a2d82",
-          onClick: () =>
-            navigate(`/account?return=${encodeURIComponent(returnUrl)}`),
-        },
-        {
-          label: "Create Account",
-          color: C.mid,
-          onClick: () =>
-            navigate(`/account?return=${encodeURIComponent(returnUrl)}`),
-          outline: true,
-        },
-      ],
-    },
-    [S.RATE]: {
-      icon: "⏳",
-      title: "Please Wait",
-      desc: "This code was just attempted. Wait a few seconds and try again.",
-      bg: "#fffbf0",
-      border: "#f0dfa0",
-      actions: [
-        {
-          label: "Try Again",
-          color: C.gold,
-          onClick: () => {
-            processedRef.current = false;
-            processScan();
-          },
-        },
-      ],
-    },
-    [S.INVALID]: {
-      icon: "⚠️",
-      title: "Code Not Recognised",
-      desc:
-        detail ||
-        "This QR code isn't in our system. Make sure you're scanning the inside-packaging code.",
-      bg: "#fef0ee",
-      border: "#e8b4ad",
-      actions: [
-        {
-          label: "Scan Again",
-          color: C.error,
-          onClick: () => navigate("/scan"),
-        },
-      ],
-    },
-    [S.ERROR]: {
-      icon: "❌",
-      title: "Something Went Wrong",
-      desc: detail || "Please check your connection and try again.",
-      bg: "#fef0ee",
-      border: "#e8b4ad",
-      actions: [
-        {
-          label: "Retry",
-          color: C.error,
-          onClick: () => {
-            processedRef.current = false;
-            processScan();
-          },
-        },
-        {
-          label: "Scan Again",
-          color: C.mid,
-          onClick: () => navigate("/scan"),
-          outline: true,
-        },
-      ],
-    },
-  };
-
-  const cfg = configs[status] || configs[S.ERROR];
-
-  return (
-    <>
-      <style>
-        {FONTS}
-        {`
-        @keyframes pb-spin { to{transform:rotate(360deg);} }
-        @keyframes pb-fadein { from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);} }
-      `}
-      </style>
       <div
         style={{
           minHeight: "100vh",
-          background: C.cream,
+          background: "#faf9f6",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "40px 20px",
-          fontFamily: "Jost, sans-serif",
         }}
       >
-        <div style={{ width: "100%", maxWidth: "480px", marginBottom: "16px" }}>
-          <button
-            onClick={() => navigate("/scan")}
-            style={{
-              background: "none",
-              border: "none",
-              color: C.muted,
-              cursor: "pointer",
-              fontFamily: "Jost, sans-serif",
-              fontSize: "12px",
-              textDecoration: "underline",
-              padding: 0,
-            }}
-          >
-            ← Back to Scanner
-          </button>
-        </div>
-
-        <div style={{ marginBottom: "12px", textAlign: "center" }}>
-          <div
-            style={{
-              fontSize: "11px",
-              letterSpacing: "0.35em",
-              textTransform: "uppercase",
-              color: C.accent,
-              marginBottom: "4px",
-            }}
-          >
-            QR Code
+        <style>{styles}</style>
+        <div style={{ textAlign: "center" }}>
+          <div className="pulse" style={{ fontSize: 48, marginBottom: 16 }}>
+            🔍
           </div>
-          <code
+          <p
+            className="body-font"
             style={{
-              fontSize: "12px",
-              background: C.cream,
-              border: `1px solid ${C.border}`,
-              padding: "3px 10px",
+              fontSize: 13,
+              color: "#888",
+              fontWeight: 300,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
             }}
           >
-            {decodeURIComponent(qrCode || "—")}
-          </code>
+            Verifying product…
+          </p>
         </div>
+      </div>
+    );
+  }
 
+  // ── Not authentic ─────────────────────────────────────────────────────────
+  if (!result?.authentic) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#faf9f6",
+          fontFamily: "'Jost', sans-serif",
+        }}
+      >
+        <style>{styles}</style>
         <div
+          className="sr-inner"
           style={{
-            maxWidth: "480px",
-            width: "100%",
-            background: cfg.bg,
-            border: `1px solid ${cfg.border}`,
-            padding: "40px 32px",
+            maxWidth: 640,
+            margin: "0 auto",
+            padding: "60px 24px",
             textAlign: "center",
-            animation: "pb-fadein 0.3s ease both",
           }}
         >
-          {cfg.spinner ? (
+          <div style={{ fontSize: 64, marginBottom: 24 }}>⚠</div>
+          <h1
+            className="shop-font"
+            style={{
+              fontSize: 36,
+              fontWeight: 300,
+              color: "#1a1a1a",
+              marginBottom: 12,
+            }}
+          >
+            Unverified Product
+          </h1>
+          <p
+            className="body-font"
+            style={{
+              fontSize: 14,
+              color: "#888",
+              fontWeight: 300,
+              lineHeight: 1.7,
+              marginBottom: 32,
+              maxWidth: 420,
+              margin: "0 auto 32px",
+            }}
+          >
+            {result?.message ||
+              "This QR code could not be verified. If you believe this is an error, please contact us."}
+          </p>
+          <div
+            className="sr-card"
+            style={{
+              padding: "20px 24px",
+              marginBottom: 32,
+              borderLeft: "3px solid #dc2626",
+              textAlign: "left",
+            }}
+          >
+            <p
+              className="body-font"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#dc2626",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              What this means
+            </p>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 13,
+                color: "#666",
+                fontWeight: 300,
+                lineHeight: 1.7,
+                margin: 0,
+              }}
+            >
+              This product may be counterfeit or the QR code may have been
+              tampered with. Do not consume this product. All authentic Protea
+              Botanicals products carry a digitally signed QR code.
+            </p>
+          </div>
+          <button
+            className="sr-btn sr-btn-green"
+            onClick={() => navigate("/scan")}
+          >
+            Scan Another Code
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { batch, pointsEarned, isFirstScan, anomalyFlags, userProfile } =
+    result;
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#faf9f6",
+        fontFamily: "'Jost', sans-serif",
+      }}
+    >
+      <style>{styles}</style>
+
+      {/* ── HERO: Authenticated ── */}
+      <div
+        style={{
+          background:
+            "linear-gradient(160deg, #1b4332 0%, #2d6a4f 60%, #1b4332dd 100%)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage:
+              "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 60%)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          className="sr-hero-inner"
+          style={{ maxWidth: 720, margin: "0 auto", padding: "48px 32px 44px" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              className="sr-badge"
+              style={{
+                background: "rgba(82,183,136,0.15)",
+                color: "#52b788",
+                border: "1px solid rgba(82,183,136,0.3)",
+              }}
+            >
+              ✓ Authentic Product
+            </span>
+            {isFirstScan && (
+              <span
+                className="sr-badge"
+                style={{
+                  background: "rgba(181,147,90,0.15)",
+                  color: "#e8c870",
+                  border: "1px solid rgba(181,147,90,0.3)",
+                }}
+              >
+                ★ First Scan
+              </span>
+            )}
+            {!isFirstScan && (
+              <span
+                className="sr-badge"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  color: "rgba(255,255,255,0.5)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                }}
+              >
+                Previously Verified
+              </span>
+            )}
+          </div>
+
+          <h1
+            className="shop-font"
+            style={{
+              fontSize: "clamp(36px, 7vw, 60px)",
+              fontWeight: 300,
+              color: "#faf9f6",
+              lineHeight: 1,
+              marginBottom: 8,
+              letterSpacing: "0.03em",
+            }}
+          >
+            {batch?.product_name || "Verified Product"}
+          </h1>
+          <p
+            className="body-font"
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.4)",
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
+              marginBottom: 0,
+              fontWeight: 300,
+            }}
+          >
+            Batch {batch?.batch_number || "—"} · QR Authenticated
+          </p>
+        </div>
+      </div>
+
+      {/* ── BODY ── */}
+      <div
+        className="sr-inner"
+        style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px" }}
+      >
+        {/* Anomaly warning (shown to staff/admin only in production — shown here for transparency) */}
+        {anomalyFlags?.length > 0 && (
+          <div
+            className="sr-card"
+            style={{
+              padding: "16px 20px",
+              marginBottom: 20,
+              borderLeft: "3px solid #f59e0b",
+            }}
+          >
+            <p
+              className="body-font"
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "#f59e0b",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                marginBottom: 4,
+              }}
+            >
+              Scan Notice
+            </p>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 13,
+                color: "#666",
+                fontWeight: 300,
+                margin: 0,
+              }}
+            >
+              {anomalyFlags.includes("daily_cap") &&
+                "Daily scan limit reached — no additional points awarded today. "}
+              {anomalyFlags.includes("velocity") &&
+                "This code has been scanned many times recently. "}
+              Points are awarded on first verified scan only.
+            </p>
+          </div>
+        )}
+
+        {/* Points earned */}
+        {user && (
+          <div
+            className="sr-card"
+            style={{
+              padding: "24px 28px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.3em",
+                  textTransform: "uppercase",
+                  color: "#aaa",
+                  marginBottom: 6,
+                }}
+              >
+                {isFirstScan && anomalyFlags?.length === 0
+                  ? "Points Earned"
+                  : "Points"}
+              </p>
+              <p
+                className="shop-font"
+                style={{
+                  fontSize: 40,
+                  fontWeight: 300,
+                  color: "#1b4332",
+                  lineHeight: 1,
+                }}
+              >
+                {isFirstScan && anomalyFlags?.length === 0
+                  ? `+${pointsEarned}`
+                  : "0"}
+              </p>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 11,
+                  color: "#aaa",
+                  marginTop: 4,
+                  fontWeight: 300,
+                }}
+              >
+                {isFirstScan && anomalyFlags?.length === 0
+                  ? "Added to your balance"
+                  : isFirstScan
+                    ? "Withheld — scan limit reached"
+                    : "Already claimed on first scan"}
+              </p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: "0.3em",
+                  textTransform: "uppercase",
+                  color: "#aaa",
+                  marginBottom: 6,
+                }}
+              >
+                Your Total
+              </p>
+              <p
+                className="shop-font"
+                style={{
+                  fontSize: 32,
+                  fontWeight: 300,
+                  color: "#b5935a",
+                  lineHeight: 1,
+                }}
+              >
+                {(userProfile?.loyalty_points || 0) +
+                  (isFirstScan && anomalyFlags?.length === 0
+                    ? pointsEarned
+                    : 0)}
+              </p>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 11,
+                  color: "#aaa",
+                  marginTop: 4,
+                  fontWeight: 300,
+                }}
+              >
+                {(userProfile?.loyalty_tier || "bronze").toUpperCase()} tier
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!user && (
+          <div
+            className="sr-card"
+            style={{
+              padding: "24px 28px",
+              marginBottom: 20,
+              borderLeft: "3px solid #b5935a",
+              background: "#faf5ed",
+            }}
+          >
+            <p
+              className="body-font"
+              style={{
+                fontSize: 13,
+                color: "#666",
+                fontWeight: 300,
+                marginBottom: 16,
+                lineHeight: 1.7,
+              }}
+            >
+              <strong style={{ color: "#1a1a1a", fontWeight: 500 }}>
+                Create a free account
+              </strong>{" "}
+              to claim 10 loyalty points for this scan and unlock exclusive
+              rewards.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                className="sr-btn sr-btn-green"
+                onClick={() => navigate("/account")}
+              >
+                Create Account
+              </button>
+              <button
+                className="sr-btn sr-btn-outline"
+                onClick={() => navigate("/account?mode=login")}
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Product details */}
+        <div
+          className="sr-card"
+          style={{ padding: "24px 28px", marginBottom: 20 }}
+        >
+          <p
+            className="body-font"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.35em",
+              textTransform: "uppercase",
+              color: "#52b788",
+              marginBottom: 14,
+            }}
+          >
+            Product Details
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gap: "16px 24px",
+            }}
+          >
+            {[
+              ["Product", batch?.product_name],
+              ["Batch", batch?.batch_number],
+              [
+                "THC Content",
+                batch?.thc_content ? `${batch.thc_content}%` : null,
+              ],
+              ["Lab Certified", batch?.lab_certified ? "Yes" : "No"],
+              ["Organic", batch?.organic ? "Yes" : "No"],
+            ]
+              .filter(([, v]) => v)
+              .map(([label, val]) => (
+                <div key={label}>
+                  <p
+                    className="body-font"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.25em",
+                      textTransform: "uppercase",
+                      color: "#aaa",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {label}
+                  </p>
+                  <p
+                    className="body-font"
+                    style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 400 }}
+                  >
+                    {val}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {/* COA button */}
+        <div
+          className="sr-card"
+          style={{
+            padding: "20px 28px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.35em",
+                textTransform: "uppercase",
+                color: "#52b788",
+                marginBottom: 4,
+              }}
+            >
+              Certificate of Analysis
+            </p>
+            <p
+              className="body-font"
+              style={{ fontSize: 13, color: "#555", fontWeight: 300 }}
+            >
+              Full cannabinoid profile · Lab verified · SANAS accredited
+            </p>
+          </div>
+          <a
+            href={batch?.coa_url || "https://example.com/coa/PB-001-2026.pdf"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sr-btn sr-btn-green"
+          >
+            📄 View COA
+          </a>
+        </div>
+
+        {/* ── GPS CONSENT PROMPT ── */}
+        {gpsState === "prompting" && (
+          <div
+            className="sr-card gps-prompt"
+            style={{
+              padding: "20px 24px",
+              marginBottom: 20,
+              background: "#faf5ed",
+            }}
+          >
+            <p
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.3em",
+                textTransform: "uppercase",
+                color: "#b5935a",
+                marginBottom: 8,
+              }}
+            >
+              Optional · Location
+            </p>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 14,
+                color: "#1a1a1a",
+                fontWeight: 400,
+                marginBottom: 6,
+              }}
+            >
+              Find your nearest stockist
+            </p>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 13,
+                color: "#666",
+                fontWeight: 300,
+                lineHeight: 1.65,
+                marginBottom: 16,
+              }}
+            >
+              Enable location to see the closest dispensary carrying Protea
+              Botanicals products and get personalised strain recommendations
+              for your area.
+            </p>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 11,
+                color: "#bbb",
+                fontWeight: 300,
+                marginBottom: 16,
+                fontStyle: "italic",
+              }}
+            >
+              Your location is never stored permanently and is never shared with
+              third parties. You can withdraw consent at any time in your
+              account settings.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="sr-btn sr-btn-gold" onClick={handleGrantGPS}>
+                Enable Location
+              </button>
+              <button
+                className="sr-btn"
+                style={{
+                  background: "transparent",
+                  border: "1px solid #d8d0c4",
+                  color: "#888",
+                  padding: "12px 24px",
+                  fontSize: 11,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  fontFamily: "'Jost', sans-serif",
+                  borderRadius: 2,
+                }}
+                onClick={handleDenyGPS}
+              >
+                No Thanks
+              </button>
+            </div>
+          </div>
+        )}
+
+        {gpsState === "requesting" && (
+          <div
+            className="sr-card"
+            style={{
+              padding: "20px 24px",
+              marginBottom: 20,
+              textAlign: "center",
+            }}
+          >
+            <p
+              className="body-font pulse"
+              style={{ fontSize: 13, color: "#888", fontWeight: 300 }}
+            >
+              Requesting location…
+            </p>
+          </div>
+        )}
+
+        {gpsState === "denied" && (
+          <div
+            className="sr-card"
+            style={{ padding: "16px 20px", marginBottom: 20 }}
+          >
+            <p
+              className="body-font"
+              style={{
+                fontSize: 12,
+                color: "#aaa",
+                fontWeight: 300,
+                margin: 0,
+              }}
+            >
+              Location disabled. You can enable it anytime in{" "}
+              <Link
+                to="/account"
+                style={{
+                  color: "#b5935a",
+                  textDecoration: "none",
+                  fontWeight: 500,
+                }}
+              >
+                your account settings
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+
+        {/* ── NEAREST STOCKIST CARD ── */}
+        {stockistLoading && (
+          <div
+            className="sr-card"
+            style={{
+              padding: "20px 24px",
+              marginBottom: 20,
+              textAlign: "center",
+            }}
+          >
+            <p
+              className="body-font pulse"
+              style={{ fontSize: 13, color: "#888", fontWeight: 300 }}
+            >
+              Finding nearest stockist…
+            </p>
+          </div>
+        )}
+
+        {stockist && !stockistLoading && (
+          <div
+            className="sr-card stockist-card"
+            style={{
+              padding: "24px 28px",
+              marginBottom: 20,
+              borderLeft: "3px solid #52b788",
+            }}
+          >
+            <p
+              className="body-font"
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.35em",
+                textTransform: "uppercase",
+                color: "#52b788",
+                marginBottom: 10,
+              }}
+            >
+              Nearest Stockist
+            </p>
             <div
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                border: `3px solid ${C.accent}`,
-                borderTopColor: "transparent",
-                margin: "0 auto 20px",
-                animation: "pb-spin 0.8s linear infinite",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
               }}
-            />
-          ) : (
-            <div style={{ fontSize: "48px", marginBottom: "12px" }}>
-              {cfg.icon}
+            >
+              <div>
+                <p
+                  className="shop-font"
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 400,
+                    color: "#1a1a1a",
+                    marginBottom: 4,
+                  }}
+                >
+                  {stockist.name}
+                </p>
+                <p
+                  className="body-font"
+                  style={{ fontSize: 13, color: "#666", fontWeight: 300 }}
+                >
+                  {stockist.location_city && `${stockist.location_city}, `}
+                  {stockist.location_province}
+                </p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p
+                  className="shop-font"
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 300,
+                    color: "#1b4332",
+                    lineHeight: 1,
+                  }}
+                >
+                  {stockist.distance_m < 1000
+                    ? `${stockist.distance_m}m`
+                    : `${(stockist.distance_m / 1000).toFixed(1)}km`}
+                </p>
+                <p
+                  className="body-font"
+                  style={{
+                    fontSize: 10,
+                    color: "#aaa",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    marginTop: 4,
+                  }}
+                >
+                  from your location
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── IP-INFERRED LOCATION (shown when GPS not granted) ── */}
+        {(gpsState === "idle" || gpsState === "denied") &&
+          result?.userProfile?.city && (
+            <div
+              className="sr-card"
+              style={{
+                padding: "14px 20px",
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 16, color: "#aaa" }}>📍</span>
+              <p
+                className="body-font"
+                style={{
+                  fontSize: 12,
+                  color: "#aaa",
+                  fontWeight: 300,
+                  margin: 0,
+                }}
+              >
+                Scan detected near{" "}
+                <strong style={{ color: "#555", fontWeight: 500 }}>
+                  {result.userProfile.city}
+                </strong>
+                {result.userProfile.province &&
+                  `, ${result.userProfile.province}`}
+              </p>
             </div>
           )}
 
-          <h2
+        {/* ── PROFILE COMPLETION NUDGE (if incomplete) ── */}
+        {user && userProfile && !userProfile.profile_complete && (
+          <div
+            className="sr-card"
             style={{
-              fontFamily: "Cormorant Garamond, serif",
-              fontSize: "26px",
-              fontWeight: "600",
-              color: C.green,
-              marginBottom: "12px",
+              padding: "20px 24px",
+              marginBottom: 20,
+              background: "#f0f9f4",
+              borderLeft: "3px solid #52b788",
             }}
           >
-            {cfg.title}
-          </h2>
-          <p
-            style={{
-              fontSize: "14px",
-              color: C.muted,
-              lineHeight: "1.6",
-              marginBottom: cfg.actions.length ? "28px" : 0,
-            }}
-          >
-            {cfg.desc}
-          </p>
-
-          {cfg.actions.map((a, i) => (
-            <button
-              key={i}
-              onClick={a.onClick}
+            <p
+              className="body-font"
               style={{
-                background: a.outline ? "transparent" : a.color,
-                color: a.outline ? a.color : "#fff",
-                border: a.outline ? `1px solid ${a.color}` : "none",
-                padding: "12px 24px",
-                width: "100%",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "11px",
-                fontWeight: "600",
-                letterSpacing: "0.2em",
+                fontSize: 10,
+                letterSpacing: "0.3em",
                 textTransform: "uppercase",
-                cursor: "pointer",
-                marginBottom: i < cfg.actions.length - 1 ? "10px" : 0,
+                color: "#52b788",
+                marginBottom: 6,
               }}
             >
-              {a.label}
-            </button>
-          ))}
+              Earn 50 Bonus Points
+            </p>
+            <p
+              className="body-font"
+              style={{
+                fontSize: 13,
+                color: "#555",
+                fontWeight: 300,
+                marginBottom: 14,
+                lineHeight: 1.65,
+              }}
+            >
+              Complete your profile to unlock personalised strain
+              recommendations and earn 50 bonus points.
+            </p>
+            <Link
+              to="/account?tab=profile"
+              className="sr-btn sr-btn-green"
+              style={{ fontSize: 10 }}
+            >
+              Complete Profile
+            </Link>
+          </div>
+        )}
+
+        {/* CTA row */}
+        <div
+          className="sr-cta-row"
+          style={{
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            marginBottom: 24,
+          }}
+        >
+          <Link
+            to="/shop"
+            className="sr-btn sr-btn-outline"
+            style={{ flex: 1, minWidth: 140 }}
+          >
+            Browse Shop
+          </Link>
+          <Link
+            to="/loyalty"
+            className="sr-btn sr-btn-green"
+            style={{ flex: 1, minWidth: 140 }}
+          >
+            My Points
+          </Link>
+          <button
+            className="sr-btn"
+            style={{
+              flex: 1,
+              minWidth: 140,
+              background: "transparent",
+              border: "1px solid #d8d0c4",
+              color: "#888",
+              fontFamily: "'Jost', sans-serif",
+              cursor: "pointer",
+              fontSize: 11,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              borderRadius: 2,
+            }}
+            onClick={() => navigate("/scan")}
+          >
+            Scan Another
+          </button>
+        </div>
+
+        {/* Strain profile link */}
+        {batch?.strain_id && (
+          <div style={{ textAlign: "center" }}>
+            <Link
+              to={`/verify/${batch.strain_id}`}
+              className="body-font"
+              style={{
+                fontSize: 11,
+                color: "#aaa",
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                textDecoration: "none",
+                borderBottom: "1px solid #ddd",
+                paddingBottom: 2,
+              }}
+            >
+              View full strain profile →
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Footer strip */}
+      <div
+        style={{ background: "#060e09", padding: "24px 32px", marginTop: 32 }}
+      >
+        <div
+          style={{
+            maxWidth: 720,
+            margin: "0 auto",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <span
+            className="shop-font"
+            style={{ fontSize: 16, color: "#faf9f6", letterSpacing: "0.2em" }}
+          >
+            Protea <span style={{ color: "#52b788" }}>Botanicals</span>
+          </span>
+          <p
+            className="body-font"
+            style={{
+              fontSize: 10,
+              color: "#333",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              margin: 0,
+            }}
+          >
+            Lab Verified · QR Authenticated · South Africa
+          </p>
         </div>
       </div>
-    </>
+    </div>
   );
 }
