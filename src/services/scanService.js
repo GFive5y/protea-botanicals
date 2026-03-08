@@ -300,10 +300,8 @@ export async function authenticateQR(qrCode, source = "direct") {
     if (scanErr) console.error("Scan record error:", scanErr);
     const scanId = scanRecord?.id || null;
 
-    // ── 10. Update user activity (non-blocking) ────────────────
-    supabase
-      .rpc("update_user_activity", { p_user_id: user.id })
-      .catch(() => {});
+    // ── 10. Update user activity ───────────────────────────────
+    // RPC not yet created — skipped until DB function exists
 
     // ── 11. Get user profile ───────────────────────────────────
     const { data: profile } = await supabase
@@ -324,6 +322,7 @@ export async function authenticateQR(qrCode, source = "direct") {
     // ── 13. Return ─────────────────────────────────────────────
     return {
       success: true,
+      authentic: true,
       points: anomalyFlags.length === 0 ? pointsToAward : 0,
       pointsEarned: anomalyFlags.length === 0 ? pointsToAward : 0,
       product,

@@ -1,9 +1,8 @@
-// src/pages/ScanResult.js v3.0
-// Phase 2: Geo enrichment display — GPS consent prompt, nearest stockist card,
-//          location attribution, anomaly alerts, enhanced scan result UX.
-// v2.x: Basic authentication result + COA + loyalty points.
+// src/pages/ScanResult.js v3.1
+// v3.1: Fix 1 — added authentic:true check compatibility with scanService v7.0
+//       Fix 2 — useRef guard prevents React StrictMode double-invoke claiming product twice
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { authenticateQR } from "../services/scanService";
 import {
@@ -71,38 +70,34 @@ export default function ScanResult() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [gpsState, setGpsState] = useState("idle");
-  // 'idle' | 'prompting' | 'requesting' | 'granted' | 'denied' | 'updating'
   const [stockist, setStockist] = useState(null);
   const [stockistLoading, setStockistLoading] = useState(false);
   const [scanLocation, setScanLocation] = useState(null);
   const [user, setUser] = useState(null);
 
+  // ── FIX 2: Ref guard — prevents StrictMode double-invoke ──────────────────
+  const hasRun = useRef(false);
+
   // ── Authenticate QR on mount ──────────────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     async function run() {
       const {
         data: { user: u },
       } = await supabase.auth.getUser();
-      if (!cancelled) setUser(u);
+      setUser(u);
 
       const res = await authenticateQR(qrCode);
-      if (!cancelled) {
-        setResult(res);
-        setLoading(false);
+      setResult(res);
+      setLoading(false);
 
-        // Show GPS prompt 2 seconds after result — never before
-        if (res.authentic && u && res.requiresGPSPrompt) {
-          setTimeout(() => {
-            if (!cancelled) setGpsState("prompting");
-          }, 2000);
-        }
+      if ((res.success || res.authentic) && u && res.requiresGPSPrompt) {
+        setTimeout(() => setGpsState("prompting"), 2000);
       }
     }
     run();
-    return () => {
-      cancelled = true;
-    };
   }, [qrCode]);
 
   // ── GPS grant handler ──────────────────────────────────────────────────────
@@ -116,10 +111,8 @@ export default function ScanResult() {
     setGpsState("updating");
     setScanLocation({ lat: gps.lat, lng: gps.lng, source: "gps" });
 
-    // Save consent
     if (user) await saveGPSConsent(user.id, true);
 
-    // Find nearest stockist with precise GPS
     setStockistLoading(true);
     const near = await findNearestStockist(gps.lat, gps.lng);
     setStockist(near);
@@ -166,8 +159,11 @@ export default function ScanResult() {
     );
   }
 
+  // ── FIX 1: check both result.success and result.authentic ────────────────
+  const isAuthentic = result?.success || result?.authentic;
+
   // ── Not authentic ─────────────────────────────────────────────────────────
-  if (!result?.authentic) {
+  if (!isAuthentic) {
     return (
       <div
         style={{
@@ -210,7 +206,8 @@ export default function ScanResult() {
               margin: "0 auto 32px",
             }}
           >
-            {result?.message ||
+            {result?.error ||
+              result?.message ||
               "This QR code could not be verified. If you believe this is an error, please contact us."}
           </p>
           <div
@@ -374,7 +371,7 @@ export default function ScanResult() {
         className="sr-inner"
         style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px" }}
       >
-        {/* Anomaly warning (shown to staff/admin only in production — shown here for transparency) */}
+        {/* Anomaly warning */}
         {anomalyFlags?.length > 0 && (
           <div
             className="sr-card"
@@ -896,7 +893,7 @@ export default function ScanResult() {
           </div>
         )}
 
-        {/* ── IP-INFERRED LOCATION (shown when GPS not granted) ── */}
+        {/* ── IP-INFERRED LOCATION ── */}
         {(gpsState === "idle" || gpsState === "denied") &&
           result?.userProfile?.city && (
             <div
@@ -929,7 +926,7 @@ export default function ScanResult() {
             </div>
           )}
 
-        {/* ── PROFILE COMPLETION NUDGE (if incomplete) ── */}
+        {/* ── PROFILE COMPLETION NUDGE ── */}
         {user && userProfile && !userProfile.profile_complete && (
           <div
             className="sr-card"

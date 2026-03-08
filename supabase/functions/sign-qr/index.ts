@@ -64,6 +64,9 @@ serve(async (req: Request) => {
     const signature = await computeHMAC(message, secret);
 
     // ── 4. Build signed QR string ──────────────────────────────
+    console.log("[sign-qr] secret length:", secret.length);
+    console.log("[sign-qr] message:", message);
+    console.log("[sign-qr] signature:", signature);
     const signed_qr = `${product_code}.${signature}`;
 
     return new Response(
