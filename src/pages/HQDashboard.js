@@ -1,30 +1,10 @@
-// src/pages/HQDashboard.js — Protea Botanicals v2.3
+// src/pages/HQDashboard.js — Protea Botanicals v2.4
 // ─────────────────────────────────────────────────────────────────────────────
-// HQ COMMAND CENTRE — Phase 2E (ALL TABS COMPLETE)
-//
-// v2.3 CHANGELOG:
-//   1. Analytics tab now uses HQAnalytics.js (business intelligence)
-//   2. ALL 6 tabs now live — no more placeholders
-//   3. Phase badge updated to "Phase 2E"
-//   4. Removed ComingSoonTab component (no longer needed)
-//
-// v2.2: Distribution tab wired in (Phase 2D)
-// v2.1: Supply Chain + Production tabs wired in (Phase 2C)
-// v2.0: Overview + Shops tabs wired in (Phase 2B)
-//
-// Route: /hq (with /hq/* wildcard in App.js for future sub-routes)
-// Guard: RequireAuth + RequireRole(admin) + RequireHQ
-//
-// Tabs (ALL LIVE):
-//   Overview     — Live cross-tenant stats, recent scans, low stock (2B ✅)
-//   Supply Chain — Inventory, suppliers, POs, stock movements (2C ✅)
-//   Production   — Assembly batches, fill carts, track inputs (2C ✅)
-//   Distribution — Shipments to shops, courier tracking (2D ✅)
-//   Shops        — Full tenant CRUD: create, view, toggle, delete (2B ✅)
-//   Analytics    — Cross-shop analytics, supply chain, production, scans (2E ✅)
-//
-// Design: Cream aesthetic (Section 7 of handover).
-// ─────────────────────────────────────────────────────────────────────────────
+// v2.4: Retailer Health tab added (WP6 — DEC-031)
+// v2.3: Analytics tab (Phase 2E)
+// v2.2: Distribution tab (Phase 2D)
+// v2.1: Supply Chain + Production tabs (Phase 2C)
+// v2.0: Overview + Shops tabs (Phase 2B)
 
 import { useState } from "react";
 import { useTenant } from "../services/tenantService";
@@ -42,6 +22,9 @@ import Distribution from "../components/hq/Distribution";
 
 // ── Phase 2E Tab Components ───────────────────────────────────────────────
 import HQAnalytics from "../components/hq/HQAnalytics";
+
+// ── Phase 2F Tab Components ───────────────────────────────────────────────
+import RetailerHealth from "../components/hq/RetailerHealth";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
@@ -64,6 +47,7 @@ const TABS = [
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   { id: "shops", label: "Shops", icon: "🏪", ready: true },
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
+  { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
 ];
 
 export default function HQDashboard() {
@@ -110,7 +94,7 @@ export default function HQDashboard() {
             </span>
           </div>
 
-          {/* Tenant Switcher (HQ users with multiple tenants) */}
+          {/* Tenant Switcher */}
           {isHQ && allTenants.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span
@@ -199,7 +183,6 @@ export default function HQDashboard() {
               display: "flex",
               alignItems: "center",
               gap: "6px",
-              position: "relative",
             }}
           >
             <span style={{ fontSize: "14px" }}>{tab.icon}</span>
@@ -227,6 +210,7 @@ export default function HQDashboard() {
         {activeTab === "distribution" && <Distribution />}
         {activeTab === "shops" && <ShopManager />}
         {activeTab === "analytics" && <HQAnalytics />}
+        {activeTab === "retailer-health" && <RetailerHealth />}
       </div>
     </div>
   );
