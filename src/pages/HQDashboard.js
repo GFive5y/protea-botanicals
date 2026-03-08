@@ -1,5 +1,6 @@
-// src/pages/HQDashboard.js — Protea Botanicals v2.5
+// src/pages/HQDashboard.js — Protea Botanicals v2.6
 // ─────────────────────────────────────────────────────────────────────────────
+// v2.6: Procurement tab added (WP-B — Phase 2 Import ERP)
 // v2.5: Suppliers tab added (WP-A — Phase 2 Import ERP)
 // v2.4: Retailer Health tab added (WP6 — DEC-031)
 // v2.3: Analytics tab (Phase 2E)
@@ -29,6 +30,7 @@ import RetailerHealth from "../components/hq/RetailerHealth";
 
 // ── Phase 2 Import ERP ────────────────────────────────────────────────────
 import HQSuppliers from "../components/hq/HQSuppliers";
+import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
@@ -53,6 +55,7 @@ const TABS = [
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
   { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
+  { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
 ];
 
 export default function HQDashboard() {
@@ -217,6 +220,7 @@ export default function HQDashboard() {
         {activeTab === "analytics" && <HQAnalytics />}
         {activeTab === "retailer-health" && <RetailerHealth />}
         {activeTab === "suppliers" && <HQSuppliers />}
+        {activeTab === "procurement" && <HQPurchaseOrders />}
       </div>
     </div>
   );
