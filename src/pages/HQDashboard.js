@@ -1,5 +1,6 @@
-// src/pages/HQDashboard.js — Protea Botanicals v2.7
+// src/pages/HQDashboard.js — Protea Botanicals v2.8
 // ─────────────────────────────────────────────────────────────────────────────
+// v2.8: Pricing tab added (WP-D — Pricing & Margin Intelligence)
 // v2.7: Costing tab added (WP-C — COGS Engine)
 // v2.6: Procurement tab added (WP-B — Purchase Order Flow)
 // v2.5: Suppliers tab added (WP-A — Phase 2 Import ERP)
@@ -33,6 +34,7 @@ import RetailerHealth from "../components/hq/RetailerHealth";
 import HQSuppliers from "../components/hq/HQSuppliers";
 import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
 import HQCogs from "../components/hq/HQCogs";
+import HQPricing from "../components/hq/HQPricing";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
@@ -59,6 +61,7 @@ const TABS = [
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
   { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
   { id: "costing", label: "Costing", icon: "🧮", ready: true },
+  { id: "pricing", label: "Pricing", icon: "💰", ready: true },
 ];
 
 export default function HQDashboard() {
@@ -105,7 +108,6 @@ export default function HQDashboard() {
             </span>
           </div>
 
-          {/* Tenant Switcher */}
           {isHQ && allTenants.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span
@@ -225,6 +227,7 @@ export default function HQDashboard() {
         {activeTab === "suppliers" && <HQSuppliers />}
         {activeTab === "procurement" && <HQPurchaseOrders />}
         {activeTab === "costing" && <HQCogs />}
+        {activeTab === "pricing" && <HQPricing />}
       </div>
     </div>
   );
