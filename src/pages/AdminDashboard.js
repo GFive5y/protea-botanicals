@@ -16,6 +16,7 @@ import AdminBatchManager from "../components/AdminBatchManager";
 import AdminProductionModule from "../components/AdminProductionModule";
 import AdminShipments from "../components/AdminShipments";
 import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
+import AdminFraudSecurity from "../components/AdminFraudSecurity";
 
 // ─── Design Tokens ───
 const C = {
@@ -323,6 +324,11 @@ export default function AdminDashboard() {
           onClick={() => setTab("customers")}
         />
         <TabBtn
+          active={tab === "security"}
+          label="Security"
+          onClick={() => setTab("security")}
+        />
+        <TabBtn
           active={tab === "analytics"}
           label="Analytics"
           onClick={() => setTab("analytics")}
@@ -517,6 +523,9 @@ export default function AdminDashboard() {
 
       {/* ══════ CUSTOMERS ══════ */}
       {tab === "customers" && <AdminCustomerEngagement />}
+
+      {/* ══════ SECURITY ══════ */}
+      {tab === "security" && <AdminFraudSecurity />}
 
       {/* ══════ QR CODES — sub-tabs ══════ */}
       {tab === "qr_codes" && (
