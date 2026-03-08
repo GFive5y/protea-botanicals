@@ -17,6 +17,7 @@ import AdminProductionModule from "../components/AdminProductionModule";
 import AdminShipments from "../components/AdminShipments";
 import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
 import AdminFraudSecurity from "../components/AdminFraudSecurity";
+import AdminNotifications from "../components/AdminNotifications";
 
 // ─── Design Tokens ───
 const C = {
@@ -329,6 +330,11 @@ export default function AdminDashboard() {
           onClick={() => setTab("security")}
         />
         <TabBtn
+          active={tab === "notifications"}
+          label="Notifications"
+          onClick={() => setTab("notifications")}
+        />
+        <TabBtn
           active={tab === "analytics"}
           label="Analytics"
           onClick={() => setTab("analytics")}
@@ -526,6 +532,9 @@ export default function AdminDashboard() {
 
       {/* ══════ SECURITY ══════ */}
       {tab === "security" && <AdminFraudSecurity />}
+
+      {/* ══════ NOTIFICATIONS ══════ */}
+      {tab === "notifications" && <AdminNotifications />}
 
       {/* ══════ QR CODES — sub-tabs ══════ */}
       {tab === "qr_codes" && (
