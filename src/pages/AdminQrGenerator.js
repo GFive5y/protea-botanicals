@@ -1,28 +1,23 @@
 // src/pages/AdminQrGenerator.js
-// v3.0 — March 2026
-// Admin QR Code Generator — Bulk signed generation added
+// v4.0 — March 2026
+// Staff-friendly QR Generator — no Supabase copy-paste required
 //
-// Changes from v2.0:
-//   - Mode switcher: "Single Code" | "Bulk Generate"
-//   - Bulk mode: enter start code, quantity, batch ID → signs all via Edge Function
-//   - Bulk results table: shows each signed code + status + progress bar
-//   - Bulk inserts new rows into products table (hmac_signed = true)
-//   - Export CSV of bulk results
-//   - Single mode: unchanged from v2.0
-//
-// Accessible at /admin/qr (requires admin role)
-// Uses inline styles + tokens.js design system (NO Tailwind)
+// Changes from v3.0:
+//   - Batch ID field REMOVED — replaced with dropdown loaded from DB
+//   - Batches fetched on mount: batch_number + product_name shown as options
+//   - Next product code auto-suggested from highest existing code in DB
+//   - "Test Scan" button appears immediately after generation (opens in new tab)
+//   - Bulk mode: same dropdown, no UUID needed
+//   - All "paste from Supabase" instructions removed
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../services/supabaseClient";
 
-// ── Config ────────────────────────────────────────────────────────────────────
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -37,54 +32,6 @@ const C = {
   warning: "#e67e22",
 };
 
-const QR_TYPES = [
-  {
-    value: "standard",
-    label: "Standard Product QR",
-    desc: "Inner packaging → /scan/:code for loyalty points — HMAC SIGNED",
-    needsHMAC: true,
-  },
-  {
-    value: "promo",
-    label: "Promo Campaign QR",
-    desc: "Marketing → landing with ?promo= parameter — no signing needed",
-    needsHMAC: false,
-  },
-  {
-    value: "product",
-    label: "Product Verification QR",
-    desc: "Outer packaging → /verify/:strainId (public COA) — HMAC SIGNED",
-    needsHMAC: true,
-  },
-  {
-    value: "custom",
-    label: "Custom URL QR",
-    desc: "Any URL — flyers, social, business cards — no signing needed",
-    needsHMAC: false,
-  },
-];
-
-const STRAINS = [
-  "pineapple-express",
-  "wedding-cake",
-  "gelato-41",
-  "peaches-and-cream",
-  "purple-punch",
-  "mimosa",
-  "cinnamon-kush-cake",
-  "rntz",
-  "blue-zushi",
-  "mac",
-  "sweet-watermelon",
-  "pear-jam",
-  "melon-lychee",
-  "tutti-frutti",
-  "zkz",
-  "purple-crack",
-  "lemonhead-plus",
-  "sherblato-plus",
-];
-
 const SOURCES = [
   "packaging",
   "flyer",
@@ -94,68 +41,40 @@ const SOURCES = [
   "wholesale",
 ];
 
-export default function AdminQrGenerator() {
-  // ── Mode ──────────────────────────────────────────────────────────────────
-  const [mode, setMode] = useState("single"); // "single" | "bulk"
+// ── Shared styles ─────────────────────────────────────────────────────────────
+const inputStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  border: `1px solid ${C.border}`,
+  borderRadius: 2,
+  fontSize: 14,
+  fontFamily: "'Jost', sans-serif",
+  backgroundColor: "#fff",
+  color: C.text,
+  boxSizing: "border-box",
+  outline: "none",
+};
+const selectStyle = { ...inputStyle, cursor: "pointer" };
+const sectionLabel = {
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "0.35em",
+  textTransform: "uppercase",
+  color: C.accent,
+  marginBottom: 8,
+  fontFamily: "'Jost', sans-serif",
+};
+const hint = {
+  fontSize: 11,
+  color: C.muted,
+  marginTop: 4,
+  fontFamily: "'Jost', sans-serif",
+};
+const row = { display: "flex", gap: 16, marginBottom: 24 };
+const fieldWrap = { flex: 1, marginBottom: 0 };
 
-  // ── Single mode state ─────────────────────────────────────────────────────
-  const [qrType, setQrType] = useState("standard");
-  const [domain, setDomain] = useState("http://localhost:3000");
-  const [generatedUrl, setGeneratedUrl] = useState("");
-  const [signedProductCode, setSignedProductCode] = useState("");
-  const [isSigned, setIsSigned] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [signing, setSigning] = useState(false);
-  const [signError, setSignError] = useState("");
-  const [saveStatus, setSaveStatus] = useState("");
-  const qrRef = useRef(null);
-
-  const [productCode, setProductCode] = useState("0006");
-  const [batchId, setBatchId] = useState("");
-  const [source, setSource] = useState("packaging");
-  const [promoCode, setPromoCode] = useState("preregister-1000");
-  const [strain, setStrain] = useState("pineapple-express");
-  const [customUrl, setCustomUrl] = useState("");
-
-  // ── Bulk mode state ───────────────────────────────────────────────────────
-  const [bulkDomain, setBulkDomain] = useState("http://localhost:3000");
-  const [bulkStartCode, setBulkStartCode] = useState("0007");
-  const [bulkCount, setBulkCount] = useState("10");
-  const [bulkBatchId, setBulkBatchId] = useState("");
-  const [bulkSource, setBulkSource] = useState("packaging");
-  const [bulkPointsValue, setBulkPointsValue] = useState("10");
-  const [bulkRunning, setBulkRunning] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0); // 0–100
-  const [bulkDone, setBulkDone] = useState(0);
-  const [bulkTotal, setBulkTotal] = useState(0);
-  const [bulkResults, setBulkResults] = useState([]); // [{code, signedQr, url, status, error}]
-  const [bulkError, setBulkError] = useState("");
-  const cancelBulkRef = useRef(false);
-
-  // ── Shared styles ──────────────────────────────────────────────────────────
-  const sectionLabel = {
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: "0.35em",
-    textTransform: "uppercase",
-    color: C.accent,
-    marginBottom: 8,
-    fontFamily: "'Jost', sans-serif",
-  };
-  const inputStyle = {
-    width: "100%",
-    padding: "10px 12px",
-    border: `1px solid ${C.border}`,
-    borderRadius: 2,
-    fontSize: 14,
-    fontFamily: "'Jost', sans-serif",
-    backgroundColor: "#fff",
-    color: C.text,
-    boxSizing: "border-box",
-    outline: "none",
-  };
-  const selectStyle = { ...inputStyle, cursor: "pointer" };
-  const makeBtn = (bg = C.mid, color = "#fff", disabled = false) => ({
+function makeBtn(bg = C.mid, color = "#fff", disabled = false) {
+  return {
     padding: "12px 24px",
     backgroundColor: disabled ? C.muted : bg,
     color,
@@ -169,131 +88,199 @@ export default function AdminQrGenerator() {
     fontFamily: "'Jost', sans-serif",
     transition: "opacity 0.2s",
     opacity: disabled ? 0.6 : 1,
+  };
+}
+
+// ── HMAC signing ──────────────────────────────────────────────────────────────
+async function callSignQr(productCodeStr, batchIdStr) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+  const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/sign-qr`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: process.env.REACT_APP_SUPABASE_ANON_KEY || "",
+    },
+    body: JSON.stringify({
+      product_code: productCodeStr,
+      batch_id: batchIdStr,
+    }),
   });
-  const row = { display: "flex", gap: 16, marginBottom: 24 };
-  const fieldWrap = { flex: 1, marginBottom: 0 };
-  const hint = { fontSize: 11, color: C.muted, marginTop: 4 };
-
-  // ── callSignQr ────────────────────────────────────────────────────────────
-  async function callSignQr(productCodeStr, batchIdStr) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) throw new Error("Not authenticated");
-    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/sign-qr`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: process.env.REACT_APP_SUPABASE_ANON_KEY || "",
-      },
-      body: JSON.stringify({
-        product_code: productCodeStr,
-        batch_id: batchIdStr,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    return data.signed_qr;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
   }
+  const data = await res.json();
+  return data.signed_qr;
+}
 
-  // ── Single: generateUrl ───────────────────────────────────────────────────
-  const generateUrl = useCallback(async () => {
+// ── Parse highest code number from DB ────────────────────────────────────────
+async function fetchNextCodeNumber() {
+  try {
+    const { data } = await supabase
+      .from("products")
+      .select("qr_code")
+      .like("qr_code", "PB-001-2026-%")
+      .order("qr_code", { ascending: false })
+      .limit(50);
+
+    if (!data || data.length === 0) return "0001";
+
+    let max = 0;
+    for (const p of data) {
+      const raw = (p.qr_code || "").split(".")[0]; // strip signature
+      const parts = raw.split("-");
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(num) && num > max) max = num;
+    }
+    return String(max + 1).padStart(4, "0");
+  } catch {
+    return "0001";
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function AdminQrGenerator() {
+  const [mode, setMode] = useState("single");
+
+  // Batch list loaded from DB
+  const [batches, setBatches] = useState([]);
+  const [batchesLoading, setBatchesLoading] = useState(true);
+
+  // Single mode
+  const [selectedBatchId, setSelectedBatchId] = useState("");
+  const [productCode, setProductCode] = useState("0001");
+  const [source, setSource] = useState("packaging");
+  const [domain, setDomain] = useState(
+    window.location.origin || "http://localhost:3000",
+  );
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState("");
+  const [generatedUrl, setGeneratedUrl] = useState("");
+  const [signedQr, setSignedQr] = useState("");
+  const [saveStatus, setSaveStatus] = useState("");
+  const [copied, setCopied] = useState(false);
+  const qrRef = useRef(null);
+
+  // Bulk mode
+  const [bulkBatchId, setBulkBatchId] = useState("");
+  const [bulkStartCode, setBulkStartCode] = useState("0001");
+  const [bulkCount, setBulkCount] = useState("10");
+  const [bulkSource, setBulkSource] = useState("packaging");
+  const [bulkPointsValue, setBulkPointsValue] = useState("10");
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkDone, setBulkDone] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
+  const [bulkResults, setBulkResults] = useState([]);
+  const [bulkError, setBulkError] = useState("");
+  const cancelBulkRef = useRef(false);
+
+  // ── Load batches + suggest next code on mount ────────────────────────────
+  useEffect(() => {
+    async function load() {
+      setBatchesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("batches")
+          .select("id, batch_number, product_name, strain")
+          .order("batch_number", { ascending: false });
+
+        const list = error ? [] : data || [];
+        setBatches(list);
+        if (list.length > 0) {
+          setSelectedBatchId(list[0].id);
+          setBulkBatchId(list[0].id);
+        }
+      } catch {
+        setBatches([]);
+      } finally {
+        setBatchesLoading(false);
+      }
+
+      const next = await fetchNextCodeNumber();
+      setProductCode(next);
+      setBulkStartCode(next);
+    }
+    load();
+  }, []);
+
+  // ── Single: generate ─────────────────────────────────────────────────────
+  const generateSingle = useCallback(async () => {
     setSignError("");
-    setIsSigned(false);
-    setSignedProductCode("");
+    setGeneratedUrl("");
+    setSignedQr("");
     setSaveStatus("");
-    const currentType = QR_TYPES.find((t) => t.value === qrType);
-    const needsHMAC = currentType?.needsHMAC;
-    const fullProductCode = `PB-001-2026-${productCode.padStart(4, "0")}`;
 
-    if (!needsHMAC) {
-      let url =
-        qrType === "promo"
-          ? `${domain}/?promo=${promoCode}&source=promo`
-          : customUrl || domain;
-      setGeneratedUrl(url);
-      setIsSigned(false);
-      setCopied(false);
+    if (!selectedBatchId) {
+      setSignError("Please select a batch.");
       return;
     }
-    if (!batchId.trim()) {
-      setSignError(
-        "Batch ID is required to generate a signed QR code. Paste the UUID from the batches table.",
-      );
-      return;
-    }
+    const fullCode = `PB-001-2026-${productCode.padStart(4, "0")}`;
     setSigning(true);
     try {
-      const codeToSign = qrType === "product" ? strain : fullProductCode;
-      const signed = await callSignQr(codeToSign, batchId.trim());
-      const url =
-        qrType === "standard"
-          ? `${domain}/scan/${signed}?source=${source}`
-          : `${domain}/verify/${signed}?source=${source}`;
-      setSignedProductCode(signed);
+      const signed = await callSignQr(fullCode, selectedBatchId);
+      const url = `${domain}/scan/${signed}?source=${source}`;
+      setSignedQr(signed);
       setGeneratedUrl(url);
-      setIsSigned(true);
-      setCopied(false);
     } catch (err) {
       setSignError(err.message);
     } finally {
       setSigning(false);
     }
-  }, [
-    qrType,
-    domain,
-    productCode,
-    batchId,
-    source,
-    promoCode,
-    strain,
-    customUrl,
-  ]);
+  }, [selectedBatchId, productCode, domain, source]);
 
-  // ── Single: saveToDatabase ────────────────────────────────────────────────
+  // ── Single: save to DB ───────────────────────────────────────────────────
   const saveToDatabase = async () => {
-    if (!signedProductCode || !batchId.trim()) return;
+    if (!signedQr || !selectedBatchId) return;
     setSaveStatus("saving");
     try {
       const unsignedCode = `PB-001-2026-${productCode.padStart(4, "0")}`;
-      const { error } = await supabase
+      // Try update first (code already exists unsigned)
+      const { error: upErr, count } = await supabase
         .from("products")
-        .update({
-          qr_code: signedProductCode,
+        .update({ qr_code: signedQr, hmac_signed: true })
+        .eq("qr_code", unsignedCode)
+        .select("id", { count: "exact" });
+
+      if (upErr || count === 0) {
+        // Insert as new
+        const { error: insErr } = await supabase.from("products").insert({
+          qr_code: signedQr,
           hmac_signed: true,
-        })
-        .eq("qr_code", unsignedCode);
-      if (error) throw error;
+          status: "in_stock",
+          claimed: false,
+          scan_count: 0,
+          points_value: 10,
+          is_active: true,
+          batch_id: selectedBatchId,
+        });
+        if (insErr) throw insErr;
+      }
       setSaveStatus("saved");
     } catch (err) {
-      console.error("Save to DB error:", err);
+      console.error("Save error:", err);
       setSaveStatus("error");
     }
   };
 
-  // ── Single: clipboard / PNG ───────────────────────────────────────────────
-  const copyToClipboard = () => {
-    navigator.clipboard
-      .writeText(generatedUrl)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {
-        const ta = document.createElement("textarea");
-        ta.value = generatedUrl;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
+  // ── Single: clipboard / PNG ──────────────────────────────────────────────
+  const copyUrl = () => {
+    navigator.clipboard.writeText(generatedUrl).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = generatedUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
+
   const downloadPng = () => {
     const svg = qrRef.current?.querySelector("svg");
     if (!svg) return;
@@ -308,7 +295,7 @@ export default function AdminQrGenerator() {
       ctx.fillRect(0, 0, 512, 512);
       ctx.drawImage(img, 0, 0, 512, 512);
       const link = document.createElement("a");
-      link.download = `protea-qr-${qrType}-${Date.now()}.png`;
+      link.download = `protea-qr-${productCode}-${Date.now()}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     };
@@ -317,17 +304,17 @@ export default function AdminQrGenerator() {
       btoa(unescape(encodeURIComponent(svgData)));
   };
 
-  // ── Bulk: runBulkGenerate ─────────────────────────────────────────────────
+  // ── Bulk: run ────────────────────────────────────────────────────────────
   const runBulkGenerate = async () => {
     setBulkError("");
     const count = parseInt(bulkCount, 10);
     const startNum = parseInt(bulkStartCode, 10);
-    if (!bulkBatchId.trim()) {
-      setBulkError("Batch ID is required.");
+    if (!bulkBatchId) {
+      setBulkError("Please select a batch.");
       return;
     }
     if (isNaN(count) || count < 1 || count > 200) {
-      setBulkError("Quantity must be between 1 and 200.");
+      setBulkError("Quantity must be 1–200.");
       return;
     }
     if (isNaN(startNum) || startNum < 1) {
@@ -343,10 +330,8 @@ export default function AdminQrGenerator() {
     cancelBulkRef.current = false;
 
     const results = [];
-
     for (let i = 0; i < count; i++) {
       if (cancelBulkRef.current) break;
-
       const codeNum = startNum + i;
       const productCodeStr = `PB-001-2026-${String(codeNum).padStart(4, "0")}`;
       let result = {
@@ -358,47 +343,33 @@ export default function AdminQrGenerator() {
       };
 
       try {
-        const signed = await callSignQr(productCodeStr, bulkBatchId.trim());
-        const scanUrl = `${bulkDomain}/scan/${signed}?source=${bulkSource}`;
+        const signed = await callSignQr(productCodeStr, bulkBatchId);
+        const scanUrl = `${domain}/scan/${signed}?source=${bulkSource}`;
 
-        // Insert new product row
         const { error: dbErr } = await supabase.from("products").insert({
           qr_code: signed,
           hmac_signed: true,
-          status: "available",
+          status: "in_stock",
           claimed: false,
           scan_count: 0,
           points_value: parseInt(bulkPointsValue, 10) || 10,
           is_active: true,
-          batch_id: bulkBatchId.trim(),
+          batch_id: bulkBatchId,
         });
 
         if (dbErr) {
-          // Row may already exist — try update instead
+          // Try update (pre-existing unsigned code)
           const { error: updErr } = await supabase
             .from("products")
-            .update({
-              qr_code: signed,
-              hmac_signed: true,
-            })
+            .update({ qr_code: signed, hmac_signed: true })
             .eq("qr_code", productCodeStr);
-
-          if (updErr) {
-            result = {
-              ...result,
-              signedQr: signed,
-              url: scanUrl,
-              status: "warn",
-              error: "Signed but DB update failed: " + updErr.message,
-            };
-          } else {
-            result = {
-              ...result,
-              signedQr: signed,
-              url: scanUrl,
-              status: "updated",
-            };
-          }
+          result = {
+            ...result,
+            signedQr: signed,
+            url: scanUrl,
+            status: updErr ? "warn" : "updated",
+            error: updErr ? "DB update failed: " + updErr.message : "",
+          };
         } else {
           result = {
             ...result,
@@ -415,15 +386,12 @@ export default function AdminQrGenerator() {
       setBulkResults([...results]);
       setBulkDone(i + 1);
       setBulkProgress(Math.round(((i + 1) / count) * 100));
-
-      // Small delay to avoid hammering the Edge Function
       if (i < count - 1) await new Promise((r) => setTimeout(r, 120));
     }
-
     setBulkRunning(false);
   };
 
-  // ── Bulk: exportCsv ───────────────────────────────────────────────────────
+  // ── Bulk: export CSV ─────────────────────────────────────────────────────
   const exportBulkCsv = () => {
     if (!bulkResults.length) return;
     const header = "Product Code,Signed QR,Scan URL,Status,Error";
@@ -439,13 +407,48 @@ export default function AdminQrGenerator() {
     link.click();
   };
 
-  const currentTypeConfig = QR_TYPES.find((t) => t.value === qrType);
   const bulkSuccessCount = bulkResults.filter(
     (r) => r.status === "created" || r.status === "updated",
   ).length;
   const bulkErrorCount = bulkResults.filter(
     (r) => r.status === "error" || r.status === "warn",
   ).length;
+  const selectedBatch = batches.find((b) => b.id === selectedBatchId);
+  const bulkSelectedBatch = batches.find((b) => b.id === bulkBatchId);
+
+  // ── Batch dropdown component ─────────────────────────────────────────────
+  function BatchDropdown({ value, onChange, disabled }) {
+    if (batchesLoading) {
+      return (
+        <div style={{ ...inputStyle, color: C.muted, cursor: "default" }}>
+          Loading batches…
+        </div>
+      );
+    }
+    if (batches.length === 0) {
+      return (
+        <div style={{ ...inputStyle, color: C.error, cursor: "default" }}>
+          No batches found. Create a batch in Supabase first.
+        </div>
+      );
+    }
+    return (
+      <select
+        style={selectStyle}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      >
+        <option value="">— Select a batch —</option>
+        {batches.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.batch_number} — {b.product_name}
+            {b.strain ? ` (${b.strain.replace(/-/g, " ")})` : ""}
+          </option>
+        ))}
+      </select>
+    );
+  }
 
   return (
     <div style={{ fontFamily: "'Jost', sans-serif", color: C.text }}>
@@ -461,11 +464,11 @@ export default function AdminQrGenerator() {
         QR Code Generator
       </div>
       <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>
-        Generate cryptographically signed QR codes for products, promotions, and
-        marketing campaigns.
+        Generate cryptographically signed QR codes. Select a batch from the
+        dropdown — no Supabase required.
       </div>
 
-      {/* Mode switcher */}
+      {/* Mode tabs */}
       <div
         style={{
           display: "flex",
@@ -474,211 +477,104 @@ export default function AdminQrGenerator() {
           borderBottom: `2px solid ${C.border}`,
         }}
       >
-        {["single", "bulk"].map((m) => (
+        {[
+          { key: "single", label: "Single Code" },
+          { key: "bulk", label: "Bulk Generate" },
+        ].map((m) => (
           <button
-            key={m}
-            onClick={() => setMode(m)}
+            key={m.key}
+            onClick={() => setMode(m.key)}
             style={{
               padding: "10px 28px",
               border: "none",
               borderBottom:
-                mode === m ? `2px solid ${C.mid}` : "2px solid transparent",
+                mode === m.key ? `2px solid ${C.mid}` : "2px solid transparent",
               marginBottom: -2,
               backgroundColor: "transparent",
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
-              color: mode === m ? C.mid : C.muted,
+              color: mode === m.key ? C.mid : C.muted,
               cursor: "pointer",
               fontFamily: "'Jost', sans-serif",
               transition: "color 0.2s",
             }}
           >
-            {m === "single" ? "Single Code" : "Bulk Generate"}
+            {m.label}
           </button>
         ))}
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          SINGLE MODE
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ══ SINGLE MODE ══ */}
       {mode === "single" && (
         <>
-          {/* Domain */}
+          {/* Batch selector */}
           <div style={{ marginBottom: 24 }}>
-            <div style={sectionLabel}>Production Domain</div>
+            <div style={sectionLabel}>Select Batch</div>
+            <BatchDropdown
+              value={selectedBatchId}
+              onChange={setSelectedBatchId}
+              disabled={signing}
+            />
+            {selectedBatch && (
+              <div style={hint}>
+                {selectedBatch.product_name}
+                {selectedBatch.strain
+                  ? ` · ${selectedBatch.strain.replace(/-/g, " ")}`
+                  : ""}
+              </div>
+            )}
+          </div>
+
+          <div style={row}>
+            <div style={fieldWrap}>
+              <div style={sectionLabel}>Product Code (4 digits)</div>
+              <input
+                style={inputStyle}
+                value={productCode}
+                onChange={(e) =>
+                  setProductCode(e.target.value.replace(/\D/g, "").slice(0, 4))
+                }
+                placeholder="0001"
+                maxLength={4}
+                disabled={signing}
+              />
+              <div style={hint}>
+                Will sign: PB-001-2026-{productCode.padStart(4, "0")}
+              </div>
+            </div>
+            <div style={fieldWrap}>
+              <div style={sectionLabel}>Source</div>
+              <select
+                style={selectStyle}
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                disabled={signing}
+              >
+                {SOURCES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <div style={hint}>Where this QR will be placed</div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div style={sectionLabel}>Domain</div>
             <input
               style={inputStyle}
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              placeholder="https://protea.bot"
+              disabled={signing}
             />
             <div style={hint}>
-              Use http://localhost:3000 for testing. Update to production domain
-              before printing.
+              Auto-detected from browser. Update to production domain before
+              printing for live use.
             </div>
           </div>
-
-          {/* QR Type */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={sectionLabel}>QR Type</div>
-            <select
-              style={selectStyle}
-              value={qrType}
-              onChange={(e) => {
-                setQrType(e.target.value);
-                setGeneratedUrl("");
-                setSignedProductCode("");
-                setIsSigned(false);
-                setSignError("");
-                setSaveStatus("");
-              }}
-            >
-              {QR_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <div style={hint}>{currentTypeConfig?.desc}</div>
-          </div>
-
-          {qrType === "standard" && (
-            <>
-              <div style={row}>
-                <div style={fieldWrap}>
-                  <div style={sectionLabel}>Product Code (4 digits)</div>
-                  <input
-                    style={inputStyle}
-                    value={productCode}
-                    onChange={(e) =>
-                      setProductCode(
-                        e.target.value.replace(/\D/g, "").slice(0, 4),
-                      )
-                    }
-                    placeholder="0006"
-                    maxLength={4}
-                  />
-                  <div style={hint}>
-                    Full code: PB-001-2026-{productCode.padStart(4, "0")}
-                  </div>
-                </div>
-                <div style={fieldWrap}>
-                  <div style={sectionLabel}>Source</div>
-                  <select
-                    style={selectStyle}
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
-                  >
-                    {SOURCES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div style={{ marginBottom: 24 }}>
-                <div style={sectionLabel}>
-                  Batch ID (UUID) — Required for HMAC
-                </div>
-                <input
-                  style={inputStyle}
-                  value={batchId}
-                  onChange={(e) => setBatchId(e.target.value.trim())}
-                  placeholder="e.g. 3f2504e0-4f89-11d3-9a0c-0305e82c3301"
-                />
-                <div style={hint}>
-                  Paste the UUID from the batches table in Supabase → Table
-                  Editor → batches → id column.
-                </div>
-              </div>
-            </>
-          )}
-
-          {qrType === "promo" && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={sectionLabel}>Promo Code</div>
-              <input
-                style={inputStyle}
-                value={promoCode}
-                onChange={(e) =>
-                  setPromoCode(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
-                  )
-                }
-                placeholder="preregister-1000"
-              />
-              <div style={hint}>
-                Lowercase, hyphens only. Must match PromoBanner config.
-              </div>
-            </div>
-          )}
-
-          {qrType === "product" && (
-            <>
-              <div style={row}>
-                <div style={fieldWrap}>
-                  <div style={sectionLabel}>Strain</div>
-                  <select
-                    style={selectStyle}
-                    value={strain}
-                    onChange={(e) => setStrain(e.target.value)}
-                  >
-                    {STRAINS.map((s) => (
-                      <option key={s} value={s}>
-                        {s
-                          .replace(/-/g, " ")
-                          .replace(/\b\w/g, (c) => c.toUpperCase())}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={fieldWrap}>
-                  <div style={sectionLabel}>Source</div>
-                  <select
-                    style={selectStyle}
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
-                  >
-                    {SOURCES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div style={{ marginBottom: 24 }}>
-                <div style={sectionLabel}>
-                  Batch ID (UUID) — Required for HMAC
-                </div>
-                <input
-                  style={inputStyle}
-                  value={batchId}
-                  onChange={(e) => setBatchId(e.target.value.trim())}
-                  placeholder="e.g. 3f2504e0-4f89-11d3-9a0c-0305e82c3301"
-                />
-                <div style={hint}>
-                  Paste the batch UUID from Supabase → Table Editor → batches →
-                  id column.
-                </div>
-              </div>
-            </>
-          )}
-
-          {qrType === "custom" && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={sectionLabel}>Full URL</div>
-              <input
-                style={inputStyle}
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
-                placeholder="https://protea.bot/anything"
-              />
-            </div>
-          )}
 
           {signError && (
             <div
@@ -697,9 +593,9 @@ export default function AdminQrGenerator() {
           )}
 
           <button
-            onClick={generateUrl}
-            disabled={signing}
-            style={makeBtn(C.mid, "#fff", signing)}
+            onClick={generateSingle}
+            disabled={signing || !selectedBatchId}
+            style={makeBtn(C.mid, "#fff", signing || !selectedBatchId)}
             onMouseEnter={(e) => {
               if (!signing) e.target.style.opacity = "0.85";
             }}
@@ -710,6 +606,7 @@ export default function AdminQrGenerator() {
             {signing ? "Signing…" : "Generate QR Code"}
           </button>
 
+          {/* ── Result ── */}
           {generatedUrl && (
             <div
               style={{
@@ -720,41 +617,26 @@ export default function AdminQrGenerator() {
                 backgroundColor: "#fff",
               }}
             >
+              {/* Signed badge */}
               <div style={{ textAlign: "center", marginBottom: 16 }}>
-                {isSigned ? (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "4px 14px",
-                      backgroundColor: "#eafaf1",
-                      border: `1px solid ${C.success}`,
-                      borderRadius: 20,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.15em",
-                      color: C.success,
-                    }}
-                  >
-                    🔒 HMAC SIGNED
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "4px 14px",
-                      backgroundColor: "#fefefe",
-                      border: `1px solid ${C.muted}`,
-                      borderRadius: 20,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.15em",
-                      color: C.muted,
-                    }}
-                  >
-                    UNSIGNED (promo / custom)
-                  </span>
-                )}
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "4px 14px",
+                    backgroundColor: "#eafaf1",
+                    border: `1px solid ${C.success}`,
+                    borderRadius: 20,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    color: C.success,
+                  }}
+                >
+                  🔒 HMAC SIGNED
+                </span>
               </div>
+
+              {/* QR image */}
               <div
                 ref={qrRef}
                 style={{ textAlign: "center", marginBottom: 20 }}
@@ -768,31 +650,44 @@ export default function AdminQrGenerator() {
                   fgColor={C.green}
                 />
               </div>
-              {isSigned && signedProductCode && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ ...sectionLabel, marginBottom: 4 }}>
-                    Signed QR Code String
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: C.text,
-                      wordBreak: "break-all",
-                      padding: "8px 12px",
-                      backgroundColor: "#eafaf1",
-                      border: `1px solid ${C.success}`,
-                      borderRadius: 2,
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {signedProductCode}
-                  </div>
-                  <div style={hint}>
-                    This exact string is what the QR encodes and what
-                    scanService verifies on scan.
-                  </div>
+
+              {/* Product info */}
+              {selectedBatch && (
+                <div
+                  style={{
+                    textAlign: "center",
+                    marginBottom: 16,
+                    fontSize: 13,
+                    color: C.text,
+                    fontWeight: 500,
+                  }}
+                >
+                  {selectedBatch.product_name} · Batch{" "}
+                  {selectedBatch.batch_number}
                 </div>
               )}
+
+              {/* Signed string */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ ...sectionLabel, marginBottom: 4 }}>
+                  Signed QR String
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    wordBreak: "break-all",
+                    padding: "8px 12px",
+                    backgroundColor: "#eafaf1",
+                    border: `1px solid ${C.success}`,
+                    borderRadius: 2,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {signedQr}
+                </div>
+              </div>
+
+              {/* URL */}
               <div
                 style={{
                   fontSize: 12,
@@ -808,16 +703,30 @@ export default function AdminQrGenerator() {
               >
                 {generatedUrl}
               </div>
+
+              {/* Action buttons */}
               <div
                 style={{
                   display: "flex",
-                  gap: 12,
+                  gap: 10,
                   justifyContent: "center",
                   flexWrap: "wrap",
                 }}
               >
                 <button
-                  onClick={copyToClipboard}
+                  onClick={() => window.open(generatedUrl, "_blank")}
+                  style={makeBtn(C.accent)}
+                  onMouseEnter={(e) => {
+                    e.target.style.opacity = "0.85";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.opacity = "1";
+                  }}
+                >
+                  🔍 Test Scan
+                </button>
+                <button
+                  onClick={copyUrl}
                   style={makeBtn(copied ? C.accent : C.mid)}
                   onMouseEnter={(e) => {
                     e.target.style.opacity = "0.85";
@@ -840,51 +749,35 @@ export default function AdminQrGenerator() {
                 >
                   Download PNG
                 </button>
-                {isSigned && qrType === "standard" && (
-                  <button
-                    onClick={saveToDatabase}
-                    disabled={saveStatus === "saving" || saveStatus === "saved"}
-                    style={makeBtn(
-                      saveStatus === "saved"
-                        ? C.success
-                        : saveStatus === "error"
-                          ? C.error
-                          : C.green,
-                      "#fff",
-                      saveStatus === "saving" || saveStatus === "saved",
-                    )}
-                    onMouseEnter={(e) => {
-                      if (saveStatus !== "saved")
-                        e.target.style.opacity = "0.85";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.opacity = "1";
-                    }}
-                  >
-                    {saveStatus === "saving"
-                      ? "Saving…"
-                      : saveStatus === "saved"
-                        ? "✓ Saved to DB"
-                        : saveStatus === "error"
-                          ? "Save Failed"
-                          : "Save to Database"}
-                  </button>
-                )}
-              </div>
-              {saveStatus === "error" && (
-                <div
-                  style={{
-                    marginTop: 12,
-                    fontSize: 12,
-                    color: C.error,
-                    textAlign: "center",
+                <button
+                  onClick={saveToDatabase}
+                  disabled={saveStatus === "saving" || saveStatus === "saved"}
+                  style={makeBtn(
+                    saveStatus === "saved"
+                      ? C.success
+                      : saveStatus === "error"
+                        ? C.error
+                        : C.green,
+                    "#fff",
+                    saveStatus === "saving" || saveStatus === "saved",
+                  )}
+                  onMouseEnter={(e) => {
+                    if (saveStatus !== "saved") e.target.style.opacity = "0.85";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.opacity = "1";
                   }}
                 >
-                  Could not update products table. Check that a row exists for{" "}
-                  {productCode.padStart(4, "0")} with the old unsigned qr_code
-                  value.
-                </div>
-              )}
+                  {saveStatus === "saving"
+                    ? "Saving…"
+                    : saveStatus === "saved"
+                      ? "✓ Saved"
+                      : saveStatus === "error"
+                        ? "Save Failed"
+                        : "Save to Database"}
+                </button>
+              </div>
+
               {saveStatus === "saved" && (
                 <div
                   style={{
@@ -894,8 +787,19 @@ export default function AdminQrGenerator() {
                     textAlign: "center",
                   }}
                 >
-                  products.qr_code updated to signed string. hmac_signed = true.
-                  ✓
+                  Saved to products table. hmac_signed = true ✓
+                </div>
+              )}
+              {saveStatus === "error" && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: C.error,
+                    textAlign: "center",
+                  }}
+                >
+                  Save failed — check console for details.
                 </div>
               )}
             </div>
@@ -903,16 +807,14 @@ export default function AdminQrGenerator() {
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          BULK MODE
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ══ BULK MODE ══ */}
       {mode === "bulk" && (
         <>
           <div
             style={{
               padding: "14px 18px",
               backgroundColor: "#f0faf4",
-              border: `1px solid #b8e0c8`,
+              border: "1px solid #b8e0c8",
               borderRadius: 2,
               marginBottom: 28,
               fontSize: 12,
@@ -920,27 +822,30 @@ export default function AdminQrGenerator() {
               lineHeight: 1.7,
             }}
           >
-            <strong>Bulk Generate</strong> signs each code via the HMAC Edge
-            Function and inserts a new row into the <code>products</code> table.
-            Codes are generated sequentially from the start number. Max 200 per
-            run.
+            <strong>Bulk Generate</strong> signs each code via HMAC and saves it
+            to the <code>products</code> table. Codes are generated
+            sequentially. Max 200 per run.
           </div>
 
-          {/* Domain */}
+          {/* Batch dropdown */}
           <div style={{ marginBottom: 24 }}>
-            <div style={sectionLabel}>Production Domain</div>
-            <input
-              style={inputStyle}
-              value={bulkDomain}
-              onChange={(e) => setBulkDomain(e.target.value)}
-              placeholder="https://protea.bot"
+            <div style={sectionLabel}>Select Batch</div>
+            <BatchDropdown
+              value={bulkBatchId}
+              onChange={setBulkBatchId}
+              disabled={bulkRunning}
             />
-            <div style={hint}>Use http://localhost:3000 for testing.</div>
+            {bulkSelectedBatch && (
+              <div style={hint}>
+                {bulkSelectedBatch.product_name} ·{" "}
+                {bulkSelectedBatch.batch_number}
+              </div>
+            )}
           </div>
 
           <div style={row}>
             <div style={fieldWrap}>
-              <div style={sectionLabel}>Start Code (4 digits)</div>
+              <div style={sectionLabel}>Start Code</div>
               <input
                 style={inputStyle}
                 value={bulkStartCode}
@@ -949,13 +854,13 @@ export default function AdminQrGenerator() {
                     e.target.value.replace(/\D/g, "").slice(0, 4),
                   )
                 }
-                placeholder="0007"
+                placeholder="0001"
                 maxLength={4}
                 disabled={bulkRunning}
               />
               <div style={hint}>
-                First code: PB-001-2026-
-                {String(bulkStartCode || "0007").padStart(4, "0")}
+                First: PB-001-2026-
+                {String(bulkStartCode || "0001").padStart(4, "0")}
               </div>
             </div>
             <div style={fieldWrap}>
@@ -971,7 +876,7 @@ export default function AdminQrGenerator() {
               />
               <div style={hint}>
                 {bulkCount && bulkStartCode
-                  ? `Will generate: PB-001-2026-${String(bulkStartCode).padStart(4, "0")} → PB-001-2026-${String(parseInt(bulkStartCode, 10) + parseInt(bulkCount, 10) - 1).padStart(4, "0")}`
+                  ? `PB-001-2026-${String(bulkStartCode).padStart(4, "0")} → PB-001-2026-${String(parseInt(bulkStartCode, 10) + parseInt(bulkCount, 10) - 1).padStart(4, "0")}`
                   : "Max 200 per run"}
               </div>
             </div>
@@ -994,7 +899,7 @@ export default function AdminQrGenerator() {
               </select>
             </div>
             <div style={fieldWrap}>
-              <div style={sectionLabel}>Points Value</div>
+              <div style={sectionLabel}>Points per Scan</div>
               <input
                 style={inputStyle}
                 value={bulkPointsValue}
@@ -1004,22 +909,20 @@ export default function AdminQrGenerator() {
                 placeholder="10"
                 disabled={bulkRunning}
               />
-              <div style={hint}>Loyalty points awarded per scan.</div>
+              <div style={hint}>Loyalty points awarded on first scan</div>
             </div>
           </div>
 
-          <div style={{ marginBottom: 28 }}>
-            <div style={sectionLabel}>Batch ID (UUID) — Required</div>
+          <div style={{ marginBottom: 24 }}>
+            <div style={sectionLabel}>Domain</div>
             <input
               style={inputStyle}
-              value={bulkBatchId}
-              onChange={(e) => setBulkBatchId(e.target.value.trim())}
-              placeholder="e.g. 3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
               disabled={bulkRunning}
             />
             <div style={hint}>
-              Supabase → Table Editor → batches → copy the id column for this
-              batch. All generated codes will be linked to this batch.
+              Auto-detected. Update before printing for live use.
             </div>
           </div>
 
@@ -1049,8 +952,8 @@ export default function AdminQrGenerator() {
           >
             <button
               onClick={runBulkGenerate}
-              disabled={bulkRunning}
-              style={makeBtn(C.green, "#fff", bulkRunning)}
+              disabled={bulkRunning || !bulkBatchId}
+              style={makeBtn(C.green, "#fff", bulkRunning || !bulkBatchId)}
               onMouseEnter={(e) => {
                 if (!bulkRunning) e.target.style.opacity = "0.85";
               }}
@@ -1067,7 +970,7 @@ export default function AdminQrGenerator() {
                 onClick={() => {
                   cancelBulkRef.current = true;
                 }}
-                style={{ ...makeBtn(C.error), padding: "12px 20px" }}
+                style={makeBtn(C.error)}
               >
                 Cancel
               </button>
@@ -1128,7 +1031,7 @@ export default function AdminQrGenerator() {
             </div>
           )}
 
-          {/* Results summary */}
+          {/* Summary */}
           {bulkResults.length > 0 && (
             <div
               style={{
@@ -1193,17 +1096,16 @@ export default function AdminQrGenerator() {
                 overflow: "hidden",
               }}
             >
-              {/* Header */}
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.2fr 2fr 0.7fr 1.5fr",
+                  gridTemplateColumns: "1.2fr 2fr 0.7fr 0.8fr 1.2fr",
                   padding: "8px 14px",
                   backgroundColor: C.cream,
                   borderBottom: `1px solid ${C.border}`,
                 }}
               >
-                {["Code", "Signed QR", "Status", "Error"].map((h) => (
+                {["Code", "Signed QR", "Status", "Test", "Error"].map((h) => (
                   <div
                     key={h}
                     style={{
@@ -1218,7 +1120,6 @@ export default function AdminQrGenerator() {
                   </div>
                 ))}
               </div>
-              {/* Rows */}
               {bulkResults.map((r, i) => {
                 const statusColor =
                   r.status === "created"
@@ -1233,7 +1134,7 @@ export default function AdminQrGenerator() {
                     key={i}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.2fr 2fr 0.7fr 1.5fr",
+                      gridTemplateColumns: "1.2fr 2fr 0.7fr 0.8fr 1.2fr",
                       padding: "9px 14px",
                       borderBottom:
                         i < bulkResults.length - 1
@@ -1262,26 +1163,45 @@ export default function AdminQrGenerator() {
                     >
                       {r.signedQr || "—"}
                     </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: statusColor,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                      }}
+                    >
+                      {r.status === "created"
+                        ? "✓ New"
+                        : r.status === "updated"
+                          ? "↑ Updated"
+                          : r.status === "pending"
+                            ? "…"
+                            : r.status === "warn"
+                              ? "⚠ Warn"
+                              : "✗ Err"}
+                    </div>
                     <div>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: statusColor,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                        }}
-                      >
-                        {r.status === "created"
-                          ? "✓ New"
-                          : r.status === "updated"
-                            ? "↑ Updated"
-                            : r.status === "pending"
-                              ? "…"
-                              : r.status === "warn"
-                                ? "⚠ Warn"
-                                : "✗ Err"}
-                      </span>
+                      {r.url && (
+                        <button
+                          onClick={() => window.open(r.url, "_blank")}
+                          style={{
+                            padding: "4px 10px",
+                            backgroundColor: C.accent,
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 2,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            letterSpacing: "0.1em",
+                            cursor: "pointer",
+                            fontFamily: "'Jost', sans-serif",
+                          }}
+                        >
+                          Test
+                        </button>
+                      )}
                     </div>
                     <div style={{ fontSize: 10, color: C.error }}>
                       {r.error || ""}
@@ -1291,100 +1211,6 @@ export default function AdminQrGenerator() {
               })}
             </div>
           )}
-        </>
-      )}
-
-      {/* Legacy info — shown in single mode only */}
-      {mode === "single" && (
-        <>
-          <div
-            style={{
-              marginTop: 32,
-              padding: 20,
-              backgroundColor: "#fffdf5",
-              borderRadius: 2,
-              border: `1px solid #e8d97a`,
-            }}
-          >
-            <div style={{ ...sectionLabel, color: "#a08020", marginBottom: 8 }}>
-              Legacy Code Transition
-            </div>
-            <div style={{ fontSize: 12, color: C.text, lineHeight: 1.7 }}>
-              Existing QR codes (e.g. <code>PB-001-2026-0001</code>) are
-              automatically treated as <strong>legacy unsigned</strong> — they
-              still scan and award points during transition. Use the{" "}
-              <strong>Save to Database</strong> button above to upgrade each
-              product code to a signed string. Once all codes are upgraded,
-              legacy support can be removed.
-            </div>
-          </div>
-          <div
-            style={{
-              marginTop: 24,
-              padding: 24,
-              backgroundColor: C.cream,
-              borderRadius: 2,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <div style={{ ...sectionLabel, marginBottom: 12 }}>
-              Quick Reference — QR Types
-            </div>
-            {[
-              [
-                "Standard",
-                "/scan/PB-001-2026-XXXX.SIG?source=packaging",
-                "Inner packaging → loyalty points · SIGNED",
-              ],
-              [
-                "Promo",
-                "/?promo=preregister-1000&source=promo",
-                "Flyers/social → landing + banner",
-              ],
-              [
-                "Product",
-                "/verify/gelato-41.SIG?source=flyer",
-                "Outer packaging → public COA · SIGNED",
-              ],
-              ["Custom", "Any URL", "Business cards, events, etc."],
-            ].map(([type, url, use], i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  padding: "8px 0",
-                  borderBottom: i < 3 ? `1px solid ${C.border}` : "none",
-                  fontSize: 12,
-                  color: C.text,
-                }}
-              >
-                <div
-                  style={{
-                    width: 80,
-                    fontWeight: 600,
-                    color: C.mid,
-                    flexShrink: 0,
-                  }}
-                >
-                  {type}
-                </div>
-                <div
-                  style={{
-                    flex: 1,
-                    fontFamily: "monospace",
-                    color: C.muted,
-                    fontSize: 11,
-                  }}
-                >
-                  {url}
-                </div>
-                <div style={{ width: 220, color: C.muted, flexShrink: 0 }}>
-                  {use}
-                </div>
-              </div>
-            ))}
-          </div>
         </>
       )}
     </div>

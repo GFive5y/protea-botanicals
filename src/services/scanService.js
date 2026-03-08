@@ -1,5 +1,12 @@
-// scanService.js v7.0 — Protea Botanicals — March 2026
+// scanService.js v7.2 — Protea Botanicals — March 2026
 // ============================================================================
+// v7.2: First-scan-only enforcement UI (DEC-026)
+//   - already_claimed check now returns { success:true, authentic:true, rescan:true }
+//   - batch data fetched BEFORE returning so ScanResult has product details
+//   - userProfile fetched for rescan path so tier/points display correctly
+//   - Red counterfeit page reserved for HMAC failures only
+//
+// v7.1: update_user_activity RPC call removed (404 — RPC not in DB)
 // v7.0: HMAC QR verification — anti-counterfeiting (DEC-025)
 //   - authenticateQR now calls verify-qr Edge Function FIRST
 //   - Invalid signatures → rejected immediately, no DB lookup, no points
@@ -112,15 +119,17 @@ async function ensureProfile(userId) {
  * Flow:
  *   1. Verify HMAC signature via Edge Function
  *   2. If invalid → reject immediately (counterfeit QR)
- *   3. If legacy → strip nothing, proceed with full qrString as DB lookup key
- *   4. If signed → use product_code (without .SIGNATURE) as DB lookup key
- *   5. Continue with existing claim + points + geo flow
+ *   3. DB lookup to find the product + batch
+ *   4. If claimed=true → return SUCCESSFUL rescan result (v7.2 change)
+ *      Red page is reserved for HMAC failures only (DEC-026)
+ *   5. Claim product, award points, record scan, geo enrich
  *
  * @param {string} qrCode  - raw string from QR scanner (may include signature)
  * @param {string} [source='direct'] - scan origin
- * @returns {Object} { success, points, pointsEarned, product, error, errorType,
- *                     isFirstScan, scanId, anomalyFlags, userProfile,
- *                     requiresGPSPrompt, isLegacy, hmacVerified }
+ * @returns {Object} { success, authentic, rescan?, points, pointsEarned,
+ *                     product, batch, error, errorType, isFirstScan, scanId,
+ *                     anomalyFlags, userProfile, requiresGPSPrompt,
+ *                     isLegacy, hmacVerified }
  */
 export async function authenticateQR(qrCode, source = "direct") {
   try {
@@ -138,7 +147,7 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // ── 2. HMAC verification (NEW in v7.0) ─────────────────────
+    // ── 2. HMAC verification ───────────────────────────────────
     const hmacResult = await verifyQrHMAC(qrCode);
 
     if (!hmacResult.valid) {
@@ -157,17 +166,11 @@ export async function authenticateQR(qrCode, source = "direct") {
       };
     }
 
-    // Resolve the clean product_code for DB lookup
-    // - Legacy: product_code === original qrCode (no change)
-    // - Signed: product_code is the prefix before the dot
     const isLegacy = hmacResult.is_legacy || false;
     const hmacVerified = !isLegacy;
 
-    // For DB lookup:
-    // - Signed codes: the products table stores the FULL signed string (product_code.SIGNATURE)
-    //   because that's what AdminQrGenerator saved when generating. So look up by full qrCode.
-    // - Legacy codes: look up by the raw qrCode as before.
-    // Either way, use qrCode as-is for the DB lookup.
+    // For DB lookup: use full qrCode as-is
+    // (products table stores the full signed string)
     const dbLookupKey = qrCode;
 
     // ── 3. Ensure profile exists ───────────────────────────────
@@ -207,14 +210,34 @@ export async function authenticateQR(qrCode, source = "direct") {
     }
 
     // ── 5. Validate state ──────────────────────────────────────
+
+    // v7.2: already_claimed → return SUCCESSFUL rescan result (DEC-026)
+    // The product IS authentic (HMAC passed). Returning red/error here was wrong.
     if (product.claimed) {
+      // Fetch user profile so the rescan page can show tier / points
+      const { data: rescanProfile } = await supabase
+        .from("user_profiles")
+        .select(
+          "geolocation_consent, province, city, loyalty_tier, loyalty_points, profile_complete",
+        )
+        .eq("id", user.id)
+        .single();
+
       return {
-        success: false,
-        error: "This QR code has already been claimed",
-        errorType: "already_claimed",
+        success: true,
+        authentic: true,
+        rescan: true,
+        isFirstScan: false,
+        pointsEarned: 0,
         product,
+        batch: product.batches,
+        userProfile: rescanProfile || null,
+        anomalyFlags: [],
+        isLegacy,
+        hmacVerified,
       };
     }
+
     if (product.is_active === false) {
       return {
         success: false,
@@ -279,7 +302,7 @@ export async function authenticateQR(qrCode, source = "direct") {
       if (txErr) console.error("Transaction log error:", txErr);
     }
 
-    // ── 9. Insert scan record (now includes is_legacy + hmac_verified) ───
+    // ── 9. Insert scan record ──────────────────────────────────
     const { data: scanRecord, error: scanErr } = await supabase
       .from("scans")
       .insert({
@@ -291,7 +314,6 @@ export async function authenticateQR(qrCode, source = "direct") {
         scan_flagged: anomalyFlags.length > 0,
         flag_reason: anomalyFlags.length > 0 ? anomalyFlags.join(", ") : null,
         tenant_id: product.tenant_id || null,
-        // v7.0 additions
         is_legacy: isLegacy,
       })
       .select("id")
@@ -300,10 +322,7 @@ export async function authenticateQR(qrCode, source = "direct") {
     if (scanErr) console.error("Scan record error:", scanErr);
     const scanId = scanRecord?.id || null;
 
-    // ── 10. Update user activity ───────────────────────────────
-    // RPC not yet created — skipped until DB function exists
-
-    // ── 11. Get user profile ───────────────────────────────────
+    // ── 10. Get user profile ───────────────────────────────────
     const { data: profile } = await supabase
       .from("user_profiles")
       .select(
@@ -312,20 +331,22 @@ export async function authenticateQR(qrCode, source = "direct") {
       .eq("id", user.id)
       .single();
 
-    // ── 12. Geo enrichment (async, non-blocking) ───────────────
+    // ── 11. Geo enrichment (async, non-blocking) ───────────────
     enrichAndStoreScanGeo(
       scanId,
       user.id,
       profile?.geolocation_consent || false,
     );
 
-    // ── 13. Return ─────────────────────────────────────────────
+    // ── 12. Return ─────────────────────────────────────────────
     return {
       success: true,
       authentic: true,
+      rescan: false,
       points: anomalyFlags.length === 0 ? pointsToAward : 0,
       pointsEarned: anomalyFlags.length === 0 ? pointsToAward : 0,
       product,
+      batch: product.batches,
       isFirstScan,
       scanId,
       anomalyFlags,
