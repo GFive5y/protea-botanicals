@@ -13,6 +13,7 @@ import AdminAnalytics from "./AdminAnalytics";
 import AdminQrList from "../components/AdminQrList";
 import StockControl from "../components/StockControl";
 import AdminBatchManager from "../components/AdminBatchManager";
+import AdminProductionModule from "../components/AdminProductionModule";
 
 // ─── Design Tokens ───
 const C = {
@@ -295,6 +296,11 @@ export default function AdminDashboard() {
           onClick={() => setTab("batches")}
         />
         <TabBtn
+          active={tab === "production"}
+          label="Production"
+          onClick={() => setTab("production")}
+        />
+        <TabBtn
           active={tab === "qr_codes"}
           label="QR Codes"
           onClick={() => setTab("qr_codes")}
@@ -440,6 +446,12 @@ export default function AdminDashboard() {
             Quick Actions
           </h3>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button
+              onClick={() => setTab("production")}
+              style={makeBtn(C.gold)}
+            >
+              ⚙️ PRODUCTION RUNS
+            </button>
             <button onClick={() => setTab("batches")} style={makeBtn(C.green)}>
               🌿 MANAGE BATCHES
             </button>
@@ -476,6 +488,9 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* ══════ PRODUCTION ══════ */}
+      {tab === "production" && <AdminProductionModule />}
 
       {/* ══════ BATCHES ══════ */}
       {tab === "batches" && (
