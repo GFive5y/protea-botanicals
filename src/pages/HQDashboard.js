@@ -1,15 +1,11 @@
-// src/pages/HQDashboard.js — Protea Botanicals v2.9
+// src/pages/HQDashboard.js — Protea Botanicals v3.0
 // ─────────────────────────────────────────────────────────────────────────────
-// v2.9: P&L tab added (WP-E — Live P&L Waterfall Dashboard)
-// v2.8: Pricing tab added (WP-D — Pricing & Margin Intelligence)
-// v2.7: Costing tab added (WP-C — COGS Engine)
-// v2.6: Procurement tab added (WP-B — Purchase Order Flow)
-// v2.5: Suppliers tab added (WP-A — Phase 2 Import ERP)
-// v2.4: Retailer Health tab added (WP6 — DEC-031)
-// v2.3: Analytics tab
-// v2.2: Distribution tab
-// v2.1: Supply Chain + Production tabs
-// v2.0: Overview + Shops tabs
+// v3.0: Reorder & Scoring tab added (WP-F + WP-G)
+// v2.9: P&L tab added (WP-E)
+// v2.8: Pricing tab added (WP-D)
+// v2.7: Costing tab added (WP-C)
+// v2.6: Procurement tab added (WP-B)
+// v2.5: Suppliers tab added (WP-A)
 
 import { useState } from "react";
 import { useTenant } from "../services/tenantService";
@@ -26,6 +22,7 @@ import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
 import HQCogs from "../components/hq/HQCogs";
 import HQPricing from "../components/hq/HQPricing";
 import HQProfitLoss from "../components/hq/HQProfitLoss";
+import HQReorderScoring from "../components/hq/HQReorderScoring";
 
 const C = {
   primaryDark: "#1b4332",
@@ -49,6 +46,7 @@ const TABS = [
   { id: "costing", label: "Costing", icon: "🧮" },
   { id: "pricing", label: "Pricing", icon: "💰" },
   { id: "pl", label: "P&L", icon: "📉" },
+  { id: "reorder", label: "Reorder", icon: "🔔" },
 ];
 
 export default function HQDashboard() {
@@ -211,6 +209,9 @@ export default function HQDashboard() {
         {activeTab === "costing" && <HQCogs />}
         {activeTab === "pricing" && <HQPricing />}
         {activeTab === "pl" && <HQProfitLoss />}
+        {activeTab === "reorder" && (
+          <HQReorderScoring onNavigate={(tab) => setActiveTab(tab)} />
+        )}
       </div>
     </div>
   );
