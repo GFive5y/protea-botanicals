@@ -1,19 +1,20 @@
-// src/services/tenantService.js — Protea Botanicals v1.0
+// src/services/tenantService.js — Protea Botanicals v1.1
 // ─────────────────────────────────────────────────────────────────────────────
 // TENANT CONTEXT PROVIDER
 //
-// Provides the active tenant (shop/HQ) to all components.
-// Loads tenant data from user_profiles.tenant_id on login.
-// HQ users (hq_access=true) can switch between tenants.
+// v1.1 FIX (2026-03-08):
+//   PROBLEM: onAuthStateChange called loadTenant() on every SIGNED_IN event.
+//   Supabase fires SIGNED_IN repeatedly (token refresh, re-auth, etc).
+//   Each loadTenant() call mutated state → caused RequireAuth to briefly see
+//   no role → redirected to /account → logged in → SIGNED_IN → loop.
+//   Each loop iteration mounted a new AdminDashboard on top of the existing one.
 //
-// Usage:
-//   import { TenantProvider, useTenant } from '../services/tenantService';
+//   FIX: Use a hasLoaded ref. Only call loadTenant() on SIGNED_IN if we have
+//   NOT already loaded tenant data. On SIGNED_OUT, reset the ref so next
+//   login loads fresh. TOKEN_REFRESHED no longer triggers a reload at all
+//   (tenant data doesn't change when token refreshes).
 //
-//   // In App.js: wrap with <TenantProvider>
-//   // In any component:
-//   const { tenant, isHQ, allTenants, switchTenant } = useTenant();
-//
-// Phase 2A — Foundation. Created for multi-tenant architecture.
+// v1.0: Initial implementation
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -22,6 +23,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { supabase } from "./supabaseClient";
 
@@ -30,10 +32,14 @@ const TenantContext = createContext(null);
 
 // ── Provider ──────────────────────────────────────────────────────────────
 export function TenantProvider({ children }) {
-  const [tenant, setTenant] = useState(null); // Active tenant object
-  const [isHQ, setIsHQ] = useState(false); // Does user have hq_access?
-  const [allTenants, setAllTenants] = useState([]); // HQ only: list of all tenants
+  const [tenant, setTenant] = useState(null);
+  const [isHQ, setIsHQ] = useState(false);
+  const [allTenants, setAllTenants] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // ★ v1.1: Track whether we've already loaded tenant data.
+  // Prevents reloading on every SIGNED_IN event (Supabase fires this repeatedly).
+  const hasLoaded = useRef(false);
 
   // ── Load tenant from current user's profile ────────────────────────────
   const loadTenant = useCallback(async () => {
@@ -41,6 +47,7 @@ export function TenantProvider({ children }) {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (!session?.user) {
         setTenant(null);
         setIsHQ(false);
@@ -86,7 +93,7 @@ export function TenantProvider({ children }) {
         const { data: tenantsData, error: tenantsError } = await supabase
           .from("tenants")
           .select("*")
-          .order("type", { ascending: false }) // HQ first, then shops
+          .order("type", { ascending: false })
           .order("name");
 
         if (tenantsError) {
@@ -103,6 +110,9 @@ export function TenantProvider({ children }) {
           );
         }
       }
+
+      // ★ v1.1: Mark as loaded so SIGNED_IN doesn't trigger another load
+      hasLoaded.current = true;
     } catch (err) {
       console.error("[TenantService] loadTenant error:", err);
     } finally {
@@ -130,13 +140,25 @@ export function TenantProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        loadTenant();
+      if (event === "SIGNED_IN") {
+        // ★ v1.1: Only load if not already loaded.
+        // Supabase fires SIGNED_IN on every token refresh and page focus.
+        // Reloading every time caused RequireAuth to flicker → redirect loop
+        // → stacked AdminDashboard instances.
+        if (!hasLoaded.current) {
+          loadTenant();
+        }
       } else if (event === "SIGNED_OUT") {
+        // ★ v1.1: Reset the loaded flag so next login gets fresh data
+        hasLoaded.current = false;
         setTenant(null);
         setIsHQ(false);
         setAllTenants([]);
+        setLoading(false);
       }
+      // ★ v1.1: TOKEN_REFRESHED intentionally NOT handled here.
+      // Tenant data doesn't change when the JWT refreshes.
+      // Reloading on TOKEN_REFRESHED was another source of the loop.
     });
 
     return () => subscription.unsubscribe();
@@ -144,16 +166,16 @@ export function TenantProvider({ children }) {
 
   // ── Context value ──────────────────────────────────────────────────────
   const value = {
-    tenant, // Current active tenant object (or null)
-    tenantId: tenant?.id || null, // Shorthand for tenant.id
+    tenant,
+    tenantId: tenant?.id || null,
     tenantName: tenant?.name || null,
     tenantSlug: tenant?.slug || null,
-    tenantType: tenant?.type || null, // 'hq' or 'shop'
-    isHQ, // Does this user have HQ access?
-    allTenants, // All tenants (HQ only, empty for shop users)
-    switchTenant, // Switch active tenant (HQ only)
-    loading, // Is tenant data still loading?
-    reload: loadTenant, // Force reload tenant data
+    tenantType: tenant?.type || null,
+    isHQ,
+    allTenants,
+    switchTenant,
+    loading,
+    reload: loadTenant,
   };
 
   return (

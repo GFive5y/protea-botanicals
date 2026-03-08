@@ -499,7 +499,11 @@ function RequireAuth({ children }) {
   const { role, loading } = useContext(RoleContext);
   const location = useLocation();
 
-  if (loading && !role) {
+  const storedRole = localStorage.getItem("protea_role");
+
+  if (role || storedRole) return children;
+
+  if (loading)
     return (
       <div
         style={{
@@ -537,22 +541,13 @@ function RequireAuth({ children }) {
         </span>
       </div>
     );
-  }
 
-  if (!role) {
-    console.log(
-      "[RequireAuth] No role, redirecting to /account from:",
-      location.pathname,
-    );
-    return (
-      <Navigate
-        to={`/account?return=${encodeURIComponent(location.pathname)}`}
-        replace
-      />
-    );
-  }
-
-  return children;
+  return (
+    <Navigate
+      to={`/account?return=${encodeURIComponent(location.pathname)}`}
+      replace
+    />
+  );
 }
 
 function RequireRole({ allowedRoles, children }) {
@@ -710,7 +705,8 @@ export default function App() {
           if (profile?.role) setRole(profile.role);
           setUserEmail(session.user.email);
         } else {
-          setRole(null);
+          // Don't clear role here — getSession() can return null briefly on page
+          // load while Supabase initializes. SIGNED_OUT event handles real logouts.
           setUserEmail(null);
         }
       } catch (err) {
