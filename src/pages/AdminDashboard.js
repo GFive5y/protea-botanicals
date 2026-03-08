@@ -1,10 +1,10 @@
-// AdminDashboard.js v3.8 — Unified QR Services Tab (clean, zero warnings)
-// Protea Botanicals — March 08 2026
-// ★ v3.8 changes:
-//   1. REMOVED: "QR Generator" and "Smart QR" top-level tabs
-//   2. MERGED: QR Codes tab → two sub-tabs: "QR Registry" + "Generate"
-//   3. FIXED: broken floating <div> that always rendered old QR table
-//   4. CLEANED: removed all dead state/functions — zero eslint warnings
+// AdminDashboard.js v3.9 — Adds Batches tab (WP1)
+// Protea Botanicals — March 2026
+// ★ v3.9 changes:
+//   1. ADDED: "Batches" tab → AdminBatchManager component
+//   2. ADDED: onNavigateToQR callback — batch "Generate QR" button switches to QR tab
+//   3. ADDED: Quick action "MANAGE BATCHES" on overview
+//   4. UPDATED: Overview stats strip — no logic changes to existing tabs
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -12,6 +12,7 @@ import AdminQrGenerator from "./AdminQrGenerator";
 import AdminAnalytics from "./AdminAnalytics";
 import AdminQrList from "../components/AdminQrList";
 import StockControl from "../components/StockControl";
+import AdminBatchManager from "../components/AdminBatchManager";
 
 // ─── Design Tokens ───
 const C = {
@@ -229,6 +230,15 @@ export default function AdminDashboard() {
     computeAnalytics();
   }, [fetchUsers, computeAnalytics]);
 
+  // ── Called from AdminBatchManager "Generate QR" button ──────────────────
+  const handleNavigateToQR = (batchId) => {
+    setTab("qr_codes");
+    setQrSubTab("generate");
+    // Note: AdminQrGenerator v4.0 auto-loads batch dropdown on mount.
+    // The user picks the correct batch from the dropdown (already auto-selects newest).
+    // Full batch pre-selection wiring can be added in a future session if needed.
+  };
+
   return (
     <div style={{ fontFamily: FONTS.body }}>
       {/* Header */}
@@ -278,6 +288,11 @@ export default function AdminDashboard() {
           active={tab === "overview"}
           label="Overview"
           onClick={() => setTab("overview")}
+        />
+        <TabBtn
+          active={tab === "batches"}
+          label="Batches"
+          onClick={() => setTab("batches")}
         />
         <TabBtn
           active={tab === "qr_codes"}
@@ -425,6 +440,9 @@ export default function AdminDashboard() {
             Quick Actions
           </h3>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button onClick={() => setTab("batches")} style={makeBtn(C.green)}>
+              🌿 MANAGE BATCHES
+            </button>
             <button
               onClick={() => {
                 setTab("qr_codes");
@@ -457,6 +475,11 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ══════ BATCHES ══════ */}
+      {tab === "batches" && (
+        <AdminBatchManager onNavigateToQR={handleNavigateToQR} />
       )}
 
       {/* ══════ QR CODES — sub-tabs ══════ */}
