@@ -1,10 +1,12 @@
-// src/components/CoPilot.js v2.3
+// src/components/CoPilot.js v2.4
 // Protea Botanicals — AI Assistant Sidebar Panel
 // v2.0: Slide-in sidebar, conversation history, role-aware, branded design
 // v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
 // v2.2: WP-002 — Replace static floating button with AnimatedAICharacter
 // v2.3: WP-003 — Frosted glass panel, gradient fade borders, Lottie bot
 //       in header when open, aggressive fade-in transition, no hard edges.
+// v2.4: Hide/show toggle — "hide" button above bot collapses to slim tab,
+//       tab click restores bot. Bot hidden by default until summoned.
 
 import React, {
   useState,
@@ -52,7 +54,6 @@ function getWelcome(role) {
   }
 }
 
-// Page-specific prompts — shown based on current route
 const PAGE_SUGGESTIONS = {
   "/": [
     "What products do you offer?",
@@ -104,7 +105,6 @@ const PAGE_SUGGESTIONS = {
   ],
 };
 
-// Role-based fallbacks (used when no page match)
 const ROLE_SUGGESTIONS = {
   admin: [
     "System health check",
@@ -134,18 +134,11 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 function getSuggestions(role, pathname) {
-  // Admin always gets admin prompts regardless of page
   if (role === "admin") return ROLE_SUGGESTIONS.admin;
-
-  // Check for exact page match first
   if (PAGE_SUGGESTIONS[pathname]) return PAGE_SUGGESTIONS[pathname];
-
-  // Check for prefix match (e.g. /verify/purple-punch → /verify)
   const prefix = "/" + (pathname.split("/")[1] || "");
   if (prefix !== pathname && PAGE_SUGGESTIONS[prefix])
     return PAGE_SUGGESTIONS[prefix];
-
-  // Fall back to role-based, then default
   return ROLE_SUGGESTIONS[role] || DEFAULT_SUGGESTIONS;
 }
 
@@ -184,6 +177,7 @@ export default function CoPilot() {
   const location = useLocation();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [botVisible, setBotVisible] = useState(false); // v2.4: hidden by default
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -295,17 +289,106 @@ export default function CoPilot() {
 
   return (
     <>
-      {/* ── v2.3: Lottie floating character (bottom-right, hides when panel open) ── */}
+      {/* ── v2.4: Bot visible/hidden toggle ── */}
       {!shouldHide && (
-        <LottieCharacter
-          isOpen={isOpen}
-          isThinking={loading}
-          onClick={() => setIsOpen(true)}
-          size={120}
-        />
+        <>
+          {botVisible ? (
+            /* Bot is visible — show character with "hide" button above */
+            <div
+              style={{
+                position: "fixed",
+                bottom: 24,
+                right: 24,
+                zIndex: 9998,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <button
+                onClick={() => setBotVisible(false)}
+                title="Hide assistant"
+                style={{
+                  background: "rgba(27,67,50,0.75)",
+                  border: "none",
+                  color: "rgba(255,255,255,0.75)",
+                  borderRadius: "12px",
+                  padding: "3px 10px",
+                  fontSize: "10px",
+                  cursor: "pointer",
+                  fontFamily: FONTS.body,
+                  letterSpacing: "0.08em",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.target.style.background = "rgba(27,67,50,0.95)")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.background = "rgba(27,67,50,0.75)")
+                }
+              >
+                hide ✕
+              </button>
+              <LottieCharacter
+                isOpen={isOpen}
+                isThinking={loading}
+                onClick={() => setIsOpen(true)}
+                size={120}
+              />
+            </div>
+          ) : (
+            /* Bot is hidden — slim tab tucked against right edge */
+            <button
+              onClick={() => setBotVisible(true)}
+              title="Show AI assistant"
+              style={{
+                position: "fixed",
+                bottom: 80,
+                right: 0,
+                zIndex: 9998,
+                background: "rgba(27,67,50,0.88)",
+                border: "none",
+                color: C.accent,
+                borderRadius: "8px 0 0 8px",
+                padding: "12px 7px",
+                cursor: "pointer",
+                fontSize: "16px",
+                lineHeight: 1,
+                boxShadow: "-2px 2px 12px rgba(0,0,0,0.18)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+                transition: "background 0.15s, padding 0.15s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(27,67,50,1)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(27,67,50,0.88)")
+              }
+            >
+              <span style={{ fontSize: "16px" }}>🤖</span>
+              <span
+                style={{
+                  fontSize: "9px",
+                  fontFamily: FONTS.body,
+                  letterSpacing: "0.1em",
+                  writingMode: "vertical-rl",
+                  textOrientation: "mixed",
+                  color: "rgba(255,255,255,0.6)",
+                  textTransform: "uppercase",
+                }}
+              >
+                AI
+              </span>
+            </button>
+          )}
+        </>
       )}
 
-      {/* ── Backdrop overlay — frosted, aggressive fade-in ── */}
+      {/* ── Backdrop overlay ── */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
@@ -332,11 +415,9 @@ export default function CoPilot() {
           width: `${PANEL_WIDTH}px`,
           maxWidth: "90vw",
           zIndex: 10000,
-          // Frosted glass: semi-transparent with blur
           background: "rgba(250, 249, 246, 0.55)",
           backdropFilter: "blur(12px) saturate(1.2)",
           WebkitBackdropFilter: "blur(12px) saturate(1.2)",
-          // No hard border — subtle gradient shadow instead
           borderLeft: "none",
           display: "flex",
           flexDirection: "column",
@@ -345,13 +426,12 @@ export default function CoPilot() {
             ? "translateX(0)"
             : `translateX(${PANEL_WIDTH + 10}px)`,
           transition: "transform 0.25s cubic-bezier(0.2, 0, 0, 1)",
-          // Soft shadow instead of hard border
           boxShadow: isOpen
             ? "-20px 0 60px rgba(0,0,0,0.12), -4px 0 20px rgba(0,0,0,0.06)"
             : "none",
         }}
       >
-        {/* ── Left edge gradient fade (replaces hard border) ── */}
+        {/* ── Left edge gradient fade ── */}
         <div
           style={{
             position: "absolute",
@@ -365,10 +445,9 @@ export default function CoPilot() {
           }}
         />
 
-        {/* ── Header with Lottie bot ── */}
+        {/* ── Header ── */}
         <div
           style={{
-            // Frosted header — slightly more opaque green
             background: "rgba(27, 67, 50, 0.88)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
@@ -377,12 +456,10 @@ export default function CoPilot() {
             alignItems: "center",
             justifyContent: "space-between",
             flexShrink: 0,
-            // Bottom fade instead of hard border
             boxShadow: "0 4px 20px rgba(27, 67, 50, 0.15)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            {/* Lottie bot in header when panel is open */}
             <div
               style={{
                 width: 52,
@@ -476,7 +553,7 @@ export default function CoPilot() {
           </div>
         </div>
 
-        {/* ── Messages area — frosted, transparent ── */}
+        {/* ── Messages area ── */}
         <div
           style={{
             flex: 1,
@@ -485,7 +562,6 @@ export default function CoPilot() {
             display: "flex",
             flexDirection: "column",
             gap: "12px",
-            // Subtle inner top fade from header
             background:
               "linear-gradient(to bottom, rgba(27,67,50,0.04) 0%, transparent 40px)",
           }}
@@ -506,7 +582,6 @@ export default function CoPilot() {
                     msg.role === "user"
                       ? "16px 16px 4px 16px"
                       : "16px 16px 16px 4px",
-                  // Frosted message bubbles
                   background:
                     msg.role === "user"
                       ? "rgba(27, 67, 50, 0.85)"
@@ -524,7 +599,6 @@ export default function CoPilot() {
                         : C.text,
                   fontSize: "13px",
                   lineHeight: "1.6",
-                  // Soft borders instead of hard lines
                   border:
                     msg.role === "user"
                       ? "none"
@@ -618,17 +692,15 @@ export default function CoPilot() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ── Input area — frosted bottom bar ── */}
+        {/* ── Input area ── */}
         <div
           style={{
-            // Top fade instead of hard border
             borderTop: "none",
             padding: "12px 16px",
             background: "rgba(255, 255, 255, 0.5)",
             backdropFilter: "blur(16px)",
             WebkitBackdropFilter: "blur(16px)",
             flexShrink: 0,
-            // Top shadow fade
             boxShadow: "0 -4px 16px rgba(0,0,0,0.03)",
           }}
         >
