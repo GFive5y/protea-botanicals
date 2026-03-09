@@ -1,5 +1,8 @@
-// src/components/StockControl.js v1.0
-// Protea Botanicals — Inventory Management System (WP5.1)
+// src/components/StockControl.js v1.1
+// v1.1 — WP-I: Document source badge on inventory rows (Items view)
+//              Detects items recently updated via Document Ingestion Engine
+//              by inspecting stock_movements for document-sourced entries
+// v1.0 — Protea Botanicals — Inventory Management System (WP5.1)
 // Sub-views: Overview, Items, Movements, Purchase Orders, Suppliers
 // Imported by AdminDashboard.js as a tab component
 
@@ -21,6 +24,8 @@ const C = {
   error: "#c0392b",
   red: "#e74c3c",
   blue: "#2c4a6e",
+  purple: "#6c3483",
+  lightPurple: "#f5eef8",
 };
 const F = {
   heading: "'Cormorant Garamond', Georgia, serif",
@@ -124,6 +129,67 @@ const PO_STATUS_COLORS = {
   cancelled: C.red,
 };
 
+// ── WP-I: Detect if movement was document-sourced ──────────────────────
+// A movement is document-sourced if its notes contains "document" (case-insensitive)
+// or its reference is a UUID (matches document_log.id format)
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isDocumentSourced(movement) {
+  if (!movement) return false;
+  const notes = (movement.notes || "").toLowerCase();
+  const ref = (movement.reference || "").toLowerCase();
+  return (
+    notes.includes("document") ||
+    notes.includes("ingested") ||
+    notes.includes("ai extracted") ||
+    UUID_PATTERN.test(ref)
+  );
+}
+
+// Build a map of item_id → most recent document-sourced movement
+function buildDocSourceMap(movements) {
+  const map = {};
+  for (const m of movements) {
+    if (isDocumentSourced(m)) {
+      const existing = map[m.item_id];
+      if (!existing || new Date(m.created_at) > new Date(existing.created_at)) {
+        map[m.item_id] = m;
+      }
+    }
+  }
+  return map;
+}
+
+// ── Document Source Badge (WP-I) ───────────────────────────────────────
+function DocumentSourceBadge({ movement }) {
+  if (!movement) return null;
+  const date = new Date(movement.created_at).toLocaleDateString("en-ZA", {
+    day: "numeric",
+    month: "short",
+  });
+  return (
+    <span
+      title={`Updated via Document Ingestion on ${date}${movement.reference ? " · Ref: " + movement.reference : ""}`}
+      style={{
+        fontSize: "9px",
+        padding: "1px 6px",
+        borderRadius: 20,
+        background: C.lightPurple,
+        color: C.purple,
+        border: `1px solid ${C.purple}`,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        fontFamily: F.body,
+        whiteSpace: "nowrap",
+        cursor: "default",
+      }}
+    >
+      🔬 DOC
+    </span>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -150,7 +216,7 @@ export default function StockControl() {
           .from("stock_movements")
           .select("*, inventory_items(name, sku)")
           .order("created_at", { ascending: false })
-          .limit(100),
+          .limit(200), // increased from 100 to catch more document movements
         supabase.from("suppliers").select("*").order("name"),
         supabase
           .from("purchase_orders")
@@ -255,6 +321,7 @@ export default function StockControl() {
             <ItemsView
               items={items}
               suppliers={suppliers}
+              movements={movements}
               onRefresh={fetchAll}
             />
           )}
@@ -565,14 +632,17 @@ function StatCard({ label, value, sub, color }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ITEMS — Inventory list + add/edit
+// ITEMS — Inventory list + add/edit (v1.1: receives movements, shows doc badge)
 // ═══════════════════════════════════════════════════════════════════════════
-function ItemsView({ items, suppliers, onRefresh }) {
+function ItemsView({ items, suppliers, movements, onRefresh }) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // WP-I: build document source map from movements
+  const docSourceMap = buildDocSourceMap(movements);
 
   const filtered = items.filter((i) => {
     if (filter !== "all" && i.category !== filter) return false;
@@ -708,6 +778,7 @@ function ItemsView({ items, suppliers, onRefresh }) {
               <th style={{ ...sTh, textAlign: "right" }}>Sell</th>
               <th style={{ ...sTh, textAlign: "right" }}>Margin</th>
               <th style={sTh}>Supplier</th>
+              <th style={sTh}>Source</th>
               <th style={sTh}>Actions</th>
             </tr>
           </thead>
@@ -715,7 +786,7 @@ function ItemsView({ items, suppliers, onRefresh }) {
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan="10"
+                  colSpan="11"
                   style={{
                     ...sTd,
                     textAlign: "center",
@@ -732,6 +803,8 @@ function ItemsView({ items, suppliers, onRefresh }) {
                   item.reorder_level > 0 &&
                   item.quantity_on_hand <= item.reorder_level;
                 const isOut = item.quantity_on_hand <= 0;
+                // WP-I: check for document-sourced movement for this item
+                const docMovement = docSourceMap[item.id] || null;
                 return (
                   <tr key={item.id}>
                     <td
@@ -801,6 +874,10 @@ function ItemsView({ items, suppliers, onRefresh }) {
                     <td style={{ ...sTd, fontSize: "12px", color: C.muted }}>
                       {item.suppliers?.name || "—"}
                     </td>
+                    {/* WP-I: Document source badge */}
+                    <td style={sTd}>
+                      <DocumentSourceBadge movement={docMovement} />
+                    </td>
                     <td style={sTd}>
                       <div style={{ display: "flex", gap: "6px" }}>
                         <button
@@ -848,6 +925,12 @@ function ItemsView({ items, suppliers, onRefresh }) {
       >
         Showing {filtered.length} of {items.filter((i) => i.is_active).length}{" "}
         active items
+        {Object.keys(docSourceMap).length > 0 && (
+          <span style={{ marginLeft: 12, color: C.purple }}>
+            · 🔬 {Object.keys(docSourceMap).length} updated via document
+            ingestion
+          </span>
+        )}
       </div>
     </div>
   );
@@ -1224,7 +1307,6 @@ function MovementsView({ movements, items, onRefresh }) {
       );
       const finalQty = isOut ? -Math.abs(qty) : Math.abs(qty);
 
-      // Insert movement
       const { error: moveErr } = await supabase.from("stock_movements").insert({
         item_id: form.item_id,
         quantity: finalQty,
@@ -1234,7 +1316,6 @@ function MovementsView({ movements, items, onRefresh }) {
       });
       if (moveErr) throw moveErr;
 
-      // Update quantity on hand
       const item = items.find((i) => i.id === form.item_id);
       if (item) {
         const newQty = (item.quantity_on_hand || 0) + finalQty;
@@ -1418,7 +1499,6 @@ function MovementsView({ movements, items, onRefresh }) {
         </div>
       )}
 
-      {/* Movements table */}
       <div style={{ ...sCard, padding: "0", overflow: "auto" }}>
         <table style={sTable}>
           <thead>
@@ -1467,17 +1547,24 @@ function MovementsView({ movements, items, onRefresh }) {
                     {m.inventory_items?.sku || "—"}
                   </td>
                   <td style={sTd}>
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        padding: "2px 8px",
-                        borderRadius: "2px",
-                        background: m.quantity >= 0 ? "#d4edda" : "#fde8e8",
-                        color: m.quantity >= 0 ? C.green : C.red,
-                      }}
+                    <div
+                      style={{ display: "flex", gap: 4, alignItems: "center" }}
                     >
-                      {MOVEMENT_LABELS[m.movement_type] || m.movement_type}
-                    </span>
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          padding: "2px 8px",
+                          borderRadius: "2px",
+                          background: m.quantity >= 0 ? "#d4edda" : "#fde8e8",
+                          color: m.quantity >= 0 ? C.green : C.red,
+                        }}
+                      >
+                        {MOVEMENT_LABELS[m.movement_type] || m.movement_type}
+                      </span>
+                      {isDocumentSourced(m) && (
+                        <DocumentSourceBadge movement={m} />
+                      )}
+                    </div>
                   </td>
                   <td
                     style={{
@@ -1580,7 +1667,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           expected_date: form.expected_date || null,
           notes: form.notes || null,
           currency: form.currency,
-          subtotal: subtotal,
+          subtotal,
           status: "draft",
         })
         .select()
@@ -1630,17 +1717,17 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
       return;
     }
 
-    // If received, auto-create stock movements for each line item
     if (newStatus === "received" && po.purchase_order_items) {
       for (const line of po.purchase_order_items) {
-        await supabase.from("stock_movements").insert({
-          item_id: line.item_id,
-          quantity: line.quantity_ordered,
-          movement_type: "purchase_in",
-          reference: po.po_number,
-          notes: `Auto-recorded from PO ${po.po_number}`,
-        });
-        // Update quantity on hand
+        await supabase
+          .from("stock_movements")
+          .insert({
+            item_id: line.item_id,
+            quantity: line.quantity_ordered,
+            movement_type: "purchase_in",
+            reference: po.po_number,
+            notes: `Auto-recorded from PO ${po.po_number}`,
+          });
         const item = items.find((i) => i.id === line.item_id);
         if (item) {
           await supabase
@@ -1843,7 +1930,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
               onChange={(e) => set("notes", e.target.value)}
             />
           </div>
-
           <div
             style={{
               display: "flex",
@@ -1858,7 +1944,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
         </div>
       )}
 
-      {/* PO list */}
       <div style={{ display: "grid", gap: "12px" }}>
         {orders.length === 0 ? (
           <div
@@ -1941,7 +2026,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                   )}
                 </div>
               </div>
-
               {po.purchase_order_items &&
                 po.purchase_order_items.length > 0 && (
                   <div
@@ -1956,7 +2040,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                     {po.currency} {po.subtotal?.toFixed(2)}
                   </div>
                 )}
-
               {po.expected_date && (
                 <div style={{ fontSize: "11px", color: C.muted }}>
                   Expected: {po.expected_date}
@@ -1998,7 +2081,6 @@ function SuppliersView({ suppliers, onRefresh }) {
     website: "",
     notes: "",
   });
-
   const set = (key, val) => setForm((p) => ({ ...p, [key]: val }));
 
   const openEdit = (s) => {
@@ -2026,8 +2108,7 @@ function SuppliersView({ suppliers, onRefresh }) {
       Object.keys(data).forEach((k) => {
         if (data[k] === "") data[k] = null;
       });
-      data.name = form.name; // keep name
-
+      data.name = form.name;
       if (editSupplier) {
         const { error } = await supabase
           .from("suppliers")
@@ -2254,7 +2335,6 @@ function SuppliersView({ suppliers, onRefresh }) {
         </div>
       )}
 
-      {/* Supplier cards */}
       <div
         style={{
           display: "grid",

@@ -1,4 +1,5 @@
 // src/components/AdminBatchManager.js
+// v1.1 — WP-I: COA source document link on batch card when coa_document_id is set
 // v1.0 — March 2026
 // WP1 — Batch Manager
 // Features:
@@ -10,6 +11,7 @@
 //   - Edit batch
 //   - Archive batch (never delete)
 //   - "Generate QR Codes" button → navigates to QR tab
+//   - COA source document badge linking to document_log record (WP-I)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -32,6 +34,8 @@ const C = {
   lightGreen: "#eafaf1",
   blue: "#2c4a6e",
   lightBlue: "#eaf0f8",
+  purple: "#6c3483",
+  lightPurple: "#f5eef8",
 };
 const FONTS = {
   heading: "'Cormorant Garamond', Georgia, serif",
@@ -219,8 +223,47 @@ function ProgressBar({ value, max, color = C.accent }) {
   );
 }
 
+// ─── COA Document Source Badge (WP-I) ─────────────────────────────────────────
+// Shows when a batch's COA was ingested via the Document Ingestion Engine
+function COADocumentBadge({ coaDocumentId, onViewInDocuments }) {
+  if (!coaDocumentId) return null;
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onViewInDocuments) onViewInDocuments(coaDocumentId);
+      }}
+      title="This COA was ingested via the Document Engine — click to view source document"
+      style={{
+        fontSize: 10,
+        padding: "2px 8px",
+        borderRadius: 20,
+        backgroundColor: C.lightPurple,
+        color: C.purple,
+        border: `1px solid ${C.purple}`,
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        cursor: onViewInDocuments ? "pointer" : "default",
+        fontFamily: FONTS.body,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+      }}
+    >
+      🔬 AI INGESTED
+    </button>
+  );
+}
+
 // ─── Batch Card ───────────────────────────────────────────────────────────────
-function BatchCard({ batch, stats, onEdit, onArchive, onGoToQR }) {
+function BatchCard({
+  batch,
+  stats,
+  onEdit,
+  onArchive,
+  onGoToQR,
+  onViewDocumentSource,
+}) {
   const qr = stats?.qr_count || 0;
   const claimed = stats?.claimed_count || 0;
   const activation = pct(claimed, qr);
@@ -428,6 +471,12 @@ function BatchCard({ batch, stats, onEdit, onArchive, onGoToQR }) {
         ) : (
           <span style={{ fontSize: 10, color: C.muted }}>No COA uploaded</span>
         )}
+
+        {/* WP-I: AI Ingested COA badge */}
+        <COADocumentBadge
+          coaDocumentId={batch.coa_document_id}
+          onViewInDocuments={onViewDocumentSource}
+        />
       </div>
 
       {/* Actions */}
@@ -1052,7 +1101,10 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function AdminBatchManager({ onNavigateToQR }) {
+export default function AdminBatchManager({
+  onNavigateToQR,
+  onNavigateToDocuments,
+}) {
   const [batches, setBatches] = useState([]);
   const [statsMap, setStatsMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -1148,6 +1200,11 @@ export default function AdminBatchManager({ onNavigateToQR }) {
   // ── Go to QR generator ───────────────────────────────────────────────────
   const handleGoToQR = (batchId) => {
     if (onNavigateToQR) onNavigateToQR(batchId);
+  };
+
+  // ── Go to Document source (WP-I) ─────────────────────────────────────────
+  const handleViewDocumentSource = (documentId) => {
+    if (onNavigateToDocuments) onNavigateToDocuments(documentId);
   };
 
   // ── Filtered list ────────────────────────────────────────────────────────
@@ -1462,6 +1519,7 @@ export default function AdminBatchManager({ onNavigateToQR }) {
               }}
               onArchive={(b) => setArchiveTarget(b)}
               onGoToQR={handleGoToQR}
+              onViewDocumentSource={handleViewDocumentSource}
             />
           ))}
         </div>

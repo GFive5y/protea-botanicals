@@ -1,4 +1,5 @@
-// src/pages/HQDashboard.js — Protea Botanicals v3.1
+// src/pages/HQDashboard.js — Protea Botanicals v3.2
+// v3.2: WP-I — Documents tab added (14th tab, HQDocuments.js)
 // v3.1: WP-H — pass onNavigate to HQOverview (ERP quick-action tiles)
 // v3.0: Reorder & Scoring tab (WP-F+G)
 // v2.9: P&L tab (WP-E)
@@ -19,6 +20,7 @@ import HQCogs from "../components/hq/HQCogs";
 import HQPricing from "../components/hq/HQPricing";
 import HQProfitLoss from "../components/hq/HQProfitLoss";
 import HQReorderScoring from "../components/hq/HQReorderScoring";
+import HQDocuments from "../components/hq/HQDocuments";
 
 const C = {
   primaryDark: "#1b4332",
@@ -43,6 +45,7 @@ const TABS = [
   { id: "pricing", label: "Pricing", icon: "💰" },
   { id: "pl", label: "P&L", icon: "📉" },
   { id: "reorder", label: "Reorder", icon: "🔔" },
+  { id: "documents", label: "Documents", icon: "📄" },
 ];
 
 export default function HQDashboard() {
@@ -207,6 +210,7 @@ export default function HQDashboard() {
         {activeTab === "reorder" && (
           <HQReorderScoring onNavigate={(tab) => setActiveTab(tab)} />
         )}
+        {activeTab === "documents" && <HQDocuments />}
       </div>
     </div>
   );
