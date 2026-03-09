@@ -1,17 +1,14 @@
-// src/components/hq/RetailerHealth.js
-// v1.0 — March 2026
+// src/components/hq/RetailerHealth.js — Protea Botanicals v1.1
 // WP6 — Retailer Health Score & Partner Analytics
 //
 // Features:
-//   - Health score calculation per retailer (0–100) from live data:
-//       Scan activity (30%), Shipment receipt & confirmation (25%),
-//       Loyalty engagement (20%), Stock movement (15%), Recency (10%)
+//   - Health score calculation per retailer (0–100) from live data
 //   - Tier classification: Platinum ≥85 | Gold ≥70 | Silver ≥50 | Bronze <50
 //   - Writes health_score + activation_rate + tier + monthly_unit_avg back to tenants
-//   - Retailer card grid with score ring, tier badge, KPI breakdown
-//   - Detail modal: full score breakdown, trend, shipment history
-//   - Bulk recalculate all scores button
-//   - League table sorted by score
+//   - ★ v1.1: Margin per Retailer — fetches product_pricing (retail) + product_cogs
+//     + supplier_products + fx_rates. For each retailer, calculates weighted avg margin
+//     on products they've received (from shipment history). Shows per-retailer margin
+//     grade in card, full breakdown in detail modal.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -41,7 +38,6 @@ const F = {
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ── Tier config ───────────────────────────────────────────────────────────
 const TIERS = {
   platinum: {
     label: "Platinum",
@@ -73,12 +69,21 @@ function getTier(score) {
   if (score >= 50) return "silver";
   return "bronze";
 }
-
 function getTierConfig(score) {
   return TIERS[getTier(score)];
 }
 
-// ── Shared styles ─────────────────────────────────────────────────────────
+function marginColor(pct) {
+  if (pct >= 35) return C.accent;
+  if (pct >= 20) return C.gold;
+  return C.red;
+}
+function marginLabel(pct) {
+  if (pct >= 35) return "Healthy";
+  if (pct >= 20) return "Moderate";
+  return "Low";
+}
+
 const sCard = {
   background: C.white,
   border: `1px solid ${C.border}`,
@@ -111,7 +116,6 @@ function ScoreRing({ score, size = 80 }) {
   const pct = Math.max(0, Math.min(100, score));
   const dash = (pct / 100) * circ;
   const tier = getTierConfig(score);
-
   return (
     <div
       style={{ position: "relative", width: size, height: size, flexShrink: 0 }}
@@ -173,7 +177,6 @@ function ScoreRing({ score, size = 80 }) {
   );
 }
 
-// ── Score Bar (sub-metric) ────────────────────────────────────────────────
 function ScoreBar({ label, score, max, color = C.accent }) {
   const pct = max > 0 ? Math.round((score / max) * 100) : 0;
   return (
@@ -205,7 +208,6 @@ function ScoreBar({ label, score, max, color = C.accent }) {
   );
 }
 
-// ── Tier Badge ────────────────────────────────────────────────────────────
 function TierBadge({ score }) {
   const t = getTierConfig(score);
   const key = getTier(score);
@@ -231,10 +233,33 @@ function TierBadge({ score }) {
   );
 }
 
+// ── Margin Badge ──────────────────────────────────────────────────────────
+function MarginBadge({ pct }) {
+  if (pct === null || pct === undefined)
+    return <span style={{ fontSize: 10, color: C.muted }}>—</span>;
+  const color = marginColor(pct);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "2px 8px",
+        borderRadius: 2,
+        fontSize: 10,
+        fontWeight: 700,
+        backgroundColor: `${color}15`,
+        color,
+        border: `1px solid ${color}30`,
+      }}
+    >
+      {pct.toFixed(1)}% margin
+    </span>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // SCORE CALCULATOR
-// Inputs: tenant + scans[] + shipments[] + movements[] + loyalty[]
-// Returns: { total, breakdown: { scans, shipments, loyalty, stock, recency } }
 // ═══════════════════════════════════════════════════════════════════════════
 function calculateHealthScore(
   tenant,
@@ -245,13 +270,11 @@ function calculateHealthScore(
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 86400000);
   const sixMonthsAgo = new Date(now.getTime() - 180 * 86400000);
 
-  // ── 1. Scan Activity (30 pts) ─────────────────────────────────────────
   const recentScans = scans.filter(
     (s) => new Date(s.scan_date) >= thirtyDaysAgo,
   ).length;
-  const scanScore = Math.min(30, Math.round((recentScans / 20) * 30)); // 20 scans = full marks
+  const scanScore = Math.min(30, Math.round((recentScans / 20) * 30));
 
-  // ── 2. Shipment Receipt & Confirmation (25 pts) ───────────────────────
   const tenantShipments = shipments.filter(
     (s) =>
       s.destination_name?.toLowerCase() === tenant.name?.toLowerCase() ||
@@ -267,44 +290,39 @@ function calculateHealthScore(
     ["delivered", "confirmed"].includes(s.status),
   );
   let shipScore = 0;
-  if (recentShipments.length > 0) shipScore += 10; // has received shipments
-  if (deliveredShipments.length > 0) shipScore += 10; // delivery confirmed
-  if (confirmedShipments.length > 0) shipScore += 5; // explicitly confirmed
+  if (recentShipments.length > 0) shipScore += 10;
+  if (deliveredShipments.length > 0) shipScore += 10;
+  if (confirmedShipments.length > 0) shipScore += 5;
   shipScore = Math.min(25, shipScore);
 
-  // ── 3. Loyalty Engagement (20 pts) ───────────────────────────────────
   const recentLoyalty = loyalty.filter(
     (l) => new Date(l.created_at || now) >= thirtyDaysAgo,
   );
   const redemptions = recentLoyalty.filter((l) =>
     ["REDEEMED", "redeemed", "REDEEMED_POINTS"].includes(l.transaction_type),
   ).length;
-  const loyaltyScore = Math.min(20, Math.round((redemptions / 5) * 20)); // 5 redemptions = full marks
+  const loyaltyScore = Math.min(20, Math.round((redemptions / 5) * 20));
 
-  // ── 4. Stock Movement Activity (15 pts) ──────────────────────────────
   const recentMovements = movements.filter(
     (m) => new Date(m.created_at) >= thirtyDaysAgo,
   );
   const stockScore = Math.min(
     15,
     Math.round((recentMovements.length / 10) * 15),
-  ); // 10 movements = full marks
+  );
 
-  // ── 5. Recency — last active (10 pts) ────────────────────────────────
   const lastScan = scans.length > 0 ? new Date(scans[0].scan_date) : null;
   let recencyScore = 0;
   if (lastScan) {
-    const daysSinceLastScan = (now - lastScan) / 86400000;
-    if (daysSinceLastScan <= 7) recencyScore = 10;
-    else if (daysSinceLastScan <= 14) recencyScore = 8;
-    else if (daysSinceLastScan <= 30) recencyScore = 5;
-    else if (daysSinceLastScan <= 90) recencyScore = 2;
+    const daysSince = (now - lastScan) / 86400000;
+    if (daysSince <= 7) recencyScore = 10;
+    else if (daysSince <= 14) recencyScore = 8;
+    else if (daysSince <= 30) recencyScore = 5;
+    else if (daysSince <= 90) recencyScore = 2;
   }
 
   const total =
     scanScore + shipScore + loyaltyScore + stockScore + recencyScore;
-
-  // ── Activation rate: scans in 30d / total scans (capped at 100%) ──────
   const activationRate =
     scans.length > 0
       ? Math.min(
@@ -313,7 +331,6 @@ function calculateHealthScore(
         )
       : 0;
 
-  // ── Monthly unit avg from confirmed shipment items (last 6 months) ────
   const sixMonthShipments = tenantShipments.filter(
     (s) =>
       ["delivered", "confirmed"].includes(s.status) &&
@@ -371,12 +388,81 @@ function calculateHealthScore(
       redemptions,
       recentMovements: recentMovements.length,
       lastScan,
+      // v1.1: shipment items for this tenant (for margin calculation)
+      receivedShipmentItems: sixMonthShipments.flatMap(
+        (s) => s.shipment_items || [],
+      ),
     },
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v1.1: MARGIN CALCULATOR
+// Calculates weighted avg margin for a tenant based on products they've received.
+// Uses product_pricing (retail channel) + product_cogs as baseline.
+// Falls back to global retail avg if no shipment-item match.
+// ═══════════════════════════════════════════════════════════════════════════
+function calculateRetailerMargin(
+  tenantScoreData,
+  { pricingMap, globalAvgMargin },
+) {
+  if (!pricingMap || Object.keys(pricingMap).length === 0) {
+    return { avgMargin: null, productMargins: [], source: "none" };
+  }
+
+  const receivedItems = tenantScoreData?.meta?.receivedShipmentItems || [];
+
+  if (receivedItems.length === 0) {
+    // No received items in last 6 months — use global retail avg
+    return { avgMargin: globalAvgMargin, productMargins: [], source: "global" };
+  }
+
+  // Match shipment items to pricing by item_name
+  const matched = [];
+  for (const si of receivedItems) {
+    const name = (si.item_name || "").toLowerCase().trim();
+    // Look for matching key in pricingMap
+    const key = Object.keys(pricingMap).find(
+      (k) =>
+        name.includes(k.toLowerCase()) ||
+        k.toLowerCase().includes(name.split(" ")[0]),
+    );
+    if (key && pricingMap[key]) {
+      matched.push({
+        name: si.item_name,
+        qty: si.quantity || 1,
+        ...pricingMap[key],
+      });
+    }
+  }
+
+  if (matched.length === 0) {
+    return { avgMargin: globalAvgMargin, productMargins: [], source: "global" };
+  }
+
+  // Weighted average by quantity
+  const totalQty = matched.reduce((s, m) => s + m.qty, 0);
+  const weightedMargin =
+    matched.reduce((s, m) => s + m.margin * m.qty, 0) / totalQty;
+
+  const productMargins = [...new Map(matched.map((m) => [m.name, m])).values()];
+
+  return {
+    avgMargin: parseFloat(weightedMargin.toFixed(1)),
+    productMargins,
+    source: "shipments",
+  };
+}
+
 // ── Retailer Card ─────────────────────────────────────────────────────────
-function RetailerCard({ tenant, scoreData, onView, onRecalculate, saving }) {
+function RetailerCard({
+  tenant,
+  scoreData,
+  marginData,
+  onView,
+  onRecalculate,
+  saving,
+}) {
   const { total, breakdown, activationRate } = scoreData;
   const tier = getTierConfig(total);
 
@@ -392,9 +478,8 @@ function RetailerCard({ tenant, scoreData, onView, onRecalculate, saving }) {
         (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")
       }
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
-      onClick={() => onView(tenant, scoreData)}
+      onClick={() => onView(tenant, scoreData, marginData)}
     >
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -425,10 +510,15 @@ function RetailerCard({ tenant, scoreData, onView, onRecalculate, saving }) {
               {tenant.name}
             </div>
             <TierBadge score={total} />
+            {/* v1.1: Margin badge */}
+            {marginData?.avgMargin !== null &&
+              marginData?.avgMargin !== undefined && (
+                <MarginBadge pct={marginData.avgMargin} />
+              )}
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-            {tenant.type}{" "}
-            {tenant.location_city ? `· ${tenant.location_city}` : ""}
+            {tenant.type}
+            {tenant.location_city ? ` · ${tenant.location_city}` : ""}
             {tenant.location_province ? `, ${tenant.location_province}` : ""}
           </div>
           <div
@@ -451,7 +541,6 @@ function RetailerCard({ tenant, scoreData, onView, onRecalculate, saving }) {
         </div>
       </div>
 
-      {/* Score bars */}
       <div style={{ marginBottom: 12 }}>
         {Object.values(breakdown).map((b) => (
           <ScoreBar
@@ -464,7 +553,6 @@ function RetailerCard({ tenant, scoreData, onView, onRecalculate, saving }) {
         ))}
       </div>
 
-      {/* Footer */}
       <div
         style={{
           display: "flex",
@@ -506,7 +594,7 @@ function RetailerCard({ tenant, scoreData, onView, onRecalculate, saving }) {
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────
-function DetailModal({ tenant, scoreData, onClose }) {
+function DetailModal({ tenant, scoreData, marginData, onClose }) {
   if (!tenant || !scoreData) return null;
   const { total, breakdown, activationRate, monthlyUnitAvg, meta } = scoreData;
   const tier = getTierConfig(total);
@@ -534,9 +622,9 @@ function DetailModal({ tenant, scoreData, onClose }) {
           background: C.white,
           borderRadius: 2,
           padding: 32,
-          maxWidth: 580,
+          maxWidth: 600,
           width: "90%",
-          maxHeight: "88vh",
+          maxHeight: "90vh",
           overflowY: "auto",
           fontFamily: F.body,
         }}
@@ -639,6 +727,10 @@ function DetailModal({ tenant, scoreData, onClose }) {
             />
           ))}
         </div>
+
+        {/* ── v1.1: Margin Section ─────────────────────────────────── */}
+        <MarginSection marginData={marginData} />
+        {/* ── end v1.1 ─────────────────────────────────────────────── */}
 
         {/* KPIs */}
         <div style={sLabel}>Partner Metrics</div>
@@ -778,16 +870,238 @@ function DetailModal({ tenant, scoreData, onClose }) {
   );
 }
 
+// ── v1.1: Margin Section (shown in Detail Modal) ──────────────────────────
+function MarginSection({ marginData }) {
+  if (!marginData || marginData.avgMargin === null) {
+    return (
+      <div
+        style={{
+          marginBottom: 20,
+          padding: "12px 16px",
+          background: "#fafaf8",
+          border: `1px dashed ${C.border}`,
+          borderRadius: 2,
+        }}
+      >
+        <div style={sLabel}>Margin Analysis</div>
+        <div style={{ fontSize: 12, color: C.muted }}>
+          No product pricing data available for this retailer yet.
+        </div>
+      </div>
+    );
+  }
+
+  const { avgMargin, productMargins, source } = marginData;
+  const color = marginColor(avgMargin);
+  const label = marginLabel(avgMargin);
+
+  return (
+    <div
+      style={{
+        marginBottom: 20,
+        padding: "16px",
+        background: `${color}08`,
+        border: `1px solid ${color}25`,
+        borderRadius: 2,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 12,
+        }}
+      >
+        <div style={sLabel}>Margin Analysis</div>
+        <span style={{ fontSize: 10, color: C.muted, letterSpacing: "0.08em" }}>
+          {source === "global"
+            ? "Global retail avg"
+            : "Based on received products"}
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 20,
+          marginBottom: productMargins.length > 0 ? 16 : 0,
+        }}
+      >
+        {/* Big margin number */}
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              fontFamily: F.heading,
+              fontSize: 42,
+              fontWeight: 300,
+              color,
+              lineHeight: 1,
+            }}
+          >
+            {avgMargin.toFixed(1)}%
+          </div>
+          <div
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color,
+              fontWeight: 700,
+              marginTop: 2,
+            }}
+          >
+            {label} Margin
+          </div>
+        </div>
+        {/* Visual bar */}
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 9,
+              color: C.muted,
+              marginBottom: 3,
+            }}
+          >
+            <span>0%</span>
+            <span>20% (min)</span>
+            <span>35% (target)</span>
+            <span>50%+</span>
+          </div>
+          <div
+            style={{
+              position: "relative",
+              height: 8,
+              background: C.border,
+              borderRadius: 4,
+            }}
+          >
+            {/* Zone markers */}
+            <div
+              style={{
+                position: "absolute",
+                left: "40%",
+                top: 0,
+                bottom: 0,
+                width: 1,
+                background: C.orange,
+                opacity: 0.5,
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                left: "70%",
+                top: 0,
+                bottom: 0,
+                width: 1,
+                background: C.accent,
+                opacity: 0.5,
+              }}
+            />
+            {/* Actual */}
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                height: "100%",
+                width: `${Math.min(100, avgMargin * 2)}%`,
+                background: color,
+                borderRadius: 4,
+                transition: "width 0.6s ease",
+              }}
+            />
+          </div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+            {avgMargin >= 35
+              ? "✓ Meeting target margin"
+              : avgMargin >= 20
+                ? "⚠ Below 35% target"
+                : "⛔ Below 20% minimum"}
+          </div>
+        </div>
+      </div>
+
+      {/* Per-product breakdown */}
+      {productMargins.length > 0 && (
+        <div>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: C.primaryDark,
+              marginBottom: 8,
+            }}
+          >
+            Product Breakdown
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {productMargins.map((pm) => (
+              <div
+                key={pm.name}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "6px 10px",
+                  background: C.white,
+                  borderRadius: 2,
+                  border: `1px solid ${C.border}`,
+                }}
+              >
+                <span style={{ fontSize: 12, color: C.text, fontWeight: 500 }}>
+                  {pm.name}
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    fontSize: 11,
+                  }}
+                >
+                  {pm.sellPrice && (
+                    <span style={{ color: C.muted }}>
+                      Sell: R{pm.sellPrice.toFixed(2)}
+                    </span>
+                  )}
+                  {pm.cogs && (
+                    <span style={{ color: C.muted }}>
+                      COGS: R{pm.cogs.toFixed(2)}
+                    </span>
+                  )}
+                  <span
+                    style={{ fontWeight: 700, color: marginColor(pm.margin) }}
+                  >
+                    {pm.margin.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 export default function RetailerHealth() {
   const [tenants, setTenants] = useState([]);
-  const [scores, setScores] = useState({}); // { tenantId: scoreData }
+  const [scores, setScores] = useState({});
+  const [margins, setMargins] = useState({}); // v1.1: { tenantId: { avgMargin, productMargins, source } }
   const [loading, setLoading] = useState(true);
-  const [recalcing, setRecalcing] = useState({}); // { tenantId: bool }
+  const [recalcing, setRecalcing] = useState({});
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [viewTarget, setViewTarget] = useState(null); // { tenant, scoreData }
+  const [viewTarget, setViewTarget] = useState(null);
   const [filter, setFilter] = useState("all");
   const [toast, setToast] = useState("");
   const [lastCalc, setLastCalc] = useState(null);
@@ -800,28 +1114,65 @@ export default function RetailerHealth() {
   const fetchAndCalculate = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch all data needed for scoring
-      const [tenantsRes, scansRes, shipmentsRes, movementsRes, loyaltyRes] =
-        await Promise.all([
-          supabase.from("tenants").select("*").eq("is_active", true),
-          supabase
-            .from("scans")
-            .select("id,product_id,source,scan_date")
-            .order("scan_date", { ascending: false }),
-          supabase
-            .from("shipments")
-            .select(
-              "id,shipment_number,destination_name,destination_tenant_id,status,created_at,confirmed_date,delivered_date,shipment_items(quantity,total_cost)",
-            ),
-          supabase
-            .from("stock_movements")
-            .select("id,item_id,quantity,movement_type,reference,created_at")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("loyalty_transactions")
-            .select("points,transaction_type,created_at")
-            .catch(() => ({ data: [] })),
-        ]);
+      // Fetch all health score data + v1.1: pricing/cogs/fx
+      const [
+        tenantsRes,
+        scansRes,
+        shipmentsRes,
+        movementsRes,
+        loyaltyRes,
+        pricingRes,
+        cogsRes,
+        fxRes,
+      ] = await Promise.all([
+        supabase.from("tenants").select("*").eq("is_active", true),
+        supabase
+          .from("scans")
+          .select("id,product_id,source,scan_date")
+          .order("scan_date", { ascending: false }),
+        supabase
+          .from("shipments")
+          .select(
+            "id,shipment_number,destination_name,destination_tenant_id,status,created_at,confirmed_date,delivered_date,shipment_items(quantity,total_cost,item_name,unit_cost)",
+          ),
+        supabase
+          .from("stock_movements")
+          .select("id,item_id,quantity,movement_type,reference,created_at")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("loyalty_transactions")
+          .select("points,transaction_type,created_at")
+          .catch(() => ({ data: [] })),
+        // v1.1: retail pricing
+        supabase
+          .from("product_pricing")
+          .select("id,product_cogs_id,channel,sell_price_zar")
+          .eq("channel", "retail"),
+        // v1.1: product COGS with joins
+        supabase
+          .from("product_cogs")
+          .select(
+            `
+          id, product_name, sku,
+          hardware_item_id, hardware_qty,
+          terpene_item_id, terpene_qty_g,
+          distillate_input_id, distillate_qty_ml,
+          packaging_input_id, packaging_qty,
+          labour_input_id, labour_qty,
+          other_cost_zar,
+          hardware:hardware_item_id(unit_price_usd),
+          terpene:terpene_item_id(unit_price_usd)
+        `,
+          )
+          .eq("is_active", true),
+        // v1.1: FX rate
+        supabase
+          .from("fx_rates")
+          .select("rate")
+          .eq("currency_pair", "USD/ZAR")
+          .order("fetched_at", { ascending: false })
+          .limit(1),
+      ]);
 
       const allTenants = (tenantsRes.data || []).filter((t) => t.type !== "hq");
       const allScans = scansRes.data || [];
@@ -829,19 +1180,102 @@ export default function RetailerHealth() {
       const allMovements = movementsRes.data || [];
       const allLoyalty = loyaltyRes.data || [];
 
+      // ── v1.1: Build pricing map ────────────────────────────────────────
+      const fxRate = fxRes.data?.[0]?.rate || 18.5;
+      const allPricing = pricingRes.data || [];
+      const allCogs = cogsRes.data || [];
+
+      // Fetch local inputs needed for COGS calculation
+      const localIds = [
+        ...new Set(
+          allCogs.flatMap((c) =>
+            [
+              c.distillate_input_id,
+              c.packaging_input_id,
+              c.labour_input_id,
+            ].filter(Boolean),
+          ),
+        ),
+      ];
+      let locals = [];
+      if (localIds.length > 0) {
+        const { data } = await supabase
+          .from("local_inputs")
+          .select("id, name, cost_zar")
+          .in("id", localIds);
+        locals = data || [];
+      }
+      const getLocal = (id) => locals.find((l) => l.id === id);
+
+      // Build pricingMap: { productName (lowercase) → { margin, sellPrice, cogs } }
+      const pricingMap = {};
+      let globalMarginSum = 0;
+      let globalMarginCount = 0;
+
+      for (const p of allPricing) {
+        const cog = allCogs.find((c) => c.id === p.product_cogs_id);
+        if (!cog) continue;
+
+        const hwCost =
+          (cog.hardware?.unit_price_usd || 0) *
+          (cog.hardware_qty || 1) *
+          fxRate;
+        const tpCost =
+          ((cog.terpene?.unit_price_usd || 0) / 50) *
+          fxRate *
+          (cog.terpene_qty_g || 0);
+        const dist = getLocal(cog.distillate_input_id);
+        const pack = getLocal(cog.packaging_input_id);
+        const labour = getLocal(cog.labour_input_id);
+        const distCost = (dist?.cost_zar || 0) * (cog.distillate_qty_ml || 0);
+        const packCost = (pack?.cost_zar || 0) * (cog.packaging_qty || 0);
+        const labourCost = (labour?.cost_zar || 0) * (cog.labour_qty || 0);
+        const totalCogs =
+          hwCost +
+          tpCost +
+          distCost +
+          packCost +
+          labourCost +
+          (cog.other_cost_zar || 0);
+
+        const sellPrice = p.sell_price_zar || 0;
+        const margin =
+          sellPrice > 0 ? ((sellPrice - totalCogs) / sellPrice) * 100 : 0;
+
+        pricingMap[cog.product_name] = { margin, sellPrice, cogs: totalCogs };
+        globalMarginSum += margin;
+        globalMarginCount++;
+      }
+
+      const globalAvgMargin =
+        globalMarginCount > 0
+          ? parseFloat((globalMarginSum / globalMarginCount).toFixed(1))
+          : null;
+      // ── end v1.1 pricing map ───────────────────────────────────────────
+
       setTenants(allTenants);
 
-      // Calculate score for each non-HQ tenant
       const newScores = {};
+      const newMargins = {};
+
       for (const tenant of allTenants) {
-        newScores[tenant.id] = calculateHealthScore(tenant, {
+        const sd = calculateHealthScore(tenant, {
           scans: allScans,
           shipments: allShipments,
           movements: allMovements,
           loyalty: allLoyalty,
         });
+        newScores[tenant.id] = sd;
+
+        // v1.1: Calculate margin for this tenant
+        newMargins[tenant.id] = calculateRetailerMargin(sd, {
+          pricingMap,
+          globalAvgMargin,
+        });
       }
+
       setScores(newScores);
+      setMargins(newMargins);
       setLastCalc(new Date());
     } catch (err) {
       console.error("RetailerHealth fetchAndCalculate:", err);
@@ -854,7 +1288,6 @@ export default function RetailerHealth() {
     fetchAndCalculate();
   }, [fetchAndCalculate]);
 
-  // ── Write score back to tenants table ────────────────────────────────────
   const saveScore = async (tenant, scoreData) => {
     const { error } = await supabase
       .from("tenants")
@@ -893,17 +1326,14 @@ export default function RetailerHealth() {
     fetchAndCalculate();
   };
 
-  // ── Filter ────────────────────────────────────────────────────────────────
   const sorted = [...tenants].sort(
     (a, b) => (scores[b.id]?.total || 0) - (scores[a.id]?.total || 0),
   );
   const filtered = sorted.filter((t) => {
     if (filter === "all") return true;
-    const score = scores[t.id]?.total || 0;
-    return getTier(score) === filter;
+    return getTier(scores[t.id]?.total || 0) === filter;
   });
 
-  // ── Tier counts ───────────────────────────────────────────────────────────
   const tierCounts = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
   tenants.forEach((t) => {
     tierCounts[getTier(scores[t.id]?.total || 0)]++;
@@ -916,6 +1346,20 @@ export default function RetailerHealth() {
             tenants.length,
         )
       : 0;
+
+  // v1.1: Global avg margin for display
+  const globalAvgMarginDisplay = Object.values(margins).filter(
+    (m) => m.avgMargin !== null,
+  );
+  const globalAvgMarginVal =
+    globalAvgMarginDisplay.length > 0
+      ? parseFloat(
+          (
+            globalAvgMarginDisplay.reduce((s, m) => s + m.avgMargin, 0) /
+            globalAvgMarginDisplay.length
+          ).toFixed(1),
+        )
+      : null;
 
   if (loading) {
     return (
@@ -935,7 +1379,6 @@ export default function RetailerHealth() {
 
   return (
     <div style={{ fontFamily: F.body, position: "relative" }}>
-      {/* Toast */}
       {toast && (
         <div
           style={{
@@ -979,7 +1422,7 @@ export default function RetailerHealth() {
             Retailer Health
           </h2>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-            Live partner scoring · Tier classification · Performance tracking
+            Live partner scoring · Tier classification · Margin analysis
             {lastCalc && (
               <span>
                 {" "}
@@ -1033,7 +1476,7 @@ export default function RetailerHealth() {
         </div>
       </div>
 
-      {/* Summary KPIs */}
+      {/* Summary KPIs — v1.1: added avg margin tile */}
       <div
         style={{
           display: "grid",
@@ -1048,6 +1491,14 @@ export default function RetailerHealth() {
             label: "Avg Score",
             value: `${avgScore}/100`,
             color: avgScore >= 70 ? C.accent : avgScore >= 50 ? C.gold : C.red,
+          },
+          {
+            label: "Avg Margin",
+            value: globalAvgMarginVal !== null ? `${globalAvgMarginVal}%` : "—",
+            color:
+              globalAvgMarginVal !== null
+                ? marginColor(globalAvgMarginVal)
+                : C.muted,
           },
           {
             label: "💎 Platinum",
@@ -1137,7 +1588,7 @@ export default function RetailerHealth() {
         ))}
       </div>
 
-      {/* League Table (top section) */}
+      {/* League Table — v1.1: added Margin column */}
       {sorted.length > 0 && (
         <div style={{ ...sCard, marginBottom: 20 }}>
           <div style={sLabel}>League Table — Ranked by Health Score</div>
@@ -1151,6 +1602,7 @@ export default function RetailerHealth() {
                   "Retailer",
                   "Score",
                   "Tier",
+                  "Avg Margin",
                   "Activation",
                   "Monthly Avg",
                   "Last Scan",
@@ -1176,12 +1628,15 @@ export default function RetailerHealth() {
             <tbody>
               {sorted.map((tenant, i) => {
                 const sd = scores[tenant.id];
+                const md = margins[tenant.id];
                 if (!sd) return null;
                 return (
                   <tr
                     key={tenant.id}
                     style={{ cursor: "pointer" }}
-                    onClick={() => setViewTarget({ tenant, scoreData: sd })}
+                    onClick={() =>
+                      setViewTarget({ tenant, scoreData: sd, marginData: md })
+                    }
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.background = C.bg)
                     }
@@ -1255,6 +1710,39 @@ export default function RetailerHealth() {
                       }}
                     >
                       <TierBadge score={sd.total} />
+                    </td>
+                    {/* v1.1: Margin column */}
+                    <td
+                      style={{
+                        padding: "10px",
+                        borderBottom: `1px solid ${C.border}`,
+                      }}
+                    >
+                      {md?.avgMargin !== null && md?.avgMargin !== undefined ? (
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color: marginColor(md.avgMargin),
+                            fontSize: 12,
+                          }}
+                        >
+                          {md.avgMargin.toFixed(1)}%
+                          {md.source === "global" && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                color: C.muted,
+                                fontWeight: 400,
+                              }}
+                            >
+                              {" "}
+                              (avg)
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span style={{ color: C.muted }}>—</span>
+                      )}
                     </td>
                     <td
                       style={{
@@ -1369,7 +1857,10 @@ export default function RetailerHealth() {
                   meta: {},
                 }
               }
-              onView={(t, sd) => setViewTarget({ tenant: t, scoreData: sd })}
+              marginData={margins[tenant.id] || null}
+              onView={(t, sd, md) =>
+                setViewTarget({ tenant: t, scoreData: sd, marginData: md })
+              }
               onRecalculate={handleRecalculate}
               saving={!!recalcing[tenant.id]}
             />
@@ -1382,6 +1873,7 @@ export default function RetailerHealth() {
         <DetailModal
           tenant={viewTarget.tenant}
           scoreData={viewTarget.scoreData}
+          marginData={viewTarget.marginData}
           onClose={() => setViewTarget(null)}
         />
       )}

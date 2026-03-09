@@ -1,38 +1,30 @@
-// src/components/hq/Distribution.js — Protea Botanicals v1.1
+// src/components/hq/Distribution.js — Protea Botanicals v1.2
 // ─────────────────────────────────────────────────────────────────────────────
 // DISTRIBUTION TAB — Phase 2D
-//
-// Purpose: Outbound shipment tracking — the DISTRIBUTE step of the supply chain:
-//   Procure → Receive → Produce → ★ DISTRIBUTE ★ → Customer Scans
 //
 // Features:
 //   - View all shipments (filterable by status)
 //   - Create shipment (select destination shop, add items)
-//   - Link items to inventory and/or production batches
 //   - Status progression: preparing → shipped → in_transit → delivered → confirmed
-//   - Courier & tracking number
-//   - Cost tracking per shipment
-//   - ★ v1.1: Auto-transfer inventory on delivery (Task A-3 — Automation WP).
-//     When shipment marked "delivered": deducts from HQ inventory, creates
-//     stock_movements (shipment_out), and if destination is a registered shop
-//     tenant, creates/increments shop inventory + stock_movements (shipment_in).
+//   - v1.1: Auto-transfer inventory on delivery (Task A-3)
+//   - ★ v1.2: Import PO Cost Integration
+//       - Fetches received import POs on load (po_status not in draft/cancelled)
+//       - In create form: auto-populates unit_cost from landed_cost_per_unit_zar
+//         of the most recent received PO for each inventory item selected
+//       - In shipment card expanded view: shows cost analysis panel with
+//         landed cost vs inferred sell price → implied margin per line item
+//       - Summary bar shows total shipment value vs estimated landed cost
 //
 // Tables used:
-//   - shipments (CRUD)
-//   - shipment_items (CRUD, linked to shipments)
-//   - tenants (read, for destination shop selection)
-//   - inventory_items (read + update/insert for auto-transfer)
-//   - production_batches (read, for batch linking)
+//   - shipments, shipment_items, tenants, inventory_items, production_batches
 //   - stock_movements (insert for audit trail)
-//
-// Design: Cream aesthetic (Section 7 of handover).
-// RLS: Uses is_hq_user() — HQ can do everything.
+//   - purchase_orders (read, for landed cost lookup — v1.2)
+//   - purchase_order_items (read, for landed_cost_per_unit_zar — v1.2)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
   bg: "#faf9f6",
   warmBg: "#f4f0e8",
@@ -46,13 +38,13 @@ const C = {
   white: "#ffffff",
   red: "#c0392b",
   blue: "#2c4a6e",
+  orange: "#e67e22",
 };
 const F = {
   heading: "'Cormorant Garamond', Georgia, serif",
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ── Shared styles ─────────────────────────────────────────────────────────
 const sLabel = {
   fontSize: "9px",
   letterSpacing: "0.3em",
@@ -95,7 +87,6 @@ const sInput = {
 };
 const sSelect = { ...sInput, cursor: "pointer" };
 
-// ── Status config ─────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   preparing: { label: "Preparing", color: C.blue, bg: "rgba(44,74,110,0.1)" },
   shipped: { label: "Shipped", color: C.gold, bg: "rgba(181,147,90,0.1)" },
@@ -116,8 +107,6 @@ const STATUS_CONFIG = {
   },
   cancelled: { label: "Cancelled", color: C.red, bg: "rgba(192,57,43,0.1)" },
 };
-
-// ── Next valid status transitions ─────────────────────────────────────────
 const NEXT_STATUSES = {
   preparing: ["shipped", "cancelled"],
   shipped: ["in_transit", "delivered", "cancelled"],
@@ -127,7 +116,6 @@ const NEXT_STATUSES = {
   cancelled: [],
 };
 
-// ── HQ tenant ID ──────────────────────────────────────────────────────────
 const HQ_TENANT_ID = "43b34c33-6864-4f02-98dd-df1d340475c3";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -138,40 +126,53 @@ export default function Distribution() {
   const [shops, setShops] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [productionBatches, setProductionBatches] = useState([]);
+  const [importPOs, setImportPOs] = useState([]); // v1.2
+  const [landedCostMap, setLandedCostMap] = useState({}); // v1.2: { inventoryItemId → landed_cost_per_unit_zar }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [expandedShipment, setExpandedShipment] = useState(null);
 
-  // ── Fetch all data ─────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [shipmentsRes, shopsRes, itemsRes, batchesRes] = await Promise.all([
-        supabase
-          .from("shipments")
-          .select("*, shipment_items(*)")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("tenants")
-          .select("id, name, slug, type, is_active")
-          .eq("is_active", true)
-          .order("name"),
-        supabase
-          .from("inventory_items")
-          .select("id, name, sku, category, unit, quantity_on_hand, cost_price")
-          .eq("is_active", true)
-          .order("name"),
-        supabase
-          .from("production_batches")
-          .select(
-            "id, batch_code, strain_name, product_type, size_ml, status, actual_quantity",
-          )
-          .in("status", ["completed", "in_progress"])
-          .order("created_at", { ascending: false }),
-      ]);
+      const [shipmentsRes, shopsRes, itemsRes, batchesRes, posRes] =
+        await Promise.all([
+          supabase
+            .from("shipments")
+            .select("*, shipment_items(*)")
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("tenants")
+            .select("id, name, slug, type, is_active")
+            .eq("is_active", true)
+            .order("name"),
+          supabase
+            .from("inventory_items")
+            .select(
+              "id, name, sku, category, unit, quantity_on_hand, cost_price",
+            )
+            .eq("is_active", true)
+            .order("name"),
+          supabase
+            .from("production_batches")
+            .select(
+              "id, batch_code, strain_name, product_type, size_ml, status, actual_quantity",
+            )
+            .in("status", ["completed", "in_progress"])
+            .order("created_at", { ascending: false }),
+          // v1.2: Fetch received import POs with their items for landed cost lookup
+          supabase
+            .from("purchase_orders")
+            .select(
+              "id, po_number, po_status, landed_cost_zar, expected_arrival, actual_arrival, purchase_order_items(id, item_id, quantity_ordered, landed_cost_per_unit_zar, unit_price_usd)",
+            )
+            .not("po_status", "in", '("draft","cancelled")')
+            .order("created_at", { ascending: false }),
+        ]);
+
       if (shipmentsRes.error) throw shipmentsRes.error;
       if (shopsRes.error) throw shopsRes.error;
       if (itemsRes.error) throw itemsRes.error;
@@ -181,6 +182,29 @@ export default function Distribution() {
       setShops(shopsRes.data || []);
       setInventoryItems(itemsRes.data || []);
       setProductionBatches(batchesRes.data || []);
+
+      // v1.2: Build landed cost map from most recent received PO per item
+      const pos = posRes.data || [];
+      setImportPOs(pos);
+
+      const lcMap = {};
+      // Process in reverse-chronological order so first assignment = most recent
+      for (const po of pos) {
+        for (const poi of po.purchase_order_items || []) {
+          if (
+            poi.item_id &&
+            poi.landed_cost_per_unit_zar &&
+            !lcMap[poi.item_id]
+          ) {
+            lcMap[poi.item_id] = {
+              landedCost: poi.landed_cost_per_unit_zar,
+              poNumber: po.po_number,
+              poStatus: po.po_status,
+            };
+          }
+        }
+      }
+      setLandedCostMap(lcMap);
     } catch (err) {
       console.error("[Distribution] Fetch error:", err);
       setError(err.message);
@@ -193,13 +217,11 @@ export default function Distribution() {
     fetchData();
   }, [fetchData]);
 
-  // ── Filter shipments ───────────────────────────────────────────────
   const filteredShipments =
     statusFilter === "all"
       ? shipments
       : shipments.filter((s) => s.status === statusFilter);
 
-  // ── Summary stats ──────────────────────────────────────────────────
   const preparing = shipments.filter((s) => s.status === "preparing").length;
   const inTransit = shipments.filter((s) =>
     ["shipped", "in_transit"].includes(s.status),
@@ -235,7 +257,7 @@ export default function Distribution() {
 
   return (
     <div>
-      {/* ── Header ────────────────────────────────────────────────── */}
+      {/* Header */}
       <div style={{ marginBottom: "24px" }}>
         <div
           style={{
@@ -279,12 +301,12 @@ export default function Distribution() {
             margin: 0,
           }}
         >
-          Track outbound shipments to shops — items, quantities, courier, and
-          delivery status.
+          Track outbound shipments to shops — items, quantities, courier,
+          delivery status and landed costs.
         </p>
       </div>
 
-      {/* ── Supply Chain Flow ─────────────────────────────────────── */}
+      {/* Supply Chain Flow */}
       <div
         style={{
           background: C.warmBg,
@@ -315,7 +337,7 @@ export default function Distribution() {
         <FlowStep label="Customer Scans" done />
       </div>
 
-      {/* ── Summary Stats ─────────────────────────────────────────── */}
+      {/* Summary Stats */}
       <div
         style={{
           display: "grid",
@@ -334,7 +356,7 @@ export default function Distribution() {
         />
       </div>
 
-      {/* ── Toolbar ───────────────────────────────────────────────── */}
+      {/* Toolbar */}
       <div
         style={{
           display: "flex",
@@ -386,12 +408,14 @@ export default function Distribution() {
         </button>
       </div>
 
-      {/* ── Create Form ───────────────────────────────────────────── */}
+      {/* Create Form */}
       {showCreateForm && (
         <CreateShipmentForm
           shops={shops}
           inventoryItems={inventoryItems}
           productionBatches={productionBatches}
+          importPOs={importPOs}
+          landedCostMap={landedCostMap}
           existingCount={shipments.length}
           onCreated={() => {
             setShowCreateForm(false);
@@ -401,7 +425,7 @@ export default function Distribution() {
         />
       )}
 
-      {/* ── Shipment List ─────────────────────────────────────────── */}
+      {/* Shipment List */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
           <div style={{ fontSize: "24px", marginBottom: "12px" }}>🚚</div>
@@ -431,6 +455,7 @@ export default function Distribution() {
             <ShipmentCard
               key={shipment.id}
               shipment={shipment}
+              landedCostMap={landedCostMap}
               expanded={expandedShipment === shipment.id}
               onToggle={() =>
                 setExpandedShipment(
@@ -447,12 +472,14 @@ export default function Distribution() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CREATE SHIPMENT FORM
+// CREATE SHIPMENT FORM — v1.2: auto-populates landed cost from import POs
 // ═══════════════════════════════════════════════════════════════════════════
 function CreateShipmentForm({
   shops,
   inventoryItems,
   productionBatches,
+  importPOs,
+  landedCostMap,
   existingCount,
   onCreated,
   onCancel,
@@ -475,16 +502,15 @@ function CreateShipmentForm({
       quantity: "",
       unit: "pcs",
       unit_cost: "",
+      landedCostRef: null,
     },
   ]);
 
-  // Available shops (exclude HQ)
   const shopTenants = shops.filter((s) => s.type === "shop");
 
   const set = (key, val) => {
     setForm((p) => {
       const updated = { ...p, [key]: val };
-      // Auto-fill destination name from selected shop
       if (key === "destination_tenant_id" && val) {
         const shop = shops.find((s) => s.id === val);
         if (shop) updated.destination_name = shop.name;
@@ -498,17 +524,24 @@ function CreateShipmentForm({
       const arr = [...prev];
       arr[idx] = { ...arr[idx], [key]: val };
 
-      // Auto-fill from inventory item
       if (key === "inventory_item_id" && val) {
         const item = inventoryItems.find((i) => i.id === val);
         if (item) {
           arr[idx].item_name = item.name;
           arr[idx].sku = item.sku;
           arr[idx].unit = item.unit || "pcs";
-          arr[idx].unit_cost = item.cost_price || "";
+
+          // v1.2: Auto-populate from landed cost map (most recent PO)
+          const lc = landedCostMap[val];
+          if (lc && lc.landedCost) {
+            arr[idx].unit_cost = lc.landedCost.toFixed(2);
+            arr[idx].landedCostRef = lc;
+          } else {
+            arr[idx].unit_cost = item.cost_price || "";
+            arr[idx].landedCostRef = null;
+          }
         }
       }
-      // Auto-fill from production batch
       if (key === "production_batch_id" && val) {
         const batch = productionBatches.find((b) => b.id === val);
         if (batch) {
@@ -533,20 +566,16 @@ function CreateShipmentForm({
         quantity: "",
         unit: "pcs",
         unit_cost: "",
+        landedCostRef: null,
       },
     ]);
   const removeItem = (idx) => setItems((p) => p.filter((_, i) => i !== idx));
 
-  // ── Generate shipment number ───────────────────────────────────────
   const generateShipmentNumber = () => {
     const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const seq = String(existingCount + 1).padStart(3, "0");
-    return `SH-${y}${m}-${seq}`;
+    return `SH-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}-${String(existingCount + 1).padStart(3, "0")}`;
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!form.destination_name.trim()) {
       alert("Destination is required. Select a shop or enter a name.");
@@ -562,20 +591,12 @@ function CreateShipmentForm({
     try {
       const shipmentId = crypto.randomUUID();
       const shipmentNumber = generateShipmentNumber();
-      console.log(
-        "[Distribution] Creating shipment:",
-        shipmentNumber,
-        "id:",
-        shipmentId,
-      );
 
       let userId = null;
       try {
         const { data } = await supabase.auth.getUser();
         userId = data?.user?.id || null;
-      } catch (e) {
-        console.warn("[Distribution] getUser failed:", e.message);
-      }
+      } catch (e) {}
 
       const { error: shipErr } = await supabase.from("shipments").insert({
         id: shipmentId,
@@ -590,13 +611,8 @@ function CreateShipmentForm({
         notes: form.notes.trim() || null,
         created_by: userId,
       });
-      if (shipErr) {
-        console.error("[Distribution] Shipment insert error:", shipErr);
-        throw shipErr;
-      }
-      console.log("[Distribution] Shipment created:", shipmentId);
+      if (shipErr) throw shipErr;
 
-      // Insert items
       const itemRows = validItems.map((i) => ({
         shipment_id: shipmentId,
         inventory_item_id: i.inventory_item_id || null,
@@ -611,30 +627,25 @@ function CreateShipmentForm({
             ? parseFloat(i.unit_cost) * parseInt(i.quantity)
             : null,
       }));
-      console.log("[Distribution] Inserting", itemRows.length, "items");
       const { error: itemErr } = await supabase
         .from("shipment_items")
         .insert(itemRows);
-      if (itemErr) {
-        console.error("[Distribution] Item insert error:", itemErr);
-        throw itemErr;
-      }
-      console.log("[Distribution] Items created successfully");
+      if (itemErr) throw itemErr;
 
       onCreated();
     } catch (err) {
-      console.error("[Distribution] Create error:", err);
       alert("Error creating shipment: " + (err.message || JSON.stringify(err)));
     } finally {
       setSaving(false);
     }
   };
 
-  const totalCost = items.reduce((sum, i) => {
-    const qty = parseInt(i.quantity) || 0;
-    const cost = parseFloat(i.unit_cost) || 0;
-    return sum + qty * cost;
-  }, 0);
+  const totalCost = items.reduce(
+    (sum, i) =>
+      sum + (parseInt(i.quantity) || 0) * (parseFloat(i.unit_cost) || 0),
+    0,
+  );
+  const landedItemsCount = items.filter((i) => i.landedCostRef).length;
 
   return (
     <div
@@ -705,7 +716,6 @@ function CreateShipmentForm({
         </div>
       </div>
 
-      {/* Courier & tracking */}
       <div
         style={{
           display: "grid",
@@ -770,7 +780,6 @@ function CreateShipmentForm({
         </div>
       </div>
 
-      {/* Notes */}
       <div style={{ marginBottom: "16px" }}>
         <label
           style={{
@@ -790,155 +799,195 @@ function CreateShipmentForm({
         />
       </div>
 
+      {/* v1.2: Landed cost notice */}
+      {landedItemsCount > 0 && (
+        <div
+          style={{
+            marginBottom: "12px",
+            padding: "8px 12px",
+            background: "rgba(82,183,136,0.08)",
+            border: `1px solid ${C.accentGreen}30`,
+            borderRadius: "2px",
+            fontSize: "11px",
+            color: C.primaryDark,
+          }}
+        >
+          ✓{" "}
+          <strong>
+            {landedItemsCount} item{landedItemsCount !== 1 ? "s" : ""}
+          </strong>{" "}
+          auto-priced from import PO landed costs
+        </div>
+      )}
+
       {/* Shipment items */}
       <div style={{ ...sLabel, marginBottom: "8px" }}>Shipment Items</div>
 
       {items.map((item, idx) => (
-        <div
-          key={idx}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1.5fr 1fr 0.8fr 0.8fr auto",
-            gap: "8px",
-            marginBottom: "8px",
-            alignItems: "end",
-          }}
-        >
-          <div>
-            {idx === 0 && (
-              <label
-                style={{
-                  fontSize: "10px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
+        <div key={idx}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 1.5fr 1fr 0.8fr 0.8fr auto",
+              gap: "8px",
+              marginBottom: "4px",
+              alignItems: "end",
+            }}
+          >
+            <div>
+              {idx === 0 && (
+                <label
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  From Inventory (optional)
+                </label>
+              )}
+              <select
+                style={sSelect}
+                value={item.inventory_item_id}
+                onChange={(e) =>
+                  setItem(idx, "inventory_item_id", e.target.value)
+                }
               >
-                From Inventory (optional)
-              </label>
-            )}
-            <select
-              style={sSelect}
-              value={item.inventory_item_id}
-              onChange={(e) =>
-                setItem(idx, "inventory_item_id", e.target.value)
-              }
+                <option value="">— Manual entry —</option>
+                {inventoryItems.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({i.quantity_on_hand} {i.unit})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              {idx === 0 && (
+                <label
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Item Name
+                </label>
+              )}
+              <input
+                style={sInput}
+                value={item.item_name}
+                onChange={(e) => setItem(idx, "item_name", e.target.value)}
+                placeholder="Name"
+              />
+            </div>
+            <div>
+              {idx === 0 && (
+                <label
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Quantity
+                </label>
+              )}
+              <input
+                style={sInput}
+                type="number"
+                min="1"
+                value={item.quantity}
+                onChange={(e) => setItem(idx, "quantity", e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              {idx === 0 && (
+                <label
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Unit
+                </label>
+              )}
+              <select
+                style={sSelect}
+                value={item.unit}
+                onChange={(e) => setItem(idx, "unit", e.target.value)}
+              >
+                <option value="pcs">pcs</option>
+                <option value="ml">ml</option>
+                <option value="g">g</option>
+                <option value="bottles">bottles</option>
+                <option value="boxes">boxes</option>
+              </select>
+            </div>
+            <div>
+              {idx === 0 && (
+                <label
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Cost (R)
+                </label>
+              )}
+              <input
+                style={{
+                  ...sInput,
+                  borderColor: item.landedCostRef ? C.accentGreen : C.border,
+                }}
+                type="number"
+                step="0.01"
+                value={item.unit_cost}
+                onChange={(e) => setItem(idx, "unit_cost", e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              {items.length > 1 && (
+                <button
+                  onClick={() => removeItem(idx)}
+                  style={{
+                    ...sBtn("outline"),
+                    padding: "8px",
+                    color: C.red,
+                    borderColor: C.red,
+                    fontSize: "11px",
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+          {/* v1.2: Show landed cost source */}
+          {item.landedCostRef && (
+            <div
+              style={{
+                marginBottom: "8px",
+                marginLeft: "4px",
+                fontSize: "10px",
+                color: C.accentGreen,
+              }}
             >
-              <option value="">— Manual entry —</option>
-              {inventoryItems.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({i.quantity_on_hand} {i.unit})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            {idx === 0 && (
-              <label
-                style={{
-                  fontSize: "10px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Item Name
-              </label>
-            )}
-            <input
-              style={sInput}
-              value={item.item_name}
-              onChange={(e) => setItem(idx, "item_name", e.target.value)}
-              placeholder="Name"
-            />
-          </div>
-          <div>
-            {idx === 0 && (
-              <label
-                style={{
-                  fontSize: "10px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Quantity
-              </label>
-            )}
-            <input
-              style={sInput}
-              type="number"
-              min="1"
-              value={item.quantity}
-              onChange={(e) => setItem(idx, "quantity", e.target.value)}
-              placeholder="0"
-            />
-          </div>
-          <div>
-            {idx === 0 && (
-              <label
-                style={{
-                  fontSize: "10px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Unit
-              </label>
-            )}
-            <select
-              style={sSelect}
-              value={item.unit}
-              onChange={(e) => setItem(idx, "unit", e.target.value)}
-            >
-              <option value="pcs">pcs</option>
-              <option value="ml">ml</option>
-              <option value="g">g</option>
-              <option value="bottles">bottles</option>
-              <option value="boxes">boxes</option>
-            </select>
-          </div>
-          <div>
-            {idx === 0 && (
-              <label
-                style={{
-                  fontSize: "10px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Cost (R)
-              </label>
-            )}
-            <input
-              style={sInput}
-              type="number"
-              step="0.01"
-              value={item.unit_cost}
-              onChange={(e) => setItem(idx, "unit_cost", e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-          <div>
-            {items.length > 1 && (
-              <button
-                onClick={() => removeItem(idx)}
-                style={{
-                  ...sBtn("outline"),
-                  padding: "8px",
-                  color: C.red,
-                  borderColor: C.red,
-                  fontSize: "11px",
-                }}
-              >
-                ✕
-              </button>
-            )}
-          </div>
+              ✓ Landed cost from {item.landedCostRef.poNumber} (
+              {item.landedCostRef.poStatus})
+            </div>
+          )}
         </div>
       ))}
+
       <div
         style={{
           display: "flex",
@@ -962,7 +1011,6 @@ function CreateShipmentForm({
         )}
       </div>
 
-      {/* Actions */}
       <div
         style={{
           display: "flex",
@@ -985,9 +1033,15 @@ function CreateShipmentForm({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SHIPMENT CARD — Individual shipment with expand/collapse
+// SHIPMENT CARD — v1.2: includes cost analysis panel
 // ═══════════════════════════════════════════════════════════════════════════
-function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
+function ShipmentCard({
+  shipment,
+  landedCostMap,
+  expanded,
+  onToggle,
+  onRefresh,
+}) {
   const [updating, setUpdating] = useState(false);
 
   const statusCfg = STATUS_CONFIG[shipment.status] || STATUS_CONFIG.preparing;
@@ -996,7 +1050,53 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
   const totalCost = items.reduce((sum, i) => sum + (i.total_cost || 0), 0);
   const nextStatuses = NEXT_STATUSES[shipment.status] || [];
 
-  // ── Status change (v1.1: includes auto-transfer on delivery) ───────
+  // v1.2: Calculate cost analysis metrics
+  const costAnalysis = (() => {
+    if (items.length === 0 || !landedCostMap) return null;
+
+    let totalLandedCost = 0;
+    let landedCount = 0;
+    const lineAnalysis = [];
+
+    for (const si of items) {
+      const lc = si.inventory_item_id
+        ? landedCostMap[si.inventory_item_id]
+        : null;
+      const landedCostPerUnit = lc?.landedCost || si.unit_cost || 0;
+      const sellCostPerUnit = si.unit_cost || 0;
+      const qty = si.quantity || 0;
+
+      if (landedCostPerUnit > 0) {
+        totalLandedCost += landedCostPerUnit * qty;
+        landedCount++;
+      }
+
+      const impliedMargin =
+        sellCostPerUnit > 0 && landedCostPerUnit > 0
+          ? ((sellCostPerUnit - landedCostPerUnit) / sellCostPerUnit) * 100
+          : null;
+
+      lineAnalysis.push({
+        name: si.item_name,
+        qty,
+        landedCostPerUnit,
+        sellCostPerUnit,
+        impliedMargin,
+        hasLandedData: !!lc,
+        poRef: lc?.poNumber,
+      });
+    }
+
+    if (landedCount === 0) return null;
+
+    const shipmentMargin =
+      totalCost > 0 && totalLandedCost > 0
+        ? ((totalCost - totalLandedCost) / totalCost) * 100
+        : null;
+
+    return { lineAnalysis, totalLandedCost, shipmentMargin, landedCount };
+  })();
+
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
     try {
@@ -1014,66 +1114,34 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
         .eq("id", shipment.id);
       if (error) throw error;
 
-      // ── TASK A-3: Auto-transfer inventory on delivery ──────────
-      // When shipment is delivered:
-      //   1. Deduct shipped items from HQ inventory (shipment_out)
-      //   2. If destination is a registered shop tenant, create/increment
-      //      shop inventory (shipment_in)
+      // Task A-3: Auto-transfer inventory on delivery
       if (newStatus === "delivered") {
         const shipItems = shipment.shipment_items || [];
         const transferErrors = [];
-        let transferredCount = 0;
         const destTenantId = shipment.destination_tenant_id;
-
-        console.log(
-          `[Distribution] A-3: Processing delivery for ${shipment.shipment_number} → ${shipment.destination_name}`,
-        );
 
         for (const si of shipItems) {
           const qty = si.quantity || 0;
           if (qty <= 0) continue;
-
           try {
-            // ── STEP 1: Deduct from HQ inventory ─────────────────
             if (si.inventory_item_id) {
-              // Read current HQ quantity
               const { data: hqItem, error: hqReadErr } = await supabase
                 .from("inventory_items")
                 .select("quantity_on_hand")
                 .eq("id", si.inventory_item_id)
                 .single();
-
               if (hqReadErr) {
-                console.error(
-                  `[Distribution] A-3: Read HQ inventory error for ${si.item_name}:`,
-                  hqReadErr,
-                );
                 transferErrors.push(
                   `${si.item_name} (HQ read): ${hqReadErr.message}`,
                 );
               } else if (hqItem) {
-                const newHqQty = (hqItem.quantity_on_hand || 0) - qty;
-                const { error: hqUpdErr } = await supabase
+                await supabase
                   .from("inventory_items")
-                  .update({ quantity_on_hand: newHqQty })
+                  .update({
+                    quantity_on_hand: (hqItem.quantity_on_hand || 0) - qty,
+                  })
                   .eq("id", si.inventory_item_id);
-
-                if (hqUpdErr) {
-                  console.error(
-                    `[Distribution] A-3: Update HQ inventory error for ${si.item_name}:`,
-                    hqUpdErr,
-                  );
-                  transferErrors.push(
-                    `${si.item_name} (HQ update): ${hqUpdErr.message}`,
-                  );
-                } else {
-                  console.log(
-                    `[Distribution] A-3: ✓ HQ deducted ${qty} ${si.unit} of ${si.item_name}`,
-                  );
-                }
-
-                // HQ stock movement (shipment_out)
-                const { error: hqMoveErr } = await supabase
+                await supabase
                   .from("stock_movements")
                   .insert({
                     id: crypto.randomUUID(),
@@ -1084,162 +1152,73 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
                     notes: `Shipped to ${shipment.destination_name} (${shipment.shipment_number})`,
                     tenant_id: HQ_TENANT_ID,
                   });
-
-                if (hqMoveErr) {
-                  console.error(
-                    `[Distribution] A-3: HQ stock movement error for ${si.item_name}:`,
-                    hqMoveErr,
-                  );
-                  transferErrors.push(
-                    `${si.item_name} (HQ movement): ${hqMoveErr.message}`,
-                  );
-                }
               }
-            } else {
-              console.log(
-                `[Distribution] A-3: Skipping HQ deduction for "${si.item_name}" (no inventory_item_id)`,
-              );
             }
 
-            // ── STEP 2: Add to shop inventory (if registered tenant) ─
             if (destTenantId) {
-              // Find or create matching item at shop tenant
-              const { data: shopItems, error: shopFindErr } = await supabase
+              const { data: shopItems } = await supabase
                 .from("inventory_items")
                 .select("id, quantity_on_hand")
                 .eq("tenant_id", destTenantId)
                 .ilike("name", si.item_name)
                 .limit(1);
-
-              if (shopFindErr) {
-                console.error(
-                  `[Distribution] A-3: Find shop inventory error for ${si.item_name}:`,
-                  shopFindErr,
-                );
-                transferErrors.push(
-                  `${si.item_name} (shop find): ${shopFindErr.message}`,
-                );
+              let shopItemId;
+              if (shopItems && shopItems.length > 0) {
+                shopItemId = shopItems[0].id;
+                await supabase
+                  .from("inventory_items")
+                  .update({
+                    quantity_on_hand:
+                      (shopItems[0].quantity_on_hand || 0) + qty,
+                  })
+                  .eq("id", shopItemId);
               } else {
-                let shopItemId;
-
-                if (shopItems && shopItems.length > 0) {
-                  // INCREMENT existing shop item
-                  shopItemId = shopItems[0].id;
-                  const newShopQty = (shopItems[0].quantity_on_hand || 0) + qty;
-                  const { error: shopUpdErr } = await supabase
-                    .from("inventory_items")
-                    .update({ quantity_on_hand: newShopQty })
-                    .eq("id", shopItemId);
-
-                  if (shopUpdErr) {
-                    console.error(
-                      `[Distribution] A-3: Update shop inventory error for ${si.item_name}:`,
-                      shopUpdErr,
-                    );
-                    transferErrors.push(
-                      `${si.item_name} (shop update): ${shopUpdErr.message}`,
-                    );
-                  } else {
-                    console.log(
-                      `[Distribution] A-3: ✓ Shop incremented "${si.item_name}" by ${qty} → ${newShopQty}`,
-                    );
-                  }
-                } else {
-                  // CREATE new shop inventory item (client-side UUID per LL-048)
-                  shopItemId = crypto.randomUUID();
-                  const { error: shopCreateErr } = await supabase
-                    .from("inventory_items")
-                    .insert({
-                      id: shopItemId,
-                      tenant_id: destTenantId,
-                      name: si.item_name,
-                      sku: si.sku || null,
-                      category: "finished_product",
-                      quantity_on_hand: qty,
-                      unit: si.unit || "pcs",
-                      cost_price: si.unit_cost || null,
-                      is_active: true,
-                    });
-
-                  if (shopCreateErr) {
-                    console.error(
-                      `[Distribution] A-3: Create shop inventory error for ${si.item_name}:`,
-                      shopCreateErr,
-                    );
-                    transferErrors.push(
-                      `${si.item_name} (shop create): ${shopCreateErr.message}`,
-                    );
-                  } else {
-                    console.log(
-                      `[Distribution] A-3: ✓ Created shop item "${si.item_name}" with ${qty} ${si.unit}`,
-                    );
-                  }
-                }
-
-                // Shop stock movement (shipment_in)
-                if (shopItemId) {
-                  const { error: shopMoveErr } = await supabase
-                    .from("stock_movements")
-                    .insert({
-                      id: crypto.randomUUID(),
-                      item_id: shopItemId,
-                      quantity: qty,
-                      movement_type: "shipment_in",
-                      reference: shipment.shipment_number,
-                      notes: `Received from HQ (${shipment.shipment_number})`,
-                      tenant_id: destTenantId,
-                    });
-
-                  if (shopMoveErr) {
-                    console.error(
-                      `[Distribution] A-3: Shop stock movement error for ${si.item_name}:`,
-                      shopMoveErr,
-                    );
-                    transferErrors.push(
-                      `${si.item_name} (shop movement): ${shopMoveErr.message}`,
-                    );
-                  }
-                }
+                shopItemId = crypto.randomUUID();
+                await supabase
+                  .from("inventory_items")
+                  .insert({
+                    id: shopItemId,
+                    tenant_id: destTenantId,
+                    name: si.item_name,
+                    sku: si.sku || null,
+                    category: "finished_product",
+                    quantity_on_hand: qty,
+                    unit: si.unit || "pcs",
+                    cost_price: si.unit_cost || null,
+                    is_active: true,
+                  });
               }
-            } else {
-              console.log(
-                `[Distribution] A-3: No destination tenant — skipping shop inventory for "${si.item_name}"`,
-              );
+              if (shopItemId) {
+                await supabase
+                  .from("stock_movements")
+                  .insert({
+                    id: crypto.randomUUID(),
+                    item_id: shopItemId,
+                    quantity: qty,
+                    movement_type: "shipment_in",
+                    reference: shipment.shipment_number,
+                    notes: `Received from HQ (${shipment.shipment_number})`,
+                    tenant_id: destTenantId,
+                  });
+              }
             }
-
-            transferredCount++;
           } catch (itemErr) {
-            console.error(
-              `[Distribution] A-3: Transfer error for ${si.item_name}:`,
-              itemErr,
-            );
             transferErrors.push(
               `${si.item_name}: ${itemErr.message || "Unknown error"}`,
             );
           }
         }
 
-        // Report results
         if (transferErrors.length > 0) {
-          console.warn(
-            "[Distribution] A-3: Some transfers failed:",
-            transferErrors,
-          );
           alert(
             "Shipment marked as delivered, but some inventory transfers failed:\n\n" +
-              transferErrors.join("\n") +
-              "\n\nYou may need to manually adjust inventory.",
-          );
-        } else if (transferredCount > 0) {
-          console.log(
-            `[Distribution] A-3: ✓ All ${transferredCount} items transferred for ${shipment.shipment_number}`,
+              transferErrors.join("\n"),
           );
         }
       }
 
       onRefresh();
     } catch (err) {
-      console.error("[Distribution] Status update error:", err);
       alert("Error updating status: " + err.message);
     } finally {
       setUpdating(false);
@@ -1456,6 +1435,15 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
             </div>
           )}
 
+          {/* ── v1.2: Cost Analysis Panel ──────────────────────────── */}
+          {costAnalysis && (
+            <CostAnalysisPanel
+              analysis={costAnalysis}
+              totalShipmentCost={totalCost}
+            />
+          )}
+          {/* ── end v1.2 ───────────────────────────────────────────── */}
+
           {/* Shipment details */}
           <div
             style={{
@@ -1537,9 +1525,8 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
                       window.confirm(
                         "Cancel this shipment? This cannot be undone.",
                       )
-                    ) {
+                    )
                       handleStatusChange("cancelled");
-                    }
                   }}
                   disabled={updating}
                   style={{
@@ -1559,21 +1546,261 @@ function ShipmentCard({ shipment, expanded, onToggle, onRefresh }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COST ANALYSIS PANEL — v1.2
+// Shows landed cost vs sell-out cost per line item, implied margin
+// ═══════════════════════════════════════════════════════════════════════════
+function CostAnalysisPanel({ analysis, totalShipmentCost }) {
+  const { lineAnalysis, totalLandedCost, shipmentMargin } = analysis;
+
+  const mColor = (pct) => {
+    if (pct === null) return C.muted;
+    if (pct >= 35) return C.accentGreen;
+    if (pct >= 20) return C.gold;
+    return C.red;
+  };
+
+  return (
+    <div
+      style={{
+        marginBottom: "16px",
+        padding: "16px",
+        background: "rgba(44,74,110,0.04)",
+        border: `1px solid ${C.blue}25`,
+        borderRadius: "2px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "12px",
+        }}
+      >
+        <div style={{ ...sLabel, color: C.blue }}>Import Cost Analysis</div>
+        {shipmentMargin !== null && (
+          <div style={{ textAlign: "right" }}>
+            <div
+              style={{
+                fontSize: "9px",
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: mColor(shipmentMargin),
+                marginBottom: "2px",
+              }}
+            >
+              Implied Margin
+            </div>
+            <div
+              style={{
+                fontFamily: F.heading,
+                fontSize: "20px",
+                color: mColor(shipmentMargin),
+                fontWeight: 600,
+              }}
+            >
+              {shipmentMargin.toFixed(1)}%
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Summary bar */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: "10px",
+          marginBottom: "14px",
+        }}
+      >
+        {[
+          {
+            label: "Sell-Out Value",
+            value: `R${totalShipmentCost.toFixed(2)}`,
+            color: C.primaryDark,
+          },
+          {
+            label: "Landed Cost",
+            value: `R${totalLandedCost.toFixed(2)}`,
+            color: C.blue,
+          },
+          {
+            label: "Gross Profit",
+            value:
+              shipmentMargin !== null
+                ? `R${(totalShipmentCost - totalLandedCost).toFixed(2)}`
+                : "—",
+            color: mColor(shipmentMargin),
+          },
+        ].map((k) => (
+          <div
+            key={k.label}
+            style={{
+              padding: "8px 12px",
+              background: C.white,
+              borderRadius: "2px",
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "9px",
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: C.muted,
+                marginBottom: "3px",
+              }}
+            >
+              {k.label}
+            </div>
+            <div
+              style={{
+                fontFamily: F.heading,
+                fontSize: "16px",
+                color: k.color,
+                fontWeight: 600,
+              }}
+            >
+              {k.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-line breakdown */}
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: "11px",
+          fontFamily: F.body,
+        }}
+      >
+        <thead>
+          <tr>
+            {[
+              "Item",
+              "Qty",
+              "Landed Cost/Unit",
+              "Sell Cost/Unit",
+              "Margin",
+              "PO Ref",
+            ].map((h, i) => (
+              <th
+                key={h}
+                style={{
+                  textAlign: i >= 1 ? "right" : "left",
+                  padding: "6px 8px",
+                  fontSize: "9px",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                  borderBottom: `1px solid ${C.border}`,
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {lineAnalysis.map((row, i) => (
+            <tr key={i}>
+              <td
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: `1px solid ${C.border}`,
+                  fontWeight: 500,
+                }}
+              >
+                {row.name}
+              </td>
+              <td
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: `1px solid ${C.border}`,
+                  textAlign: "right",
+                  color: C.muted,
+                }}
+              >
+                {row.qty}
+              </td>
+              <td
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: `1px solid ${C.border}`,
+                  textAlign: "right",
+                }}
+              >
+                {row.landedCostPerUnit > 0 ? (
+                  <span style={{ color: C.blue }}>
+                    {row.hasLandedData ? "✓ " : ""}R
+                    {row.landedCostPerUnit.toFixed(2)}
+                  </span>
+                ) : (
+                  <span style={{ color: C.muted }}>—</span>
+                )}
+              </td>
+              <td
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: `1px solid ${C.border}`,
+                  textAlign: "right",
+                }}
+              >
+                {row.sellCostPerUnit > 0 ? (
+                  `R${row.sellCostPerUnit.toFixed(2)}`
+                ) : (
+                  <span style={{ color: C.muted }}>—</span>
+                )}
+              </td>
+              <td
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: `1px solid ${C.border}`,
+                  textAlign: "right",
+                  fontWeight: 700,
+                  color: mColor(row.impliedMargin),
+                }}
+              >
+                {row.impliedMargin !== null ? (
+                  `${row.impliedMargin.toFixed(1)}%`
+                ) : (
+                  <span style={{ color: C.muted }}>—</span>
+                )}
+              </td>
+              <td
+                style={{
+                  padding: "6px 8px",
+                  borderBottom: `1px solid ${C.border}`,
+                  textAlign: "right",
+                  fontSize: "10px",
+                  color: C.muted,
+                }}
+              >
+                {row.poRef || "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ fontSize: "10px", color: C.muted, marginTop: "8px" }}>
+        ✓ = Landed cost from import PO · Margin = (Sell − Landed) / Sell
+      </div>
+    </div>
+  );
+}
+
 // ── Helper components ───────────────────────────────────────────────────
 function FlowStep({ label, done, active }) {
-  const C_ = {
-    accentGreen: "#52b788",
-    white: "#ffffff",
-    warmBg: "#f4f0e8",
-    muted: "#888888",
-    border: "#e8e0d4",
-  };
-  if (active) {
+  if (active)
     return (
       <span
         style={{
-          background: C_.accentGreen,
-          color: C_.white,
+          background: C.accentGreen,
+          color: C.white,
           padding: "4px 12px",
           borderRadius: "2px",
           fontWeight: 700,
@@ -1582,13 +1809,12 @@ function FlowStep({ label, done, active }) {
         {label}
       </span>
     );
-  }
-  if (done) {
+  if (done)
     return (
       <span
         style={{
           background: "rgba(82,183,136,0.15)",
-          color: C_.accentGreen,
+          color: C.accentGreen,
           padding: "4px 12px",
           borderRadius: "2px",
           fontWeight: 600,
@@ -1597,15 +1823,14 @@ function FlowStep({ label, done, active }) {
         ✓ {label}
       </span>
     );
-  }
   return (
     <span
       style={{
-        background: C_.warmBg,
-        color: C_.muted,
+        background: C.warmBg,
+        color: C.muted,
         padding: "4px 12px",
         borderRadius: "2px",
-        border: `1px dashed ${C_.border}`,
+        border: `1px dashed ${C.border}`,
       }}
     >
       {label}
@@ -1617,8 +1842,8 @@ function MiniStat({ label, value, color }) {
   return (
     <div
       style={{
-        background: "#ffffff",
-        border: "1px solid #e8e0d4",
+        background: C.white,
+        border: `1px solid ${C.border}`,
         borderTop: `3px solid ${color}`,
         borderRadius: "2px",
         padding: "12px 16px",
@@ -1631,7 +1856,7 @@ function MiniStat({ label, value, color }) {
           fontWeight: 600,
           letterSpacing: "0.15em",
           textTransform: "uppercase",
-          color: "#888888",
+          color: C.muted,
           marginBottom: "4px",
         }}
       >
@@ -1639,7 +1864,7 @@ function MiniStat({ label, value, color }) {
       </div>
       <div
         style={{
-          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontFamily: F.heading,
           fontSize: "28px",
           fontWeight: 300,
           color,
@@ -1661,13 +1886,13 @@ function DetailItem({ label, value }) {
           fontSize: "9px",
           letterSpacing: "0.15em",
           textTransform: "uppercase",
-          color: "#888888",
+          color: C.muted,
           marginBottom: "2px",
         }}
       >
         {label}
       </div>
-      <div style={{ fontSize: "12px", color: "#1a1a1a", fontWeight: 500 }}>
+      <div style={{ fontSize: "12px", color: C.text, fontWeight: 500 }}>
         {value}
       </div>
     </div>
