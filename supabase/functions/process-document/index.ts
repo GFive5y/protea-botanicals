@@ -1,5 +1,5 @@
 // supabase/functions/process-document/index.ts
-// WP-I: Intelligent Document Ingestion Engine — v1.0
+// WP-I: Intelligent Document Ingestion Engine — v1.3
 // Receives base64 document, sends to Claude Vision (claude-sonnet-4-20250514)
 // Returns structured extraction + proposed DB updates
 // Logs to document_log with status: pending_review
@@ -95,14 +95,41 @@ EXTRACTION RULES:
 - proposed_updates: ONLY suggest if confidence > 0.70. Never propose destructive changes.
 - For action types use: update_purchase_order | update_supplier_product | update_batch_coa | update_inventory_qty | create_supplier_product | update_po_payment
 - COA documents: extract THC%, CBD%, CBN%, terpene_profile, lab_name, lab_test_date, batch_number → map to batches table fields
-- Price lists: each line is a line_item. Bulk propose supplier_products price updates.
+- Price lists: set line_items to [] (empty array). Put ALL product data in proposed_updates instead — one entry per product. This is critical to avoid token overflow on large catalogs.
 - Delivery notes: quantities received → proposed inventory_items quantity_on_hand updates
 - Proof of payment: amount paid, date, bank ref → purchase_orders payment_date, payment_reference, po_status=paid
 - Match suppliers: use name similarity (AimVape ≈ Steamups Technology AimVape)
 - Match products: use name + SKU similarity
 - Currencies: detect from symbols (R/ZAR = ZAR, $ = USD, € = EUR, ¥ = CNY)
 - Non-English documents: translate extracted data to English in the JSON
-- If a multi-page PDF: extract from all visible pages`;
+- If a multi-page PDF: extract from all visible pages
+
+UNMATCHED ITEMS RULE (IMPORTANT):
+- For every item in unknown_items (products that could not be matched to existing records), you MUST also add a create_supplier_product entry to proposed_updates.
+- Use the matched supplier_id from the supplier block for supplier_id.
+- Infer category from context: terpene blends/flavours = "terpene", hardware/devices = "hardware".
+- Generate a clean SKU from the document SKU if present, otherwise derive from name (e.g. "Toffee Diesel Pure Terpenes" → "EYBNA-TOFFEE-DIESEL-PT").
+- REQUIRED fields for create_supplier_product: supplier_id, name, sku, category, unit_price_usd, currency, moq.
+- Example create_supplier_product proposed_update:
+{
+  "action": "create_supplier_product",
+  "table": "supplier_products",
+  "record_id": null,
+  "description": "Create new product: Toffee Diesel — Pure Terpenes Line",
+  "data": {
+    "supplier_id": "3357f93b-8dac-46fa-b591-d5cf74c6d313",
+    "name": "Toffee Diesel — Pure Terpenes Line",
+    "sku": "EYBNA-TOFFEE-DIESEL-PT",
+    "category": "terpene",
+    "unit_price_usd": 200.00,
+    "currency": "USD",
+    "moq": 1,
+    "lead_time_days": 7,
+    "is_active": true,
+    "notes": "Auto-created from price catalog ingestion"
+  },
+  "confidence": 0.88
+}`;
 }
 
 // ─── Main handler ──────────────────────────────────────────────────────────
@@ -185,18 +212,18 @@ serve(async (req) => {
       },
     ];
 
-    // Call Claude
+    // Call Claude — comma-separated beta flags, 32k token ceiling for large catalogs
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "pdfs-2024-09-25",
+        "anthropic-beta": "pdfs-2024-09-25,output-128k-2025-02-19",
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+        max_tokens: 32000,
         system: buildSystemPrompt(existingSuppliers, existingProducts),
         messages: [{ role: "user", content: userContent }],
       }),
