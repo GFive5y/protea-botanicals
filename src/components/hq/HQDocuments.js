@@ -1,5 +1,6 @@
 // src/components/hq/HQDocuments.js
-// v1.0 — WP-I: Intelligent Document Ingestion Engine
+// v1.1 — WP-I: Intelligent Document Ingestion Engine
+// FIX: fetch fresh suppliers/products context on every upload (not stale mount data)
 // Three-panel: document list | preview | extraction+confirm
 // Upload → Claude Vision extraction → human review → DB apply
 // supabaseClient import: ../../services/supabaseClient
@@ -193,7 +194,7 @@ function ConfidenceDot({ score }) {
 }
 
 function ConfidenceBar({ score }) {
-  const pct = score !== null ? Math.round((score || 0) * 100) : 0;
+  const pct = score !== null ? Math.max(0, Math.round((score || 0) * 100)) : 0;
   const color = confidenceColor(score);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1071,7 +1072,6 @@ function DocumentLogTable({ documents, onSelectDoc }) {
 
   return (
     <div>
-      {/* Toolbar */}
       <div
         style={{
           display: "flex",
@@ -1253,7 +1253,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function HQDocuments() {
-  const [view, setView] = useState("review"); // 'review' | 'log'
+  const [view, setView] = useState("review");
   const [documents, setDocuments] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [selectedDocId, setSelectedDocId] = useState(null);
@@ -1261,7 +1261,7 @@ export default function HQDocuments() {
   const [signedUrlLoading, setSignedUrlLoading] = useState(false);
 
   // Upload states
-  const [uploadState, setUploadState] = useState("idle"); // idle | uploading | processing | done | error
+  const [uploadState, setUploadState] = useState("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadMsg, setUploadMsg] = useState("");
   const [typeHint, setTypeHint] = useState("");
@@ -1270,10 +1270,6 @@ export default function HQDocuments() {
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmError, setConfirmError] = useState("");
-
-  // Suppliers + products for context
-  const [suppliers, setSuppliers] = useState([]);
-  const [supplierProducts, setSupplierProducts] = useState([]);
 
   const selectedDoc = documents.find((d) => d.id === selectedDocId) || null;
 
@@ -1294,8 +1290,10 @@ export default function HQDocuments() {
     }
   }, []);
 
-  // ── Fetch context data for extraction ─────────────────────────────────────
-  const fetchContext = useCallback(async () => {
+  // ── Fetch FRESH context data — called on every upload, not cached ──────────
+  // This ensures newly created products from previous passes are included,
+  // preventing Claude from re-proposing products that already exist.
+  const fetchFreshContext = async () => {
     const [suppRes, prodRes] = await Promise.all([
       supabase
         .from("suppliers")
@@ -1306,14 +1304,15 @@ export default function HQDocuments() {
         .select("id, name, sku, category, unit_price_usd, supplier_id")
         .eq("is_active", true),
     ]);
-    if (suppRes.data) setSuppliers(suppRes.data);
-    if (prodRes.data) setSupplierProducts(prodRes.data);
-  }, []);
+    return {
+      existing_suppliers: suppRes.data || [],
+      existing_products: prodRes.data || [],
+    };
+  };
 
   useEffect(() => {
     fetchDocuments();
-    fetchContext();
-  }, [fetchDocuments, fetchContext]);
+  }, [fetchDocuments]);
 
   // ── Generate signed URL on document select ─────────────────────────────────
   useEffect(() => {
@@ -1363,22 +1362,27 @@ export default function HQDocuments() {
 
     try {
       // 1. Upload to Storage
-      const ext = file.name.split(".").pop();
       const storagePath = `${detectedHint || "documents"}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("supplier-documents")
         .upload(storagePath, file, { contentType: file.type, upsert: false });
       if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
-      setUploadProgress(35);
+      setUploadProgress(30);
+      setUploadMsg("Loading latest product catalogue for matching…");
+
+      // 2. Fetch FRESH context right now — includes all products created this session
+      const freshContext = await fetchFreshContext();
+
+      setUploadProgress(50);
       setUploadMsg("Extracting data with Claude Vision…");
       setUploadState("processing");
 
-      // 2. Convert to base64
+      // 3. Convert to base64
       const base64 = await fileToBase64(file);
-      setUploadProgress(50);
+      setUploadProgress(55);
 
-      // 3. Call process-document edge function
+      // 4. Call process-document edge function with fresh context
       const { data: fnData, error: fnErr } = await supabase.functions.invoke(
         "process-document",
         {
@@ -1389,10 +1393,7 @@ export default function HQDocuments() {
             file_name: file.name,
             file_size_kb: Math.round(file.size / 1024),
             document_type_hint: detectedHint || null,
-            context: {
-              existing_suppliers: suppliers,
-              existing_products: supplierProducts,
-            },
+            context: freshContext,
           },
         },
       );
@@ -1405,7 +1406,7 @@ export default function HQDocuments() {
       setUploadMsg("Extraction complete — review below");
       setUploadState("done");
 
-      // 4. Refresh and select new document
+      // 5. Refresh and select new document
       await fetchDocuments();
       if (fnData.document_log_id) {
         setSelectedDocId(fnData.document_log_id);
@@ -1469,7 +1470,6 @@ export default function HQDocuments() {
       }
     }
 
-    // Determine final status
     let newStatus = "confirmed";
     if (failedUpdates.length > 0 && appliedUpdates.length > 0)
       newStatus = "partially_applied";
@@ -1654,7 +1654,6 @@ export default function HQDocuments() {
           }}
         />
       ) : (
-        /* THREE PANEL LAYOUT */
         <div
           style={{
             display: "flex",
@@ -1665,7 +1664,7 @@ export default function HQDocuments() {
             overflow: "hidden",
           }}
         >
-          {/* LEFT PANEL — Document list */}
+          {/* LEFT PANEL */}
           <div
             style={{
               width: 220,
@@ -1676,7 +1675,6 @@ export default function HQDocuments() {
               flexDirection: "column",
             }}
           >
-            {/* Upload zone */}
             <div
               style={{
                 padding: 10,
@@ -1684,7 +1682,6 @@ export default function HQDocuments() {
                 background: C.cream,
               }}
             >
-              {/* Type hint selector */}
               <div style={{ marginBottom: 8 }}>
                 <select
                   value={typeHint}
@@ -1717,7 +1714,6 @@ export default function HQDocuments() {
                 disabled={isUploading}
               />
 
-              {/* Upload progress */}
               {uploadState !== "idle" && (
                 <div style={{ marginTop: 8 }}>
                   {(uploadState === "uploading" ||
@@ -1738,10 +1734,6 @@ export default function HQDocuments() {
                           width: `${uploadProgress}%`,
                           background: C.accent,
                           transition: "width 0.4s ease",
-                          animation:
-                            uploadState === "processing"
-                              ? "pulse 1.5s infinite"
-                              : "none",
                         }}
                       />
                     </div>
@@ -1770,7 +1762,6 @@ export default function HQDocuments() {
               )}
             </div>
 
-            {/* Document list */}
             <div style={{ flex: 1, overflowY: "auto" }}>
               {loadingDocs ? (
                 <div
@@ -1809,7 +1800,7 @@ export default function HQDocuments() {
             </div>
           </div>
 
-          {/* CENTRE PANEL — Document preview */}
+          {/* CENTRE PANEL */}
           <div
             style={{
               flex: 1,
@@ -1820,7 +1811,6 @@ export default function HQDocuments() {
           >
             {selectedDoc ? (
               <>
-                {/* Preview header */}
                 <div
                   style={{
                     padding: "10px 16px",
@@ -1879,7 +1869,6 @@ export default function HQDocuments() {
                   )}
                 </div>
 
-                {/* Preview area */}
                 <div
                   style={{
                     flex: 1,
@@ -1979,7 +1968,7 @@ export default function HQDocuments() {
             )}
           </div>
 
-          {/* RIGHT PANEL — Review + confirm */}
+          {/* RIGHT PANEL */}
           {selectedDoc ? (
             <ReviewPanel
               doc={selectedDoc}

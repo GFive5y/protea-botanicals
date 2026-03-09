@@ -1,8 +1,6 @@
 // supabase/functions/process-document/index.ts
-// WP-I: Intelligent Document Ingestion Engine — v1.3
-// Receives base64 document, sends to Claude Vision (claude-sonnet-4-20250514)
-// Returns structured extraction + proposed DB updates
-// Logs to document_log with status: pending_review
+// WP-I: Intelligent Document Ingestion Engine — v1.4
+// FIX: Explicit deduplication rule — never create a product that already exists in existing_products.
 // Deploy: npx supabase functions deploy process-document --no-verify-jwt
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -35,7 +33,7 @@ invoice | quote | proof_of_payment | delivery_note | coa | price_list | stock_sh
 EXISTING SUPPLIERS IN SYSTEM:
 ${JSON.stringify(existingSuppliers, null, 2)}
 
-EXISTING PRODUCTS/SKUs IN SYSTEM:
+EXISTING PRODUCTS/SKUs IN SYSTEM (${existingProducts.length} products already in database):
 ${JSON.stringify(existingProducts, null, 2)}
 
 RESPOND EXACTLY in this JSON structure (all fields required, use null where not applicable):
@@ -55,62 +53,68 @@ RESPOND EXACTLY in this JSON structure (all fields required, use null where not 
   },
   "currency": "USD",
   "total_amount": 950.00,
-  "line_items": [
-    {
-      "description": "510 Cartridge 1ml",
-      "sku": "AIM-510-1ML or null",
-      "matched_product_id": "uuid from existing products if matched, else null",
-      "quantity": 1000,
-      "unit_price": 0.95,
-      "line_total": 950.00,
-      "unit": "pcs",
-      "confidence": 0.96
-    }
-  ],
-  "proposed_updates": [
-    {
-      "action": "update_purchase_order",
-      "table": "purchase_orders",
-      "record_id": "uuid of matched PO or null",
-      "description": "Human readable: Link invoice INV-2026-0441 to PO and mark as ordered",
-      "data": { "supplier_invoice_ref": "INV-2026-0441", "po_status": "ordered" },
-      "confidence": 0.93
-    },
-    {
-      "action": "update_product_price",
-      "table": "supplier_products",
-      "record_id": "uuid of matched product or null",
-      "description": "Update 510 Cartridge 1ml unit price to $0.95",
-      "data": { "unit_price_usd": 0.95, "price_effective_date": "2026-03-01" },
-      "confidence": 0.96
-    }
-  ],
-  "unknown_items": ["item descriptions that could not be matched to any existing product"],
-  "warnings": ["any data quality issues, ambiguities, or concerns"],
+  "line_items": [],
+  "proposed_updates": [],
+  "unknown_items": [],
+  "warnings": [],
   "extraction_notes": "brief note about document quality and extraction confidence"
 }
+
+═══════════════════════════════════════════════════════
+PRODUCT MATCHING — READ THIS CAREFULLY — NON-NEGOTIABLE
+═══════════════════════════════════════════════════════
+
+For EVERY product in the document, follow this exact decision tree:
+
+STEP 1 — Search existing_products for a name match.
+  Compare the product name from the document against every entry in the
+  EXISTING PRODUCTS list above. Use fuzzy/partial matching:
+  "Orange Cookies" matches "Orange Cookies — Live Line", "Bubba Kush" matches
+  "Bubba Kush — Pure Terpenes", etc. A product is considered MATCHED if the
+  core name appears in any existing product's name field.
+
+STEP 2 — If MATCHED:
+  → Propose an update_product_price action (NOT create_supplier_product).
+  → Put the matched product's id in record_id.
+  → Do NOT add to unknown_items.
+  → Do NOT propose create_supplier_product for this product.
+
+STEP 3 — If NOT MATCHED (core name does not appear in existing_products at all):
+  → Add to unknown_items.
+  → Propose a create_supplier_product action.
+
+RULE: A product cannot be both in unknown_items AND already in existing_products.
+RULE: Never propose create_supplier_product for any product whose name already
+      appears anywhere in the existing_products list.
+RULE: If you are unsure whether a product matches, prefer treating it as MATCHED
+      and propose a price update rather than a duplicate create.
+
+═══════════════════════════════════════════════════════
 
 EXTRACTION RULES:
 - Confidence scores: 0.0-1.0. Be conservative — never inflate. Unknown/ambiguous = 0.5 or lower.
 - proposed_updates: ONLY suggest if confidence > 0.70. Never propose destructive changes.
-- For action types use: update_purchase_order | update_supplier_product | update_batch_coa | update_inventory_qty | create_supplier_product | update_po_payment
+- For action types use: update_purchase_order | update_product_price | update_supplier_product | update_batch_coa | update_inventory_qty | create_supplier_product | update_po_payment
 - COA documents: extract THC%, CBD%, CBN%, terpene_profile, lab_name, lab_test_date, batch_number → map to batches table fields
-- Price lists: set line_items to [] (empty array). Put ALL product data in proposed_updates instead — one entry per product. This is critical to avoid token overflow on large catalogs.
+- Price lists: set line_items to [] (empty array). Put ALL product data in proposed_updates instead — one entry per product.
 - Delivery notes: quantities received → proposed inventory_items quantity_on_hand updates
 - Proof of payment: amount paid, date, bank ref → purchase_orders payment_date, payment_reference, po_status=paid
 - Match suppliers: use name similarity (AimVape ≈ Steamups Technology AimVape)
-- Match products: use name + SKU similarity
 - Currencies: detect from symbols (R/ZAR = ZAR, $ = USD, € = EUR, ¥ = CNY)
 - Non-English documents: translate extracted data to English in the JSON
 - If a multi-page PDF: extract from all visible pages
 
-UNMATCHED ITEMS RULE (IMPORTANT):
-- For every item in unknown_items (products that could not be matched to existing records), you MUST also add a create_supplier_product entry to proposed_updates.
-- Use the matched supplier_id from the supplier block for supplier_id.
-- Infer category from context: terpene blends/flavours = "terpene", hardware/devices = "hardware".
-- Generate a clean SKU from the document SKU if present, otherwise derive from name (e.g. "Toffee Diesel Pure Terpenes" → "EYBNA-TOFFEE-DIESEL-PT").
-- REQUIRED fields for create_supplier_product: supplier_id, name, sku, category, unit_price_usd, currency, moq.
-- Example create_supplier_product proposed_update:
+EXAMPLE — update_product_price (use this when product already exists):
+{
+  "action": "update_product_price",
+  "table": "supplier_products",
+  "record_id": "uuid-of-existing-product",
+  "description": "Update Orange Cookies unit price to $200.00",
+  "data": { "unit_price_usd": 200.00, "price_effective_date": "2026-03-01" },
+  "confidence": 0.95
+}
+
+EXAMPLE — create_supplier_product (use ONLY when product does NOT exist in system):
 {
   "action": "create_supplier_product",
   "table": "supplier_products",
@@ -208,11 +212,13 @@ serve(async (req) => {
       documentBlock,
       {
         type: "text",
-        text: `Extract all data from this ${document_type_hint ? document_type_hint + " " : ""}document and return the JSON as specified. Be thorough — extract every line item, date, reference number, and amount visible.`,
+        text: `Extract all data from this ${document_type_hint ? document_type_hint + " " : ""}document and return the JSON as specified.
+
+IMPORTANT: Before proposing any create_supplier_product, check the EXISTING PRODUCTS list in your system prompt. If the product name already exists there (even partially), propose update_product_price instead. Only propose creates for genuinely new products not present in the existing list.`,
       },
     ];
 
-    // Call Claude — comma-separated beta flags, 32k token ceiling for large catalogs
+    // Call Claude
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -237,7 +243,7 @@ serve(async (req) => {
     const claudeData = await claudeRes.json();
     const rawText: string = claudeData.content?.[0]?.text || "";
 
-    // Parse JSON from Claude — strip any accidental markdown fences
+    // Parse JSON from Claude
     let extraction: Record<string, unknown>;
     try {
       const cleaned = rawText
