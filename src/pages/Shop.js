@@ -1,21 +1,20 @@
-// src/pages/Shop.js v3.0
-// v3.0: FULL VERIFICATION IN MODAL (DEC-025) — StrainModal now contains the
-//       complete ProductVerification page content: SVG donut chart, full COA
-//       with lab details + additional testing, "What These Numbers Mean" cards,
-//       Eybna attribution. No navigation required — everything stays in-shop
-//       with Add to Cart pinned in footer. "Full verification page →" kept as
-//       fallback direct URL link.
-//       CannabinoidDonut component extracted from ProductVerification.js v2.3.
-//       DISTILLATE_COA updated to include otherTests array.
-// v2.9: STRAIN MODAL (DEC-018) — frosted glass in-page overlay modal.
+// src/pages/Shop.js v4.0
+// v4.0: WP-H ADMIN COGS WARNING — checks if any finished_product is priced
+//       below its calculated COGS (hardware + terpene + other_cost_zar).
+//       Banner visible to admin/hq roles only. Dismissible per session.
+//       Zero impact on customer-facing shop experience.
+// v3.0: FULL VERIFICATION IN MODAL — StrainModal with donut chart, full COA,
+//       terpene profile, "What These Numbers Mean" cards, Eybna attribution.
+// v2.9: STRAIN MODAL — frosted glass in-page overlay modal.
 // v2.8: LIVE INVENTORY — queries inventory_items (category: "finished_product").
 // v2.7: CART INTEGRATION — useCart, addToCart, cart badge in NavBar.
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
 
-// ── Distillate COA (Ecogreen Analytics — Lab ID: JB26-046-01) ───────────────
+// ── Distillate COA ────────────────────────────────────────────────────────────
 const DISTILLATE_COA = {
   labId: "JB26-046-01",
   sampleId: "D9DSOL160126",
@@ -871,7 +870,6 @@ const STRAINS = [
   },
 ];
 
-// ── Strain matching helpers ───────────────────────────────────────────────────
 const STRAINS_BY_LENGTH = [...STRAINS].sort(
   (a, b) => b.name.length - a.name.length,
 );
@@ -923,7 +921,7 @@ function buildProductFromInventory(item) {
   };
 }
 
-// ── Coming Soon Categories ────────────────────────────────────────────────────
+// ── Coming Soon ───────────────────────────────────────────────────────────────
 const COMING_SOON = [
   {
     id: "cs-wellness",
@@ -981,8 +979,8 @@ const FILTER_OPTIONS = [
 // ── SVG Donut Chart ───────────────────────────────────────────────────────────
 function CannabinoidDonut({ cannabinoids, accentColor }) {
   const total = cannabinoids.reduce((sum, c) => sum + c.value, 0);
-  const size = 200;
-  const strokeWidth = 28;
+  const size = 200,
+    strokeWidth = 28;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const sliceColors = [
@@ -1010,7 +1008,6 @@ function CannabinoidDonut({ cannabinoids, accentColor }) {
       color: sliceColors[i] || "#ccc",
     };
   });
-
   return (
     <div
       style={{
@@ -1140,116 +1137,37 @@ const shopStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap');
   .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
   .body-font { font-family: 'Jost', sans-serif; }
-  .shop-card {
-    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04); overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
+  .shop-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
   .shop-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
-  .shop-btn {
-    font-family: 'Jost', sans-serif; padding: 11px 28px; background: #1b4332;
-    color: white; border: none; border-radius: 2px; font-size: 11px;
-    letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer;
-    transition: background 0.2s; font-weight: 500; display: inline-block;
-    text-decoration: none; text-align: center;
-  }
+  .shop-btn { font-family: 'Jost', sans-serif; padding: 11px 28px; background: #1b4332; color: white; border: none; border-radius: 2px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: background 0.2s; font-weight: 500; display: inline-block; text-decoration: none; text-align: center; }
   .shop-btn:hover { background: #2d6a4f; }
-  .shop-btn-outline {
-    font-family: 'Jost', sans-serif; padding: 10px 24px; background: transparent;
-    border: 1px solid #1b4332; color: #1b4332; border-radius: 2px;
-    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
-    cursor: pointer; transition: all 0.2s; font-weight: 500;
-    text-decoration: none; text-align: center; display: inline-block;
-  }
+  .shop-btn-outline { font-family: 'Jost', sans-serif; padding: 10px 24px; background: transparent; border: 1px solid #1b4332; color: #1b4332; border-radius: 2px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-weight: 500; text-decoration: none; text-align: center; display: inline-block; }
   .shop-btn-outline:hover { background: #1b4332; color: white; }
-  .shop-filter-btn {
-    font-family: 'Jost', sans-serif; padding: 8px 20px; border: 1px solid #d8d0c4;
-    border-radius: 2px; background: white; color: #666; font-size: 11px;
-    letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer;
-    transition: all 0.2s; font-weight: 400; white-space: nowrap;
-  }
+  .shop-filter-btn { font-family: 'Jost', sans-serif; padding: 8px 20px; border: 1px solid #d8d0c4; border-radius: 2px; background: white; color: #666; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; font-weight: 400; white-space: nowrap; }
   .shop-filter-btn:hover { border-color: #1b4332; color: #1b4332; }
   .shop-filter-btn.active { background: #1b4332; color: white; border-color: #1b4332; }
-  .shop-effect-tag {
-    font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.1em;
-    text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 400;
-  }
-  .shop-format-badge {
-    font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.15em;
-    text-transform: uppercase; padding: 4px 12px; border-radius: 2px; font-weight: 500;
-  }
-  .cs-card {
-    background: #f9f7f2; border: 1px dashed #d8d0c4; border-radius: 2px;
-    padding: 40px 28px; text-align: center; transition: border-color 0.2s;
-  }
+  .shop-effect-tag { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 400; }
+  .shop-format-badge { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; padding: 4px 12px; border-radius: 2px; font-weight: 500; }
+  .cs-card { background: #f9f7f2; border: 1px dashed #d8d0c4; border-radius: 2px; padding: 40px 28px; text-align: center; transition: border-color 0.2s; }
   .cs-card:hover { border-color: #b5935a; }
-  .shop-footer-link {
-    font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em;
-    text-transform: uppercase; color: #555; text-decoration: none; transition: color 0.2s;
-  }
+  .shop-footer-link { font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: #555; text-decoration: none; transition: color 0.2s; }
   .shop-footer-link:hover { color: #52b788; }
-  .section-divider {
-    width: 100%; height: 1px;
-    background: linear-gradient(to right, transparent, #e0d8cc, transparent); margin: 36px 0;
-  }
-
-  /* ── Modal ── */
-  .strain-modal-overlay {
-    position: fixed; inset: 0; z-index: 9000;
-    background: rgba(6, 14, 9, 0.75);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-    animation: modalFadeIn 0.25s ease forwards;
-  }
-  .strain-modal-card {
-    background: #faf9f6; border-radius: 4px; width: 100%; max-width: 820px;
-    max-height: 90vh; overflow-y: auto; position: relative;
-    box-shadow: 0 32px 80px rgba(0,0,0,0.55);
-    animation: modalSlideUp 0.3s ease forwards;
-    display: flex; flex-direction: column;
-  }
+  .section-divider { width: 100%; height: 1px; background: linear-gradient(to right, transparent, #e0d8cc, transparent); margin: 36px 0; }
+  .strain-modal-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(6,14,9,0.75); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); display: flex; align-items: center; justify-content: center; padding: 20px; animation: modalFadeIn 0.25s ease forwards; }
+  .strain-modal-card { background: #faf9f6; border-radius: 4px; width: 100%; max-width: 820px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,0.55); animation: modalSlideUp 0.3s ease forwards; display: flex; flex-direction: column; }
   .strain-modal-card::-webkit-scrollbar { width: 4px; }
   .strain-modal-card::-webkit-scrollbar-track { background: #f0ebe3; }
   .strain-modal-card::-webkit-scrollbar-thumb { background: #c8bfb0; border-radius: 2px; }
-  .modal-close-btn {
-    position: absolute; top: 16px; right: 16px; z-index: 10;
-    width: 36px; height: 36px; border-radius: 2px;
-    background: rgba(0,0,0,0.3); border: none; color: white;
-    font-size: 18px; cursor: pointer; display: flex;
-    align-items: center; justify-content: center;
-    transition: background 0.2s; font-family: 'Jost', sans-serif; line-height: 1;
-  }
+  .modal-close-btn { position: absolute; top: 16px; right: 16px; z-index: 10; width: 36px; height: 36px; border-radius: 2px; background: rgba(0,0,0,0.3); border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; font-family: 'Jost', sans-serif; line-height: 1; }
   .modal-close-btn:hover { background: rgba(0,0,0,0.55); }
-  .modal-card {
-    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  }
-  .modal-terpene-card {
-    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
-    padding: 20px 18px; position: relative; overflow: hidden;
-  }
-  .modal-verify-link {
-    font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 0.2em;
-    text-transform: uppercase; color: rgba(255,255,255,0.55); text-decoration: none;
-    border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px;
-    transition: color 0.2s, border-color 0.2s;
-  }
+  .modal-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .modal-terpene-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; padding: 20px 18px; position: relative; overflow: hidden; }
+  .modal-verify-link { font-family: 'Jost', sans-serif; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.55); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px; transition: color 0.2s, border-color 0.2s; }
   .modal-verify-link:hover { color: white; border-color: rgba(255,255,255,0.5); }
-  .what-numbers-card {
-    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
-    padding: 24px 22px;
-  }
+  .what-numbers-card { background: white; border: 1px solid #e8e0d4; border-radius: 2px; padding: 24px 22px; }
   @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes modalSlideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(24px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+  @keyframes modalSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
   .fade-up   { animation: fadeUp 0.6s ease forwards; }
   .fade-up-2 { animation: fadeUp 0.6s 0.1s ease forwards; opacity: 0; }
   .fade-up-3 { animation: fadeUp 0.6s 0.2s ease forwards; opacity: 0; }
@@ -1278,7 +1196,7 @@ const shopStyles = `
   }
 `;
 
-// ── StrainModal Component — v3.0 full verification content ────────────────────
+// ── StrainModal v3.0 ──────────────────────────────────────────────────────────
 function StrainModal({ strain, product, onClose, onAddToCart }) {
   const detail = STRAINS_DETAIL[strain.id] || {};
 
@@ -1324,7 +1242,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
           ✕
         </button>
 
-        {/* ── A. Hero strip ── */}
+        {/* A. Hero */}
         <div
           style={{
             background: `linear-gradient(160deg, ${strain.gradientFrom} 0%, ${strain.gradientTo} 60%, ${strain.gradientFrom}dd 100%)`,
@@ -1469,9 +1387,9 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
           </div>
         </div>
 
-        {/* ── Modal scrollable body ── */}
+        {/* Scrollable body */}
         <div style={{ padding: "32px 32px 0", overflowY: "auto" }}>
-          {/* ── B. About ── */}
+          {/* B. About */}
           {detail.description && (
             <div style={{ marginBottom: 28 }}>
               <span
@@ -1542,10 +1460,9 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               )}
             </div>
           )}
-
           {divider}
 
-          {/* ── C. Certificate of Analysis ── */}
+          {/* C. COA */}
           <div style={{ marginBottom: 28 }}>
             <div
               style={{
@@ -1608,8 +1525,6 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 </p>
               </div>
             </div>
-
-            {/* Lab details */}
             <div
               className="modal-card"
               style={{
@@ -1649,8 +1564,6 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 </div>
               ))}
             </div>
-
-            {/* Donut chart */}
             <div
               className="modal-card"
               style={{ padding: "32px 28px", marginBottom: 16 }}
@@ -1711,8 +1624,6 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                 ))}
               </div>
             </div>
-
-            {/* Additional testing */}
             <div>
               <p
                 className="body-font"
@@ -1785,11 +1696,10 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               </p>
             </div>
           </div>
-
           {divider}
 
-          {/* ── D. Terpene Profile ── */}
-          {detail.dominantTerpenes && detail.dominantTerpenes.length > 0 && (
+          {/* D. Terpenes */}
+          {detail.dominantTerpenes?.length > 0 && (
             <div style={{ marginBottom: 28 }}>
               <span
                 className="body-font"
@@ -1913,8 +1823,6 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
                   </div>
                 ))}
               </div>
-
-              {/* Eybna attribution */}
               {detail.eybnaDescription && (
                 <div
                   className="modal-card"
@@ -1975,10 +1883,9 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               )}
             </div>
           )}
-
           {divider}
 
-          {/* ── E. What These Numbers Mean ── */}
+          {/* E. What These Numbers Mean */}
           <div style={{ marginBottom: 28 }}>
             <span
               className="body-font"
@@ -2073,12 +1980,10 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
               ))}
             </div>
           </div>
-
-          {/* spacer before sticky footer */}
           <div style={{ height: 8 }} />
         </div>
 
-        {/* ── F. Sticky footer: Add to Cart ── */}
+        {/* F. Sticky footer */}
         <div
           style={{
             background: `linear-gradient(135deg, ${strain.gradientFrom}, ${strain.gradientTo})`,
@@ -2155,7 +2060,7 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
   );
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Shop Component ────────────────────────────────────────────────────────────
 export default function Shop() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -2165,6 +2070,87 @@ export default function Shop() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [liveProducts, setLiveProducts] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
+
+  // ── WP-H: Admin below-COGS warning ──────────────────────────────────
+  const [cogsWarnings, setCogsWarnings] = useState([]);
+  const [warningDismissed, setWarningDismissed] = useState(false);
+
+  useEffect(() => {
+    const checkCogsWarnings = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        if (profile?.role !== "admin" && profile?.role !== "hq") return;
+
+        const [pricingRes, cogsRes, suppRes, fxRes] = await Promise.all([
+          supabase
+            .from("product_pricing")
+            .select("product_cogs_id, channel, sell_price_zar")
+            .eq("channel", "retail"),
+          supabase
+            .from("product_cogs")
+            .select(
+              "id, product_name, sku, hardware_item_id, hardware_qty, terpene_item_id, terpene_qty_g, other_cost_zar",
+            ),
+          supabase.from("supplier_products").select("id, unit_price_usd"),
+          supabase
+            .from("fx_rates")
+            .select("rate")
+            .eq("currency_pair", "USD/ZAR")
+            .order("fetched_at", { ascending: false })
+            .limit(1),
+        ]);
+
+        const usdZar = fxRes.data?.[0]?.rate || 18.5;
+        const warnings = [];
+
+        (pricingRes.data || []).forEach((p) => {
+          if (!p.sell_price_zar) return;
+          const recipe = (cogsRes.data || []).find(
+            (r) => r.id === p.product_cogs_id,
+          );
+          if (!recipe) return;
+          const hw = (suppRes.data || []).find(
+            (s) => s.id === recipe.hardware_item_id,
+          );
+          const tp = (suppRes.data || []).find(
+            (s) => s.id === recipe.terpene_item_id,
+          );
+          const hwCost = hw
+            ? parseFloat(recipe.hardware_qty || 1) *
+              parseFloat(hw.unit_price_usd) *
+              usdZar
+            : 0;
+          const tpCost = tp
+            ? parseFloat(recipe.terpene_qty_g || 0) *
+              (parseFloat(tp.unit_price_usd) / 50) *
+              usdZar
+            : 0;
+          const cogs = hwCost + tpCost + parseFloat(recipe.other_cost_zar || 0);
+          if (parseFloat(p.sell_price_zar) < cogs) {
+            warnings.push({
+              name: recipe.product_name,
+              sku: recipe.sku,
+              sellPrice: parseFloat(p.sell_price_zar).toFixed(2),
+              cogs: cogs.toFixed(2),
+            });
+          }
+        });
+        setCogsWarnings(warnings);
+      } catch {
+        /* non-admin or missing data — silently skip */
+      }
+    };
+    checkCogsWarnings();
+  }, []);
+  // ── End WP-H ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -2200,8 +2186,7 @@ export default function Shop() {
   };
 
   const handleViewProfile = (product) => {
-    const detail = STRAINS_DETAIL[product.strainId];
-    if (detail) {
+    if (STRAINS_DETAIL[product.strainId]) {
       setSelectedStrain(product.strain);
       setSelectedProduct(product);
     } else {
@@ -2238,6 +2223,79 @@ export default function Shop() {
       }}
     >
       <style>{shopStyles}</style>
+
+      {/* ── ADMIN: Below-COGS Warning Banner (WP-H) ── */}
+      {cogsWarnings.length > 0 && !warningDismissed && (
+        <div
+          style={{
+            background: "#FFF3E0",
+            borderBottom: "2px solid #FF8F00",
+            padding: "12px 40px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+            position: "relative",
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <span
+              style={{
+                fontFamily: "Jost, sans-serif",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#E65100",
+              }}
+            >
+              Admin: {cogsWarnings.length} product
+              {cogsWarnings.length > 1 ? "s" : ""} priced below COGS
+            </span>
+            {cogsWarnings.map((w) => (
+              <span
+                key={w.sku || w.name}
+                style={{
+                  fontFamily: "Jost, sans-serif",
+                  fontSize: 12,
+                  color: "#BF360C",
+                  background: "rgba(191,54,12,0.08)",
+                  padding: "3px 10px",
+                  borderRadius: 2,
+                  border: "1px solid rgba(191,54,12,0.2)",
+                }}
+              >
+                {w.name} — R{w.sellPrice} sell / R{w.cogs} cost
+              </span>
+            ))}
+          </div>
+          <button
+            onClick={() => setWarningDismissed(true)}
+            style={{
+              background: "none",
+              border: "1px solid #E65100",
+              borderRadius: 2,
+              padding: "5px 14px",
+              cursor: "pointer",
+              fontFamily: "Jost, sans-serif",
+              fontSize: 11,
+              color: "#E65100",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ── HERO ── */}
       <div

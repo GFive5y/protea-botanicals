@@ -1,11 +1,7 @@
-// src/pages/HQDashboard.js — Protea Botanicals v3.0
-// ─────────────────────────────────────────────────────────────────────────────
-// v3.0: Reorder & Scoring tab added (WP-F + WP-G)
-// v2.9: P&L tab added (WP-E)
-// v2.8: Pricing tab added (WP-D)
-// v2.7: Costing tab added (WP-C)
-// v2.6: Procurement tab added (WP-B)
-// v2.5: Suppliers tab added (WP-A)
+// src/pages/HQDashboard.js — Protea Botanicals v3.1
+// v3.1: WP-H — pass onNavigate to HQOverview (ERP quick-action tiles)
+// v3.0: Reorder & Scoring tab (WP-F+G)
+// v2.9: P&L tab (WP-E)
 
 import { useState } from "react";
 import { useTenant } from "../services/tenantService";
@@ -55,7 +51,6 @@ export default function HQDashboard() {
 
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
-      {/* Header */}
       <div style={{ marginBottom: "24px" }}>
         <div
           style={{
@@ -144,7 +139,6 @@ export default function HQDashboard() {
         </p>
       </div>
 
-      {/* Tab Navigation */}
       <div
         style={{
           display: "flex",
@@ -195,9 +189,10 @@ export default function HQDashboard() {
         ))}
       </div>
 
-      {/* Tab Content */}
       <div>
-        {activeTab === "overview" && <HQOverview />}
+        {activeTab === "overview" && (
+          <HQOverview onNavigate={(tab) => setActiveTab(tab)} />
+        )}
         {activeTab === "supply-chain" && <SupplyChain />}
         {activeTab === "production" && <Production />}
         {activeTab === "distribution" && <Distribution />}
