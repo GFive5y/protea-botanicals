@@ -1,23 +1,19 @@
-// src/components/hq/SupplyChain.js — Protea Botanicals v1.0
+// src/components/hq/SupplyChain.js — Protea Botanicals v2.0
 // ─────────────────────────────────────────────────────────────────────────────
-// SUPPLY CHAIN TAB — Phase 2C
+// SUPPLY CHAIN TAB — WP-K update
 //
-// Purpose: Integrates the existing StockControl.js module into the HQ
-// Command Centre. This provides HQ users with full access to:
-//   - Inventory overview (stock value, low stock alerts, category breakdown)
-//   - Inventory items CRUD (add, edit, deactivate)
-//   - Stock movements (record in/out, view history)
-//   - Purchase orders (create PO, track status, auto-receive stock)
-//   - Suppliers (add, edit, view)
+// v2.0: Consumes SystemHealthContext — stats now come from the shared live
+//       data layer instead of independent fetch. Stats guaranteed consistent
+//       with Overview, Analytics, Production at all times.
+//       Realtime: any DB change auto-refreshes stats across all tabs.
+// v1.0: Initial HQ Supply Chain wrapper around StockControl
 //
-// Architecture: This is a thin wrapper that imports StockControl and adds
-// HQ-specific context (header, summary stats, future: cross-tenant view).
-//
-// Design: Cream aesthetic (Section 7 of handover).
+// Architecture: Thin wrapper that imports StockControl and adds
+// HQ-specific context (header, summary stats, cross-tenant future).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect } from "react";
-import { supabase } from "../../services/supabaseClient";
+import React from "react";
+import { useSystemHealth } from "../../services/systemHealthContext";
 import StockControl from "../StockControl";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────
@@ -37,77 +33,9 @@ const C = {
 };
 
 export default function SupplyChain() {
-  const [summaryStats, setSummaryStats] = useState(null);
-  const [loadingStats, setLoadingStats] = useState(true);
-
-  // ── Fetch high-level supply chain stats for header ──────────────────
-  useEffect(() => {
-    async function fetchSummary() {
-      setLoadingStats(true);
-      try {
-        let totalItems = 0,
-          lowStockCount = 0,
-          openPOs = 0,
-          supplierCount = 0;
-
-        // Total active items
-        try {
-          const r = await supabase
-            .from("inventory_items")
-            .select("id", { count: "exact", head: true })
-            .eq("is_active", true);
-          totalItems = r.count || 0;
-        } catch (e) {
-          console.warn("[SupplyChain] items count:", e.message);
-        }
-
-        // Low stock count (quantity_on_hand below reorder_level)
-        try {
-          const r = await supabase
-            .from("inventory_items")
-            .select("id, quantity_on_hand, reorder_level")
-            .eq("is_active", true)
-            .gt("reorder_level", 0);
-          if (r.data) {
-            lowStockCount = r.data.filter(
-              (i) => i.quantity_on_hand <= i.reorder_level,
-            ).length;
-          }
-        } catch (e) {
-          console.warn("[SupplyChain] low stock:", e.message);
-        }
-
-        // Open purchase orders
-        try {
-          const r = await supabase
-            .from("purchase_orders")
-            .select("id", { count: "exact", head: true })
-            .not("status", "in", '("received","cancelled")');
-          openPOs = r.count || 0;
-        } catch (e) {
-          console.warn("[SupplyChain] open POs:", e.message);
-        }
-
-        // Active suppliers
-        try {
-          const r = await supabase
-            .from("suppliers")
-            .select("id", { count: "exact", head: true })
-            .eq("is_active", true);
-          supplierCount = r.count || 0;
-        } catch (e) {
-          console.warn("[SupplyChain] suppliers:", e.message);
-        }
-
-        setSummaryStats({ totalItems, lowStockCount, openPOs, supplierCount });
-      } catch (err) {
-        console.error("[SupplyChain] Summary fetch error:", err);
-      } finally {
-        setLoadingStats(false);
-      }
-    }
-    fetchSummary();
-  }, []);
+  // ── Consume shared live stats — no independent fetch needed ───────────
+  const { stats, loading: statsLoading } = useSystemHealth();
+  const { inventory, purchaseOrders } = stats;
 
   return (
     <div>
@@ -159,37 +87,84 @@ export default function SupplyChain() {
         </p>
       </div>
 
-      {/* ── Summary Stats Bar ───────────────────────────────────────── */}
-      {!loadingStats && summaryStats && (
+      {/* ── Summary Stats Bar — from SystemHealthContext ────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
+        <MiniStat
+          label="Active SKUs"
+          value={statsLoading ? "—" : inventory.totalActive}
+          color={C.accentGreen}
+        />
+        <MiniStat
+          label="Low Stock"
+          value={statsLoading ? "—" : inventory.lowStock}
+          color={inventory.lowStock > 0 ? C.gold : C.accentGreen}
+          alert={inventory.lowStock > 0}
+          subtext={
+            inventory.outOfStock > 0
+              ? `${inventory.outOfStock} out of stock`
+              : null
+          }
+        />
+        <MiniStat
+          label="Open POs"
+          value={statsLoading ? "—" : purchaseOrders.open}
+          color={C.blue}
+          subtext={
+            purchaseOrders.inTransit > 0
+              ? `${purchaseOrders.inTransit} in transit`
+              : null
+          }
+        />
+        <MiniStat
+          label="Stock Value"
+          value={
+            statsLoading
+              ? "—"
+              : `R${(inventory.stockValueSell / 1000).toFixed(0)}k`
+          }
+          color={C.primaryDark}
+          subtext={
+            inventory.stockCost > 0
+              ? `Cost: R${(inventory.stockCost / 1000).toFixed(0)}k`
+              : null
+          }
+        />
+      </div>
+
+      {/* ── Out of stock alert banner ───────────────────────────────── */}
+      {!statsLoading && inventory.outOfStock > 0 && (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "12px",
-            marginBottom: "24px",
+            background: "#fdf0ef",
+            border: `1px solid ${C.red}30`,
+            borderLeft: `3px solid ${C.red}`,
+            borderRadius: "2px",
+            padding: "10px 16px",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            fontSize: "12px",
           }}
         >
-          <MiniStat
-            label="Active SKUs"
-            value={summaryStats.totalItems}
-            color={C.accentGreen}
-          />
-          <MiniStat
-            label="Low Stock"
-            value={summaryStats.lowStockCount}
-            color={summaryStats.lowStockCount > 0 ? C.gold : C.accentGreen}
-            alert={summaryStats.lowStockCount > 0}
-          />
-          <MiniStat
-            label="Open POs"
-            value={summaryStats.openPOs}
-            color={C.blue}
-          />
-          <MiniStat
-            label="Suppliers"
-            value={summaryStats.supplierCount}
-            color={C.primaryDark}
-          />
+          <span style={{ color: C.red, fontWeight: 700 }}>
+            ● {inventory.outOfStock} items out of stock
+          </span>
+          <span style={{ color: C.muted }}>
+            {stats.alerts.outOfStockItems
+              .slice(0, 3)
+              .map((i) => i.name)
+              .join(", ")}
+            {stats.alerts.outOfStockItems.length > 3 &&
+              ` +${stats.alerts.outOfStockItems.length - 3} more`}
+          </span>
         </div>
       )}
 
@@ -213,65 +188,15 @@ export default function SupplyChain() {
           flexWrap: "wrap",
         }}
       >
-        <span
-          style={{
-            background: C.accentGreen,
-            color: C.white,
-            padding: "4px 12px",
-            borderRadius: "2px",
-            fontWeight: 700,
-          }}
-        >
-          ★ Procure
-        </span>
-        <span style={{ color: C.border, fontSize: "16px" }}>→</span>
-        <span
-          style={{
-            background: C.accentGreen,
-            color: C.white,
-            padding: "4px 12px",
-            borderRadius: "2px",
-            fontWeight: 700,
-          }}
-        >
-          ★ Receive & Store
-        </span>
-        <span style={{ color: C.border, fontSize: "16px" }}>→</span>
-        <span
-          style={{
-            background: C.warmBg,
-            color: C.muted,
-            padding: "4px 12px",
-            borderRadius: "2px",
-            border: `1px dashed ${C.border}`,
-          }}
-        >
-          Produce (Production tab)
-        </span>
-        <span style={{ color: C.border, fontSize: "16px" }}>→</span>
-        <span
-          style={{
-            background: C.warmBg,
-            color: C.muted,
-            padding: "4px 12px",
-            borderRadius: "2px",
-            border: `1px dashed ${C.border}`,
-          }}
-        >
-          Distribute (Phase 2D)
-        </span>
-        <span style={{ color: C.border, fontSize: "16px" }}>→</span>
-        <span
-          style={{
-            background: C.accentGreen,
-            color: C.white,
-            padding: "4px 12px",
-            borderRadius: "2px",
-            fontWeight: 700,
-          }}
-        >
-          ★ Customer Scans
-        </span>
+        <FlowStep label="★ Procure" active />
+        <Arrow />
+        <FlowStep label="★ Receive & Store" active />
+        <Arrow />
+        <FlowStep label="Produce (Production tab)" />
+        <Arrow />
+        <FlowStep label="Distribute (Phase 2D)" />
+        <Arrow />
+        <FlowStep label="★ Customer Scans" active />
       </div>
 
       {/* ── StockControl Module (full existing functionality) ───────── */}
@@ -289,13 +214,35 @@ export default function SupplyChain() {
   );
 }
 
-// ── Mini stat card for summary bar ──────────────────────────────────────
-function MiniStat({ label, value, color, alert = false }) {
+// ── Flow step pill ─────────────────────────────────────────────────────
+function FlowStep({ label, active = false }) {
+  return (
+    <span
+      style={{
+        background: active ? "#52b788" : "#f4f0e8",
+        color: active ? "#ffffff" : "#888888",
+        padding: "4px 12px",
+        borderRadius: "2px",
+        fontWeight: active ? 700 : 400,
+        border: active ? "none" : "1px dashed #e8e0d4",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function Arrow() {
+  return <span style={{ color: "#e8e0d4", fontSize: "16px" }}>→</span>;
+}
+
+// ── Mini stat card ─────────────────────────────────────────────────────
+function MiniStat({ label, value, color, alert = false, subtext = null }) {
   return (
     <div
       style={{
-        background: C.white,
-        border: `1px solid ${alert ? C.gold : C.border}`,
+        background: "#ffffff",
+        border: `1px solid ${alert ? "#b5935a" : "#e8e0d4"}`,
         borderTop: `3px solid ${color}`,
         borderRadius: "2px",
         padding: "12px 16px",
@@ -308,7 +255,7 @@ function MiniStat({ label, value, color, alert = false }) {
           fontWeight: 600,
           letterSpacing: "0.15em",
           textTransform: "uppercase",
-          color: C.muted,
+          color: "#888888",
           marginBottom: "4px",
         }}
       >
@@ -325,6 +272,17 @@ function MiniStat({ label, value, color, alert = false }) {
       >
         {value}
       </div>
+      {subtext && (
+        <div
+          style={{
+            fontSize: "10px",
+            color: "#888888",
+            marginTop: "4px",
+          }}
+        >
+          {subtext}
+        </div>
+      )}
     </div>
   );
 }

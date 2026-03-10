@@ -1,10 +1,14 @@
-// AdminDashboard.js v3.9 — Adds Batches tab (WP1)
+// AdminDashboard.js v4.0 — Adds Documents tab (WP-I)
 // Protea Botanicals — March 2026
-// ★ v3.9 changes:
-//   1. ADDED: "Batches" tab → AdminBatchManager component
-//   2. ADDED: onNavigateToQR callback — batch "Generate QR" button switches to QR tab
-//   3. ADDED: Quick action "MANAGE BATCHES" on overview
-//   4. UPDATED: Overview stats strip — no logic changes to existing tabs
+// ★ v4.0 changes:
+//   1. ADDED: "Documents" tab → HQDocuments component
+//   2. ADDED: onNavigateToDocuments callback — batch "🔬 AI INGESTED" badge
+//             switches to Documents tab and pre-selects the source document
+//   3. ADDED: documentsTargetId state — passed as initialDocId to HQDocuments
+// ★ v3.9 changes (preserved):
+//   1. "Batches" tab → AdminBatchManager
+//   2. onNavigateToQR callback
+//   3. Quick action "MANAGE BATCHES"
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -18,6 +22,7 @@ import AdminShipments from "../components/AdminShipments";
 import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
 import AdminFraudSecurity from "../components/AdminFraudSecurity";
 import AdminNotifications from "../components/AdminNotifications";
+import HQDocuments from "../components/hq/HQDocuments";
 
 // ─── Design Tokens ───
 const C = {
@@ -142,6 +147,8 @@ function fmtDate(d) {
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
   const [qrSubTab, setQrSubTab] = useState("registry");
+  // v4.0: document pre-selection for deep-link from batch badge
+  const [documentsTargetId, setDocumentsTargetId] = useState(null);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
   const [analytics, setAnalytics] = useState({
@@ -239,9 +246,13 @@ export default function AdminDashboard() {
   const handleNavigateToQR = (batchId) => {
     setTab("qr_codes");
     setQrSubTab("generate");
-    // Note: AdminQrGenerator v4.0 auto-loads batch dropdown on mount.
-    // The user picks the correct batch from the dropdown (already auto-selects newest).
-    // Full batch pre-selection wiring can be added in a future session if needed.
+  };
+
+  // ── v4.0: Called from AdminBatchManager "🔬 AI INGESTED" badge ──────────
+  // Switches to Documents tab and pre-selects the source document
+  const handleNavigateToDocuments = (documentId) => {
+    setDocumentsTargetId(documentId);
+    setTab("documents");
   };
 
   return (
@@ -343,6 +354,14 @@ export default function AdminDashboard() {
           active={tab === "stock"}
           label="Stock"
           onClick={() => setTab("stock")}
+        />
+        <TabBtn
+          active={tab === "documents"}
+          label="📄 Documents"
+          onClick={() => {
+            setDocumentsTargetId(null);
+            setTab("documents");
+          }}
         />
       </div>
 
@@ -505,6 +524,15 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => {
+                setDocumentsTargetId(null);
+                setTab("documents");
+              }}
+              style={makeBtn(C.mid)}
+            >
+              📄 DOCUMENTS
+            </button>
+            <button
+              onClick={() => {
                 computeAnalytics();
                 fetchUsers();
               }}
@@ -524,7 +552,10 @@ export default function AdminDashboard() {
 
       {/* ══════ BATCHES ══════ */}
       {tab === "batches" && (
-        <AdminBatchManager onNavigateToQR={handleNavigateToQR} />
+        <AdminBatchManager
+          onNavigateToQR={handleNavigateToQR}
+          onNavigateToDocuments={handleNavigateToDocuments}
+        />
       )}
 
       {/* ══════ CUSTOMERS ══════ */}
@@ -713,6 +744,10 @@ export default function AdminDashboard() {
 
       {/* ══════ STOCK ══════ */}
       {tab === "stock" && <StockControl />}
+
+      {/* ══════ DOCUMENTS ══════ */}
+      {/* v4.0: initialDocId passed when navigating from 🔬 AI INGESTED badge */}
+      {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
     </div>
   );
 }

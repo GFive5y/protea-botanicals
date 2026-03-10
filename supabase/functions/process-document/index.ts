@@ -1,6 +1,8 @@
 // supabase/functions/process-document/index.ts
-// WP-I: Intelligent Document Ingestion Engine — v1.4
-// FIX: Explicit deduplication rule — never create a product that already exists in existing_products.
+// v1.6 — WP-I Extended: Delivery Note → Auto-receive inventory
+// NEW: existing_inventory + open_purchase_orders passed in context
+// NEW: receive_delivery_item action (inventory_items qty increment + stock_movements audit)
+// NEW: update_po_status action (purchase_orders po_status → received)
 // Deploy: npx supabase functions deploy process-document --no-verify-jwt
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -18,13 +20,14 @@ const JSON_HEADERS = {
   "Content-Type": "application/json",
 };
 
-// ─── System prompt for Claude ──────────────────────────────────────────────
 function buildSystemPrompt(
   existingSuppliers: unknown[],
   existingProducts: unknown[],
+  existingInventory: unknown[],
+  openPurchaseOrders: unknown[],
 ): string {
   return `You are a document extraction engine for Protea Botanicals, a cannabis extract company in South Africa.
-Your job is to extract ALL structured data from business documents and propose specific database updates.
+Extract ALL structured data from business documents and propose specific database updates.
 You MUST respond with ONLY valid JSON — no markdown, no code fences, no explanation, no preamble.
 
 DOCUMENT TYPES (detect from content):
@@ -35,6 +38,12 @@ ${JSON.stringify(existingSuppliers, null, 2)}
 
 EXISTING PRODUCTS/SKUs IN SYSTEM (${existingProducts.length} products already in database):
 ${JSON.stringify(existingProducts, null, 2)}
+
+EXISTING INVENTORY ITEMS (use for delivery_note item matching — match by name/sku):
+${JSON.stringify(existingInventory, null, 2)}
+
+OPEN PURCHASE ORDERS (use for delivery_note PO matching — match by po_number or supplier):
+${JSON.stringify(openPurchaseOrders, null, 2)}
 
 RESPOND EXACTLY in this JSON structure (all fields required, use null where not applicable):
 {
@@ -61,82 +70,190 @@ RESPOND EXACTLY in this JSON structure (all fields required, use null where not 
 }
 
 ═══════════════════════════════════════════════════════
-PRODUCT MATCHING — READ THIS CAREFULLY — NON-NEGOTIABLE
+MANDATORY RULE — proposed_updates MUST NEVER BE EMPTY
 ═══════════════════════════════════════════════════════
 
-For EVERY product in the document, follow this exact decision tree:
+If the document contains ANY line items, suppliers, payments, or quantities,
+you MUST produce at least one proposed_update. An empty proposed_updates array
+is only acceptable for a document with literally no actionable data (e.g. a blank page).
 
-STEP 1 — Search existing_products for a name match.
-  Compare the product name from the document against every entry in the
-  EXISTING PRODUCTS list above. Use fuzzy/partial matching:
-  "Orange Cookies" matches "Orange Cookies — Live Line", "Bubba Kush" matches
-  "Bubba Kush — Pure Terpenes", etc. A product is considered MATCHED if the
-  core name appears in any existing product's name field.
+For EVERY document type, always produce these actions:
+
+INVOICE or QUOTE (any order document):
+  1. ALWAYS propose create_purchase_order — one action covering the whole order.
+     Include all matched line items as purchase_order_items in the data.
+  2. For each matched product line item, ALSO propose update_product_price IF
+     the unit price is > 0 and not a free sample / 100% discount.
+  3. For each unmatched product, propose create_supplier_product.
+
+PROOF OF PAYMENT:
+  1. Propose update_po_payment on purchase_orders — set payment_date,
+     payment_reference, po_status = "paid".
+
+DELIVERY NOTE:
+  For EACH received line item that matches existing_inventory (match by name/sku similarity):
+    1. Propose receive_delivery_item action — this will increment quantity_on_hand
+       in inventory_items and create a stock_movements audit record.
+       CRITICAL: data MUST include item_id (uuid from existing_inventory) + quantity_received (number > 0).
+       record_id MUST also be set to the inventory_items uuid (same as item_id).
+  For items NOT matched in existing_inventory:
+    → Add to unknown_items only. Do NOT propose receive_delivery_item for unmatched items.
+  If a matching PO is found in open_purchase_orders (match by po_number or supplier):
+    2. Propose update_po_status on purchase_orders — set po_status = "received".
+       CRITICAL: record_id MUST be the PO uuid from open_purchase_orders.
+       data MUST include po_status: "received" and actual_arrival (date string YYYY-MM-DD).
+
+COA / LAB REPORT:
+  1. Propose update_batch_coa on batches — set thc_content, cbd_content,
+     lab_name, lab_test_date, lab_certified = true, coa_url if present.
+
+PRICE LIST:
+  1. set line_items to []. For EVERY product in the list, propose
+     update_product_price (matched) or create_supplier_product (unmatched).
+
+═══════════════════════════════════════════════════════
+PRODUCT MATCHING RULES
+═══════════════════════════════════════════════════════
+
+For EVERY product in the document:
+
+STEP 1 — Search existing_products by name similarity (fuzzy/partial match).
+  "Orange Cookies" matches "Orange Cookies — Live Line".
+  "Gelato #41" matches "Gelato #41 - Palate Line - 2ml".
 
 STEP 2 — If MATCHED:
-  → Propose an update_product_price action (NOT create_supplier_product).
-  → Put the matched product's id in record_id.
+  → Set matched_product_id in the line_item.
+  → Propose update_product_price ONLY IF unit_price > 0 (not free sample).
   → Do NOT add to unknown_items.
-  → Do NOT propose create_supplier_product for this product.
+  → Do NOT propose create_supplier_product.
 
-STEP 3 — If NOT MATCHED (core name does not appear in existing_products at all):
+STEP 3 — If NOT MATCHED:
   → Add to unknown_items.
-  → Propose a create_supplier_product action.
+  → Propose create_supplier_product with full data object.
 
-RULE: A product cannot be both in unknown_items AND already in existing_products.
-RULE: Never propose create_supplier_product for any product whose name already
-      appears anywhere in the existing_products list.
-RULE: If you are unsure whether a product matches, prefer treating it as MATCHED
-      and propose a price update rather than a duplicate create.
+RULE: Never propose create_supplier_product for products already in existing_products.
+RULE: If unsure whether a product matches, prefer MATCHED (update, not create).
+RULE: Free samples ($0 or 100% discounted) → still matched in line_items,
+      but skip the update_product_price (don't overwrite real prices with $0).
+      The create_purchase_order action still captures them as order items.
 
 ═══════════════════════════════════════════════════════
+create_purchase_order EXAMPLE (use for invoice/quote):
+═══════════════════════════════════════════════════════
+{
+  "action": "create_purchase_order",
+  "table": "purchase_orders",
+  "record_id": null,
+  "description": "Create PO for Eybna GmbH quote PQG2600182 — 14 terpene samples",
+  "data": {
+    "supplier_id": "3357f93b-8dac-46fa-b591-d5cf74c6d313",
+    "po_number": "PQG2600182",
+    "supplier_invoice_ref": "PQG2600182",
+    "status": "ordered",
+    "po_status": "ordered",
+    "order_date": "2026-02-23",
+    "currency": "USD",
+    "subtotal": 234.00,
+    "notes": "Terpene samples — 2ml each",
+    "items": [
+      {
+        "supplier_product_id": "matched-uuid-or-null",
+        "description": "Pineapple Express - Pure Terpenes Line - 2ml",
+        "quantity_ordered": 1,
+        "unit_price_usd": 25.00
+      }
+    ]
+  },
+  "confidence": 0.92
+}
 
-EXTRACTION RULES:
-- Confidence scores: 0.0-1.0. Be conservative — never inflate. Unknown/ambiguous = 0.5 or lower.
-- proposed_updates: ONLY suggest if confidence > 0.70. Never propose destructive changes.
-- For action types use: update_purchase_order | update_product_price | update_supplier_product | update_batch_coa | update_inventory_qty | create_supplier_product | update_po_payment
-- COA documents: extract THC%, CBD%, CBN%, terpene_profile, lab_name, lab_test_date, batch_number → map to batches table fields
-- Price lists: set line_items to [] (empty array). Put ALL product data in proposed_updates instead — one entry per product.
-- Delivery notes: quantities received → proposed inventory_items quantity_on_hand updates
-- Proof of payment: amount paid, date, bank ref → purchase_orders payment_date, payment_reference, po_status=paid
-- Match suppliers: use name similarity (AimVape ≈ Steamups Technology AimVape)
-- Currencies: detect from symbols (R/ZAR = ZAR, $ = USD, € = EUR, ¥ = CNY)
-- Non-English documents: translate extracted data to English in the JSON
-- If a multi-page PDF: extract from all visible pages
+═══════════════════════════════════════════════════════
+receive_delivery_item EXAMPLE (use for delivery_note — one per matched item):
+═══════════════════════════════════════════════════════
+{
+  "action": "receive_delivery_item",
+  "table": "inventory_items",
+  "record_id": "uuid-of-inventory-item",
+  "description": "Receive 50 units of Pineapple Express terpene (current stock: 10 → new: 60)",
+  "data": {
+    "item_id": "uuid-of-inventory-item",
+    "quantity_received": 50
+  },
+  "confidence": 0.94
+}
 
-EXAMPLE — update_product_price (use this when product already exists):
+RULES for receive_delivery_item:
+- record_id and data.item_id MUST be the same uuid from existing_inventory
+- quantity_received MUST be a positive number (the qty on the delivery note, not cumulative)
+- Only propose this for items FOUND in existing_inventory
+- Include current quantity in description so operator can verify
+
+═══════════════════════════════════════════════════════
+update_po_status EXAMPLE (use for delivery_note when PO found):
+═══════════════════════════════════════════════════════
+{
+  "action": "update_po_status",
+  "table": "purchase_orders",
+  "record_id": "uuid-of-purchase-order",
+  "description": "Mark PO-2026-001 as received — goods arrived 2026-03-11",
+  "data": {
+    "po_status": "received",
+    "actual_arrival": "2026-03-11"
+  },
+  "confidence": 0.88
+}
+
+RULES for update_po_status:
+- record_id MUST be a uuid from open_purchase_orders — never invent one
+- po_status MUST be exactly: "received"
+- actual_arrival MUST be the delivery date from the document (YYYY-MM-DD format)
+- If no matching PO found in open_purchase_orders, do NOT propose this action
+
+═══════════════════════════════════════════════════════
+update_product_price EXAMPLE (matched product, price > 0):
+═══════════════════════════════════════════════════════
 {
   "action": "update_product_price",
   "table": "supplier_products",
   "record_id": "uuid-of-existing-product",
-  "description": "Update Orange Cookies unit price to $200.00",
-  "data": { "unit_price_usd": 200.00, "price_effective_date": "2026-03-01" },
+  "description": "Update Pineapple Express unit price to $25.00",
+  "data": { "unit_price_usd": 25.00, "price_effective_date": "2026-02-23" },
   "confidence": 0.95
 }
 
-EXAMPLE — create_supplier_product (use ONLY when product does NOT exist in system):
+═══════════════════════════════════════════════════════
+create_supplier_product EXAMPLE (unmatched only):
+═══════════════════════════════════════════════════════
 {
   "action": "create_supplier_product",
   "table": "supplier_products",
   "record_id": null,
-  "description": "Create new product: Toffee Diesel — Pure Terpenes Line",
+  "description": "Create new product: ZKZ - Live Plus+ Line - 2ml",
   "data": {
     "supplier_id": "3357f93b-8dac-46fa-b591-d5cf74c6d313",
-    "name": "Toffee Diesel — Pure Terpenes Line",
-    "sku": "EYBNA-TOFFEE-DIESEL-PT",
+    "name": "ZKZ - Live Plus+ Line - 2ml",
+    "sku": "EYBNA-ZKZ-LIVEPLUS-2ML",
     "category": "terpene",
-    "unit_price_usd": 200.00,
+    "unit_price_usd": 25.00,
     "currency": "USD",
     "moq": 1,
     "lead_time_days": 7,
     "is_active": true,
-    "notes": "Auto-created from price catalog ingestion"
+    "notes": "Auto-created from document ingestion"
   },
   "confidence": 0.88
-}`;
 }
 
-// ─── Main handler ──────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════
+GENERAL EXTRACTION RULES:
+- Confidence scores: 0.0-1.0. Conservative — never inflate.
+- Currencies: R/ZAR = ZAR, $ = USD, € = EUR
+- Match suppliers by name similarity
+- Non-English documents: translate extracted data to English
+- Multi-page PDFs: extract from all pages
+- supplier_products.category must be: hardware OR terpene (lowercase, no plural)`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -187,8 +304,27 @@ serve(async (req) => {
         supplier_id: p.supplier_id,
       }),
     );
+    // v1.6 — inventory items for delivery note matching
+    const existingInventory = (context.existing_inventory || []).map(
+      (i: Record<string, unknown>) => ({
+        id: i.id,
+        name: i.name,
+        sku: i.sku,
+        category: i.category,
+        quantity_on_hand: i.quantity_on_hand,
+      }),
+    );
+    // v1.6 — open POs for delivery note PO matching
+    const openPurchaseOrders = (context.open_purchase_orders || []).map(
+      (po: Record<string, unknown>) => ({
+        id: po.id,
+        po_number: po.po_number,
+        supplier_id: po.supplier_id,
+        po_status: po.po_status,
+        expected_arrival: po.expected_arrival,
+      }),
+    );
 
-    // Build document block for Claude
     const isPdf = mime_type === "application/pdf";
     const documentBlock = isPdf
       ? {
@@ -201,11 +337,7 @@ serve(async (req) => {
         }
       : {
           type: "image",
-          source: {
-            type: "base64",
-            media_type: mime_type,
-            data: file_base64,
-          },
+          source: { type: "base64", media_type: mime_type, data: file_base64 },
         };
 
     const userContent = [
@@ -214,11 +346,20 @@ serve(async (req) => {
         type: "text",
         text: `Extract all data from this ${document_type_hint ? document_type_hint + " " : ""}document and return the JSON as specified.
 
-IMPORTANT: Before proposing any create_supplier_product, check the EXISTING PRODUCTS list in your system prompt. If the product name already exists there (even partially), propose update_product_price instead. Only propose creates for genuinely new products not present in the existing list.`,
+CRITICAL REMINDERS:
+1. proposed_updates MUST NOT be empty if there are any line items or actionable data.
+2. For invoices and quotes: ALWAYS create a create_purchase_order action covering all items.
+3. For matched products with price > 0: ALSO propose update_product_price.
+4. For unmatched products: propose create_supplier_product.
+5. Free samples ($0): include in the PO items but skip update_product_price.
+6. Check EXISTING PRODUCTS list before proposing any create — if name matches, use update instead.
+7. For delivery notes: use receive_delivery_item (NOT update_inventory_qty) for each matched inventory item.
+   record_id and data.item_id MUST be the uuid from existing_inventory. quantity_received must be > 0.
+8. For delivery notes: use update_po_status (NOT update_purchase_order) to mark the PO received.
+   record_id MUST be a uuid from open_purchase_orders. Only propose if a match is found.`,
       },
     ];
 
-    // Call Claude
     const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -230,7 +371,12 @@ IMPORTANT: Before proposing any create_supplier_product, check the EXISTING PROD
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 32000,
-        system: buildSystemPrompt(existingSuppliers, existingProducts),
+        system: buildSystemPrompt(
+          existingSuppliers,
+          existingProducts,
+          existingInventory,
+          openPurchaseOrders,
+        ),
         messages: [{ role: "user", content: userContent }],
       }),
     });
@@ -243,7 +389,6 @@ IMPORTANT: Before proposing any create_supplier_product, check the EXISTING PROD
     const claudeData = await claudeRes.json();
     const rawText: string = claudeData.content?.[0]?.text || "";
 
-    // Parse JSON from Claude
     let extraction: Record<string, unknown>;
     try {
       const cleaned = rawText
@@ -258,7 +403,6 @@ IMPORTANT: Before proposing any create_supplier_product, check the EXISTING PROD
       );
     }
 
-    // Write to document_log
     const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: logEntry, error: logErr } = await db

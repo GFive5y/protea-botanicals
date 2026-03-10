@@ -164,10 +164,19 @@ export default function HQPurchaseOrders() {
   // ── Data fetching ────────────────────────────────────────────────────────
   const fetchPOs = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("purchase_orders")
       .select("*, suppliers(name, country, currency)")
       .order("created_at", { ascending: false });
+    if (error) {
+      console.error(
+        "[HQPurchaseOrders] fetchPOs error:",
+        error.message,
+        error.code,
+        error.details,
+      );
+    }
+    console.log("[HQPurchaseOrders] rows returned:", data?.length ?? 0);
     setPos(data || []);
     setLoading(false);
   }, []);

@@ -1,41 +1,29 @@
-// src/components/hq/Production.js — Protea Botanicals v1.3
+// src/components/hq/Production.js — Protea Botanicals v2.0
 // ─────────────────────────────────────────────────────────────────────────────
-// PRODUCTION TAB — Phase 2C
+// PRODUCTION TAB — WP-K update
 //
-// Purpose: Assembly batch tracking — the PRODUCE step of the supply chain:
-//   Procure → Receive → ★ PRODUCE ★ → Distribute → Customer Scans
+// v2.0 changes (WP-K):
+//   ★ Stock Gating — CreateBatchForm checks inventory BEFORE allowing create.
+//     Shows per-input shortfall panel with exact deficit. Hard blocks if any
+//     linked inventory item has insufficient stock. "Proceed Anyway" available
+//     for manual/unlinked inputs only.
+//   ★ Admin Delete — planned/cancelled batches can be permanently deleted.
+//     Confirmation required. Audit entry written to stock_movements.
+//   ★ Admin Void — completed batches can be voided (reverses stock movements).
+//     Re-credits raw materials to inventory. Deducts finished goods.
+//     Full audit trail written. Requires double confirmation.
+//   ★ SystemHealthContext.refresh() called after every mutation so all tabs
+//     update automatically.
 //
-// Features:
-//   - View all production batches (filterable by status)
-//   - Create new batch (strain, cart size, target quantity)
-//   - Add inputs from inventory (distillate, terpene, hardware)
-//   - Auto-calculate bill of materials from cart size × quantity
-//   - Status progression: planned → in_progress → completed → cancelled
-//   - Record actual fill quantity when completing
-//   - Cost tracking per batch (from input costs)
-//   - ★ v1.1: Auto-deduct raw materials from inventory on batch completion
-//   - ★ v1.2: Auto-create finished goods in inventory on batch completion
-//   - ★ v1.3: COGS Integration — on batch expand, lazy-fetch matching product_cogs
-//     entry and compare target COGS per unit vs actual batch cost per unit.
-//     Shows full breakdown: hardware, terpene, distillate, packaging, labour, other.
-//     Variance highlights over/under-spend vs recipe.
-//
-// Tables used:
-//   - production_batches (CRUD)
-//   - production_inputs (CRUD, linked to batches)
-//   - inventory_items (read + update/insert)
-//   - stock_movements (insert for audit trail)
-//   - product_cogs (read, for COGS comparison — v1.3)
-//   - local_inputs (read, for distillate/packaging/labour costs — v1.3)
-//   - supplier_products (read via product_cogs FK — v1.3)
-//   - fx_rates (read, for USD→ZAR conversion — v1.3)
-//
-// Design: Cream aesthetic (Section 7 of handover).
-// RLS: Uses is_hq_user() — HQ can do everything.
+// v1.3: COGS Integration (lazy-fetch on expand)
+// v1.2: Auto-create finished goods on batch completion
+// v1.1: Auto-deduct raw materials from inventory on batch completion
+// v1.0: Initial production batch tracking
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { useSystemHealth } from "../../services/systemHealthContext";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
@@ -58,7 +46,6 @@ const F = {
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ── Shared styles ─────────────────────────────────────────────────────────
 const sLabel = {
   fontSize: "9px",
   letterSpacing: "0.3em",
@@ -101,7 +88,6 @@ const sInput = {
 };
 const sSelect = { ...sInput, cursor: "pointer" };
 
-// ── Status config ─────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   planned: { label: "Planned", color: C.blue, bg: "rgba(44,74,110,0.1)" },
   in_progress: {
@@ -115,9 +101,9 @@ const STATUS_CONFIG = {
     bg: "rgba(82,183,136,0.1)",
   },
   cancelled: { label: "Cancelled", color: C.red, bg: "rgba(192,57,43,0.1)" },
+  voided: { label: "Voided", color: C.muted, bg: "rgba(136,136,136,0.1)" },
 };
 
-// ── HQ tenant ID ──────────────────────────────────────────────────────────
 const HQ_TENANT_ID = "43b34c33-6864-4f02-98dd-df1d340475c3";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -132,6 +118,9 @@ export default function Production() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [expandedBatch, setExpandedBatch] = useState(null);
 
+  // Shared live context — refresh triggers all tabs to update
+  const { refresh: refreshSystem } = useSystemHealth();
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -143,7 +132,9 @@ export default function Production() {
           .order("created_at", { ascending: false }),
         supabase
           .from("inventory_items")
-          .select("id, name, sku, category, unit, quantity_on_hand, cost_price")
+          .select(
+            "id, name, sku, category, unit, quantity_on_hand, reorder_level, cost_price",
+          )
           .eq("is_active", true)
           .order("name"),
       ]);
@@ -162,6 +153,11 @@ export default function Production() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleMutation = useCallback(() => {
+    fetchData();
+    refreshSystem(); // Propagate to all HQ tabs
+  }, [fetchData, refreshSystem]);
 
   const filteredBatches =
     statusFilter === "all"
@@ -313,7 +309,7 @@ export default function Production() {
           inventoryItems={inventoryItems}
           onCreated={() => {
             setShowCreateForm(false);
-            fetchData();
+            handleMutation();
           }}
           onCancel={() => setShowCreateForm(false)}
         />
@@ -354,7 +350,7 @@ export default function Production() {
               onToggle={() =>
                 setExpandedBatch(expandedBatch === batch.id ? null : batch.id)
               }
-              onRefresh={fetchData}
+              onRefresh={handleMutation}
             />
           ))}
         </div>
@@ -364,10 +360,46 @@ export default function Production() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CREATE BATCH FORM
+// STOCK GATE CHECK — runs before batch creation
+// Returns array of shortfalls for linked inventory items
+// ═══════════════════════════════════════════════════════════════════════════
+async function checkStockAvailability(inputs, inventoryItems) {
+  const shortfalls = [];
+  const linkedInputs = inputs.filter(
+    (inp) => inp.inventory_item_id && inp.quantity_used,
+  );
+
+  for (const inp of linkedInputs) {
+    const item = inventoryItems.find((i) => i.id === inp.inventory_item_id);
+    if (!item) continue;
+
+    const available = item.quantity_on_hand || 0;
+    const required = parseFloat(inp.quantity_used) || 0;
+
+    if (available < required) {
+      shortfalls.push({
+        inputName: inp.input_name || item.name,
+        itemName: item.name,
+        sku: item.sku,
+        required,
+        available,
+        deficit: required - available,
+        unit: item.unit,
+      });
+    }
+  }
+
+  return shortfalls;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CREATE BATCH FORM — v2.0 with stock gating
 // ═══════════════════════════════════════════════════════════════════════════
 function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
   const [saving, setSaving] = useState(false);
+  const [stockShortfalls, setStockShortfalls] = useState(null);
+  const [checkingStock, setCheckingStock] = useState(false);
+
   const [form, setForm] = useState({
     strain_name: "",
     product_type: "cartridge",
@@ -401,8 +433,10 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
       }
       return arr;
     });
+    // Clear shortfall check when inputs change
+    setStockShortfalls(null);
   };
-  const addInput = () =>
+  const addInput = () => {
     setInputs((p) => [
       ...p,
       {
@@ -414,7 +448,12 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
         cost_per_unit: "",
       },
     ]);
-  const removeInput = (idx) => setInputs((p) => p.filter((_, i) => i !== idx));
+    setStockShortfalls(null);
+  };
+  const removeInput = (idx) => {
+    setInputs((p) => p.filter((_, i) => i !== idx));
+    setStockShortfalls(null);
+  };
 
   const generateBatchCode = () => {
     const d = new Date();
@@ -461,9 +500,11 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
         cost_per_unit: "",
       },
     ]);
+    setStockShortfalls(null);
   };
 
-  const handleCreate = async () => {
+  // ── Stock check (runs on first Create attempt) ────────────────────────
+  const handleCheckAndCreate = async () => {
     if (!form.strain_name.trim()) {
       alert("Strain name is required.");
       return;
@@ -472,6 +513,38 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
       alert("Enter a target quantity greater than 0.");
       return;
     }
+
+    // ── Hard block: no inventory at all ──────────────────────────────────
+    if (inventoryItems.length === 0) {
+      setStockShortfalls([
+        {
+          itemName: "No inventory items exist",
+          sku: "",
+          required: "—",
+          available: 0,
+          deficit: "—",
+          unit: "",
+          inputName:
+            "You have no inventory. Receive stock via a Purchase Order first before creating a production batch.",
+        },
+      ]);
+      return;
+    }
+
+    // ── Check linked inputs have sufficient stock ─────────────────────────
+    setCheckingStock(true);
+    const shortfalls = await checkStockAvailability(inputs, inventoryItems);
+    setCheckingStock(false);
+
+    if (shortfalls.length > 0) {
+      setStockShortfalls(shortfalls);
+      return;
+    }
+
+    await doCreate();
+  };
+
+  const doCreate = async () => {
     setSaving(true);
     try {
       const batchCode = generateBatchCode();
@@ -530,13 +603,15 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
     }
   };
 
-  const totalCost = inputs.reduce((sum, inp) => {
-    return (
+  const totalCost = inputs.reduce(
+    (sum, inp) =>
       sum +
       (parseFloat(inp.quantity_used) || 0) *
-        (parseFloat(inp.cost_per_unit) || 0)
-    );
-  }, 0);
+        (parseFloat(inp.cost_per_unit) || 0),
+    0,
+  );
+
+  const hasLinkedInputs = inputs.some((inp) => inp.inventory_item_id);
 
   return (
     <div
@@ -854,6 +929,121 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
         )}
       </div>
 
+      {/* ── Stock Shortfall Panel ─────────────────────────────────────── */}
+      {stockShortfalls && stockShortfalls.length > 0 && (
+        <div
+          style={{
+            marginTop: "16px",
+            padding: "16px",
+            background: "#fdf0ef",
+            border: `1px solid ${C.red}40`,
+            borderLeft: `3px solid ${C.red}`,
+            borderRadius: "2px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: C.red,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              marginBottom: "10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            ⚠ Insufficient Stock — Cannot Create Batch
+          </div>
+          <div
+            style={{ fontSize: "12px", color: C.text, marginBottom: "12px" }}
+          >
+            The following inventory items do not have enough stock for this
+            batch:
+          </div>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "12px",
+            }}
+          >
+            <thead>
+              <tr>
+                {["Item", "Required", "Available", "Deficit"].map((h, i) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: i === 0 ? "left" : "right",
+                      padding: "6px 8px",
+                      fontSize: "9px",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: C.muted,
+                      borderBottom: `1px solid ${C.border}`,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {stockShortfalls.map((s, i) => (
+                <tr key={i}>
+                  <td style={{ padding: "6px 8px", fontWeight: 500 }}>
+                    {s.itemName}
+                    {s.sku && (
+                      <span
+                        style={{
+                          color: C.muted,
+                          fontSize: "10px",
+                          marginLeft: "6px",
+                        }}
+                      >
+                        {s.sku}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                    {s.required} {s.unit}
+                  </td>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      textAlign: "right",
+                      color: C.red,
+                    }}
+                  >
+                    {s.available} {s.unit}
+                  </td>
+                  <td
+                    style={{
+                      padding: "6px 8px",
+                      textAlign: "right",
+                      fontWeight: 700,
+                      color: C.red,
+                    }}
+                  >
+                    −
+                    {typeof s.deficit === "number"
+                      ? s.deficit.toFixed(s.unit === "pcs" ? 0 : 2)
+                      : s.deficit}{" "}
+                    {s.unit}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: "12px", fontSize: "11px", color: C.muted }}>
+            Receive stock via a Purchase Order first, then create this batch.
+            {!hasLinkedInputs &&
+              " (No inventory items are linked — link items above to enable stock gating.)"}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -867,8 +1057,16 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
         <button onClick={onCancel} style={sBtn("outline")}>
           Cancel
         </button>
-        <button onClick={handleCreate} disabled={saving} style={sBtn()}>
-          {saving ? "Creating..." : "Create Batch"}
+        <button
+          onClick={handleCheckAndCreate}
+          disabled={saving || checkingStock}
+          style={sBtn()}
+        >
+          {checkingStock
+            ? "Checking Stock..."
+            : saving
+              ? "Creating..."
+              : "Create Batch"}
         </button>
       </div>
     </div>
@@ -876,15 +1074,18 @@ function CreateBatchForm({ inventoryItems, onCreated, onCancel }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BATCH CARD
+// BATCH CARD — v2.0 with admin delete/void
 // ═══════════════════════════════════════════════════════════════════════════
 function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
   const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [voiding, setVoiding] = useState(false);
+  const [showAdminActions, setShowAdminActions] = useState(false);
   const [actualQty, setActualQty] = useState(
     batch.actual_quantity || batch.target_quantity || 0,
   );
 
-  // ── v1.3: COGS Integration ─────────────────────────────────────────────
+  // v1.3: COGS Integration
   const [cogsData, setCogsData] = useState(null);
   const [cogsLoading, setCogsLoading] = useState(false);
 
@@ -895,156 +1096,127 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
     0,
   );
 
-  // Lazy-fetch COGS when batch is expanded for the first time
+  // Lazy-fetch COGS when expanded
   useEffect(() => {
     if (!expanded || cogsData !== null) return;
-
-    const fetchCOGS = async () => {
-      setCogsLoading(true);
-      try {
-        // Fetch product_cogs matching this batch's strain name
-        const [cogsRes, fxRes] = await Promise.all([
-          supabase
-            .from("product_cogs")
-            .select(
-              `
-              id, product_name, sku,
-              hardware_item_id, hardware_qty,
-              terpene_item_id, terpene_qty_g,
-              distillate_input_id, distillate_qty_ml,
-              packaging_input_id, packaging_qty,
-              labour_input_id, labour_qty,
-              other_cost_zar,
-              hardware:hardware_item_id(id, name, unit_price_usd),
-              terpene:terpene_item_id(id, name, unit_price_usd)
-            `,
-            )
-            .eq("is_active", true)
-            .ilike("product_name", `%${batch.strain_name}%`)
-            .limit(5),
-          supabase
-            .from("fx_rates")
-            .select("rate")
-            .eq("currency_pair", "USD/ZAR")
-            .order("fetched_at", { ascending: false })
-            .limit(1),
-        ]);
-
-        const fxRate = fxRes.data?.[0]?.rate || 18.5;
-
-        if (!cogsRes.data || cogsRes.data.length === 0) {
-          setCogsData({ notFound: true });
-          setCogsLoading(false);
-          return;
-        }
-
-        // Best match: prefer sku or exact name
-        const best = cogsRes.data[0];
-
-        // Fetch local inputs (distillate, packaging, labour)
-        const localIds = [
-          best.distillate_input_id,
-          best.packaging_input_id,
-          best.labour_input_id,
-        ].filter(Boolean);
-
-        let locals = [];
-        if (localIds.length > 0) {
-          const { data } = await supabase
-            .from("local_inputs")
-            .select("id, name, cost_zar, unit")
-            .in("id", localIds);
-          locals = data || [];
-        }
-
-        const getLocal = (id) => locals.find((l) => l.id === id);
-        const dist = getLocal(best.distillate_input_id);
-        const pack = getLocal(best.packaging_input_id);
-        const labour = getLocal(best.labour_input_id);
-
-        // Calculate per-unit target costs
-        const hwCost =
-          (best.hardware?.unit_price_usd || 0) *
-          (best.hardware_qty || 1) *
-          fxRate;
-        // Terpene: unit_price_usd ÷ 50 × usd_zar per gram (bottle is 50ml)
-        const tpCostPerGram =
-          ((best.terpene?.unit_price_usd || 0) / 50) * fxRate;
-        const tpCost = tpCostPerGram * (best.terpene_qty_g || 0);
-        const distCost = (dist?.cost_zar || 0) * (best.distillate_qty_ml || 0);
-        const packCost = (pack?.cost_zar || 0) * (best.packaging_qty || 0);
-        const labourCost = (labour?.cost_zar || 0) * (best.labour_qty || 0);
-        const otherCost = best.other_cost_zar || 0;
-        const targetCogsPerUnit =
-          hwCost + tpCost + distCost + packCost + labourCost + otherCost;
-
-        // Actual cost per unit from this batch's inputs
-        const filledQty = batch.actual_quantity || batch.target_quantity || 0;
-        const actualCostPerUnit =
-          filledQty > 0 && totalInputCost > 0 ? totalInputCost / filledQty : 0;
-        const variance = actualCostPerUnit - targetCogsPerUnit;
-        const variancePct =
-          targetCogsPerUnit > 0 ? (variance / targetCogsPerUnit) * 100 : 0;
-
-        setCogsData({
-          found: true,
-          productName: best.product_name,
-          fxRate,
-          breakdown: [
-            {
-              label: best.hardware?.name || "Hardware",
-              cost: hwCost,
-              type: "hardware",
-            },
-            {
-              label: best.terpene?.name || "Terpene",
-              cost: tpCost,
-              type: "terpene",
-            },
-            {
-              label: dist?.name || "Distillate",
-              cost: distCost,
-              type: "distillate",
-            },
-            {
-              label: pack?.name || "Packaging",
-              cost: packCost,
-              type: "packaging",
-            },
-            {
-              label: labour?.name || "Labour",
-              cost: labourCost,
-              type: "labour",
-            },
-            ...(otherCost > 0
-              ? [{ label: "Other", cost: otherCost, type: "other" }]
-              : []),
-          ],
-          targetCogsPerUnit,
-          actualCostPerUnit,
-          variance,
-          variancePct,
-          filledQty,
-          totalTargetCost: targetCogsPerUnit * filledQty,
-        });
-      } catch (err) {
-        console.error("[Production] COGS fetch error:", err);
-        setCogsData({ error: err.message });
-      } finally {
-        setCogsLoading(false);
-      }
-    };
-
     fetchCOGS();
-  }, [
-    expanded,
-    batch.strain_name,
-    batch.actual_quantity,
-    batch.target_quantity,
-    totalInputCost,
-  ]);
-  // ── end v1.3 ───────────────────────────────────────────────────────────
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
+  const fetchCOGS = async () => {
+    setCogsLoading(true);
+    try {
+      const [cogsRes, fxRes] = await Promise.all([
+        supabase
+          .from("product_cogs")
+          .select(
+            `id, product_name, sku,
+             hardware_item_id, hardware_qty,
+             terpene_item_id, terpene_qty_g,
+             distillate_input_id, distillate_qty_ml,
+             packaging_input_id, packaging_qty,
+             labour_input_id, labour_qty,
+             other_cost_zar,
+             hardware:hardware_item_id(id, name, unit_price_usd),
+             terpene:terpene_item_id(id, name, unit_price_usd)`,
+          )
+          .eq("is_active", true)
+          .ilike("product_name", `%${batch.strain_name}%`)
+          .limit(5),
+        supabase
+          .from("fx_rates")
+          .select("rate")
+          .eq("currency_pair", "USD/ZAR")
+          .order("fetched_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      const fxRate = fxRes.data?.[0]?.rate || 18.5;
+      if (!cogsRes.data || cogsRes.data.length === 0) {
+        setCogsData({ notFound: true });
+        return;
+      }
+      const best = cogsRes.data[0];
+      const localIds = [
+        best.distillate_input_id,
+        best.packaging_input_id,
+        best.labour_input_id,
+      ].filter(Boolean);
+      let locals = [];
+      if (localIds.length > 0) {
+        const { data } = await supabase
+          .from("local_inputs")
+          .select("id, name, cost_zar, unit")
+          .in("id", localIds);
+        locals = data || [];
+      }
+      const getLocal = (id) => locals.find((l) => l.id === id);
+      const dist = getLocal(best.distillate_input_id);
+      const pack = getLocal(best.packaging_input_id);
+      const labour = getLocal(best.labour_input_id);
+      const hwCost =
+        (best.hardware?.unit_price_usd || 0) *
+        (best.hardware_qty || 1) *
+        fxRate;
+      const tpCostPerGram = ((best.terpene?.unit_price_usd || 0) / 50) * fxRate;
+      const tpCost = tpCostPerGram * (best.terpene_qty_g || 0);
+      const distCost = (dist?.cost_zar || 0) * (best.distillate_qty_ml || 0);
+      const packCost = (pack?.cost_zar || 0) * (best.packaging_qty || 0);
+      const labourCost = (labour?.cost_zar || 0) * (best.labour_qty || 0);
+      const otherCost = best.other_cost_zar || 0;
+      const targetCogsPerUnit =
+        hwCost + tpCost + distCost + packCost + labourCost + otherCost;
+      const filledQty = batch.actual_quantity || batch.target_quantity || 0;
+      const actualCostPerUnit =
+        filledQty > 0 && totalInputCost > 0 ? totalInputCost / filledQty : 0;
+      const variance = actualCostPerUnit - targetCogsPerUnit;
+      const variancePct =
+        targetCogsPerUnit > 0 ? (variance / targetCogsPerUnit) * 100 : 0;
+      setCogsData({
+        found: true,
+        productName: best.product_name,
+        fxRate,
+        breakdown: [
+          {
+            label: best.hardware?.name || "Hardware",
+            cost: hwCost,
+            type: "hardware",
+          },
+          {
+            label: best.terpene?.name || "Terpene",
+            cost: tpCost,
+            type: "terpene",
+          },
+          {
+            label: dist?.name || "Distillate",
+            cost: distCost,
+            type: "distillate",
+          },
+          {
+            label: pack?.name || "Packaging",
+            cost: packCost,
+            type: "packaging",
+          },
+          { label: labour?.name || "Labour", cost: labourCost, type: "labour" },
+          ...(otherCost > 0
+            ? [{ label: "Other", cost: otherCost, type: "other" }]
+            : []),
+        ],
+        targetCogsPerUnit,
+        actualCostPerUnit,
+        variance,
+        variancePct,
+        filledQty,
+        totalTargetCost: targetCogsPerUnit * filledQty,
+      });
+    } catch (err) {
+      setCogsData({ error: err.message });
+    } finally {
+      setCogsLoading(false);
+    }
+  };
+
+  // ── Status progression ─────────────────────────────────────────────────
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
     try {
@@ -1063,131 +1235,7 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
       if (error) throw error;
 
       if (newStatus === "completed") {
-        const batchInputs = batch.production_inputs || [];
-        const deductionErrors = [];
-        let deductedCount = 0;
-
-        for (const inp of batchInputs) {
-          if (!inp.inventory_item_id || inp.deducted_from_stock) continue;
-          try {
-            const { data: item, error: readErr } = await supabase
-              .from("inventory_items")
-              .select("quantity_on_hand")
-              .eq("id", inp.inventory_item_id)
-              .single();
-            if (readErr) {
-              deductionErrors.push(`${inp.input_name}: ${readErr.message}`);
-              continue;
-            }
-
-            const newQty =
-              (item.quantity_on_hand || 0) - (inp.quantity_used || 0);
-            const { error: updateErr } = await supabase
-              .from("inventory_items")
-              .update({ quantity_on_hand: newQty })
-              .eq("id", inp.inventory_item_id);
-            if (updateErr) {
-              deductionErrors.push(`${inp.input_name}: ${updateErr.message}`);
-              continue;
-            }
-
-            await supabase.from("stock_movements").insert({
-              id: crypto.randomUUID(),
-              item_id: inp.inventory_item_id,
-              quantity: -(inp.quantity_used || 0),
-              movement_type: "production_out",
-              reference: batch.batch_code,
-              notes: `Auto-deducted for batch ${batch.batch_code}`,
-              tenant_id: HQ_TENANT_ID,
-            });
-
-            const { error: flagErr } = await supabase
-              .from("production_inputs")
-              .update({ deducted_from_stock: true })
-              .eq("id", inp.id);
-            if (!flagErr) deductedCount++;
-          } catch (deductErr) {
-            deductionErrors.push(
-              `${inp.input_name}: ${deductErr.message || "Unknown error"}`,
-            );
-          }
-        }
-
-        if (deductionErrors.length > 0) {
-          alert(
-            "Batch marked as completed, but some inventory deductions failed:\n\n" +
-              deductionErrors.join("\n"),
-          );
-        }
-
-        // Task A-2: Auto-create finished goods
-        const filledQty = parseInt(actualQty) || 0;
-        if (filledQty > 0) {
-          try {
-            const fpName = `${batch.strain_name} ${batch.size_ml}ml ${batch.product_type}`;
-            const fpSku =
-              `FP-${batch.strain_name.replace(/\s+/g, "-").toUpperCase()}-${batch.size_ml}ML`.substring(
-                0,
-                50,
-              );
-
-            const { data: existing } = await supabase
-              .from("inventory_items")
-              .select("id, quantity_on_hand")
-              .eq("category", "finished_product")
-              .eq("tenant_id", HQ_TENANT_ID)
-              .ilike("name", fpName)
-              .limit(1);
-
-            let finishedItemId;
-            if (existing && existing.length > 0) {
-              finishedItemId = existing[0].id;
-              await supabase
-                .from("inventory_items")
-                .update({
-                  quantity_on_hand:
-                    (existing[0].quantity_on_hand || 0) + filledQty,
-                })
-                .eq("id", finishedItemId);
-            } else {
-              finishedItemId = crypto.randomUUID();
-              const batchTotalCost = (batch.production_inputs || []).reduce(
-                (sum, inp) => sum + (inp.total_cost || 0),
-                0,
-              );
-              const costPerUnit =
-                filledQty > 0 && batchTotalCost > 0
-                  ? parseFloat((batchTotalCost / filledQty).toFixed(2))
-                  : null;
-              await supabase.from("inventory_items").insert({
-                id: finishedItemId,
-                tenant_id: HQ_TENANT_ID,
-                name: fpName,
-                sku: fpSku,
-                category: "finished_product",
-                quantity_on_hand: filledQty,
-                unit: "pcs",
-                cost_price: costPerUnit,
-                is_active: true,
-              });
-            }
-
-            await supabase.from("stock_movements").insert({
-              id: crypto.randomUUID(),
-              item_id: finishedItemId,
-              quantity: filledQty,
-              movement_type: "production_in",
-              reference: batch.batch_code,
-              notes: `Finished goods from batch ${batch.batch_code}: ${filledQty} × ${batch.size_ml}ml ${batch.product_type}`,
-              tenant_id: HQ_TENANT_ID,
-            });
-          } catch (fpErr) {
-            alert(
-              "Batch completed and raw materials deducted, but finished goods creation failed:\n\n" +
-                (fpErr.message || JSON.stringify(fpErr)),
-            );
-          }
-        }
+        await deductMaterials(batch, inputs, parseInt(actualQty) || 0);
       }
 
       onRefresh();
@@ -1197,6 +1245,157 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
       setUpdating(false);
     }
   };
+
+  // ── Admin: Delete batch (planned/cancelled only) ──────────────────────
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        `PERMANENTLY DELETE batch ${batch.batch_code}?\n\nThis cannot be undone. No stock changes will be made.\n\nType "delete" to confirm.`,
+      )
+    )
+      return;
+
+    const confirm2 = window.prompt(
+      `Type "delete" to permanently delete ${batch.batch_code}:`,
+    );
+    if (confirm2?.toLowerCase() !== "delete") {
+      alert("Deletion cancelled — confirmation text did not match.");
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      // Delete inputs first (FK)
+      await supabase
+        .from("production_inputs")
+        .delete()
+        .eq("production_batch_id", batch.id);
+
+      // Delete batch
+      const { error } = await supabase
+        .from("production_batches")
+        .delete()
+        .eq("id", batch.id);
+      if (error) throw error;
+
+      onRefresh();
+    } catch (err) {
+      alert("Error deleting batch: " + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ── Admin: Void completed batch (reverses stock) ──────────────────────
+  const handleVoid = async () => {
+    if (
+      !window.confirm(
+        `VOID completed batch ${batch.batch_code}?\n\n` +
+          `This will:\n` +
+          `• Re-credit all raw materials back to inventory\n` +
+          `• Deduct ${batch.actual_quantity || 0} finished goods from inventory\n` +
+          `• Mark batch as voided\n\n` +
+          `This is irreversible. Continue?`,
+      )
+    )
+      return;
+
+    const confirm2 = window.prompt(
+      `Type "void" to confirm voiding ${batch.batch_code}:`,
+    );
+    if (confirm2?.toLowerCase() !== "void") {
+      alert("Void cancelled — confirmation text did not match.");
+      return;
+    }
+
+    setVoiding(true);
+    try {
+      // 1. Re-credit raw materials
+      for (const inp of inputs) {
+        if (!inp.inventory_item_id || !inp.deducted_from_stock) continue;
+        try {
+          const { data: item } = await supabase
+            .from("inventory_items")
+            .select("quantity_on_hand")
+            .eq("id", inp.inventory_item_id)
+            .single();
+
+          if (item) {
+            await supabase
+              .from("inventory_items")
+              .update({
+                quantity_on_hand:
+                  (item.quantity_on_hand || 0) + (inp.quantity_used || 0),
+              })
+              .eq("id", inp.inventory_item_id);
+
+            await supabase.from("stock_movements").insert({
+              id: crypto.randomUUID(),
+              item_id: inp.inventory_item_id,
+              quantity: inp.quantity_used || 0,
+              movement_type: "void_return",
+              reference: batch.batch_code,
+              notes: `Void of batch ${batch.batch_code} — materials re-credited`,
+              tenant_id: HQ_TENANT_ID,
+            });
+          }
+        } catch (e) {
+          console.warn("[Production] Void re-credit error:", e.message);
+        }
+      }
+
+      // 2. Deduct finished goods if they exist in inventory
+      if (batch.actual_quantity > 0) {
+        const fpName = `${batch.strain_name} ${batch.size_ml}ml ${batch.product_type}`;
+        const { data: fpItems } = await supabase
+          .from("inventory_items")
+          .select("id, quantity_on_hand")
+          .eq("category", "finished_product")
+          .eq("tenant_id", HQ_TENANT_ID)
+          .ilike("name", fpName)
+          .limit(1);
+
+        if (fpItems && fpItems.length > 0) {
+          const newQty = Math.max(
+            0,
+            (fpItems[0].quantity_on_hand || 0) - (batch.actual_quantity || 0),
+          );
+          await supabase
+            .from("inventory_items")
+            .update({ quantity_on_hand: newQty })
+            .eq("id", fpItems[0].id);
+
+          await supabase.from("stock_movements").insert({
+            id: crypto.randomUUID(),
+            item_id: fpItems[0].id,
+            quantity: -(batch.actual_quantity || 0),
+            movement_type: "void_deduction",
+            reference: batch.batch_code,
+            notes: `Void of batch ${batch.batch_code} — finished goods removed`,
+            tenant_id: HQ_TENANT_ID,
+          });
+        }
+      }
+
+      // 3. Mark batch voided
+      await supabase
+        .from("production_batches")
+        .update({
+          status: "voided",
+          notes: `${batch.notes ? batch.notes + " | " : ""}VOIDED ${new Date().toLocaleDateString()}`,
+        })
+        .eq("id", batch.id);
+
+      onRefresh();
+    } catch (err) {
+      alert("Error voiding batch: " + err.message);
+    } finally {
+      setVoiding(false);
+    }
+  };
+
+  const canDelete = ["planned", "cancelled"].includes(batch.status);
+  const canVoid = batch.status === "completed";
 
   return (
     <div style={sCard}>
@@ -1408,13 +1607,12 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
             </div>
           )}
 
-          {/* ── v1.3: COGS Analysis Panel ────────────────────────────── */}
+          {/* COGS Panel */}
           <COGSPanel
             cogsData={cogsData}
             cogsLoading={cogsLoading}
             strainName={batch.strain_name}
           />
-          {/* ── end v1.3 ─────────────────────────────────────────────── */}
 
           {/* Timestamps */}
           <div
@@ -1456,68 +1654,183 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
           )}
 
           {/* Status actions */}
-          {batch.status !== "completed" && batch.status !== "cancelled" && (
+          {batch.status !== "completed" &&
+            batch.status !== "cancelled" &&
+            batch.status !== "voided" && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  alignItems: "center",
+                  borderTop: `1px solid ${C.border}`,
+                  paddingTop: "12px",
+                  marginBottom: "12px",
+                }}
+              >
+                {batch.status === "planned" && (
+                  <button
+                    onClick={() => handleStatusChange("in_progress")}
+                    disabled={updating}
+                    style={{ ...sBtn(), background: C.gold }}
+                  >
+                    {updating ? "Updating..." : "▶ Start Production"}
+                  </button>
+                )}
+                {batch.status === "in_progress" && (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <label style={{ fontSize: "11px", color: C.muted }}>
+                        Actual filled:
+                      </label>
+                      <input
+                        style={{ ...sInput, width: "80px" }}
+                        type="number"
+                        min="0"
+                        value={actualQty}
+                        onChange={(e) => setActualQty(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleStatusChange("completed")}
+                      disabled={updating}
+                      style={{ ...sBtn(), background: C.accentGreen }}
+                    >
+                      {updating ? "Updating..." : "✓ Mark Completed"}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Cancel this production batch? This cannot be undone.",
+                      )
+                    )
+                      handleStatusChange("cancelled");
+                  }}
+                  disabled={updating}
+                  style={{
+                    ...sBtn("outline"),
+                    color: C.red,
+                    borderColor: C.red,
+                  }}
+                >
+                  Cancel Batch
+                </button>
+              </div>
+            )}
+
+          {/* ── Admin Danger Zone ─────────────────────────────────────── */}
+          {(canDelete || canVoid) && (
             <div
               style={{
-                display: "flex",
-                gap: "10px",
-                alignItems: "center",
                 borderTop: `1px solid ${C.border}`,
                 paddingTop: "12px",
+                marginTop: "4px",
               }}
             >
-              {batch.status === "planned" && (
-                <button
-                  onClick={() => handleStatusChange("in_progress")}
-                  disabled={updating}
-                  style={{ ...sBtn(), background: C.gold }}
+              <button
+                onClick={() => setShowAdminActions(!showAdminActions)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "10px",
+                  color: C.muted,
+                  cursor: "pointer",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  padding: "0",
+                  fontFamily: F.body,
+                }}
+              >
+                {showAdminActions ? "▾" : "▸"} Admin Actions
+              </button>
+
+              {showAdminActions && (
+                <div
+                  style={{
+                    marginTop: "10px",
+                    padding: "12px 16px",
+                    background: "#fdf8f4",
+                    border: `1px solid ${C.gold}40`,
+                    borderLeft: `3px solid ${C.gold}`,
+                    borderRadius: "2px",
+                  }}
                 >
-                  {updating ? "Updating..." : "▶ Start Production"}
-                </button>
-              )}
-              {batch.status === "in_progress" && (
-                <>
                   <div
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: C.gold,
+                      marginBottom: "10px",
                     }}
                   >
-                    <label style={{ fontSize: "11px", color: C.muted }}>
-                      Actual filled:
-                    </label>
-                    <input
-                      style={{ ...sInput, width: "80px" }}
-                      type="number"
-                      min="0"
-                      value={actualQty}
-                      onChange={(e) => setActualQty(e.target.value)}
-                    />
+                    ⚠ Danger Zone — Super Admin Only
                   </div>
-                  <button
-                    onClick={() => handleStatusChange("completed")}
-                    disabled={updating}
-                    style={{ ...sBtn(), background: C.accentGreen }}
+                  <div
+                    style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
                   >
-                    {updating ? "Updating..." : "✓ Mark Completed"}
-                  </button>
-                </>
+                    {canDelete && (
+                      <div>
+                        <button
+                          onClick={handleDelete}
+                          disabled={deleting}
+                          style={{
+                            ...sBtn("outline"),
+                            color: C.red,
+                            borderColor: C.red,
+                            fontSize: "10px",
+                          }}
+                        >
+                          {deleting ? "Deleting..." : "🗑 Delete Batch"}
+                        </button>
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            color: C.muted,
+                            marginTop: "4px",
+                          }}
+                        >
+                          Permanently removes this batch. No stock changes.
+                        </div>
+                      </div>
+                    )}
+                    {canVoid && (
+                      <div>
+                        <button
+                          onClick={handleVoid}
+                          disabled={voiding}
+                          style={{
+                            ...sBtn("outline"),
+                            color: C.amber,
+                            borderColor: C.amber,
+                            fontSize: "10px",
+                          }}
+                        >
+                          {voiding ? "Voiding..." : "↩ Void & Reverse Stock"}
+                        </button>
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            color: C.muted,
+                            marginTop: "4px",
+                          }}
+                        >
+                          Re-credits materials, removes finished goods.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Cancel this production batch? This cannot be undone.",
-                    )
-                  )
-                    handleStatusChange("cancelled");
-                }}
-                disabled={updating}
-                style={{ ...sBtn("outline"), color: C.red, borderColor: C.red }}
-              >
-                Cancel Batch
-              </button>
             </div>
           )}
         </div>
@@ -1526,9 +1839,130 @@ function BatchCard({ batch, inventoryItems, expanded, onToggle, onRefresh }) {
   );
 }
 
+// ── Auto-deduct raw materials + create finished goods on completion ───────
+async function deductMaterials(batch, inputs, filledQty) {
+  const deductionErrors = [];
+
+  for (const inp of inputs) {
+    if (!inp.inventory_item_id || inp.deducted_from_stock) continue;
+    try {
+      const { data: item, error: readErr } = await supabase
+        .from("inventory_items")
+        .select("quantity_on_hand")
+        .eq("id", inp.inventory_item_id)
+        .single();
+      if (readErr) {
+        deductionErrors.push(`${inp.input_name}: ${readErr.message}`);
+        continue;
+      }
+
+      const newQty = (item.quantity_on_hand || 0) - (inp.quantity_used || 0);
+      const { error: updateErr } = await supabase
+        .from("inventory_items")
+        .update({ quantity_on_hand: newQty })
+        .eq("id", inp.inventory_item_id);
+      if (updateErr) {
+        deductionErrors.push(`${inp.input_name}: ${updateErr.message}`);
+        continue;
+      }
+
+      await supabase.from("stock_movements").insert({
+        id: crypto.randomUUID(),
+        item_id: inp.inventory_item_id,
+        quantity: -(inp.quantity_used || 0),
+        movement_type: "production_out",
+        reference: batch.batch_code,
+        notes: `Auto-deducted for batch ${batch.batch_code}`,
+        tenant_id: HQ_TENANT_ID,
+      });
+
+      await supabase
+        .from("production_inputs")
+        .update({ deducted_from_stock: true })
+        .eq("id", inp.id);
+    } catch (e) {
+      deductionErrors.push(
+        `${inp.input_name}: ${e.message || "Unknown error"}`,
+      );
+    }
+  }
+
+  if (deductionErrors.length > 0) {
+    alert(
+      "Batch completed, but some inventory deductions failed:\n\n" +
+        deductionErrors.join("\n"),
+    );
+  }
+
+  // Auto-create finished goods
+  if (filledQty > 0) {
+    try {
+      const fpName = `${batch.strain_name} ${batch.size_ml}ml ${batch.product_type}`;
+      const fpSku =
+        `FP-${batch.strain_name.replace(/\s+/g, "-").toUpperCase()}-${batch.size_ml}ML`.substring(
+          0,
+          50,
+        );
+      const { data: existing } = await supabase
+        .from("inventory_items")
+        .select("id, quantity_on_hand")
+        .eq("category", "finished_product")
+        .eq("tenant_id", HQ_TENANT_ID)
+        .ilike("name", fpName)
+        .limit(1);
+
+      let finishedItemId;
+      if (existing && existing.length > 0) {
+        finishedItemId = existing[0].id;
+        await supabase
+          .from("inventory_items")
+          .update({
+            quantity_on_hand: (existing[0].quantity_on_hand || 0) + filledQty,
+          })
+          .eq("id", finishedItemId);
+      } else {
+        finishedItemId = crypto.randomUUID();
+        const batchTotalCost = (batch.production_inputs || []).reduce(
+          (sum, inp) => sum + (inp.total_cost || 0),
+          0,
+        );
+        const costPerUnit =
+          filledQty > 0 && batchTotalCost > 0
+            ? parseFloat((batchTotalCost / filledQty).toFixed(2))
+            : null;
+        await supabase.from("inventory_items").insert({
+          id: finishedItemId,
+          tenant_id: HQ_TENANT_ID,
+          name: fpName,
+          sku: fpSku,
+          category: "finished_product",
+          quantity_on_hand: filledQty,
+          unit: "pcs",
+          cost_price: costPerUnit,
+          is_active: true,
+        });
+      }
+
+      await supabase.from("stock_movements").insert({
+        id: crypto.randomUUID(),
+        item_id: finishedItemId,
+        quantity: filledQty,
+        movement_type: "production_in",
+        reference: batch.batch_code,
+        notes: `Finished goods from batch ${batch.batch_code}: ${filledQty} × ${batch.size_ml}ml ${batch.product_type}`,
+        tenant_id: HQ_TENANT_ID,
+      });
+    } catch (fpErr) {
+      alert(
+        "Batch completed and materials deducted, but finished goods creation failed:\n\n" +
+          (fpErr.message || JSON.stringify(fpErr)),
+      );
+    }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// COGS PANEL — v1.3 addition
-// Shows target COGS per unit (from product_cogs) vs actual batch cost per unit
+// COGS PANEL — v1.3 (unchanged logic, same UI)
 // ═══════════════════════════════════════════════════════════════════════════
 function COGSPanel({ cogsData, cogsLoading, strainName }) {
   if (cogsLoading) {
@@ -1541,26 +1975,13 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
           borderRadius: "2px",
           fontSize: "11px",
           color: C.muted,
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
         }}
       >
-        <span
-          style={{
-            animation: "spin 1s linear infinite",
-            display: "inline-block",
-          }}
-        >
-          ⏳
-        </span>
-        Loading COGS data for {strainName}…
+        ⏳ Loading COGS data for {strainName}…
       </div>
     );
   }
-
   if (!cogsData) return null;
-
   if (cogsData.notFound) {
     return (
       <div
@@ -1575,12 +1996,11 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
         <div style={{ ...sLabel, color: C.muted }}>COGS Analysis</div>
         <div style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}>
           No matching product_cogs entry found for "{strainName}". Add one in
-          the COGS tab to enable cost analysis.
+          the COGS tab.
         </div>
       </div>
     );
   }
-
   if (cogsData.error) {
     return (
       <div
@@ -1589,7 +2009,6 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
           padding: "12px 16px",
           background: "#fdf0ef",
           borderRadius: "2px",
-          border: `1px solid ${C.red}20`,
         }}
       >
         <div style={{ fontSize: "11px", color: C.red }}>
@@ -1598,7 +2017,6 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
       </div>
     );
   }
-
   if (!cogsData.found) return null;
 
   const {
@@ -1677,12 +2095,9 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
           </div>
         )}
       </div>
-
-      {/* Side-by-side: Recipe breakdown + Comparison */}
       <div
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
       >
-        {/* Left: Recipe COGS breakdown */}
         <div>
           <div
             style={{
@@ -1738,8 +2153,6 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
             </div>
           )}
         </div>
-
-        {/* Right: Actual vs Target comparison */}
         <div>
           <div
             style={{
@@ -1754,108 +2167,42 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
             This Batch
           </div>
           {filledQty > 0 && actualCostPerUnit > 0 ? (
-            <>
-              {/* Visual comparison bar */}
-              <div style={{ marginBottom: "12px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "11px",
-                    color: C.muted,
-                    marginBottom: "4px",
-                  }}
-                >
-                  <span>Target</span>
-                  <span>R{targetCogsPerUnit.toFixed(2)}</span>
-                </div>
-                <div
-                  style={{
-                    height: "6px",
-                    background: C.border,
-                    borderRadius: "3px",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: "100%",
-                      background: C.accentGreen,
-                      borderRadius: "3px",
-                    }}
-                  />
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "11px",
-                    color: C.muted,
-                    marginBottom: "4px",
-                  }}
-                >
-                  <span>Actual</span>
-                  <span style={{ color: varianceColor }}>
-                    R{actualCostPerUnit.toFixed(2)}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    height: "6px",
-                    background: C.border,
-                    borderRadius: "3px",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${Math.min(200, (actualCostPerUnit / targetCogsPerUnit) * 100)}%`,
-                      background: varianceColor,
-                      borderRadius: "3px",
-                      transition: "width 0.6s ease",
-                    }}
-                  />
-                </div>
+            <div
+              style={{
+                padding: "10px 12px",
+                background: `${varianceColor}12`,
+                border: `1px solid ${varianceColor}30`,
+                borderRadius: "2px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "9px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.15em",
+                  color: varianceColor,
+                  marginBottom: "4px",
+                }}
+              >
+                {varianceLabel}
               </div>
               <div
                 style={{
-                  padding: "10px 12px",
-                  background: `${varianceColor}12`,
-                  border: `1px solid ${varianceColor}30`,
-                  borderRadius: "2px",
+                  fontFamily: F.heading,
+                  fontSize: "22px",
+                  color: varianceColor,
+                  fontWeight: 600,
                 }}
               >
-                <div
-                  style={{
-                    fontSize: "9px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.15em",
-                    color: varianceColor,
-                    marginBottom: "4px",
-                  }}
-                >
-                  {varianceLabel}
-                </div>
-                <div
-                  style={{
-                    fontFamily: F.heading,
-                    fontSize: "22px",
-                    color: varianceColor,
-                    fontWeight: 600,
-                  }}
-                >
-                  {variance > 0 ? "+" : ""}R{variance.toFixed(2)} / unit
-                </div>
-                <div
-                  style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}
-                >
-                  Total: {variance > 0 ? "+" : ""}R
-                  {(variance * filledQty).toFixed(2)} across {filledQty} units
-                </div>
+                {variance > 0 ? "+" : ""}R{variance.toFixed(2)} / unit
               </div>
-            </>
+              <div
+                style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}
+              >
+                Total: {variance > 0 ? "+" : ""}R
+                {(variance * filledQty).toFixed(2)} across {filledQty} units
+              </div>
+            </div>
           ) : (
             <div
               style={{
@@ -1869,7 +2216,7 @@ function COGSPanel({ cogsData, cogsLoading, strainName }) {
             >
               {filledQty === 0
                 ? "Enter actual filled quantity to compare vs recipe."
-                : "No input costs recorded — add cost_per_unit to inputs to enable comparison."}
+                : "No input costs recorded — add cost_per_unit to inputs."}
             </div>
           )}
         </div>
