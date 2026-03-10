@@ -1,12 +1,10 @@
 // src/components/hq/HQDocuments.js
-// v1.6 — WP-I Extended: Delivery Note → Auto-receive inventory
-// NEW: fetchFreshContext fetches inventory_items + open purchase_orders
-// NEW: handleConfirm — receive_delivery_item action:
-//        fetch qty_on_hand → increment → insert stock_movements (purchase_in)
-// NEW: handleConfirm — update_po_status action:
-//        field-whitelisted update on purchase_orders (po_status → received)
-// Existing: create_purchase_order, create_supplier_product, create_batch,
-//           generic record_id update — all unchanged
+// v1.9 — Inline supplier creation: when AI detects ⚠ No match, show ➕ Create as Supplier
+//         form pre-filled with extracted name + currency. On save: INSERT suppliers,
+//         UPDATE document_log.supplier_id, re-fetch — future COAs auto-match.
+// v1.8 — Fix: update_batch_coa resolves batch UUID by batch_number when record_id null
+// v1.7 — initialDocId prop for external navigation from AdminBatchManager
+// v1.6 — Delivery Note → Auto-receive inventory
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -23,13 +21,13 @@ const C = {
   text: "#1a1a1a",
   red: "#c0392b",
   lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef9f0",
   lightGreen: "#eafaf1",
   blue: "#2c4a6e",
   lightBlue: "#eaf0f8",
   amber: "#d4830a",
   lightAmber: "#fff8ee",
+  purple: "#6c3483",
+  lightPurple: "#f5eef8",
 };
 const F = {
   heading: "'Cormorant Garamond', Georgia, serif",
@@ -44,7 +42,6 @@ const fmtDate = (d) => {
     year: "numeric",
   });
 };
-
 const fmtDateTime = (d) => {
   if (!d) return "—";
   return new Date(d).toLocaleString("en-ZA", {
@@ -231,10 +228,249 @@ function ConfidenceBar({ score }) {
   );
 }
 
+// ── v1.9: Inline supplier creation form ───────────────────────────────────────
+function SupplierCreateForm({
+  extractedName,
+  extractedCurrency,
+  onSave,
+  onCancel,
+}) {
+  const [form, setForm] = useState({
+    name: extractedName || "",
+    country: "",
+    currency: extractedCurrency || "ZAR",
+    contact_name: "",
+    email: "",
+    phone: "",
+    website: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const set = (field) => (e) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const inputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "6px 8px",
+    border: `1px solid ${C.border}`,
+    borderRadius: 2,
+    fontSize: 11,
+    fontFamily: F.body,
+    outline: "none",
+    background: C.white,
+  };
+  const labelStyle = {
+    fontSize: 9,
+    fontWeight: 700,
+    letterSpacing: "0.15em",
+    textTransform: "uppercase",
+    color: C.muted,
+    fontFamily: F.body,
+    display: "block",
+    marginBottom: 3,
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      setError("Supplier name is required");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({ ...form, is_active: true });
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        background: C.lightPurple,
+        borderTop: `1px solid ${C.border}`,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: C.purple,
+          fontFamily: F.body,
+          marginBottom: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        ➕ Create New Supplier
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {/* Name */}
+        <div>
+          <label style={labelStyle}>Supplier Name *</label>
+          <input
+            style={{ ...inputStyle, borderColor: C.purple }}
+            value={form.name}
+            onChange={set("name")}
+            placeholder="e.g. Ecogreen Analytics (Pty) Ltd"
+          />
+        </div>
+
+        {/* Country + Currency row */}
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
+        >
+          <div>
+            <label style={labelStyle}>Country</label>
+            <input
+              style={inputStyle}
+              value={form.country}
+              onChange={set("country")}
+              placeholder="e.g. South Africa"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Currency</label>
+            <select
+              style={{ ...inputStyle, cursor: "pointer" }}
+              value={form.currency}
+              onChange={set("currency")}
+            >
+              {["ZAR", "USD", "EUR", "GBP", "CNY", "CHF"].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Contact + Email row */}
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
+        >
+          <div>
+            <label style={labelStyle}>Contact Name</label>
+            <input
+              style={inputStyle}
+              value={form.contact_name}
+              onChange={set("contact_name")}
+              placeholder="Optional"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input
+              style={inputStyle}
+              value={form.email}
+              onChange={set("email")}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
+
+        {/* Phone + Website row */}
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
+        >
+          <div>
+            <label style={labelStyle}>Phone</label>
+            <input
+              style={inputStyle}
+              value={form.phone}
+              onChange={set("phone")}
+              placeholder="Optional"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Website</label>
+            <input
+              style={inputStyle}
+              value={form.website}
+              onChange={set("website")}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div>
+          <label style={labelStyle}>Notes</label>
+          <input
+            style={inputStyle}
+            value={form.notes}
+            onChange={set("notes")}
+            placeholder="Optional"
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            fontSize: 10,
+            color: C.red,
+            fontFamily: F.body,
+            marginTop: 6,
+          }}
+        >
+          ⚠ {error}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            flex: 2,
+            padding: "8px 0",
+            background: C.purple,
+            color: C.white,
+            border: "none",
+            borderRadius: 2,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            cursor: saving ? "not-allowed" : "pointer",
+            fontFamily: F.body,
+            opacity: saving ? 0.7 : 1,
+          }}
+        >
+          {saving ? "Saving…" : "✓ SAVE SUPPLIER"}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          style={{
+            flex: 1,
+            padding: "8px 0",
+            background: "transparent",
+            color: C.muted,
+            border: `1px solid ${C.border}`,
+            borderRadius: 2,
+            fontSize: 10,
+            cursor: "pointer",
+            fontFamily: F.body,
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function UploadZone({ onFileSelected, disabled }) {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef(null);
-
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
@@ -242,13 +478,11 @@ function UploadZone({ onFileSelected, disabled }) {
     const file = e.dataTransfer.files?.[0];
     if (file) onFileSelected(file);
   };
-
   const handleChange = (e) => {
     const file = e.target.files?.[0];
     if (file) onFileSelected(file);
     e.target.value = "";
   };
-
   return (
     <div
       onDragOver={(e) => {
@@ -383,6 +617,7 @@ function ReviewPanel({
   onConfirm,
   onReject,
   onReopen,
+  onCreateSupplier,
   confirming,
   confirmed,
   error: confirmError,
@@ -390,6 +625,8 @@ function ReviewPanel({
   const [checkedUpdates, setCheckedUpdates] = useState(new Set());
   const [rejecting, setRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [supplierCreated, setSupplierCreated] = useState(false);
 
   const extraction = doc.extracted_data || {};
   const lineItems = extraction.line_items || [];
@@ -397,7 +634,9 @@ function ReviewPanel({
   const unknownItems = extraction.unknown_items || [];
   const warnings = extraction.warnings || [];
 
-  // Auto-check all high-confidence updates on mount
+  const supplierUnmatched =
+    extraction.supplier?.name && !extraction.supplier?.matched_id;
+
   useEffect(() => {
     const autoChecked = new Set(
       proposedUpdates
@@ -407,8 +646,9 @@ function ReviewPanel({
     setCheckedUpdates(autoChecked);
     setRejecting(false);
     setRejectReason("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc.id]);
+    setShowSupplierForm(false);
+    setSupplierCreated(false);
+  }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleUpdate = (idx) => {
     setCheckedUpdates((prev) => {
@@ -451,8 +691,41 @@ function ReviewPanel({
     fontFamily: F.body,
   };
 
+  const actionBadgeStyle = (action) => ({
+    fontSize: 9,
+    padding: "1px 6px",
+    borderRadius: 2,
+    background:
+      action === "receive_delivery_item"
+        ? C.lightGreen
+        : action === "update_batch_coa"
+          ? C.lightPurple
+          : C.lightBlue,
+    color:
+      action === "receive_delivery_item"
+        ? C.mid
+        : action === "update_batch_coa"
+          ? C.purple
+          : C.blue,
+    fontFamily: F.body,
+    letterSpacing: "0.05em",
+  });
+  const actionBadgeLabel = (action, table) => {
+    if (action === "receive_delivery_item") return "📦 " + table;
+    if (action === "update_batch_coa") return "🔬 " + table;
+    if (action === "update_po_status") return "🔄 " + table;
+    return table;
+  };
+
+  const handleSupplierSave = async (supplierData) => {
+    await onCreateSupplier(doc.id, supplierData);
+    setShowSupplierForm(false);
+    setSupplierCreated(true);
+  };
+
   return (
     <div style={panelStyle}>
+      {/* ── Header ── */}
       <div
         style={{
           padding: "14px",
@@ -506,6 +779,7 @@ function ReviewPanel({
         )}
       </div>
 
+      {/* ── Extracted Fields ── */}
       <div style={sectionHead}>Extracted Fields</div>
       {extraction.reference?.number && (
         <div style={fieldRow}>
@@ -535,18 +809,79 @@ function ReviewPanel({
           </span>
         </div>
       )}
+
+      {/* ── Supplier row — matched or unmatched ── */}
       {extraction.supplier?.matched_id ? (
         <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Supplier Match</span>
+          <span style={{ color: C.muted }}>Supplier</span>
           <ConfidenceDot score={extraction.supplier.confidence} />
         </div>
       ) : extraction.supplier?.name ? (
-        <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Supplier</span>
-          <span style={{ color: C.amber, fontSize: 11 }}>⚠ No match</span>
-        </div>
+        <>
+          {/* Unmatched supplier row */}
+          <div
+            style={{
+              ...fieldRow,
+              flexWrap: "wrap",
+              gap: 6,
+              alignItems: "center",
+            }}
+          >
+            <span style={{ color: C.muted }}>Supplier</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginLeft: "auto",
+              }}
+            >
+              {supplierCreated ? (
+                <span style={{ fontSize: 10, color: C.mid, fontWeight: 600 }}>
+                  ✅ Supplier created
+                </span>
+              ) : (
+                <>
+                  <span style={{ color: C.amber, fontSize: 11 }}>
+                    ⚠ No match
+                  </span>
+                  {!showSupplierForm && (
+                    <button
+                      onClick={() => setShowSupplierForm(true)}
+                      style={{
+                        fontSize: 9,
+                        padding: "3px 8px",
+                        background: C.purple,
+                        color: C.white,
+                        border: "none",
+                        borderRadius: 2,
+                        cursor: "pointer",
+                        fontFamily: F.body,
+                        fontWeight: 700,
+                        letterSpacing: "0.05em",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      ➕ Add Supplier
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+          {/* Inline form */}
+          {showSupplierForm && (
+            <SupplierCreateForm
+              extractedName={extraction.supplier.name}
+              extractedCurrency={extraction.currency || "ZAR"}
+              onSave={handleSupplierSave}
+              onCancel={() => setShowSupplierForm(false)}
+            />
+          )}
+        </>
       ) : null}
 
+      {/* ── Line Items ── */}
       {lineItems.length > 0 && (
         <>
           <div style={sectionHead}>Line Items ({lineItems.length})</div>
@@ -606,6 +941,7 @@ function ReviewPanel({
         </>
       )}
 
+      {/* ── Proposed Updates ── */}
       {proposedUpdates.length > 0 && (
         <>
           <div style={sectionHead}>
@@ -660,30 +996,8 @@ function ReviewPanel({
                         alignItems: "center",
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: 9,
-                          padding: "1px 6px",
-                          borderRadius: 2,
-                          background:
-                            update.action === "receive_delivery_item"
-                              ? C.lightGreen
-                              : update.action === "update_po_status"
-                                ? C.lightBlue
-                                : C.lightBlue,
-                          color:
-                            update.action === "receive_delivery_item"
-                              ? C.mid
-                              : C.blue,
-                          fontFamily: F.body,
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        {update.action === "receive_delivery_item"
-                          ? "📦 " + update.table
-                          : update.action === "update_po_status"
-                            ? "🔄 " + update.table
-                            : update.table}
+                      <span style={actionBadgeStyle(update.action)}>
+                        {actionBadgeLabel(update.action, update.table)}
                       </span>
                       <ConfidenceDot score={update.confidence} />
                     </div>
@@ -773,7 +1087,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Confirmed status banner ── */}
+      {/* ── Confirmed banner ── */}
       {doc.status === "confirmed" && doc.applied_updates && (
         <div
           style={{
@@ -793,37 +1107,6 @@ function ReviewPanel({
             ✅ Applied {doc.applied_updates.length} update
             {doc.applied_updates.length !== 1 ? "s" : ""}
           </div>
-          {/* Delivery note receipt summary */}
-          {doc.document_type === "delivery_note" && (
-            <div
-              style={{
-                fontSize: 9,
-                color: C.mid,
-                marginTop: 4,
-                fontFamily: F.body,
-              }}
-            >
-              {doc.applied_updates.filter(
-                (u) => u.action === "receive_delivery_item",
-              ).length > 0 && (
-                <span>
-                  📦{" "}
-                  {
-                    doc.applied_updates.filter(
-                      (u) => u.action === "receive_delivery_item",
-                    ).length
-                  }{" "}
-                  inventory item
-                  {doc.applied_updates.filter(
-                    (u) => u.action === "receive_delivery_item",
-                  ).length !== 1
-                    ? "s"
-                    : ""}{" "}
-                  received · stock_movements logged
-                </span>
-              )}
-            </div>
-          )}
           {doc.confirmed_at && (
             <div
               style={{
@@ -839,7 +1122,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Rejected status banner ── */}
+      {/* ── Rejected banner ── */}
       {doc.status === "rejected" && (
         <div
           style={{
@@ -873,7 +1156,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Re-open button (confirmed / partially_applied / rejected) ── */}
+      {/* ── Re-open ── */}
       {(doc.status === "confirmed" ||
         doc.status === "partially_applied" ||
         doc.status === "rejected") && (
@@ -905,7 +1188,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Reject reason textarea ── */}
+      {/* ── Reject textarea ── */}
       {rejecting && (
         <div
           style={{
@@ -927,7 +1210,7 @@ function ReviewPanel({
           <textarea
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Optional — describe why this document is rejected"
+            placeholder="Optional"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -957,7 +1240,6 @@ function ReviewPanel({
                 borderRadius: 2,
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.15em",
                 cursor: "pointer",
                 fontFamily: F.body,
               }}
@@ -983,8 +1265,8 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Confirm / Reject action buttons (pending_review only) ── */}
-      {!isReadOnly && !rejecting && (
+      {/* ── Confirm / Reject buttons ── */}
+      {!isReadOnly && !rejecting && !showSupplierForm && (
         <div
           style={{
             padding: "12px 14px",
@@ -1323,7 +1605,8 @@ function DocumentLogTable({ documents, onSelectDoc }) {
   );
 }
 
-export default function HQDocuments() {
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function HQDocuments({ initialDocId = null }) {
   const [view, setView] = useState("review");
   const [documents, setDocuments] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
@@ -1356,9 +1639,18 @@ export default function HQDocuments() {
     }
   }, []);
 
-  // v1.6 — extended context: now includes inventory_items + open purchase_orders
-  // inventory_items → delivery note item matching (receive_delivery_item)
-  // open purchase_orders → delivery note PO matching (update_po_status)
+  const initialDocApplied = useRef(false);
+  useEffect(() => {
+    if (initialDocId && !initialDocApplied.current && documents.length > 0) {
+      const match = documents.find((d) => d.id === initialDocId);
+      if (match) {
+        setSelectedDocId(initialDocId);
+        setView("review");
+        initialDocApplied.current = true;
+      }
+    }
+  }, [initialDocId, documents]);
+
   const fetchFreshContext = async () => {
     const [suppRes, prodRes, invRes, poRes] = await Promise.all([
       supabase
@@ -1390,13 +1682,11 @@ export default function HQDocuments() {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  // ── Generate signed URL on document select ─────────────────────────────────
   useEffect(() => {
     setSignedUrl(null);
     setConfirmed(false);
     setConfirmError("");
     if (!selectedDoc?.file_url) return;
-
     setSignedUrlLoading(true);
     supabase.storage
       .from("supplier-documents")
@@ -1432,7 +1722,6 @@ export default function HQDocuments() {
     setUploadProgress(10);
     setUploadMsg("Uploading to secure storage…");
     setConfirmError("");
-
     const detectedHint = typeHint || detectTypeFromName(file.name);
 
     try {
@@ -1443,14 +1732,12 @@ export default function HQDocuments() {
       if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
       setUploadProgress(30);
-      // v1.6: message updated — now loads inventory + POs too
       setUploadMsg("Loading catalogue, inventory & open POs for matching…");
       const freshContext = await fetchFreshContext();
 
       setUploadProgress(50);
       setUploadMsg("Extracting data with Claude Vision…");
       setUploadState("processing");
-
       const base64 = await fileToBase64(file);
       setUploadProgress(55);
 
@@ -1476,10 +1763,8 @@ export default function HQDocuments() {
       setUploadProgress(90);
       setUploadMsg("Extraction complete — review below");
       setUploadState("done");
-
       await fetchDocuments();
       if (fnData.document_log_id) setSelectedDocId(fnData.document_log_id);
-
       setUploadProgress(100);
       setTimeout(() => {
         setUploadState("idle");
@@ -1495,9 +1780,7 @@ export default function HQDocuments() {
     }
   };
 
-  // ── Schema whitelists — prevents 400s when Claude invents column names ─────
-
-  // Whitelist for purchase_orders INSERT (create_purchase_order action)
+  // ── Schema whitelists ──────────────────────────────────────────────────────
   const PO_HEADER_COLS = new Set([
     "po_number",
     "supplier_id",
@@ -1523,17 +1806,19 @@ export default function HQDocuments() {
     "payment_date",
     "payment_reference",
   ]);
-
-  // Whitelist for purchase_orders UPDATE (update_po_status action)
-  // Only safe fields on goods receipt — never allow financial fields to be overwritten
   const PO_RECEIVE_COLS = new Set([
     "po_status",
     "actual_arrival",
     "received_date",
     "notes",
   ]);
-
-  // Valid po_status enum values (PostgreSQL ENUM — never guess)
+  const BATCH_COA_COLS = new Set([
+    "thc_content",
+    "cbd_content",
+    "lab_name",
+    "lab_test_date",
+    "is_lab_certified",
+  ]);
   const VALID_PO_STATUSES = new Set([
     "draft",
     "ordered",
@@ -1544,10 +1829,6 @@ export default function HQDocuments() {
     "cancelled",
   ]);
 
-  // Normalise a PO line item to exact purchase_order_items column names
-  // item_id FKs to inventory_items (for stock receiving) — NOT used here
-  // supplier_product_id FKs to supplier_products — correct for doc ingestion
-  // line_total is a generated column — NEVER insert it
   const normalisePOItem = (item) => ({
     supplier_product_id:
       item.supplier_product_id ||
@@ -1557,7 +1838,6 @@ export default function HQDocuments() {
       null,
     quantity_ordered: item.quantity_ordered ?? item.quantity ?? 1,
     unit_cost: item.unit_cost ?? item.unit_price_usd ?? item.unit_price ?? 0,
-    // optional columns only — no generated columns
     ...(item.unit_price_usd != null
       ? { unit_price_usd: item.unit_price_usd ?? item.unit_price ?? 0 }
       : {}),
@@ -1569,9 +1849,36 @@ export default function HQDocuments() {
       : {}),
     ...(item.weight_kg != null ? { weight_kg: item.weight_kg } : {}),
     ...(item.notes ? { notes: item.notes } : {}),
-    // line_total intentionally omitted — generated column in DB
-    // item_id intentionally omitted — FKs to inventory_items, not supplier_products
   });
+
+  // ── v1.9: Create supplier inline + link to document_log ───────────────────
+  const handleCreateSupplier = async (docId, supplierData) => {
+    // Insert new supplier (only known-safe columns)
+    const { data: newSupplier, error: insErr } = await supabase
+      .from("suppliers")
+      .insert({
+        name: supplierData.name.trim(),
+        country: supplierData.country.trim() || null,
+        currency: supplierData.currency || "ZAR",
+        contact_name: supplierData.contact_name.trim() || null,
+        email: supplierData.email.trim() || null,
+        phone: supplierData.phone.trim() || null,
+        website: supplierData.website.trim() || null,
+        notes: supplierData.notes.trim() || null,
+        is_active: true,
+      })
+      .select("id, name")
+      .single();
+    if (insErr) throw new Error(insErr.message);
+
+    // Stamp supplier_id + supplier_name on the document_log record
+    await supabase
+      .from("document_log")
+      .update({ supplier_id: newSupplier.id, supplier_name: newSupplier.name })
+      .eq("id", docId);
+
+    await fetchDocuments();
+  };
 
   const handleConfirm = async (checkedIndices) => {
     if (!selectedDoc || checkedIndices.length === 0) return;
@@ -1581,7 +1888,6 @@ export default function HQDocuments() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     const extraction = selectedDoc.extracted_data || {};
     const proposedUpdates = extraction.proposed_updates || [];
     const toApply = checkedIndices
@@ -1595,27 +1901,21 @@ export default function HQDocuments() {
         const { action, table, record_id, data } = update;
         if (!table || !data) throw new Error("Missing table or data");
 
-        // ── create_purchase_order ─────────────────────────────────────────────
         if (action === "create_purchase_order") {
-          // Sanitise: strip items + any column not in schema whitelist
           const { items, ...rawHeader } = data;
           const poHeader = Object.fromEntries(
             Object.entries(rawHeader).filter(([k]) => PO_HEADER_COLS.has(k)),
           );
-          // Always stamp who created it + which document sourced it
           if (user?.id) poHeader.created_by = user.id;
           poHeader.source_document_id = selectedDoc.id;
-          // Force draft status — po_status is a PG ENUM, only "draft" valid on create
           poHeader.status = "draft";
           poHeader.po_status = "draft";
           if (!poHeader.currency)
             poHeader.currency = extraction.currency || "USD";
           if (!poHeader.order_date)
             poHeader.order_date = new Date().toISOString().split("T")[0];
-          // Auto-generate po_number if missing
           if (!poHeader.po_number)
             poHeader.po_number = `PO-DOC-${Date.now().toString().slice(-8)}`;
-          // supplier_id fallback — AI may nest it or omit it entirely
           if (!poHeader.supplier_id) {
             poHeader.supplier_id =
               data.supplier?.id ||
@@ -1629,21 +1929,13 @@ export default function HQDocuments() {
               "supplier_id could not be resolved — cannot insert PO without a supplier",
             );
 
-          console.log(
-            "[PO INSERT] poHeader:",
-            JSON.stringify(poHeader, null, 2),
-          );
-
-          // Try insert; if po_number already exists, fetch the existing PO instead
           let newPO = null;
           const { data: insertedPO, error: poErr } = await supabase
             .from(table)
             .insert(poHeader)
             .select()
             .single();
-
           if (poErr) {
-            // 23505 = unique_violation — PO already created from a prior confirm attempt
             if (poErr.code === "23505" && poHeader.po_number) {
               const { data: existingPO, error: fetchErr } = await supabase
                 .from(table)
@@ -1652,10 +1944,6 @@ export default function HQDocuments() {
                 .single();
               if (fetchErr || !existingPO) throw poErr;
               newPO = existingPO;
-              console.log(
-                "[PO INSERT] duplicate po_number — using existing PO:",
-                existingPO.id,
-              );
             } else {
               throw poErr;
             }
@@ -1663,13 +1951,10 @@ export default function HQDocuments() {
             newPO = insertedPO;
           }
 
-          // Insert line items with normalised column names
           if (items?.length && newPO?.id) {
             const poItems = items
               .map((item) => ({ ...normalisePOItem(item), po_id: newPO.id }))
-              // drop items with no supplier_product_id — can't FK without it
               .filter((item) => item.supplier_product_id);
-            console.log("[PO ITEMS INSERT]", JSON.stringify(poItems, null, 2));
             if (poItems.length > 0) {
               const { error: itemsErr } = await supabase
                 .from("purchase_order_items")
@@ -1677,21 +1962,15 @@ export default function HQDocuments() {
               if (itemsErr) throw itemsErr;
             }
           }
-
-          // ── receive_delivery_item ─────────────────────────────────────────────
-          // Increments inventory_items.quantity_on_hand + creates stock_movements audit record
         } else if (action === "receive_delivery_item") {
           const itemId = data.item_id || record_id;
           if (!itemId)
             throw new Error("item_id required for receive_delivery_item");
-
           const qty = Number(data.quantity_received ?? data.quantity ?? 0);
           if (!qty || qty <= 0)
             throw new Error(
               `quantity_received must be > 0 (got ${data.quantity_received ?? data.quantity})`,
             );
-
-          // Read current quantity_on_hand — never assume, always fetch fresh
           const { data: invRow, error: fetchErr } = await supabase
             .from("inventory_items")
             .select("quantity_on_hand")
@@ -1699,23 +1978,12 @@ export default function HQDocuments() {
             .single();
           if (fetchErr || !invRow)
             throw new Error(`inventory_items row not found for id: ${itemId}`);
-
           const newQty = (Number(invRow.quantity_on_hand) || 0) + qty;
-          console.log(
-            `[RECEIVE] item ${itemId}: ${invRow.quantity_on_hand} + ${qty} = ${newQty}`,
-          );
-
-          // Increment quantity_on_hand
           const { error: updErr } = await supabase
             .from("inventory_items")
             .update({ quantity_on_hand: newQty })
             .eq("id", itemId);
           if (updErr) throw updErr;
-
-          // Create stock_movements audit record
-          // movement_type: purchase_in (confirmed enum value)
-          // reference: delivery note reference number from extracted_data
-          // notes: file name for traceability
           const { error: movErr } = await supabase
             .from("stock_movements")
             .insert({
@@ -1728,49 +1996,66 @@ export default function HQDocuments() {
               tenant_id: selectedDoc.tenant_id ?? null,
             });
           if (movErr) throw movErr;
-
-          // ── update_po_status ──────────────────────────────────────────────────
-          // Field-whitelisted update on purchase_orders for goods receipt
         } else if (action === "update_po_status") {
           if (!record_id)
             throw new Error("record_id required for update_po_status");
-
-          // Strip anything not in the safe receive whitelist
           const cleanData = Object.fromEntries(
             Object.entries(data).filter(([k]) => PO_RECEIVE_COLS.has(k)),
           );
-
-          // Guard: po_status must be a valid PG ENUM value — default to "received"
           if (
             cleanData.po_status &&
             !VALID_PO_STATUSES.has(String(cleanData.po_status))
-          ) {
+          )
             cleanData.po_status = "received";
-          }
           if (!cleanData.po_status) cleanData.po_status = "received";
-
-          console.log(
-            "[PO STATUS UPDATE] id:",
-            record_id,
-            "data:",
-            JSON.stringify(cleanData),
-          );
-
           const { error } = await supabase
             .from("purchase_orders")
             .update(cleanData)
             .eq("id", record_id);
           if (error) throw error;
-
-          // ── create_supplier_product / create_batch ────────────────────────────
+        } else if (action === "update_batch_coa") {
+          // v1.8: resolve batch by batch_number when record_id is null
+          let batchId = record_id;
+          if (!batchId) {
+            const batchNumber =
+              data.batch_number ||
+              data.sample_id ||
+              data.sample_name ||
+              extraction.reference?.number ||
+              null;
+            if (!batchNumber)
+              throw new Error(
+                "No batch_number in COA data — cannot identify which batch to update",
+              );
+            const { data: batchRow, error: lookupErr } = await supabase
+              .from("batches")
+              .select("id")
+              .eq("batch_number", batchNumber)
+              .maybeSingle();
+            if (lookupErr) throw lookupErr;
+            if (!batchRow)
+              throw new Error(
+                `No batch found with batch_number: ${batchNumber} — create the batch first then re-confirm`,
+              );
+            batchId = batchRow.id;
+          }
+          const batchUpdate = Object.fromEntries(
+            Object.entries(data).filter(([k]) => BATCH_COA_COLS.has(k)),
+          );
+          batchUpdate.coa_document_id = selectedDoc.id;
+          if (Object.keys(batchUpdate).length === 0)
+            throw new Error("No valid COA fields to update on batch");
+          const { error } = await supabase
+            .from("batches")
+            .update(batchUpdate)
+            .eq("id", batchId);
+          if (error) throw error;
         } else if (
           action === "create_supplier_product" ||
           action === "create_batch"
         ) {
           const { error } = await supabase.from(table).insert(data);
           if (error) throw error;
-
-          // ── generic record update (update_product_price, update_batch_coa, etc) ─
         } else if (record_id) {
           const { error } = await supabase
             .from(table)
@@ -1906,6 +2191,28 @@ export default function HQDocuments() {
           ))}
         </div>
       </div>
+
+      {initialDocId && selectedDoc && (
+        <div
+          style={{
+            padding: "10px 16px",
+            background: C.lightPurple,
+            border: `1px solid ${C.purple}`,
+            borderRadius: 2,
+            marginBottom: 16,
+            fontSize: 12,
+            color: C.purple,
+            fontFamily: F.body,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          🔬 <strong>Navigated from Batch Manager</strong> — showing source COA
+          document:&nbsp;
+          <span style={{ fontWeight: 600 }}>{selectedDoc.file_name}</span>
+        </div>
+      )}
 
       <div
         style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}
@@ -2293,6 +2600,7 @@ export default function HQDocuments() {
               onConfirm={handleConfirm}
               onReject={handleReject}
               onReopen={handleReopen}
+              onCreateSupplier={handleCreateSupplier}
               confirming={confirming}
               confirmed={confirmed}
               error={confirmError}
