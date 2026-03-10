@@ -1,14 +1,15 @@
 // src/components/hq/HQDocuments.js
-// v1.1 — WP-I: Intelligent Document Ingestion Engine
-// FIX: fetch fresh suppliers/products context on every upload (not stale mount data)
-// Three-panel: document list | preview | extraction+confirm
-// Upload → Claude Vision extraction → human review → DB apply
-// supabaseClient import: ../../services/supabaseClient
+// v1.5 — WP-I: Intelligent Document Ingestion Engine
+// FIX: create_purchase_order — strict schema whitelist + item field mapper
+//      prevents 400 Bad Request when Claude invents column names
+// FIX: Re-open for Review button added (confirmed / partially_applied docs)
+// FIX: else if (record_id) update branch restored
+// FIX: fetch fresh suppliers/products context on every upload
+// FIX: reject state cleanup, ESLint suppressions, signed URL useEffect restored
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -34,7 +35,6 @@ const F = {
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtDate = (d) => {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -140,8 +140,6 @@ const confidenceColor = (score) => {
 const confidencePct = (score) =>
   score !== null && score !== undefined ? `${Math.round(score * 100)}%` : "—";
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
 function StatusBadge({ status }) {
   const s = STATUS_COLORS[status] || STATUS_COLORS.pending_review;
   return (
@@ -232,7 +230,6 @@ function ConfidenceBar({ score }) {
   );
 }
 
-// ─── Upload Zone ──────────────────────────────────────────────────────────────
 function UploadZone({ onFileSelected, disabled }) {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef(null);
@@ -303,7 +300,6 @@ function UploadZone({ onFileSelected, disabled }) {
   );
 }
 
-// ─── Document List Item ───────────────────────────────────────────────────────
 function DocListItem({ doc, selected, onClick }) {
   const icon = DOC_TYPE_ICONS[doc.document_type] || "📄";
   return (
@@ -381,11 +377,11 @@ function DocListItem({ doc, selected, onClick }) {
   );
 }
 
-// ─── Review Panel ─────────────────────────────────────────────────────────────
 function ReviewPanel({
   doc,
   onConfirm,
   onReject,
+  onReopen,
   confirming,
   confirmed,
   error: confirmError,
@@ -410,6 +406,7 @@ function ReviewPanel({
     setCheckedUpdates(autoChecked);
     setRejecting(false);
     setRejectReason("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.id]);
 
   const toggleUpdate = (idx) => {
@@ -455,7 +452,6 @@ function ReviewPanel({
 
   return (
     <div style={panelStyle}>
-      {/* Document type + confidence header */}
       <div
         style={{
           padding: "14px",
@@ -509,7 +505,6 @@ function ReviewPanel({
         )}
       </div>
 
-      {/* Key fields */}
       <div style={sectionHead}>Extracted Fields</div>
       {extraction.reference?.number && (
         <div style={fieldRow}>
@@ -551,7 +546,6 @@ function ReviewPanel({
         </div>
       ) : null}
 
-      {/* Line items */}
       {lineItems.length > 0 && (
         <>
           <div style={sectionHead}>Line Items ({lineItems.length})</div>
@@ -611,7 +605,6 @@ function ReviewPanel({
         </>
       )}
 
-      {/* Proposed updates */}
       {proposedUpdates.length > 0 && (
         <>
           <div style={sectionHead}>
@@ -703,7 +696,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Warnings */}
       {warnings.length > 0 && (
         <div
           style={{
@@ -728,7 +720,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Unknown items */}
       {unknownItems.length > 0 && (
         <div
           style={{
@@ -760,13 +751,16 @@ function ReviewPanel({
                 marginBottom: 2,
               }}
             >
-              • {u}
+              •{" "}
+              {typeof u === "object" && u !== null
+                ? `${u.name || u.sku || "Unknown item"}${u.sku ? ` (${u.sku})` : ""}${u.unit_price ? ` — $${u.unit_price}` : ""}`
+                : String(u)}
             </div>
           ))}
         </div>
       )}
 
-      {/* Confirmed / rejected display */}
+      {/* ── Confirmed status banner ── */}
       {doc.status === "confirmed" && doc.applied_updates && (
         <div
           style={{
@@ -800,6 +794,8 @@ function ReviewPanel({
           )}
         </div>
       )}
+
+      {/* ── Rejected status banner ── */}
       {doc.status === "rejected" && (
         <div
           style={{
@@ -833,7 +829,39 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Reject reason input */}
+      {/* ── Re-open button (confirmed / partially_applied / rejected) ── */}
+      {(doc.status === "confirmed" ||
+        doc.status === "partially_applied" ||
+        doc.status === "rejected") && (
+        <div
+          style={{
+            padding: "10px 14px",
+            borderTop: `1px solid ${C.border}`,
+            background: C.cream,
+          }}
+        >
+          <button
+            onClick={() => onReopen && onReopen()}
+            style={{
+              width: "100%",
+              padding: "8px",
+              background: "transparent",
+              color: C.muted,
+              border: `1px solid ${C.border}`,
+              borderRadius: 2,
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: F.body,
+              letterSpacing: "0.1em",
+            }}
+          >
+            ↺ Re-open for Review
+          </button>
+        </div>
+      )}
+
+      {/* ── Reject reason textarea ── */}
       {rejecting && (
         <div
           style={{
@@ -871,7 +899,11 @@ function ReviewPanel({
           />
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button
-              onClick={() => onReject(rejectReason)}
+              onClick={async () => {
+                await onReject(rejectReason);
+                setRejecting(false);
+                setRejectReason("");
+              }}
               style={{
                 flex: 1,
                 padding: "8px",
@@ -907,7 +939,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* ── Confirm / Reject action buttons (pending_review only) ── */}
       {!isReadOnly && !rejecting && (
         <div
           style={{
@@ -944,11 +976,11 @@ function ReviewPanel({
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => onConfirm(Array.from(checkedUpdates))}
-                disabled={confirming || checkedUpdates.size === 0}
+                disabled={confirming}
                 style={{
                   flex: 2,
                   padding: "10px 0",
-                  background: checkedUpdates.size === 0 ? "#ccc" : C.green,
+                  background: C.green,
                   color: C.white,
                   border: "none",
                   borderRadius: 2,
@@ -990,7 +1022,6 @@ function ReviewPanel({
   );
 }
 
-// ─── Document Log Table ───────────────────────────────────────────────────────
 function DocumentLogTable({ documents, onSelectDoc }) {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
@@ -1133,7 +1164,6 @@ function DocumentLogTable({ documents, onSelectDoc }) {
           ↓ Export CSV
         </button>
       </div>
-
       <div
         style={{
           background: C.white,
@@ -1249,9 +1279,6 @@ function DocumentLogTable({ documents, onSelectDoc }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
 export default function HQDocuments() {
   const [view, setView] = useState("review");
   const [documents, setDocuments] = useState([]);
@@ -1259,21 +1286,16 @@ export default function HQDocuments() {
   const [selectedDocId, setSelectedDocId] = useState(null);
   const [signedUrl, setSignedUrl] = useState(null);
   const [signedUrlLoading, setSignedUrlLoading] = useState(false);
-
-  // Upload states
   const [uploadState, setUploadState] = useState("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadMsg, setUploadMsg] = useState("");
   const [typeHint, setTypeHint] = useState("");
-
-  // Confirm states
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
   const selectedDoc = documents.find((d) => d.id === selectedDocId) || null;
 
-  // ── Fetch documents ────────────────────────────────────────────────────────
   const fetchDocuments = useCallback(async () => {
     setLoadingDocs(true);
     try {
@@ -1290,9 +1312,6 @@ export default function HQDocuments() {
     }
   }, []);
 
-  // ── Fetch FRESH context data — called on every upload, not cached ──────────
-  // This ensures newly created products from previous passes are included,
-  // preventing Claude from re-proposing products that already exist.
   const fetchFreshContext = async () => {
     const [suppRes, prodRes] = await Promise.all([
       supabase
@@ -1330,9 +1349,9 @@ export default function HQDocuments() {
       })
       .catch(() => setSignedUrl(null))
       .finally(() => setSignedUrlLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDocId]);
 
-  // ── Upload + process ───────────────────────────────────────────────────────
   const handleFileSelected = async (file) => {
     const maxBytes = 20 * 1024 * 1024;
     if (file.size > maxBytes) {
@@ -1340,7 +1359,6 @@ export default function HQDocuments() {
       setUploadMsg("File exceeds 20MB limit.");
       return;
     }
-
     const allowed = [
       "application/pdf",
       "image/jpeg",
@@ -1361,7 +1379,6 @@ export default function HQDocuments() {
     const detectedHint = typeHint || detectTypeFromName(file.name);
 
     try {
-      // 1. Upload to Storage
       const storagePath = `${detectedHint || "documents"}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("supplier-documents")
@@ -1370,19 +1387,15 @@ export default function HQDocuments() {
 
       setUploadProgress(30);
       setUploadMsg("Loading latest product catalogue for matching…");
-
-      // 2. Fetch FRESH context right now — includes all products created this session
       const freshContext = await fetchFreshContext();
 
       setUploadProgress(50);
       setUploadMsg("Extracting data with Claude Vision…");
       setUploadState("processing");
 
-      // 3. Convert to base64
       const base64 = await fileToBase64(file);
       setUploadProgress(55);
 
-      // 4. Call process-document edge function with fresh context
       const { data: fnData, error: fnErr } = await supabase.functions.invoke(
         "process-document",
         {
@@ -1406,11 +1419,8 @@ export default function HQDocuments() {
       setUploadMsg("Extraction complete — review below");
       setUploadState("done");
 
-      // 5. Refresh and select new document
       await fetchDocuments();
-      if (fnData.document_log_id) {
-        setSelectedDocId(fnData.document_log_id);
-      }
+      if (fnData.document_log_id) setSelectedDocId(fnData.document_log_id);
 
       setUploadProgress(100);
       setTimeout(() => {
@@ -1427,18 +1437,78 @@ export default function HQDocuments() {
     }
   };
 
-  // ── Confirm (apply updates) ────────────────────────────────────────────────
+  // ── Schema whitelists — prevents 400s when Claude invents column names ───
+  const PO_HEADER_COLS = new Set([
+    "po_number",
+    "supplier_id",
+    "status",
+    "order_date",
+    "expected_date",
+    "received_date",
+    "subtotal",
+    "currency",
+    "notes",
+    "created_by",
+    "shipping_mode",
+    "total_weight_kg",
+    "shipping_cost_usd",
+    "clearance_fee_usd",
+    "usd_zar_rate",
+    "landed_cost_zar",
+    "expected_arrival",
+    "actual_arrival",
+    "po_status",
+    "supplier_invoice_ref",
+    "source_document_id",
+    "payment_date",
+    "payment_reference",
+  ]);
+
+  // Normalise a PO line item to exact purchase_order_items column names
+  // NOTE: item_id FKs to inventory_items — use supplier_product_id for product refs
+  // Normalise PO line item to exact purchase_order_items columns
+  // item_id FKs to inventory_items (for stock receiving) — NOT used here
+  // supplier_product_id FKs to supplier_products — correct for doc ingestion
+  // line_total is a generated column — NEVER insert it
+  const normalisePOItem = (item) => ({
+    supplier_product_id:
+      item.supplier_product_id ||
+      item.product_id ||
+      item.matched_product_id ||
+      item.item_id ||
+      null,
+    quantity_ordered: item.quantity_ordered ?? item.quantity ?? 1,
+    unit_cost: item.unit_cost ?? item.unit_price_usd ?? item.unit_price ?? 0,
+    // optional columns only — no generated columns
+    ...(item.unit_price_usd != null
+      ? { unit_price_usd: item.unit_price_usd ?? item.unit_price ?? 0 }
+      : {}),
+    ...(item.quantity_received != null
+      ? { quantity_received: item.quantity_received }
+      : {}),
+    ...(item.landed_cost_per_unit_zar != null
+      ? { landed_cost_per_unit_zar: item.landed_cost_per_unit_zar }
+      : {}),
+    ...(item.weight_kg != null ? { weight_kg: item.weight_kg } : {}),
+    ...(item.notes ? { notes: item.notes } : {}),
+    // line_total intentionally omitted — generated column in DB
+    // item_id intentionally omitted — FKs to inventory_items, not supplier_products
+  });
+
   const handleConfirm = async (checkedIndices) => {
     if (!selectedDoc || checkedIndices.length === 0) return;
     setConfirming(true);
     setConfirmError("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const extraction = selectedDoc.extracted_data || {};
     const proposedUpdates = extraction.proposed_updates || [];
     const toApply = checkedIndices
       .map((i) => proposedUpdates[i])
       .filter(Boolean);
-
     const appliedUpdates = [];
     const failedUpdates = [];
 
@@ -1452,9 +1522,96 @@ export default function HQDocuments() {
           "create_purchase_order",
           "create_batch",
         ];
+
         if (createActions.includes(action)) {
-          const { error } = await supabase.from(table).insert(data);
-          if (error) throw error;
+          if (action === "create_purchase_order") {
+            // ── Sanitise: strip items + any column not in schema whitelist ──
+            const { items, ...rawHeader } = data;
+            const poHeader = Object.fromEntries(
+              Object.entries(rawHeader).filter(([k]) => PO_HEADER_COLS.has(k)),
+            );
+            // Always stamp who created it + which document sourced it
+            if (user?.id) poHeader.created_by = user.id;
+            poHeader.source_document_id = selectedDoc.id;
+            // Force draft status — po_status is a PG ENUM, only "draft" valid on create
+            poHeader.status = "draft";
+            poHeader.po_status = "draft";
+            if (!poHeader.currency)
+              poHeader.currency = extraction.currency || "USD";
+            if (!poHeader.order_date)
+              poHeader.order_date = new Date().toISOString().split("T")[0];
+            // Auto-generate po_number if missing
+            if (!poHeader.po_number)
+              poHeader.po_number = `PO-DOC-${Date.now().toString().slice(-8)}`;
+            // supplier_id fallback — AI may nest it or omit it entirely
+            if (!poHeader.supplier_id) {
+              poHeader.supplier_id =
+                data.supplier?.id ||
+                data.supplier?.matched_id ||
+                extraction.supplier?.matched_id ||
+                selectedDoc.supplier_id ||
+                null;
+            }
+            if (!poHeader.supplier_id)
+              throw new Error(
+                "supplier_id could not be resolved — cannot insert PO without a supplier",
+              );
+
+            console.log(
+              "[PO INSERT] poHeader:",
+              JSON.stringify(poHeader, null, 2),
+            );
+
+            // Try insert; if po_number already exists, fetch the existing PO instead
+            let newPO = null;
+            const { data: insertedPO, error: poErr } = await supabase
+              .from(table)
+              .insert(poHeader)
+              .select()
+              .single();
+
+            if (poErr) {
+              // 23505 = unique_violation — PO already created from a prior confirm attempt
+              if (poErr.code === "23505" && poHeader.po_number) {
+                const { data: existingPO, error: fetchErr } = await supabase
+                  .from(table)
+                  .select()
+                  .eq("po_number", poHeader.po_number)
+                  .single();
+                if (fetchErr || !existingPO) throw poErr; // original error if can't recover
+                newPO = existingPO;
+                console.log(
+                  "[PO INSERT] duplicate po_number — using existing PO:",
+                  existingPO.id,
+                );
+              } else {
+                throw poErr;
+              }
+            } else {
+              newPO = insertedPO;
+            }
+
+            // ── Insert line items with normalised column names ──────────────
+            if (items?.length && newPO?.id) {
+              const poItems = items
+                .map((item) => ({ ...normalisePOItem(item), po_id: newPO.id }))
+                // drop items with no supplier_product_id — can't FK without it
+                .filter((item) => item.supplier_product_id);
+              console.log(
+                "[PO ITEMS INSERT]",
+                JSON.stringify(poItems, null, 2),
+              );
+              if (poItems.length > 0) {
+                const { error: itemsErr } = await supabase
+                  .from("purchase_order_items")
+                  .insert(poItems);
+                if (itemsErr) throw itemsErr;
+              }
+            }
+          } else {
+            const { error } = await supabase.from(table).insert(data);
+            if (error) throw error;
+          }
         } else if (record_id) {
           const { error } = await supabase
             .from(table)
@@ -1464,8 +1621,10 @@ export default function HQDocuments() {
         } else {
           throw new Error(`No record_id for update action on ${table}`);
         }
+
         appliedUpdates.push(update);
       } catch (err) {
+        console.error("[handleConfirm] failed update:", err.message, update);
         failedUpdates.push({ update, error: err.message });
       }
     }
@@ -1476,9 +1635,6 @@ export default function HQDocuments() {
     else if (failedUpdates.length > 0 && appliedUpdates.length === 0)
       newStatus = "rejected";
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
     await supabase
       .from("document_log")
       .update({
@@ -1490,7 +1646,6 @@ export default function HQDocuments() {
       .eq("id", selectedDoc.id);
 
     setConfirming(false);
-
     if (failedUpdates.length > 0) {
       setConfirmError(
         `${failedUpdates.length} update(s) failed: ${failedUpdates[0].error}`,
@@ -1498,30 +1653,40 @@ export default function HQDocuments() {
     } else {
       setConfirmed(true);
     }
-
     await fetchDocuments();
   };
 
-  // ── Reject ─────────────────────────────────────────────────────────────────
   const handleReject = async (reason) => {
     if (!selectedDoc) return;
     await supabase
       .from("document_log")
-      .update({
-        status: "rejected",
-        rejection_reason: reason || null,
-      })
+      .update({ status: "rejected", rejection_reason: reason || null })
       .eq("id", selectedDoc.id);
     await fetchDocuments();
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const handleReopen = async () => {
+    if (!selectedDoc) return;
+    await supabase
+      .from("document_log")
+      .update({
+        status: "pending_review",
+        applied_updates: null,
+        confirmed_by: null,
+        confirmed_at: null,
+        rejection_reason: null,
+      })
+      .eq("id", selectedDoc.id);
+    setConfirmed(false);
+    setConfirmError("");
+    await fetchDocuments();
+  };
+
   const isUploading =
     uploadState === "uploading" || uploadState === "processing";
 
   return (
     <div style={{ fontFamily: F.body, position: "relative" }}>
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -1548,8 +1713,6 @@ export default function HQDocuments() {
             DB updates
           </div>
         </div>
-
-        {/* View toggle */}
         <div
           style={{
             display: "flex",
@@ -1585,7 +1748,6 @@ export default function HQDocuments() {
         </div>
       </div>
 
-      {/* Stats strip */}
       <div
         style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}
       >
@@ -1713,7 +1875,6 @@ export default function HQDocuments() {
                 onFileSelected={handleFileSelected}
                 disabled={isUploading}
               />
-
               {uploadState !== "idle" && (
                 <div style={{ marginTop: 8 }}>
                   {(uploadState === "uploading" ||
@@ -1761,7 +1922,6 @@ export default function HQDocuments() {
                 </div>
               )}
             </div>
-
             <div style={{ flex: 1, overflowY: "auto" }}>
               {loadingDocs ? (
                 <div
@@ -1868,7 +2028,6 @@ export default function HQDocuments() {
                     </a>
                   )}
                 </div>
-
                 <div
                   style={{
                     flex: 1,
@@ -1974,6 +2133,7 @@ export default function HQDocuments() {
               doc={selectedDoc}
               onConfirm={handleConfirm}
               onReject={handleReject}
+              onReopen={handleReopen}
               confirming={confirming}
               confirmed={confirmed}
               error={confirmError}
