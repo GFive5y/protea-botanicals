@@ -1,11 +1,12 @@
 // src/components/hq/HQDocuments.js
-// v1.5 — WP-I: Intelligent Document Ingestion Engine
-// FIX: create_purchase_order — strict schema whitelist + item field mapper
-//      prevents 400 Bad Request when Claude invents column names
-// FIX: Re-open for Review button added (confirmed / partially_applied docs)
-// FIX: else if (record_id) update branch restored
-// FIX: fetch fresh suppliers/products context on every upload
-// FIX: reject state cleanup, ESLint suppressions, signed URL useEffect restored
+// v1.6 — WP-I Extended: Delivery Note → Auto-receive inventory
+// NEW: fetchFreshContext fetches inventory_items + open purchase_orders
+// NEW: handleConfirm — receive_delivery_item action:
+//        fetch qty_on_hand → increment → insert stock_movements (purchase_in)
+// NEW: handleConfirm — update_po_status action:
+//        field-whitelisted update on purchase_orders (po_status → received)
+// Existing: create_purchase_order, create_supplier_product, create_batch,
+//           generic record_id update — all unchanged
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -664,13 +665,25 @@ function ReviewPanel({
                           fontSize: 9,
                           padding: "1px 6px",
                           borderRadius: 2,
-                          background: C.lightBlue,
-                          color: C.blue,
+                          background:
+                            update.action === "receive_delivery_item"
+                              ? C.lightGreen
+                              : update.action === "update_po_status"
+                                ? C.lightBlue
+                                : C.lightBlue,
+                          color:
+                            update.action === "receive_delivery_item"
+                              ? C.mid
+                              : C.blue,
                           fontFamily: F.body,
                           letterSpacing: "0.05em",
                         }}
                       >
-                        {update.table}
+                        {update.action === "receive_delivery_item"
+                          ? "📦 " + update.table
+                          : update.action === "update_po_status"
+                            ? "🔄 " + update.table
+                            : update.table}
                       </span>
                       <ConfidenceDot score={update.confidence} />
                     </div>
@@ -780,6 +793,37 @@ function ReviewPanel({
             ✅ Applied {doc.applied_updates.length} update
             {doc.applied_updates.length !== 1 ? "s" : ""}
           </div>
+          {/* Delivery note receipt summary */}
+          {doc.document_type === "delivery_note" && (
+            <div
+              style={{
+                fontSize: 9,
+                color: C.mid,
+                marginTop: 4,
+                fontFamily: F.body,
+              }}
+            >
+              {doc.applied_updates.filter(
+                (u) => u.action === "receive_delivery_item",
+              ).length > 0 && (
+                <span>
+                  📦{" "}
+                  {
+                    doc.applied_updates.filter(
+                      (u) => u.action === "receive_delivery_item",
+                    ).length
+                  }{" "}
+                  inventory item
+                  {doc.applied_updates.filter(
+                    (u) => u.action === "receive_delivery_item",
+                  ).length !== 1
+                    ? "s"
+                    : ""}{" "}
+                  received · stock_movements logged
+                </span>
+              )}
+            </div>
+          )}
           {doc.confirmed_at && (
             <div
               style={{
@@ -1312,8 +1356,11 @@ export default function HQDocuments() {
     }
   }, []);
 
+  // v1.6 — extended context: now includes inventory_items + open purchase_orders
+  // inventory_items → delivery note item matching (receive_delivery_item)
+  // open purchase_orders → delivery note PO matching (update_po_status)
   const fetchFreshContext = async () => {
-    const [suppRes, prodRes] = await Promise.all([
+    const [suppRes, prodRes, invRes, poRes] = await Promise.all([
       supabase
         .from("suppliers")
         .select("id, name, country, currency")
@@ -1322,10 +1369,20 @@ export default function HQDocuments() {
         .from("supplier_products")
         .select("id, name, sku, category, unit_price_usd, supplier_id")
         .eq("is_active", true),
+      supabase
+        .from("inventory_items")
+        .select("id, name, sku, category, quantity_on_hand")
+        .eq("is_active", true),
+      supabase
+        .from("purchase_orders")
+        .select("id, po_number, supplier_id, po_status, expected_arrival")
+        .in("po_status", ["ordered", "in_transit", "customs"]),
     ]);
     return {
       existing_suppliers: suppRes.data || [],
       existing_products: prodRes.data || [],
+      existing_inventory: invRes.data || [],
+      open_purchase_orders: poRes.data || [],
     };
   };
 
@@ -1386,7 +1443,8 @@ export default function HQDocuments() {
       if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
 
       setUploadProgress(30);
-      setUploadMsg("Loading latest product catalogue for matching…");
+      // v1.6: message updated — now loads inventory + POs too
+      setUploadMsg("Loading catalogue, inventory & open POs for matching…");
       const freshContext = await fetchFreshContext();
 
       setUploadProgress(50);
@@ -1437,7 +1495,9 @@ export default function HQDocuments() {
     }
   };
 
-  // ── Schema whitelists — prevents 400s when Claude invents column names ───
+  // ── Schema whitelists — prevents 400s when Claude invents column names ─────
+
+  // Whitelist for purchase_orders INSERT (create_purchase_order action)
   const PO_HEADER_COLS = new Set([
     "po_number",
     "supplier_id",
@@ -1464,9 +1524,27 @@ export default function HQDocuments() {
     "payment_reference",
   ]);
 
+  // Whitelist for purchase_orders UPDATE (update_po_status action)
+  // Only safe fields on goods receipt — never allow financial fields to be overwritten
+  const PO_RECEIVE_COLS = new Set([
+    "po_status",
+    "actual_arrival",
+    "received_date",
+    "notes",
+  ]);
+
+  // Valid po_status enum values (PostgreSQL ENUM — never guess)
+  const VALID_PO_STATUSES = new Set([
+    "draft",
+    "ordered",
+    "in_transit",
+    "customs",
+    "received",
+    "complete",
+    "cancelled",
+  ]);
+
   // Normalise a PO line item to exact purchase_order_items column names
-  // NOTE: item_id FKs to inventory_items — use supplier_product_id for product refs
-  // Normalise PO line item to exact purchase_order_items columns
   // item_id FKs to inventory_items (for stock receiving) — NOT used here
   // supplier_product_id FKs to supplier_products — correct for doc ingestion
   // line_total is a generated column — NEVER insert it
@@ -1517,101 +1595,182 @@ export default function HQDocuments() {
         const { action, table, record_id, data } = update;
         if (!table || !data) throw new Error("Missing table or data");
 
-        const createActions = [
-          "create_supplier_product",
-          "create_purchase_order",
-          "create_batch",
-        ];
-
-        if (createActions.includes(action)) {
-          if (action === "create_purchase_order") {
-            // ── Sanitise: strip items + any column not in schema whitelist ──
-            const { items, ...rawHeader } = data;
-            const poHeader = Object.fromEntries(
-              Object.entries(rawHeader).filter(([k]) => PO_HEADER_COLS.has(k)),
-            );
-            // Always stamp who created it + which document sourced it
-            if (user?.id) poHeader.created_by = user.id;
-            poHeader.source_document_id = selectedDoc.id;
-            // Force draft status — po_status is a PG ENUM, only "draft" valid on create
-            poHeader.status = "draft";
-            poHeader.po_status = "draft";
-            if (!poHeader.currency)
-              poHeader.currency = extraction.currency || "USD";
-            if (!poHeader.order_date)
-              poHeader.order_date = new Date().toISOString().split("T")[0];
-            // Auto-generate po_number if missing
-            if (!poHeader.po_number)
-              poHeader.po_number = `PO-DOC-${Date.now().toString().slice(-8)}`;
-            // supplier_id fallback — AI may nest it or omit it entirely
-            if (!poHeader.supplier_id) {
-              poHeader.supplier_id =
-                data.supplier?.id ||
-                data.supplier?.matched_id ||
-                extraction.supplier?.matched_id ||
-                selectedDoc.supplier_id ||
-                null;
-            }
-            if (!poHeader.supplier_id)
-              throw new Error(
-                "supplier_id could not be resolved — cannot insert PO without a supplier",
-              );
-
-            console.log(
-              "[PO INSERT] poHeader:",
-              JSON.stringify(poHeader, null, 2),
+        // ── create_purchase_order ─────────────────────────────────────────────
+        if (action === "create_purchase_order") {
+          // Sanitise: strip items + any column not in schema whitelist
+          const { items, ...rawHeader } = data;
+          const poHeader = Object.fromEntries(
+            Object.entries(rawHeader).filter(([k]) => PO_HEADER_COLS.has(k)),
+          );
+          // Always stamp who created it + which document sourced it
+          if (user?.id) poHeader.created_by = user.id;
+          poHeader.source_document_id = selectedDoc.id;
+          // Force draft status — po_status is a PG ENUM, only "draft" valid on create
+          poHeader.status = "draft";
+          poHeader.po_status = "draft";
+          if (!poHeader.currency)
+            poHeader.currency = extraction.currency || "USD";
+          if (!poHeader.order_date)
+            poHeader.order_date = new Date().toISOString().split("T")[0];
+          // Auto-generate po_number if missing
+          if (!poHeader.po_number)
+            poHeader.po_number = `PO-DOC-${Date.now().toString().slice(-8)}`;
+          // supplier_id fallback — AI may nest it or omit it entirely
+          if (!poHeader.supplier_id) {
+            poHeader.supplier_id =
+              data.supplier?.id ||
+              data.supplier?.matched_id ||
+              extraction.supplier?.matched_id ||
+              selectedDoc.supplier_id ||
+              null;
+          }
+          if (!poHeader.supplier_id)
+            throw new Error(
+              "supplier_id could not be resolved — cannot insert PO without a supplier",
             );
 
-            // Try insert; if po_number already exists, fetch the existing PO instead
-            let newPO = null;
-            const { data: insertedPO, error: poErr } = await supabase
-              .from(table)
-              .insert(poHeader)
-              .select()
-              .single();
+          console.log(
+            "[PO INSERT] poHeader:",
+            JSON.stringify(poHeader, null, 2),
+          );
 
-            if (poErr) {
-              // 23505 = unique_violation — PO already created from a prior confirm attempt
-              if (poErr.code === "23505" && poHeader.po_number) {
-                const { data: existingPO, error: fetchErr } = await supabase
-                  .from(table)
-                  .select()
-                  .eq("po_number", poHeader.po_number)
-                  .single();
-                if (fetchErr || !existingPO) throw poErr; // original error if can't recover
-                newPO = existingPO;
-                console.log(
-                  "[PO INSERT] duplicate po_number — using existing PO:",
-                  existingPO.id,
-                );
-              } else {
-                throw poErr;
-              }
-            } else {
-              newPO = insertedPO;
-            }
+          // Try insert; if po_number already exists, fetch the existing PO instead
+          let newPO = null;
+          const { data: insertedPO, error: poErr } = await supabase
+            .from(table)
+            .insert(poHeader)
+            .select()
+            .single();
 
-            // ── Insert line items with normalised column names ──────────────
-            if (items?.length && newPO?.id) {
-              const poItems = items
-                .map((item) => ({ ...normalisePOItem(item), po_id: newPO.id }))
-                // drop items with no supplier_product_id — can't FK without it
-                .filter((item) => item.supplier_product_id);
+          if (poErr) {
+            // 23505 = unique_violation — PO already created from a prior confirm attempt
+            if (poErr.code === "23505" && poHeader.po_number) {
+              const { data: existingPO, error: fetchErr } = await supabase
+                .from(table)
+                .select()
+                .eq("po_number", poHeader.po_number)
+                .single();
+              if (fetchErr || !existingPO) throw poErr;
+              newPO = existingPO;
               console.log(
-                "[PO ITEMS INSERT]",
-                JSON.stringify(poItems, null, 2),
+                "[PO INSERT] duplicate po_number — using existing PO:",
+                existingPO.id,
               );
-              if (poItems.length > 0) {
-                const { error: itemsErr } = await supabase
-                  .from("purchase_order_items")
-                  .insert(poItems);
-                if (itemsErr) throw itemsErr;
-              }
+            } else {
+              throw poErr;
             }
           } else {
-            const { error } = await supabase.from(table).insert(data);
-            if (error) throw error;
+            newPO = insertedPO;
           }
+
+          // Insert line items with normalised column names
+          if (items?.length && newPO?.id) {
+            const poItems = items
+              .map((item) => ({ ...normalisePOItem(item), po_id: newPO.id }))
+              // drop items with no supplier_product_id — can't FK without it
+              .filter((item) => item.supplier_product_id);
+            console.log("[PO ITEMS INSERT]", JSON.stringify(poItems, null, 2));
+            if (poItems.length > 0) {
+              const { error: itemsErr } = await supabase
+                .from("purchase_order_items")
+                .insert(poItems);
+              if (itemsErr) throw itemsErr;
+            }
+          }
+
+          // ── receive_delivery_item ─────────────────────────────────────────────
+          // Increments inventory_items.quantity_on_hand + creates stock_movements audit record
+        } else if (action === "receive_delivery_item") {
+          const itemId = data.item_id || record_id;
+          if (!itemId)
+            throw new Error("item_id required for receive_delivery_item");
+
+          const qty = Number(data.quantity_received ?? data.quantity ?? 0);
+          if (!qty || qty <= 0)
+            throw new Error(
+              `quantity_received must be > 0 (got ${data.quantity_received ?? data.quantity})`,
+            );
+
+          // Read current quantity_on_hand — never assume, always fetch fresh
+          const { data: invRow, error: fetchErr } = await supabase
+            .from("inventory_items")
+            .select("quantity_on_hand")
+            .eq("id", itemId)
+            .single();
+          if (fetchErr || !invRow)
+            throw new Error(`inventory_items row not found for id: ${itemId}`);
+
+          const newQty = (Number(invRow.quantity_on_hand) || 0) + qty;
+          console.log(
+            `[RECEIVE] item ${itemId}: ${invRow.quantity_on_hand} + ${qty} = ${newQty}`,
+          );
+
+          // Increment quantity_on_hand
+          const { error: updErr } = await supabase
+            .from("inventory_items")
+            .update({ quantity_on_hand: newQty })
+            .eq("id", itemId);
+          if (updErr) throw updErr;
+
+          // Create stock_movements audit record
+          // movement_type: purchase_in (confirmed enum value)
+          // reference: delivery note reference number from extracted_data
+          // notes: file name for traceability
+          const { error: movErr } = await supabase
+            .from("stock_movements")
+            .insert({
+              item_id: itemId,
+              quantity: qty,
+              movement_type: "purchase_in",
+              reference: selectedDoc.extracted_data?.reference?.number ?? null,
+              notes: `Goods received — ${selectedDoc.file_name}`,
+              performed_by: user?.id ?? null,
+              tenant_id: selectedDoc.tenant_id ?? null,
+            });
+          if (movErr) throw movErr;
+
+          // ── update_po_status ──────────────────────────────────────────────────
+          // Field-whitelisted update on purchase_orders for goods receipt
+        } else if (action === "update_po_status") {
+          if (!record_id)
+            throw new Error("record_id required for update_po_status");
+
+          // Strip anything not in the safe receive whitelist
+          const cleanData = Object.fromEntries(
+            Object.entries(data).filter(([k]) => PO_RECEIVE_COLS.has(k)),
+          );
+
+          // Guard: po_status must be a valid PG ENUM value — default to "received"
+          if (
+            cleanData.po_status &&
+            !VALID_PO_STATUSES.has(String(cleanData.po_status))
+          ) {
+            cleanData.po_status = "received";
+          }
+          if (!cleanData.po_status) cleanData.po_status = "received";
+
+          console.log(
+            "[PO STATUS UPDATE] id:",
+            record_id,
+            "data:",
+            JSON.stringify(cleanData),
+          );
+
+          const { error } = await supabase
+            .from("purchase_orders")
+            .update(cleanData)
+            .eq("id", record_id);
+          if (error) throw error;
+
+          // ── create_supplier_product / create_batch ────────────────────────────
+        } else if (
+          action === "create_supplier_product" ||
+          action === "create_batch"
+        ) {
+          const { error } = await supabase.from(table).insert(data);
+          if (error) throw error;
+
+          // ── generic record update (update_product_price, update_batch_coa, etc) ─
         } else if (record_id) {
           const { error } = await supabase
             .from(table)
