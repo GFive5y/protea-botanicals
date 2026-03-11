@@ -12,7 +12,7 @@ import { SystemHealthProvider } from "../services/systemHealthContext";
 import HQOverview from "../components/hq/HQOverview";
 import ShopManager from "../components/hq/ShopManager";
 import SupplyChain from "../components/hq/SupplyChain";
-import Production from "../components/hq/Production";
+import HQProduction from "../components/hq/HQProduction";
 import Distribution from "../components/hq/Distribution";
 import HQAnalytics from "../components/hq/HQAnalytics";
 import RetailerHealth from "../components/hq/RetailerHealth";
@@ -206,7 +206,7 @@ export default function HQDashboard() {
             <HQOverview onNavigate={(tab) => setActiveTab(tab)} />
           )}
           {activeTab === "supply-chain" && <SupplyChain />}
-          {activeTab === "production" && <Production />}
+          {activeTab === "production" && <HQProduction />}
           {activeTab === "distribution" && <Distribution />}
           {activeTab === "shops" && <ShopManager />}
           {activeTab === "analytics" && <HQAnalytics />}

@@ -1,4 +1,8 @@
-// src/pages/Shop.js v4.1
+// src/pages/Shop.js v4.2
+// v4.2: WP-K Publish to Shop — reads sell_price from inventory_items
+//       Price is no longer hardcoded. buildProductFromInventory uses
+//       item.sell_price from DB. fetchProducts SELECT includes sell_price.
+//       Zero impact on all other Shop functionality.
 // v4.1: WP-J Mobile Responsiveness — 375px pass
 //       - shop-loyalty-inner: reduces loyalty CTA section padding on mobile
 //       - shop-loyalty-btns: stacks loyalty CTA buttons full-width on mobile
@@ -918,7 +922,7 @@ function buildProductFromInventory(item) {
     strain,
     format: is2ml ? "2ml Disposable Pen" : "1ml Cartridge",
     formatShort: is2ml ? "2ml Pen" : "1ml Cart",
-    price: is2ml ? 1600 : 800,
+    price: parseFloat(item.sell_price) || 0,
     thc: "93.55%",
     badge: is2ml ? "All-in-One" : "510 Thread",
     quantity_on_hand: item.quantity_on_hand,
@@ -2172,7 +2176,9 @@ export default function Shop() {
       try {
         const { data, error } = await supabase
           .from("inventory_items")
-          .select("id, name, sku, category, unit, quantity_on_hand, cost_price")
+          .select(
+            "id, name, sku, category, unit, quantity_on_hand, cost_price, sell_price",
+          )
           .eq("category", "finished_product")
           .eq("is_active", true)
           .gt("quantity_on_hand", 0)

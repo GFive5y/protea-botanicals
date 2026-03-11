@@ -310,11 +310,7 @@ export default function AdminDashboard() {
           label="Batches"
           onClick={() => setTab("batches")}
         />
-        <TabBtn
-          active={tab === "production"}
-          label="Production"
-          onClick={() => setTab("production")}
-        />
+        {/* Production tab hidden — use HQ → Production instead */}
         <TabBtn
           active={tab === "shipments"}
           label="Shipments"

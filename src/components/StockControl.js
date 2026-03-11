@@ -1,4 +1,13 @@
-// src/components/StockControl.js v1.1
+// src/components/StockControl.js v1.3
+// v1.3 — Item History Drilldown: per-item movement history modal with
+//         running balance, type badges, reference/notes audit trail.
+//         History button added to every row in Items view.
+// v1.2 — WP-K: Publish to Shop
+//              - LIVE badge in items table for finished_product items
+//                with sell_price > 0 and quantity_on_hand > 0
+//              - Shop Listing panel in ItemForm when category = finished_product
+//                shows publish status, sell price, strain ID reminder
+//              Zero impact on all other views or existing functionality.
 // v1.1 — WP-I: Document source badge on inventory rows (Items view)
 //              Detects items recently updated via Document Ingestion Engine
 //              by inspecting stock_movements for document-sourced entries
@@ -130,8 +139,6 @@ const PO_STATUS_COLORS = {
 };
 
 // ── WP-I: Detect if movement was document-sourced ──────────────────────
-// A movement is document-sourced if its notes contains "document" (case-insensitive)
-// or its reference is a UUID (matches document_log.id format)
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -147,7 +154,6 @@ function isDocumentSourced(movement) {
   );
 }
 
-// Build a map of item_id → most recent document-sourced movement
 function buildDocSourceMap(movements) {
   const map = {};
   for (const m of movements) {
@@ -190,6 +196,40 @@ function DocumentSourceBadge({ movement }) {
   );
 }
 
+// ── WP-K: Live Shop Badge ──────────────────────────────────────────────
+function LiveShopBadge() {
+  return (
+    <span
+      title="Live in customer shop"
+      style={{
+        fontSize: "9px",
+        padding: "2px 7px",
+        borderRadius: "20px",
+        background: "#d4edda",
+        color: C.green,
+        border: `1px solid ${C.accent}`,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        fontFamily: F.body,
+        whiteSpace: "nowrap",
+        cursor: "default",
+        marginLeft: "6px",
+      }}
+    >
+      🛍 LIVE
+    </span>
+  );
+}
+
+// ── WP-K: Is item live in shop? ─────────────────────────────────────────
+function isLiveInShop(item) {
+  return (
+    item.category === "finished_product" &&
+    parseFloat(item.sell_price || 0) > 0 &&
+    parseFloat(item.quantity_on_hand || 0) > 0
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -202,7 +242,6 @@ export default function StockControl() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ── Fetch all data on mount ───────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -216,7 +255,7 @@ export default function StockControl() {
           .from("stock_movements")
           .select("*, inventory_items(name, sku)")
           .order("created_at", { ascending: false })
-          .limit(200), // increased from 100 to catch more document movements
+          .limit(200),
         supabase.from("suppliers").select("*").order("name"),
         supabase
           .from("purchase_orders")
@@ -243,7 +282,6 @@ export default function StockControl() {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Sub-tab navigation ────────────────────────────────────────────────
   const SUB_TABS = [
     { id: "overview", label: "Overview", icon: "◎" },
     { id: "items", label: "Items", icon: "◈" },
@@ -274,7 +312,6 @@ export default function StockControl() {
 
   return (
     <div>
-      {/* Sub-tab bar */}
       <div
         style={{
           display: "flex",
@@ -350,7 +387,7 @@ export default function StockControl() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// OVERVIEW — Dashboard summary
+// OVERVIEW
 // ═══════════════════════════════════════════════════════════════════════════
 function OverviewView({ items, movements, orders }) {
   const activeItems = items.filter((i) => i.is_active);
@@ -379,10 +416,11 @@ function OverviewView({ items, movements, orders }) {
   });
 
   const recentMoves = movements.slice(0, 8);
+  // WP-K: count live shop items
+  const liveShopCount = activeItems.filter(isLiveInShop).length;
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* Summary cards */}
       <div
         style={{
           display: "grid",
@@ -426,9 +464,15 @@ function OverviewView({ items, movements, orders }) {
           sub="Not yet received"
           color={C.blue}
         />
+        {/* WP-K: live shop count */}
+        <StatCard
+          label="Live in Shop"
+          value={liveShopCount}
+          sub="Customer-facing"
+          color={liveShopCount > 0 ? C.accent : C.muted}
+        />
       </div>
 
-      {/* Low stock alerts */}
       {lowStock.length > 0 && (
         <div style={{ ...sCard, borderLeft: `3px solid ${C.gold}` }}>
           <div style={sLabel}>⚠ Low Stock Alerts</div>
@@ -486,7 +530,6 @@ function OverviewView({ items, movements, orders }) {
         </div>
       )}
 
-      {/* Category breakdown */}
       <div style={sCard}>
         <div style={sLabel}>Stock by Category</div>
         <div
@@ -536,7 +579,6 @@ function OverviewView({ items, movements, orders }) {
         </div>
       </div>
 
-      {/* Recent movements */}
       <div style={sCard}>
         <div style={sLabel}>Recent Stock Movements</div>
         {recentMoves.length === 0 ? (
@@ -632,7 +674,7 @@ function StatCard({ label, value, sub, color }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ITEMS — Inventory list + add/edit (v1.1: receives movements, shows doc badge)
+// ITEMS — v1.2: LIVE badge + Shop Listing panel
 // ═══════════════════════════════════════════════════════════════════════════
 function ItemsView({ items, suppliers, movements, onRefresh }) {
   const [filter, setFilter] = useState("all");
@@ -640,8 +682,8 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [historyItem, setHistoryItem] = useState(null);
 
-  // WP-I: build document source map from movements
   const docSourceMap = buildDocSourceMap(movements);
 
   const filtered = items.filter((i) => {
@@ -707,6 +749,9 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
     ).toFixed(1);
   };
 
+  // WP-K: count live items for footer note
+  const liveCount = filtered.filter(isLiveInShop).length;
+
   return (
     <div>
       {/* Toolbar */}
@@ -750,7 +795,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
         </button>
       </div>
 
-      {/* Form modal */}
+      {/* Form */}
       {showForm && (
         <ItemForm
           item={editItem}
@@ -764,7 +809,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
         />
       )}
 
-      {/* Items table */}
+      {/* Table */}
       <div style={{ ...sCard, padding: "0", overflow: "auto" }}>
         <table style={sTable}>
           <thead>
@@ -803,8 +848,8 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                   item.reorder_level > 0 &&
                   item.quantity_on_hand <= item.reorder_level;
                 const isOut = item.quantity_on_hand <= 0;
-                // WP-I: check for document-sourced movement for this item
                 const docMovement = docSourceMap[item.id] || null;
+                const live = isLiveInShop(item);
                 return (
                   <tr key={item.id}>
                     <td
@@ -817,7 +862,20 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                     >
                       {item.sku}
                     </td>
-                    <td style={{ ...sTd, fontWeight: 500 }}>{item.name}</td>
+                    {/* WP-K: LIVE badge in name cell */}
+                    <td style={{ ...sTd, fontWeight: 500 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {item.name}
+                        {live && <LiveShopBadge />}
+                      </div>
+                    </td>
                     <td style={sTd}>
                       <span
                         style={{
@@ -874,12 +932,24 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                     <td style={{ ...sTd, fontSize: "12px", color: C.muted }}>
                       {item.suppliers?.name || "—"}
                     </td>
-                    {/* WP-I: Document source badge */}
                     <td style={sTd}>
                       <DocumentSourceBadge movement={docMovement} />
                     </td>
                     <td style={sTd}>
                       <div style={{ display: "flex", gap: "6px" }}>
+                        <button
+                          onClick={() => setHistoryItem(item)}
+                          style={{
+                            ...sBtn("outline"),
+                            padding: "4px 10px",
+                            fontSize: "9px",
+                            color: C.blue,
+                            borderColor: C.blue,
+                          }}
+                          title="View movement history"
+                        >
+                          📋
+                        </button>
                         <button
                           onClick={() => {
                             setEditItem(item);
@@ -925,6 +995,11 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
       >
         Showing {filtered.length} of {items.filter((i) => i.is_active).length}{" "}
         active items
+        {liveCount > 0 && (
+          <span style={{ marginLeft: 12, color: C.green }}>
+            · 🛍 {liveCount} live in shop
+          </span>
+        )}
         {Object.keys(docSourceMap).length > 0 && (
           <span style={{ marginLeft: 12, color: C.purple }}>
             · 🔬 {Object.keys(docSourceMap).length} updated via document
@@ -932,11 +1007,409 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
           </span>
         )}
       </div>
+
+      {historyItem && (
+        <ItemHistoryModal
+          item={historyItem}
+          movements={movements.filter((m) => m.item_id === historyItem.id)}
+          onClose={() => setHistoryItem(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Item Add/Edit Form ──────────────────────────────────────────────────
+// ── Item History Modal v1.3 ─────────────────────────────────────────────
+function ItemHistoryModal({ item, movements, onClose }) {
+  // Sort oldest → newest to calculate running balance
+  const sorted = [...movements].sort(
+    (a, b) => new Date(a.created_at) - new Date(b.created_at),
+  );
+
+  // Build running balance per movement
+  let running = 0;
+  const rows = sorted.map((m) => {
+    running += parseFloat(m.quantity || 0);
+    return { ...m, runningBalance: running };
+  });
+  // Display newest first
+  const display = [...rows].reverse();
+
+  const totalIn = sorted
+    .filter((m) => m.quantity > 0)
+    .reduce((s, m) => s + parseFloat(m.quantity), 0);
+  const totalOut = sorted
+    .filter((m) => m.quantity < 0)
+    .reduce((s, m) => s + parseFloat(m.quantity), 0);
+
+  const typeColor = (type, qty) => {
+    if (qty > 0) return { bg: "#d4edda", color: "#1b4332" };
+    return { bg: "#fde8e8", color: "#c0392b" };
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "flex-end",
+        padding: "0",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          width: "min(640px, 100vw)",
+          height: "100vh",
+          background: C.white,
+          boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: `1px solid ${C.border}`,
+            background: C.cream,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: "9px",
+                  letterSpacing: "0.25em",
+                  textTransform: "uppercase",
+                  color: C.accent,
+                  marginBottom: "4px",
+                  fontFamily: F.body,
+                }}
+              >
+                Stock Audit Trail
+              </div>
+              <div
+                style={{
+                  fontFamily: F.heading,
+                  fontSize: "22px",
+                  fontWeight: 400,
+                  color: C.green,
+                }}
+              >
+                {item.name}
+              </div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "11px",
+                  color: C.muted,
+                  marginTop: "2px",
+                }}
+              >
+                {item.sku} · {CATEGORY_LABELS[item.category]} · unit:{" "}
+                {item.unit}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: "transparent",
+                border: "none",
+                fontSize: "20px",
+                cursor: "pointer",
+                color: C.muted,
+                padding: "4px 8px",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Summary stats */}
+          <div
+            style={{
+              display: "flex",
+              gap: "16px",
+              marginTop: "16px",
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              {
+                label: "Current Stock",
+                value: `${item.quantity_on_hand} ${item.unit}`,
+                color: item.quantity_on_hand <= 0 ? C.red : C.green,
+                big: true,
+              },
+              {
+                label: "Total In",
+                value: `+${totalIn.toFixed(2)}`,
+                color: C.green,
+              },
+              { label: "Total Out", value: totalOut.toFixed(2), color: C.red },
+              { label: "Movements", value: movements.length, color: C.muted },
+              {
+                label: "Cost Price",
+                value: `R${(item.cost_price || 0).toFixed(2)}`,
+                color: C.gold,
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{
+                  background: C.white,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: "2px",
+                  padding: "10px 14px",
+                  minWidth: "90px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "9px",
+                    letterSpacing: "0.2em",
+                    textTransform: "uppercase",
+                    color: C.muted,
+                    fontFamily: F.body,
+                    marginBottom: "4px",
+                  }}
+                >
+                  {s.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: s.big ? "20px" : "16px",
+                    fontWeight: 600,
+                    fontFamily: F.heading,
+                    color: s.color,
+                  }}
+                >
+                  {s.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Movement list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0" }}>
+          {display.length === 0 ? (
+            <div
+              style={{
+                padding: "48px",
+                textAlign: "center",
+                color: C.muted,
+                fontFamily: F.body,
+                fontSize: "13px",
+              }}
+            >
+              <div style={{ fontSize: "28px", marginBottom: "10px" }}>📋</div>
+              No movements recorded yet for this item.
+              <br />
+              <span style={{ fontSize: "11px" }}>
+                Use Movements tab → Record Movement to add stock.
+              </span>
+            </div>
+          ) : (
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "12px",
+                fontFamily: F.body,
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    background: C.warm,
+                    zIndex: 1,
+                  }}
+                >
+                  <th style={{ ...sTh, padding: "10px 16px" }}>Date & Time</th>
+                  <th style={{ ...sTh, padding: "10px 8px" }}>Type</th>
+                  <th
+                    style={{ ...sTh, textAlign: "right", padding: "10px 8px" }}
+                  >
+                    Qty
+                  </th>
+                  <th
+                    style={{ ...sTh, textAlign: "right", padding: "10px 8px" }}
+                  >
+                    Balance
+                  </th>
+                  <th style={{ ...sTh, padding: "10px 8px" }}>Reference</th>
+                  <th style={{ ...sTh, padding: "10px 16px" }}>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {display.map((m, i) => {
+                  const tc = typeColor(m.movement_type, m.quantity);
+                  return (
+                    <tr
+                      key={m.id}
+                      style={{ background: i % 2 === 0 ? C.white : "#fafaf8" }}
+                    >
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "10px 16px",
+                          whiteSpace: "nowrap",
+                          fontSize: "11px",
+                          color: C.muted,
+                        }}
+                      >
+                        <div style={{ color: C.text, fontWeight: 500 }}>
+                          {new Date(m.created_at).toLocaleDateString("en-ZA")}
+                        </div>
+                        <div style={{ fontSize: "10px" }}>
+                          {new Date(m.created_at).toLocaleTimeString("en-ZA", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </td>
+                      <td style={{ ...sTd, padding: "10px 8px" }}>
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            padding: "2px 8px",
+                            borderRadius: "2px",
+                            background: tc.bg,
+                            color: tc.color,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {MOVEMENT_LABELS[m.movement_type] || m.movement_type}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          padding: "10px 8px",
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          color: m.quantity >= 0 ? C.green : C.red,
+                          fontFamily: F.heading,
+                        }}
+                      >
+                        {m.quantity >= 0 ? "+" : ""}
+                        {parseFloat(m.quantity).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          padding: "10px 8px",
+                          fontWeight: 600,
+                          fontSize: "13px",
+                          fontFamily: F.heading,
+                          color: m.runningBalance <= 0 ? C.red : C.text,
+                        }}
+                      >
+                        {m.runningBalance.toFixed(2)}
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            color: C.muted,
+                            marginLeft: "3px",
+                            fontFamily: F.body,
+                            fontWeight: 400,
+                          }}
+                        >
+                          {item.unit}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "10px 8px",
+                          fontSize: "11px",
+                          color: C.blue,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {m.reference || "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "10px 16px",
+                          fontSize: "11px",
+                          color: C.muted,
+                          maxWidth: "180px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={m.notes || ""}
+                        >
+                          {m.notes || "—"}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "14px 24px",
+            borderTop: `1px solid ${C.border}`,
+            background: C.cream,
+            flexShrink: 0,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{ fontSize: "11px", color: C.muted, fontFamily: F.body }}
+          >
+            {movements.length} total movements · current balance:{" "}
+            <strong>
+              {item.quantity_on_hand} {item.unit}
+            </strong>
+          </span>
+          <button onClick={onClose} style={sBtn()}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Item Add/Edit Form — v1.2: Shop Listing panel ──────────────────────
 function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
   const [form, setForm] = useState({
     sku: item?.sku || "",
@@ -980,6 +1453,20 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
     gap: "12px",
     marginBottom: "12px",
   };
+
+  // WP-K: derive live status from current form values
+  const willBeLive =
+    form.category === "finished_product" &&
+    parseFloat(form.sell_price || 0) > 0 &&
+    parseFloat(form.quantity_on_hand || 0) > 0;
+
+  const missingPrice =
+    form.category === "finished_product" &&
+    parseFloat(form.sell_price || 0) <= 0;
+  const missingStock =
+    form.category === "finished_product" &&
+    parseFloat(form.sell_price || 0) > 0 &&
+    parseFloat(form.quantity_on_hand || 0) <= 0;
 
   return (
     <div
@@ -1152,6 +1639,18 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
             }}
           >
             Sell Price (ZAR)
+            {form.category === "finished_product" && (
+              <span
+                style={{
+                  marginLeft: 6,
+                  fontSize: "9px",
+                  color: C.accent,
+                  letterSpacing: "0.1em",
+                }}
+              >
+                ← shown in shop
+              </span>
+            )}
           </label>
           <input
             style={sInput}
@@ -1238,6 +1737,18 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
             }}
           >
             Strain ID
+            {form.category === "finished_product" && (
+              <span
+                style={{
+                  marginLeft: 6,
+                  fontSize: "9px",
+                  color: C.accent,
+                  letterSpacing: "0.1em",
+                }}
+              >
+                ← links to shop profile
+              </span>
+            )}
           </label>
           <input
             style={sInput}
@@ -1266,6 +1777,128 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
         />
       </div>
 
+      {/* ── WP-K: Shop Listing Panel ─────────────────────────────────── */}
+      {form.category === "finished_product" && (
+        <div
+          style={{
+            background: willBeLive ? "#f0faf5" : "#fdf9f0",
+            border: `1px solid ${willBeLive ? C.accent : C.gold}`,
+            borderLeft: `4px solid ${willBeLive ? C.accent : C.gold}`,
+            borderRadius: "2px",
+            padding: "16px",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "9px",
+              letterSpacing: "0.3em",
+              textTransform: "uppercase",
+              color: willBeLive ? C.green : C.gold,
+              fontFamily: F.body,
+              marginBottom: "8px",
+              fontWeight: 700,
+            }}
+          >
+            🛍 Shop Listing
+          </div>
+
+          {willBeLive ? (
+            <div>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: C.green,
+                  fontFamily: F.body,
+                  marginBottom: "6px",
+                }}
+              >
+                ✓ Will appear in customer shop
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: C.mid,
+                  fontFamily: F.body,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "16px",
+                }}
+              >
+                <span>
+                  Price:{" "}
+                  <strong>
+                    R
+                    {parseFloat(form.sell_price).toLocaleString("en-ZA", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                </span>
+                <span>
+                  Stock:{" "}
+                  <strong>
+                    {form.quantity_on_hand} {form.unit}
+                  </strong>
+                </span>
+                {form.strain_id && (
+                  <span>
+                    Strain profile: <strong>{form.strain_id}</strong>
+                  </span>
+                )}
+              </div>
+              {!form.strain_id && (
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: C.gold,
+                    fontFamily: F.body,
+                    marginTop: "8px",
+                  }}
+                >
+                  💡 Add a Strain ID above to link this product to its terpene
+                  profile in the shop modal
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: C.gold,
+                  fontFamily: F.body,
+                  fontWeight: 500,
+                  marginBottom: "6px",
+                }}
+              >
+                ⚠ Not yet live in shop
+              </div>
+              <div
+                style={{ fontSize: "12px", color: C.muted, fontFamily: F.body }}
+              >
+                {missingPrice &&
+                  "Set a sell price above R0 to publish this product to the customer shop."}
+                {missingStock &&
+                  "Sell price is set — add stock via Movements tab to make this product live."}
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: C.muted,
+                  fontFamily: F.body,
+                  marginTop: "8px",
+                }}
+              >
+                Requirements: Category = Finished Product · Sell Price &gt; R0 ·
+                Stock &gt; 0
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* ── End WP-K ─────────────────────────────────────────────────── */}
+
       <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
         <button onClick={onCancel} style={sBtn("outline")}>
           Cancel
@@ -1279,7 +1912,7 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MOVEMENTS — Stock in/out log + record new
+// MOVEMENTS
 // ═══════════════════════════════════════════════════════════════════════════
 function MovementsView({ movements, items, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
@@ -1594,7 +2227,7 @@ function MovementsView({ movements, items, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PURCHASE ORDERS — List + create
+// PURCHASE ORDERS
 // ═══════════════════════════════════════════════════════════════════════════
 function OrdersView({ orders, suppliers, items, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
@@ -1719,15 +2352,13 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
 
     if (newStatus === "received" && po.purchase_order_items) {
       for (const line of po.purchase_order_items) {
-        await supabase
-          .from("stock_movements")
-          .insert({
-            item_id: line.item_id,
-            quantity: line.quantity_ordered,
-            movement_type: "purchase_in",
-            reference: po.po_number,
-            notes: `Auto-recorded from PO ${po.po_number}`,
-          });
+        await supabase.from("stock_movements").insert({
+          item_id: line.item_id,
+          quantity: line.quantity_ordered,
+          movement_type: "purchase_in",
+          reference: po.po_number,
+          notes: `Auto-recorded from PO ${po.po_number}`,
+        });
         const item = items.find((i) => i.id === line.item_id);
         if (item) {
           await supabase
@@ -2066,7 +2697,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SUPPLIERS — List + add/edit
+// SUPPLIERS
 // ═══════════════════════════════════════════════════════════════════════════
 function SuppliersView({ suppliers, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
