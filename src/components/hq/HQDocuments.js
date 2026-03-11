@@ -1,4 +1,10 @@
 // src/components/hq/HQDocuments.js
+// v2.0 — Fix: create_supplier_product action now also creates inventory_item + stock_movement
+//         When AI proposes "Create new product: X", confirming it now:
+//           1. INSERT supplier_products (catalogue entry)
+//           2. INSERT inventory_items (IMP- SKU, cost from invoice FX)
+//           3. INSERT stock_movements (purchase_in, reference = invoice ref)
+//         Previously only step 1 happened → items appeared in catalogue but not stock.
 // v1.9 — Inline supplier creation: when AI detects ⚠ No match, show ➕ Create as Supplier
 //         form pre-filled with extracted name + currency. On save: INSERT suppliers,
 //         UPDATE document_log.supplier_id, re-fetch — future COAs auto-match.
@@ -93,6 +99,17 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+// ── v2.0: helpers for auto-creating inventory from supplier_product ──────────
+const supplierCatToInventoryCat = (cat) => {
+  if (cat === "terpene") return "terpene";
+  if (cat === "hardware") return "hardware";
+  return "raw_material";
+};
+const defaultUnitForCat = (cat) => {
+  if (cat === "hardware" || cat === "terpene") return "pcs";
+  return "g";
+};
 
 const DOC_TYPE_LABELS = {
   invoice: "Invoice",
@@ -312,7 +329,6 @@ function SupplierCreateForm({
       </div>
 
       <div style={{ display: "grid", gap: 8 }}>
-        {/* Name */}
         <div>
           <label style={labelStyle}>Supplier Name *</label>
           <input
@@ -322,8 +338,6 @@ function SupplierCreateForm({
             placeholder="e.g. Ecogreen Analytics (Pty) Ltd"
           />
         </div>
-
-        {/* Country + Currency row */}
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
         >
@@ -351,8 +365,6 @@ function SupplierCreateForm({
             </select>
           </div>
         </div>
-
-        {/* Contact + Email row */}
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
         >
@@ -375,8 +387,6 @@ function SupplierCreateForm({
             />
           </div>
         </div>
-
-        {/* Phone + Website row */}
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
         >
@@ -399,8 +409,6 @@ function SupplierCreateForm({
             />
           </div>
         </div>
-
-        {/* Notes */}
         <div>
           <label style={labelStyle}>Notes</label>
           <input
@@ -638,11 +646,11 @@ function ReviewPanel({
     extraction.supplier?.name && !extraction.supplier?.matched_id;
 
   useEffect(() => {
-    const autoChecked = new Set(
-      proposedUpdates
-        .map((u, i) => (u.confidence >= 0.8 ? i : null))
-        .filter((i) => i !== null),
-    );
+    // v2.0: auto-check ALL proposed updates (not just >=0.8)
+    // Rationale: create_product proposals for unmatched items were being missed
+    // when users clicked Confirm without manually checking them. All updates
+    // require human confirmation anyway — showing them pre-checked is safe.
+    const autoChecked = new Set(proposedUpdates.map((_, i) => i));
     setCheckedUpdates(autoChecked);
     setRejecting(false);
     setRejectReason("");
@@ -714,6 +722,7 @@ function ReviewPanel({
     if (action === "receive_delivery_item") return "📦 " + table;
     if (action === "update_batch_coa") return "🔬 " + table;
     if (action === "update_po_status") return "🔄 " + table;
+    if (action === "create_supplier_product") return "➕ " + table;
     return table;
   };
 
@@ -818,7 +827,6 @@ function ReviewPanel({
         </div>
       ) : extraction.supplier?.name ? (
         <>
-          {/* Unmatched supplier row */}
           <div
             style={{
               ...fieldRow,
@@ -869,7 +877,6 @@ function ReviewPanel({
               )}
             </div>
           </div>
-          {/* Inline form */}
           {showSupplierForm && (
             <SupplierCreateForm
               extractedName={extraction.supplier.name}
@@ -1853,7 +1860,6 @@ export default function HQDocuments({ initialDocId = null }) {
 
   // ── v1.9: Create supplier inline + link to document_log ───────────────────
   const handleCreateSupplier = async (docId, supplierData) => {
-    // Insert new supplier (only known-safe columns)
     const { data: newSupplier, error: insErr } = await supabase
       .from("suppliers")
       .insert({
@@ -1871,7 +1877,6 @@ export default function HQDocuments({ initialDocId = null }) {
       .single();
     if (insErr) throw new Error(insErr.message);
 
-    // Stamp supplier_id + supplier_name on the document_log record
     await supabase
       .from("document_log")
       .update({ supplier_id: newSupplier.id, supplier_name: newSupplier.name })
@@ -1890,11 +1895,20 @@ export default function HQDocuments({ initialDocId = null }) {
     } = await supabase.auth.getUser();
     const extraction = selectedDoc.extracted_data || {};
     const proposedUpdates = extraction.proposed_updates || [];
+    const lineItems = extraction.line_items || [];
     const toApply = checkedIndices
       .map((i) => proposedUpdates[i])
       .filter(Boolean);
     const appliedUpdates = [];
     const failedUpdates = [];
+
+    // ── v2.0: FX rate for cost_price calculation ──────────────────────────
+    // Use rate from document if available, otherwise fall back to 18.5
+    const fxRate = extraction.usd_zar_rate || extraction.fx_rate || 18.5;
+
+    // ── v2.0: Supplier id for new inventory items ─────────────────────────
+    const docSupplierId =
+      extraction.supplier?.matched_id || selectedDoc.supplier_id || null;
 
     for (const update of toApply) {
       try {
@@ -2014,7 +2028,6 @@ export default function HQDocuments({ initialDocId = null }) {
             .eq("id", record_id);
           if (error) throw error;
         } else if (action === "update_batch_coa") {
-          // v1.8: resolve batch by batch_number when record_id is null
           let batchId = record_id;
           if (!batchId) {
             const batchNumber =
@@ -2050,10 +2063,105 @@ export default function HQDocuments({ initialDocId = null }) {
             .update(batchUpdate)
             .eq("id", batchId);
           if (error) throw error;
-        } else if (
-          action === "create_supplier_product" ||
-          action === "create_batch"
-        ) {
+
+          // ── v2.0: create_supplier_product → also create inventory_item + movement ──
+        } else if (action === "create_supplier_product") {
+          // 1. Insert into supplier_products catalogue
+          const { data: newProduct, error: spErr } = await supabase
+            .from(table)
+            .insert(data)
+            .select("id, name, sku, category, unit_price_usd, supplier_id")
+            .single();
+          if (spErr) throw spErr;
+
+          // 2. Find matching line item quantity from extracted line_items
+          const productNameLower = (
+            newProduct.name ||
+            data.name ||
+            ""
+          ).toLowerCase();
+          const matchingLine = lineItems.find(
+            (li) =>
+              (li.description || "")
+                .toLowerCase()
+                .includes(productNameLower.slice(0, 20)) ||
+              productNameLower.includes(
+                (li.description || "").toLowerCase().slice(0, 20),
+              ),
+          );
+          const qty = matchingLine
+            ? Number(matchingLine.quantity ?? 1)
+            : Number(data.quantity ?? data.quantity_ordered ?? 1);
+
+          // 3. Build inventory SKU — prefer supplier SKU, fallback to IMP-{sanitised name}
+          const rawSku = newProduct.sku || data.sku || "";
+          const invSku = rawSku
+            ? `IMP-${rawSku}`
+            : `IMP-${(newProduct.name || data.name || "ITEM")
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "-")
+                .slice(0, 20)}`;
+
+          // 4. Cost price: unit_price_usd × fxRate (0 if free sample)
+          const unitPriceUsd = Number(
+            newProduct.unit_price_usd ?? data.unit_price_usd ?? 0,
+          );
+          const costPriceZar = Math.round(unitPriceUsd * fxRate * 100) / 100;
+
+          // 5. Category + unit
+          const invCat = supplierCatToInventoryCat(
+            newProduct.category || data.category || "",
+          );
+          const invUnit = defaultUnitForCat(invCat);
+
+          // 6. Supplier id
+          const supplierId =
+            newProduct.supplier_id || data.supplier_id || docSupplierId;
+
+          // 7. Insert inventory_item (ON CONFLICT DO NOTHING on sku)
+          const { data: newInvItem, error: invErr } = await supabase
+            .from("inventory_items")
+            .insert({
+              sku: invSku,
+              name: newProduct.name || data.name,
+              category: invCat,
+              unit: invUnit,
+              quantity_on_hand: qty,
+              reorder_level: 0,
+              cost_price: costPriceZar,
+              sell_price: 0,
+              supplier_id: supplierId,
+              description: `Imported from ${selectedDoc.supplier_name || "supplier"} via ${extraction.reference?.number || selectedDoc.file_name}`,
+              is_active: true,
+            })
+            .select("id")
+            .single();
+
+          if (invErr) {
+            // If SKU already exists, just log a warning but don't fail the whole update
+            console.warn(
+              "[HQDocuments] inventory_item insert skipped (likely duplicate SKU):",
+              invErr.message,
+            );
+          } else if (newInvItem?.id && qty > 0) {
+            // 8. Write stock movement
+            const { error: movErr } = await supabase
+              .from("stock_movements")
+              .insert({
+                item_id: newInvItem.id,
+                quantity: qty,
+                movement_type: "purchase_in",
+                reference: extraction.reference?.number ?? null,
+                notes: `Received via ${extraction.reference?.number || selectedDoc.file_name} — auto-created from document ingestion`,
+                performed_by: user?.id ?? null,
+              });
+            if (movErr)
+              console.warn(
+                "[HQDocuments] stock_movement insert failed:",
+                movErr.message,
+              );
+          }
+        } else if (action === "create_batch") {
           const { error } = await supabase.from(table).insert(data);
           if (error) throw error;
         } else if (record_id) {
