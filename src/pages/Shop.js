@@ -1,4 +1,9 @@
-// src/pages/Shop.js v4.0
+// src/pages/Shop.js v4.1
+// v4.1: WP-J Mobile Responsiveness — 375px pass
+//       - shop-loyalty-inner: reduces loyalty CTA section padding on mobile
+//       - shop-loyalty-btns: stacks loyalty CTA buttons full-width on mobile
+//       All existing 768px + 480px breakpoints preserved from v4.0.
+//       Zero impact on desktop layout or admin COGS warning logic.
 // v4.0: WP-H ADMIN COGS WARNING — checks if any finished_product is priced
 //       below its calculated COGS (hardware + terpene + other_cost_zar).
 //       Banner visible to admin/hq roles only. Dismissible per session.
@@ -1171,6 +1176,8 @@ const shopStyles = `
   .fade-up   { animation: fadeUp 0.6s ease forwards; }
   .fade-up-2 { animation: fadeUp 0.6s 0.1s ease forwards; opacity: 0; }
   .fade-up-3 { animation: fadeUp 0.6s 0.2s ease forwards; opacity: 0; }
+
+  /* ── WP-J: Mobile Responsiveness ──────────────────────────────────────── */
   @media (max-width: 768px) {
     .shop-hero-inner { padding: 40px 20px 44px !important; }
     .shop-body-inner { padding: 32px 20px !important; }
@@ -1185,6 +1192,11 @@ const shopStyles = `
     .strain-modal-card { max-height: 94vh; }
     .modal-footer-row { flex-direction: column !important; gap: 10px !important; }
     .modal-footer-row .shop-btn { width: 100%; text-align: center; }
+    /* Loyalty CTA — reduce padding */
+    .shop-loyalty-inner { padding: 36px 20px !important; }
+    /* Loyalty CTA buttons — stack full-width */
+    .shop-loyalty-btns { flex-direction: column !important; width: 100% !important; }
+    .shop-loyalty-btns .shop-btn { width: 100% !important; box-sizing: border-box !important; text-align: center !important; }
   }
   @media (max-width: 480px) {
     .shop-hero-inner { padding: 32px 16px 36px !important; }
@@ -1193,6 +1205,8 @@ const shopStyles = `
     .shop-hero-title { font-size: 32px !important; }
     .strain-modal-overlay { padding: 0; align-items: flex-end; }
     .strain-modal-card { border-radius: 4px 4px 0 0; max-height: 94vh; }
+    /* Loyalty CTA — further reduce padding on very small screens */
+    .shop-loyalty-inner { padding: 28px 16px !important; }
   }
 `;
 
@@ -2667,8 +2681,10 @@ export default function Shop() {
       </div>
 
       {/* ── LOYALTY CTA ── */}
+      {/* v4.1: shop-loyalty-inner + shop-loyalty-btns classes for mobile responsiveness */}
       <div style={{ background: "linear-gradient(135deg, #1b4332, #2d6a4f)" }}>
         <div
+          className="shop-loyalty-inner"
           style={{
             maxWidth: 1100,
             margin: "0 auto",
@@ -2717,7 +2733,10 @@ export default function Shop() {
               exclusive rewards.
             </p>
           </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div
+            className="shop-loyalty-btns"
+            style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
+          >
             <button
               className="shop-btn"
               style={{ background: "white", color: "#1b4332" }}

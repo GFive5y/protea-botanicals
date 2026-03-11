@@ -1,4 +1,12 @@
-// src/pages/Landing.js v5.8
+// src/pages/Landing.js v5.9
+// v5.9: WP-J Mobile Responsiveness — 375px pass
+//       Classes added (all via injected <style> media queries):
+//       - landing-header:    reduces padding 0 28px → 0 16px at ≤600px
+//       - landing-video:     reduces video divider 700px → 300px at ≤600px
+//       - landing-section:   reduces section vertical padding 100px → 56px at ≤600px
+//       - landing-hero-desc: reduces hero description bottom margin 80px → 40px at ≤600px
+//       All clamp() typography, flexWrap portal cards, footer links — already mobile-safe.
+//       Zero impact on desktop layout or any component logic.
 // v5.8: Terpene modal fix (DEC-024).
 //       TerpeneCarousel hex click no longer navigates to /terpenes/:id.
 //       Instead: activeTerp state lifts to Landing, TerpeneModal overlays
@@ -349,6 +357,18 @@ export default function Landing() {
         @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
         section { position: relative; }
         .signin-btn:hover { background: ${scrolled ? "rgba(255,255,255,0.2)" : "rgba(27,67,50,0.1)"} !important; }
+
+        /* ── WP-J: Mobile Responsiveness ─────────────────────────────────── */
+        @media (max-width: 600px) {
+          /* Header — tighter padding so logo + button don't crowd */
+          .landing-header { padding: 0 16px !important; }
+          /* Video divider — 700px is an entire phone screen, reduce sharply */
+          .landing-video { height: 300px !important; }
+          /* Content sections — 100px vertical padding is excessive on mobile */
+          .landing-section { padding: 56px 20px !important; }
+          /* Hero description — reduce oversized bottom margin */
+          .landing-hero-desc { margin-bottom: 40px !important; }
+        }
       `}</style>
 
         <div className="grain" />
@@ -356,7 +376,9 @@ export default function Landing() {
         <PromoBanner promo={promo} onNavigate={navigate} />
 
         {/* ── Floating header ── */}
+        {/* v5.9: landing-header class for mobile padding */}
         <header
+          className="landing-header"
           style={{
             position: "fixed",
             top: 0,
@@ -613,8 +635,9 @@ export default function Landing() {
             />
           </div>
 
+          {/* v5.9: landing-hero-desc reduces marginBottom on mobile */}
           <p
-            className="body-font"
+            className="body-font landing-hero-desc"
             style={{
               maxWidth: "560px",
               textAlign: "center",
@@ -771,7 +794,9 @@ export default function Landing() {
         </section>
 
         {/* ── DISTILLATE VIDEO DIVIDER ── */}
+        {/* v5.9: landing-video reduces height 700px → 300px on mobile */}
         <section
+          className="landing-video"
           style={{
             position: "relative",
             overflow: "hidden",
@@ -828,11 +853,12 @@ export default function Landing() {
         </section>
 
         {/* ── CONTENT SECTIONS ── */}
+        {/* v5.9: landing-section reduces 100px vertical padding on mobile */}
         {contentSections.map((sec, idx) => (
           <section
             key={sec.id}
             id={sec.id}
-            className="reveal"
+            className="reveal landing-section"
             style={{
               padding: "100px 24px",
               background: idx % 2 === 0 ? "#faf9f6" : "#f4f0e8",
@@ -861,7 +887,9 @@ export default function Landing() {
 
         {/* ── TERPENES CAROUSEL ── */}
         {/* v5.8: onSelect lifts terpene id to Landing — no navigation (DEC-024) */}
+        {/* v5.9: landing-section reduces padding on mobile */}
         <section
+          className="landing-section"
           style={{
             padding: "100px 24px 80px",
             background: "#faf9f6",
@@ -921,7 +949,9 @@ export default function Landing() {
         </section>
 
         {/* ── QUALITY PROMISE ── */}
+        {/* v5.9: landing-section reduces padding on mobile */}
         <section
+          className="landing-section"
           style={{
             padding: "100px 24px",
             background: "#faf9f6",

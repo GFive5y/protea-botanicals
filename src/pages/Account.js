@@ -1,4 +1,11 @@
-// src/pages/Account.js — Protea Botanicals v5.6
+// src/pages/Account.js — Protea Botanicals v5.7
+// ============================================================================
+// CHANGELOG v5.6 → v5.7:
+//   WP-J Mobile Responsiveness — 375px pass
+//   - account-nav-grid: stacks "View Loyalty" / "Browse Shop" buttons to a
+//     single column at ≤400px. Above 400px the 1fr 1fr grid is preserved.
+//   Login form and all other elements were already mobile-safe (width:100%,
+//   box-sizing:border-box, maxWidth:480, padding:40px 20px). No other changes.
 // ============================================================================
 // CHANGELOG v5.5 → v5.6:
 //   1. ADD: "My Account" view for already-logged-in users visiting /account
@@ -43,6 +50,19 @@ async function ensureProfile(userId, email) {
   console.log("ensureProfile: got profile", data);
   return data;
 }
+
+// ── WP-J: injected styles ────────────────────────────────────────────────────
+const accountStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* WP-J: nav grid stacks to 1-col on very small screens */
+  @media (max-width: 400px) {
+    .account-nav-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+`;
 
 export default function Account() {
   const [email, setEmail] = useState("");
@@ -144,7 +164,7 @@ export default function Account() {
             doRedirect(profile);
           } else {
             // Stay on /account — show logged-in view
-            redirectedRef.current = true; // ← ADD THIS LINE
+            redirectedRef.current = true;
             setLoggedInUser(user);
             setLoggedInProfile(profile);
           }
@@ -280,70 +300,72 @@ export default function Account() {
   // ── Spinner while checking session ──────────────────────────────────────
   if (checkingSession) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#faf9f6",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <>
+        <style>{accountStyles}</style>
         <div
           style={{
-            width: 32,
-            height: 32,
-            border: "3px solid #e0dbd2",
-            borderTopColor: "#1b4332",
-            borderRadius: "50%",
-            animation: "spin .8s linear infinite",
-          }}
-        />
-        <p
-          style={{
-            color: "#888",
-            marginTop: "16px",
-            fontSize: "13px",
-            fontFamily: "'Jost',sans-serif",
+            minHeight: "100vh",
+            background: "#faf9f6",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          Checking session...
-        </p>
-        {showForceLogout && (
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <p
-              style={{
-                color: "#888",
-                fontSize: "12px",
-                marginBottom: "12px",
-                fontFamily: "'Jost',sans-serif",
-              }}
-            >
-              Taking too long? Session may be stuck.
-            </p>
-            <button
-              onClick={handleForceSignOut}
-              style={{
-                background: "#c0392b",
-                color: "#fff",
-                border: "none",
-                borderRadius: "2px",
-                padding: "10px 24px",
-                fontSize: "11px",
-                fontWeight: 600,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                fontFamily: "'Jost',sans-serif",
-                cursor: "pointer",
-              }}
-            >
-              FORCE SIGN OUT & RESET
-            </button>
-          </div>
-        )}
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </div>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              border: "3px solid #e0dbd2",
+              borderTopColor: "#1b4332",
+              borderRadius: "50%",
+              animation: "spin .8s linear infinite",
+            }}
+          />
+          <p
+            style={{
+              color: "#888",
+              marginTop: "16px",
+              fontSize: "13px",
+              fontFamily: "'Jost',sans-serif",
+            }}
+          >
+            Checking session...
+          </p>
+          {showForceLogout && (
+            <div style={{ marginTop: "20px", textAlign: "center" }}>
+              <p
+                style={{
+                  color: "#888",
+                  fontSize: "12px",
+                  marginBottom: "12px",
+                  fontFamily: "'Jost',sans-serif",
+                }}
+              >
+                Taking too long? Session may be stuck.
+              </p>
+              <button
+                onClick={handleForceSignOut}
+                style={{
+                  background: "#c0392b",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "2px",
+                  padding: "10px 24px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  fontFamily: "'Jost',sans-serif",
+                  cursor: "pointer",
+                }}
+              >
+                FORCE SIGN OUT & RESET
+              </button>
+            </div>
+          )}
+        </div>
+      </>
     );
   }
 
@@ -351,7 +373,7 @@ export default function Account() {
   if (loggedInUser) {
     return (
       <>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`}</style>
+        <style>{accountStyles}</style>
         <div
           style={{
             minHeight: "100vh",
@@ -432,7 +454,14 @@ export default function Account() {
                     Email
                   </span>
                   <span
-                    style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "#1a1a1a",
+                      wordBreak: "break-all",
+                      textAlign: "right",
+                      maxWidth: "60%",
+                    }}
                   >
                     {loggedInUser.email}
                   </span>
@@ -547,8 +576,10 @@ export default function Account() {
               }}
             />
 
-            {/* Navigation shortcuts */}
+            {/* Navigation shortcuts
+                v5.7: account-nav-grid class → stacks to 1-col at ≤400px */}
             <div
+              className="account-nav-grid"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
@@ -627,7 +658,7 @@ export default function Account() {
   // ── Login / Sign Up form (unchanged from v5.5) ────────────────────────────
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`}</style>
+      <style>{accountStyles}</style>
 
       <div
         style={{

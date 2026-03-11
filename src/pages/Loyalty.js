@@ -1,5 +1,8 @@
 // src/pages/Loyalty.js
 // Protea Botanicals — Loyalty Programme Page
+// v5.3 — WP-J Mobile Responsiveness — 375px pass
+//        - loyalty-browse-btn: full-width + box-sizing on mobile (≤600px)
+//        All clamp/flexWrap patterns from v5.2 preserved — no other layout changes.
 // v5.2 — WP3 Cream Redesign: white cards (#e8e0d4 border), Cormorant+Jost typography,
 //        green/gold accents, EARNED/SPENT badges, dark footer. Mobile responsive.
 //        ALL data logic preserved exactly from v5.1.
@@ -88,6 +91,15 @@ const injectedStyles = `
   .loyalty-tab-btn:hover { color: #1b4332 !important; }
   .loyalty-footer-link { transition: color 0.2s; }
   .loyalty-footer-link:hover { color: #52b788 !important; }
+
+  /* ── WP-J: Mobile Responsiveness ──────────────────────────────────────── */
+  @media (max-width: 600px) {
+    /* Browse Rewards button: full-width on mobile */
+    .loyalty-browse-btn {
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+  }
 `;
 
 export default function Loyalty() {
@@ -970,8 +982,10 @@ export default function Loyalty() {
                 </div>
               </div>
 
+              {/* v5.3: loyalty-browse-btn → full-width on mobile via media query */}
               <button
                 type="button"
+                className="loyalty-browse-btn"
                 onClick={() => navigate("/redeem")}
                 style={{
                   background:

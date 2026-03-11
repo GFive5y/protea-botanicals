@@ -1,12 +1,13 @@
-// src/components/CoPilot.js v2.4
+// src/components/CoPilot.js v2.5
 // Protea Botanicals — AI Assistant Sidebar Panel
-// v2.0: Slide-in sidebar, conversation history, role-aware, branded design
-// v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
-// v2.2: WP-002 — Replace static floating button with AnimatedAICharacter
-// v2.3: WP-003 — Frosted glass panel, gradient fade borders, Lottie bot
-//       in header when open, aggressive fade-in transition, no hard edges.
+// v2.5: Revert LottieCharacter size 120 → 80 (was bumped 50% too large)
 // v2.4: Hide/show toggle — "hide" button above bot collapses to slim tab,
 //       tab click restores bot. Bot hidden by default until summoned.
+// v2.3: WP-003 — Frosted glass panel, gradient fade borders, Lottie bot
+//       in header when open, aggressive fade-in transition, no hard edges.
+// v2.2: WP-002 — Replace static floating button with AnimatedAICharacter
+// v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
+// v2.0: Slide-in sidebar, conversation history, role-aware, branded design
 
 import React, {
   useState,
@@ -330,11 +331,12 @@ export default function CoPilot() {
               >
                 hide ✕
               </button>
+              {/* v2.5: size reverted 120 → 80 (was 50% too large) */}
               <LottieCharacter
                 isOpen={isOpen}
                 isThinking={loading}
                 onClick={() => setIsOpen(true)}
-                size={120}
+                size={80}
               />
             </div>
           ) : (

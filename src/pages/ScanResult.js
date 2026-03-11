@@ -1,4 +1,15 @@
-// src/pages/ScanResult.js v3.2
+// src/pages/ScanResult.js v3.3
+// v3.3: WP-J Mobile Responsiveness — full 375px pass
+//       - Enhanced CSS media queries for 375px and 600px
+//       - sr-card-padded: reduces card inner padding on mobile
+//       - sr-points-row: stacks points/total vertically on mobile
+//       - sr-btn-row: stacks GPS + auth nudge buttons full-width on mobile
+//       - sr-coa-row: stacks COA card flex row on mobile
+//       - sr-stockist-row: stacks stockist distance left-aligned on mobile
+//       - sr-details-grid: 2-column product grid on narrow screens
+//       - sr-footer-inner: centres footer content on mobile
+//       - sr-hero-title: clamps hero font floor to 30px at 375px
+//       All logic, data flow, and component structure preserved from v3.2.
 // v3.2: First-scan-only enforcement UI (DEC-026)
 //       - isRescan flag derived from result.rescan
 //       - Rescan path: green hero + "Previously Verified" badge
@@ -60,11 +71,52 @@ const styles = `
     50% { opacity: 0.5; }
   }
   .pulse { animation: pulse 1.5s infinite; }
+
+  /* ── WP-J: Mobile Responsiveness ──────────────────────────────────────── */
   @media (max-width: 600px) {
     .sr-inner { padding: 24px 16px !important; }
-    .sr-hero-inner { padding: 32px 16px 36px !important; }
+    .sr-hero-inner { padding: 28px 16px 32px !important; }
+
+    /* CTA row — full-width stacked buttons */
     .sr-cta-row { flex-direction: column !important; }
-    .sr-cta-row .sr-btn { width: 100%; text-align: center; }
+    .sr-cta-row .sr-btn,
+    .sr-cta-row a.sr-btn,
+    .sr-cta-row button { width: 100% !important; text-align: center; box-sizing: border-box; }
+
+    /* Card inner padding reduction */
+    .sr-card-padded { padding: 18px 16px !important; }
+
+    /* Points card — stack vertically */
+    .sr-points-row { flex-direction: column !important; gap: 16px !important; align-items: flex-start !important; }
+    .sr-points-right { text-align: left !important; }
+
+    /* Button rows (GPS + auth nudge) — full-width stack */
+    .sr-btn-row { flex-direction: column !important; }
+    .sr-btn-row .sr-btn,
+    .sr-btn-row a.sr-btn,
+    .sr-btn-row button { width: 100% !important; box-sizing: border-box !important; text-align: center !important; }
+
+    /* COA row — stack button below text */
+    .sr-coa-row { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
+    .sr-coa-row .sr-btn,
+    .sr-coa-row a.sr-btn { width: 100%; box-sizing: border-box; }
+
+    /* Stockist card inner — stack distance below name */
+    .sr-stockist-row { flex-direction: column !important; gap: 10px !important; }
+    .sr-stockist-dist { text-align: left !important; }
+
+    /* Product details grid — force 2 columns */
+    .sr-details-grid { grid-template-columns: 1fr 1fr !important; }
+
+    /* Footer — centre stacked */
+    .sr-footer-inner { flex-direction: column !important; gap: 10px !important; text-align: center; }
+  }
+
+  @media (max-width: 380px) {
+    /* Very small phones — single column product grid */
+    .sr-details-grid { grid-template-columns: 1fr !important; }
+    /* Slightly reduce hero font floor */
+    .sr-hero-title { font-size: 30px !important; }
   }
 `;
 
@@ -112,7 +164,7 @@ export default function ScanResult() {
     run();
   }, [qrCode]);
 
-  // ── GPS grant handler ──────────────────────────────────────────────────────
+  // ── GPS grant handler ─────────────────────────────────────────────────────
   const handleGrantGPS = useCallback(async () => {
     setGpsState("requesting");
     const gps = await requestGPSLocation();
@@ -171,7 +223,7 @@ export default function ScanResult() {
     );
   }
 
-  // ── FIX 1: check both result.success and result.authentic ────────────────
+  // ── FIX 1: check both result.success and result.authentic ─────────────────
   const isAuthentic = result?.success || result?.authentic;
 
   // v3.2: rescan flag — product IS authentic but already claimed
@@ -226,7 +278,7 @@ export default function ScanResult() {
               "This QR code could not be verified. If you believe this is an error, please contact us."}
           </p>
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{
               padding: "20px 24px",
               marginBottom: 32,
@@ -346,7 +398,7 @@ export default function ScanResult() {
             </div>
 
             <h1
-              className="shop-font"
+              className="shop-font sr-hero-title"
               style={{
                 fontSize: "clamp(36px, 7vw, 60px)",
                 fontWeight: 300,
@@ -381,7 +433,7 @@ export default function ScanResult() {
         >
           {/* Rescan info card — replaces the points card */}
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{
               padding: "24px 28px",
               marginBottom: 20,
@@ -431,7 +483,7 @@ export default function ScanResult() {
 
           {/* Product details */}
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{ padding: "24px 28px", marginBottom: 20 }}
           >
             <p
@@ -447,6 +499,7 @@ export default function ScanResult() {
               Product Details
             </p>
             <div
+              className="sr-details-grid"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
@@ -495,7 +548,7 @@ export default function ScanResult() {
 
           {/* COA button */}
           <div
-            className="sr-card"
+            className="sr-card sr-coa-row"
             style={{
               padding: "20px 28px",
               marginBottom: 20,
@@ -601,6 +654,7 @@ export default function ScanResult() {
           style={{ background: "#060e09", padding: "24px 32px", marginTop: 32 }}
         >
           <div
+            className="sr-footer-inner"
             style={{
               maxWidth: 720,
               margin: "0 auto",
@@ -635,7 +689,7 @@ export default function ScanResult() {
     );
   }
 
-  // ── FIRST SCAN PAGE (unchanged from v3.1) ─────────────────────────────────
+  // ── FIRST SCAN PAGE (v3.3: enhanced mobile) ───────────────────────────────
   const { isFirstScan } = result;
 
   return (
@@ -715,7 +769,7 @@ export default function ScanResult() {
           </div>
 
           <h1
-            className="shop-font"
+            className="shop-font sr-hero-title"
             style={{
               fontSize: "clamp(36px, 7vw, 60px)",
               fontWeight: 300,
@@ -751,7 +805,7 @@ export default function ScanResult() {
         {/* Anomaly warning */}
         {anomalyFlags?.length > 0 && (
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{
               padding: "16px 20px",
               marginBottom: 20,
@@ -792,106 +846,112 @@ export default function ScanResult() {
         {/* Points earned */}
         {user && (
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{
               padding: "24px 28px",
               marginBottom: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              flexWrap: "wrap",
             }}
           >
-            <div>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.3em",
-                  textTransform: "uppercase",
-                  color: "#aaa",
-                  marginBottom: 6,
-                }}
-              >
-                {isFirstScan && anomalyFlags?.length === 0
-                  ? "Points Earned"
-                  : "Points"}
-              </p>
-              <p
-                className="shop-font"
-                style={{
-                  fontSize: 40,
-                  fontWeight: 300,
-                  color: "#1b4332",
-                  lineHeight: 1,
-                }}
-              >
-                {isFirstScan && anomalyFlags?.length === 0
-                  ? `+${pointsEarned}`
-                  : "0"}
-              </p>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 11,
-                  color: "#aaa",
-                  marginTop: 4,
-                  fontWeight: 300,
-                }}
-              >
-                {isFirstScan && anomalyFlags?.length === 0
-                  ? "Added to your balance"
-                  : isFirstScan
-                    ? "Withheld — scan limit reached"
-                    : "Already claimed on first scan"}
-              </p>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.3em",
-                  textTransform: "uppercase",
-                  color: "#aaa",
-                  marginBottom: 6,
-                }}
-              >
-                Your Total
-              </p>
-              <p
-                className="shop-font"
-                style={{
-                  fontSize: 32,
-                  fontWeight: 300,
-                  color: "#b5935a",
-                  lineHeight: 1,
-                }}
-              >
-                {(userProfile?.loyalty_points || 0) +
-                  (isFirstScan && anomalyFlags?.length === 0
-                    ? pointsEarned
-                    : 0)}
-              </p>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 11,
-                  color: "#aaa",
-                  marginTop: 4,
-                  fontWeight: 300,
-                }}
-              >
-                {(userProfile?.loyalty_tier || "bronze").toUpperCase()} tier
-              </p>
+            <div
+              className="sr-points-row"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <p
+                  className="body-font"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.3em",
+                    textTransform: "uppercase",
+                    color: "#aaa",
+                    marginBottom: 6,
+                  }}
+                >
+                  {isFirstScan && anomalyFlags?.length === 0
+                    ? "Points Earned"
+                    : "Points"}
+                </p>
+                <p
+                  className="shop-font"
+                  style={{
+                    fontSize: 40,
+                    fontWeight: 300,
+                    color: "#1b4332",
+                    lineHeight: 1,
+                  }}
+                >
+                  {isFirstScan && anomalyFlags?.length === 0
+                    ? `+${pointsEarned}`
+                    : "0"}
+                </p>
+                <p
+                  className="body-font"
+                  style={{
+                    fontSize: 11,
+                    color: "#aaa",
+                    marginTop: 4,
+                    fontWeight: 300,
+                  }}
+                >
+                  {isFirstScan && anomalyFlags?.length === 0
+                    ? "Added to your balance"
+                    : isFirstScan
+                      ? "Withheld — scan limit reached"
+                      : "Already claimed on first scan"}
+                </p>
+              </div>
+              <div className="sr-points-right" style={{ textAlign: "right" }}>
+                <p
+                  className="body-font"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.3em",
+                    textTransform: "uppercase",
+                    color: "#aaa",
+                    marginBottom: 6,
+                  }}
+                >
+                  Your Total
+                </p>
+                <p
+                  className="shop-font"
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 300,
+                    color: "#b5935a",
+                    lineHeight: 1,
+                  }}
+                >
+                  {(userProfile?.loyalty_points || 0) +
+                    (isFirstScan && anomalyFlags?.length === 0
+                      ? pointsEarned
+                      : 0)}
+                </p>
+                <p
+                  className="body-font"
+                  style={{
+                    fontSize: 11,
+                    color: "#aaa",
+                    marginTop: 4,
+                    fontWeight: 300,
+                  }}
+                >
+                  {(userProfile?.loyalty_tier || "bronze").toUpperCase()} tier
+                </p>
+              </div>
             </div>
           </div>
         )}
 
         {!user && (
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{
               padding: "24px 28px",
               marginBottom: 20,
@@ -915,7 +975,10 @@ export default function ScanResult() {
               to claim 10 loyalty points for this scan and unlock exclusive
               rewards.
             </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div
+              className="sr-btn-row"
+              style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+            >
               <button
                 className="sr-btn sr-btn-green"
                 onClick={() => navigate("/account")}
@@ -934,7 +997,7 @@ export default function ScanResult() {
 
         {/* Product details */}
         <div
-          className="sr-card"
+          className="sr-card sr-card-padded"
           style={{ padding: "24px 28px", marginBottom: 20 }}
         >
           <p
@@ -950,6 +1013,7 @@ export default function ScanResult() {
             Product Details
           </p>
           <div
+            className="sr-details-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
@@ -994,7 +1058,7 @@ export default function ScanResult() {
 
         {/* COA button */}
         <div
-          className="sr-card"
+          className="sr-card sr-coa-row"
           style={{
             padding: "20px 28px",
             marginBottom: 20,
@@ -1038,7 +1102,7 @@ export default function ScanResult() {
         {/* ── GPS CONSENT PROMPT ── */}
         {gpsState === "prompting" && (
           <div
-            className="sr-card gps-prompt"
+            className="sr-card gps-prompt sr-card-padded"
             style={{
               padding: "20px 24px",
               marginBottom: 20,
@@ -1096,7 +1160,10 @@ export default function ScanResult() {
               third parties. You can withdraw consent at any time in your
               account settings.
             </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div
+              className="sr-btn-row"
+              style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+            >
               <button className="sr-btn sr-btn-gold" onClick={handleGrantGPS}>
                 Enable Location
               </button>
@@ -1191,7 +1258,7 @@ export default function ScanResult() {
 
         {stockist && !stockistLoading && (
           <div
-            className="sr-card stockist-card"
+            className="sr-card stockist-card sr-card-padded"
             style={{
               padding: "24px 28px",
               marginBottom: 20,
@@ -1211,6 +1278,7 @@ export default function ScanResult() {
               Nearest Stockist
             </p>
             <div
+              className="sr-stockist-row"
               style={{
                 display: "flex",
                 alignItems: "flex-start",
@@ -1239,7 +1307,7 @@ export default function ScanResult() {
                   {stockist.location_province}
                 </p>
               </div>
-              <div style={{ textAlign: "right" }}>
+              <div className="sr-stockist-dist" style={{ textAlign: "right" }}>
                 <p
                   className="shop-font"
                   style={{
@@ -1306,7 +1374,7 @@ export default function ScanResult() {
         {/* ── PROFILE COMPLETION NUDGE ── */}
         {user && userProfile && !userProfile.profile_complete && (
           <div
-            className="sr-card"
+            className="sr-card sr-card-padded"
             style={{
               padding: "20px 24px",
               marginBottom: 20,
@@ -1421,6 +1489,7 @@ export default function ScanResult() {
         style={{ background: "#060e09", padding: "24px 32px", marginTop: 32 }}
       >
         <div
+          className="sr-footer-inner"
           style={{
             maxWidth: 720,
             margin: "0 auto",
