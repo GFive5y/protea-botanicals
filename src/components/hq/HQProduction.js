@@ -1,4 +1,5 @@
-// src/components/hq/HQProduction.js v1.1
+// src/components/hq/HQProduction.js v1.2
+// v1.2 — Admin controls on History: Edit (notes/actual/status), Cancel, Delete w/ stock reversal
 // v1.1 — Schema fix: aligned to real DB columns
 //   production_runs: id, batch_id, run_number, status, planned_units,
 //     actual_units, started_at, completed_at, notes, tenant_id, created_at
@@ -993,7 +994,7 @@ function NewRunPanel({ items, onComplete }) {
       onComplete();
     } catch (err) {
       console.error("[HQProduction] Run error:", err);
-      alert("Error: " + err.message);
+      console.error("[HQProduction] Run error:", err);
     } finally {
       setSaving(false);
     }
@@ -1375,13 +1376,176 @@ function NewRunPanel({ items, onComplete }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HISTORY
+// HISTORY  (v1.2 — Admin controls: Edit · Cancel · Delete w/ optional reversal)
 // ═══════════════════════════════════════════════════════════════════════════════
 function HistoryPanel({ runs, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
+  const [editing, setEditing] = useState(null); // run.id currently in edit mode
+  const [editForm, setEditForm] = useState({});
+  const [deleting, setDeleting] = useState(null); // run.id pending delete confirmation
+  const [reverseStock, setReverseStock] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [cancelling, setCancelling] = useState(null); // run.id awaiting cancel confirm
+  const [toast, setToast] = useState(null); // { msg, type } inline feedback
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openEdit = (run) => {
+    setEditing(run.id);
+    setEditForm({
+      notes: run.notes || "",
+      actual_units: run.actual_units || run.planned_units || "",
+      status: run.status || "completed",
+    });
+    setExpanded(run.id);
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setEditForm({});
+  };
+
+  // ── Save edit ──────────────────────────────────────────────────────────────
+  const handleSaveEdit = async (run) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("production_runs")
+        .update({
+          notes: editForm.notes || null,
+          actual_units: parseInt(editForm.actual_units) || run.planned_units,
+          status: editForm.status,
+        })
+        .eq("id", run.id);
+      if (error) throw error;
+      setEditing(null);
+      onRefresh();
+    } catch (err) {
+      showToast("Save failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Cancel run (status → cancelled, no stock reversal) ────────────────────
+  const handleCancel = async (run) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("production_runs")
+        .update({ status: "cancelled" })
+        .eq("id", run.id);
+      if (error) throw error;
+      setCancelling(null);
+      onRefresh();
+    } catch (err) {
+      showToast("Cancel failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Delete run (optionally reverse stock movements) ───────────────────────
+  const handleDelete = async (run) => {
+    setSaving(true);
+    try {
+      if (reverseStock) {
+        // Fetch all stock_movements for this run number
+        const { data: movements, error: mErr } = await supabase
+          .from("stock_movements")
+          .select("id, item_id, quantity, movement_type")
+          .eq("reference", run.run_number);
+        if (mErr) throw mErr;
+
+        if (movements && movements.length > 0) {
+          // Reverse each movement: production_out → add back · production_in → deduct
+          for (const mv of movements) {
+            const reversal = -mv.quantity; // flip sign
+
+            // Insert reversal movement
+            const { error: revErr } = await supabase
+              .from("stock_movements")
+              .insert({
+                item_id: mv.item_id,
+                quantity: reversal,
+                movement_type:
+                  mv.movement_type === "production_out"
+                    ? "adjustment"
+                    : "adjustment",
+                reference: `VOID-${run.run_number}`,
+                notes: `Reversal: deleted run ${run.run_number}`,
+              });
+            if (revErr) throw revErr;
+
+            // Update inventory_items.quantity_on_hand
+            const { data: item, error: iErr } = await supabase
+              .from("inventory_items")
+              .select("quantity_on_hand")
+              .eq("id", mv.item_id)
+              .single();
+            if (iErr) throw iErr;
+
+            const newQty = parseFloat(item.quantity_on_hand || 0) + reversal;
+            const { error: uErr } = await supabase
+              .from("inventory_items")
+              .update({ quantity_on_hand: Math.max(0, newQty) })
+              .eq("id", mv.item_id);
+            if (uErr) throw uErr;
+          }
+        }
+      }
+
+      // Delete inputs first (FK constraint)
+      const { error: inpErr } = await supabase
+        .from("production_run_inputs")
+        .delete()
+        .eq("run_id", run.id);
+      if (inpErr) throw inpErr;
+
+      // Delete the run
+      const { error: runErr } = await supabase
+        .from("production_runs")
+        .delete()
+        .eq("id", run.id);
+      if (runErr) throw runErr;
+
+      setDeleting(null);
+      onRefresh();
+      showToast(
+        `Run ${run.run_number} deleted.${reverseStock ? " Stock reversed." : ""}`,
+      );
+    } catch (err) {
+      showToast("Delete failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ALL_STATUSES = ["planned", "in_progress", "completed", "cancelled"];
 
   return (
     <div>
+      {toast && (
+        <div
+          style={{
+            padding: "10px 16px",
+            marginBottom: "12px",
+            borderRadius: "2px",
+            fontSize: "12px",
+            fontFamily: F.body,
+            fontWeight: 500,
+            background: toast.type === "error" ? "#fff0f0" : "#f0faf5",
+            color: toast.type === "error" ? C.red : C.green,
+            border: `1px solid ${toast.type === "error" ? C.red : C.accent}`,
+          }}
+        >
+          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.msg}
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -1423,19 +1587,25 @@ function HistoryPanel({ runs, onRefresh }) {
                 ? calcYield(run.actual_units, run.planned_units)
                 : null;
             const isOpen = expanded === run.id;
+            const isEditing = editing === run.id;
+            const isDeleting = deleting === run.id;
             const productLabel =
               run.batches?.product_name ||
               run.batches?.strain ||
               run.run_number ||
               "Production Run";
+            const isCancelled = run.status === "cancelled";
+
             return (
               <div
                 key={run.id}
                 style={{
                   ...sCard,
-                  borderLeft: `3px solid ${yp && yp < 95 ? C.orange : C.accent}`,
+                  borderLeft: `3px solid ${isCancelled ? C.muted : yp && yp < 95 ? C.orange : C.accent}`,
+                  opacity: isCancelled ? 0.75 : 1,
                 }}
               >
+                {/* ── Header row ── */}
                 <div
                   style={{
                     display: "flex",
@@ -1470,7 +1640,7 @@ function HistoryPanel({ runs, onRefresh }) {
                   <div
                     style={{
                       display: "flex",
-                      gap: "10px",
+                      gap: "8px",
                       alignItems: "center",
                       flexWrap: "wrap",
                     }}
@@ -1485,6 +1655,86 @@ function HistoryPanel({ runs, onRefresh }) {
                     >
                       {new Date(run.created_at).toLocaleDateString("en-ZA")}
                     </span>
+                    {/* Admin buttons */}
+                    <button
+                      onClick={() => openEdit(run)}
+                      style={{
+                        ...sBtn("outline"),
+                        padding: "4px 10px",
+                        fontSize: "9px",
+                        letterSpacing: "0.1em",
+                      }}
+                      title="Edit notes, actual units, status"
+                    >
+                      ✎ Edit
+                    </button>
+                    {!isCancelled && cancelling !== run.id && (
+                      <button
+                        onClick={() => setCancelling(run.id)}
+                        style={{
+                          ...sBtn("outline"),
+                          padding: "4px 10px",
+                          fontSize: "9px",
+                          color: C.orange,
+                          borderColor: C.orange,
+                        }}
+                      >
+                        ✕ Cancel Run
+                      </button>
+                    )}
+                    {cancelling === run.id && (
+                      <>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            color: C.orange,
+                            fontFamily: F.body,
+                          }}
+                        >
+                          Cancel this run?
+                        </span>
+                        <button
+                          onClick={() => handleCancel(run)}
+                          disabled={saving}
+                          style={{
+                            ...sBtn("outline"),
+                            padding: "4px 10px",
+                            fontSize: "9px",
+                            color: C.red,
+                            borderColor: C.red,
+                          }}
+                        >
+                          {saving ? "..." : "✓ Yes"}
+                        </button>
+                        <button
+                          onClick={() => setCancelling(null)}
+                          style={{
+                            ...sBtn("outline"),
+                            padding: "4px 10px",
+                            fontSize: "9px",
+                          }}
+                        >
+                          No
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        setDeleting(run.id);
+                        setExpanded(run.id);
+                        setReverseStock(true);
+                      }}
+                      style={{
+                        ...sBtn("outline"),
+                        padding: "4px 10px",
+                        fontSize: "9px",
+                        color: C.red,
+                        borderColor: C.red,
+                      }}
+                      title="Delete this run (with optional stock reversal)"
+                    >
+                      🗑 Delete
+                    </button>
                     <button
                       onClick={() => setExpanded(isOpen ? null : run.id)}
                       style={{
@@ -1498,6 +1748,7 @@ function HistoryPanel({ runs, onRefresh }) {
                   </div>
                 </div>
 
+                {/* ── KPI row ── */}
                 <div
                   style={{
                     display: "flex",
@@ -1566,6 +1817,7 @@ function HistoryPanel({ runs, onRefresh }) {
                   </div>
                 )}
 
+                {/* ── Expanded detail ── */}
                 {isOpen && (
                   <div
                     style={{
@@ -1574,6 +1826,246 @@ function HistoryPanel({ runs, onRefresh }) {
                       paddingTop: "14px",
                     }}
                   >
+                    {/* DELETE confirmation panel */}
+                    {isDeleting && (
+                      <div
+                        style={{
+                          padding: "16px",
+                          background: "#fff5f5",
+                          border: `1px solid ${C.red}`,
+                          borderRadius: "2px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            color: C.red,
+                            fontFamily: F.body,
+                            marginBottom: "10px",
+                          }}
+                        >
+                          ⚠ Delete Run {run.run_number}?
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: C.text,
+                            fontFamily: F.body,
+                            marginBottom: "12px",
+                            lineHeight: "1.7",
+                          }}
+                        >
+                          This permanently deletes the production run record and
+                          all its input logs.
+                        </div>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            cursor: "pointer",
+                            marginBottom: "14px",
+                            fontSize: "12px",
+                            fontFamily: F.body,
+                            color: C.text,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={reverseStock}
+                            onChange={(e) => setReverseStock(e.target.checked)}
+                            style={{ width: "15px", height: "15px" }}
+                          />
+                          <span>
+                            <strong>Reverse stock movements</strong> — add raw
+                            materials back to inventory and deduct finished
+                            goods
+                            <br />
+                            <span style={{ fontSize: "11px", color: C.muted }}>
+                              Looks for stock_movements with reference = "
+                              {run.run_number}" and inserts adjustment entries
+                              to undo them.
+                            </span>
+                          </span>
+                        </label>
+                        {!reverseStock && (
+                          <div
+                            style={{
+                              padding: "8px 12px",
+                              background: C.lightOrange,
+                              borderRadius: "2px",
+                              fontSize: "11px",
+                              color: C.orange,
+                              fontFamily: F.body,
+                              marginBottom: "12px",
+                            }}
+                          >
+                            ⚠ Without reversal, stock levels will NOT change.
+                            Only the run record is removed.
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <button
+                            onClick={() => handleDelete(run)}
+                            disabled={saving}
+                            style={{ ...sBtn("danger"), minWidth: "140px" }}
+                          >
+                            {saving ? "Deleting..." : "✓ Confirm Delete"}
+                          </button>
+                          <button
+                            onClick={() => setDeleting(null)}
+                            style={sBtn("outline")}
+                          >
+                            ← Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* EDIT panel */}
+                    {isEditing && (
+                      <div
+                        style={{
+                          padding: "16px",
+                          background: "#f0faf5",
+                          border: `1px solid ${C.accent}`,
+                          borderRadius: "2px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "9px",
+                            letterSpacing: "0.2em",
+                            textTransform: "uppercase",
+                            color: C.accent,
+                            fontFamily: F.body,
+                            marginBottom: "14px",
+                          }}
+                        >
+                          Edit Run
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr 1fr",
+                            gap: "12px",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <div>
+                            <label
+                              style={{
+                                fontSize: "11px",
+                                color: C.muted,
+                                display: "block",
+                                marginBottom: "4px",
+                                fontFamily: F.body,
+                              }}
+                            >
+                              Actual Units
+                            </label>
+                            <input
+                              style={sInput}
+                              type="number"
+                              min="0"
+                              value={editForm.actual_units}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  actual_units: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label
+                              style={{
+                                fontSize: "11px",
+                                color: C.muted,
+                                display: "block",
+                                marginBottom: "4px",
+                                fontFamily: F.body,
+                              }}
+                            >
+                              Status
+                            </label>
+                            <select
+                              style={sSelect}
+                              value={editForm.status}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  status: e.target.value,
+                                }))
+                              }
+                            >
+                              {ALL_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s.charAt(0).toUpperCase() +
+                                    s.slice(1).replace("_", " ")}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label
+                              style={{
+                                fontSize: "11px",
+                                color: C.muted,
+                                display: "block",
+                                marginBottom: "4px",
+                                fontFamily: F.body,
+                              }}
+                            >
+                              Notes
+                            </label>
+                            <input
+                              style={sInput}
+                              placeholder="Optional notes"
+                              value={editForm.notes}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  notes: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            padding: "8px 12px",
+                            background: C.warm,
+                            borderRadius: "2px",
+                            fontSize: "11px",
+                            color: C.muted,
+                            fontFamily: F.body,
+                            marginBottom: "12px",
+                          }}
+                        >
+                          ℹ Edit only updates the run record. To correct stock
+                          levels, use Delete + Reverse Stock, then log a new
+                          run.
+                        </div>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <button
+                            onClick={() => handleSaveEdit(run)}
+                            disabled={saving}
+                            style={sBtn()}
+                          >
+                            {saving ? "Saving..." : "✓ Save Changes"}
+                          </button>
+                          <button onClick={cancelEdit} style={sBtn("outline")}>
+                            ← Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Materials consumed */}
                     {run.production_run_inputs?.length > 0 && (
                       <>
                         <div
@@ -1646,7 +2138,7 @@ function HistoryPanel({ runs, onRefresh }) {
                         </div>
                       </>
                     )}
-                    {run.notes && (
+                    {run.notes && !isEditing && (
                       <p
                         style={{
                           fontSize: "12px",
@@ -1746,10 +2238,9 @@ function AllocatePanel({ items, partners, onRefresh }) {
         notes: "",
       });
       onRefresh();
-      alert(`✓ ${qty} units of ${selItem.name} allocated to ${ref}`);
+      // success — UI refreshes automatically via onRefresh()
     } catch (err) {
       console.error("[HQProduction] Allocate error:", err);
-      alert("Error: " + err.message);
     } finally {
       setSaving(false);
     }
