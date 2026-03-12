@@ -1,20 +1,19 @@
-// AdminDashboard.js v4.0 — Adds Documents tab (WP-I)
+// AdminDashboard.js v4.1 — WP-M: replaced QR sub-tabs with AdminQRCodes v2.0
 // Protea Botanicals — March 2026
-// ★ v4.0 changes:
-//   1. ADDED: "Documents" tab → HQDocuments component
-//   2. ADDED: onNavigateToDocuments callback — batch "🔬 AI INGESTED" badge
-//             switches to Documents tab and pre-selects the source document
-//   3. ADDED: documentsTargetId state — passed as initialDocId to HQDocuments
-// ★ v3.9 changes (preserved):
-//   1. "Batches" tab → AdminBatchManager
-//   2. onNavigateToQR callback
-//   3. Quick action "MANAGE BATCHES"
+// ★ v4.1 changes:
+//   1. REMOVED: AdminQrList import (retired)
+//   2. REMOVED: AdminQrGenerator import (now inside AdminQRCodes)
+//   3. ADDED: AdminQRCodes import (full engine — registry + generate + banners)
+//   4. REMOVED: qrSubTab state + QR sub-tab bar (AdminQRCodes manages its own tabs)
+//   5. QR CODES tab now renders <AdminQRCodes /> directly
+// ★ v4.0 changes (preserved):
+//   1. "Documents" tab → HQDocuments component
+//   2. onNavigateToDocuments callback
+//   3. documentsTargetId state
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
-import AdminQrGenerator from "./AdminQrGenerator";
 import AdminAnalytics from "./AdminAnalytics";
-import AdminQrList from "../components/AdminQrList";
 import StockControl from "../components/StockControl";
 import AdminBatchManager from "../components/AdminBatchManager";
 import AdminProductionModule from "../components/AdminProductionModule";
@@ -23,6 +22,7 @@ import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
 import AdminFraudSecurity from "../components/AdminFraudSecurity";
 import AdminNotifications from "../components/AdminNotifications";
 import HQDocuments from "../components/hq/HQDocuments";
+import AdminQRCodes from "../components/AdminQRCodes"; // v2.0 — WP-M
 
 // ─── Design Tokens ───
 const C = {
@@ -141,12 +141,11 @@ function fmtDate(d) {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
-  const [qrSubTab, setQrSubTab] = useState("registry");
   // v4.0: document pre-selection for deep-link from batch badge
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
   const [users, setUsers] = useState([]);
@@ -243,13 +242,11 @@ export default function AdminDashboard() {
   }, [fetchUsers, computeAnalytics]);
 
   // ── Called from AdminBatchManager "Generate QR" button ──────────────────
-  const handleNavigateToQR = (batchId) => {
+  const handleNavigateToQR = () => {
     setTab("qr_codes");
-    setQrSubTab("generate");
   };
 
   // ── v4.0: Called from AdminBatchManager "🔬 AI INGESTED" badge ──────────
-  // Switches to Documents tab and pre-selects the source document
   const handleNavigateToDocuments = (documentId) => {
     setDocumentsTargetId(documentId);
     setTab("documents");
@@ -310,7 +307,6 @@ export default function AdminDashboard() {
           label="Batches"
           onClick={() => setTab("batches")}
         />
-        {/* Production tab hidden — use HQ → Production instead */}
         <TabBtn
           active={tab === "shipments"}
           label="Shipments"
@@ -498,22 +494,10 @@ export default function AdminDashboard() {
               🌿 MANAGE BATCHES
             </button>
             <button
-              onClick={() => {
-                setTab("qr_codes");
-                setQrSubTab("generate");
-              }}
+              onClick={() => setTab("qr_codes")}
               style={makeBtn(C.accent)}
             >
-              GENERATE QR CODES
-            </button>
-            <button
-              onClick={() => {
-                setTab("qr_codes");
-                setQrSubTab("registry");
-              }}
-              style={makeBtn(C.blue)}
-            >
-              VIEW ALL CODES
+              QR ENGINE v2
             </button>
             <button onClick={() => setTab("stock")} style={makeBtn(C.mid)}>
               STOCK CONTROL
@@ -563,51 +547,8 @@ export default function AdminDashboard() {
       {/* ══════ NOTIFICATIONS ══════ */}
       {tab === "notifications" && <AdminNotifications />}
 
-      {/* ══════ QR CODES — sub-tabs ══════ */}
-      {tab === "qr_codes" && (
-        <div>
-          <div
-            style={{
-              display: "flex",
-              gap: 0,
-              marginBottom: "28px",
-              borderBottom: `2px solid ${C.border}`,
-            }}
-          >
-            {[
-              { key: "registry", label: "QR Registry" },
-              { key: "generate", label: "Generate" },
-            ].map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setQrSubTab(s.key)}
-                style={{
-                  padding: "10px 28px",
-                  border: "none",
-                  borderBottom:
-                    qrSubTab === s.key
-                      ? `3px solid ${C.accent}`
-                      : "3px solid transparent",
-                  marginBottom: "-2px",
-                  background: "none",
-                  cursor: "pointer",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "0.2em",
-                  textTransform: "uppercase",
-                  color: qrSubTab === s.key ? C.green : C.muted,
-                  fontFamily: FONTS.body,
-                  transition: "color 0.15s",
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-          {qrSubTab === "registry" && <AdminQrList />}
-          {qrSubTab === "generate" && <AdminQrGenerator />}
-        </div>
-      )}
+      {/* ══════ QR CODES — v4.1: AdminQRCodes v2.0 (WP-M) ══════ */}
+      {tab === "qr_codes" && <AdminQRCodes />}
 
       {/* ══════ USERS ══════ */}
       {tab === "users" && (
@@ -742,7 +683,6 @@ export default function AdminDashboard() {
       {tab === "stock" && <StockControl />}
 
       {/* ══════ DOCUMENTS ══════ */}
-      {/* v4.0: initialDocId passed when navigating from 🔬 AI INGESTED badge */}
       {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
     </div>
   );
