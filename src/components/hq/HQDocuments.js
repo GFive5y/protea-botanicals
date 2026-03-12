@@ -1,13 +1,12 @@
 // src/components/hq/HQDocuments.js
+// v2.1 — Shipping line detection: after AI extraction, client-side scan of line_items
+//         for shipping/freight/handling keywords. If found and a linked PO exists,
+//         auto-injects a proposed "update_po_shipping" update into extracted_data.
+//         handleConfirm now handles update_po_shipping: writes shipping_cost_usd,
+//         shipping_mode, and recalculates landed_cost_zar on the purchase_order.
+//         ActionBadge + label updated for new action type (orange ship icon).
 // v2.0 — Fix: create_supplier_product action now also creates inventory_item + stock_movement
-//         When AI proposes "Create new product: X", confirming it now:
-//           1. INSERT supplier_products (catalogue entry)
-//           2. INSERT inventory_items (IMP- SKU, cost from invoice FX)
-//           3. INSERT stock_movements (purchase_in, reference = invoice ref)
-//         Previously only step 1 happened → items appeared in catalogue but not stock.
-// v1.9 — Inline supplier creation: when AI detects ⚠ No match, show ➕ Create as Supplier
-//         form pre-filled with extracted name + currency. On save: INSERT suppliers,
-//         UPDATE document_log.supplier_id, re-fetch — future COAs auto-match.
+// v1.9 — Inline supplier creation
 // v1.8 — Fix: update_batch_coa resolves batch UUID by batch_number when record_id null
 // v1.7 — initialDocId prop for external navigation from AdminBatchManager
 // v1.6 — Delivery Note → Auto-receive inventory
@@ -34,10 +33,30 @@ const C = {
   lightAmber: "#fff8ee",
   purple: "#6c3483",
   lightPurple: "#f5eef8",
+  orange: "#c0560a",
+  lightOrange: "#fff4ee",
 };
 const F = {
   heading: "'Cormorant Garamond', Georgia, serif",
   body: "'Jost', 'Helvetica Neue', sans-serif",
+};
+
+// ── Shipping keyword detection ────────────────────────────────────────────────
+const SHIPPING_KEYWORDS = [
+  "shipping",
+  "freight",
+  "handling",
+  "delivery",
+  "postage",
+  "courier",
+  "transport",
+  "carriage",
+  "dispatch",
+  "forwarding",
+];
+const isShippingLine = (description = "") => {
+  const d = description.toLowerCase();
+  return SHIPPING_KEYWORDS.some((kw) => d.includes(kw));
 };
 
 const fmtDate = (d) => {
@@ -100,7 +119,6 @@ const fileToBase64 = (file) =>
     reader.readAsDataURL(file);
   });
 
-// ── v2.0: helpers for auto-creating inventory from supplier_product ──────────
 const supplierCatToInventoryCat = (cat) => {
   if (cat === "terpene") return "terpene";
   if (cat === "hardware") return "hardware";
@@ -245,7 +263,6 @@ function ConfidenceBar({ score }) {
   );
 }
 
-// ── v1.9: Inline supplier creation form ───────────────────────────────────────
 function SupplierCreateForm({
   extractedName,
   extractedCurrency,
@@ -264,7 +281,6 @@ function SupplierCreateForm({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   const set = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
@@ -327,7 +343,6 @@ function SupplierCreateForm({
       >
         ➕ Create New Supplier
       </div>
-
       <div style={{ display: "grid", gap: 8 }}>
         <div>
           <label style={labelStyle}>Supplier Name *</label>
@@ -419,7 +434,6 @@ function SupplierCreateForm({
           />
         </div>
       </div>
-
       {error && (
         <div
           style={{
@@ -432,7 +446,6 @@ function SupplierCreateForm({
           ⚠ {error}
         </div>
       )}
-
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         <button
           onClick={handleSave}
@@ -641,15 +654,10 @@ function ReviewPanel({
   const proposedUpdates = extraction.proposed_updates || [];
   const unknownItems = extraction.unknown_items || [];
   const warnings = extraction.warnings || [];
-
   const supplierUnmatched =
     extraction.supplier?.name && !extraction.supplier?.matched_id;
 
   useEffect(() => {
-    // v2.0: auto-check ALL proposed updates (not just >=0.8)
-    // Rationale: create_product proposals for unmatched items were being missed
-    // when users clicked Confirm without manually checking them. All updates
-    // require human confirmation anyway — showing them pre-checked is safe.
     const autoChecked = new Set(proposedUpdates.map((_, i) => i));
     setCheckedUpdates(autoChecked);
     setRejecting(false);
@@ -699,6 +707,7 @@ function ReviewPanel({
     fontFamily: F.body,
   };
 
+  // v2.1: added update_po_shipping styling
   const actionBadgeStyle = (action) => ({
     fontSize: 9,
     padding: "1px 6px",
@@ -708,21 +717,27 @@ function ReviewPanel({
         ? C.lightGreen
         : action === "update_batch_coa"
           ? C.lightPurple
-          : C.lightBlue,
+          : action === "update_po_shipping"
+            ? C.lightOrange
+            : C.lightBlue,
     color:
       action === "receive_delivery_item"
         ? C.mid
         : action === "update_batch_coa"
           ? C.purple
-          : C.blue,
+          : action === "update_po_shipping"
+            ? C.orange
+            : C.blue,
     fontFamily: F.body,
     letterSpacing: "0.05em",
   });
+
   const actionBadgeLabel = (action, table) => {
     if (action === "receive_delivery_item") return "📦 " + table;
     if (action === "update_batch_coa") return "🔬 " + table;
     if (action === "update_po_status") return "🔄 " + table;
     if (action === "create_supplier_product") return "➕ " + table;
+    if (action === "update_po_shipping") return "🚢 Shipping Cost";
     return table;
   };
 
@@ -734,7 +749,7 @@ function ReviewPanel({
 
   return (
     <div style={panelStyle}>
-      {/* ── Header ── */}
+      {/* Header */}
       <div
         style={{
           padding: "14px",
@@ -788,7 +803,7 @@ function ReviewPanel({
         )}
       </div>
 
-      {/* ── Extracted Fields ── */}
+      {/* Extracted Fields */}
       <div style={sectionHead}>Extracted Fields</div>
       {extraction.reference?.number && (
         <div style={fieldRow}>
@@ -819,7 +834,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Supplier row — matched or unmatched ── */}
+      {/* Supplier row */}
       {extraction.supplier?.matched_id ? (
         <div style={fieldRow}>
           <span style={{ color: C.muted }}>Supplier</span>
@@ -888,7 +903,7 @@ function ReviewPanel({
         </>
       ) : null}
 
-      {/* ── Line Items ── */}
+      {/* Line Items */}
       {lineItems.length > 0 && (
         <>
           <div style={sectionHead}>Line Items ({lineItems.length})</div>
@@ -912,12 +927,15 @@ function ReviewPanel({
                 >
                   <span
                     style={{
-                      color: C.text,
+                      color: isShippingLine(item.description)
+                        ? C.orange
+                        : C.text,
                       fontWeight: 500,
                       flex: 1,
                       marginRight: 6,
                     }}
                   >
+                    {isShippingLine(item.description) ? "🚢 " : ""}
                     {item.description}
                   </span>
                   <ConfidenceDot score={item.confidence} />
@@ -938,6 +956,8 @@ function ReviewPanel({
                   )}
                   {item.matched_product_id ? (
                     <span style={{ color: C.accent }}>✓ matched</span>
+                  ) : isShippingLine(item.description) ? (
+                    <span style={{ color: C.orange }}>🚢 shipping</span>
                   ) : (
                     <span style={{ color: C.amber }}>⚠ unmatched</span>
                   )}
@@ -948,7 +968,7 @@ function ReviewPanel({
         </>
       )}
 
-      {/* ── Proposed Updates ── */}
+      {/* Proposed Updates */}
       {proposedUpdates.length > 0 && (
         <>
           <div style={sectionHead}>
@@ -962,7 +982,11 @@ function ReviewPanel({
                 style={{
                   padding: "8px 14px",
                   borderBottom: `1px solid ${C.border}`,
-                  background: checkedUpdates.has(i) ? "#f5fdf8" : C.white,
+                  background: checkedUpdates.has(i)
+                    ? update.action === "update_po_shipping"
+                      ? "#fff7f2"
+                      : "#f5fdf8"
+                    : C.white,
                   opacity: isReadOnly ? 0.7 : 1,
                 }}
               >
@@ -1094,7 +1118,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Confirmed banner ── */}
+      {/* Confirmed banner */}
       {doc.status === "confirmed" && doc.applied_updates && (
         <div
           style={{
@@ -1129,7 +1153,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Rejected banner ── */}
+      {/* Rejected banner */}
       {doc.status === "rejected" && (
         <div
           style={{
@@ -1163,7 +1187,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Re-open ── */}
+      {/* Re-open */}
       {(doc.status === "confirmed" ||
         doc.status === "partially_applied" ||
         doc.status === "rejected") && (
@@ -1195,7 +1219,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Reject textarea ── */}
+      {/* Reject textarea */}
       {rejecting && (
         <div
           style={{
@@ -1272,7 +1296,7 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* ── Confirm / Reject buttons ── */}
+      {/* Confirm / Reject buttons */}
       {!isReadOnly && !rejecting && !showSupplierForm && (
         <div
           style={{
@@ -1508,14 +1532,20 @@ function DocumentLogTable({ documents, onSelectDoc }) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              <th style={sTh}>Date</th>
-              <th style={sTh}>Type</th>
-              <th style={sTh}>Supplier</th>
-              <th style={sTh}>File</th>
-              <th style={sTh}>Confidence</th>
-              <th style={sTh}>Status</th>
-              <th style={sTh}>Applied</th>
-              <th style={sTh}></th>
+              {[
+                "Date",
+                "Type",
+                "Supplier",
+                "File",
+                "Confidence",
+                "Status",
+                "Applied",
+                "",
+              ].map((h) => (
+                <th key={h} style={sTh}>
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -1659,29 +1689,30 @@ export default function HQDocuments({ initialDocId = null }) {
   }, [initialDocId, documents]);
 
   const fetchFreshContext = async () => {
-    const [suppRes, prodRes, invRes, poRes] = await Promise.all([
-      supabase
-        .from("suppliers")
-        .select("id, name, country, currency")
-        .eq("is_active", true),
-      supabase
-        .from("supplier_products")
-        .select("id, name, sku, category, unit_price_usd, supplier_id")
-        .eq("is_active", true),
-      supabase
-        .from("inventory_items")
-        .select("id, name, sku, category, quantity_on_hand")
-        .eq("is_active", true),
-      supabase
-        .from("purchase_orders")
-        .select("id, po_number, supplier_id, po_status, expected_arrival")
-        .in("po_status", ["ordered", "in_transit", "customs"]),
-    ]);
+    const [{ data: sups }, { data: prods }, { data: invs }, { data: pos }] =
+      await Promise.all([
+        supabase
+          .from("suppliers")
+          .select("id, name, country, currency")
+          .eq("is_active", true),
+        supabase
+          .from("supplier_products")
+          .select("id, name, sku, category, unit_price_usd, supplier_id")
+          .eq("is_active", true),
+        supabase
+          .from("inventory_items")
+          .select("id, name, sku, category, quantity_on_hand")
+          .eq("is_active", true),
+        supabase
+          .from("purchase_orders")
+          .select("id, po_number, supplier_id, po_status, expected_arrival")
+          .in("po_status", ["ordered", "in_transit", "customs"]),
+      ]);
     return {
-      existing_suppliers: suppRes.data || [],
-      existing_products: prodRes.data || [],
-      existing_inventory: invRes.data || [],
-      open_purchase_orders: poRes.data || [],
+      existing_suppliers: sups || [],
+      existing_products: prods || [],
+      existing_inventory: invs || [],
+      open_purchase_orders: pos || [],
     };
   };
 
@@ -1698,9 +1729,7 @@ export default function HQDocuments({ initialDocId = null }) {
     supabase.storage
       .from("supplier-documents")
       .createSignedUrl(selectedDoc.file_url, 3600)
-      .then(({ data }) => {
-        setSignedUrl(data?.signedUrl || null);
-      })
+      .then(({ data }) => setSignedUrl(data?.signedUrl || null))
       .catch(() => setSignedUrl(null))
       .finally(() => setSignedUrlLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1766,6 +1795,95 @@ export default function HQDocuments({ initialDocId = null }) {
       if (fnErr) throw new Error(`Edge function error: ${fnErr.message}`);
       if (!fnData?.success)
         throw new Error(fnData?.error || "Extraction failed");
+
+      // ── v2.1: Client-side shipping line detection ──────────────────────
+      // The AI extracts line items but doesn't always propose a shipping update.
+      // Scan line_items for shipping keywords. If found and a linked PO exists,
+      // inject a proposed update_po_shipping action into extracted_data.
+      if (fnData.document_log_id) {
+        try {
+          const { data: freshDoc } = await supabase
+            .from("document_log")
+            .select("extracted_data")
+            .eq("id", fnData.document_log_id)
+            .single();
+
+          if (freshDoc?.extracted_data) {
+            const exData = freshDoc.extracted_data;
+            const lines = exData.line_items || [];
+            const proposals = exData.proposed_updates || [];
+
+            // Find shipping line item
+            const shippingLine = lines.find(
+              (li) =>
+                isShippingLine(li.description) &&
+                Number(li.unit_price ?? 0) > 0,
+            );
+
+            // Check if a shipping proposal already exists
+            const alreadyHasShippingProposal = proposals.some(
+              (p) => p.action === "update_po_shipping",
+            );
+
+            if (shippingLine && !alreadyHasShippingProposal) {
+              // Find PO record_id from update_po_status proposal
+              const poProposal = proposals.find(
+                (p) =>
+                  (p.action === "update_po_status" ||
+                    p.action === "create_purchase_order") &&
+                  p.record_id,
+              );
+
+              // Also check if PO matched via supplier + reference
+              let poRecordId = poProposal?.record_id || null;
+
+              if (!poRecordId && exData.supplier?.matched_id) {
+                // Try to find PO by supplier + invoice reference
+                const ref = exData.reference?.number;
+                if (ref) {
+                  const { data: matchedPO } = await supabase
+                    .from("purchase_orders")
+                    .select("id, po_number")
+                    .eq("supplier_id", exData.supplier.matched_id)
+                    .eq("po_number", ref)
+                    .maybeSingle();
+                  if (matchedPO) poRecordId = matchedPO.id;
+                }
+              }
+
+              if (poRecordId) {
+                const shippingAmt = Number(shippingLine.unit_price);
+                const shippingProposal = {
+                  action: "update_po_shipping",
+                  table: "purchase_orders",
+                  record_id: poRecordId,
+                  description: `Write shipping cost to PO: ${exData.currency || "USD"} ${shippingAmt.toFixed(2)} — from "${shippingLine.description}" line on invoice`,
+                  confidence: 0.95,
+                  data: {
+                    shipping_cost_usd: shippingAmt,
+                    shipping_mode: "supplier_included",
+                  },
+                };
+                const patchedData = {
+                  ...exData,
+                  proposed_updates: [...proposals, shippingProposal],
+                };
+                await supabase
+                  .from("document_log")
+                  .update({ extracted_data: patchedData })
+                  .eq("id", fnData.document_log_id);
+              }
+            }
+          }
+        } catch (patchErr) {
+          // Non-fatal — log but don't fail the whole upload
+          console.warn(
+            "[HQDocuments] shipping patch failed:",
+            patchErr.message,
+          );
+        }
+      }
+      // ── end shipping detection ──────────────────────────────────────────
 
       setUploadProgress(90);
       setUploadMsg("Extraction complete — review below");
@@ -1858,7 +1976,6 @@ export default function HQDocuments({ initialDocId = null }) {
     ...(item.notes ? { notes: item.notes } : {}),
   });
 
-  // ── v1.9: Create supplier inline + link to document_log ───────────────────
   const handleCreateSupplier = async (docId, supplierData) => {
     const { data: newSupplier, error: insErr } = await supabase
       .from("suppliers")
@@ -1876,12 +1993,10 @@ export default function HQDocuments({ initialDocId = null }) {
       .select("id, name")
       .single();
     if (insErr) throw new Error(insErr.message);
-
     await supabase
       .from("document_log")
       .update({ supplier_id: newSupplier.id, supplier_name: newSupplier.name })
       .eq("id", docId);
-
     await fetchDocuments();
   };
 
@@ -1902,11 +2017,7 @@ export default function HQDocuments({ initialDocId = null }) {
     const appliedUpdates = [];
     const failedUpdates = [];
 
-    // ── v2.0: FX rate for cost_price calculation ──────────────────────────
-    // Use rate from document if available, otherwise fall back to 18.5
     const fxRate = extraction.usd_zar_rate || extraction.fx_rate || 18.5;
-
-    // ── v2.0: Supplier id for new inventory items ─────────────────────────
     const docSupplierId =
       extraction.supplier?.matched_id || selectedDoc.supplier_id || null;
 
@@ -2063,10 +2174,7 @@ export default function HQDocuments({ initialDocId = null }) {
             .update(batchUpdate)
             .eq("id", batchId);
           if (error) throw error;
-
-          // ── v2.0: create_supplier_product → also create inventory_item + movement ──
         } else if (action === "create_supplier_product") {
-          // 1. Insert into supplier_products catalogue
           const { data: newProduct, error: spErr } = await supabase
             .from(table)
             .insert(data)
@@ -2074,7 +2182,6 @@ export default function HQDocuments({ initialDocId = null }) {
             .single();
           if (spErr) throw spErr;
 
-          // 2. Find matching line item quantity from extracted line_items
           const productNameLower = (
             newProduct.name ||
             data.name ||
@@ -2082,18 +2189,18 @@ export default function HQDocuments({ initialDocId = null }) {
           ).toLowerCase();
           const matchingLine = lineItems.find(
             (li) =>
-              (li.description || "")
+              !isShippingLine(li.description) &&
+              ((li.description || "")
                 .toLowerCase()
                 .includes(productNameLower.slice(0, 20)) ||
-              productNameLower.includes(
-                (li.description || "").toLowerCase().slice(0, 20),
-              ),
+                productNameLower.includes(
+                  (li.description || "").toLowerCase().slice(0, 20),
+                )),
           );
           const qty = matchingLine
             ? Number(matchingLine.quantity ?? 1)
             : Number(data.quantity ?? data.quantity_ordered ?? 1);
 
-          // 3. Build inventory SKU — prefer supplier SKU, fallback to IMP-{sanitised name}
           const rawSku = newProduct.sku || data.sku || "";
           const invSku = rawSku
             ? `IMP-${rawSku}`
@@ -2102,23 +2209,17 @@ export default function HQDocuments({ initialDocId = null }) {
                 .replace(/[^A-Z0-9]/g, "-")
                 .slice(0, 20)}`;
 
-          // 4. Cost price: unit_price_usd × fxRate (0 if free sample)
           const unitPriceUsd = Number(
             newProduct.unit_price_usd ?? data.unit_price_usd ?? 0,
           );
           const costPriceZar = Math.round(unitPriceUsd * fxRate * 100) / 100;
-
-          // 5. Category + unit
           const invCat = supplierCatToInventoryCat(
             newProduct.category || data.category || "",
           );
           const invUnit = defaultUnitForCat(invCat);
-
-          // 6. Supplier id
           const supplierId =
             newProduct.supplier_id || data.supplier_id || docSupplierId;
 
-          // 7. Insert inventory_item (ON CONFLICT DO NOTHING on sku)
           const { data: newInvItem, error: invErr } = await supabase
             .from("inventory_items")
             .insert({
@@ -2138,13 +2239,11 @@ export default function HQDocuments({ initialDocId = null }) {
             .single();
 
           if (invErr) {
-            // If SKU already exists, just log a warning but don't fail the whole update
             console.warn(
               "[HQDocuments] inventory_item insert skipped (likely duplicate SKU):",
               invErr.message,
             );
           } else if (newInvItem?.id && qty > 0) {
-            // 8. Write stock movement
             const { error: movErr } = await supabase
               .from("stock_movements")
               .insert({
@@ -2161,6 +2260,54 @@ export default function HQDocuments({ initialDocId = null }) {
                 movErr.message,
               );
           }
+
+          // ── v2.1: update_po_shipping ─────────────────────────────────────
+        } else if (action === "update_po_shipping") {
+          if (!record_id)
+            throw new Error("record_id required for update_po_shipping");
+
+          const shippingUpdate = {};
+          if (data.shipping_cost_usd != null)
+            shippingUpdate.shipping_cost_usd = parseFloat(
+              data.shipping_cost_usd,
+            );
+          if (data.clearance_fee_usd != null)
+            shippingUpdate.clearance_fee_usd = parseFloat(
+              data.clearance_fee_usd,
+            );
+          if (data.shipping_mode != null)
+            shippingUpdate.shipping_mode = data.shipping_mode;
+
+          // Fetch current PO to recalculate landed_cost_zar
+          const { data: poRow, error: poFetchErr } = await supabase
+            .from("purchase_orders")
+            .select(
+              "subtotal, usd_zar_rate, clearance_fee_usd, shipping_cost_usd",
+            )
+            .eq("id", record_id)
+            .single();
+
+          if (!poFetchErr && poRow) {
+            const fxR = parseFloat(poRow.usd_zar_rate) || fxRate;
+            const subtotal = parseFloat(poRow.subtotal) || 0;
+            const newShipping =
+              shippingUpdate.shipping_cost_usd != null
+                ? shippingUpdate.shipping_cost_usd
+                : parseFloat(poRow.shipping_cost_usd) || 0;
+            const clearance =
+              shippingUpdate.clearance_fee_usd != null
+                ? shippingUpdate.clearance_fee_usd
+                : parseFloat(poRow.clearance_fee_usd) || 0;
+            shippingUpdate.landed_cost_zar =
+              Math.round((subtotal + newShipping + clearance) * fxR * 100) /
+              100;
+          }
+
+          const { error: poUpdErr } = await supabase
+            .from("purchase_orders")
+            .update(shippingUpdate)
+            .eq("id", record_id);
+          if (poUpdErr) throw poUpdErr;
         } else if (action === "create_batch") {
           const { error } = await supabase.from(table).insert(data);
           if (error) throw error;
