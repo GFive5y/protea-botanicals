@@ -1,18 +1,31 @@
-// HQPurchaseOrders.js v1.2 — WP-B: Purchase Order Flow (Import-Aware)
+// HQPurchaseOrders.js v1.3 — WP-B: Purchase Order Flow (Import-Aware)
 // Protea Botanicals · Phase 2 · March 2026
 //
-// v1.2 — "Add Shipping to PO" feature:
-//   - "✈️ + Add Shipping" button appears on all POs (actions column + detail modal)
-//   - Displays "✓ Shipping: $XX.XX — Edit" when shipping already confirmed
-//   - User enters total weight (kg) → auto-calculates DDP freight, $25 clearance, per-unit landed cost
-//   - Preview table: each line item shows old EXW cost → new landed cost before confirm
-//   - Pro-rata allocation by EXW line value (not qty) — filling gun gets ~69% of shipping
-//   - Confirm writes three tables in sequence:
-//       purchase_orders       → shipping_cost_usd, clearance_fee_usd, landed_cost_zar, total_weight_kg
-//       purchase_order_items  → landed_cost_per_unit_zar per item
-//       inventory_items       → cost_price per linked item_id
-//   - Uses locked usd_zar_rate from PO (not live FX) for cost consistency
-//   - shipping_cost_usd = freight only; clearance_fee_usd = $25 stored separately
+// v1.3 — Dual shipping model:
+//   MODEL A — DDP Agent (AimVape/Steamups only):
+//     - shipping_mode = "ddp_air" | "standard_air" | "sea_freight"
+//     - Weight-based: kg × DDP rate + $25 clearance agent fee
+//     - clearance_fee_usd = 25 stored separately in DB
+//   MODEL B — Supplier Included (Eybna + all other non-DDP suppliers):
+//     - shipping_mode = "supplier_included"
+//     - Flat amount entered directly from supplier invoice
+//     - clearance_fee_usd = 0, no per-kg calculation
+//   Changes in v1.3:
+//     - Added "supplier_included" to SHIPPING_MODES (display/label lookup)
+//     - Added CREATE_SHIPPING_MODES — excludes supplier_included (not known at PO creation)
+//     - Added addShipFlatAmount state for Model B input
+//     - computeShippingPreview: new supplier_included branch (flat amount, no clearance)
+//     - openAddShipping: pre-fills flat amount or weight based on po.shipping_mode
+//     - handleConfirmShipping: writes shipping_mode back to purchase_orders
+//     - Edit Shipping modal: left panel shows model selector with clear Model A/B separation
+//     - Edit Shipping modal: right panel conditionally shows flat amount vs weight input
+//     - Breakdown display panel: adapts labels/colours to supplier_included mode
+//     - PO detail modal: shipping breakdown hides clearance for supplier_included
+//     - Create PO step 3: uses CREATE_SHIPPING_MODES + tip note for Eybna-style POs
+//
+// v1.2 — "Add Shipping to PO" feature (preserved):
+//   - DDP weight-based calc, $25 clearance, pro-rata per-item landed cost
+//   - Confirm writes purchase_orders, purchase_order_items, inventory_items
 //
 // v1.1 fixes (preserved):
 //   - handleReceive: auto-create inventory_items when no match found
@@ -80,26 +93,40 @@ const NEXT_STATUS = {
   customs: "received",
 };
 
+// Full list — used for label/icon lookup throughout the file.
+// supplier_included is intentionally EXCLUDED from CREATE_SHIPPING_MODES below
+// because the flat amount is unknown at PO creation time.
 const SHIPPING_MODES = [
   {
     id: "ddp_air",
     label: "DDP Air (per kg)",
-    note: "Door-to-door · 10–18 days",
+    note: "AimVape/Steamups — DDP agent · 10–18 days",
     icon: "✈️",
   },
   {
     id: "standard_air",
     label: "Standard Air",
-    note: "Half cube $800 flat · ~4 weeks",
+    note: "Standard airfreight · ~2–3 weeks",
     icon: "📦",
   },
   {
     id: "sea_freight",
     label: "Sea Freight",
-    note: "$650/CBM self-pickup · 45–55 days",
+    note: "Half cube $800 flat · ~4 months",
     icon: "🚢",
   },
+  {
+    id: "supplier_included",
+    label: "Supplier Included",
+    note: "Eybna & others — flat amount from invoice",
+    icon: "📄",
+  },
 ];
+
+// Used in Create PO step 3 only — excludes supplier_included
+const CREATE_SHIPPING_MODES = SHIPPING_MODES.filter(
+  (m) => m.id !== "supplier_included",
+);
 
 const DDP_TIERS = [
   { maxKg: 21, rateUsd: 15.8 },
@@ -108,7 +135,7 @@ const DDP_TIERS = [
   { maxKg: Infinity, rateUsd: 14.9 },
 ];
 
-// ─── Category mapping: supplier_products → inventory_items ───────────────────
+// ─── Category mapping ─────────────────────────────────────────────────────────
 function supplierCatToInventoryCat(cat) {
   if (cat === "terpene") return "terpene";
   if (cat === "hardware") return "hardware";
@@ -121,7 +148,7 @@ function defaultUnitForCat(cat) {
   return "pcs";
 }
 
-// ─── Shipping Calculation — used by Create PO form ────────────────────────────
+// ─── Shipping Calculation — Create PO form only ────────────────────────────
 function calcShippingUsd(mode, weightKg, seaCustom = 650) {
   if (mode === "ddp_air") {
     const tier =
@@ -134,8 +161,7 @@ function calcShippingUsd(mode, weightKg, seaCustom = 650) {
   return 0;
 }
 
-// ─── DDP Freight Only — for Add Shipping feature ─────────────────────────────
-// Returns freight-only (no clearance). Clearance ($25) stored separately in DB.
+// ─── DDP Freight Only — freight without clearance ─────────────────────────
 function calcDdpFreightUsd(weightKg) {
   const tier =
     DDP_TIERS.find((t) => weightKg <= t.maxKg) ||
@@ -148,27 +174,41 @@ function calcDdpFreightUsd(weightKg) {
 
 // ─── Compute Shipping Preview ─────────────────────────────────────────────────
 // Pure function — no side effects.
-// Pro-rates total shipping across PO lines by EXW line value (not by qty).
-// Formula (Section 7):
+//
+// MODEL B (supplier_included):
+//   flatAmountUsd = freight amount from invoice. clearanceUsd = 0.
+//   weightKg is ignored.
+//
+// MODEL A (ddp_air / standard_air / sea_freight):
+//   weightKg used to compute freight. ddp_air adds $25 clearance.
+//
+// Pro-rates total shipping across lines by EXW line value (not qty).
 //   shipping_per_unit = (line_exw / total_exw) × total_shipping_usd / qty
 //   landed_cost_usd   = unit_exw_usd + shipping_per_unit
 //   cost_price_zar    = ROUND(landed_cost_usd × locked_fx, 2)
-function computeShippingPreview(po, items, weightKg, mode) {
+function computeShippingPreview(po, items, weightKg, mode, flatAmountUsd = 0) {
   if (!po || !items || items.length === 0) return null;
-  if (!weightKg || isNaN(weightKg) || weightKg <= 0) return null;
 
   let freightUsd, clearanceUsd, tier;
 
-  if (mode === "ddp_air") {
-    const result = calcDdpFreightUsd(weightKg);
-    freightUsd = result.freightUsd;
-    clearanceUsd = 25;
-    tier = result.tier;
-  } else {
-    // For non-DDP modes, treat full calcShippingUsd result as freight (no clearance split)
-    freightUsd = parseFloat(calcShippingUsd(mode, weightKg).toFixed(2));
+  if (mode === "supplier_included") {
+    const flat = parseFloat(flatAmountUsd) || 0;
+    if (flat <= 0) return null;
+    freightUsd = flat;
     clearanceUsd = 0;
     tier = null;
+  } else {
+    if (!weightKg || isNaN(weightKg) || weightKg <= 0) return null;
+    if (mode === "ddp_air") {
+      const result = calcDdpFreightUsd(weightKg);
+      freightUsd = result.freightUsd;
+      clearanceUsd = 25;
+      tier = result.tier;
+    } else {
+      freightUsd = parseFloat(calcShippingUsd(mode, weightKg).toFixed(2));
+      clearanceUsd = 0;
+      tier = null;
+    }
   }
 
   const totalShippingUsd = freightUsd + clearanceUsd;
@@ -183,7 +223,6 @@ function computeShippingPreview(po, items, weightKg, mode) {
     const unitExwUsd = parseFloat(item.unit_price_usd) || 0;
     const lineExwUsd = unitExwUsd * qty;
 
-    // Pro-rata by EXW line value; fallback to equal split if subtotal is 0
     const proRata =
       subtotalUsd > 0 ? lineExwUsd / subtotalUsd : 1 / items.length;
     const itemShipUsd = proRata * totalShippingUsd;
@@ -221,6 +260,7 @@ function computeShippingPreview(po, items, weightKg, mode) {
       tier,
       newLandedCostZar,
       subtotalUsd,
+      mode,
     },
     lineItems,
     lockedFx,
@@ -230,7 +270,10 @@ function computeShippingPreview(po, items, weightKg, mode) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 const fmtZar = (n) =>
-  `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `R${(parseFloat(n) || 0).toLocaleString("en-ZA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 const fmtUsd = (n) => `$${(parseFloat(n) || 0).toFixed(2)}`;
 const isOverdue = (po) => {
   const arrival = po.expected_arrival || po.expected_date;
@@ -290,10 +333,18 @@ export default function HQPurchaseOrders() {
   // ── Add Shipping state ──────────────────────────────────────────────────────
   const [addShipPo, setAddShipPo] = useState(null);
   const [addShipItems, setAddShipItems] = useState([]);
-  const [addShipWeight, setAddShipWeight] = useState("");
+  const [addShipWeight, setAddShipWeight] = useState(""); // MODEL A
+  const [addShipFlatAmount, setAddShipFlatAmount] = useState(""); // MODEL B
   const [addShipMode, setAddShipMode] = useState("ddp_air");
   const [addShipLoading, setAddShipLoading] = useState(false);
   const [addShipConfirming, setAddShipConfirming] = useState(false);
+
+  const closeAddShipping = () => {
+    setAddShipPo(null);
+    setAddShipItems([]);
+    setAddShipWeight("");
+    setAddShipFlatAmount("");
+  };
 
   // ── Data fetching ─────────────────────────────────────────────────────────
   const fetchPOs = useCallback(async () => {
@@ -394,7 +445,6 @@ export default function HQPurchaseOrders() {
   const landedPerUnit = totalUnits > 0 ? landedZar / totalUnits : 0;
   const shipPerUnit = totalUnits > 0 ? shipCostUsd / totalUnits : 0;
 
-  // ── Reset Create Panel ───────────────────────────────────────────────────
   const resetCreate = () => {
     setStep(1);
     setSelSupplier(null);
@@ -445,7 +495,7 @@ export default function HQPurchaseOrders() {
       return;
     }
 
-    // ⚠ NEVER include line_total — it is a GENERATED column in Supabase
+    // ⚠ NEVER include line_total — GENERATED column
     const itemInserts = lineItems.map((item) => ({
       po_id: po.id,
       supplier_product_id: item.product_id,
@@ -456,7 +506,6 @@ export default function HQPurchaseOrders() {
       ),
       weight_kg: parseFloat((item.weight_kg_per_unit * item.qty).toFixed(4)),
       unit_cost: parseFloat(item.unit_price_usd.toFixed(4)),
-      // line_total intentionally omitted — GENERATED COLUMN
       notes: `${item.name}${item.sku ? ` (${item.sku})` : ""}`,
     }));
 
@@ -502,7 +551,6 @@ export default function HQPurchaseOrders() {
   };
 
   // ── Receive PO ───────────────────────────────────────────────────────────
-  // v1.1: Auto-creates inventory_items when no match found + writes stock_movements
   const handleReceive = async (po) => {
     setReceiving(true);
 
@@ -534,7 +582,6 @@ export default function HQPurchaseOrders() {
         const productName =
           sp?.name || item.notes?.replace(/ \(.*\)$/, "") || "Unknown Product";
         const qty = parseFloat(item.quantity_ordered) || 0;
-
         if (qty <= 0) continue;
 
         try {
@@ -561,7 +608,10 @@ export default function HQPurchaseOrders() {
             const invUnit = defaultUnitForCat(invCategory);
             const invSku = sp?.sku
               ? `IMP-${sp.sku}`
-              : `IMP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+              : `IMP-${Date.now().toString().slice(-6)}-${Math.random()
+                  .toString(36)
+                  .slice(2, 5)
+                  .toUpperCase()}`;
             const costPrice = parseFloat(
               item.landed_cost_per_unit_zar || item.unit_cost || 0,
             );
@@ -588,7 +638,7 @@ export default function HQPurchaseOrders() {
 
             if (createErr) {
               console.error(
-                `[HQPurchaseOrders] Failed to create inventory item for "${productName}":`,
+                `[HQPurchaseOrders] Failed to create inventory item "${productName}":`,
                 createErr,
               );
               errors.push(productName);
@@ -607,12 +657,13 @@ export default function HQPurchaseOrders() {
                 quantity: qty,
                 movement_type: "purchase_in",
                 reference: po.po_number,
-                notes: `Received via PO ${po.po_number} — ${po.suppliers?.name || "supplier"}`,
+                notes: `Received via PO ${po.po_number} — ${
+                  po.suppliers?.name || "supplier"
+                }`,
               });
-
             if (moveErr) {
               console.error(
-                `[HQPurchaseOrders] Stock movement error for "${productName}":`,
+                `[HQPurchaseOrders] Stock movement error "${productName}":`,
                 moveErr,
               );
             } else {
@@ -654,9 +705,21 @@ export default function HQPurchaseOrders() {
   const openAddShipping = async (po, e) => {
     if (e) e.stopPropagation();
     setAddShipPo(po);
-    setAddShipMode(po.shipping_mode || "ddp_air");
-    // Pre-fill weight from PO if already stored
-    setAddShipWeight(po.total_weight_kg ? String(po.total_weight_kg) : "");
+
+    const mode = po.shipping_mode || "ddp_air";
+    setAddShipMode(mode);
+
+    // Pre-fill correct input based on existing mode
+    if (mode === "supplier_included") {
+      setAddShipFlatAmount(
+        po.shipping_cost_usd ? String(po.shipping_cost_usd) : "",
+      );
+      setAddShipWeight("");
+    } else {
+      setAddShipWeight(po.total_weight_kg ? String(po.total_weight_kg) : "");
+      setAddShipFlatAmount("");
+    }
+
     setAddShipLoading(true);
     setAddShipItems([]);
 
@@ -679,23 +742,33 @@ export default function HQPurchaseOrders() {
   };
 
   // ── Confirm Shipping Update ────────────────────────────────────────────────
-  // Writes to purchase_orders, purchase_order_items, inventory_items in sequence.
+  // v1.3: also writes shipping_mode back to purchase_orders
   const handleConfirmShipping = async () => {
     if (!addShipPo || !addShipPreview) return;
     setAddShipConfirming(true);
 
-    const { freightUsd, clearanceUsd, totalShippingUsd, newLandedCostZar } =
+    const { freightUsd, clearanceUsd, newLandedCostZar } =
       addShipPreview.breakdown;
 
-    // 1. Update purchase_orders
+    const isSupplierIncluded = addShipMode === "supplier_included";
+
+    const poUpdate = {
+      shipping_cost_usd: parseFloat(freightUsd.toFixed(2)),
+      clearance_fee_usd: parseFloat(clearanceUsd.toFixed(2)),
+      landed_cost_zar: newLandedCostZar,
+      shipping_mode: addShipMode,
+    };
+
+    // Only write weight for weight-based modes
+    if (!isSupplierIncluded && addShipWeight) {
+      poUpdate.total_weight_kg = parseFloat(
+        parseFloat(addShipWeight).toFixed(3),
+      );
+    }
+
     const { error: poErr } = await supabase
       .from("purchase_orders")
-      .update({
-        shipping_cost_usd: parseFloat(freightUsd.toFixed(2)),
-        clearance_fee_usd: parseFloat(clearanceUsd.toFixed(2)),
-        landed_cost_zar: newLandedCostZar,
-        total_weight_kg: parseFloat(parseFloat(addShipWeight).toFixed(3)),
-      })
+      .update(poUpdate)
       .eq("id", addShipPo.id);
 
     if (poErr) {
@@ -712,7 +785,6 @@ export default function HQPurchaseOrders() {
     const invErrors = [];
 
     for (const item of addShipPreview.lineItems) {
-      // 2. Update purchase_order_items.landed_cost_per_unit_zar
       const { error: lineErr } = await supabase
         .from("purchase_order_items")
         .update({ landed_cost_per_unit_zar: item.newLandedCostPerUnitZar })
@@ -727,7 +799,6 @@ export default function HQPurchaseOrders() {
         linesUpdated++;
       }
 
-      // 3. Update inventory_items.cost_price where item_id is linked
       if (item.item_id) {
         const { error: invErr } = await supabase
           .from("inventory_items")
@@ -736,7 +807,7 @@ export default function HQPurchaseOrders() {
 
         if (invErr) {
           console.error(
-            `[HQPurchaseOrders] Inventory cost update error for item_id ${item.item_id}:`,
+            `[HQPurchaseOrders] Inventory cost update error item_id ${item.item_id}:`,
             invErr,
           );
           invErrors.push(item.name);
@@ -747,9 +818,7 @@ export default function HQPurchaseOrders() {
     }
 
     setAddShipConfirming(false);
-    setAddShipPo(null);
-    setAddShipItems([]);
-    setAddShipWeight("");
+    closeAddShipping();
 
     const summary = [
       `${linesUpdated} PO lines updated`,
@@ -767,15 +836,16 @@ export default function HQPurchaseOrders() {
     fetchPOs();
   };
 
-  // ── Add Shipping Preview (derived — pure calc from state) ─────────────────
+  // ── Add Shipping Preview (derived) ─────────────────────────────────────────
   const addShipPreview = computeShippingPreview(
     addShipPo,
     addShipItems,
     parseFloat(addShipWeight),
     addShipMode,
+    parseFloat(addShipFlatAmount),
   );
 
-  // ── Derived Display Lists ────────────────────────────────────────────────
+  // ── Derived Display Lists ─────────────────────────────────────────────────
   const filteredPos =
     filterStatus === "all"
       ? pos
@@ -949,7 +1019,9 @@ export default function HQPurchaseOrders() {
           >
             {fxLoading
               ? "Loading FX…"
-              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+              : `USD/ZAR R${usdZar.toFixed(4)} ${
+                  fxRate?.source === "live" ? "🟢" : "🟡"
+                }`}
           </div>
           <button
             style={btn("primary")}
@@ -1033,7 +1105,6 @@ export default function HQPurchaseOrders() {
 
       {/* ── PO List ───────────────────────────────────────────────────── */}
       <div style={card}>
-        {/* Filter chips */}
         <div
           style={{
             display: "flex",
@@ -1233,13 +1304,15 @@ export default function HQPurchaseOrders() {
                               ✓ Complete
                             </button>
                           )}
-                          {/* Add Shipping button — shown on all POs */}
                           <button
                             style={shippingSet ? btn("ship-set") : btn("ship")}
                             onClick={(e) => openAddShipping(po, e)}
                           >
                             {shippingSet
-                              ? `✓ ${fmtUsd(parseFloat(po.shipping_cost_usd) + parseFloat(po.clearance_fee_usd || 0))} — Edit`
+                              ? `✓ ${fmtUsd(
+                                  parseFloat(po.shipping_cost_usd) +
+                                    parseFloat(po.clearance_fee_usd || 0),
+                                )} — Edit`
                               : "✈️ + Shipping"}
                           </button>
                         </div>
@@ -1258,7 +1331,12 @@ export default function HQPurchaseOrders() {
       ══════════════════════════════════════════════════════════════════ */}
       {showCreate && (
         <div
-          style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex" }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "flex",
+          }}
         >
           <div
             style={{ flex: 1, background: "rgba(0,0,0,0.4)" }}
@@ -1277,7 +1355,6 @@ export default function HQPurchaseOrders() {
               flexDirection: "column",
             }}
           >
-            {/* Panel header */}
             <div
               style={{
                 padding: "24px 28px",
@@ -1328,7 +1405,6 @@ export default function HQPurchaseOrders() {
               </button>
             </div>
 
-            {/* Step progress */}
             <div
               style={{
                 padding: "16px 28px",
@@ -1360,9 +1436,8 @@ export default function HQPurchaseOrders() {
               ))}
             </div>
 
-            {/* Panel body */}
             <div style={{ padding: 28, flex: 1 }}>
-              {/* STEP 1: Select Supplier */}
+              {/* STEP 1 */}
               {step === 1 && (
                 <div>
                   <p style={{ color: "#666", marginTop: 0, fontSize: 14 }}>
@@ -1377,7 +1452,9 @@ export default function HQPurchaseOrders() {
                         borderRadius: 10,
                         marginBottom: 12,
                         cursor: "pointer",
-                        border: `2px solid ${selSupplier?.id === s.id ? "#2d4a2d" : "#f0ede8"}`,
+                        border: `2px solid ${
+                          selSupplier?.id === s.id ? "#2d4a2d" : "#f0ede8"
+                        }`,
                         background:
                           selSupplier?.id === s.id ? "#f0f7f0" : "#fff",
                       }}
@@ -1422,7 +1499,7 @@ export default function HQPurchaseOrders() {
                 </div>
               )}
 
-              {/* STEP 2: Add Items */}
+              {/* STEP 2 */}
               {step === 2 && (
                 <div>
                   <div
@@ -1654,7 +1731,7 @@ export default function HQPurchaseOrders() {
                 </div>
               )}
 
-              {/* STEP 3: Shipping & Confirm */}
+              {/* STEP 3 — uses CREATE_SHIPPING_MODES (no supplier_included) */}
               {step === 3 && (
                 <div>
                   <div style={{ marginBottom: 24 }}>
@@ -1669,7 +1746,23 @@ export default function HQPurchaseOrders() {
                     >
                       Shipping Mode
                     </label>
-                    {SHIPPING_MODES.map((m) => (
+                    <div
+                      style={{
+                        background: "#fff8e1",
+                        border: "1px solid #ffe082",
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                        fontSize: 12,
+                        color: "#795548",
+                        marginBottom: 12,
+                      }}
+                    >
+                      💡 <strong>Eybna / supplier-invoiced freight?</strong>{" "}
+                      Select DDP Air as a placeholder here, then use{" "}
+                      <strong>Edit Shipping</strong> on the saved PO and switch
+                      to "Supplier Included" to enter the exact invoice amount.
+                    </div>
+                    {CREATE_SHIPPING_MODES.map((m) => (
                       <div
                         key={m.id}
                         onClick={() => setShipMode(m.id)}
@@ -1678,7 +1771,9 @@ export default function HQPurchaseOrders() {
                           borderRadius: 10,
                           marginBottom: 8,
                           cursor: "pointer",
-                          border: `2px solid ${shipMode === m.id ? "#2d4a2d" : "#f0ede8"}`,
+                          border: `2px solid ${
+                            shipMode === m.id ? "#2d4a2d" : "#f0ede8"
+                          }`,
                           background: shipMode === m.id ? "#f0f7f0" : "#fff",
                           display: "flex",
                           gap: 14,
@@ -1748,7 +1843,7 @@ export default function HQPurchaseOrders() {
                           marginBottom: 8,
                         }}
                       >
-                        DDP Air Rate Card (China → SA)
+                        DDP Air Rate Card (China → SA · AimVape/Steamups)
                       </div>
                       {DDP_TIERS.map((t, i) => {
                         const active =
@@ -1845,7 +1940,10 @@ export default function HQPurchaseOrders() {
                       {[
                         ["Subtotal (USD)", fmtUsd(subtotalUsd)],
                         [
-                          `Shipping — ${SHIPPING_MODES.find((m) => m.id === shipMode)?.label} (${fmt(totalWeight, 3)} kg)`,
+                          `Shipping — ${
+                            CREATE_SHIPPING_MODES.find((m) => m.id === shipMode)
+                              ?.label
+                          } (${fmt(totalWeight, 3)} kg)`,
                           fmtUsd(shipCostUsd),
                         ],
                         ["Total (USD)", fmtUsd(totalUsd)],
@@ -1872,7 +1970,6 @@ export default function HQPurchaseOrders() {
               )}
             </div>
 
-            {/* Panel footer */}
             <div
               style={{
                 padding: "20px 28px",
@@ -1967,6 +2064,8 @@ export default function HQPurchaseOrders() {
               const shippingSet =
                 po.shipping_cost_usd !== null &&
                 po.shipping_cost_usd !== undefined;
+              const isSupplierIncluded =
+                po.shipping_mode === "supplier_included";
 
               return (
                 <>
@@ -2111,11 +2210,17 @@ export default function HQPurchaseOrders() {
                       ],
                       [
                         "Total Weight",
-                        po.total_weight_kg ? `${po.total_weight_kg} kg` : "—",
+                        isSupplierIncluded
+                          ? "N/A (supplier freight)"
+                          : po.total_weight_kg
+                            ? `${po.total_weight_kg} kg`
+                            : "—",
                       ],
                       ["Subtotal (EXW USD)", fmtUsd(po.subtotal)],
                       [
-                        "Freight (USD)",
+                        isSupplierIncluded
+                          ? "Freight on Invoice (USD)"
+                          : "Freight (USD)",
                         shippingSet ? fmtUsd(po.shipping_cost_usd) : "Not set",
                       ],
                     ].map(([label, val]) => (
@@ -2151,12 +2256,14 @@ export default function HQPurchaseOrders() {
                     ))}
                   </div>
 
-                  {/* Shipping breakdown (when set) */}
+                  {/* Shipping breakdown — adapts to model */}
                   {shippingSet && (
                     <div
                       style={{
-                        background: "#f3f0ff",
-                        border: "1px solid #d1c4e9",
+                        background: isSupplierIncluded ? "#f0f7f0" : "#f3f0ff",
+                        border: `1px solid ${
+                          isSupplierIncluded ? "#c8e6c9" : "#d1c4e9"
+                        }`,
                         borderRadius: 10,
                         padding: "14px 18px",
                         marginBottom: 20,
@@ -2166,13 +2273,15 @@ export default function HQPurchaseOrders() {
                         style={{
                           fontSize: 12,
                           fontWeight: 700,
-                          color: "#5C6BC0",
+                          color: isSupplierIncluded ? "#2E7D32" : "#5C6BC0",
                           marginBottom: 10,
                           textTransform: "uppercase",
                           letterSpacing: "0.3px",
                         }}
                       >
-                        ✈️ Shipping Breakdown
+                        {isSupplierIncluded
+                          ? "📄 Supplier Freight (Invoice)"
+                          : "✈️ Shipping Breakdown"}
                       </div>
                       <div
                         style={{
@@ -2182,32 +2291,56 @@ export default function HQPurchaseOrders() {
                           fontSize: 13,
                         }}
                       >
-                        {[
-                          ["Freight", fmtUsd(po.shipping_cost_usd)],
-                          ["Clearance", fmtUsd(po.clearance_fee_usd)],
-                          [
-                            "Total Ship",
-                            fmtUsd(
-                              parseFloat(po.shipping_cost_usd) +
-                                parseFloat(po.clearance_fee_usd || 0),
-                            ),
-                          ],
-                        ].map(([label, val]) => (
-                          <div key={label}>
+                        {isSupplierIncluded ? (
+                          // MODEL B — flat amount only, no clearance line
+                          <div>
                             <div
                               style={{
                                 fontSize: 11,
-                                color: "#7986CB",
+                                color: "#388E3C",
                                 marginBottom: 2,
                               }}
                             >
-                              {label}
+                              Freight (from invoice)
                             </div>
-                            <div style={{ fontWeight: 700, color: "#3949AB" }}>
-                              {val}
+                            <div style={{ fontWeight: 700, color: "#2E7D32" }}>
+                              {fmtUsd(po.shipping_cost_usd)}
                             </div>
                           </div>
-                        ))}
+                        ) : (
+                          // MODEL A — freight + clearance + total
+                          [
+                            ["Freight", fmtUsd(po.shipping_cost_usd)],
+                            ["Clearance", fmtUsd(po.clearance_fee_usd)],
+                            [
+                              "Total Ship",
+                              fmtUsd(
+                                parseFloat(po.shipping_cost_usd) +
+                                  parseFloat(po.clearance_fee_usd || 0),
+                              ),
+                            ],
+                          ].map(([label, val]) => (
+                            <div key={label}>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "#7986CB",
+                                  marginBottom: 2,
+                                }}
+                              >
+                                {label}
+                              </div>
+                              <div
+                                style={{
+                                  fontWeight: 700,
+                                  color: "#3949AB",
+                                }}
+                              >
+                                {val}
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   )}
@@ -2277,7 +2410,6 @@ export default function HQPurchaseOrders() {
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                     {nextStatus &&
                       status !== "received" &&
@@ -2308,7 +2440,6 @@ export default function HQPurchaseOrders() {
                         ✓ Mark Complete
                       </button>
                     )}
-                    {/* Add / Edit Shipping */}
                     <button
                       style={shippingSet ? btn("ship-set") : btn("ship")}
                       onClick={() => {
@@ -2317,7 +2448,10 @@ export default function HQPurchaseOrders() {
                       }}
                     >
                       {shippingSet
-                        ? `✈️ Edit Shipping (${fmtUsd(parseFloat(po.shipping_cost_usd) + parseFloat(po.clearance_fee_usd || 0))})`
+                        ? `✈️ Edit Shipping (${fmtUsd(
+                            parseFloat(po.shipping_cost_usd) +
+                              parseFloat(po.clearance_fee_usd || 0),
+                          )})`
                         : "✈️ + Add Shipping"}
                     </button>
                     <button
@@ -2335,7 +2469,7 @@ export default function HQPurchaseOrders() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
-          ADD SHIPPING MODAL  (v1.2 new)
+          ADD / EDIT SHIPPING MODAL  (v1.3 — dual model)
       ══════════════════════════════════════════════════════════════════ */}
       {addShipPo && (
         <div
@@ -2350,11 +2484,7 @@ export default function HQPurchaseOrders() {
             padding: 24,
           }}
           onClick={() => {
-            if (!addShipConfirming) {
-              setAddShipPo(null);
-              setAddShipItems([]);
-              setAddShipWeight("");
-            }
+            if (!addShipConfirming) closeAddShipping();
           }}
         >
           <div
@@ -2410,11 +2540,7 @@ export default function HQPurchaseOrders() {
                   color: "#999",
                 }}
                 onClick={() => {
-                  if (!addShipConfirming) {
-                    setAddShipPo(null);
-                    setAddShipItems([]);
-                    setAddShipWeight("");
-                  }
+                  if (!addShipConfirming) closeAddShipping();
                 }}
               >
                 ✕
@@ -2430,7 +2556,7 @@ export default function HQPurchaseOrders() {
                 </div>
               ) : (
                 <>
-                  {/* Shipping mode + weight input */}
+                  {/* Two-column: mode selector LEFT, input RIGHT */}
                   <div
                     style={{
                       display: "grid",
@@ -2439,6 +2565,7 @@ export default function HQPurchaseOrders() {
                       marginBottom: 24,
                     }}
                   >
+                    {/* LEFT — Model selector */}
                     <div>
                       <label
                         style={{
@@ -2449,9 +2576,78 @@ export default function HQPurchaseOrders() {
                           marginBottom: 10,
                         }}
                       >
-                        Shipping Mode
+                        Shipping Model
                       </label>
-                      {SHIPPING_MODES.map((m) => (
+
+                      {/* MODEL B — Supplier Included (top, green accent) */}
+                      <div
+                        onClick={() => setAddShipMode("supplier_included")}
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: 8,
+                          marginBottom: 10,
+                          cursor: "pointer",
+                          border: `2px solid ${
+                            addShipMode === "supplier_included"
+                              ? "#2E7D32"
+                              : "#f0ede8"
+                          }`,
+                          background:
+                            addShipMode === "supplier_included"
+                              ? "#f0f7f0"
+                              : "#fafafa",
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <span style={{ fontSize: 18, marginTop: 1 }}>📄</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>
+                            Supplier Included
+                          </div>
+                          <div style={{ fontSize: 11, color: "#888" }}>
+                            Eybna &amp; others — flat amount from invoice
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#2E7D32",
+                              marginTop: 2,
+                              fontWeight: 600,
+                            }}
+                          >
+                            No clearance fee · no per-kg calc
+                          </div>
+                        </div>
+                        {addShipMode === "supplier_included" && (
+                          <span
+                            style={{
+                              color: "#2E7D32",
+                              fontWeight: 700,
+                              fontSize: 14,
+                            }}
+                          >
+                            ✓
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "#bbb",
+                          textAlign: "center",
+                          letterSpacing: "0.15em",
+                          textTransform: "uppercase",
+                          marginBottom: 8,
+                        }}
+                      >
+                        — or DDP agent (AimVape/Steamups) —
+                      </div>
+
+                      {/* MODEL A modes */}
+                      {CREATE_SHIPPING_MODES.map((m) => (
                         <div
                           key={m.id}
                           onClick={() => setAddShipMode(m.id)}
@@ -2460,7 +2656,9 @@ export default function HQPurchaseOrders() {
                             borderRadius: 8,
                             marginBottom: 6,
                             cursor: "pointer",
-                            border: `2px solid ${addShipMode === m.id ? "#3949AB" : "#f0ede8"}`,
+                            border: `2px solid ${
+                              addShipMode === m.id ? "#3949AB" : "#f0ede8"
+                            }`,
                             background:
                               addShipMode === m.id ? "#f3f0ff" : "#fafafa",
                             display: "flex",
@@ -2493,107 +2691,228 @@ export default function HQPurchaseOrders() {
                       ))}
                     </div>
 
+                    {/* RIGHT — Input area (switches on mode) */}
                     <div>
-                      <div style={{ marginBottom: 20 }}>
-                        <label
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "#555",
-                            display: "block",
-                            marginBottom: 8,
-                          }}
-                        >
-                          Total Shipment Weight (kg)
-                        </label>
-                        <input
-                          type="number"
-                          value={addShipWeight}
-                          min="0.001"
-                          step="0.001"
-                          placeholder="e.g. 4.500"
-                          onChange={(e) => setAddShipWeight(e.target.value)}
-                          style={{
-                            ...input,
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: "#3949AB",
-                            border: "2px solid #9fa8da",
-                          }}
-                        />
-                        <div
-                          style={{ fontSize: 12, color: "#999", marginTop: 6 }}
-                        >
-                          Enter total weight from freight agent notification
-                        </div>
-                      </div>
-
-                      {/* DDP rate card (when ddp_air selected) */}
-                      {addShipMode === "ddp_air" && (
-                        <div
-                          style={{
-                            background: "#f8f9ff",
-                            border: "1px solid #e8eaf6",
-                            borderRadius: 8,
-                            padding: "12px 16px",
-                          }}
-                        >
-                          <div
+                      {addShipMode === "supplier_included" ? (
+                        // MODEL B — flat invoice amount
+                        <div>
+                          <label
                             style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: "#7986CB",
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: "#555",
+                              display: "block",
                               marginBottom: 8,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.3px",
                             }}
                           >
-                            DDP Rate Card (China → SA)
+                            Shipping Amount on Invoice (USD)
+                          </label>
+                          <input
+                            type="number"
+                            value={addShipFlatAmount}
+                            min="0.01"
+                            step="0.01"
+                            placeholder="e.g. 35.00"
+                            onChange={(e) =>
+                              setAddShipFlatAmount(e.target.value)
+                            }
+                            style={{
+                              ...input,
+                              fontSize: 22,
+                              fontWeight: 700,
+                              color: "#2E7D32",
+                              border: "2px solid #a5d6a7",
+                            }}
+                          />
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#999",
+                              marginTop: 8,
+                            }}
+                          >
+                            Enter the exact shipping line from the supplier
+                            invoice. No clearance fee is added.
                           </div>
-                          {DDP_TIERS.map((t, i) => {
-                            const wt = parseFloat(addShipWeight) || 0;
-                            const active =
-                              wt > 0 &&
-                              wt <= t.maxKg &&
-                              (i === 0 || wt > DDP_TIERS[i - 1].maxKg);
-                            return (
+                          {parseFloat(addShipFlatAmount) > 0 && (
+                            <div
+                              style={{
+                                marginTop: 16,
+                                background: "#f0f7f0",
+                                border: "1px solid #c8e6c9",
+                                borderRadius: 8,
+                                padding: "12px 16px",
+                                fontSize: 13,
+                              }}
+                            >
+                              <div style={{ color: "#555", marginBottom: 6 }}>
+                                Quick preview:
+                              </div>
+                              {[
+                                [
+                                  "Freight (invoice):",
+                                  fmtUsd(addShipFlatAmount),
+                                  "#2E7D32",
+                                ],
+                                ["Clearance fee:", "$0.00 (none)", "#999"],
+                              ].map(([label, val, color]) => (
+                                <div
+                                  key={label}
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    marginBottom: 3,
+                                  }}
+                                >
+                                  <span style={{ color: "#666" }}>{label}</span>
+                                  <strong style={{ color }}>{val}</strong>
+                                </div>
+                              ))}
                               <div
-                                key={i}
                                 style={{
                                   display: "flex",
                                   justifyContent: "space-between",
-                                  fontSize: 12,
-                                  padding: "3px 0",
-                                  color: active ? "#3949AB" : "#aaa",
-                                  fontWeight: active ? 700 : 400,
+                                  borderTop: "1px solid #c8e6c9",
+                                  paddingTop: 6,
+                                  marginTop: 4,
                                 }}
                               >
-                                <span>
-                                  {i === 0 ? "≤" : `${DDP_TIERS[i - 1].maxKg}–`}
-                                  {t.maxKg === Infinity ? "100+" : t.maxKg}kg
+                                <span
+                                  style={{ color: "#333", fontWeight: 600 }}
+                                >
+                                  Est. landed (ZAR):
                                 </span>
-                                <span>${t.rateUsd}/kg + $25</span>
-                                {active && (
-                                  <span style={{ color: "#3949AB" }}>
-                                    ← active
-                                  </span>
-                                )}
+                                <strong style={{ color: "#2d4a2d" }}>
+                                  {fmtZar(
+                                    (parseFloat(addShipPo.subtotal) +
+                                      parseFloat(addShipFlatAmount)) *
+                                      parseFloat(
+                                        addShipPo.usd_zar_rate || 18.5,
+                                      ),
+                                  )}
+                                </strong>
                               </div>
-                            );
-                          })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        // MODEL A — weight + optional DDP rate card
+                        <div>
+                          <div style={{ marginBottom: 20 }}>
+                            <label
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "#555",
+                                display: "block",
+                                marginBottom: 8,
+                              }}
+                            >
+                              Total Shipment Weight (kg)
+                            </label>
+                            <input
+                              type="number"
+                              value={addShipWeight}
+                              min="0.001"
+                              step="0.001"
+                              placeholder="e.g. 4.500"
+                              onChange={(e) => setAddShipWeight(e.target.value)}
+                              style={{
+                                ...input,
+                                fontSize: 18,
+                                fontWeight: 700,
+                                color: "#3949AB",
+                                border: "2px solid #9fa8da",
+                              }}
+                            />
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#999",
+                                marginTop: 6,
+                              }}
+                            >
+                              Enter total weight from freight agent notification
+                            </div>
+                          </div>
+
+                          {addShipMode === "ddp_air" && (
+                            <div
+                              style={{
+                                background: "#f8f9ff",
+                                border: "1px solid #e8eaf6",
+                                borderRadius: 8,
+                                padding: "12px 16px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: "#7986CB",
+                                  marginBottom: 8,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.3px",
+                                }}
+                              >
+                                DDP Rate Card (China → SA)
+                              </div>
+                              {DDP_TIERS.map((t, i) => {
+                                const wt = parseFloat(addShipWeight) || 0;
+                                const active =
+                                  wt > 0 &&
+                                  wt <= t.maxKg &&
+                                  (i === 0 || wt > DDP_TIERS[i - 1].maxKg);
+                                return (
+                                  <div
+                                    key={i}
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      fontSize: 12,
+                                      padding: "3px 0",
+                                      color: active ? "#3949AB" : "#aaa",
+                                      fontWeight: active ? 700 : 400,
+                                    }}
+                                  >
+                                    <span>
+                                      {i === 0
+                                        ? "≤"
+                                        : `${DDP_TIERS[i - 1].maxKg}–`}
+                                      {t.maxKg === Infinity ? "100+" : t.maxKg}
+                                      kg
+                                    </span>
+                                    <span>${t.rateUsd}/kg + $25</span>
+                                    {active && (
+                                      <span style={{ color: "#3949AB" }}>
+                                        ← active
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Preview — auto-updates as weight changes */}
+                  {/* Preview */}
                   {addShipPreview ? (
                     <>
-                      {/* Cost breakdown summary */}
+                      {/* Breakdown summary */}
                       <div
                         style={{
-                          background: "#f3f0ff",
-                          border: "1px solid #d1c4e9",
+                          background:
+                            addShipMode === "supplier_included"
+                              ? "#f0f7f0"
+                              : "#f3f0ff",
+                          border: `1px solid ${
+                            addShipMode === "supplier_included"
+                              ? "#c8e6c9"
+                              : "#d1c4e9"
+                          }`,
                           borderRadius: 10,
                           padding: "16px 20px",
                           marginBottom: 20,
@@ -2603,7 +2922,10 @@ export default function HQPurchaseOrders() {
                           style={{
                             fontSize: 12,
                             fontWeight: 700,
-                            color: "#5C6BC0",
+                            color:
+                              addShipMode === "supplier_included"
+                                ? "#2E7D32"
+                                : "#5C6BC0",
                             marginBottom: 12,
                             textTransform: "uppercase",
                             letterSpacing: "0.3px",
@@ -2614,32 +2936,57 @@ export default function HQPurchaseOrders() {
                         <div
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "repeat(5, 1fr)",
+                            gridTemplateColumns:
+                              addShipMode === "supplier_included"
+                                ? "repeat(3, 1fr)"
+                                : "repeat(5, 1fr)",
                             gap: 12,
                           }}
                         >
-                          {[
-                            [
-                              "Freight (USD)",
-                              fmtUsd(addShipPreview.breakdown.freightUsd),
-                            ],
-                            [
-                              "Clearance (USD)",
-                              fmtUsd(addShipPreview.breakdown.clearanceUsd),
-                            ],
-                            [
-                              "Total Ship (USD)",
-                              fmtUsd(addShipPreview.breakdown.totalShippingUsd),
-                            ],
-                            [
-                              "EXW Subtotal (USD)",
-                              fmtUsd(addShipPreview.breakdown.subtotalUsd),
-                            ],
-                            [
-                              "New Landed (ZAR)",
-                              fmtZar(addShipPreview.breakdown.newLandedCostZar),
-                            ],
-                          ].map(([label, val]) => (
+                          {(addShipMode === "supplier_included"
+                            ? [
+                                [
+                                  "Invoice Freight (USD)",
+                                  fmtUsd(addShipPreview.breakdown.freightUsd),
+                                ],
+                                [
+                                  "EXW Subtotal (USD)",
+                                  fmtUsd(addShipPreview.breakdown.subtotalUsd),
+                                ],
+                                [
+                                  "New Landed (ZAR)",
+                                  fmtZar(
+                                    addShipPreview.breakdown.newLandedCostZar,
+                                  ),
+                                ],
+                              ]
+                            : [
+                                [
+                                  "Freight (USD)",
+                                  fmtUsd(addShipPreview.breakdown.freightUsd),
+                                ],
+                                [
+                                  "Clearance (USD)",
+                                  fmtUsd(addShipPreview.breakdown.clearanceUsd),
+                                ],
+                                [
+                                  "Total Ship (USD)",
+                                  fmtUsd(
+                                    addShipPreview.breakdown.totalShippingUsd,
+                                  ),
+                                ],
+                                [
+                                  "EXW Subtotal (USD)",
+                                  fmtUsd(addShipPreview.breakdown.subtotalUsd),
+                                ],
+                                [
+                                  "New Landed (ZAR)",
+                                  fmtZar(
+                                    addShipPreview.breakdown.newLandedCostZar,
+                                  ),
+                                ],
+                              ]
+                          ).map(([label, val]) => (
                             <div
                               key={label}
                               style={{
@@ -2652,7 +2999,10 @@ export default function HQPurchaseOrders() {
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: "#7986CB",
+                                  color:
+                                    addShipMode === "supplier_included"
+                                      ? "#388E3C"
+                                      : "#7986CB",
                                   marginBottom: 4,
                                   textTransform: "uppercase",
                                 }}
@@ -2662,7 +3012,10 @@ export default function HQPurchaseOrders() {
                               <div
                                 style={{
                                   fontWeight: 700,
-                                  color: "#3949AB",
+                                  color:
+                                    addShipMode === "supplier_included"
+                                      ? "#2E7D32"
+                                      : "#3949AB",
                                   fontSize: 14,
                                 }}
                               >
@@ -2673,7 +3026,7 @@ export default function HQPurchaseOrders() {
                         </div>
                       </div>
 
-                      {/* Per-item landed cost preview table */}
+                      {/* Per-item preview table */}
                       <div style={{ marginBottom: 24 }}>
                         <div
                           style={{
@@ -2692,8 +3045,7 @@ export default function HQPurchaseOrders() {
                               marginLeft: 8,
                             }}
                           >
-                            Pro-rated by EXW line value — shipping allocated
-                            proportionally
+                            Pro-rated by EXW line value
                           </span>
                         </div>
                         <div style={{ overflowX: "auto" }}>
@@ -2761,7 +3113,12 @@ export default function HQPurchaseOrders() {
                                         </div>
                                       )}
                                     </td>
-                                    <td style={{ ...td, textAlign: "center" }}>
+                                    <td
+                                      style={{
+                                        ...td,
+                                        textAlign: "center",
+                                      }}
+                                    >
                                       {item.qty}
                                     </td>
                                     <td style={td}>
@@ -2815,7 +3172,6 @@ export default function HQPurchaseOrders() {
                         </div>
                       </div>
 
-                      {/* Items without inventory_link warning */}
                       {addShipPreview.lineItems.some((i) => !i.item_id) && (
                         <div
                           style={{
@@ -2829,15 +3185,14 @@ export default function HQPurchaseOrders() {
                           }}
                         >
                           ⚠️ <strong>Note:</strong> Items marked "No inventory
-                          link" will have their PO line costs updated, but
-                          inventory <code>cost_price</code> cannot be updated
-                          without a linked <code>item_id</code>. Receive the PO
-                          first to link inventory, then run Add Shipping again
-                          to update costs.
+                          link" will have PO line costs updated, but{" "}
+                          <code>inventory_items.cost_price</code> cannot be
+                          updated without a linked <code>item_id</code>. Receive
+                          the PO first, then re-run Edit Shipping to propagate
+                          costs.
                         </div>
                       )}
 
-                      {/* Confirm button */}
                       <div
                         style={{
                           display: "flex",
@@ -2850,17 +3205,17 @@ export default function HQPurchaseOrders() {
                         <button
                           style={btn("ghost")}
                           disabled={addShipConfirming}
-                          onClick={() => {
-                            setAddShipPo(null);
-                            setAddShipItems([]);
-                            setAddShipWeight("");
-                          }}
+                          onClick={closeAddShipping}
                         >
                           Cancel
                         </button>
                         <button
                           style={{
-                            ...btn("ship"),
+                            ...btn(
+                              addShipMode === "supplier_included"
+                                ? "success"
+                                : "ship",
+                            ),
                             fontSize: 14,
                             padding: "12px 28px",
                           }}
@@ -2869,12 +3224,13 @@ export default function HQPurchaseOrders() {
                         >
                           {addShipConfirming
                             ? "Updating…"
-                            : `✓ Confirm & Update Costs — ${fmtZar(addShipPreview.breakdown.newLandedCostZar)}`}
+                            : `✓ Confirm & Update Costs — ${fmtZar(
+                                addShipPreview.breakdown.newLandedCostZar,
+                              )}`}
                         </button>
                       </div>
                     </>
                   ) : (
-                    /* Prompt to enter weight */
                     <div
                       style={{
                         textAlign: "center",
@@ -2882,19 +3238,28 @@ export default function HQPurchaseOrders() {
                         color: "#bbb",
                       }}
                     >
-                      <div style={{ fontSize: 36, marginBottom: 12 }}>⚖️</div>
+                      <div style={{ fontSize: 36, marginBottom: 12 }}>
+                        {addShipMode === "supplier_included" ? "💵" : "⚖️"}
+                      </div>
                       <div style={{ fontSize: 14 }}>
-                        Enter the total shipment weight above to preview landed
-                        cost calculations.
+                        {addShipMode === "supplier_included"
+                          ? "Enter the shipping amount from the supplier invoice above."
+                          : "Enter the total shipment weight above to preview landed cost calculations."}
                       </div>
                       {addShipItems.length > 0 && (
                         <div
-                          style={{ marginTop: 12, fontSize: 13, color: "#999" }}
+                          style={{
+                            marginTop: 12,
+                            fontSize: 13,
+                            color: "#999",
+                          }}
                         >
                           {addShipItems.length} line item
                           {addShipItems.length !== 1 ? "s" : ""} loaded
                           {addShipItems.filter((i) => i.item_id).length > 0
-                            ? ` · ${addShipItems.filter((i) => i.item_id).length} linked to inventory`
+                            ? ` · ${
+                                addShipItems.filter((i) => i.item_id).length
+                              } linked to inventory`
                             : " · ⚠ no inventory links — receive PO first"}
                         </div>
                       )}
