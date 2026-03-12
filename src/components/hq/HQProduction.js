@@ -1,10 +1,8 @@
-// src/components/hq/HQProduction.js v1.2
+// src/components/hq/HQProduction.js v1.3
+// v1.3 — Terpene unit fix: ml (post SQL conversion), % input now accepts 3–15 (not ratio)
+//         terpeneRatio = input% / 100  |  all terpene labels updated g → ml
 // v1.2 — Admin controls on History: Edit (notes/actual/status), Cancel, Delete w/ stock reversal
 // v1.1 — Schema fix: aligned to real DB columns
-//   production_runs: id, batch_id, run_number, status, planned_units,
-//     actual_units, started_at, completed_at, notes, tenant_id, created_at
-//   production_run_inputs: id, run_id, item_id, quantity_planned, quantity_actual, notes
-//   yield_pct: calculated client-side (actual/planned × 100) — not a DB column
 // v1.0 — WP-L: Production Module
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -96,13 +94,13 @@ const FORMAT_BOM = {
   "1ml_cart": {
     label: "1ml Cartridge (510 Thread)",
     distillate_ml: 1.0,
-    terpene_ratio: 0.1,
+    terpene_pct: 10, // default 10% — stored as percentage now
     format_short: "1ml Cart",
   },
   "2ml_pen": {
     label: "2ml Disposable Pen (All-in-One)",
     distillate_ml: 2.0,
-    terpene_ratio: 0.1,
+    terpene_pct: 10,
     format_short: "2ml Pen",
   },
 };
@@ -515,7 +513,7 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
           },
           {
             label: "Terpenes",
-            value: `${totalTerpenes.toFixed(1)}g`,
+            value: `${totalTerpenes.toFixed(2)}ml`,
             sub: `${terpenes.length} strains`,
             color: C.purple,
           },
@@ -605,7 +603,7 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
       >
         {[
           { label: "🧪 Distillate", data: distillate, unit: "ml", decimals: 1 },
-          { label: "🌿 Terpenes", data: terpenes, unit: "g", decimals: 2 },
+          { label: "🌿 Terpenes", data: terpenes, unit: "ml", decimals: 2 },
           { label: "⚙ Hardware", data: hardware, unit: "pcs", decimals: 0 },
           { label: "📦 Finished", data: finished, unit: "pcs", decimals: 0 },
         ].map(({ label, data, unit, decimals }) => (
@@ -777,7 +775,7 @@ function NewRunPanel({ items, onComplete }) {
     distillate_item_id: "",
     actual_units: "",
     notes: "",
-    terpene_ratio_override: "",
+    terpene_pct_override: "", // v1.3: stored as % (e.g. 6.67), not ratio
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -788,12 +786,17 @@ function NewRunPanel({ items, onComplete }) {
 
   const bom = FORMAT_BOM[form.format] || FORMAT_BOM["1ml_cart"];
   const planned = parseInt(form.planned_units) || 0;
-  const terpeneRatio =
-    parseFloat(form.terpene_ratio_override) || bom.terpene_ratio;
+
+  // v1.3 FIX: user enters a percentage (e.g. 6.67 or 10), divide by 100 for ratio
+  const terpeneOverridePct = parseFloat(form.terpene_pct_override);
+  const terpenePct =
+    terpeneOverridePct > 0 ? terpeneOverridePct : bom.terpene_pct;
+  const terpeneRatio = terpenePct / 100; // e.g. 6.67 → 0.0667
 
   const distillateNeeded = +(planned * bom.distillate_ml).toFixed(2);
+  // terpeneNeeded in ml = units × distillate_ml_per_unit × ratio
   const terpeneNeeded = +(planned * bom.distillate_ml * terpeneRatio).toFixed(
-    2,
+    3,
   );
   const hardwareNeeded = planned;
 
@@ -881,7 +884,7 @@ function NewRunPanel({ items, onComplete }) {
         .single();
       if (runErr) throw runErr;
 
-      // 3. Log inputs (run_id FK, not production_run_id)
+      // 3. Log inputs (run_id FK)
       await supabase.from("production_run_inputs").insert([
         {
           run_id: run.id,
@@ -994,7 +997,6 @@ function NewRunPanel({ items, onComplete }) {
       onComplete();
     } catch (err) {
       console.error("[HQProduction] Run error:", err);
-      console.error("[HQProduction] Run error:", err);
     } finally {
       setSaving(false);
     }
@@ -1074,20 +1076,31 @@ function NewRunPanel({ items, onComplete }) {
             />
           </div>
           <div>
-            {fLabel(
-              "Terpene % g/ml",
-              `default ${(bom.terpene_ratio * 100).toFixed(0)}%`,
-            )}
+            {/* v1.3: input is now a real percentage (3–15), not a ratio */}
+            {fLabel("Terpene %", `default ${bom.terpene_pct}% · range 3–15%`)}
             <input
               style={sInput}
               type="number"
-              step="0.01"
-              min="0.01"
-              max="0.30"
-              placeholder={`${(bom.terpene_ratio * 100).toFixed(0)}% (default)`}
-              value={form.terpene_ratio_override}
-              onChange={(e) => set("terpene_ratio_override", e.target.value)}
+              step="0.1"
+              min="3"
+              max="15"
+              placeholder={`${bom.terpene_pct} (default)`}
+              value={form.terpene_pct_override}
+              onChange={(e) => set("terpene_pct_override", e.target.value)}
             />
+            {terpeneNeeded > 0 && planned > 0 && (
+              <p
+                style={{
+                  fontSize: "10px",
+                  color: C.accent,
+                  margin: "4px 0 0",
+                  fontFamily: F.body,
+                }}
+              >
+                = {terpeneNeeded.toFixed(3)}ml terpene for {planned} unit
+                {planned !== 1 ? "s" : ""}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -1140,7 +1153,7 @@ function NewRunPanel({ items, onComplete }) {
               <option value="">— Select —</option>
               {terpeneItems.map((i) => (
                 <option key={i.id} value={i.id}>
-                  {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(2)}g)
+                  {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(2)}ml)
                 </option>
               ))}
             </select>
@@ -1194,11 +1207,12 @@ function NewRunPanel({ items, onComplete }) {
               unit="ml"
               color={C.blue}
             />
+            {/* v1.3: terpene gauge now uses ml */}
             <StockGauge
               label={`Terpene (${selTerp?.name || "—"})`}
               available={terpAvail}
               needed={terpeneNeeded}
-              unit="g"
+              unit="ml"
               color={C.purple}
             />
             <StockGauge
@@ -1327,7 +1341,8 @@ function NewRunPanel({ items, onComplete }) {
                   {selDist?.name}
                 </li>
                 <li>
-                  Deduct <strong>{terpeneNeeded}g</strong> from {selTerp?.name}
+                  Deduct <strong>{terpeneNeeded.toFixed(3)}ml</strong> from{" "}
+                  {selTerp?.name}
                 </li>
                 <li>
                   Deduct <strong>{hardwareNeeded} pcs</strong> from{" "}
@@ -1380,13 +1395,13 @@ function NewRunPanel({ items, onComplete }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function HistoryPanel({ runs, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
-  const [editing, setEditing] = useState(null); // run.id currently in edit mode
+  const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
-  const [deleting, setDeleting] = useState(null); // run.id pending delete confirmation
+  const [deleting, setDeleting] = useState(null);
   const [reverseStock, setReverseStock] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [cancelling, setCancelling] = useState(null); // run.id awaiting cancel confirm
-  const [toast, setToast] = useState(null); // { msg, type } inline feedback
+  const [cancelling, setCancelling] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -1408,7 +1423,6 @@ function HistoryPanel({ runs, onRefresh }) {
     setEditForm({});
   };
 
-  // ── Save edit ──────────────────────────────────────────────────────────────
   const handleSaveEdit = async (run) => {
     setSaving(true);
     try {
@@ -1430,7 +1444,6 @@ function HistoryPanel({ runs, onRefresh }) {
     }
   };
 
-  // ── Cancel run (status → cancelled, no stock reversal) ────────────────────
   const handleCancel = async (run) => {
     setSaving(true);
     try {
@@ -1448,12 +1461,10 @@ function HistoryPanel({ runs, onRefresh }) {
     }
   };
 
-  // ── Delete run (optionally reverse stock movements) ───────────────────────
   const handleDelete = async (run) => {
     setSaving(true);
     try {
       if (reverseStock) {
-        // Fetch all stock_movements for this run number
         const { data: movements, error: mErr } = await supabase
           .from("stock_movements")
           .select("id, item_id, quantity, movement_type")
@@ -1461,26 +1472,19 @@ function HistoryPanel({ runs, onRefresh }) {
         if (mErr) throw mErr;
 
         if (movements && movements.length > 0) {
-          // Reverse each movement: production_out → add back · production_in → deduct
           for (const mv of movements) {
-            const reversal = -mv.quantity; // flip sign
-
-            // Insert reversal movement
+            const reversal = -mv.quantity;
             const { error: revErr } = await supabase
               .from("stock_movements")
               .insert({
                 item_id: mv.item_id,
                 quantity: reversal,
-                movement_type:
-                  mv.movement_type === "production_out"
-                    ? "adjustment"
-                    : "adjustment",
+                movement_type: "adjustment",
                 reference: `VOID-${run.run_number}`,
                 notes: `Reversal: deleted run ${run.run_number}`,
               });
             if (revErr) throw revErr;
 
-            // Update inventory_items.quantity_on_hand
             const { data: item, error: iErr } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
@@ -1498,14 +1502,12 @@ function HistoryPanel({ runs, onRefresh }) {
         }
       }
 
-      // Delete inputs first (FK constraint)
       const { error: inpErr } = await supabase
         .from("production_run_inputs")
         .delete()
         .eq("run_id", run.id);
       if (inpErr) throw inpErr;
 
-      // Delete the run
       const { error: runErr } = await supabase
         .from("production_runs")
         .delete()
@@ -1605,7 +1607,6 @@ function HistoryPanel({ runs, onRefresh }) {
                   opacity: isCancelled ? 0.75 : 1,
                 }}
               >
-                {/* ── Header row ── */}
                 <div
                   style={{
                     display: "flex",
@@ -1655,7 +1656,6 @@ function HistoryPanel({ runs, onRefresh }) {
                     >
                       {new Date(run.created_at).toLocaleDateString("en-ZA")}
                     </span>
-                    {/* Admin buttons */}
                     <button
                       onClick={() => openEdit(run)}
                       style={{
@@ -1664,7 +1664,6 @@ function HistoryPanel({ runs, onRefresh }) {
                         fontSize: "9px",
                         letterSpacing: "0.1em",
                       }}
-                      title="Edit notes, actual units, status"
                     >
                       ✎ Edit
                     </button>
@@ -1731,7 +1730,6 @@ function HistoryPanel({ runs, onRefresh }) {
                         color: C.red,
                         borderColor: C.red,
                       }}
-                      title="Delete this run (with optional stock reversal)"
                     >
                       🗑 Delete
                     </button>
@@ -1748,7 +1746,6 @@ function HistoryPanel({ runs, onRefresh }) {
                   </div>
                 </div>
 
-                {/* ── KPI row ── */}
                 <div
                   style={{
                     display: "flex",
@@ -1817,7 +1814,6 @@ function HistoryPanel({ runs, onRefresh }) {
                   </div>
                 )}
 
-                {/* ── Expanded detail ── */}
                 {isOpen && (
                   <div
                     style={{
@@ -1826,7 +1822,6 @@ function HistoryPanel({ runs, onRefresh }) {
                       paddingTop: "14px",
                     }}
                   >
-                    {/* DELETE confirmation panel */}
                     {isDeleting && (
                       <div
                         style={{
@@ -1924,7 +1919,6 @@ function HistoryPanel({ runs, onRefresh }) {
                       </div>
                     )}
 
-                    {/* EDIT panel */}
                     {isEditing && (
                       <div
                         style={{
@@ -2065,7 +2059,6 @@ function HistoryPanel({ runs, onRefresh }) {
                       </div>
                     )}
 
-                    {/* Materials consumed */}
                     {run.production_run_inputs?.length > 0 && (
                       <>
                         <div
@@ -2122,7 +2115,7 @@ function HistoryPanel({ runs, onRefresh }) {
                                   inp.quantity_actual ||
                                     inp.quantity_planned ||
                                     0,
-                                ).toFixed(2)}
+                                ).toFixed(3)}
                                 <span
                                   style={{
                                     fontSize: "11px",
@@ -2225,9 +2218,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
 
       await supabase
         .from("inventory_items")
-        .update({
-          quantity_on_hand: available - qty,
-        })
+        .update({ quantity_on_hand: available - qty })
         .eq("id", form.item_id);
 
       setForm({
@@ -2238,7 +2229,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
         notes: "",
       });
       onRefresh();
-      // success — UI refreshes automatically via onRefresh()
     } catch (err) {
       console.error("[HQProduction] Allocate error:", err);
     } finally {

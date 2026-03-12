@@ -1,16 +1,10 @@
-// src/components/hq/HQSuppliers.js — v1.1
-// Protea Botanicals — WP-A Supplier Catalogue & FX Engine
-// HQ-only view: supplier product catalogue + live USD/ZAR + shipping calculator + local inputs
-// DO NOT render in Admin or Retailer views — HQ only
-//
-// v1.1: Light theme fix (was dark theme on light background — text invisible)
-//       Add Supplier panel added to Supplier List tab — free-form, not sector-confined
-//       Supplier list refreshes live after add (feeds systemHealthContext)
+// src/components/hq/HQSuppliers.js — v1.2
+// v1.2: Edit Product panel — click Edit on any catalogue row to update price, SKU, MOQ, weight, lead time, description
+// v1.1: Light theme fix, Add Supplier panel, live refresh
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── Colour tokens — LIGHT THEME (matches HQ dashboard) ──────────────────────
 const C = {
   bg: "#f4f0e8",
   surface: "#ffffff",
@@ -29,7 +23,6 @@ const C = {
   primaryDark: "#1b4332",
 };
 
-// ─── DDP Air rate tiers ───────────────────────────────────────────────────────
 const DDP_TIERS = [
   { maxKg: 21, ratePerKg: 15.8 },
   { maxKg: 50, ratePerKg: 15.5 },
@@ -37,14 +30,12 @@ const DDP_TIERS = [
   { maxKg: Infinity, ratePerKg: 14.9 },
 ];
 const DDP_CLEARANCE_USD = 25;
-
 function calcDdpAir(weightKg) {
   if (!weightKg || weightKg <= 0) return 0;
   const tier = DDP_TIERS.find((t) => weightKg <= t.maxKg);
   return weightKg * tier.ratePerKg + DDP_CLEARANCE_USD;
 }
 
-// ─── useFxRate hook ───────────────────────────────────────────────────────────
 function useFxRate() {
   const [fx, setFx] = useState({
     usd_zar: null,
@@ -53,7 +44,6 @@ function useFxRate() {
     fetched_at: null,
   });
   const [loading, setLoading] = useState(true);
-
   const fetchRate = useCallback(async () => {
     setLoading(true);
     try {
@@ -77,14 +67,12 @@ function useFxRate() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     fetchRate();
   }, [fetchRate]);
   return { fx, loading, refresh: fetchRate };
 }
 
-// ─── Pill badge ───────────────────────────────────────────────────────────────
 function Badge({ label, color = C.info, bg = C.infoDim }) {
   return (
     <span
@@ -105,7 +93,6 @@ function Badge({ label, color = C.info, bg = C.infoDim }) {
   );
 }
 
-// ─── Section card wrapper ─────────────────────────────────────────────────────
 function Card({ children, style = {}, onClick }) {
   return (
     <div
@@ -125,7 +112,6 @@ function Card({ children, style = {}, onClick }) {
   );
 }
 
-// ─── Input ────────────────────────────────────────────────────────────────────
 function Input({ label, ...props }) {
   return (
     <div style={{ marginBottom: 12 }}>
@@ -182,6 +168,311 @@ function Select({ label, children, ...props }) {
   );
 }
 
+// ─── Edit Product Panel (NEW v1.2) ────────────────────────────────────────────
+function EditProductPanel({ product, suppliers, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    supplier_id: product.supplier_id || "",
+    sku: product.sku || "",
+    name: product.name || "",
+    category: product.category || "hardware",
+    description: product.description || "",
+    unit_price_usd:
+      product.unit_price_usd != null ? String(product.unit_price_usd) : "",
+    currency: product.currency || "USD",
+    moq: product.moq != null ? String(product.moq) : "",
+    weight_kg_per_unit:
+      product.weight_kg_per_unit != null
+        ? String(product.weight_kg_per_unit)
+        : "",
+    lead_time_days:
+      product.lead_time_days != null ? String(product.lead_time_days) : "",
+    notes: product.notes || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const save = async () => {
+    if (!form.supplier_id || !form.name.trim()) {
+      setError("Supplier and name are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const payload = {
+      supplier_id: form.supplier_id,
+      sku: form.sku.trim() || null,
+      name: form.name.trim(),
+      category: form.category,
+      description: form.description.trim() || null,
+      unit_price_usd:
+        form.unit_price_usd !== "" ? parseFloat(form.unit_price_usd) : null,
+      currency: form.currency,
+      moq: form.moq !== "" ? parseInt(form.moq) : 1,
+      weight_kg_per_unit:
+        form.weight_kg_per_unit !== ""
+          ? parseFloat(form.weight_kg_per_unit)
+          : null,
+      lead_time_days:
+        form.lead_time_days !== "" ? parseInt(form.lead_time_days) : null,
+      notes: form.notes.trim() || null,
+    };
+    const { error: err } = await supabase
+      .from("supplier_products")
+      .update(payload)
+      .eq("id", product.id);
+    setSaving(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    onSaved();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        right: 0,
+        width: 440,
+        height: "100vh",
+        background: C.surface,
+        borderLeft: `1px solid ${C.border}`,
+        zIndex: 1000,
+        overflowY: "auto",
+        padding: 24,
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              color: C.text,
+              fontWeight: 700,
+              fontSize: 18,
+              fontFamily: "'Cormorant Garamond', serif",
+            }}
+          >
+            Edit Product
+          </div>
+          <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+            Update price, SKU, weight or any field
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: C.muted,
+            fontSize: 22,
+            cursor: "pointer",
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      <Select
+        label="Supplier *"
+        value={form.supplier_id}
+        onChange={(e) => set("supplier_id", e.target.value)}
+      >
+        <option value="">— select supplier —</option>
+        {suppliers.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name} ({s.country})
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="Category"
+        value={form.category}
+        onChange={(e) => set("category", e.target.value)}
+      >
+        <option value="hardware">Hardware</option>
+        <option value="terpene">Terpene</option>
+        <option value="packaging">Packaging</option>
+        <option value="distillate">Distillate</option>
+        <option value="other">Other</option>
+      </Select>
+      <Input
+        label="Product Name *"
+        value={form.name}
+        onChange={(e) => set("name", e.target.value)}
+      />
+      <Input
+        label="SKU / Code"
+        value={form.sku}
+        onChange={(e) => set("sku", e.target.value)}
+        placeholder="e.g. AIM-510-1ML"
+      />
+
+      <div
+        style={{
+          background: C.accentDim,
+          border: `1px solid ${C.accent}40`,
+          borderRadius: 6,
+          padding: "12px 14px",
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            color: C.accent,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            marginBottom: 8,
+          }}
+        >
+          💲 Pricing
+        </div>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+        >
+          <Input
+            label="Unit Price"
+            type="number"
+            value={form.unit_price_usd}
+            onChange={(e) => set("unit_price_usd", e.target.value)}
+            placeholder="0.00"
+            style={{ marginBottom: 0 }}
+          />
+          <Select
+            label="Currency"
+            value={form.currency}
+            onChange={(e) => set("currency", e.target.value)}
+            style={{ marginBottom: 0 }}
+          >
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="ZAR">ZAR</option>
+            <option value="CNY">CNY</option>
+          </Select>
+        </div>
+      </div>
+
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
+      >
+        <Input
+          label="MOQ"
+          type="number"
+          value={form.moq}
+          onChange={(e) => set("moq", e.target.value)}
+          placeholder="1"
+        />
+        <Input
+          label="Weight kg/unit"
+          type="number"
+          value={form.weight_kg_per_unit}
+          onChange={(e) => set("weight_kg_per_unit", e.target.value)}
+          placeholder="0.0000"
+        />
+        <Input
+          label="Lead Time (days)"
+          type="number"
+          value={form.lead_time_days}
+          onChange={(e) => set("lead_time_days", e.target.value)}
+          placeholder="21"
+        />
+      </div>
+      <Input
+        label="Description"
+        value={form.description}
+        onChange={(e) => set("description", e.target.value)}
+        placeholder="Optional"
+      />
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>
+          Notes
+        </div>
+        <textarea
+          value={form.notes}
+          onChange={(e) => set("notes", e.target.value)}
+          rows={3}
+          style={{
+            background: C.bg,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            color: C.text,
+            padding: "8px 12px",
+            width: "100%",
+            fontSize: 13,
+            outline: "none",
+            boxSizing: "border-box",
+            resize: "vertical",
+          }}
+        />
+      </div>
+
+      {error && (
+        <div
+          style={{
+            background: C.dangerDim,
+            border: `1px solid ${C.danger}30`,
+            borderLeft: `3px solid ${C.danger}`,
+            borderRadius: 4,
+            padding: "8px 12px",
+            color: C.danger,
+            fontSize: 12,
+            marginBottom: 16,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          onClick={onClose}
+          style={{
+            flex: 1,
+            padding: "12px",
+            borderRadius: 6,
+            border: `1px solid ${C.border}`,
+            background: "none",
+            color: C.muted,
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: 14,
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{
+            flex: 2,
+            background: C.accent,
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            padding: "12px 24px",
+            cursor: saving ? "not-allowed" : "pointer",
+            fontWeight: 600,
+            fontSize: 14,
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? "Saving…" : "✓ Update Product"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Add Supplier panel ───────────────────────────────────────────────────────
 function AddSupplierPanel({ onClose, onSaved }) {
   const [form, setForm] = useState({
@@ -196,9 +487,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
   const save = async () => {
     if (!form.name.trim()) {
       setError("Supplier name is required.");
@@ -206,13 +495,14 @@ function AddSupplierPanel({ onClose, onSaved }) {
     }
     setSaving(true);
     setError("");
-    const payload = {
-      name: form.name.trim(),
-      country: form.country.trim() || "Unknown",
-      currency: form.currency,
-      contact_name: form.contact_name.trim() || null,
-    };
-    const { error: err } = await supabase.from("suppliers").insert([payload]);
+    const { error: err } = await supabase.from("suppliers").insert([
+      {
+        name: form.name.trim(),
+        country: form.country.trim() || "Unknown",
+        currency: form.currency,
+        contact_name: form.contact_name.trim() || null,
+      },
+    ]);
     setSaving(false);
     if (err) {
       setError(err.message);
@@ -220,7 +510,6 @@ function AddSupplierPanel({ onClose, onSaved }) {
     }
     onSaved();
   };
-
   return (
     <div
       style={{
@@ -268,14 +557,11 @@ function AddSupplierPanel({ onClose, onSaved }) {
             color: C.muted,
             fontSize: 22,
             cursor: "pointer",
-            lineHeight: 1,
           }}
         >
           ×
         </button>
       </div>
-
-      {/* Core fields */}
       <div
         style={{
           background: C.bg,
@@ -310,25 +596,20 @@ function AddSupplierPanel({ onClose, onSaved }) {
             label="Country"
             value={form.country}
             onChange={(e) => set("country", e.target.value)}
-            placeholder="South Africa"
           />
           <Select
             label="Invoicing Currency"
             value={form.currency}
             onChange={(e) => set("currency", e.target.value)}
           >
-            <option value="ZAR">ZAR — South African Rand</option>
-            <option value="USD">USD — US Dollar</option>
-            <option value="EUR">EUR — Euro</option>
-            <option value="CNY">CNY — Chinese Yuan</option>
-            <option value="GBP">GBP — British Pound</option>
-            <option value="ILS">ILS — Israeli Shekel</option>
-            <option value="AUD">AUD — Australian Dollar</option>
+            <option value="ZAR">ZAR</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="CNY">CNY</option>
+            <option value="GBP">GBP</option>
           </Select>
         </div>
       </div>
-
-      {/* Contact fields */}
       <div
         style={{
           background: C.bg,
@@ -354,60 +635,24 @@ function AddSupplierPanel({ onClose, onSaved }) {
           label="Contact Person"
           value={form.contact_name}
           onChange={(e) => set("contact_name", e.target.value)}
-          placeholder="e.g. Jane Smith"
         />
         <Input
           label="Email"
           type="email"
           value={form.contact_email}
           onChange={(e) => set("contact_email", e.target.value)}
-          placeholder="e.g. jane@company.com"
         />
         <Input
           label="Phone / WhatsApp"
           value={form.contact_phone}
           onChange={(e) => set("contact_phone", e.target.value)}
-          placeholder="e.g. +27 82 000 0000"
         />
         <Input
           label="Website"
           value={form.website}
           onChange={(e) => set("website", e.target.value)}
-          placeholder="e.g. https://company.com"
         />
       </div>
-
-      {/* Notes */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>
-          Notes (optional)
-        </div>
-        <textarea
-          value={form.notes}
-          onChange={(e) => set("notes", e.target.value)}
-          rows={3}
-          placeholder="Anything useful — lead times, payment terms, MOQ policies…"
-          style={{
-            background: C.bg,
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            color: C.text,
-            padding: "8px 12px",
-            width: "100%",
-            fontSize: 13,
-            outline: "none",
-            boxSizing: "border-box",
-            resize: "vertical",
-          }}
-        />
-        <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>
-          ℹ Contact email, phone, website and notes are saved locally in this
-          form only for now — core fields (name, country, currency, contact
-          name) are stored in the database. Extended fields can be added as
-          columns when needed.
-        </div>
-      </div>
-
       {error && (
         <div
           style={{
@@ -424,7 +669,6 @@ function AddSupplierPanel({ onClose, onSaved }) {
           {error}
         </div>
       )}
-
       <button
         onClick={save}
         disabled={saving}
@@ -465,7 +709,6 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
   const save = async () => {
     if (!form.supplier_id || !form.name) {
       setError("Supplier and name are required.");
@@ -473,28 +716,27 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
     }
     setSaving(true);
     setError("");
-    const payload = {
-      supplier_id: form.supplier_id,
-      sku: form.sku || null,
-      name: form.name,
-      category: form.category,
-      description: form.description || null,
-      unit_price_usd: form.unit_price_usd
-        ? parseFloat(form.unit_price_usd)
-        : null,
-      currency: form.currency,
-      moq: form.moq ? parseInt(form.moq) : 1,
-      weight_kg_per_unit: form.weight_kg_per_unit
-        ? parseFloat(form.weight_kg_per_unit)
-        : null,
-      lead_time_days: form.lead_time_days
-        ? parseInt(form.lead_time_days)
-        : null,
-      notes: form.notes || null,
-    };
-    const { error: err } = await supabase
-      .from("supplier_products")
-      .insert([payload]);
+    const { error: err } = await supabase.from("supplier_products").insert([
+      {
+        supplier_id: form.supplier_id,
+        sku: form.sku || null,
+        name: form.name,
+        category: form.category,
+        description: form.description || null,
+        unit_price_usd: form.unit_price_usd
+          ? parseFloat(form.unit_price_usd)
+          : null,
+        currency: form.currency,
+        moq: form.moq ? parseInt(form.moq) : 1,
+        weight_kg_per_unit: form.weight_kg_per_unit
+          ? parseFloat(form.weight_kg_per_unit)
+          : null,
+        lead_time_days: form.lead_time_days
+          ? parseInt(form.lead_time_days)
+          : null,
+        notes: form.notes || null,
+      },
+    ]);
     setSaving(false);
     if (err) {
       setError(err.message);
@@ -502,7 +744,6 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
     }
     onSaved();
   };
-
   return (
     <div
       style={{
@@ -550,7 +791,6 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           ×
         </button>
       </div>
-
       <Select
         label="Supplier *"
         value={form.supplier_id}
@@ -640,7 +880,6 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           value={form.notes}
           onChange={(e) => set("notes", e.target.value)}
           rows={3}
-          placeholder="Optional supplier notes"
           style={{
             background: C.bg,
             border: `1px solid ${C.border}`,
@@ -655,13 +894,11 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           }}
         />
       </div>
-
       {error && (
         <div style={{ color: C.danger, fontSize: 12, marginBottom: 12 }}>
           {error}
         </div>
       )}
-
       <button
         onClick={save}
         disabled={saving}
@@ -697,7 +934,6 @@ function AddLocalInputPanel({ onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
   const save = async () => {
     if (!form.name || !form.category) {
       setError("Name and category required.");
@@ -722,7 +958,6 @@ function AddLocalInputPanel({ onClose, onSaved }) {
     }
     onSaved();
   };
-
   return (
     <div
       style={{
@@ -770,7 +1005,6 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           ×
         </button>
       </div>
-
       <Input
         label="Name *"
         value={form.name}
@@ -829,7 +1063,6 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           }}
         />
       </div>
-
       {error && (
         <div style={{ color: C.danger, fontSize: 12, marginBottom: 12 }}>
           {error}
@@ -864,19 +1097,16 @@ function ShippingCalculator({ fx }) {
   const [units, setUnits] = useState("");
   const [seaRate, setSeaRate] = useState("");
   const usdZar = fx?.usd_zar || 18.5;
-
   let totalUSD = 0;
   if (mode === "ddp_air" && weightKg)
     totalUSD = calcDdpAir(parseFloat(weightKg));
   if (mode === "standard_air") totalUSD = 800;
   if (mode === "sea" && seaRate) totalUSD = parseFloat(seaRate);
-
   const totalZAR = totalUSD * usdZar;
   const perUnitZAR =
     units && parseFloat(units) > 0 ? totalZAR / parseFloat(units) : null;
   const perUnitUSD =
     units && parseFloat(units) > 0 ? totalUSD / parseFloat(units) : null;
-
   return (
     <Card>
       <div
@@ -927,7 +1157,6 @@ function ShippingCalculator({ fx }) {
           onChange={(e) => setUnits(e.target.value)}
         />
       </div>
-
       {totalUSD > 0 && (
         <div
           style={{
@@ -985,6 +1214,7 @@ export default function HQSuppliers() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [showAddInput, setShowAddInput] = useState(false);
+  const [editProduct, setEditProduct] = useState(null); // NEW v1.2
   const [editInput, setEditInput] = useState(null);
   const [savingInput, setSavingInput] = useState(false);
 
@@ -1051,7 +1281,6 @@ export default function HQSuppliers() {
     acc[c] = products.filter((p) => p.category === c).length;
     return acc;
   }, {});
-
   const categoryColor = {
     hardware: C.info,
     terpene: C.accent,
@@ -1389,15 +1618,23 @@ export default function HQSuppliers() {
               <tbody>
                 {filtered.map((p) => {
                   const zarPrice = toZAR(p.unit_price_usd, p.currency);
+                  const missingPrice = !p.unit_price_usd;
                   return (
                     <tr
                       key={p.id}
-                      style={{ borderBottom: `1px solid ${C.border}` }}
+                      style={{
+                        borderBottom: `1px solid ${C.border}`,
+                        background: missingPrice ? "#fffbf0" : "transparent",
+                      }}
                       onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = C.bg)
+                        (e.currentTarget.style.background = missingPrice
+                          ? "#fff5e0"
+                          : C.bg)
                       }
                       onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "transparent")
+                        (e.currentTarget.style.background = missingPrice
+                          ? "#fffbf0"
+                          : "transparent")
                       }
                     >
                       <td style={{ padding: "10px 12px" }}>
@@ -1425,7 +1662,7 @@ export default function HQSuppliers() {
                         }}
                       >
                         {p.name}
-                        {p.notes && (
+                        {p.description && p.description.length > 0 && (
                           <div
                             style={{
                               color: C.muted,
@@ -1433,8 +1670,8 @@ export default function HQSuppliers() {
                               marginTop: 2,
                             }}
                           >
-                            {p.notes.slice(0, 60)}
-                            {p.notes.length > 60 ? "…" : ""}
+                            {p.description.slice(0, 60)}
+                            {p.description.length > 60 ? "…" : ""}
                           </div>
                         )}
                       </td>
@@ -1448,9 +1685,13 @@ export default function HQSuppliers() {
                           fontWeight: 600,
                         }}
                       >
-                        {p.unit_price_usd
-                          ? `${p.currency} ${parseFloat(p.unit_price_usd).toFixed(4)}`
-                          : "—"}
+                        {p.unit_price_usd ? (
+                          `${p.currency} ${parseFloat(p.unit_price_usd).toFixed(4)}`
+                        ) : (
+                          <span style={{ color: C.warn, fontSize: 11 }}>
+                            ⚠ Not set
+                          </span>
+                        )}
                       </td>
                       <td
                         style={{
@@ -1472,7 +1713,26 @@ export default function HQSuppliers() {
                       <td style={{ padding: "10px 12px", color: C.muted }}>
                         {p.lead_time_days ? `${p.lead_time_days}d` : "—"}
                       </td>
-                      <td style={{ padding: "10px 12px" }}>
+                      <td
+                        style={{ padding: "10px 12px", whiteSpace: "nowrap" }}
+                      >
+                        {/* EDIT BUTTON — NEW v1.2 */}
+                        <button
+                          onClick={() => setEditProduct(p)}
+                          style={{
+                            background: missingPrice ? C.accent : "none",
+                            border: `1px solid ${missingPrice ? C.accent : C.border}`,
+                            color: missingPrice ? "#fff" : C.muted,
+                            borderRadius: 4,
+                            padding: "3px 10px",
+                            cursor: "pointer",
+                            fontSize: 11,
+                            marginRight: 6,
+                            fontWeight: missingPrice ? 600 : 400,
+                          }}
+                        >
+                          {missingPrice ? "⚠ Set Price" : "Edit"}
+                        </button>
                         <button
                           onClick={async () => {
                             if (!window.confirm(`Deactivate "${p.name}"?`))
@@ -1567,7 +1827,6 @@ export default function HQSuppliers() {
               + Add Input
             </button>
           </div>
-
           {["distillate", "packaging", "labour", "other"].map((cat) => {
             const items = localInputs.filter((i) => i.category === cat);
             if (items.length === 0) return null;
@@ -1933,10 +2192,9 @@ export default function HQSuppliers() {
               + Add Supplier
             </button>
           </div>
-
           {suppliers.length === 0 ? (
             <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>
-              No suppliers yet. Click + Add Supplier to get started.
+              No suppliers yet.
             </div>
           ) : (
             suppliers.map((s) => {
@@ -2004,7 +2262,6 @@ export default function HQSuppliers() {
                       </div>
                     </div>
                   </div>
-
                   {sProds.length > 0 && (
                     <div
                       style={{
@@ -2054,7 +2311,6 @@ export default function HQSuppliers() {
                       )}
                     </div>
                   )}
-
                   {sProds.length === 0 && (
                     <div
                       style={{
@@ -2064,8 +2320,7 @@ export default function HQSuppliers() {
                         fontStyle: "italic",
                       }}
                     >
-                      No products catalogued yet — use + Add Product to link
-                      products to this supplier.
+                      No products catalogued yet.
                     </div>
                   )}
                 </Card>
@@ -2100,6 +2355,19 @@ export default function HQSuppliers() {
           onClose={() => setShowAddInput(false)}
           onSaved={() => {
             setShowAddInput(false);
+            load();
+          }}
+        />
+      )}
+
+      {/* EDIT PRODUCT PANEL — NEW v1.2 */}
+      {editProduct && (
+        <EditProductPanel
+          product={editProduct}
+          suppliers={suppliers}
+          onClose={() => setEditProduct(null)}
+          onSaved={() => {
+            setEditProduct(null);
             load();
           }}
         />

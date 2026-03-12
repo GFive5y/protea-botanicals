@@ -1,16 +1,33 @@
-// src/components/hq/HQPricing.js v1.0 — WP-D: Pricing & Margin Intelligence
+// src/components/hq/HQPricing.js v3.4 — WP-D: Pricing & Margin Intelligence
 // Protea Botanicals · Phase 2 · March 2026
-// New file — add to src/components/hq/
+// v3.4 — Batch P&L boxes always show per-unit price alongside total
+// v3.3 — Per-unit COGS always shown prominently, batch P&L secondary, channel cards show per-unit + batch
+// v3.2 — Edit scrolls to detail panel, quantity P&L strip, hardware_qty warning
+// v3.1 — calcCogsTotal now mirrors HQCogs v3.1 exactly:
+//         chambers (multi-chamber), packaging_manual_zar, labour_manual_zar,
+//         shipping_alloc_zar, µl terpene, lab, transport, misc
 //
 // Margin formula:  margin% = (sell_price - cogs) / sell_price × 100
 // Recommended price from target margin: price = cogs / (1 - target/100)
 // Channels: wholesale / retail / website
 // Colour thresholds: red <20% · orange 20–35% · green >35%
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── FX Hook (same pattern throughout Phase 2) ────────────────────────────────
+// ─── Cannalytics test list (mirrors HQCogs v2.0) ──────────────────────────────
+const CANNALYTICS_TESTS = [
+  { id: "potency", price: 350 },
+  { id: "solvents", price: 200 },
+  { id: "microbial", price: 150 },
+  { id: "mycotoxins", price: 1800 },
+  { id: "heavy_metal", price: 1200 },
+  { id: "pesticide", price: 1000 },
+  { id: "terpene_profile", price: 750 },
+  { id: "foreign_matter", price: 100 },
+];
+
+// ─── FX Hook ──────────────────────────────────────────────────────────────────
 function useFxRate() {
   const [fxRate, setFxRate] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
@@ -36,45 +53,98 @@ function useFxRate() {
   return { fxRate, fxLoading };
 }
 
-// ─── COGS Calculation (mirrors HQCogs.js) ────────────────────────────────────
+// ─── COGS Calculation v3.1 — exact mirror of HQCogs v3.1 ────────────────────
+// Single source of truth: any change to HQCogs.js calcCogs() must be reflected here.
+// Supports: chambers (multi-chamber JSONB), packaging_manual_zar, labour_manual_zar,
+//           shipping_alloc_zar, terpene_qty_ul (µl), lab tests, transport, misc.
 function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
   if (!recipe || !usdZar) return 0;
+
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
-  const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
-  const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
   const pk = localInputs.find((i) => i.id === recipe.packaging_input_id);
   const lb = localInputs.find((i) => i.id === recipe.labour_input_id);
 
+  // Hardware (always flat field regardless of chamber count)
   const hwCost = hw
     ? parseFloat(recipe.hardware_qty || 1) *
         parseFloat(hw.unit_price_usd) *
         usdZar +
       parseFloat(recipe.shipping_alloc_zar || 0)
     : 0;
-  const tpCost = tp
-    ? parseFloat(recipe.terpene_qty_g || 0) *
-      (parseFloat(tp.unit_price_usd) / 50) *
-      usdZar
-    : 0;
-  const diCost =
-    di && di.cost_zar
-      ? parseFloat(recipe.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
-      : 0;
+
+  // v3.0: multi-chamber JSONB takes priority; null = single-chamber flat fields
+  let tpCost = 0;
+  let diCost = 0;
+  const chamberData =
+    Array.isArray(recipe.chambers) && recipe.chambers.length > 1
+      ? recipe.chambers
+      : null;
+
+  if (chamberData) {
+    // Sum across all chambers
+    chamberData.forEach((ch) => {
+      const chTp = supplierProducts.find((p) => p.id === ch.terpene_item_id);
+      const chDi = localInputs.find((i) => i.id === ch.distillate_input_id);
+      const ul = parseFloat(ch.terpene_qty_ul || 0);
+      const cpml = chTp ? (parseFloat(chTp.unit_price_usd) / 50) * usdZar : 0;
+      tpCost += chTp ? (ul / 1000) * cpml : 0;
+      diCost +=
+        chDi && chDi.cost_zar
+          ? parseFloat(ch.distillate_qty_ml || 0) * parseFloat(chDi.cost_zar)
+          : 0;
+    });
+  } else {
+    // Single-chamber: flat fields (backward compatible)
+    const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
+    const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
+    const terpUl = parseFloat(recipe.terpene_qty_ul || 0);
+    const tpCostPerMl = tp ? (parseFloat(tp.unit_price_usd) / 50) * usdZar : 0;
+    tpCost = tp ? (terpUl / 1000) * tpCostPerMl : 0;
+    diCost =
+      di && di.cost_zar
+        ? parseFloat(recipe.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
+        : 0;
+  }
+
+  // v2.2: packaging — manual ZAR override takes priority over dropdown
+  const pkRate =
+    recipe.packaging_manual_zar != null && recipe.packaging_manual_zar !== ""
+      ? parseFloat(recipe.packaging_manual_zar)
+      : pk && pk.cost_zar
+        ? parseFloat(pk.cost_zar)
+        : 0;
   const pkCost =
-    pk && pk.cost_zar
-      ? parseFloat(recipe.packaging_qty || 1) * parseFloat(pk.cost_zar)
-      : 0;
-  const lbCost =
-    lb && lb.cost_zar
-      ? parseFloat(recipe.labour_qty || 1) * parseFloat(lb.cost_zar)
-      : 0;
+    pkRate > 0 ? parseFloat(recipe.packaging_qty || 1) * pkRate : 0;
+
+  // v2.2: labour — same override pattern
+  const lbRate =
+    recipe.labour_manual_zar != null && recipe.labour_manual_zar !== ""
+      ? parseFloat(recipe.labour_manual_zar)
+      : lb && lb.cost_zar
+        ? parseFloat(lb.cost_zar)
+        : 0;
+  const lbCost = lbRate > 0 ? parseFloat(recipe.labour_qty || 1) * lbRate : 0;
+
+  // Batch-amortised: lab, transport, misc
+  const batchSize = Math.max(1, parseInt(recipe.batch_size || 1));
+  const labTests = Array.isArray(recipe.lab_tests) ? recipe.lab_tests : [];
+  const labTotal = labTests.reduce((s, id) => {
+    const t = CANNALYTICS_TESTS.find((x) => x.id === id);
+    return s + (t ? t.price : 0);
+  }, 0);
+  const labPerUnit = labTotal / batchSize;
+  const transPerU = parseFloat(recipe.transport_cost_zar || 0) / batchSize;
+  const miscPerU = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
+
   return (
     hwCost +
     tpCost +
     diCost +
     pkCost +
     lbCost +
-    parseFloat(recipe.other_cost_zar || 0)
+    labPerUnit +
+    transPerU +
+    miscPerU
   );
 }
 
@@ -135,11 +205,10 @@ function MarginBadge({ pct, large = false }) {
   );
 }
 
-// ─── FX Sensitivity Row ───────────────────────────────────────────────────────
+// ─── FX Sensitivity ───────────────────────────────────────────────────────────
 function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
   const scenarios = [-2, -1, 0, +1, +2].map((delta) => {
     const rate = baseRate + delta;
-    // COGS scales with FX — approximate: multiply cogs by rate ratio
     const scenarioCogs = baseCogs * (rate / baseRate);
     const margin = sellPrice > 0 ? calcMargin(sellPrice, scenarioCogs) : null;
     return { rate, scenarioCogs, margin, delta };
@@ -209,13 +278,10 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CHANNEL PRICING CARD
+// CHANNEL PRICING CARD (unchanged from v1.0 except style cleanup)
 // ══════════════════════════════════════════════════════════════════════════════
-function ChannelCard({ channel, cogs, pricing, onSave }) {
+function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
   const existing = pricing.find((p) => p.channel === channel.id);
-
-  // Initialise from existing data. Use a key on the parent to remount
-  // after save rather than syncing via useEffect (which wipes in-progress edits).
   const [sellPrice, setSellPrice] = useState(
     existing?.sell_price_zar ? fmt(existing.sell_price_zar) : "",
   );
@@ -225,7 +291,6 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  // No useEffect sync — state is only reset when the card remounts (after save via key prop)
 
   const sell = parseFloat(sellPrice) || 0;
   const margin = sell > 0 ? calcMargin(sell, cogs) : null;
@@ -252,6 +317,31 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
     }
   };
 
+  const inputBase = {
+    padding: "10px 14px",
+    border: "1px solid #ddd",
+    borderRadius: 8,
+    fontFamily: "Jost, sans-serif",
+    fontSize: 14,
+    width: "100%",
+    boxSizing: "border-box",
+  };
+  const lbl = (text) => (
+    <label
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: "#888",
+        textTransform: "uppercase",
+        letterSpacing: "0.4px",
+        display: "block",
+        marginBottom: 6,
+      }}
+    >
+      {text}
+    </label>
+  );
+
   return (
     <div
       style={{
@@ -262,7 +352,7 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
         transition: "border-color 0.2s",
       }}
     >
-      {/* Channel header */}
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -283,21 +373,9 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
         {margin !== null && <MarginBadge pct={margin} large />}
       </div>
 
-      {/* Sell price input */}
+      {/* Sell price */}
       <div style={{ marginBottom: 14 }}>
-        <label
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "#888",
-            textTransform: "uppercase",
-            letterSpacing: "0.4px",
-            display: "block",
-            marginBottom: 6,
-          }}
-        >
-          Sell Price (ZAR)
-        </label>
+        {lbl("Sell Price (ZAR) — per unit")}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16, color: "#555", fontWeight: 600 }}>
             R
@@ -313,35 +391,21 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
             }}
             placeholder="0.00"
             style={{
-              flex: 1,
-              padding: "10px 14px",
-              border: `1px solid ${dirty ? "#2d4a2d" : "#ddd"}`,
-              borderRadius: 8,
-              fontFamily: "Jost, sans-serif",
+              ...inputBase,
               fontSize: 16,
               fontWeight: 600,
               color: "#2d4a2d",
+              border: `1px solid ${dirty ? "#2d4a2d" : "#ddd"}`,
+              flex: 1,
             }}
           />
         </div>
       </div>
 
-      {/* What-if slider */}
+      {/* Slider */}
       {sell > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <label
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#888",
-              textTransform: "uppercase",
-              letterSpacing: "0.4px",
-              display: "block",
-              marginBottom: 6,
-            }}
-          >
-            Adjust Price (what-if)
-          </label>
+          {lbl("Adjust Price (what-if)")}
           <input
             type="range"
             min={Math.max(1, Math.round(cogs * 0.8))}
@@ -372,47 +436,97 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
         </div>
       )}
 
-      {/* Margin breakdown */}
+      {/* Margin breakdown — per unit */}
       {sell > 0 && (
-        <div
-          style={{
-            background: mc.bg,
-            borderRadius: 8,
-            padding: "10px 14px",
-            marginBottom: 14,
-            display: "flex",
-            justifyContent: "space-between",
-            fontSize: 13,
-          }}
-        >
-          <span style={{ color: "#666" }}>
-            COGS: <strong>{fmtZar(cogs)}</strong>
-          </span>
-          <span style={{ color: "#666" }}>
-            Gross:{" "}
-            <strong style={{ color: mc.color }}>{fmtZar(sell - cogs)}</strong>
-          </span>
-          <span style={{ color: "#666" }}>
-            Margin: <strong style={{ color: mc.color }}>{fmt(margin)}%</strong>
-          </span>
-        </div>
+        <>
+          <div
+            style={{
+              background: mc.bg,
+              borderRadius: 8,
+              padding: "10px 14px",
+              marginBottom: qtyUnits > 1 ? 6 : 14,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                color: "#888",
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              Per unit
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 13,
+              }}
+            >
+              <span style={{ color: "#666" }}>
+                COGS: <strong>{fmtZar(cogs)}</strong>
+              </span>
+              <span style={{ color: "#666" }}>
+                Profit:{" "}
+                <strong style={{ color: mc.color }}>
+                  {fmtZar(sell - cogs)}
+                </strong>
+              </span>
+              <span style={{ color: "#666" }}>
+                Margin:{" "}
+                <strong style={{ color: mc.color }}>{fmt(margin)}%</strong>
+              </span>
+            </div>
+          </div>
+          {qtyUnits > 1 && (
+            <div
+              style={{
+                background: "#f5f5f5",
+                borderRadius: 8,
+                padding: "8px 12px",
+                marginBottom: 14,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ color: "#888", marginBottom: 4 }}>
+                × {qtyUnits.toLocaleString()} units
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#666" }}>
+                  Total COGS:{" "}
+                  <strong style={{ color: "#c62828" }}>
+                    {fmtZar(cogs * qtyUnits)}
+                  </strong>
+                </span>
+                <span style={{ color: "#666" }}>
+                  Total Revenue:{" "}
+                  <strong style={{ color: "#2d4a2d" }}>
+                    {fmtZar(sell * qtyUnits)}
+                  </strong>
+                </span>
+              </div>
+              <div style={{ marginTop: 3 }}>
+                <span style={{ color: "#666" }}>
+                  Total Profit:{" "}
+                  <strong
+                    style={{
+                      color:
+                        (sell - cogs) * qtyUnits >= 0 ? "#2d4a2d" : "#c62828",
+                    }}
+                  >
+                    {fmtZar((sell - cogs) * qtyUnits)}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Target margin → recommended price */}
+      {/* Target margin */}
       <div style={{ marginBottom: 14 }}>
-        <label
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "#888",
-            textTransform: "uppercase",
-            letterSpacing: "0.4px",
-            display: "block",
-            marginBottom: 6,
-          }}
-        >
-          Target Margin % → Recommended Price
-        </label>
+        {lbl("Target Margin % → Recommended Price")}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
             type="number"
@@ -449,7 +563,7 @@ function ChannelCard({ channel, cogs, pricing, onSave }) {
                 fontSize: 13,
                 fontWeight: 600,
               }}
-              title="Click to apply this price"
+              title="Click to apply"
             >
               {fmtZar(recPrice)} ↑ apply
             </button>
@@ -515,14 +629,16 @@ export default function HQPricing() {
   const [recipes, setRecipes] = useState([]);
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [localInputs, setLocalInputs] = useState([]);
-  const [pricing, setPricing] = useState([]); // all product_pricing rows
+  const [pricing, setPricing] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  const detailRef = useRef(null);
   const [toast, setToast] = useState("");
   const [showFxPanel, setShowFxPanel] = useState(false);
-  const [pricingVersion, setPricingVersion] = useState(0); // bumped after each save to remount cards
+  const [pricingVersion, setPricingVersion] = useState(0);
+  const [qtyUnits, setQtyUnits] = useState(1); // batch quantity for P&L view
 
-  // ── Fetch ────────────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [r1, r2, r3, r4] = await Promise.all([
@@ -540,22 +656,33 @@ export default function HQPricing() {
     setLocalInputs(r3.data || []);
     setPricing(r4.data || []);
     setLoading(false);
-    // Auto-select first SKU
-    if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id);
+    if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id); // no scroll on initial load
   }, [selectedId]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
 
+  const selectAndScroll = (id) => {
+    setSelectedId(id);
+    // Scroll to detail panel on next paint
+    setTimeout(() => {
+      if (detailRef.current) {
+        detailRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 50);
+  };
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 4000);
   };
 
-  // ── Save a channel price (manual upsert — avoids constraint dependency) ──
+  // ── Save channel price ─────────────────────────────────────────────────
   const handleSaveChannel = async (cogsId, channelId, values) => {
-    // Check if a row already exists for this SKU + channel
     const { data: existing } = await supabase
       .from("product_pricing")
       .select("id")
@@ -586,7 +713,7 @@ export default function HQPricing() {
     setPricingVersion((v) => v + 1);
   };
 
-  // ── Derived ───────────────────────────────────────────────────────────
+  // ── Derived ────────────────────────────────────────────────────────────
   const selected = recipes.find((r) => r.id === selectedId);
   const selectedCogs = selected
     ? calcCogsTotal(selected, supplierProducts, localInputs, usdZar)
@@ -595,20 +722,17 @@ export default function HQPricing() {
     (p) => p.product_cogs_id === selectedId,
   );
 
-  // All-SKUs summary table
   const summaryRows = recipes.map((r) => {
     const cogs = calcCogsTotal(r, supplierProducts, localInputs, usdZar);
     const rows = pricing.filter((p) => p.product_cogs_id === r.id);
     const channels = CHANNELS.map((ch) => {
       const p = rows.find((x) => x.channel === ch.id);
       const sell = p?.sell_price_zar ? parseFloat(p.sell_price_zar) : null;
-      const margin = sell ? calcMargin(sell, cogs) : null;
-      return { id: ch.id, sell, margin };
+      return { id: ch.id, sell, margin: sell ? calcMargin(sell, cogs) : null };
     });
     return { id: r.id, name: r.product_name, sku: r.sku, cogs, channels };
   });
 
-  // ── Styles ───────────────────────────────────────────────────────────
   const card = {
     background: "#fff",
     borderRadius: 12,
@@ -726,7 +850,7 @@ export default function HQPricing() {
         </div>
       ) : (
         <>
-          {/* ── All-SKUs Summary Table ─────────────────────────────── */}
+          {/* ── All-SKUs Summary ──────────────────────────────────── */}
           <div style={card}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, color: "#2d4a2d" }}>
               All SKUs — Margin Overview
@@ -765,7 +889,7 @@ export default function HQPricing() {
                   {summaryRows.map((row) => (
                     <tr
                       key={row.id}
-                      onClick={() => setSelectedId(row.id)}
+                      onClick={() => selectAndScroll(row.id)}
                       style={{
                         cursor: "pointer",
                         background:
@@ -828,7 +952,7 @@ export default function HQPricing() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedId(row.id);
+                            selectAndScroll(row.id);
                           }}
                           style={{
                             padding: "5px 12px",
@@ -851,7 +975,8 @@ export default function HQPricing() {
             </div>
           </div>
 
-          {/* ── Selected SKU Detail ────────────────────────────────── */}
+          {/* ── Selected SKU Detail ───────────────────────────────── */}
+          <div ref={detailRef} />
           {selected && (
             <div>
               {/* SKU header */}
@@ -879,6 +1004,64 @@ export default function HQPricing() {
                         style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}
                       >
                         {selected.sku}
+                      </div>
+                    )}
+                    {/* v2.0: show batch size + amortised costs hint */}
+                    {(selected.lab_tests?.length > 0 ||
+                      selected.transport_cost_zar > 0 ||
+                      selected.misc_cost_zar > 0) && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          display: "flex",
+                          gap: 10,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {selected.lab_tests?.length > 0 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              background: "#E8EAF6",
+                              color: "#283593",
+                              borderRadius: 10,
+                              padding: "3px 10px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🔬 {selected.lab_tests.length} lab test
+                            {selected.lab_tests.length > 1 ? "s" : ""} ÷{" "}
+                            {selected.batch_size || 1} units
+                          </span>
+                        )}
+                        {parseFloat(selected.transport_cost_zar) > 0 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              background: "#E0F7FA",
+                              color: "#00695C",
+                              borderRadius: 10,
+                              padding: "3px 10px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🚚 Transport ÷ {selected.batch_size || 1}
+                          </span>
+                        )}
+                        {parseFloat(selected.misc_cost_zar) > 0 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              background: "#ECEFF1",
+                              color: "#455A64",
+                              borderRadius: 10,
+                              padding: "3px 10px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            ✏️ Misc ÷ {selected.batch_size || 1}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -910,7 +1093,7 @@ export default function HQPricing() {
                 </div>
               </div>
 
-              {/* FX Sensitivity Panel */}
+              {/* FX Sensitivity */}
               {showFxPanel && selectedCogs > 0 && (
                 <div
                   style={{ ...card, background: "#f8f9fa", marginBottom: 20 }}
@@ -927,8 +1110,8 @@ export default function HQPricing() {
                   <p
                     style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}
                   >
-                    How your margin changes if USD/ZAR moves by ±R2 from current
-                    rate. Using highest sell price set across channels.
+                    How your margin changes if USD/ZAR moves ±R2. Using highest
+                    sell price set across channels.
                   </p>
                   {(() => {
                     const bestSell = Math.max(
@@ -956,6 +1139,321 @@ export default function HQPricing() {
                 </div>
               )}
 
+              {/* ── Quantity scenario strip */}
+              <div
+                style={{
+                  background: "#f8faf8",
+                  border: "1px solid #e0ede0",
+                  borderRadius: 10,
+                  padding: "16px 18px",
+                  marginBottom: 20,
+                }}
+              >
+                {/* Row 1: per-unit COGS — always visible */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                    marginBottom: 14,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#fff",
+                      border: "2px solid #2d4a2d",
+                      borderRadius: 8,
+                      padding: "10px 18px",
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#888",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.3px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      COGS per unit
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 26,
+                        fontWeight: 700,
+                        color: "#2d4a2d",
+                      }}
+                    >
+                      {fmtZar(selectedCogs)}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#888" }}>
+                    ← This is what ONE unit costs to make.
+                    <br />
+                    <span style={{ color: "#2d4a2d", fontWeight: 600 }}>
+                      Sell prices below are also per unit.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Row 2: batch scenario */}
+                <div style={{ borderTop: "1px solid #e8f0e8", paddingTop: 12 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#2d4a2d",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.4px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      Batch P&L — how many units?
+                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={qtyUnits}
+                      onChange={(e) =>
+                        setQtyUnits(Math.max(1, parseInt(e.target.value) || 1))
+                      }
+                      style={{
+                        padding: "6px 10px",
+                        border: "1px solid #c8e6c9",
+                        borderRadius: 6,
+                        fontFamily: "Jost, sans-serif",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: "#2d4a2d",
+                        width: 90,
+                        textAlign: "center",
+                      }}
+                    />
+                    {[1, 50, 100, 500, 1000].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setQtyUnits(n)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #c8e6c9",
+                          background: qtyUnits === n ? "#2d4a2d" : "#fff",
+                          color: qtyUnits === n ? "#fff" : "#2d4a2d",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontFamily: "Jost, sans-serif",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {n === 1 ? "1" : n >= 1000 ? `${n / 1000}k` : n}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Batch totals — always shown */}
+                  {(() => {
+                    const totalCogs = selectedCogs * qtyUnits;
+                    const bestSell = Math.max(
+                      0,
+                      ...CHANNELS.map((ch) => {
+                        const p = selectedPricing.find(
+                          (x) => x.channel === ch.id,
+                        );
+                        return p?.sell_price_zar
+                          ? parseFloat(p.sell_price_zar)
+                          : 0;
+                      }),
+                    );
+                    const bestChannel = CHANNELS.find((ch) => {
+                      const p = selectedPricing.find(
+                        (x) => x.channel === ch.id,
+                      );
+                      return (
+                        p?.sell_price_zar &&
+                        parseFloat(p.sell_price_zar) === bestSell
+                      );
+                    });
+                    const totalRev = bestSell * qtyUnits;
+                    const totalProfit = totalRev - totalCogs;
+                    const margin =
+                      totalRev > 0 ? (totalProfit / totalRev) * 100 : null;
+
+                    return (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          display: "flex",
+                          gap: 16,
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "#fff",
+                            border: "1px solid #ddd",
+                            borderRadius: 8,
+                            padding: "8px 14px",
+                            minWidth: 160,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#888",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Total COGS × {qtyUnits.toLocaleString()}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 18,
+                              fontWeight: 700,
+                              color: "#c62828",
+                            }}
+                          >
+                            {fmtZar(totalCogs)}
+                          </div>
+                          <div
+                            style={{ display: "flex", gap: 10, marginTop: 4 }}
+                          >
+                            <span style={{ fontSize: 10, color: "#aaa" }}>
+                              {fmtZar(selectedCogs)}/unit
+                            </span>
+                            {qtyUnits > 1 && (
+                              <span style={{ fontSize: 10, color: "#aaa" }}>
+                                × {qtyUnits.toLocaleString()} units
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {bestSell > 0 ? (
+                          <>
+                            <div style={{ fontSize: 20, color: "#ddd" }}>→</div>
+                            <div
+                              style={{
+                                background: "#fff",
+                                border: "1px solid #ddd",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                minWidth: 160,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: "#888",
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                Total Revenue
+                                {bestChannel ? ` (${bestChannel.label})` : ""}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 18,
+                                  fontWeight: 700,
+                                  color: "#2d4a2d",
+                                }}
+                              >
+                                {fmtZar(totalRev)}
+                              </div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 10,
+                                  marginTop: 4,
+                                }}
+                              >
+                                <span style={{ fontSize: 10, color: "#aaa" }}>
+                                  {fmtZar(bestSell)}/unit
+                                </span>
+                                {qtyUnits > 1 && (
+                                  <span style={{ fontSize: 10, color: "#aaa" }}>
+                                    × {qtyUnits.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 20, color: "#ddd" }}>→</div>
+                            <div
+                              style={{
+                                background:
+                                  totalProfit >= 0 ? "#f0f7f0" : "#FFEBEE",
+                                border: `1px solid ${totalProfit >= 0 ? "#c8e6c9" : "#ffcdd2"}`,
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                minWidth: 160,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: "#888",
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                Gross Profit
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 18,
+                                  fontWeight: 700,
+                                  color:
+                                    totalProfit >= 0 ? "#2d4a2d" : "#c62828",
+                                }}
+                              >
+                                {fmtZar(totalProfit)}
+                              </div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 10,
+                                  marginTop: 4,
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span style={{ fontSize: 10, color: "#aaa" }}>
+                                  {fmtZar(totalProfit / qtyUnits)}/unit
+                                </span>
+                                {margin !== null && (
+                                  <MarginBadge pct={margin} />
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#bbb",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            Set a sell price in the cards below to see batch P&L
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
               {/* Channel cards */}
               <div
                 style={{
@@ -969,6 +1467,7 @@ export default function HQPricing() {
                     key={`${ch.id}-${selectedId}-${pricingVersion}`}
                     channel={ch}
                     cogs={selectedCogs}
+                    qtyUnits={qtyUnits}
                     pricing={selectedPricing}
                     onSave={(channelId, values) =>
                       handleSaveChannel(selected.id, channelId, values)
@@ -977,7 +1476,7 @@ export default function HQPricing() {
                 ))}
               </div>
 
-              {/* Margin legend */}
+              {/* Legend */}
               <div
                 style={{
                   marginTop: 16,
