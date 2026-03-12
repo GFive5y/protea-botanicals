@@ -1,30 +1,35 @@
-// src/components/hq/HQSuppliers.js — v1.0
+// src/components/hq/HQSuppliers.js — v1.1
 // Protea Botanicals — WP-A Supplier Catalogue & FX Engine
 // HQ-only view: supplier product catalogue + live USD/ZAR + shipping calculator + local inputs
 // DO NOT render in Admin or Retailer views — HQ only
+//
+// v1.1: Light theme fix (was dark theme on light background — text invisible)
+//       Add Supplier panel added to Supplier List tab — free-form, not sector-confined
+//       Supplier list refreshes live after add (feeds systemHealthContext)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── Colour tokens (match existing HQ style) ─────────────────────────────────
+// ─── Colour tokens — LIGHT THEME (matches HQ dashboard) ──────────────────────
 const C = {
-  bg: "#0d1117",
-  surface: "#161b22",
-  border: "#30363d",
-  text: "#e6edf3",
-  muted: "#8b949e",
-  accent: "#4fa94d",
-  accentDim: "#1e3a1e",
-  warn: "#d29922",
-  warnDim: "#2d2007",
-  danger: "#f85149",
-  dangerDim: "#3d1a1a",
-  info: "#388bfd",
-  infoDim: "#0d2045",
-  gold: "#e3b341",
+  bg: "#f4f0e8",
+  surface: "#ffffff",
+  border: "#d8d0c4",
+  text: "#1a1a1a",
+  muted: "#4a4a4a",
+  accent: "#2d6a4f",
+  accentDim: "#e8f4ee",
+  warn: "#b5935a",
+  warnDim: "#fdf6ec",
+  danger: "#c0392b",
+  dangerDim: "#fdf0ef",
+  info: "#2c4a6e",
+  infoDim: "#eef2f7",
+  gold: "#b5935a",
+  primaryDark: "#1b4332",
 };
 
-// ─── DDP Air rate tiers (from WhatsApp shipping quote) ───────────────────────
+// ─── DDP Air rate tiers ───────────────────────────────────────────────────────
 const DDP_TIERS = [
   { maxKg: 21, ratePerKg: 15.8 },
   { maxKg: 50, ratePerKg: 15.5 },
@@ -101,15 +106,17 @@ function Badge({ label, color = C.info, bg = C.infoDim }) {
 }
 
 // ─── Section card wrapper ─────────────────────────────────────────────────────
-function Card({ children, style = {} }) {
+function Card({ children, style = {}, onClick }) {
   return (
     <div
+      onClick={onClick}
       style={{
         background: C.surface,
         border: `1px solid ${C.border}`,
-        borderRadius: 8,
-        padding: 20,
-        marginBottom: 16,
+        borderRadius: 6,
+        padding: 16,
+        marginBottom: 12,
+        cursor: onClick ? "pointer" : "default",
         ...style,
       }}
     >
@@ -175,138 +182,272 @@ function Select({ label, children, ...props }) {
   );
 }
 
-// ─── Shipping Calculator panel ────────────────────────────────────────────────
-function ShippingCalculator({ fx }) {
-  const [mode, setMode] = useState("ddp_air");
-  const [weightKg, setWeightKg] = useState("");
-  const [units, setUnits] = useState("");
-  const [seaRate, setSeaRate] = useState("");
-  const usdZar = fx?.usd_zar || 18.5;
+// ─── Add Supplier panel ───────────────────────────────────────────────────────
+function AddSupplierPanel({ onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: "",
+    country: "South Africa",
+    currency: "ZAR",
+    contact_name: "",
+    contact_email: "",
+    contact_phone: "",
+    website: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  let totalUSD = 0;
-  if (mode === "ddp_air" && weightKg)
-    totalUSD = calcDdpAir(parseFloat(weightKg));
-  if (mode === "standard_air") totalUSD = 800;
-  if (mode === "sea" && seaRate) totalUSD = parseFloat(seaRate);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const totalZAR = totalUSD * usdZar;
-  const perUnitZAR =
-    units && parseFloat(units) > 0 ? totalZAR / parseFloat(units) : null;
-  const perUnitUSD =
-    units && parseFloat(units) > 0 ? totalUSD / parseFloat(units) : null;
-
-  const modeLabels = {
-    ddp_air: "DDP Air (per kg)",
-    standard_air: "Standard Air ($800 flat)",
-    sea: "Sea Freight (custom rate)",
+  const save = async () => {
+    if (!form.name.trim()) {
+      setError("Supplier name is required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const payload = {
+      name: form.name.trim(),
+      country: form.country.trim() || "Unknown",
+      currency: form.currency,
+      contact_name: form.contact_name.trim() || null,
+    };
+    const { error: err } = await supabase.from("suppliers").insert([payload]);
+    setSaving(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    onSaved();
   };
 
   return (
-    <Card>
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        right: 0,
+        width: 440,
+        height: "100vh",
+        background: C.surface,
+        borderLeft: `1px solid ${C.border}`,
+        zIndex: 1000,
+        overflowY: "auto",
+        padding: 24,
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
+      }}
+    >
       <div
         style={{
-          color: C.text,
-          fontWeight: 600,
-          marginBottom: 16,
-          fontSize: 15,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 24,
         }}
       >
-        📦 Shipping Cost Calculator
+        <div>
+          <div
+            style={{
+              color: C.text,
+              fontWeight: 700,
+              fontSize: 18,
+              fontFamily: "'Cormorant Garamond', serif",
+            }}
+          >
+            Add New Supplier
+          </div>
+          <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+            Hardware · Terpene · Packaging · IT · Transport · Any sector
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: C.muted,
+            fontSize: 22,
+            cursor: "pointer",
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
       </div>
 
+      {/* Core fields */}
       <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
+        style={{
+          background: C.bg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 6,
+          padding: 16,
+          marginBottom: 16,
+        }}
       >
-        <Select
-          label="Shipping Mode"
-          value={mode}
-          onChange={(e) => setMode(e.target.value)}
+        <div
+          style={{
+            color: C.muted,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}
         >
-          <option value="ddp_air">DDP Air (per kg)</option>
-          <option value="standard_air">Standard Air ($800 flat)</option>
-          <option value="sea">Sea Freight</option>
-        </Select>
-
-        {mode === "ddp_air" && (
-          <Input
-            label="Total Weight (kg)"
-            type="number"
-            placeholder="e.g. 12"
-            value={weightKg}
-            onChange={(e) => setWeightKg(e.target.value)}
-          />
-        )}
-        {mode === "sea" && (
-          <Input
-            label="Freight Cost (USD)"
-            type="number"
-            placeholder="e.g. 800"
-            value={seaRate}
-            onChange={(e) => setSeaRate(e.target.value)}
-          />
-        )}
+          Company Details
+        </div>
         <Input
-          label="Units in Shipment"
-          type="number"
-          placeholder="e.g. 1000"
-          value={units}
-          onChange={(e) => setUnits(e.target.value)}
+          label="Company Name *"
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          placeholder="e.g. Acme Packaging Co."
+        />
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+        >
+          <Input
+            label="Country"
+            value={form.country}
+            onChange={(e) => set("country", e.target.value)}
+            placeholder="South Africa"
+          />
+          <Select
+            label="Invoicing Currency"
+            value={form.currency}
+            onChange={(e) => set("currency", e.target.value)}
+          >
+            <option value="ZAR">ZAR — South African Rand</option>
+            <option value="USD">USD — US Dollar</option>
+            <option value="EUR">EUR — Euro</option>
+            <option value="CNY">CNY — Chinese Yuan</option>
+            <option value="GBP">GBP — British Pound</option>
+            <option value="ILS">ILS — Israeli Shekel</option>
+            <option value="AUD">AUD — Australian Dollar</option>
+          </Select>
+        </div>
+      </div>
+
+      {/* Contact fields */}
+      <div
+        style={{
+          background: C.bg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 6,
+          padding: 16,
+          marginBottom: 16,
+        }}
+      >
+        <div
+          style={{
+            color: C.muted,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}
+        >
+          Contact (optional)
+        </div>
+        <Input
+          label="Contact Person"
+          value={form.contact_name}
+          onChange={(e) => set("contact_name", e.target.value)}
+          placeholder="e.g. Jane Smith"
+        />
+        <Input
+          label="Email"
+          type="email"
+          value={form.contact_email}
+          onChange={(e) => set("contact_email", e.target.value)}
+          placeholder="e.g. jane@company.com"
+        />
+        <Input
+          label="Phone / WhatsApp"
+          value={form.contact_phone}
+          onChange={(e) => set("contact_phone", e.target.value)}
+          placeholder="e.g. +27 82 000 0000"
+        />
+        <Input
+          label="Website"
+          value={form.website}
+          onChange={(e) => set("website", e.target.value)}
+          placeholder="e.g. https://company.com"
         />
       </div>
 
-      {totalUSD > 0 && (
+      {/* Notes */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>
+          Notes (optional)
+        </div>
+        <textarea
+          value={form.notes}
+          onChange={(e) => set("notes", e.target.value)}
+          rows={3}
+          placeholder="Anything useful — lead times, payment terms, MOQ policies…"
+          style={{
+            background: C.bg,
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            color: C.text,
+            padding: "8px 12px",
+            width: "100%",
+            fontSize: 13,
+            outline: "none",
+            boxSizing: "border-box",
+            resize: "vertical",
+          }}
+        />
+        <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>
+          ℹ Contact email, phone, website and notes are saved locally in this
+          form only for now — core fields (name, country, currency, contact
+          name) are stored in the database. Extended fields can be added as
+          columns when needed.
+        </div>
+      </div>
+
+      {error && (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 12,
-            marginTop: 8,
-            padding: 16,
-            background: C.bg,
-            borderRadius: 6,
-            border: `1px solid ${C.border}`,
+            background: C.dangerDim,
+            border: `1px solid ${C.danger}30`,
+            borderLeft: `3px solid ${C.danger}`,
+            borderRadius: 4,
+            padding: "8px 12px",
+            color: C.danger,
+            fontSize: 12,
+            marginBottom: 16,
           }}
         >
-          {[
-            { label: "Mode", value: modeLabels[mode] },
-            { label: "Total Freight USD", value: `$${totalUSD.toFixed(2)}` },
-            { label: "Total Freight ZAR", value: `R${totalZAR.toFixed(2)}` },
-            perUnitZAR !== null && {
-              label: "Shipping per Unit ZAR",
-              value: `R${perUnitZAR.toFixed(4)}`,
-            },
-            perUnitUSD !== null && {
-              label: "Shipping per Unit USD",
-              value: `$${perUnitUSD.toFixed(4)}`,
-            },
-            mode === "ddp_air" &&
-              weightKg && {
-                label: "Rate Applied",
-                value: `$${DDP_TIERS.find((t) => parseFloat(weightKg) <= t.maxKg)?.ratePerKg}/kg + $${DDP_CLEARANCE_USD} clearance`,
-              },
-          ]
-            .filter(Boolean)
-            .map((item, i) => (
-              <div key={i}>
-                <div style={{ color: C.muted, fontSize: 11 }}>{item.label}</div>
-                <div style={{ color: C.accent, fontWeight: 600, fontSize: 14 }}>
-                  {item.value}
-                </div>
-              </div>
-            ))}
+          {error}
         </div>
       )}
 
-      <div style={{ marginTop: 12, color: C.muted, fontSize: 11 }}>
-        DDP rates: ≤21kg $15.80/kg · 21–50kg $15.50/kg · 50–100kg $15.20/kg ·
-        100kg+ $14.90/kg · +$25 customs clearance · Max 350kg/CBM · Sea min 1
-        CBM
-      </div>
-    </Card>
+      <button
+        onClick={save}
+        disabled={saving}
+        style={{
+          background: C.accent,
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          padding: "12px 24px",
+          cursor: saving ? "not-allowed" : "pointer",
+          fontWeight: 600,
+          width: "100%",
+          fontSize: 14,
+          opacity: saving ? 0.6 : 1,
+        }}
+      >
+        {saving ? "Saving…" : "✓ Save Supplier"}
+      </button>
+    </div>
   );
 }
 
-// ─── Add Product slide-in panel ───────────────────────────────────────────────
+// ─── Add Product panel ────────────────────────────────────────────────────────
 function AddProductPanel({ suppliers, onClose, onSaved }) {
   const [form, setForm] = useState({
     supplier_id: "",
@@ -323,7 +464,6 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
@@ -376,6 +516,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
         zIndex: 1000,
         overflowY: "auto",
         padding: 24,
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
       }}
     >
       <div
@@ -386,7 +527,14 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           marginBottom: 20,
         }}
       >
-        <div style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>
+        <div
+          style={{
+            color: C.text,
+            fontWeight: 700,
+            fontSize: 18,
+            fontFamily: "'Cormorant Garamond', serif",
+          }}
+        >
           Add Supplier Product
         </div>
         <button
@@ -395,7 +543,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
             background: "none",
             border: "none",
             color: C.muted,
-            fontSize: 20,
+            fontSize: 22,
             cursor: "pointer",
           }}
         >
@@ -453,11 +601,11 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
         >
           <option value="USD">USD</option>
           <option value="EUR">EUR</option>
-          <option value="CNY">CNY</option>
           <option value="ZAR">ZAR</option>
+          <option value="CNY">CNY</option>
         </Select>
         <Input
-          label="MOQ (min order qty)"
+          label="MOQ"
           type="number"
           value={form.moq}
           onChange={(e) => set("moq", e.target.value)}
@@ -484,7 +632,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
         onChange={(e) => set("description", e.target.value)}
         placeholder="Optional"
       />
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
         <div style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>
           Notes
         </div>
@@ -500,7 +648,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
             color: C.text,
             padding: "8px 12px",
             width: "100%",
-            fontSize: 14,
+            fontSize: 13,
             outline: "none",
             boxSizing: "border-box",
             resize: "vertical",
@@ -522,14 +670,15 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
           color: "#fff",
           border: "none",
           borderRadius: 6,
-          padding: "10px 24px",
+          padding: "12px 24px",
           cursor: "pointer",
           fontWeight: 600,
           width: "100%",
+          fontSize: 14,
           opacity: saving ? 0.6 : 1,
         }}
       >
-        {saving ? "Saving…" : "Save Product"}
+        {saving ? "Saving…" : "✓ Save Product"}
       </button>
     </div>
   );
@@ -587,6 +736,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
         zIndex: 1000,
         overflowY: "auto",
         padding: 24,
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
       }}
     >
       <div
@@ -597,7 +747,14 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           marginBottom: 20,
         }}
       >
-        <div style={{ color: C.text, fontWeight: 700, fontSize: 16 }}>
+        <div
+          style={{
+            color: C.text,
+            fontWeight: 700,
+            fontSize: 18,
+            fontFamily: "'Cormorant Garamond', serif",
+          }}
+        >
           Add Local Input
         </div>
         <button
@@ -606,7 +763,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
             background: "none",
             border: "none",
             color: C.muted,
-            fontSize: 20,
+            fontSize: 22,
             cursor: "pointer",
           }}
         >
@@ -648,10 +805,10 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           label="Unit"
           value={form.unit}
           onChange={(e) => set("unit", e.target.value)}
-          placeholder="per ml / per unit / per hour"
+          placeholder="per ml / per unit"
         />
       </div>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
         <div style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>
           Notes
         </div>
@@ -666,7 +823,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
             color: C.text,
             padding: "8px 12px",
             width: "100%",
-            fontSize: 14,
+            fontSize: 13,
             outline: "none",
             boxSizing: "border-box",
           }}
@@ -686,16 +843,132 @@ function AddLocalInputPanel({ onClose, onSaved }) {
           color: "#fff",
           border: "none",
           borderRadius: 6,
-          padding: "10px 24px",
+          padding: "12px 24px",
           cursor: "pointer",
           fontWeight: 600,
           width: "100%",
+          fontSize: 14,
           opacity: saving ? 0.6 : 1,
         }}
       >
-        {saving ? "Saving…" : "Save Input"}
+        {saving ? "Saving…" : "✓ Save Input"}
       </button>
     </div>
+  );
+}
+
+// ─── Shipping Calculator ──────────────────────────────────────────────────────
+function ShippingCalculator({ fx }) {
+  const [mode, setMode] = useState("ddp_air");
+  const [weightKg, setWeightKg] = useState("");
+  const [units, setUnits] = useState("");
+  const [seaRate, setSeaRate] = useState("");
+  const usdZar = fx?.usd_zar || 18.5;
+
+  let totalUSD = 0;
+  if (mode === "ddp_air" && weightKg)
+    totalUSD = calcDdpAir(parseFloat(weightKg));
+  if (mode === "standard_air") totalUSD = 800;
+  if (mode === "sea" && seaRate) totalUSD = parseFloat(seaRate);
+
+  const totalZAR = totalUSD * usdZar;
+  const perUnitZAR =
+    units && parseFloat(units) > 0 ? totalZAR / parseFloat(units) : null;
+  const perUnitUSD =
+    units && parseFloat(units) > 0 ? totalUSD / parseFloat(units) : null;
+
+  return (
+    <Card>
+      <div
+        style={{
+          color: C.text,
+          fontWeight: 600,
+          marginBottom: 16,
+          fontSize: 15,
+        }}
+      >
+        📦 Shipping Cost Calculator
+      </div>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
+      >
+        <Select
+          label="Shipping Mode"
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
+        >
+          <option value="ddp_air">DDP Air (per kg)</option>
+          <option value="standard_air">Standard Air ($800 flat)</option>
+          <option value="sea">Sea Freight</option>
+        </Select>
+        {mode === "ddp_air" && (
+          <Input
+            label="Total Weight (kg)"
+            type="number"
+            placeholder="e.g. 12"
+            value={weightKg}
+            onChange={(e) => setWeightKg(e.target.value)}
+          />
+        )}
+        {mode === "sea" && (
+          <Input
+            label="Freight Cost (USD)"
+            type="number"
+            placeholder="e.g. 800"
+            value={seaRate}
+            onChange={(e) => setSeaRate(e.target.value)}
+          />
+        )}
+        <Input
+          label="Units in Shipment"
+          type="number"
+          placeholder="e.g. 1000"
+          value={units}
+          onChange={(e) => setUnits(e.target.value)}
+        />
+      </div>
+
+      {totalUSD > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 12,
+            marginTop: 8,
+            padding: 16,
+            background: C.bg,
+            borderRadius: 6,
+            border: `1px solid ${C.border}`,
+          }}
+        >
+          {[
+            { label: "Total Freight USD", value: `$${totalUSD.toFixed(2)}` },
+            { label: "Total Freight ZAR", value: `R${totalZAR.toFixed(2)}` },
+            perUnitZAR !== null && {
+              label: "Per Unit ZAR",
+              value: `R${perUnitZAR.toFixed(4)}`,
+            },
+            perUnitUSD !== null && {
+              label: "Per Unit USD",
+              value: `$${perUnitUSD.toFixed(4)}`,
+            },
+          ]
+            .filter(Boolean)
+            .map((item, i) => (
+              <div key={i}>
+                <div style={{ color: C.muted, fontSize: 11 }}>{item.label}</div>
+                <div style={{ color: C.accent, fontWeight: 700, fontSize: 14 }}>
+                  {item.value}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+      <div style={{ marginTop: 12, color: C.muted, fontSize: 11 }}>
+        DDP rates: ≤21kg $15.80/kg · 21–50kg $15.50/kg · 50–100kg $15.20/kg ·
+        100kg+ $14.90/kg · +$25 customs clearance
+      </div>
+    </Card>
   );
 }
 
@@ -710,6 +983,7 @@ export default function HQSuppliers() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [showAddInput, setShowAddInput] = useState(false);
   const [editInput, setEditInput] = useState(null);
   const [savingInput, setSavingInput] = useState(false);
@@ -722,7 +996,7 @@ export default function HQSuppliers() {
     if (currency === "USD") return price * usdZar;
     if (currency === "EUR") return price * eurZar;
     if (currency === "ZAR") return price;
-    return price * usdZar; // default
+    return price * usdZar;
   };
 
   const load = useCallback(async () => {
@@ -756,7 +1030,6 @@ export default function HQSuppliers() {
     load();
   }, [load]);
 
-  // Filtered products
   const filtered = products.filter((p) => {
     if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
     if (supplierFilter !== "all" && p.supplier_id !== supplierFilter)
@@ -764,7 +1037,6 @@ export default function HQSuppliers() {
     return true;
   });
 
-  // Stats
   const totalCatalogueZAR = filtered.reduce(
     (sum, p) => sum + (toZAR(p.unit_price_usd, p.currency) || 0),
     0,
@@ -784,7 +1056,7 @@ export default function HQSuppliers() {
     hardware: C.info,
     terpene: C.accent,
     packaging: C.warn,
-    distillate: "#a78bfa",
+    distillate: "#7c3aed",
     other: C.muted,
   };
 
@@ -805,69 +1077,6 @@ export default function HQSuppliers() {
     load();
   };
 
-  // ── FX status bar ──────────────────────────────────────────────────────────
-  const FxBar = () => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        padding: "10px 16px",
-        background: C.accentDim,
-        border: `1px solid ${C.accent}`,
-        borderRadius: 8,
-        marginBottom: 16,
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: fxLoading ? C.warn : C.accent,
-            display: "inline-block",
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ color: C.muted, fontSize: 12 }}>Live FX</span>
-      </div>
-      <span style={{ color: C.text, fontWeight: 700, fontSize: 15 }}>
-        USD/ZAR: {fxLoading ? "…" : `R${usdZar.toFixed(4)}`}
-      </span>
-      <span style={{ color: C.muted, fontSize: 13 }}>
-        EUR/ZAR: {fxLoading ? "…" : `R${eurZar.toFixed(4)}`}
-      </span>
-      {fx?.fetched_at && (
-        <span style={{ color: C.muted, fontSize: 11 }}>
-          {fx.source === "cache"
-            ? "(cached)"
-            : fx.source === "stale_cache"
-              ? "(stale)"
-              : "(live)"}{" "}
-          · Updated {new Date(fx.fetched_at).toLocaleTimeString("en-ZA")}
-        </span>
-      )}
-      <button
-        onClick={refreshFx}
-        style={{
-          background: "none",
-          border: `1px solid ${C.accent}`,
-          borderRadius: 4,
-          color: C.accent,
-          fontSize: 11,
-          padding: "2px 8px",
-          cursor: "pointer",
-          marginLeft: "auto",
-        }}
-      >
-        ↻ Refresh
-      </button>
-    </div>
-  );
-
-  // ── Sub-tabs ───────────────────────────────────────────────────────────────
   const tabs = [
     { id: "catalogue", label: "📦 Product Catalogue" },
     { id: "local", label: "🇿🇦 Local Inputs" },
@@ -895,7 +1104,13 @@ export default function HQSuppliers() {
       >
         <div>
           <h2
-            style={{ color: C.text, margin: 0, fontSize: 22, fontWeight: 700 }}
+            style={{
+              color: C.primaryDark,
+              margin: 0,
+              fontSize: 22,
+              fontWeight: 300,
+              fontFamily: "'Cormorant Garamond', serif",
+            }}
           >
             Supplier Catalogue
           </h2>
@@ -921,7 +1136,66 @@ export default function HQSuppliers() {
         </button>
       </div>
 
-      <FxBar />
+      {/* FX Bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          padding: "10px 16px",
+          background: C.primaryDark,
+          border: `1px solid ${C.primaryDark}`,
+          borderRadius: 6,
+          marginBottom: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: fxLoading ? C.warn : "#52b788",
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+            Live FX
+          </span>
+        </div>
+        <span style={{ color: "#ffffff", fontWeight: 700, fontSize: 15 }}>
+          USD/ZAR: {fxLoading ? "…" : `R${usdZar.toFixed(4)}`}
+        </span>
+        <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}>
+          EUR/ZAR: {fxLoading ? "…" : `R${eurZar.toFixed(4)}`}
+        </span>
+        {fx?.fetched_at && (
+          <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+            {fx.source === "cache"
+              ? "(cached)"
+              : fx.source === "stale_cache"
+                ? "(stale)"
+                : "(live)"}{" "}
+            · Updated {new Date(fx.fetched_at).toLocaleTimeString("en-ZA")}
+          </span>
+        )}
+        <button
+          onClick={refreshFx}
+          style={{
+            background: "none",
+            border: "1px solid rgba(255,255,255,0.3)",
+            borderRadius: 4,
+            color: "rgba(255,255,255,0.8)",
+            fontSize: 11,
+            padding: "2px 8px",
+            cursor: "pointer",
+            marginLeft: "auto",
+          }}
+        >
+          ↻ Refresh
+        </button>
+      </div>
 
       {/* KPI row */}
       <div
@@ -934,25 +1208,28 @@ export default function HQSuppliers() {
       >
         {["hardware", "terpene", "packaging", "distillate", "other"].map(
           (cat) => (
-            <Card
+            <div
               key={cat}
-              style={{
-                margin: 0,
-                padding: 14,
-                cursor: "pointer",
-                border:
-                  categoryFilter === cat
-                    ? `1px solid ${categoryColor[cat]}`
-                    : `1px solid ${C.border}`,
-              }}
               onClick={() =>
                 setCategoryFilter(categoryFilter === cat ? "all" : cat)
               }
+              style={{
+                background: C.surface,
+                border:
+                  categoryFilter === cat
+                    ? `2px solid ${categoryColor[cat]}`
+                    : `1px solid ${C.border}`,
+                borderRadius: 6,
+                padding: 14,
+                cursor: "pointer",
+                textAlign: "center",
+                borderTop: `3px solid ${categoryColor[cat]}`,
+              }}
             >
               <div
                 style={{
                   color: C.muted,
-                  fontSize: 11,
+                  fontSize: 10,
                   textTransform: "uppercase",
                   letterSpacing: "0.5px",
                 }}
@@ -962,14 +1239,15 @@ export default function HQSuppliers() {
               <div
                 style={{
                   color: categoryColor[cat],
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: 700,
+                  fontFamily: "'Cormorant Garamond', serif",
                 }}
               >
                 {categoryCount[cat]}
               </div>
               <div style={{ color: C.muted, fontSize: 11 }}>products</div>
-            </Card>
+            </div>
           ),
         )}
       </div>
@@ -981,7 +1259,6 @@ export default function HQSuppliers() {
           gap: 4,
           marginBottom: 20,
           borderBottom: `1px solid ${C.border}`,
-          paddingBottom: 0,
         }}
       >
         {tabs.map((t) => (
@@ -989,18 +1266,17 @@ export default function HQSuppliers() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={{
-              background: activeTab === t.id ? C.surface : "transparent",
+              background: "transparent",
               border: "none",
               borderBottom:
                 activeTab === t.id
                   ? `2px solid ${C.accent}`
                   : "2px solid transparent",
-              color: activeTab === t.id ? C.text : C.muted,
+              color: activeTab === t.id ? C.accent : C.muted,
               padding: "8px 16px",
               cursor: "pointer",
               fontSize: 13,
-              fontWeight: 600,
-              transition: "all 0.15s",
+              fontWeight: activeTab === t.id ? 700 : 400,
             }}
           >
             {t.label}
@@ -1008,10 +1284,9 @@ export default function HQSuppliers() {
         ))}
       </div>
 
-      {/* ── CATALOGUE TAB ───────────────────────────────────────────────────── */}
+      {/* ── CATALOGUE TAB ─────────────────────────────────────────────────── */}
       {activeTab === "catalogue" && (
         <div>
-          {/* Filters */}
           <div
             style={{
               display: "flex",
@@ -1071,7 +1346,6 @@ export default function HQSuppliers() {
             </div>
           </div>
 
-          {/* Product table */}
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -1081,7 +1355,7 @@ export default function HQSuppliers() {
               }}
             >
               <thead>
-                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                <tr style={{ borderBottom: `2px solid ${C.border}` }}>
                   {[
                     "Category",
                     "SKU",
@@ -1102,6 +1376,9 @@ export default function HQSuppliers() {
                         padding: "8px 12px",
                         textAlign: "left",
                         whiteSpace: "nowrap",
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
                       }}
                     >
                       {h}
@@ -1117,7 +1394,7 @@ export default function HQSuppliers() {
                       key={p.id}
                       style={{ borderBottom: `1px solid ${C.border}` }}
                       onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = C.surface)
+                        (e.currentTarget.style.background = C.bg)
                       }
                       onMouseLeave={(e) =>
                         (e.currentTarget.style.background = "transparent")
@@ -1127,7 +1404,7 @@ export default function HQSuppliers() {
                         <Badge
                           label={p.category}
                           color={categoryColor[p.category] || C.muted}
-                          bg={C.bg}
+                          bg={`${categoryColor[p.category]}18` || C.infoDim}
                         />
                       </td>
                       <td
@@ -1240,7 +1517,6 @@ export default function HQSuppliers() {
             </table>
           </div>
 
-          {/* Summary */}
           {filtered.length > 0 && (
             <div
               style={{
@@ -1260,7 +1536,7 @@ export default function HQSuppliers() {
         </div>
       )}
 
-      {/* ── LOCAL INPUTS TAB ─────────────────────────────────────────────────── */}
+      {/* ── LOCAL INPUTS TAB ──────────────────────────────────────────────── */}
       {activeTab === "local" && (
         <div>
           <div
@@ -1537,7 +1813,6 @@ export default function HQSuppliers() {
               </Card>
             );
           })}
-
           <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
             ⚠ Items marked "Not set" will be excluded from COGS calculations
             until a price is entered.
@@ -1545,12 +1820,10 @@ export default function HQSuppliers() {
         </div>
       )}
 
-      {/* ── SHIPPING CALCULATOR TAB ───────────────────────────────────────────── */}
+      {/* ── SHIPPING CALCULATOR TAB ───────────────────────────────────────── */}
       {activeTab === "shipping" && (
         <div>
           <ShippingCalculator fx={fx} />
-
-          {/* Rate card reference */}
           <Card>
             <div style={{ color: C.text, fontWeight: 600, marginBottom: 12 }}>
               📋 DDP Air Rate Card
@@ -1567,7 +1840,7 @@ export default function HQSuppliers() {
                   {[
                     "Weight Bracket",
                     "Rate per kg (USD)",
-                    "Example: 10kg shipment (USD)",
+                    "Example: 10kg (USD)",
                     "Example ZAR",
                   ].map((h) => (
                     <th
@@ -1591,7 +1864,7 @@ export default function HQSuppliers() {
                   { label: "50 – 100 kg", rate: 15.2 },
                   { label: "100 kg +", rate: 14.9 },
                 ].map((row) => {
-                  const example10 = 10 * row.rate + DDP_CLEARANCE_USD;
+                  const ex = 10 * row.rate + DDP_CLEARANCE_USD;
                   return (
                     <tr
                       key={row.label}
@@ -1610,60 +1883,138 @@ export default function HQSuppliers() {
                         ${row.rate}
                       </td>
                       <td style={{ padding: "8px 12px", color: C.muted }}>
-                        ${example10.toFixed(2)} (incl. $25 clearance)
+                        ${ex.toFixed(2)} (incl. $25 clearance)
                       </td>
-                      <td style={{ padding: "8px 12px", color: C.gold }}>
-                        R{(example10 * usdZar).toFixed(2)}
+                      <td
+                        style={{
+                          padding: "8px 12px",
+                          color: C.gold,
+                          fontWeight: 600,
+                        }}
+                      >
+                        R{(ex * usdZar).toFixed(2)}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <div style={{ color: C.muted, fontSize: 11, marginTop: 8 }}>
-              Sea freight: $650/CBM self-pickup JHB · +$150/CBM door delivery ·
-              Min 1 CBM ($800 total) · 350kg max per CBM · 45–55 day transit
-            </div>
           </Card>
         </div>
       )}
 
-      {/* ── SUPPLIER LIST TAB ─────────────────────────────────────────────────── */}
+      {/* ── SUPPLIER LIST TAB ─────────────────────────────────────────────── */}
       {activeTab === "suppliers" && (
         <div>
-          {suppliers.map((s) => {
-            const sProds = products.filter((p) => p.supplier_id === s.id);
-            return (
-              <Card key={s.id}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{ color: C.text, fontWeight: 700, fontSize: 15 }}
-                    >
-                      {s.name}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ color: C.muted, fontSize: 13 }}>
+              {suppliers.length} suppliers registered · any sector
+            </div>
+            <button
+              onClick={() => setShowAddSupplier(true)}
+              style={{
+                background: C.accent,
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "8px 18px",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 13,
+              }}
+            >
+              + Add Supplier
+            </button>
+          </div>
+
+          {suppliers.length === 0 ? (
+            <div style={{ textAlign: "center", color: C.muted, padding: 40 }}>
+              No suppliers yet. Click + Add Supplier to get started.
+            </div>
+          ) : (
+            suppliers.map((s) => {
+              const sProds = products.filter((p) => p.supplier_id === s.id);
+              const categories = [...new Set(sProds.map((p) => p.category))];
+              return (
+                <Card key={s.id}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          color: C.text,
+                          fontWeight: 700,
+                          fontSize: 15,
+                          fontFamily: "'Cormorant Garamond', serif",
+                        }}
+                      >
+                        {s.name}
+                      </div>
+                      <div
+                        style={{ color: C.muted, fontSize: 12, marginTop: 2 }}
+                      >
+                        {s.country} · {s.currency}
+                        {s.contact_name && ` · ${s.contact_name}`}
+                      </div>
+                      {categories.length > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            marginTop: 8,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {categories.map((cat) => (
+                            <Badge
+                              key={cat}
+                              label={cat}
+                              color={categoryColor[cat] || C.muted}
+                              bg={`${categoryColor[cat]}18` || C.infoDim}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
-                      {s.country} · {s.currency} ·{" "}
-                      {s.contact_name || "No contact on file"}
+                    <div style={{ textAlign: "right" }}>
+                      <div
+                        style={{
+                          color: C.accent,
+                          fontWeight: 700,
+                          fontSize: 20,
+                          fontFamily: "'Cormorant Garamond', serif",
+                        }}
+                      >
+                        {sProds.length}
+                      </div>
+                      <div style={{ color: C.muted, fontSize: 11 }}>
+                        products
+                      </div>
                     </div>
                   </div>
-                  <Badge
-                    label={`${sProds.length} products`}
-                    color={C.info}
-                    bg={C.infoDim}
-                  />
-                </div>
 
-                {sProds.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {sProds.map((p) => (
+                  {sProds.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 6,
+                      }}
+                    >
+                      {sProds.slice(0, 8).map((p) => (
                         <span
                           key={p.id}
                           style={{
@@ -1690,27 +2041,56 @@ export default function HQSuppliers() {
                           )}
                         </span>
                       ))}
+                      {sProds.length > 8 && (
+                        <span
+                          style={{
+                            color: C.muted,
+                            fontSize: 11,
+                            padding: "3px 8px",
+                          }}
+                        >
+                          +{sProds.length - 8} more
+                        </span>
+                      )}
                     </div>
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-          {suppliers.length === 0 && (
-            <div style={{ color: C.muted, textAlign: "center", padding: 40 }}>
-              No suppliers found. Add suppliers via the Supply Chain tab first.
-            </div>
+                  )}
+
+                  {sProds.length === 0 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        color: C.muted,
+                        fontSize: 12,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No products catalogued yet — use + Add Product to link
+                      products to this supplier.
+                    </div>
+                  )}
+                </Card>
+              );
+            })
           )}
         </div>
       )}
 
-      {/* ── Slide-in panels ─────────────────────────────────────────────────── */}
+      {/* ── Slide-in panels ───────────────────────────────────────────────── */}
       {showAddProduct && (
         <AddProductPanel
           suppliers={suppliers}
           onClose={() => setShowAddProduct(false)}
           onSaved={() => {
             setShowAddProduct(false);
+            load();
+          }}
+        />
+      )}
+      {showAddSupplier && (
+        <AddSupplierPanel
+          onClose={() => setShowAddSupplier(false)}
+          onSaved={() => {
+            setShowAddSupplier(false);
             load();
           }}
         />
