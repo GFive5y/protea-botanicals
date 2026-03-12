@@ -1,20 +1,19 @@
 // src/components/hq/HQAnalytics.js
-// v3.0 — WP5 — March 2026
+// v3.1 — FIXED March 2026
 //
-// CHANGES v3.0:
-//   - Fixed: production_batches → production_runs (correct WP2 table)
-//   - Fixed: shipments status values (preparing/shipped/in_transit)
-//   - Added: Supabase real-time subscriptions (scans, shipments, production_runs)
-//   - Added: Live Command Centre alert banner at top of Overview
-//   - Added: Live pulse indicator showing last updated time
-//   - Production tab now reads run_number, planned_units, actual_units, batch_id
+// CHANGES v3.1:
+//   - CRITICAL FIX: scans table → scan_logs (ScanResult v4.1 writes here)
+//   - CRITICAL FIX: scan_date → scanned_at throughout
+//   - CRITICAL FIX: Realtime subscription now on scan_logs table
+//   - CRITICAL FIX: product_id → qr_code_id, source → qr_type
+//   - Scans & Loyalty sub-tab: shows QR type, outcome, points, province
+//   - Province breakdown + outcome breakdown added to Scans tab
 //
 // Sub-tabs: Overview · Supply Chain · Production · Distribution · Scans & Loyalty
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
   bg: "#faf9f6",
   primaryDark: "#1b4332",
@@ -37,8 +36,6 @@ const F = {
   heading: "'Cormorant Garamond', Georgia, serif",
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
-
-// ── Shared styles ─────────────────────────────────────────────────────────
 const sCard = {
   background: C.white,
   border: `1px solid ${C.border}`,
@@ -70,7 +67,6 @@ const sTd = {
   verticalAlign: "middle",
   fontSize: "12px",
 };
-
 const CATEGORY_LABELS = {
   finished_product: "Finished Product",
   raw_material: "Raw Material",
@@ -86,9 +82,6 @@ const CATEGORY_COLORS = {
   uncategorised: C.muted,
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
 export default function HQAnalytics() {
   const [subTab, setSubTab] = useState("overview");
   const [data, setData] = useState(null);
@@ -98,14 +91,11 @@ export default function HQAnalytics() {
   const [liveEvents, setLiveEvents] = useState([]);
   const subscriptions = useRef([]);
 
-  // ── Fetch all data ───────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const result = {};
-
-      // Inventory
       try {
         const r = await supabase
           .from("inventory_items")
@@ -116,8 +106,6 @@ export default function HQAnalytics() {
       } catch {
         result.inventory = [];
       }
-
-      // Suppliers
       try {
         const r = await supabase
           .from("suppliers")
@@ -126,8 +114,6 @@ export default function HQAnalytics() {
       } catch {
         result.suppliers = [];
       }
-
-      // Purchase Orders
       try {
         const r = await supabase
           .from("purchase_orders")
@@ -138,8 +124,6 @@ export default function HQAnalytics() {
       } catch {
         result.purchaseOrders = [];
       }
-
-      // ── FIXED: production_runs (not production_batches) ──────────────────
       try {
         const r = await supabase
           .from("production_runs")
@@ -151,8 +135,6 @@ export default function HQAnalytics() {
         console.warn("[HQAnalytics] production_runs:", e.message);
         result.productionRuns = [];
       }
-
-      // Batches (for batch names on production runs)
       try {
         const r = await supabase
           .from("batches")
@@ -161,8 +143,6 @@ export default function HQAnalytics() {
       } catch {
         result.batches = [];
       }
-
-      // Shipments — with correct status values
       try {
         const r = await supabase
           .from("shipments")
@@ -174,18 +154,20 @@ export default function HQAnalytics() {
         result.shipments = [];
       }
 
-      // Scans
+      // ── FIXED: scan_logs with scanned_at ──────────────────────────────
       try {
         const r = await supabase
-          .from("scans")
-          .select("id,product_id,source,scan_date")
-          .order("scan_date", { ascending: false });
+          .from("scan_logs")
+          .select(
+            "id,qr_code_id,qr_code,user_id,scanned_at,points_awarded,scan_outcome,qr_type,campaign_name,ip_province,ip_city,device_type",
+          )
+          .order("scanned_at", { ascending: false });
         result.scans = r.data || [];
-      } catch {
+      } catch (e) {
+        console.warn("[HQAnalytics] scan_logs:", e.message);
         result.scans = [];
       }
 
-      // Users
       try {
         const r = await supabase
           .from("user_profiles")
@@ -194,8 +176,6 @@ export default function HQAnalytics() {
       } catch {
         result.users = [];
       }
-
-      // Loyalty
       try {
         const r = await supabase
           .from("loyalty_transactions")
@@ -204,8 +184,6 @@ export default function HQAnalytics() {
       } catch {
         result.loyalty = [];
       }
-
-      // Tenants
       try {
         const r = await supabase
           .from("tenants")
@@ -214,8 +192,6 @@ export default function HQAnalytics() {
       } catch {
         result.tenants = [];
       }
-
-      // Stock movements (last 50)
       try {
         const r = await supabase
           .from("stock_movements")
@@ -237,38 +213,37 @@ export default function HQAnalytics() {
     }
   }, []);
 
-  // ── Real-time subscriptions ──────────────────────────────────────────────
   useEffect(() => {
     fetchAll();
 
-    // Subscribe to scans (new QR scans)
+    // ── FIXED: subscribe to scan_logs ────────────────────────────────────
     const scanSub = supabase
-      .channel("hq-scans")
+      .channel("hq-scan-logs")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "scans" },
+        { event: "INSERT", schema: "public", table: "scan_logs" },
         (payload) => {
+          const n = payload.new;
           setLiveEvents((prev) =>
             [
               {
                 type: "scan",
                 icon: "📱",
-                msg: "New QR scan recorded",
+                msg: `New scan · ${n.qr_type || "QR"} · ${n.ip_city || "—"}`,
                 time: new Date(),
-                id: payload.new.id,
+                id: n.id,
               },
               ...prev,
             ].slice(0, 10),
           );
           setData((prev) =>
-            prev ? { ...prev, scans: [payload.new, ...prev.scans] } : prev,
+            prev ? { ...prev, scans: [n, ...prev.scans] } : prev,
           );
           setLastUpdated(new Date());
         },
       )
       .subscribe();
 
-    // Subscribe to shipment status changes
     const shipSub = supabase
       .channel("hq-shipments")
       .on(
@@ -302,7 +277,6 @@ export default function HQAnalytics() {
       )
       .subscribe();
 
-    // Subscribe to production run status changes
     const runSub = supabase
       .channel("hq-runs")
       .on(
@@ -323,7 +297,6 @@ export default function HQAnalytics() {
             ].slice(0, 10),
           );
           setLastUpdated(new Date());
-          // Refetch production data fully on changes
           supabase
             .from("production_runs")
             .select(
@@ -340,13 +313,11 @@ export default function HQAnalytics() {
       .subscribe();
 
     subscriptions.current = [scanSub, shipSub, runSub];
-
     return () => {
       subscriptions.current.forEach((sub) => supabase.removeChannel(sub));
     };
   }, [fetchAll]);
 
-  // ── Sub-tabs ─────────────────────────────────────────────────────────────
   const SUB_TABS = [
     { id: "overview", label: "Overview", icon: "📊" },
     { id: "supply", label: "Supply Chain", icon: "📦" },
@@ -355,7 +326,7 @@ export default function HQAnalytics() {
     { id: "scans", label: "Scans & Loyalty", icon: "📱" },
   ];
 
-  if (error) {
+  if (error)
     return (
       <div style={{ ...sCard, borderLeft: `3px solid ${C.red}` }}>
         <div style={sLabel}>Error</div>
@@ -382,11 +353,9 @@ export default function HQAnalytics() {
         </button>
       </div>
     );
-  }
 
   return (
     <div style={{ fontFamily: F.body }}>
-      {/* ── Header ── */}
       <div
         style={{
           display: "flex",
@@ -409,7 +378,6 @@ export default function HQAnalytics() {
           >
             HQ Analytics
           </h2>
-          {/* Live pulse */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div
               style={{
@@ -464,7 +432,6 @@ export default function HQAnalytics() {
         </div>
       </div>
 
-      {/* ── Live Events Feed (Command Centre alerts) ── */}
       {liveEvents.length > 0 && (
         <div
           style={{
@@ -518,7 +485,6 @@ export default function HQAnalytics() {
         </div>
       )}
 
-      {/* ── Sub-tabs ── */}
       <div
         style={{
           display: "flex",
@@ -554,13 +520,11 @@ export default function HQAnalytics() {
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
           <div style={{ fontSize: "24px", marginBottom: "12px" }}>📈</div>
-          Loading analytics...
+          Loading analytics…
         </div>
       ) : data ? (
         <>
-          {subTab === "overview" && (
-            <OverviewAnalytics data={data} liveEvents={liveEvents} />
-          )}
+          {subTab === "overview" && <OverviewAnalytics data={data} />}
           {subTab === "supply" && <SupplyChainAnalytics data={data} />}
           {subTab === "production" && <ProductionAnalytics data={data} />}
           {subTab === "distribution" && <DistributionAnalytics data={data} />}
@@ -568,20 +532,15 @@ export default function HQAnalytics() {
         </>
       ) : null}
 
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.3); }
-        }
-      `}</style>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }`}</style>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// OVERVIEW — KPIs + Command Centre alerts
-// ═══════════════════════════════════════════════════════════════════════════
-function OverviewAnalytics({ data, liveEvents }) {
+// ───────────────────────────────────────────────────────
+// OVERVIEW
+// ───────────────────────────────────────────────────────
+function OverviewAnalytics({ data }) {
   const inv = data.inventory;
   const runs = data.productionRuns;
   const shipments = data.shipments;
@@ -603,10 +562,9 @@ function OverviewAnalytics({ data, liveEvents }) {
   );
   const outOfStock = inv.filter((i) => i.quantity_on_hand <= 0);
 
-  // Production runs stats
   const completedRuns = runs.filter((r) => r.status === "completed");
   const activeRuns = runs.filter((r) => r.status === "in_progress");
-  const totalUnitsProduced = completedRuns.reduce(
+  const totalUnits = completedRuns.reduce(
     (s, r) => s + (r.actual_units || 0),
     0,
   );
@@ -624,43 +582,36 @@ function OverviewAnalytics({ data, liveEvents }) {
         ).toFixed(1)
       : "—";
 
-  // Shipment stats (correct status values)
-  const deliveredShipments = shipments.filter((s) =>
+  const delivered = shipments.filter((s) =>
     ["delivered", "confirmed"].includes(s.status),
   );
   const inTransit = shipments.filter((s) =>
     ["shipped", "in_transit"].includes(s.status),
   );
-  const totalShippedUnits = shipments.reduce(
+  const unitsShipped = shipments.reduce(
     (s, sh) =>
       s +
       (sh.shipment_items || []).reduce((is, i) => is + (i.quantity || 0), 0),
     0,
   );
 
-  // Scans
   const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+  // FIXED: scanned_at
   const scans7d = data.scans.filter(
-    (s) => new Date(s.scan_date) >= sevenDaysAgo,
+    (s) => new Date(s.scanned_at) >= new Date(now - 7 * 86400000),
   ).length;
   const scans30d = data.scans.filter(
-    (s) => new Date(s.scan_date) >= thirtyDaysAgo,
+    (s) => new Date(s.scanned_at) >= new Date(now - 30 * 86400000),
   ).length;
-
-  // Loyalty
-  const totalPointsIssued = data.loyalty
+  const totalPoints = data.loyalty
     .filter((t) =>
       ["EARNED", "earned", "EARNED_POINTS", "SCAN"].includes(
         t.transaction_type,
       ),
     )
     .reduce((s, t) => s + (t.points || 0), 0);
-
   const customers = data.users.filter((u) => u.role === "customer").length;
 
-  // ── Command Centre alerts ──────────────────────────────────────────────
   const alerts = [];
   if (outOfStock.length > 0)
     alerts.push({
@@ -684,20 +635,19 @@ function OverviewAnalytics({ data, liveEvents }) {
     alerts.push({
       level: "info",
       icon: "🔧",
-      msg: `${activeRuns.length} production run${activeRuns.length > 1 ? "s" : ""} in progress`,
+      msg: `${activeRuns.length} run${activeRuns.length > 1 ? "s" : ""} in progress`,
     });
-  // Check for overdue shipments
-  const overdueShipments = shipments.filter(
+  const overdue = shipments.filter(
     (s) =>
       s.estimated_arrival &&
       !["delivered", "confirmed", "cancelled"].includes(s.status) &&
       new Date(s.estimated_arrival) < now,
   );
-  if (overdueShipments.length > 0)
+  if (overdue.length > 0)
     alerts.push({
       level: "critical",
       icon: "⚠",
-      msg: `${overdueShipments.length} shipment${overdueShipments.length > 1 ? "s" : ""} overdue`,
+      msg: `${overdue.length} shipment${overdue.length > 1 ? "s" : ""} overdue`,
     });
 
   const alertColors = { critical: C.red, warning: C.gold, info: C.blue };
@@ -709,7 +659,6 @@ function OverviewAnalytics({ data, liveEvents }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* Command Centre Alerts */}
       {alerts.length > 0 && (
         <div style={{ ...sCard, borderLeft: `4px solid ${C.red}` }}>
           <div style={{ ...sLabel, color: C.red }}>
@@ -742,12 +691,10 @@ function OverviewAnalytics({ data, liveEvents }) {
           </div>
         </div>
       )}
-
-      {/* KPI Grid Row 1 — Stock */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: "12px",
         }}
       >
@@ -778,12 +725,10 @@ function OverviewAnalytics({ data, liveEvents }) {
           color={outOfStock.length > 0 ? C.red : C.accent}
         />
       </div>
-
-      {/* KPI Grid Row 2 — Production */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: "12px",
         }}
       >
@@ -799,7 +744,7 @@ function OverviewAnalytics({ data, liveEvents }) {
         />
         <KPI
           label="Units Produced"
-          value={totalUnitsProduced.toLocaleString()}
+          value={totalUnits.toLocaleString()}
           color={C.primaryDark}
         />
         <KPI
@@ -809,21 +754,19 @@ function OverviewAnalytics({ data, liveEvents }) {
         />
         <KPI
           label="Shipments Delivered"
-          value={deliveredShipments.length}
+          value={delivered.length}
           color={C.accent}
         />
         <KPI
           label="Units Shipped"
-          value={totalShippedUnits.toLocaleString()}
+          value={unitsShipped.toLocaleString()}
           color={C.primaryDark}
         />
       </div>
-
-      {/* KPI Grid Row 3 — Engagement */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: "12px",
         }}
       >
@@ -843,7 +786,7 @@ function OverviewAnalytics({ data, liveEvents }) {
         <KPI label="Customers" value={customers} color={C.primaryMid} />
         <KPI
           label="Points Issued"
-          value={totalPointsIssued.toLocaleString()}
+          value={totalPoints.toLocaleString()}
           color={C.gold}
         />
         <KPI
@@ -852,14 +795,12 @@ function OverviewAnalytics({ data, liveEvents }) {
           color={C.primaryDark}
         />
       </div>
-
-      {/* Full Pipeline Summary */}
       <div style={sCard}>
         <div style={sLabel}>Supply Chain Pipeline — Live Status</div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
+            gridTemplateColumns: "repeat(5,1fr)",
             gap: "12px",
             marginTop: "16px",
           }}
@@ -902,7 +843,7 @@ function OverviewAnalytics({ data, liveEvents }) {
             color={C.accent}
             items={[
               { label: "In Transit", value: inTransit.length },
-              { label: "Delivered", value: deliveredShipments.length },
+              { label: "Delivered", value: delivered.length },
             ]}
           />
           <PipelineCard
@@ -916,9 +857,7 @@ function OverviewAnalytics({ data, liveEvents }) {
           />
         </div>
       </div>
-
-      {/* Recent stock movements */}
-      {data.movements && data.movements.length > 0 && (
+      {data.movements?.length > 0 && (
         <div style={sCard}>
           <div style={sLabel}>Recent Stock Movements</div>
           <table
@@ -1001,13 +940,12 @@ function OverviewAnalytics({ data, liveEvents }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
 // SUPPLY CHAIN
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
 function SupplyChainAnalytics({ data }) {
   const inv = data.inventory;
   const pos = data.purchaseOrders;
-
   const categories = {};
   inv.forEach((i) => {
     const cat = i.category || "uncategorised";
@@ -1016,12 +954,10 @@ function SupplyChainAnalytics({ data }) {
     categories[cat].value += (i.quantity_on_hand || 0) * (i.sell_price || 0);
     categories[cat].cost += (i.quantity_on_hand || 0) * (i.cost_price || 0);
   });
-
   const poStatuses = {};
   pos.forEach((p) => {
     poStatuses[p.status] = (poStatuses[p.status] || 0) + 1;
   });
-
   const supplierSpend = {};
   pos
     .filter((p) => p.status === "received")
@@ -1036,7 +972,6 @@ function SupplyChainAnalytics({ data }) {
       name: data.suppliers.find((s) => s.id === id)?.name || "Unknown",
     }))
     .sort((a, b) => b.total - a.total);
-
   const topByValue = [...inv]
     .map((i) => ({
       ...i,
@@ -1044,7 +979,6 @@ function SupplyChainAnalytics({ data }) {
     }))
     .sort((a, b) => b.totalValue - a.totalValue)
     .slice(0, 8);
-
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div style={sCard}>
@@ -1052,7 +986,7 @@ function SupplyChainAnalytics({ data }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
             gap: 12,
             marginTop: 12,
           }}
@@ -1101,7 +1035,6 @@ function SupplyChainAnalytics({ data }) {
           })}
         </div>
       </div>
-
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <div style={sCard}>
           <div style={sLabel}>Purchase Order Pipeline</div>
@@ -1198,7 +1131,6 @@ function SupplyChainAnalytics({ data }) {
           )}
         </div>
       </div>
-
       <div style={sCard}>
         <div style={sLabel}>Top Items by Stock Value</div>
         <table
@@ -1222,7 +1154,7 @@ function SupplyChainAnalytics({ data }) {
                 <th
                   key={h}
                   style={
-                    h === "On Hand" || h === "Sell Price" || h === "Total Value"
+                    ["On Hand", "Sell Price", "Total Value"].includes(h)
                       ? { ...sTh, textAlign: "right" }
                       : sTh
                   }
@@ -1286,18 +1218,16 @@ function SupplyChainAnalytics({ data }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PRODUCTION — Fixed to use production_runs
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
+// PRODUCTION
+// ───────────────────────────────────────────────────────
 function ProductionAnalytics({ data }) {
   const runs = data.productionRuns;
   const batches = data.batches;
-
   const completed = runs.filter((r) => r.status === "completed");
   const inProgress = runs.filter((r) => r.status === "in_progress");
   const planned = runs.filter((r) => r.status === "planned");
   const cancelled = runs.filter((r) => r.status === "cancelled");
-
   const totalPlanned = completed.reduce(
     (s, r) => s + (r.planned_units || 0),
     0,
@@ -1305,29 +1235,24 @@ function ProductionAnalytics({ data }) {
   const totalActual = completed.reduce((s, r) => s + (r.actual_units || 0), 0);
   const yieldRate =
     totalPlanned > 0 ? ((totalActual / totalPlanned) * 100).toFixed(1) : "—";
-
-  // Avg completion time
   const durations = completed
     .filter((r) => r.started_at && r.completed_at)
-    .map((r) => (new Date(r.completed_at) - new Date(r.started_at)) / 3600000); // hours
+    .map((r) => (new Date(r.completed_at) - new Date(r.started_at)) / 3600000);
   const avgHours =
     durations.length > 0
       ? (durations.reduce((s, d) => s + d, 0) / durations.length).toFixed(1)
       : "—";
-
-  // Enrich with batch names
   const enriched = runs.map((r) => ({
     ...r,
     batchName: batches.find((b) => b.id === r.batch_id)?.batch_number || "—",
     productName: batches.find((b) => b.id === r.batch_id)?.product_name || "—",
   }));
-
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: 12,
         }}
       >
@@ -1362,7 +1287,6 @@ function ProductionAnalytics({ data }) {
           sub="hours"
         />
       </div>
-
       {enriched.length > 0 && (
         <div style={sCard}>
           <div style={sLabel}>All Production Runs</div>
@@ -1408,7 +1332,7 @@ function ProductionAnalytics({ data }) {
                     r.planned_units > 0 && r.actual_units != null
                       ? ((r.actual_units / r.planned_units) * 100).toFixed(1)
                       : "—";
-                  const statusColors = {
+                  const sc = {
                     completed: C.accent,
                     in_progress: C.gold,
                     planned: C.blue,
@@ -1445,8 +1369,8 @@ function ProductionAnalytics({ data }) {
                             fontSize: 10,
                             padding: "2px 8px",
                             borderRadius: 2,
-                            background: `${statusColors[r.status] || C.muted}20`,
-                            color: statusColors[r.status] || C.muted,
+                            background: `${sc[r.status] || C.muted}20`,
+                            color: sc[r.status] || C.muted,
                             textTransform: "uppercase",
                             letterSpacing: "0.1em",
                             fontWeight: 700,
@@ -1494,30 +1418,27 @@ function ProductionAnalytics({ data }) {
           </table>
         </div>
       )}
-
       {runs.length === 0 && (
         <div
           style={{ ...sCard, textAlign: "center", padding: 40, color: C.muted }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🔧</div>
-          No production runs yet. Create runs in Admin → Production.
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔧</div>No production
+          runs yet.
         </div>
       )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DISTRIBUTION — Uses correct status values
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
+// DISTRIBUTION
+// ───────────────────────────────────────────────────────
 function DistributionAnalytics({ data }) {
   const shipments = data.shipments;
-
   const statusCounts = {};
   shipments.forEach((s) => {
     statusCounts[s.status] = (statusCounts[s.status] || 0) + 1;
   });
-
   const destinations = {};
   shipments.forEach((s) => {
     const dest = s.destination_name || "Unknown";
@@ -1532,7 +1453,6 @@ function DistributionAnalytics({ data }) {
   const destList = Object.entries(destinations)
     .map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => b.items - a.items);
-
   const delivered = shipments.filter((s) => s.delivered_date && s.created_at);
   const deliveryTimes = delivered.map(
     (s) => (new Date(s.delivered_date) - new Date(s.created_at)) / 86400000,
@@ -1543,25 +1463,22 @@ function DistributionAnalytics({ data }) {
           deliveryTimes.reduce((s, d) => s + d, 0) / deliveryTimes.length
         ).toFixed(1)
       : "—";
-
   const totalShippedValue = shipments.reduce(
     (s, sh) =>
       s +
       (sh.shipment_items || []).reduce((is, i) => is + (i.total_cost || 0), 0),
     0,
   );
-
   const now = new Date();
-  const overdueShipments = shipments.filter(
+  const overdue = shipments.filter(
     (s) =>
       s.estimated_arrival &&
       !["delivered", "confirmed", "cancelled"].includes(s.status) &&
       new Date(s.estimated_arrival) < now,
   );
-
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {overdueShipments.length > 0 && (
+      {overdue.length > 0 && (
         <div
           style={{
             padding: "12px 16px",
@@ -1573,16 +1490,14 @@ function DistributionAnalytics({ data }) {
             fontWeight: 600,
           }}
         >
-          ⚠ {overdueShipments.length} shipment
-          {overdueShipments.length > 1 ? "s" : ""} overdue:{" "}
-          {overdueShipments.map((s) => s.shipment_number).join(", ")}
+          ⚠ {overdue.length} shipment{overdue.length > 1 ? "s" : ""} overdue:{" "}
+          {overdue.map((s) => s.shipment_number).join(", ")}
         </div>
       )}
-
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: 12,
         }}
       >
@@ -1618,7 +1533,6 @@ function DistributionAnalytics({ data }) {
           color={C.primaryDark}
         />
       </div>
-
       {destList.length > 0 && (
         <div style={sCard}>
           <div style={sLabel}>Shipments by Destination</div>
@@ -1674,41 +1588,64 @@ function DistributionAnalytics({ data }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SCANS & LOYALTY
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
+// SCANS & LOYALTY — FIXED: scan_logs schema
+// ───────────────────────────────────────────────────────
 function ScansAnalytics({ data }) {
-  const scans = data.scans;
+  const scans = data.scans; // from scan_logs
   const now = new Date();
   const periods = [
     {
       label: "Today",
       from: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
     },
-    { label: "7 days", from: new Date(now.getTime() - 7 * 86400000) },
-    { label: "30 days", from: new Date(now.getTime() - 30 * 86400000) },
-    { label: "90 days", from: new Date(now.getTime() - 90 * 86400000) },
+    { label: "7 days", from: new Date(now - 7 * 86400000) },
+    { label: "30 days", from: new Date(now - 30 * 86400000) },
+    { label: "90 days", from: new Date(now - 90 * 86400000) },
     { label: "All time", from: new Date(0) },
   ];
 
-  const sources = {};
+  // By QR Type (replaces legacy source field)
+  const typeMap = {};
   scans.forEach((s) => {
-    const src = s.source || "unknown";
-    sources[src] = (sources[src] || 0) + 1;
+    const t = s.qr_type || "unknown";
+    typeMap[t] = (typeMap[t] || 0) + 1;
   });
-  const sourceList = Object.entries(sources)
-    .map(([source, count]) => ({ source, count }))
+  const typeList = Object.entries(typeMap)
+    .map(([qrType, count]) => ({ qrType, count }))
     .sort((a, b) => b.count - a.count);
 
-  const products = {};
+  // Top scanned qr_code_id
+  const codeMap = {};
   scans.forEach((s) => {
-    const pid = s.product_id || "unknown";
-    products[pid] = (products[pid] || 0) + 1;
+    const id = s.qr_code_id || "unknown";
+    codeMap[id] = (codeMap[id] || 0) + 1;
   });
-  const topProducts = Object.entries(products)
+  const topCodes = Object.entries(codeMap)
     .map(([id, count]) => ({ id, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
+
+  // Province
+  const provMap = {};
+  scans.forEach((s) => {
+    if (s.ip_province)
+      provMap[s.ip_province] = (provMap[s.ip_province] || 0) + 1;
+  });
+  const topProvinces = Object.entries(provMap)
+    .map(([p, c]) => ({ province: p, count: c }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  // Outcomes
+  const outcomeMap = {};
+  scans.forEach((s) => {
+    const o = s.scan_outcome || "unknown";
+    outcomeMap[o] = (outcomeMap[o] || 0) + 1;
+  });
+  const outcomeList = Object.entries(outcomeMap)
+    .map(([o, c]) => ({ outcome: o, count: c }))
+    .sort((a, b) => b.count - a.count);
 
   const earned = data.loyalty.filter((t) =>
     ["EARNED", "earned", "EARNED_POINTS", "SCAN"].includes(t.transaction_type),
@@ -1725,10 +1662,11 @@ function ScansAnalytics({ data }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
+      {/* Period KPIs — FIXED: scanned_at */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
+          gridTemplateColumns: "repeat(5,1fr)",
           gap: 12,
         }}
       >
@@ -1736,69 +1674,65 @@ function ScansAnalytics({ data }) {
           <KPI
             key={p.label}
             label={`Scans (${p.label})`}
-            value={scans.filter((s) => new Date(s.scan_date) >= p.from).length}
+            value={scans.filter((s) => new Date(s.scanned_at) >= p.from).length}
             color={C.accent}
           />
         ))}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* QR Type */}
         <div style={sCard}>
-          <div style={sLabel}>Scan Sources</div>
-          {sourceList.length === 0 ? (
+          <div style={sLabel}>Scans by QR Type</div>
+          {typeList.length === 0 ? (
             <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
               No scan data yet
             </p>
           ) : (
             <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-              {sourceList.map((s) => {
+              {typeList.map((s) => {
                 const pct =
                   scans.length > 0
                     ? ((s.count / scans.length) * 100).toFixed(1)
                     : 0;
                 return (
-                  <div
-                    key={s.source}
-                    style={{ display: "flex", alignItems: "center", gap: 12 }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div
+                  <div key={s.qrType}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: 2,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.1em",
-                          }}
-                        >
-                          {s.source}
-                        </span>
-                        <span style={{ fontSize: 11, color: C.muted }}>
-                          {s.count} ({pct}%)
-                        </span>
-                      </div>
+                        {s.qrType}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.muted }}>
+                        {s.count} ({pct}%)
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 4,
+                        background: C.border,
+                        borderRadius: 2,
+                      }}
+                    >
                       <div
                         style={{
-                          height: 4,
-                          background: C.border,
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: C.accent,
                           borderRadius: 2,
                         }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${pct}%`,
-                            background: C.accent,
-                            borderRadius: 2,
-                          }}
-                        />
-                      </div>
+                      />
                     </div>
                   </div>
                 );
@@ -1807,15 +1741,16 @@ function ScansAnalytics({ data }) {
           )}
         </div>
 
+        {/* Top codes */}
         <div style={sCard}>
-          <div style={sLabel}>Top Scanned Products</div>
-          {topProducts.length === 0 ? (
+          <div style={sLabel}>Top Scanned Codes</div>
+          {topCodes.length === 0 ? (
             <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
               No scan data yet
             </p>
           ) : (
             <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
-              {topProducts.map((p, i) => (
+              {topCodes.map((p, i) => (
                 <div
                   key={p.id}
                   style={{
@@ -1839,7 +1774,13 @@ function ScansAnalytics({ data }) {
                     >
                       #{i + 1}
                     </span>
-                    <span style={{ fontSize: 12, fontFamily: "monospace" }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontFamily: "monospace",
+                        color: C.muted,
+                      }}
+                    >
                       {p.id.slice(0, 12)}…
                     </span>
                   </div>
@@ -1860,10 +1801,138 @@ function ScansAnalytics({ data }) {
         </div>
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Province */}
+        <div style={sCard}>
+          <div style={sLabel}>Scans by Province (IP)</div>
+          {topProvinces.length === 0 ? (
+            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+              No geo data yet
+            </p>
+          ) : (
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {topProvinces.map((row) => {
+                const pct =
+                  scans.length > 0
+                    ? ((row.count / scans.length) * 100).toFixed(1)
+                    : 0;
+                return (
+                  <div key={row.province}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: C.primaryDark,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {row.province}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.muted }}>
+                        {row.count} · {pct}%
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 4,
+                        background: C.border,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: C.primaryMid,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Outcomes */}
+        <div style={sCard}>
+          <div style={sLabel}>Scan Outcomes</div>
+          {outcomeList.length === 0 ? (
+            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+              No data yet
+            </p>
+          ) : (
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {outcomeList.map((row) => {
+                const pct =
+                  scans.length > 0
+                    ? ((row.count / scans.length) * 100).toFixed(1)
+                    : 0;
+                const color =
+                  row.outcome === "points_awarded"
+                    ? C.accent
+                    : row.outcome === "already_claimed"
+                      ? C.muted
+                      : C.orange;
+                return (
+                  <div key={row.outcome}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          color,
+                        }}
+                      >
+                        {row.outcome.replace(/_/g, " ")}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.muted }}>
+                        {row.count} · {pct}%
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 4,
+                        background: C.border,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: color,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: 12,
         }}
       >
@@ -1888,12 +1957,12 @@ function ScansAnalytics({ data }) {
           color={C.blue}
         />
         <KPI
-          label="Loyalty Transactions"
+          label="Loyalty Tx"
           value={data.loyalty.length}
           color={C.primaryDark}
         />
         <KPI
-          label="Avg Points/Customer"
+          label="Avg Pts/Customer"
           value={customers > 0 ? Math.round(totalEarned / customers) : "—"}
           color={C.gold}
         />
@@ -1902,9 +1971,9 @@ function ScansAnalytics({ data }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
 // SHARED COMPONENTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────
 function KPI({ label, value, color, sub }) {
   return (
     <div
@@ -1946,7 +2015,6 @@ function KPI({ label, value, color, sub }) {
     </div>
   );
 }
-
 function PipelineCard({ stage, icon, items, color }) {
   return (
     <div

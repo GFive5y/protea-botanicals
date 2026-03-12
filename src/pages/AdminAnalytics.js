@@ -1,12 +1,12 @@
 // src/pages/AdminAnalytics.js
 // Protea Botanicals — Scan Analytics Dashboard Component
-// v1.0 — Source tracking analytics: summary cards, source breakdown, recent scans
-// Imported by AdminDashboard.js (same pattern as AdminQrGenerator)
+// v2.0 — FIXED: now queries scan_logs (not legacy scans table)
+//         scanned_at replaces scan_date, qr_type used for breakdown,
+//         realtime subscription to scan_logs, rich geo + device data
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 
-// ─── Design Tokens (match AdminDashboard) ───
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -20,8 +20,6 @@ const C = {
   muted: "#888",
   white: "#fff",
   red: "#c0392b",
-  lightGreen: "#d4edda",
-  lightBlue: "#d6eaf8",
   lightGold: "#fef9e7",
 };
 const FONTS = {
@@ -29,39 +27,43 @@ const FONTS = {
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ─── Source label + color mapping ───
-const SOURCE_META = {
-  direct: { label: "Direct Scan", color: C.blue, icon: "📱" },
-  promo: { label: "Promo Campaign", color: C.gold, icon: "📢" },
-  loyalty: { label: "Loyalty Flow", color: C.accent, icon: "⭐" },
-  verify: { label: "Verification", color: C.mid, icon: "✅" },
+const TYPE_META = {
+  product_insert: { label: "Product Insert", color: C.green, icon: "📦" },
+  packaging_exterior: {
+    label: "Exterior Packaging",
+    color: C.blue,
+    icon: "🌐",
+  },
+  promotional: { label: "Promotional", color: C.gold, icon: "📣" },
+  event: { label: "Event Check-in", color: C.orange, icon: "🎪" },
+  wearable: { label: "Wearable / Merch", color: C.brown, icon: "👕" },
+  retail_display: { label: "Retail Display", color: C.mid, icon: "🏪" },
 };
-
-function getSourceMeta(source) {
-  return SOURCE_META[source] || { label: source, color: C.muted, icon: "🔗" };
+function getTypeMeta(t) {
+  return TYPE_META[t] || { label: t || "Unknown", color: C.muted, icon: "🔗" };
 }
 
-// ─── Format date with time ───
-function fmtDateTime(d) {
+const OUTCOME_META = {
+  points_awarded: { label: "Points Awarded", color: C.accent },
+  already_claimed: { label: "Already Claimed", color: C.muted },
+  limit_reached: { label: "Limit Reached", color: C.orange },
+  cooldown: { label: "Cooldown", color: C.orange },
+  inactive: { label: "Inactive", color: C.muted },
+  expired: { label: "Expired", color: C.red },
+  no_actions: { label: "No Actions", color: C.muted },
+};
+
+function fmtDT(d) {
   if (!d) return "—";
   try {
     const dt = new Date(d);
-    const date = dt.toLocaleDateString("en-ZA", {
-      day: "numeric",
-      month: "short",
-    });
-    const time = dt.toLocaleTimeString("en-ZA", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    return `${date} · ${time}`;
+    return `${dt.toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} · ${dt.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}`;
   } catch {
     return "—";
   }
 }
 
-// ─── Stat Card (local copy to stay self-contained) ───
-function StatCard({ label, value, sub, color = C.green, icon }) {
+function StatCard({ label, value, color = C.green, icon }) {
   return (
     <div
       style={{
@@ -69,8 +71,8 @@ function StatCard({ label, value, sub, color = C.green, icon }) {
         border: `1px solid ${C.border}`,
         borderRadius: "2px",
         padding: "20px",
-        flex: "1 1 180px",
-        minWidth: "160px",
+        flex: "1 1 160px",
+        minWidth: "140px",
       }}
     >
       <div
@@ -98,25 +100,10 @@ function StatCard({ label, value, sub, color = C.green, icon }) {
       >
         {value}
       </div>
-      {sub && (
-        <div
-          style={{
-            fontSize: "12px",
-            color: C.muted,
-            fontFamily: FONTS.body,
-            marginTop: "4px",
-          }}
-        >
-          {sub}
-        </div>
-      )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════
 export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
@@ -124,87 +111,97 @@ export default function AdminAnalytics() {
     todayScans: 0,
     weekScans: 0,
     monthScans: 0,
-    bySource: [],
+    byType: [],
+    byOutcome: [],
+    byProvince: [],
     recentScans: [],
   });
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      // ── Total scans ──
-      const { count: totalScans } = await supabase
-        .from("scans")
-        .select("*", { count: "exact", head: true });
-
-      // ── Today ──
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const { count: todayScans } = await supabase
-        .from("scans")
-        .select("*", { count: "exact", head: true })
-        .gte("scan_date", todayStart.toISOString());
-
-      // ── This week ──
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - 7);
-      const { count: weekScans } = await supabase
-        .from("scans")
-        .select("*", { count: "exact", head: true })
-        .gte("scan_date", weekStart.toISOString());
-
-      // ── This month ──
       const monthStart = new Date();
       monthStart.setDate(monthStart.getDate() - 30);
-      const { count: monthScans } = await supabase
-        .from("scans")
-        .select("*", { count: "exact", head: true })
-        .gte("scan_date", monthStart.toISOString());
 
-      // ── By source (aggregate client-side for flexibility) ──
-      const { data: allScans } = await supabase
-        .from("scans")
-        .select("source, scan_date");
+      const [tot, tod, wk, mo] = await Promise.all([
+        supabase.from("scan_logs").select("*", { count: "exact", head: true }),
+        supabase
+          .from("scan_logs")
+          .select("*", { count: "exact", head: true })
+          .gte("scanned_at", todayStart.toISOString()),
+        supabase
+          .from("scan_logs")
+          .select("*", { count: "exact", head: true })
+          .gte("scanned_at", weekStart.toISOString()),
+        supabase
+          .from("scan_logs")
+          .select("*", { count: "exact", head: true })
+          .gte("scanned_at", monthStart.toISOString()),
+      ]);
 
-      const sourceMap = {};
-      (allScans || []).forEach((s) => {
-        const src = s.source || "direct";
-        if (!sourceMap[src]) sourceMap[src] = { count: 0, lastScan: null };
-        sourceMap[src].count++;
-        if (!sourceMap[src].lastScan || s.scan_date > sourceMap[src].lastScan) {
-          sourceMap[src].lastScan = s.scan_date;
-        }
+      const { data: rows } = await supabase
+        .from("scan_logs")
+        .select(
+          "id, qr_type, campaign_name, scan_outcome, scanned_at, ip_province, ip_city, user_id, qr_code, points_awarded",
+        )
+        .order("scanned_at", { ascending: false })
+        .limit(500);
+
+      const all = rows || [];
+      const total = tot.count || 0;
+
+      // By type
+      const typeMap = {};
+      all.forEach((s) => {
+        const t = s.qr_type || "unknown";
+        if (!typeMap[t]) typeMap[t] = { count: 0, lastScan: null };
+        typeMap[t].count++;
+        if (!typeMap[t].lastScan || s.scanned_at > typeMap[t].lastScan)
+          typeMap[t].lastScan = s.scanned_at;
       });
-
-      const bySource = Object.entries(sourceMap)
-        .map(([source, info]) => ({
-          source,
+      const byType = Object.entries(typeMap)
+        .map(([qrType, info]) => ({
+          qrType,
           count: info.count,
           lastScan: info.lastScan,
-          pct:
-            totalScans > 0
-              ? ((info.count / (totalScans || 1)) * 100).toFixed(1)
-              : "0",
+          pct: total > 0 ? ((info.count / total) * 100).toFixed(1) : "0",
         }))
         .sort((a, b) => b.count - a.count);
 
-      // ── Recent scans (last 20) with joins ──
-      const { data: recent, error: recentErr } = await supabase
-        .from("scans")
-        .select("id, source, scan_date, product_id, user_id, products(qr_code)")
-        .order("scan_date", { ascending: false })
-        .limit(20);
+      // By outcome
+      const outcomeMap = {};
+      all.forEach((s) => {
+        const o = s.scan_outcome || "unknown";
+        outcomeMap[o] = (outcomeMap[o] || 0) + 1;
+      });
+      const byOutcome = Object.entries(outcomeMap)
+        .map(([outcome, count]) => ({ outcome, count }))
+        .sort((a, b) => b.count - a.count);
 
-      if (recentErr) {
-        console.error("Recent scans fetch error:", recentErr);
-      }
+      // By province
+      const provMap = {};
+      all.forEach((s) => {
+        const p = s.ip_province || "Unknown";
+        provMap[p] = (provMap[p] || 0) + 1;
+      });
+      const byProvince = Object.entries(provMap)
+        .map(([province, count]) => ({ province, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
 
       setData({
-        totalScans: totalScans || 0,
-        todayScans: todayScans || 0,
-        weekScans: weekScans || 0,
-        monthScans: monthScans || 0,
-        bySource,
-        recentScans: recent || [],
+        totalScans: total,
+        todayScans: tod.count || 0,
+        weekScans: wk.count || 0,
+        monthScans: mo.count || 0,
+        byType,
+        byOutcome,
+        byProvince,
+        recentScans: all.slice(0, 25),
       });
     } catch (err) {
       console.error("Scan analytics error:", err);
@@ -215,23 +212,32 @@ export default function AdminAnalytics() {
 
   useEffect(() => {
     fetchAnalytics();
+    // Live update on new scans
+    const sub = supabase
+      .channel("admin-analytics-scan-logs")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "scan_logs" },
+        fetchAnalytics,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(sub);
+    };
   }, [fetchAnalytics]);
 
-  // ─── Loading ───
-  if (loading) {
+  if (loading)
     return (
       <div
         style={{ textAlign: "center", padding: "60px 20px", color: C.muted }}
       >
-        Loading scan analytics...
+        Loading scan analytics…
       </div>
     );
-  }
 
-  // ─── RENDER ───
   return (
     <div style={{ fontFamily: FONTS.body }}>
-      {/* ── Header ── */}
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -268,17 +274,17 @@ export default function AdminAnalytics() {
             cursor: "pointer",
           }}
         >
-          Refresh Data
+          ↻ Refresh Data
         </button>
       </div>
 
-      {/* ── Summary Cards ── */}
+      {/* KPI Strip */}
       <div
         style={{
           display: "flex",
           gap: "16px",
           flexWrap: "wrap",
-          marginBottom: "32px",
+          marginBottom: "28px",
         }}
       >
         <StatCard
@@ -307,170 +313,312 @@ export default function AdminAnalytics() {
         />
       </div>
 
-      {/* ── Source Breakdown ── */}
+      {/* Two-column: Type + right column */}
       <div
         style={{
-          background: C.white,
-          border: `1px solid ${C.border}`,
-          borderRadius: "2px",
-          marginBottom: "32px",
-          overflow: "hidden",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "20px",
+          marginBottom: "24px",
         }}
       >
+        {/* By QR Type */}
         <div
           style={{
-            padding: "16px 20px",
-            borderBottom: `1px solid ${C.border}`,
+            background: C.white,
+            border: `1px solid ${C.border}`,
+            borderRadius: "2px",
+            overflow: "hidden",
           }}
         >
           <div
             style={{
-              fontSize: "13px",
-              fontWeight: 600,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              color: C.green,
-              fontFamily: FONTS.body,
+              padding: "14px 20px",
+              borderBottom: `1px solid ${C.border}`,
             }}
           >
-            Scan Source Breakdown
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: C.green,
+              }}
+            >
+              Breakdown by QR Type
+            </div>
           </div>
-        </div>
-
-        {data.bySource.length === 0 ? (
-          <div
-            style={{
-              padding: "40px 20px",
-              textAlign: "center",
-              color: C.muted,
-              fontSize: "14px",
-            }}
-          >
-            No scans recorded yet. Scans will appear here once customers start
-            scanning QR codes.
-          </div>
-        ) : (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "13px",
-            }}
-          >
-            <thead>
-              <tr style={{ background: C.green, color: C.white }}>
-                {["Source", "Scans", "% of Total", "Last Scan"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: "10px 16px",
-                      textAlign: "left",
-                      fontSize: "10px",
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.bySource.map((row, i) => {
-                const meta = getSourceMeta(row.source);
-                return (
-                  <tr
-                    key={row.source}
-                    style={{
-                      borderBottom: `1px solid ${C.border}`,
-                      background: i % 2 === 0 ? C.white : C.cream,
-                    }}
-                  >
-                    <td style={{ padding: "12px 16px" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <span style={{ fontSize: "16px" }}>{meta.icon}</span>
-                        <div>
-                          <div style={{ fontWeight: 600, color: C.green }}>
-                            {meta.label}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "11px",
-                              color: C.muted,
-                              fontFamily: "monospace",
-                            }}
-                          >
-                            ?source={row.source}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td
+          {data.byType.length === 0 ? (
+            <div
+              style={{
+                padding: "32px 20px",
+                textAlign: "center",
+                color: C.muted,
+                fontSize: "13px",
+              }}
+            >
+              No scans recorded yet.
+            </div>
+          ) : (
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "12px",
+              }}
+            >
+              <thead>
+                <tr style={{ background: C.green, color: C.white }}>
+                  {["Type", "Scans", "% Total", "Last Scan"].map((h) => (
+                    <th
+                      key={h}
                       style={{
-                        padding: "12px 16px",
-                        fontWeight: 700,
-                        fontSize: "16px",
+                        padding: "9px 14px",
+                        textAlign: "left",
+                        fontSize: "9px",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        fontWeight: 600,
                       }}
                     >
-                      {row.count}
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.byType.map((row, i) => {
+                  const meta = getTypeMeta(row.qrType);
+                  return (
+                    <tr
+                      key={row.qrType}
+                      style={{
+                        borderBottom: `1px solid ${C.border}`,
+                        background: i % 2 === 0 ? C.white : C.cream,
+                      }}
+                    >
+                      <td style={{ padding: "9px 14px" }}>
+                        <span style={{ fontWeight: 600, color: C.green }}>
+                          {meta.icon} {meta.label}
+                        </span>
+                      </td>
+                      <td
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
+                          padding: "9px 14px",
+                          fontWeight: 700,
+                          fontSize: "14px",
                         }}
                       >
+                        {row.count}
+                      </td>
+                      <td style={{ padding: "9px 14px" }}>
                         <div
                           style={{
-                            background: C.border,
-                            borderRadius: "4px",
-                            height: "8px",
-                            width: "80px",
-                            overflow: "hidden",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
                           }}
                         >
                           <div
                             style={{
-                              background: meta.color,
-                              height: "100%",
-                              width: `${row.pct}%`,
+                              background: C.border,
                               borderRadius: "4px",
-                              transition: "width 0.6s ease-out",
+                              height: "5px",
+                              width: "60px",
+                              overflow: "hidden",
                             }}
-                          />
+                          >
+                            <div
+                              style={{
+                                background: meta.color,
+                                height: "100%",
+                                width: `${row.pct}%`,
+                                transition: "width 0.6s",
+                              }}
+                            />
+                          </div>
+                          <span style={{ fontSize: "10px", color: C.muted }}>
+                            {row.pct}%
+                          </span>
                         </div>
-                        <span style={{ fontSize: "12px", color: C.muted }}>
-                          {row.pct}%
-                        </span>
-                      </div>
-                    </td>
-                    <td
+                      </td>
+                      <td
+                        style={{
+                          padding: "9px 14px",
+                          fontSize: "10px",
+                          color: C.muted,
+                        }}
+                      >
+                        {fmtDT(row.lastScan)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Right column: Outcomes + Province */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div
+            style={{
+              background: C.white,
+              border: `1px solid ${C.border}`,
+              borderRadius: "2px",
+              padding: "16px 20px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: C.green,
+                marginBottom: "14px",
+              }}
+            >
+              Scan Outcomes
+            </div>
+            {data.byOutcome.length === 0 ? (
+              <div style={{ fontSize: "13px", color: C.muted }}>
+                No data yet.
+              </div>
+            ) : (
+              data.byOutcome.map((row) => {
+                const meta = OUTCOME_META[row.outcome] || {
+                  label: row.outcome,
+                  color: C.muted,
+                };
+                const pct =
+                  data.totalScans > 0
+                    ? ((row.count / data.totalScans) * 100).toFixed(1)
+                    : 0;
+                return (
+                  <div key={row.outcome} style={{ marginBottom: "10px" }}>
+                    <div
                       style={{
-                        padding: "12px 16px",
-                        fontSize: "12px",
-                        color: C.muted,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "3px",
                       }}
                     >
-                      {fmtDateTime(row.lastScan)}
-                    </td>
-                  </tr>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: meta.color,
+                        }}
+                      >
+                        {meta.label}
+                      </span>
+                      <span style={{ fontSize: "11px", color: C.muted }}>
+                        {row.count} · {pct}%
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: "4px",
+                        background: C.border,
+                        borderRadius: "2px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: meta.color,
+                          borderRadius: "2px",
+                          transition: "width 0.5s",
+                        }}
+                      />
+                    </div>
+                  </div>
                 );
-              })}
-            </tbody>
-          </table>
-        )}
+              })
+            )}
+          </div>
+
+          <div
+            style={{
+              background: C.white,
+              border: `1px solid ${C.border}`,
+              borderRadius: "2px",
+              padding: "16px 20px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: C.green,
+                marginBottom: "14px",
+              }}
+            >
+              Scans by Province (IP)
+            </div>
+            {data.byProvince.length === 0 ? (
+              <div style={{ fontSize: "13px", color: C.muted }}>
+                No geo data yet.
+              </div>
+            ) : (
+              data.byProvince.map((row) => {
+                const pct =
+                  data.totalScans > 0
+                    ? ((row.count / data.totalScans) * 100).toFixed(1)
+                    : 0;
+                return (
+                  <div key={row.province} style={{ marginBottom: "10px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "3px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: C.green,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {row.province}
+                      </span>
+                      <span style={{ fontSize: "11px", color: C.muted }}>
+                        {row.count} · {pct}%
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: "4px",
+                        background: C.border,
+                        borderRadius: "2px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          background: C.mid,
+                          borderRadius: "2px",
+                          transition: "width 0.5s",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* ── Recent Scans ── */}
+      {/* Recent Scans */}
       <div
         style={{
           background: C.white,
@@ -481,24 +629,22 @@ export default function AdminAnalytics() {
       >
         <div
           style={{
-            padding: "16px 20px",
+            padding: "14px 20px",
             borderBottom: `1px solid ${C.border}`,
           }}
         >
           <div
             style={{
-              fontSize: "13px",
+              fontSize: "11px",
               fontWeight: 600,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
               color: C.green,
-              fontFamily: FONTS.body,
             }}
           >
-            Recent Scans (Last 20)
+            Recent Scans (Last 25)
           </div>
         </div>
-
         {data.recentScans.length === 0 ? (
           <div
             style={{
@@ -516,18 +662,26 @@ export default function AdminAnalytics() {
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                fontSize: "13px",
+                fontSize: "12px",
               }}
             >
               <thead>
                 <tr style={{ background: C.green, color: C.white }}>
-                  {["QR Code", "Source", "User ID", "Date & Time"].map((h) => (
+                  {[
+                    "QR Code",
+                    "Type",
+                    "Outcome",
+                    "Pts",
+                    "Province",
+                    "User",
+                    "Date & Time",
+                  ].map((h) => (
                     <th
                       key={h}
                       style={{
-                        padding: "10px 16px",
+                        padding: "9px 14px",
                         textAlign: "left",
-                        fontSize: "10px",
+                        fontSize: "9px",
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
                         fontWeight: 600,
@@ -539,11 +693,15 @@ export default function AdminAnalytics() {
                 </tr>
               </thead>
               <tbody>
-                {data.recentScans.map((scan, i) => {
-                  const meta = getSourceMeta(scan.source || "direct");
+                {data.recentScans.map((s, i) => {
+                  const tm = getTypeMeta(s.qr_type);
+                  const om = OUTCOME_META[s.scan_outcome] || {
+                    label: s.scan_outcome || "—",
+                    color: C.muted,
+                  };
                   return (
                     <tr
-                      key={scan.id}
+                      key={s.id}
                       style={{
                         borderBottom: `1px solid ${C.border}`,
                         background: i % 2 === 0 ? C.white : C.cream,
@@ -551,53 +709,73 @@ export default function AdminAnalytics() {
                     >
                       <td
                         style={{
-                          padding: "10px 16px",
+                          padding: "8px 14px",
                           fontFamily: "monospace",
-                          fontSize: "12px",
+                          fontSize: "10px",
                           fontWeight: 600,
                         }}
                       >
-                        {scan.products?.qr_code ||
-                          scan.product_id?.substring(0, 8) + "..." ||
-                          "—"}
+                        {s.qr_code
+                          ? s.qr_code.length > 24
+                            ? s.qr_code.slice(0, 24) + "…"
+                            : s.qr_code
+                          : "—"}
                       </td>
-                      <td style={{ padding: "10px 16px" }}>
+                      <td style={{ padding: "8px 14px", fontSize: "11px" }}>
+                        {tm.icon} {tm.label}
+                      </td>
+                      <td style={{ padding: "8px 14px" }}>
                         <span
                           style={{
-                            background: meta.color,
-                            color: C.white,
-                            padding: "3px 10px",
+                            background: `${om.color}20`,
+                            color: om.color,
+                            padding: "2px 7px",
                             borderRadius: "2px",
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            letterSpacing: "0.1em",
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            fontFamily: FONTS.body,
                           }}
                         >
-                          {scan.source || "direct"}
+                          {om.label}
                         </span>
                       </td>
                       <td
                         style={{
-                          padding: "10px 16px",
-                          fontFamily: "monospace",
+                          padding: "8px 14px",
+                          fontWeight: 600,
+                          color: C.accent,
+                        }}
+                      >
+                        {s.points_awarded > 0 ? `+${s.points_awarded}` : "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 14px",
                           fontSize: "11px",
                           color: C.muted,
                         }}
                       >
-                        {scan.user_id
-                          ? scan.user_id.substring(0, 12) + "..."
-                          : "—"}
+                        {s.ip_province || "—"}
                       </td>
                       <td
                         style={{
-                          padding: "10px 16px",
-                          fontSize: "12px",
+                          padding: "8px 14px",
+                          fontFamily: "monospace",
+                          fontSize: "10px",
                           color: C.muted,
                         }}
                       >
-                        {fmtDateTime(scan.scan_date)}
+                        {s.user_id ? s.user_id.slice(0, 10) + "…" : "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: "11px",
+                          color: C.muted,
+                        }}
+                      >
+                        {fmtDT(s.scanned_at)}
                       </td>
                     </tr>
                   );
@@ -606,70 +784,6 @@ export default function AdminAnalytics() {
             </table>
           </div>
         )}
-      </div>
-
-      {/* ── Campaign URL Guide ── */}
-      <div
-        style={{
-          marginTop: "32px",
-          background: C.lightGold,
-          border: `1px solid ${C.border}`,
-          borderRadius: "2px",
-          padding: "20px 24px",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "12px",
-            fontWeight: 600,
-            color: C.green,
-            marginBottom: "12px",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-          }}
-        >
-          Campaign Source Tracking Guide
-        </div>
-        <div style={{ fontSize: "13px", color: "#555", lineHeight: 1.8 }}>
-          <p style={{ margin: "0 0 8px" }}>
-            Append{" "}
-            <code
-              style={{
-                background: C.white,
-                padding: "2px 6px",
-                borderRadius: "2px",
-              }}
-            >
-              ?source=
-            </code>{" "}
-            to any scan URL to track where scans come from:
-          </p>
-          <div
-            style={{ fontFamily: "monospace", fontSize: "12px", lineHeight: 2 }}
-          >
-            <div>
-              <span style={{ color: C.gold }}>Promo:</span>{" "}
-              /scan/PB-001-2026-0001<strong>?source=promo</strong>
-            </div>
-            <div>
-              <span style={{ color: C.accent }}>Loyalty:</span>{" "}
-              /scan/PB-001-2026-0001<strong>?source=loyalty</strong>
-            </div>
-            <div>
-              <span style={{ color: C.mid }}>Verify:</span>{" "}
-              /scan/PB-001-2026-0001<strong>?source=verify</strong>
-            </div>
-            <div>
-              <span style={{ color: C.blue }}>Default:</span>{" "}
-              /scan/PB-001-2026-0001{" "}
-              <span style={{ color: C.muted }}>(no param = "direct")</span>
-            </div>
-          </div>
-          <p style={{ margin: "12px 0 0", fontSize: "12px", color: C.muted }}>
-            Use the Smart QR tab to generate campaign URLs with source tracking
-            built in.
-          </p>
-        </div>
       </div>
     </div>
   );

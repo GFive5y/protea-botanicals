@@ -1,12 +1,6 @@
-// src/components/hq/HQOverview.js — Protea Botanicals v1.3
-// ─────────────────────────────────────────────────────────────────────────────
-// v1.3 WP-H Integration: Added ERP KPI tiles — Reorder Alerts, Avg Gross
-//   Margin %, Active Import POs. Pulls from inventory_items, product_pricing,
-//   product_cogs, purchase_orders. Quick Actions updated with ERP tab links.
-// v1.2 FIX: Low-stock query uses correct column `quantity_on_hand`.
-// v1.1 FIX: Each query independent with try-catch.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// src/components/hq/HQOverview.js — Protea Botanicals v1.4
+// v1.4 FIXED: scans → scan_logs, scan_date → scanned_at
+// v1.3 WP-H: ERP KPI tiles added
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
@@ -37,48 +31,28 @@ export default function HQOverview({ onNavigate }) {
     try {
       setLoading(true);
       setError(null);
-
       let products = 0,
         scans = 0,
         users = 0,
-        totalPoints = 0;
-      let inventoryItems = 0,
+        totalPoints = 0,
+        inventoryItems = 0,
         tenants = 0,
         recentScanCount = 0;
       let scansData = [],
         lowStockData = [];
 
-      // Products count
       try {
         const r = await supabase
           .from("products")
           .select("id", { count: "exact", head: true });
         products = r.count || 0;
-      } catch (e) {
-        console.warn("[HQOverview] products count failed:", e.message);
-      }
-
-      // Scans count
-      try {
-        const r = await supabase
-          .from("scans")
-          .select("id", { count: "exact", head: true });
-        scans = r.count || 0;
-      } catch (e) {
-        console.warn("[HQOverview] scans count failed:", e.message);
-      }
-
-      // Users count
+      } catch (e) {}
       try {
         const r = await supabase
           .from("user_profiles")
           .select("id", { count: "exact", head: true });
         users = r.count || 0;
-      } catch (e) {
-        console.warn("[HQOverview] users count failed:", e.message);
-      }
-
-      // Loyalty points sum
+      } catch (e) {}
       try {
         const r = await supabase
           .from("loyalty_transactions")
@@ -89,72 +63,63 @@ export default function HQOverview({ onNavigate }) {
             "EARNED_POINTS",
             "SCAN",
           ]);
-        totalPoints = (r.data || []).reduce(
-          (sum, t) => sum + (t.points || 0),
-          0,
-        );
-      } catch (e) {
-        console.warn("[HQOverview] loyalty sum failed:", e.message);
-      }
-
-      // Tenants count
+        totalPoints = (r.data || []).reduce((s, t) => s + (t.points || 0), 0);
+      } catch (e) {}
       try {
         const r = await supabase
           .from("tenants")
           .select("id", { count: "exact", head: true });
         tenants = r.count || 0;
-      } catch (e) {
-        console.warn("[HQOverview] tenants count failed:", e.message);
-      }
-
-      // Inventory count
+      } catch (e) {}
       try {
         const r = await supabase
           .from("inventory_items")
           .select("id", { count: "exact", head: true });
         inventoryItems = r.count || 0;
-      } catch (e) {
-        console.warn("[HQOverview] inventory count failed:", e.message);
-      }
+      } catch (e) {}
 
-      // Recent scans (last 10)
+      // FIXED: scan_logs + scanned_at
       try {
         const r = await supabase
-          .from("scans")
-          .select("id, user_id, product_id, scan_date, source")
-          .order("scan_date", { ascending: false })
+          .from("scan_logs")
+          .select("*", { count: "exact", head: true });
+        scans = r.count || 0;
+      } catch (e) {
+        console.warn("[HQOverview] scan_logs count:", e.message);
+      }
+      try {
+        const r = await supabase
+          .from("scan_logs")
+          .select(
+            "id,user_id,qr_code,qr_type,scanned_at,scan_outcome,points_awarded,ip_city",
+          )
+          .order("scanned_at", { ascending: false })
           .limit(10);
         scansData = r.data || [];
       } catch (e) {
-        console.warn("[HQOverview] recent scans failed:", e.message);
+        console.warn("[HQOverview] recent scan_logs:", e.message);
       }
-
-      // 7-day scan count
       try {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
         const r = await supabase
-          .from("scans")
+          .from("scan_logs")
           .select("id", { count: "exact", head: true })
-          .gte("scan_date", sevenDaysAgo.toISOString());
+          .gte("scanned_at", d.toISOString());
         recentScanCount = r.count || 0;
       } catch (e) {
-        console.warn("[HQOverview] 7-day scans failed:", e.message);
+        console.warn("[HQOverview] 7d scans:", e.message);
       }
-
-      // Low stock
       try {
         const r = await supabase
           .from("inventory_items")
-          .select("id, name, sku, quantity_on_hand, reorder_level, unit")
+          .select("id,name,sku,quantity_on_hand,reorder_level,unit")
           .eq("is_active", true)
           .lt("quantity_on_hand", 10)
           .order("quantity_on_hand", { ascending: true })
           .limit(5);
         if (!r.error) lowStockData = r.data || [];
-      } catch {
-        console.warn("[HQOverview] low stock query failed");
-      }
+      } catch {}
 
       setStats({
         products,
@@ -168,13 +133,10 @@ export default function HQOverview({ onNavigate }) {
       setRecentScans(scansData);
       setLowStock(lowStockData);
 
-      // ── ERP Stats (Phase 2) ──────────────────────────────────────────
       let reorderCount = 0,
         avgMarginPct = null,
         activeImportPOs = 0,
         fxRate = 18.5;
-
-      // FX rate
       try {
         const r = await supabase
           .from("fx_rates")
@@ -183,44 +145,35 @@ export default function HQOverview({ onNavigate }) {
           .order("fetched_at", { ascending: false })
           .limit(1);
         if (r.data?.[0]?.rate) fxRate = parseFloat(r.data[0].rate);
-      } catch {
-        /* use fallback */
-      }
-
-      // Reorder alerts count
+      } catch {}
       try {
         const r = await supabase
           .from("inventory_items")
-          .select("id, quantity_on_hand, reorder_level")
+          .select("id,quantity_on_hand,reorder_level")
           .eq("is_active", true)
           .gt("reorder_level", 0);
         reorderCount = (r.data || []).filter(
           (i) => parseFloat(i.quantity_on_hand) <= parseFloat(i.reorder_level),
         ).length;
-      } catch (e) {
-        console.warn("[HQOverview] reorder count failed:", e.message);
-      }
-
-      // Avg gross margin from product_pricing + product_cogs
+      } catch (e) {}
       try {
         const [pricesRes, cogsRes, suppRes] = await Promise.all([
           supabase
             .from("product_pricing")
-            .select("product_cogs_id, channel, sell_price_zar")
+            .select("product_cogs_id,channel,sell_price_zar")
             .eq("channel", "retail"),
           supabase
             .from("product_cogs")
             .select(
-              "id, hardware_item_id, hardware_qty, terpene_item_id, terpene_qty_g, distillate_input_id, distillate_qty_ml, packaging_input_id, packaging_qty, labour_input_id, labour_qty, other_cost_zar",
+              "id,hardware_item_id,hardware_qty,terpene_item_id,terpene_qty_g,distillate_input_id,distillate_qty_ml,packaging_input_id,packaging_qty,labour_input_id,labour_qty,other_cost_zar",
             ),
           supabase
             .from("supplier_products")
-            .select("id, unit_price_usd, category"),
+            .select("id,unit_price_usd,category"),
         ]);
-        const prices = pricesRes.data || [];
-        const recipes = cogsRes.data || [];
-        const suppProds = suppRes.data || [];
-
+        const prices = pricesRes.data || [],
+          recipes = cogsRes.data || [],
+          suppProds = suppRes.data || [];
         const margins = [];
         prices.forEach((p) => {
           if (!p.sell_price_zar) return;
@@ -247,11 +200,7 @@ export default function HQOverview({ onNavigate }) {
         });
         if (margins.length > 0)
           avgMarginPct = margins.reduce((s, m) => s + m, 0) / margins.length;
-      } catch (e) {
-        console.warn("[HQOverview] avg margin failed:", e.message);
-      }
-
-      // Active import POs (not draft/received/cancelled)
+      } catch (e) {}
       try {
         const r = await supabase
           .from("purchase_orders")
@@ -262,13 +211,10 @@ export default function HQOverview({ onNavigate }) {
             '("received","complete","cancelled","draft")',
           );
         activeImportPOs = r.count || 0;
-      } catch (e) {
-        console.warn("[HQOverview] import POs failed:", e.message);
-      }
-
+      } catch (e) {}
       setErpStats({ reorderCount, avgMarginPct, activeImportPOs, fxRate });
     } catch (err) {
-      console.error("[HQOverview] Fatal error:", err);
+      console.error("[HQOverview] Fatal:", err);
       setError("Failed to load dashboard data");
     } finally {
       setLoading(false);
@@ -279,9 +225,10 @@ export default function HQOverview({ onNavigate }) {
     fetchStats();
   }, [fetchStats]);
 
-  if (loading) {
+  if (loading)
     return (
       <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
+        <style>{`@keyframes protea-spin{to{transform:rotate(360deg)}}`}</style>
         <div
           style={{
             width: "32px",
@@ -293,7 +240,6 @@ export default function HQOverview({ onNavigate }) {
             margin: "0 auto 16px",
           }}
         />
-        <style>{`@keyframes protea-spin { to { transform: rotate(360deg); } }`}</style>
         <span
           style={{
             fontSize: "11px",
@@ -306,9 +252,7 @@ export default function HQOverview({ onNavigate }) {
         </span>
       </div>
     );
-  }
-
-  if (error) {
+  if (error)
     return (
       <div
         style={{
@@ -341,7 +285,6 @@ export default function HQOverview({ onNavigate }) {
         </button>
       </div>
     );
-  }
 
   const marginColour =
     erpStats?.avgMarginPct >= 35
@@ -352,7 +295,6 @@ export default function HQOverview({ onNavigate }) {
 
   return (
     <div>
-      {/* ── PLATFORM KPIs ────────────────────────────────────────────── */}
       <div
         style={{
           fontSize: "10px",
@@ -368,7 +310,7 @@ export default function HQOverview({ onNavigate }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
           gap: "14px",
           marginBottom: "28px",
         }}
@@ -412,7 +354,6 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ── ERP KPIs ─────────────────────────────────────────────────── */}
       {erpStats && (
         <>
           <div
@@ -430,188 +371,42 @@ export default function HQOverview({ onNavigate }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
               gap: "14px",
               marginBottom: "28px",
             }}
           >
-            {/* Reorder Alerts */}
-            <div
+            <ERPCard
+              icon="🔔"
+              label="Reorder Alerts"
+              value={erpStats.reorderCount}
+              color={erpStats.reorderCount > 0 ? C.red : C.accentGreen}
+              sub={
+                erpStats.reorderCount > 0 ? "items need reorder" : "all stocked"
+              }
               onClick={() => onNavigate && onNavigate("reorder")}
-              style={{
-                background: C.white,
-                border: `1px solid ${erpStats.reorderCount > 0 ? "#ffcdd2" : C.border}`,
-                borderTop: `3px solid ${erpStats.reorderCount > 0 ? C.red : C.accentGreen}`,
-                borderRadius: "2px",
-                padding: "18px 20px",
-                cursor: onNavigate ? "pointer" : "default",
-                transition: "box-shadow 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.boxShadow =
-                  "0 2px 12px rgba(0,0,0,0.08)")
-              }
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "10px",
-                }}
-              >
-                <span style={{ fontSize: "14px" }}>🔔</span>
-                <span
-                  style={{
-                    color: C.muted,
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Reorder Alerts
-                </span>
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: "32px",
-                  fontWeight: 300,
-                  color: erpStats.reorderCount > 0 ? C.red : C.accentGreen,
-                  lineHeight: 1,
-                }}
-              >
-                {erpStats.reorderCount}
-              </div>
-              <div
-                style={{ color: C.muted, fontSize: "10px", marginTop: "4px" }}
-              >
-                {erpStats.reorderCount > 0
-                  ? "items need reorder"
-                  : "all stocked"}
-              </div>
-            </div>
-
-            {/* Avg Gross Margin */}
-            <div
-              onClick={() => onNavigate && onNavigate("pricing")}
-              style={{
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderTop: `3px solid ${erpStats.avgMarginPct !== null ? marginColour : C.border}`,
-                borderRadius: "2px",
-                padding: "18px 20px",
-                cursor: onNavigate ? "pointer" : "default",
-                transition: "box-shadow 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.boxShadow =
-                  "0 2px 12px rgba(0,0,0,0.08)")
-              }
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "10px",
-                }}
-              >
-                <span style={{ fontSize: "14px" }}>📊</span>
-                <span
-                  style={{
-                    color: C.muted,
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Avg Gross Margin
-                </span>
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: "32px",
-                  fontWeight: 300,
-                  color:
-                    erpStats.avgMarginPct !== null ? marginColour : C.muted,
-                  lineHeight: 1,
-                }}
-              >
-                {erpStats.avgMarginPct !== null
+              alert={erpStats.reorderCount > 0}
+            />
+            <ERPCard
+              icon="📊"
+              label="Avg Gross Margin"
+              value={
+                erpStats.avgMarginPct !== null
                   ? `${erpStats.avgMarginPct.toFixed(1)}%`
-                  : "—"}
-              </div>
-              <div
-                style={{ color: C.muted, fontSize: "10px", marginTop: "4px" }}
-              >
-                retail channel avg
-              </div>
-            </div>
-
-            {/* Active Import POs */}
-            <div
-              onClick={() => onNavigate && onNavigate("procurement")}
-              style={{
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderTop: `3px solid #2c4a6e`,
-                borderRadius: "2px",
-                padding: "18px 20px",
-                cursor: onNavigate ? "pointer" : "default",
-                transition: "box-shadow 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.boxShadow =
-                  "0 2px 12px rgba(0,0,0,0.08)")
+                  : "—"
               }
-              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "10px",
-                }}
-              >
-                <span style={{ fontSize: "14px" }}>✈️</span>
-                <span
-                  style={{
-                    color: C.muted,
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Import POs
-                </span>
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: "32px",
-                  fontWeight: 300,
-                  color: "#2c4a6e",
-                  lineHeight: 1,
-                }}
-              >
-                {erpStats.activeImportPOs}
-              </div>
-              <div
-                style={{ color: C.muted, fontSize: "10px", marginTop: "4px" }}
-              >
-                in transit / pending
-              </div>
-            </div>
-
-            {/* Live FX Rate */}
+              color={erpStats.avgMarginPct !== null ? marginColour : C.muted}
+              sub="retail channel avg"
+              onClick={() => onNavigate && onNavigate("pricing")}
+            />
+            <ERPCard
+              icon="✈️"
+              label="Import POs"
+              value={erpStats.activeImportPOs}
+              color="#2c4a6e"
+              sub="in transit / pending"
+              onClick={() => onNavigate && onNavigate("procurement")}
+            />
             <div
               style={{
                 background: "#E8F5E9",
@@ -644,7 +439,7 @@ export default function HQOverview({ onNavigate }) {
               </div>
               <div
                 style={{
-                  fontFamily: "'Cormorant Garamond', serif",
+                  fontFamily: "'Cormorant Garamond',serif",
                   fontSize: "28px",
                   fontWeight: 300,
                   color: "#2E7D32",
@@ -663,7 +458,6 @@ export default function HQOverview({ onNavigate }) {
         </>
       )}
 
-      {/* Two Column */}
       <div
         style={{
           display: "grid",
@@ -672,7 +466,6 @@ export default function HQOverview({ onNavigate }) {
           marginBottom: "24px",
         }}
       >
-        {/* Recent Scans */}
         <div
           style={{
             background: C.white,
@@ -690,7 +483,7 @@ export default function HQOverview({ onNavigate }) {
               alignItems: "center",
             }}
           >
-            <h3 style={sectionH}>Recent Scans</h3>
+            <h3 style={sH}>Recent Scans</h3>
             <span style={badge}>{recentScans.length}</span>
           </div>
           <div style={{ maxHeight: "280px", overflowY: "auto" }}>
@@ -723,12 +516,9 @@ export default function HQOverview({ onNavigate }) {
                 >
                   <div>
                     <span style={{ color: C.text, fontWeight: 500 }}>
-                      Product:{" "}
-                      {scan.product_id
-                        ? scan.product_id.slice(0, 8) + "…"
-                        : "—"}
+                      {scan.qr_code ? scan.qr_code.slice(0, 20) + "…" : "—"}
                     </span>
-                    {scan.source && (
+                    {scan.qr_type && (
                       <span
                         style={{
                           marginLeft: "8px",
@@ -742,20 +532,29 @@ export default function HQOverview({ onNavigate }) {
                           textTransform: "uppercase",
                         }}
                       >
-                        {scan.source}
+                        {scan.qr_type}
+                      </span>
+                    )}
+                    {scan.ip_city && (
+                      <span
+                        style={{
+                          marginLeft: "6px",
+                          fontSize: "10px",
+                          color: C.muted,
+                        }}
+                      >
+                        📍{scan.ip_city}
                       </span>
                     )}
                   </div>
                   <span style={{ color: C.muted, fontSize: "11px" }}>
-                    {formatTimeAgo(scan.scan_date)}
+                    {fmtAgo(scan.scanned_at)}
                   </span>
                 </div>
               ))
             )}
           </div>
         </div>
-
-        {/* Low Stock */}
         <div
           style={{
             background: C.white,
@@ -773,7 +572,7 @@ export default function HQOverview({ onNavigate }) {
               alignItems: "center",
             }}
           >
-            <h3 style={sectionH}>Low Stock Alerts</h3>
+            <h3 style={sH}>Low Stock Alerts</h3>
             {lowStock.length > 0 && (
               <span
                 style={{
@@ -848,7 +647,7 @@ export default function HQOverview({ onNavigate }) {
                           (item.quantity_on_hand || 0) === 0 ? C.red : C.gold,
                         fontWeight: 600,
                         fontSize: "13px",
-                        fontFamily: "'Cormorant Garamond', serif",
+                        fontFamily: "'Cormorant Garamond',serif",
                       }}
                     >
                       {item.quantity_on_hand ?? 0}
@@ -872,7 +671,6 @@ export default function HQOverview({ onNavigate }) {
         </div>
       </div>
 
-      {/* Quick Actions — updated with ERP tabs */}
       <div
         style={{
           background: C.white,
@@ -881,7 +679,7 @@ export default function HQOverview({ onNavigate }) {
           padding: "20px 24px",
         }}
       >
-        <h3 style={{ ...sectionH, marginBottom: "8px" }}>Quick Actions</h3>
+        <h3 style={{ ...sH, marginBottom: "8px" }}>Quick Actions</h3>
         <div
           style={{
             fontSize: "10px",
@@ -946,7 +744,6 @@ export default function HQOverview({ onNavigate }) {
           </>
         )}
       </div>
-
       <div style={{ marginTop: "24px", textAlign: "right" }}>
         <button
           onClick={fetchStats}
@@ -956,7 +753,7 @@ export default function HQOverview({ onNavigate }) {
             borderRadius: "2px",
             padding: "8px 16px",
             cursor: "pointer",
-            fontFamily: "Jost, sans-serif",
+            fontFamily: "Jost,sans-serif",
             fontSize: "10px",
             fontWeight: 600,
             letterSpacing: "0.15em",
@@ -1005,7 +802,7 @@ function KPICard({ icon, label, value, color, sub }) {
       </div>
       <div
         style={{
-          fontFamily: "'Cormorant Garamond', serif",
+          fontFamily: "'Cormorant Garamond',serif",
           fontSize: "32px",
           fontWeight: 300,
           color,
@@ -1022,7 +819,62 @@ function KPICard({ icon, label, value, color, sub }) {
     </div>
   );
 }
-
+function ERPCard({ icon, label, value, color, sub, onClick, alert }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: C.white,
+        border: `1px solid ${alert ? "#ffcdd2" : C.border}`,
+        borderTop: `3px solid ${color}`,
+        borderRadius: "2px",
+        padding: "18px 20px",
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 0.15s",
+      }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)")
+      }
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "10px",
+        }}
+      >
+        <span style={{ fontSize: "14px" }}>{icon}</span>
+        <span
+          style={{
+            color: C.muted,
+            fontSize: "10px",
+            fontWeight: 600,
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <div
+        style={{
+          fontFamily: "'Cormorant Garamond',serif",
+          fontSize: "32px",
+          fontWeight: 300,
+          color,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ color: C.muted, fontSize: "10px", marginTop: "4px" }}>
+        {sub}
+      </div>
+    </div>
+  );
+}
 function QA({ label, href, icon }) {
   return (
     <a
@@ -1035,18 +887,18 @@ function QA({ label, href, icon }) {
         border: `1px solid ${C.border}`,
         borderRadius: "2px",
         padding: "8px 16px",
-        fontFamily: "Jost, sans-serif",
+        fontFamily: "Jost,sans-serif",
         fontSize: "11px",
         fontWeight: 500,
         color: C.primaryDark,
         textDecoration: "none",
       }}
     >
-      <span>{icon}</span> {label}
+      <span>{icon}</span>
+      {label}
     </a>
   );
 }
-
 function QABtn({ label, icon, onClick, highlight }) {
   return (
     <button
@@ -1059,20 +911,20 @@ function QABtn({ label, icon, onClick, highlight }) {
         border: `1px solid ${highlight ? "#ffcdd2" : C.border}`,
         borderRadius: "2px",
         padding: "8px 16px",
-        fontFamily: "Jost, sans-serif",
+        fontFamily: "Jost,sans-serif",
         fontSize: "11px",
         fontWeight: 500,
         color: highlight ? C.red : C.primaryDark,
         cursor: "pointer",
       }}
     >
-      <span>{icon}</span> {label}
+      <span>{icon}</span>
+      {label}
       {highlight ? " ⚠" : ""}
     </button>
   );
 }
-
-function formatTimeAgo(d) {
+function fmtAgo(d) {
   if (!d) return "—";
   const ms = Date.now() - new Date(d).getTime();
   const m = Math.floor(ms / 60000),
@@ -1084,9 +936,8 @@ function formatTimeAgo(d) {
   if (dy < 7) return `${dy}d ago`;
   return new Date(d).toLocaleDateString();
 }
-
-const sectionH = {
-  fontFamily: "'Cormorant Garamond', serif",
+const sH = {
+  fontFamily: "'Cormorant Garamond',serif",
   fontSize: "16px",
   fontWeight: 300,
   color: "#1b4332",

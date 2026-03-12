@@ -1,5 +1,13 @@
-// scanService.js v7.2 — Protea Botanicals — March 2026
+// scanService.js v7.3 — Protea Botanicals — March 2026
 // ============================================================================
+// v7.3: getScanGeoAnalytics rewritten to query scan_logs (not legacy scans table)
+//   - queries scan_logs with scanned_at, scan_outcome, qr_type, ip_province,
+//     ip_city, gps_lat, gps_lng, location_source, device_type, browser
+//   - flagged scans derived from scan_outcome (limit_reached/cooldown/already_claimed)
+//   - firstScans = scan_outcome === 'points_awarded'
+//   - byQrType breakdown added (powers GeoAnalyticsDashboard)
+//   - returns null on error (callers must handle null)
+//
 // v7.2: First-scan-only enforcement UI (DEC-026)
 //   - already_claimed check now returns { success:true, authentic:true, rescan:true }
 //   - batch data fetched BEFORE returning so ScanResult has product details
@@ -408,6 +416,8 @@ async function runAnomalyChecks(userId, productId) {
 }
 
 // ── getUserScanHistory ────────────────────────────────────────────────────────
+// NOTE: intentionally still queries legacy `scans` table — this is for the
+// customer-facing Loyalty page scan history (pre-WP-M scans).
 export async function getUserScanHistory(userId, limit = 20) {
   const { data, error } = await supabase
     .from("scans")
@@ -427,86 +437,102 @@ export async function getUserScanHistory(userId, limit = 20) {
 }
 
 // ── getScanGeoAnalytics ───────────────────────────────────────────────────────
+// v2.0 — Queries scan_logs (not legacy scans table)
+// Powers GeoAnalyticsDashboard: province/city heatmap, device split,
+// GPS consent rate, QR type breakdown, demand gap analysis.
 export async function getScanGeoAnalytics(days = 30) {
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const since = new Date(Date.now() - days * 86400000).toISOString();
 
-  const { data, error } = await supabase
-    .from("scans")
-    .select(
-      `
-      id, scan_date, ip_city, ip_province, location_source,
-      device_type, is_first_scan, scan_flagged, nearest_stockist_id,
-      distance_to_stockist_m, user_id, tenant_id, source, is_legacy
-    `,
-    )
-    .gte("scan_date", since)
-    .order("scan_date", { ascending: false });
+    const { data: rows, error } = await supabase
+      .from("scan_logs")
+      .select(
+        "id, scanned_at, scan_outcome, qr_type, campaign_name, " +
+          "ip_province, ip_city, ip_country, ip_lat, ip_lng, " +
+          "gps_lat, gps_lng, location_source, " +
+          "device_type, browser, user_id, points_awarded, qr_code_id",
+      )
+      .gte("scanned_at", since)
+      .order("scanned_at", { ascending: false });
 
-  if (error)
-    return {
-      raw: [],
-      total: 0,
-      firstScans: 0,
-      flagged: 0,
-      gpsConsent: 0,
-      legacyScans: 0,
-      byProvince: {},
-      byCity: {},
-      byDevice: {},
-      byStockist: {},
-      bySource: {},
-      topProvince: "—",
-      topCity: "—",
-    };
-
-  const raw = data || [];
-
-  const byProvince = raw.reduce((acc, s) => {
-    const p = s.ip_province || "Unknown";
-    acc[p] = (acc[p] || 0) + 1;
-    return acc;
-  }, {});
-  const byCity = raw.reduce((acc, s) => {
-    const c = s.ip_city || "Unknown";
-    acc[c] = (acc[c] || 0) + 1;
-    return acc;
-  }, {});
-  const byDevice = raw.reduce((acc, s) => {
-    const d = s.device_type || "unknown";
-    acc[d] = (acc[d] || 0) + 1;
-    return acc;
-  }, {});
-  const byStockist = raw.reduce((acc, s) => {
-    if (s.nearest_stockist_id) {
-      acc[s.nearest_stockist_id] = (acc[s.nearest_stockist_id] || 0) + 1;
+    if (error) {
+      console.error("[scanService] getScanGeoAnalytics error:", error);
+      return null;
     }
-    return acc;
-  }, {});
-  const bySource = raw.reduce((acc, s) => {
-    const src = s.source || "direct";
-    acc[src] = (acc[src] || 0) + 1;
-    return acc;
-  }, {});
 
-  const gpsCount = raw.filter((s) => s.location_source === "gps").length;
-  const flagged = raw.filter((s) => s.scan_flagged).length;
-  const firstScans = raw.filter((s) => s.is_first_scan).length;
-  const legacyScans = raw.filter((s) => s.is_legacy).length;
+    const all = rows || [];
+    const total = all.length;
 
-  return {
-    raw,
-    total: raw.length,
-    firstScans,
-    flagged,
-    legacyScans,
-    gpsConsent: raw.length ? Math.round((gpsCount / raw.length) * 100) : 0,
-    byProvince,
-    byCity,
-    byDevice,
-    byStockist,
-    bySource,
-    topProvince:
-      Object.entries(byProvince).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
-    topCity: Object.entries(byCity).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
-  };
+    // ── First scans (points actually awarded) ──────────────────────────────
+    const firstScans = all.filter(
+      (r) => r.scan_outcome === "points_awarded",
+    ).length;
+
+    // ── GPS consent rate ────────────────────────────────────────────────────
+    const gpsRows = all.filter((r) => r.location_source === "gps");
+    const gpsConsent =
+      total > 0 ? Math.round((gpsRows.length / total) * 100) : 0;
+
+    // ── Flagged / anomaly scans ─────────────────────────────────────────────
+    const flaggedOutcomes = ["limit_reached", "cooldown", "already_claimed"];
+    const flagged = all.filter((r) =>
+      flaggedOutcomes.includes(r.scan_outcome),
+    ).length;
+
+    // ── By Province ─────────────────────────────────────────────────────────
+    const byProvince = {};
+    all.forEach((r) => {
+      if (r.ip_province) {
+        byProvince[r.ip_province] = (byProvince[r.ip_province] || 0) + 1;
+      }
+    });
+
+    // ── By City ─────────────────────────────────────────────────────────────
+    const byCity = {};
+    all.forEach((r) => {
+      if (r.ip_city) {
+        byCity[r.ip_city] = (byCity[r.ip_city] || 0) + 1;
+      }
+    });
+
+    // ── By Device ───────────────────────────────────────────────────────────
+    const byDevice = { mobile: 0, desktop: 0, tablet: 0 };
+    all.forEach((r) => {
+      const dt = (r.device_type || "").toLowerCase();
+      if (dt === "mobile") byDevice.mobile++;
+      else if (dt === "tablet") byDevice.tablet++;
+      else if (dt === "desktop") byDevice.desktop++;
+      else byDevice.mobile++; // fallback: mobile
+    });
+
+    // ── By QR Type ──────────────────────────────────────────────────────────
+    const byQrType = {};
+    all.forEach((r) => {
+      const t = r.qr_type || "unknown";
+      byQrType[t] = (byQrType[t] || 0) + 1;
+    });
+
+    // ── Top Province / City ─────────────────────────────────────────────────
+    const topProvince =
+      Object.entries(byProvince).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const topCity =
+      Object.entries(byCity).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+    return {
+      total,
+      firstScans,
+      gpsConsent,
+      flagged,
+      byProvince,
+      byCity,
+      byDevice,
+      byQrType,
+      topProvince,
+      topCity,
+      raw: all, // full rows — used for location_source quality chart
+    };
+  } catch (err) {
+    console.error("[scanService] getScanGeoAnalytics exception:", err);
+    return null;
+  }
 }
