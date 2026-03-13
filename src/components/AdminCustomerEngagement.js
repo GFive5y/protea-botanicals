@@ -1,21 +1,30 @@
-// src/components/AdminCustomerEngagement.js
-// v1.0 — March 2026
-// WP7 — Customer Engagement Layer
-//
-// Features:
-//   - Customer list with engagement score, tier, churn risk flag
-//   - Engagement score calculation from live data (scans, points, recency, profile)
-//   - Churn risk detection: no scan in 30d + low points
-//   - Tier display: Bronze / Silver / Gold / Platinum from loyalty_points
-//   - Customer detail modal: full profile, scan history, loyalty transactions
-//   - Bulk flags: mark churn risk, recalculate engagement scores
-//   - Filter: All / At Risk / Active / By Tier
-//   - Stats: total customers, avg engagement, churn risk count, opt-in rate
+// src/components/AdminCustomerEngagement.js v2.0
+// Protea Botanicals — March 2026
+// ============================================================================
+// v2.0 — Customer 360 Database overhaul (built on v1.0 foundation)
+//   PRESERVED from v1.0:
+//   - calcEngagement() scoring algorithm (recency/scans/points/profile/optins)
+//   - isChurnRisk() logic
+//   - TierBadge (points-based), EngBar, makeBtn, inputStyle, TIERS config
+//   - handleBulkSave() + Save All Scores + toast system
+//   - All stat cards, filter/sort logic incl. engagement + risk sort
+//   - fmtDate, fmtDateTime, daysSince helpers
+//   ADDED in v2.0:
+//   - Customer 360 slide-in drawer (replaces modal) with 4 tabs:
+//     Profile (identity + engagement breakdown) / Loyalty / Scans / POPIA
+//   - profileScore() + ScoreBadge column (profile completeness %)
+//   - scan_logs loaded per customer in Scans tab
+//   - Register In-Store modal → creates auth user + WhatsApp admin alert
+//   - Data deletion request → WhatsApp admin alert (POPIA right to erasure)
+//   - POPIA consented + Avg Profile % added to stats strip
+//   - Sort: join_date + profile added
+//   - Filter: complete profile added
+// ============================================================================
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────
+// ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -40,8 +49,11 @@ const FONTS = {
   heading: "'Cormorant Garamond', Georgia, serif",
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
+const SUPABASE_FUNCTIONS_URL =
+  process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
+  "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Tier config (based on loyalty_points) ────────────────────────────────
+// ── Tier config — PRESERVED from v1.0 ────────────────────────────────────────
 const TIERS = {
   platinum: {
     label: "Platinum",
@@ -66,7 +78,6 @@ const TIERS = {
     icon: "🥉",
   },
 };
-
 function getTier(points) {
   if (points >= 1000) return "platinum";
   if (points >= 500) return "gold";
@@ -77,7 +88,7 @@ function getTierCfg(points) {
   return TIERS[getTier(points)];
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ── Helpers — PRESERVED from v1.0 ────────────────────────────────────────────
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -99,7 +110,29 @@ function daysSince(d) {
   if (!d) return null;
   return Math.floor((new Date() - new Date(d)) / 86400000);
 }
+function timeAgo(ts) {
+  if (!ts) return "—";
+  const diff = (Date.now() - new Date(ts)) / 1000;
+  if (diff < 60) return `${Math.round(diff)}s ago`;
+  if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
+  if (diff < 2592000) return `${Math.round(diff / 86400)}d ago`;
+  return fmtDate(ts);
+}
 
+// NEW v2.0 — profile completeness (5 fields x 20 = 100)
+function profileScore(p) {
+  if (!p) return 0;
+  let s = 0;
+  if (p.full_name) s += 20;
+  if (p.phone) s += 20;
+  if (p.date_of_birth) s += 20;
+  if (p.province) s += 20;
+  if (p.popia_consented) s += 20;
+  return s;
+}
+
+// ── Style helpers — PRESERVED from v1.0 ──────────────────────────────────────
 const inputStyle = {
   padding: "9px 12px",
   border: `1px solid ${C.border}`,
@@ -126,18 +159,10 @@ const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
   opacity: disabled ? 0.6 : 1,
 });
 
-// ── Engagement score calculator ───────────────────────────────────────────
-// Max 100 pts:
-//   Recency (last scan)   30 pts
-//   Scan volume           25 pts
-//   Points balance        20 pts
-//   Profile completeness  15 pts
-//   Opt-ins               10 pts
-function calcEngagement(profile, recentScans) {
-  const now = new Date();
+// ── Engagement score calculator — PRESERVED from v1.0 ────────────────────────
+// Max 100 pts: Recency 30 / Scan volume 25 / Points 20 / Profile 15 / Opt-ins 10
+function calcEngagement(profile) {
   const days = profile.last_active_at ? daysSince(profile.last_active_at) : 999;
-
-  // Recency (30)
   let recency = 0;
   if (days <= 7) recency = 30;
   else if (days <= 14) recency = 24;
@@ -145,15 +170,15 @@ function calcEngagement(profile, recentScans) {
   else if (days <= 60) recency = 8;
   else if (days <= 90) recency = 3;
 
-  // Scan volume (25) — total_scans
-  const scans = profile.total_scans || 0;
-  const scanScore = Math.min(25, Math.round((scans / 20) * 25));
+  const scanScore = Math.min(
+    25,
+    Math.round(((profile.total_scans || 0) / 20) * 25),
+  );
+  const pointScore = Math.min(
+    20,
+    Math.round(((profile.loyalty_points || 0) / 500) * 20),
+  );
 
-  // Points balance (20)
-  const pts = profile.loyalty_points || 0;
-  const pointScore = Math.min(20, Math.round((pts / 500) * 20));
-
-  // Profile completeness (15)
   let profScore = 0;
   if (profile.full_name) profScore += 3;
   if (profile.phone) profScore += 3;
@@ -163,16 +188,18 @@ function calcEngagement(profile, recentScans) {
   if (profile.profile_complete) profScore += 3;
   profScore = Math.min(15, profScore);
 
-  // Opt-ins (10)
   let optScore = 0;
   if (profile.popia_consented) optScore += 4;
   if (profile.marketing_opt_in) optScore += 3;
   if (profile.analytics_opt_in) optScore += 3;
   optScore = Math.min(10, optScore);
 
-  const total = recency + scanScore + pointScore + profScore + optScore;
+  const total = Math.min(
+    100,
+    Math.max(0, recency + scanScore + pointScore + profScore + optScore),
+  );
   return {
-    total: Math.min(100, Math.max(0, total)),
+    total,
     breakdown: {
       recency: { score: recency, max: 30, label: "Recency (last active)" },
       scans: { score: scanScore, max: 25, label: "Scan volume" },
@@ -183,7 +210,7 @@ function calcEngagement(profile, recentScans) {
   };
 }
 
-// Churn risk: no activity in 45d OR (low points AND no scans in 30d)
+// Churn risk — PRESERVED from v1.0
 function isChurnRisk(profile) {
   const days = daysSince(profile.last_active_at);
   const lowPoints = (profile.loyalty_points || 0) < 50;
@@ -191,7 +218,9 @@ function isChurnRisk(profile) {
   return (days !== null && days > 45) || (lowPoints && inactiveScans);
 }
 
-// ── Tier Badge ────────────────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+// TierBadge — PRESERVED from v1.0 (takes points prop)
 function TierBadge({ points }) {
   const t = getTierCfg(points || 0);
   return (
@@ -216,7 +245,7 @@ function TierBadge({ points }) {
   );
 }
 
-// ── Engagement Score Bar ──────────────────────────────────────────────────
+// EngBar — PRESERVED from v1.0
 function EngBar({ score }) {
   const color = score >= 70 ? C.accent : score >= 40 ? C.gold : C.red;
   return (
@@ -241,446 +270,67 @@ function EngBar({ score }) {
   );
 }
 
-// ── Customer Detail Modal ─────────────────────────────────────────────────
-function CustomerModal({ customer, transactions, onClose }) {
-  if (!customer) return null;
-  const eng = calcEngagement(customer, []);
-  const tier = getTierCfg(customer.loyalty_points || 0);
-  const atRisk = isChurnRisk(customer);
-
+// ScoreBadge — NEW v2.0 (profile completeness %)
+function ScoreBadge({ score }) {
+  const color = score >= 80 ? C.mid : score >= 40 ? C.orange : C.red;
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1500,
-      }}
-    >
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <div
         style={{
-          background: C.white,
-          borderRadius: 2,
-          padding: 32,
-          maxWidth: 600,
-          width: "90%",
-          maxHeight: "88vh",
-          overflowY: "auto",
-          fontFamily: FONTS.body,
+          width: 50,
+          height: 5,
+          background: C.border,
+          borderRadius: 3,
+          overflow: "hidden",
         }}
       >
-        {/* Header */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: 20,
+            width: `${score}%`,
+            height: "100%",
+            background: color,
+            borderRadius: 3,
           }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: FONTS.heading,
-                fontSize: 26,
-                color: C.green,
-              }}
-            >
-              {customer.full_name || "Anonymous User"}
-            </div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-              {customer.city}
-              {customer.province ? `, ${customer.province}` : ""}
-              {customer.acquisition_channel
-                ? ` · via ${customer.acquisition_channel}`
-                : ""}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 22,
-              cursor: "pointer",
-              color: C.muted,
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Score + tier strip */}
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginBottom: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            style={{
-              padding: "12px 16px",
-              background: tier.bg,
-              borderRadius: 2,
-              flex: 1,
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 9,
-                color: C.muted,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                marginBottom: 4,
-              }}
-            >
-              Tier
-            </div>
-            <TierBadge points={customer.loyalty_points || 0} />
-          </div>
-          <div
-            style={{
-              padding: "12px 16px",
-              background: C.cream,
-              borderRadius: 2,
-              flex: 1,
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 9,
-                color: C.muted,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                marginBottom: 4,
-              }}
-            >
-              Points
-            </div>
-            <div
-              style={{
-                fontFamily: FONTS.heading,
-                fontSize: 24,
-                color: C.gold,
-                fontWeight: 600,
-              }}
-            >
-              {(customer.loyalty_points || 0).toLocaleString()}
-            </div>
-          </div>
-          <div
-            style={{
-              padding: "12px 16px",
-              background: eng.total >= 50 ? C.lightGreen : C.lightRed,
-              borderRadius: 2,
-              flex: 1,
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 9,
-                color: C.muted,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                marginBottom: 4,
-              }}
-            >
-              Engagement
-            </div>
-            <div
-              style={{
-                fontFamily: FONTS.heading,
-                fontSize: 24,
-                color:
-                  eng.total >= 70
-                    ? C.accent
-                    : eng.total >= 40
-                      ? C.orange
-                      : C.red,
-                fontWeight: 600,
-              }}
-            >
-              {eng.total}/100
-            </div>
-          </div>
-          {atRisk && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: C.lightRed,
-                borderRadius: 2,
-                flex: 1,
-                textAlign: "center",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 9,
-                  color: C.red,
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  marginBottom: 4,
-                }}
-              >
-                Status
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.red }}>
-                ⚠ Churn Risk
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Engagement breakdown */}
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: C.muted,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              marginBottom: 10,
-            }}
-          >
-            Engagement Breakdown
-          </div>
-          {Object.values(eng.breakdown).map((b) => (
-            <div key={b.label} style={{ marginBottom: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 3,
-                }}
-              >
-                <span style={{ fontSize: 12, color: C.text }}>{b.label}</span>
-                <span
-                  style={{ fontSize: 12, fontWeight: 700, color: C.accent }}
-                >
-                  {b.score}/{b.max}
-                </span>
-              </div>
-              <div style={{ height: 4, background: C.border, borderRadius: 2 }}>
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${b.max > 0 ? (b.score / b.max) * 100 : 0}%`,
-                    background: C.accent,
-                    borderRadius: 2,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Profile grid */}
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            color: C.muted,
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-            marginBottom: 10,
-          }}
-        >
-          Profile
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 8,
-            marginBottom: 20,
-          }}
-        >
-          {[
-            { label: "Phone", value: customer.phone },
-            { label: "Gender", value: customer.gender },
-            { label: "Date of Birth", value: fmtDate(customer.date_of_birth) },
-            { label: "Total Scans", value: customer.total_scans || 0 },
-            { label: "Last Active", value: fmtDate(customer.last_active_at) },
-            { label: "Member Since", value: fmtDate(customer.created_at) },
-            {
-              label: "Marketing Opt-in",
-              value: customer.marketing_opt_in ? "✓ Yes" : "✗ No",
-            },
-            {
-              label: "Analytics Opt-in",
-              value: customer.analytics_opt_in ? "✓ Yes" : "✗ No",
-            },
-            { label: "Preferred Type", value: customer.preferred_type },
-            { label: "How Heard", value: customer.how_heard },
-            { label: "Referral Code", value: customer.referral_code },
-            {
-              label: "Lifetime Spend",
-              value: customer.lifetime_spend
-                ? `R${customer.lifetime_spend}`
-                : "—",
-            },
-          ].map((k) => (
-            <div
-              key={k.label}
-              style={{
-                padding: "8px 10px",
-                background: C.cream,
-                borderRadius: 2,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 9,
-                  color: C.muted,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  marginBottom: 2,
-                }}
-              >
-                {k.label}
-              </div>
-              <div style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>
-                {k.value || "—"}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Recent transactions */}
-        {transactions.length > 0 && (
-          <>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: C.muted,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                marginBottom: 10,
-              }}
-            >
-              Recent Loyalty Transactions
-            </div>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 12,
-                marginBottom: 20,
-              }}
-            >
-              <thead>
-                <tr>
-                  {["Date", "Type", "Points", "Description"].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: "left",
-                        padding: "6px 8px",
-                        fontSize: 9,
-                        color: C.muted,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        borderBottom: `1px solid ${C.border}`,
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.slice(0, 10).map((t) => (
-                  <tr key={t.id}>
-                    <td
-                      style={{
-                        padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
-                        fontSize: 11,
-                        color: C.muted,
-                      }}
-                    >
-                      {fmtDate(t.transaction_date)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          padding: "2px 6px",
-                          borderRadius: 2,
-                          background: t.points > 0 ? C.lightGreen : C.lightRed,
-                          color: t.points > 0 ? C.accent : C.red,
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.1em",
-                        }}
-                      >
-                        {t.transaction_type}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
-                        fontWeight: 700,
-                        color: t.points > 0 ? C.accent : C.red,
-                      }}
-                    >
-                      {t.points > 0 ? "+" : ""}
-                      {t.points}
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
-                        color: C.muted,
-                        fontSize: 11,
-                      }}
-                    >
-                      {t.description || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-
-        <button
-          onClick={onClose}
-          style={{ ...makeBtn(C.green), width: "100%" }}
-        >
-          Close
-        </button>
+        />
       </div>
+      <span
+        style={{ fontSize: 11, color, fontWeight: 600, fontFamily: FONTS.body }}
+      >
+        {score}%
+      </span>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+function Pill({ label, color, bg }) {
+  return (
+    <span
+      style={{
+        background: bg || "#eee",
+        color: color || C.muted,
+        borderRadius: 10,
+        padding: "2px 8px",
+        fontSize: 10,
+        fontWeight: 600,
+        fontFamily: FONTS.body,
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminCustomerEngagement() {
+  // ── State — PRESERVED from v1.0 ─────────────────────────────────────────────
   const [customers, setCustomers] = useState([]);
   const [engScores, setEngScores] = useState({});
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewCustomer, setViewCustomer] = useState(null);
-  const [modalTxns, setModalTxns] = useState([]);
   const [filter, setFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -688,11 +338,28 @@ export default function AdminCustomerEngagement() {
   const [toast, setToast] = useState("");
   const [sortBy, setSortBy] = useState("engagement");
 
+  // ── State — NEW v2.0 ─────────────────────────────────────────────────────────
+  const [selected, setSelected] = useState(null);
+  const [drawerTab, setDrawerTab] = useState("profile");
+  const [drawerData, setDrawerData] = useState({ txns: [], scans: [] });
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const [regForm, setRegForm] = useState({
+    email: "",
+    full_name: "",
+    phone: "",
+    province: "",
+  });
+  const [regLoading, setRegLoading] = useState(false);
+  const [regMsg, setRegMsg] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3200);
   };
 
+  // ── Fetch all — PRESERVED from v1.0 ─────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -705,22 +372,17 @@ export default function AdminCustomerEngagement() {
         supabase
           .from("loyalty_transactions")
           .select(
-            "id,user_id,points,transaction_type,description,transaction_date,source",
+            "id, user_id, points, transaction_type, description, transaction_date, source",
           )
           .order("transaction_date", { ascending: false }),
       ]);
-
       const custs = custRes.data || [];
       const txns = txnRes.data || [];
-
       setCustomers(custs);
       setTransactions(txns);
-
-      // Calculate engagement scores
       const scores = {};
       custs.forEach((c) => {
-        const customerTxns = txns.filter((t) => t.user_id === c.id);
-        scores[c.id] = calcEngagement(c, customerTxns);
+        scores[c.id] = calcEngagement(c);
       });
       setEngScores(scores);
     } catch (err) {
@@ -734,12 +396,35 @@ export default function AdminCustomerEngagement() {
     fetchAll();
   }, [fetchAll]);
 
-  const handleViewCustomer = (customer) => {
-    setViewCustomer(customer);
-    setModalTxns(transactions.filter((t) => t.user_id === customer.id));
-  };
+  // ── Load drawer data — NEW v2.0 ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!selected) return;
+    setDrawerLoading(true);
+    setDrawerData({ txns: [], scans: [] });
+    Promise.all([
+      supabase
+        .from("loyalty_transactions")
+        .select(
+          "id, points, transaction_type, description, transaction_date, source",
+        )
+        .eq("user_id", selected.id)
+        .order("transaction_date", { ascending: false })
+        .limit(50),
+      supabase
+        .from("scan_logs")
+        .select(
+          "id, scanned_at, scan_outcome, qr_type, campaign_name, points_awarded, ip_city, ip_province, device_type, location_source, qr_code",
+        )
+        .eq("user_id", selected.id)
+        .order("scanned_at", { ascending: false })
+        .limit(50),
+    ]).then(([txnRes, scanRes]) => {
+      setDrawerData({ txns: txnRes.data || [], scans: scanRes.data || [] });
+      setDrawerLoading(false);
+    });
+  }, [selected]);
 
-  // Bulk recalculate + save engagement scores + churn risk
+  // ── Bulk save engagement scores — PRESERVED from v1.0 ───────────────────────
   const handleBulkSave = async () => {
     setSaving(true);
     let saved = 0;
@@ -763,7 +448,82 @@ export default function AdminCustomerEngagement() {
     fetchAll();
   };
 
-  // ── Stats ──────────────────────────────────────────────────────────────
+  // ── Register In-Store — NEW v2.0 ─────────────────────────────────────────────
+  async function handleRegister() {
+    setRegLoading(true);
+    setRegMsg(null);
+    if (!regForm.email) {
+      setRegMsg({ error: "Email is required" });
+      setRegLoading(false);
+      return;
+    }
+    const tempPassword = Math.random().toString(36).slice(-10) + "Pb1!";
+    const { data: authData, error: authErr } = await supabase.auth.signUp({
+      email: regForm.email,
+      password: tempPassword,
+      options: { data: { full_name: regForm.full_name, phone: regForm.phone } },
+    });
+    if (authErr) {
+      setRegMsg({ error: authErr.message });
+      setRegLoading(false);
+      return;
+    }
+    const userId = authData?.user?.id;
+    if (userId) {
+      await supabase.from("user_profiles").upsert({
+        id: userId,
+        role: "customer",
+        loyalty_points: 0,
+        full_name: regForm.full_name || null,
+        phone: regForm.phone || null,
+        province: regForm.province || null,
+        acquisition_channel: "in_store",
+        profile_complete: false,
+        created_at: new Date().toISOString(),
+      });
+    }
+    try {
+      await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "admin_alert",
+          message: `🏪 IN-STORE REGISTRATION\nName: ${regForm.full_name || "Not provided"}\nEmail: ${regForm.email}\nPhone: ${regForm.phone || "—"}\nProvince: ${regForm.province || "—"}\nRegistered by store staff at ${new Date().toLocaleString("en-ZA")}`,
+        }),
+      });
+    } catch {
+      /* non-blocking */
+    }
+    setRegMsg({
+      success: `Registered! They'll receive a password-set email at ${regForm.email}`,
+    });
+    setRegForm({ email: "", full_name: "", phone: "", province: "" });
+    setRegLoading(false);
+    setTimeout(() => {
+      setShowRegister(false);
+      setRegMsg(null);
+      fetchAll();
+    }, 3000);
+  }
+
+  // ── Data deletion — NEW v2.0 ─────────────────────────────────────────────────
+  async function handleDeleteRequest(customer) {
+    try {
+      await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "admin_alert",
+          message: `🗑️ DATA DELETION REQUEST\nCustomer: ${customer.full_name || "Anonymous"}\nUser ID: ${customer.id}\nPhone: ${customer.phone || "—"}\nPoints: ${customer.loyalty_points || 0} · Tier: ${getTier(customer.loyalty_points || 0)}\nRequested: ${new Date().toLocaleString("en-ZA")}\n\n⚠️ POPIA requires action within 30 days.`,
+        }),
+      });
+      setDeleteConfirm({ done: true });
+    } catch {
+      setDeleteConfirm({ error: true });
+    }
+  }
+
+  // ── Computed stats — PRESERVED + extended ────────────────────────────────────
   const avgEng =
     customers.length > 0
       ? Math.round(
@@ -781,15 +541,20 @@ export default function AdminCustomerEngagement() {
     const d = daysSince(c.last_active_at);
     return d !== null && d <= 30;
   }).length;
-
+  const popiaCount = customers.filter((c) => c.popia_consented).length;
+  const avgProfile =
+    customers.length > 0
+      ? Math.round(
+          customers.reduce((s, c) => s + profileScore(c), 0) / customers.length,
+        )
+      : 0;
   const tierCounts = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
   customers.forEach((c) => {
     tierCounts[getTier(c.loyalty_points || 0)]++;
   });
 
-  // ── Filter + sort ──────────────────────────────────────────────────────
+  // ── Filter + sort — PRESERVED + extended ─────────────────────────────────────
   let displayed = [...customers];
-
   if (filter === "at_risk") displayed = displayed.filter((c) => isChurnRisk(c));
   if (filter === "active")
     displayed = displayed.filter((c) => {
@@ -798,12 +563,12 @@ export default function AdminCustomerEngagement() {
     });
   if (filter === "opted_in")
     displayed = displayed.filter((c) => c.marketing_opt_in);
-
+  if (filter === "complete")
+    displayed = displayed.filter((c) => profileScore(c) >= 100);
   if (tierFilter !== "all")
     displayed = displayed.filter(
       (c) => getTier(c.loyalty_points || 0) === tierFilter,
     );
-
   if (search) {
     const q = search.toLowerCase();
     displayed = displayed.filter(
@@ -811,10 +576,10 @@ export default function AdminCustomerEngagement() {
         (c.full_name || "").toLowerCase().includes(q) ||
         (c.phone || "").toLowerCase().includes(q) ||
         (c.city || "").toLowerCase().includes(q) ||
+        (c.province || "").toLowerCase().includes(q) ||
         (c.referral_code || "").toLowerCase().includes(q),
     );
   }
-
   if (sortBy === "engagement")
     displayed.sort(
       (a, b) => (engScores[b.id]?.total || 0) - (engScores[a.id]?.total || 0),
@@ -832,10 +597,17 @@ export default function AdminCustomerEngagement() {
     displayed.sort(
       (a, b) => (isChurnRisk(b) ? 1 : 0) - (isChurnRisk(a) ? 1 : 0),
     );
+  if (sortBy === "join_date")
+    displayed.sort(
+      (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0),
+    );
+  if (sortBy === "profile")
+    displayed.sort((a, b) => profileScore(b) - profileScore(a));
 
+  // ══════════════════════════════════════════════════════════════════════════════
   return (
     <div style={{ fontFamily: FONTS.body, position: "relative" }}>
-      {/* Toast */}
+      {/* Toast — PRESERVED from v1.0 */}
       {toast && (
         <div
           style={{
@@ -850,13 +622,14 @@ export default function AdminCustomerEngagement() {
             fontSize: 13,
             fontWeight: 600,
             zIndex: 2000,
+            fontFamily: FONTS.body,
           }}
         >
           {toast}
         </div>
       )}
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div
         style={{
           display: "flex",
@@ -880,10 +653,19 @@ export default function AdminCustomerEngagement() {
           </h2>
           <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
             Live engagement scoring · Churn risk detection · Loyalty tier
-            management
+            management · 360° profiles
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => {
+              setShowRegister(true);
+              setRegMsg(null);
+            }}
+            style={{ ...makeBtn(C.blue), letterSpacing: "0.12em" }}
+          >
+            + Register In-Store
+          </button>
           <button
             onClick={fetchAll}
             style={{
@@ -903,11 +685,11 @@ export default function AdminCustomerEngagement() {
         </div>
       </div>
 
-      {/* Stats strip */}
+      {/* ── Stats strip — PRESERVED + POPIA + Avg Profile added ── */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
           gap: 12,
           marginBottom: 20,
         }}
@@ -926,6 +708,12 @@ export default function AdminCustomerEngagement() {
             color: churnCount > 0 ? C.red : C.accent,
           },
           { label: "Marketing Opt-in", value: `${optInRate}%`, color: C.blue },
+          { label: "POPIA Consented", value: popiaCount, color: C.mid },
+          {
+            label: "Avg Profile",
+            value: `${avgProfile}%`,
+            color: avgProfile > 60 ? C.mid : C.orange,
+          },
           {
             label: "💎 Platinum",
             value: tierCounts.platinum,
@@ -972,7 +760,7 @@ export default function AdminCustomerEngagement() {
         ))}
       </div>
 
-      {/* Churn alert */}
+      {/* ── Churn alert — PRESERVED from v1.0 ── */}
       {churnCount > 0 && (
         <div
           style={{
@@ -991,7 +779,7 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* Filters + search + sort */}
+      {/* ── Filters + search + sort ── */}
       <div
         style={{
           display: "flex",
@@ -1003,12 +791,10 @@ export default function AdminCustomerEngagement() {
       >
         <input
           style={{ ...inputStyle, width: 220 }}
-          placeholder="Search name, phone, city…"
+          placeholder="Search name, phone, city, province…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-
-        {/* Status filter */}
         <div
           style={{
             display: "flex",
@@ -1023,6 +809,7 @@ export default function AdminCustomerEngagement() {
             { key: "active", label: "Active" },
             { key: "at_risk", label: "⚠ At Risk" },
             { key: "opted_in", label: "Opted In" },
+            { key: "complete", label: "Complete" },
           ].map((f) => (
             <button
               key={f.key}
@@ -1044,8 +831,6 @@ export default function AdminCustomerEngagement() {
             </button>
           ))}
         </div>
-
-        {/* Tier filter */}
         <select
           style={{ ...inputStyle, cursor: "pointer", width: "auto" }}
           value={tierFilter}
@@ -1057,8 +842,6 @@ export default function AdminCustomerEngagement() {
           <option value="silver">🥈 Silver</option>
           <option value="bronze">🥉 Bronze</option>
         </select>
-
-        {/* Sort */}
         <select
           style={{ ...inputStyle, cursor: "pointer", width: "auto" }}
           value={sortBy}
@@ -1069,14 +852,15 @@ export default function AdminCustomerEngagement() {
           <option value="scans">Sort: Scans</option>
           <option value="recent">Sort: Recent</option>
           <option value="risk">Sort: Churn Risk</option>
+          <option value="join_date">Sort: Join Date</option>
+          <option value="profile">Sort: Profile %</option>
         </select>
-
         <div style={{ fontSize: 12, color: C.muted, marginLeft: "auto" }}>
           {displayed.length} customer{displayed.length !== 1 ? "s" : ""}
         </div>
       </div>
 
-      {/* Customer Table */}
+      {/* ── Customer Table ── */}
       {loading ? (
         <div style={{ padding: 60, textAlign: "center", color: C.muted }}>
           Loading customers…
@@ -1125,6 +909,7 @@ export default function AdminCustomerEngagement() {
                   "Engagement",
                   "Points",
                   "Scans",
+                  "Profile",
                   "Last Active",
                   "Status",
                   "",
@@ -1150,6 +935,7 @@ export default function AdminCustomerEngagement() {
                 const eng = engScores[c.id] || { total: 0 };
                 const risk = isChurnRisk(c);
                 const days = daysSince(c.last_active_at);
+                const pScore = profileScore(c);
                 return (
                   <tr
                     key={c.id}
@@ -1158,7 +944,11 @@ export default function AdminCustomerEngagement() {
                       background: i % 2 === 0 ? C.white : C.cream,
                       cursor: "pointer",
                     }}
-                    onClick={() => handleViewCustomer(c)}
+                    onClick={() => {
+                      setSelected(c);
+                      setDrawerTab("profile");
+                      setDeleteConfirm(null);
+                    }}
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.background = "#f0faf5")
                     }
@@ -1169,12 +959,19 @@ export default function AdminCustomerEngagement() {
                   >
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ fontWeight: 600, color: C.text }}>
-                        {c.full_name || "Anonymous"}
+                        {c.full_name || (
+                          <span style={{ color: C.muted }}>Anonymous</span>
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: C.muted }}>
                         {c.city || ""}
                         {c.province ? `, ${c.province}` : ""}
                       </div>
+                      {c.phone && (
+                        <div style={{ fontSize: 11, color: C.muted }}>
+                          {c.phone}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "12px 14px" }}>
                       <TierBadge points={c.loyalty_points || 0} />
@@ -1193,6 +990,9 @@ export default function AdminCustomerEngagement() {
                     </td>
                     <td style={{ padding: "12px 14px", color: C.muted }}>
                       {c.total_scans || 0}
+                    </td>
+                    <td style={{ padding: "12px 14px", minWidth: 90 }}>
+                      <ScoreBadge score={pScore} />
                     </td>
                     <td
                       style={{
@@ -1244,7 +1044,9 @@ export default function AdminCustomerEngagement() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleViewCustomer(c);
+                          setSelected(c);
+                          setDrawerTab("profile");
+                          setDeleteConfirm(null);
                         }}
                         style={{
                           ...makeBtn("transparent", C.mid),
@@ -1264,13 +1066,1309 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* Detail Modal */}
-      {viewCustomer && (
-        <CustomerModal
-          customer={viewCustomer}
-          transactions={modalTxns}
-          onClose={() => setViewCustomer(null)}
-        />
+      {/* ══════════════════════════════════════════════════════════════════════
+          CUSTOMER 360 DRAWER — NEW v2.0
+      ══════════════════════════════════════════════════════════════════════ */}
+      {selected && (
+        <>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.4)",
+              zIndex: 1000,
+            }}
+            onClick={() => setSelected(null)}
+          />
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 600,
+              maxWidth: "95vw",
+              background: C.cream,
+              zIndex: 1001,
+              overflowY: "auto",
+              boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Drawer Header */}
+            <div
+              style={{
+                background: C.green,
+                color: C.white,
+                padding: "20px 24px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontFamily: FONTS.heading,
+                    fontWeight: 700,
+                  }}
+                >
+                  {selected.full_name || "Anonymous Customer"}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.8,
+                    marginTop: 2,
+                    fontFamily: FONTS.body,
+                  }}
+                >
+                  {selected.city}
+                  {selected.province ? `, ${selected.province}` : ""}
+                  {selected.phone ? ` · ${selected.phone}` : ""}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <TierBadge points={selected.loyalty_points || 0} />
+                <button
+                  style={{
+                    background: "rgba(255,255,255,0.2)",
+                    border: "none",
+                    color: C.white,
+                    cursor: "pointer",
+                    fontSize: 20,
+                    borderRadius: 2,
+                    padding: "4px 10px",
+                    fontFamily: FONTS.body,
+                  }}
+                  onClick={() => setSelected(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer Tabs */}
+            <div
+              style={{
+                display: "flex",
+                borderBottom: `2px solid ${C.border}`,
+                background: C.white,
+                flexShrink: 0,
+              }}
+            >
+              {[
+                { id: "profile", label: "👤 Profile" },
+                { id: "loyalty", label: "⭐ Loyalty" },
+                { id: "scans", label: "📱 Scans" },
+                { id: "popia", label: "🔒 POPIA" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setDrawerTab(t.id)}
+                  style={{
+                    padding: "12px 20px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    fontFamily: FONTS.body,
+                    cursor: "pointer",
+                    border: "none",
+                    background: "none",
+                    color: drawerTab === t.id ? C.green : C.muted,
+                    borderBottom:
+                      drawerTab === t.id
+                        ? `3px solid ${C.green}`
+                        : "3px solid transparent",
+                    marginBottom: -2,
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Drawer Body */}
+            <div style={{ padding: 24, flex: 1 }}>
+              {/* ── PROFILE TAB ──────────────────────────────────────────────── */}
+              {drawerTab === "profile" &&
+                (() => {
+                  const eng =
+                    engScores[selected.id] || calcEngagement(selected);
+                  return (
+                    <>
+                      {/* Engagement score + breakdown — PRESERVED from v1.0 CustomerModal */}
+                      <div
+                        style={{
+                          background: C.white,
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 2,
+                          padding: 20,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: "0.15em",
+                            textTransform: "uppercase",
+                            color: C.muted,
+                            marginBottom: 14,
+                            fontFamily: FONTS.body,
+                          }}
+                        >
+                          Engagement Score
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 12,
+                            marginBottom: 16,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div
+                            style={{
+                              padding: "12px 16px",
+                              background: C.cream,
+                              borderRadius: 2,
+                              flex: 1,
+                              textAlign: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color: C.muted,
+                                letterSpacing: "0.15em",
+                                textTransform: "uppercase",
+                                marginBottom: 4,
+                                fontFamily: FONTS.body,
+                              }}
+                            >
+                              Score
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: FONTS.heading,
+                                fontSize: 28,
+                                color:
+                                  eng.total >= 70
+                                    ? C.accent
+                                    : eng.total >= 40
+                                      ? C.orange
+                                      : C.red,
+                              }}
+                            >
+                              {eng.total}/100
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              padding: "12px 16px",
+                              background: C.cream,
+                              borderRadius: 2,
+                              flex: 1,
+                              textAlign: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color: C.muted,
+                                letterSpacing: "0.15em",
+                                textTransform: "uppercase",
+                                marginBottom: 4,
+                                fontFamily: FONTS.body,
+                              }}
+                            >
+                              Profile
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: FONTS.heading,
+                                fontSize: 28,
+                                color: C.blue,
+                              }}
+                            >
+                              {profileScore(selected)}%
+                            </div>
+                          </div>
+                          {isChurnRisk(selected) && (
+                            <div
+                              style={{
+                                padding: "12px 16px",
+                                background: C.lightRed,
+                                borderRadius: 2,
+                                flex: 1,
+                                textAlign: "center",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  color: C.red,
+                                  letterSpacing: "0.15em",
+                                  textTransform: "uppercase",
+                                  marginBottom: 4,
+                                  fontFamily: FONTS.body,
+                                }}
+                              >
+                                Status
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: C.red,
+                                }}
+                              >
+                                ⚠ Churn Risk
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {Object.values(eng.breakdown).map((b) => (
+                          <div key={b.label} style={{ marginBottom: 8 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginBottom: 3,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: C.text,
+                                  fontFamily: FONTS.body,
+                                }}
+                              >
+                                {b.label}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: C.accent,
+                                  fontFamily: FONTS.body,
+                                }}
+                              >
+                                {b.score}/{b.max}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                height: 4,
+                                background: C.border,
+                                borderRadius: 2,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: "100%",
+                                  width: `${b.max > 0 ? (b.score / b.max) * 100 : 0}%`,
+                                  background: C.accent,
+                                  borderRadius: 2,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Profile completeness chips */}
+                      <div
+                        style={{
+                          background: C.white,
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 2,
+                          padding: 20,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: "0.15em",
+                            textTransform: "uppercase",
+                            color: C.muted,
+                            marginBottom: 12,
+                            fontFamily: FONTS.body,
+                          }}
+                        >
+                          Profile Completeness
+                        </div>
+                        <div
+                          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+                        >
+                          {[
+                            { label: "Name", done: !!selected.full_name },
+                            { label: "Phone", done: !!selected.phone },
+                            { label: "DOB", done: !!selected.date_of_birth },
+                            { label: "Province", done: !!selected.province },
+                            {
+                              label: "POPIA",
+                              done: !!selected.popia_consented,
+                            },
+                          ].map(({ label, done }) => (
+                            <span
+                              key={label}
+                              style={{
+                                fontSize: 11,
+                                fontFamily: FONTS.body,
+                                padding: "4px 12px",
+                                borderRadius: 10,
+                                background: done ? C.lightGreen : "#eee",
+                                color: done ? C.mid : C.muted,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {done ? "✓" : "○"} {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Identity grid */}
+                      <div
+                        style={{
+                          background: C.white,
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 2,
+                          padding: 20,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: "0.15em",
+                            textTransform: "uppercase",
+                            color: C.muted,
+                            marginBottom: 14,
+                            fontFamily: FONTS.body,
+                          }}
+                        >
+                          Identity
+                        </div>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "10px 20px",
+                          }}
+                        >
+                          {[
+                            { label: "Full Name", val: selected.full_name },
+                            { label: "Phone", val: selected.phone },
+                            {
+                              label: "Date of Birth",
+                              val: fmtDate(selected.date_of_birth),
+                            },
+                            { label: "Gender", val: selected.gender },
+                            { label: "Province", val: selected.province },
+                            { label: "City", val: selected.city },
+                            {
+                              label: "Preferred Type",
+                              val: selected.preferred_type,
+                            },
+                            {
+                              label: "How Found Us",
+                              val: selected.acquisition_channel,
+                            },
+                            {
+                              label: "Total Scans",
+                              val: selected.total_scans || 0,
+                            },
+                            {
+                              label: "Last Active",
+                              val: fmtDate(selected.last_active_at),
+                            },
+                            {
+                              label: "Member Since",
+                              val: fmtDate(selected.created_at),
+                            },
+                            {
+                              label: "Referral Code",
+                              val: selected.referral_code,
+                            },
+                            {
+                              label: "Lifetime Spend",
+                              val: selected.lifetime_spend
+                                ? `R${selected.lifetime_spend}`
+                                : null,
+                            },
+                          ].map(({ label, val }) => (
+                            <div key={label}>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: C.muted,
+                                  fontFamily: FONTS.body,
+                                  marginBottom: 2,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.1em",
+                                }}
+                              >
+                                {label}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  color:
+                                    val != null && val !== "—"
+                                      ? C.text
+                                      : C.muted,
+                                  fontFamily: FONTS.body,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {val ?? "—"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Consent flags */}
+                      <div
+                        style={{
+                          background: C.white,
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 2,
+                          padding: 20,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: "0.15em",
+                            textTransform: "uppercase",
+                            color: C.muted,
+                            marginBottom: 12,
+                            fontFamily: FONTS.body,
+                          }}
+                        >
+                          Consent Flags
+                        </div>
+                        <div
+                          style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+                        >
+                          {[
+                            { label: "POPIA", val: selected.popia_consented },
+                            {
+                              label: "Marketing",
+                              val: selected.marketing_opt_in,
+                            },
+                            {
+                              label: "Analytics",
+                              val: selected.analytics_opt_in,
+                            },
+                            {
+                              label: "Geolocation",
+                              val: selected.geolocation_consent,
+                            },
+                          ].map(({ label, val }) => (
+                            <div
+                              key={label}
+                              style={{
+                                background: val ? C.lightGreen : "#eee",
+                                borderRadius: 2,
+                                padding: "10px 16px",
+                                textAlign: "center",
+                                minWidth: 80,
+                              }}
+                            >
+                              <div style={{ fontSize: 20 }}>
+                                {val ? "✅" : "⬜"}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: val ? C.mid : C.muted,
+                                  fontFamily: FONTS.body,
+                                  fontWeight: 600,
+                                  marginTop: 4,
+                                }}
+                              >
+                                {label}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+
+              {/* ── LOYALTY TAB ──────────────────────────────────────────────── */}
+              {drawerTab === "loyalty" && (
+                <>
+                  <div
+                    style={{
+                      background: C.green,
+                      borderRadius: 2,
+                      padding: 20,
+                      marginBottom: 16,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.7)",
+                          fontFamily: FONTS.body,
+                          letterSpacing: "0.15em",
+                          textTransform: "uppercase",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Total Points
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 48,
+                          fontFamily: FONTS.heading,
+                          fontWeight: 700,
+                          color: C.white,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {(selected.loyalty_points || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <TierBadge points={selected.loyalty_points || 0} />
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(255,255,255,0.6)",
+                          fontFamily: FONTS.body,
+                          marginTop: 8,
+                        }}
+                      >
+                        {drawerData.txns.length} transactions
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: C.white,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 2,
+                      padding: 20,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        color: C.muted,
+                        marginBottom: 12,
+                        fontFamily: FONTS.body,
+                      }}
+                    >
+                      Transaction History
+                    </div>
+                    {drawerLoading && (
+                      <div
+                        style={{
+                          color: C.muted,
+                          fontFamily: FONTS.body,
+                          fontSize: 13,
+                        }}
+                      >
+                        Loading…
+                      </div>
+                    )}
+                    {!drawerLoading && drawerData.txns.length === 0 && (
+                      <div
+                        style={{
+                          color: C.muted,
+                          fontFamily: FONTS.body,
+                          fontSize: 13,
+                        }}
+                      >
+                        No transactions yet
+                      </div>
+                    )}
+                    {drawerData.txns.map((tx) => (
+                      <div
+                        key={tx.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "10px 0",
+                          borderBottom: `1px solid ${C.border}`,
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: C.text,
+                              fontFamily: FONTS.body,
+                            }}
+                          >
+                            {tx.description || tx.transaction_type}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: C.muted,
+                              fontFamily: FONTS.body,
+                              marginTop: 2,
+                            }}
+                          >
+                            {fmtDate(tx.transaction_date)}
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 700,
+                            fontFamily: FONTS.heading,
+                            color: tx.points > 0 ? C.mid : C.red,
+                          }}
+                        >
+                          {tx.points > 0 ? "+" : ""}
+                          {tx.points} pts
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ── SCANS TAB ────────────────────────────────────────────────── */}
+              {drawerTab === "scans" && (
+                <>
+                  <div
+                    style={{
+                      background: C.white,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 2,
+                      padding: 20,
+                      marginBottom: 16,
+                      display: "flex",
+                      gap: 24,
+                    }}
+                  >
+                    {[
+                      {
+                        label: "Total Scans",
+                        val: drawerData.scans.length,
+                        color: C.green,
+                      },
+                      {
+                        label: "Points Earned",
+                        val: drawerData.scans.filter(
+                          (s) => s.scan_outcome === "points_awarded",
+                        ).length,
+                        color: C.gold,
+                      },
+                      {
+                        label: "GPS Scans",
+                        val: drawerData.scans.filter(
+                          (s) => s.location_source === "gps",
+                        ).length,
+                        color: C.blue,
+                      },
+                    ].map(({ label, val, color }) => (
+                      <div key={label} style={{ textAlign: "center" }}>
+                        <div
+                          style={{
+                            fontSize: 36,
+                            fontFamily: FONTS.heading,
+                            fontWeight: 700,
+                            color,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {val}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: C.muted,
+                            fontFamily: FONTS.body,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.1em",
+                            marginTop: 4,
+                          }}
+                        >
+                          {label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div
+                    style={{
+                      background: C.white,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 2,
+                      padding: 20,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        color: C.muted,
+                        marginBottom: 12,
+                        fontFamily: FONTS.body,
+                      }}
+                    >
+                      Scan Log (scan_logs)
+                    </div>
+                    {drawerLoading && (
+                      <div
+                        style={{
+                          color: C.muted,
+                          fontFamily: FONTS.body,
+                          fontSize: 13,
+                        }}
+                      >
+                        Loading…
+                      </div>
+                    )}
+                    {!drawerLoading && drawerData.scans.length === 0 && (
+                      <div
+                        style={{
+                          color: C.muted,
+                          fontFamily: FONTS.body,
+                          fontSize: 13,
+                        }}
+                      >
+                        No scans in scan_logs yet
+                      </div>
+                    )}
+                    {drawerData.scans.map((sc) => {
+                      const oc =
+                        sc.scan_outcome === "points_awarded"
+                          ? C.mid
+                          : sc.scan_outcome === "already_claimed"
+                            ? C.muted
+                            : C.orange;
+                      return (
+                        <div
+                          key={sc.id}
+                          style={{
+                            display: "flex",
+                            gap: 12,
+                            padding: "10px 0",
+                            borderBottom: `1px solid ${C.border}`,
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 22,
+                              lineHeight: 1,
+                              flexShrink: 0,
+                              marginTop: 2,
+                            }}
+                          >
+                            {sc.qr_type === "product_insert"
+                              ? "📦"
+                              : sc.qr_type === "promotional"
+                                ? "📣"
+                                : sc.qr_type === "event"
+                                  ? "🎪"
+                                  : "📱"}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontFamily: FONTS.body,
+                                  color: C.text,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {sc.qr_type || "unknown"}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: C.muted,
+                                  fontFamily: FONTS.body,
+                                }}
+                              >
+                                {timeAgo(sc.scanned_at)}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 6,
+                                marginTop: 4,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <Pill
+                                label={sc.scan_outcome || "—"}
+                                color={oc}
+                                bg={`${oc}18`}
+                              />
+                              {sc.points_awarded > 0 && (
+                                <Pill
+                                  label={`+${sc.points_awarded} pts`}
+                                  color={C.gold}
+                                  bg="#fef3dc"
+                                />
+                              )}
+                              {sc.ip_city && (
+                                <Pill
+                                  label={sc.ip_city}
+                                  color={C.blue}
+                                  bg="#e8f0f8"
+                                />
+                              )}
+                              {sc.device_type && (
+                                <Pill
+                                  label={sc.device_type}
+                                  color={C.muted}
+                                  bg="#eee"
+                                />
+                              )}
+                              {sc.location_source === "gps" && (
+                                <Pill
+                                  label="GPS ✓"
+                                  color={C.mid}
+                                  bg={C.lightGreen}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* ── POPIA TAB ────────────────────────────────────────────────── */}
+              {drawerTab === "popia" && (
+                <>
+                  <div
+                    style={{
+                      background: C.white,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 2,
+                      padding: 20,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        color: C.muted,
+                        marginBottom: 14,
+                        fontFamily: FONTS.body,
+                      }}
+                    >
+                      POPIA Compliance Record
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "10px 20px",
+                      }}
+                    >
+                      {[
+                        {
+                          label: "POPIA Consented",
+                          val: selected.popia_consented
+                            ? "✅ Yes"
+                            : "❌ Not yet",
+                        },
+                        {
+                          label: "Consent Date",
+                          val: fmtDate(selected.popia_date),
+                        },
+                        {
+                          label: "Marketing Opt-In",
+                          val: selected.marketing_opt_in ? "✅ Yes" : "No",
+                        },
+                        {
+                          label: "Analytics Opt-In",
+                          val: selected.analytics_opt_in ? "✅ Yes" : "No",
+                        },
+                        {
+                          label: "Geolocation Consent",
+                          val: selected.geolocation_consent ? "✅ Yes" : "No",
+                        },
+                      ].map(({ label, val }) => (
+                        <div key={label}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: C.muted,
+                              fontFamily: FONTS.body,
+                              marginBottom: 2,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.1em",
+                            }}
+                          >
+                            {label}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: C.text,
+                              fontFamily: FONTS.body,
+                              fontWeight: 500,
+                            }}
+                          >
+                            {val}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: C.white,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 2,
+                      padding: 20,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        color: C.muted,
+                        marginBottom: 10,
+                        fontFamily: FONTS.body,
+                      }}
+                    >
+                      Data Stored
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: C.muted,
+                        fontFamily: FONTS.body,
+                        lineHeight: 1.8,
+                      }}
+                    >
+                      {[
+                        selected.full_name && "• Full name",
+                        selected.phone && "• Phone number",
+                        selected.date_of_birth && "• Date of birth",
+                        selected.province &&
+                          "• Province / city (self-reported)",
+                        selected.analytics_opt_in &&
+                          "• Scan behaviour & geo data (analytics consent given)",
+                        selected.geolocation_consent &&
+                          "• GPS location data (geolocation consent given)",
+                        "• Loyalty points & transaction history",
+                        "• QR scan log (IP-based location, device type)",
+                      ]
+                        .filter(Boolean)
+                        .map((item, i) => (
+                          <div key={i}>{item}</div>
+                        ))}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: C.lightRed,
+                      border: `1px solid ${C.red}`,
+                      borderRadius: 2,
+                      padding: 20,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        color: C.red,
+                        marginBottom: 10,
+                        fontFamily: FONTS.body,
+                      }}
+                    >
+                      Data Deletion — POPIA Right to Erasure
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: C.text,
+                        fontFamily: FONTS.body,
+                        marginBottom: 16,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      Sends an admin WhatsApp alert. Action required within 30
+                      days under POPIA.
+                    </div>
+                    {deleteConfirm?.done ? (
+                      <div
+                        style={{
+                          color: C.mid,
+                          fontFamily: FONTS.body,
+                          fontSize: 13,
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✅ Request sent to admin. Ref:{" "}
+                        {selected.id?.slice(0, 8)}
+                      </div>
+                    ) : deleteConfirm?.error ? (
+                      <div
+                        style={{
+                          color: C.red,
+                          fontFamily: FONTS.body,
+                          fontSize: 13,
+                        }}
+                      >
+                        Failed to send. Contact admin manually.
+                      </div>
+                    ) : deleteConfirm?.confirm ? (
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                          style={{ ...makeBtn(C.red), fontSize: 10 }}
+                          onClick={() => handleDeleteRequest(selected)}
+                        >
+                          Confirm — Send Request
+                        </button>
+                        <button
+                          style={{ ...makeBtn("#eee", C.muted), fontSize: 10 }}
+                          onClick={() => setDeleteConfirm(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        style={{ ...makeBtn(C.red), fontSize: 10 }}
+                        onClick={() => setDeleteConfirm({ confirm: true })}
+                      >
+                        🗑 Request Data Deletion
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REGISTER IN-STORE MODAL — NEW v2.0
+      ══════════════════════════════════════════════════════════════════════ */}
+      {showRegister && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 4,
+              padding: 32,
+              width: 440,
+              maxWidth: "95vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+              fontFamily: FONTS.body,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTS.heading,
+                fontSize: 22,
+                fontWeight: 700,
+                color: C.green,
+                marginBottom: 6,
+              }}
+            >
+              Register Customer In-Store
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                marginBottom: 24,
+                lineHeight: 1.5,
+              }}
+            >
+              Creates an account on the customer's behalf. They'll receive a
+              password-set email. Admin will be notified via WhatsApp.
+            </div>
+            {[
+              {
+                field: "email",
+                label: "Email Address *",
+                type: "email",
+                placeholder: "customer@email.com",
+              },
+              {
+                field: "full_name",
+                label: "Full Name",
+                type: "text",
+                placeholder: "",
+              },
+              {
+                field: "phone",
+                label: "Phone Number",
+                type: "text",
+                placeholder: "+27 XXX XXX XXXX",
+              },
+            ].map(({ field, label, type, placeholder }) => (
+              <div key={field} style={{ marginBottom: 14 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: C.muted,
+                    marginBottom: 5,
+                  }}
+                >
+                  {label}
+                </label>
+                <input
+                  style={{ ...inputStyle, width: "100%" }}
+                  type={type}
+                  placeholder={placeholder}
+                  value={regForm[field]}
+                  onChange={(e) =>
+                    setRegForm((f) => ({ ...f, [field]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                  marginBottom: 5,
+                }}
+              >
+                Province
+              </label>
+              <select
+                style={{ ...inputStyle, width: "100%", cursor: "pointer" }}
+                value={regForm.province}
+                onChange={(e) =>
+                  setRegForm((f) => ({ ...f, province: e.target.value }))
+                }
+              >
+                <option value="">Select province…</option>
+                {[
+                  "Gauteng",
+                  "Western Cape",
+                  "KwaZulu-Natal",
+                  "Eastern Cape",
+                  "Limpopo",
+                  "Mpumalanga",
+                  "North West",
+                  "Free State",
+                  "Northern Cape",
+                ].map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {regMsg?.error && (
+              <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>
+                ⚠ {regMsg.error}
+              </div>
+            )}
+            {regMsg?.success && (
+              <div
+                style={{
+                  color: C.mid,
+                  fontSize: 13,
+                  marginBottom: 12,
+                  fontWeight: 600,
+                }}
+              >
+                ✅ {regMsg.success}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button
+                style={{ ...makeBtn(C.green, C.white, regLoading), flex: 1 }}
+                onClick={handleRegister}
+                disabled={regLoading}
+              >
+                {regLoading ? "Registering…" : "Register Customer"}
+              </button>
+              <button
+                style={makeBtn("#eee", C.muted)}
+                onClick={() => {
+                  setShowRegister(false);
+                  setRegMsg(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: C.muted,
+                marginTop: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              📋 POPIA: Obtain verbal consent before registration. Acquisition
+              channel recorded as "in_store".
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
