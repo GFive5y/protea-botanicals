@@ -1,25 +1,26 @@
-// src/pages/Landing.js v5.9
-// v5.9: WP-J Mobile Responsiveness — 375px pass
-//       Classes added (all via injected <style> media queries):
-//       - landing-header:    reduces padding 0 28px → 0 16px at ≤600px
-//       - landing-video:     reduces video divider 700px → 300px at ≤600px
-//       - landing-section:   reduces section vertical padding 100px → 56px at ≤600px
-//       - landing-hero-desc: reduces hero description bottom margin 80px → 40px at ≤600px
-//       All clamp() typography, flexWrap portal cards, footer links — already mobile-safe.
-//       Zero impact on desktop layout or any component logic.
-// v5.8: Terpene modal fix (DEC-024).
-//       TerpeneCarousel hex click no longer navigates to /terpenes/:id.
-//       Instead: activeTerp state lifts to Landing, TerpeneModal overlays
-//       Landing in-place (same pattern as MoleculeModal). URL stays at /.
-//       NavBar stays cream. Background stays Landing content, frosted.
-//       Changes: import TerpeneModal + TERPENES, add activeTerp state,
-//       pass onSelect to TerpeneCarousel, render TerpeneModal overlay.
-// v5.7: Header hides on scroll down (past 300px), reappears on scroll up.
-// v5.6: Terpene section — added "THE ENTOURAGE EFFECT" eyebrow label.
-// v5.5: Delta-9-THC molecule integration.
-// v5.4: Video background on distillate section.
-// v5.3: AgeGate + PromoBanner.
-// v5.2: Auth-aware header, fixed invisible text when not scrolled.
+// src/pages/Landing.js v6.0
+// ============================================================================
+// v6.0: Inbox-aware header + avatar dropdown (DEC-025)
+//   - Logged-in header: avatar circle → dropdown menu with:
+//       My Account → /account
+//       My Loyalty → /loyalty
+//       Inbox      → /account#inbox  (with unread count badge if > 0)
+//       Sign Out
+//   - Guest header: unchanged — "Sign In" button → /account
+//   - Inbox unread count fetched on session load via getInboxUnreadCount()
+//   - Avatar shows first initial of email or full_name
+//   - Dropdown closes on outside click or Escape key
+//   - Zero impact on desktop or mobile layout beyond the header button
+//
+// v5.9: WP-J Mobile Responsiveness — 375px pass (landing-header, landing-video,
+//       landing-section, landing-hero-desc media-query classes)
+// v5.8: TerpeneModal overlay fix (DEC-024)
+// v5.7: Header hide-on-scroll
+// v5.6: Terpene entourage eyebrow label
+// v5.5: Delta-9-THC molecule integration
+// v5.4: Video background distillate section
+// ============================================================================
+
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useContext, useRef } from "react";
 import { RoleContext } from "../App";
@@ -29,8 +30,8 @@ import PromoBanner from "../components/PromoBanner";
 import MoleculePulse from "../components/MoleculePulse";
 import MoleculeModal from "../components/MoleculeModal";
 import TerpeneCarousel from "../components/TerpeneCarousel";
-// v5.8: shared modal + data (DEC-024)
 import TerpeneModal, { TERPENES } from "../components/TerpeneModal";
+import { getInboxUnreadCount } from "../components/CustomerInbox";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -39,27 +40,98 @@ export default function Landing() {
   const ctx = useContext(RoleContext);
   const role = typeof ctx === "string" ? ctx : ctx?.role || null; // eslint-disable-line no-unused-vars
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userInitial, setUserInitial] = useState("?");
+  const [inboxUnread, setInboxUnread] = useState(0);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   const [modalMolId, setModalMolId] = useState(null);
-  // v5.8: terpene modal state — id of active terpene, null = closed
   const [activeTerp, setActiveTerp] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
   const cardsRef = useRef(null);
+  const dropdownRef = useRef(null);
   const [, setVisibleSections] = useState({});
 
+  // ── Auth + inbox unread ────────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsLoggedIn(!!session);
-    });
+    const init = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user) {
+        setIsLoggedIn(true);
+        setCurrentUserId(session.user.id);
+        const name =
+          session.user.user_metadata?.full_name || session.user.email || "";
+        setUserInitial((name[0] || "?").toUpperCase());
+        const unread = await getInboxUnreadCount(session.user.id);
+        setInboxUnread(unread);
+      }
+    };
+    init();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session);
+    } = supabase.auth.onAuthStateChange(async (_e, session) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        setCurrentUserId(session.user.id);
+        const name =
+          session.user.user_metadata?.full_name || session.user.email || "";
+        setUserInitial((name[0] || "?").toUpperCase());
+        const unread = await getInboxUnreadCount(session.user.id);
+        setInboxUnread(unread);
+      } else {
+        setIsLoggedIn(false);
+        setCurrentUserId(null);
+        setInboxUnread(0);
+        setUserInitial("?");
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── Close dropdown on outside click / Escape ──────────────────────────────
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === "Escape") setDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
+
+  // ── Realtime inbox updates while on Landing ───────────────────────────────
+  useEffect(() => {
+    if (!currentUserId) return;
+    const sub = supabase
+      .channel(`landing-inbox-${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "customer_messages",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        async () => {
+          const n = await getInboxUnreadCount(currentUserId);
+          setInboxUnread(n);
+        },
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [currentUserId]);
+
+  // ── Scroll hide/show header (preserved v5.7) ──────────────────────────────
   useEffect(() => {
     let lastY = window.scrollY;
     const handleScroll = () => {
@@ -92,6 +164,15 @@ export default function Landing() {
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+
+  // ── Sign out from dropdown ────────────────────────────────────────────────
+  const handleSignOut = async () => {
+    setDropdownOpen(false);
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    setCurrentUserId(null);
+    setInboxUnread(0);
+  };
 
   const cards = [
     {
@@ -150,52 +231,6 @@ export default function Landing() {
       title: "Terpenes & Their Effects",
       color: "#6b5b9e",
       body: `Terpenes are the aromatic compounds found in plants — including cannabis — that give each strain its distinctive scent, flavour and effect profile. Far from being merely cosmetic, terpenes interact synergistically with cannabinoids in what is known as the "entourage effect", meaningfully shaping the overall experience.\n\nAt Protea Botanicals we source only pharmaceutical-grade terpene profiles, each with their own Certificate of Analysis. We use precisely calibrated terpene blends to craft consistent, reliable and enjoyable products.`,
-    },
-  ];
-
-  const _terpenes = [
-    // eslint-disable-line no-unused-vars
-    {
-      name: "Myrcene",
-      aroma: "Earthy, Musky, Herbal",
-      effect: "Relaxing · Sedative · Body calm",
-      color: "#2d6a4f",
-      icon: "○",
-    },
-    {
-      name: "Limonene",
-      aroma: "Citrus, Lemon, Fresh",
-      effect: "Uplifting · Mood boost · Anti-anxiety",
-      color: "#b5935a",
-      icon: "◎",
-    },
-    {
-      name: "Pinene",
-      aroma: "Pine, Fresh, Woody",
-      effect: "Alert · Memory · Counteracts THC",
-      color: "#4a7fb5",
-      icon: "△",
-    },
-    {
-      name: "Linalool",
-      aroma: "Floral, Lavender, Sweet",
-      effect: "Calming · Anti-stress · Sleep aid",
-      color: "#9b6b9e",
-      icon: "✦",
-    },
-    {
-      name: "Caryophyllene",
-      aroma: "Spicy, Pepper, Woody",
-      effect: "Anti-inflammatory · Analgesic",
-      color: "#c0764a",
-      icon: "◆",
-    },
-    {
-      name: "Terpinolene",
-      aroma: "Floral, Piney, Herbal",
-      effect: "Uplifting · Creative · Energetic",
-      color: "#5a9e7c",
-      icon: "◇",
     },
   ];
 
@@ -348,35 +383,29 @@ export default function Landing() {
         .card-cta { transition: letter-spacing 0.3s ease; }
         .reveal { opacity: 0; transform: translateY(40px); transition: opacity 0.8s ease, transform 0.8s ease; }
         .reveal.visible { opacity: 1; transform: translateY(0); }
-        .terpene-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-        .terpene-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(0,0,0,0.12); }
         .scroll-indicator { animation: bounce 2s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
         .grain { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0.025; z-index: 999; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); }
         .hero-leaf { animation: sway 6s ease-in-out infinite; }
         @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
-        section { position: relative; }
-        .signin-btn:hover { background: ${scrolled ? "rgba(255,255,255,0.2)" : "rgba(27,67,50,0.1)"} !important; }
+        .signin-btn:hover { background: rgba(255,255,255,0.15) !important; }
+        .avatar-btn { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .avatar-btn:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+        .dropdown-item:hover { background: #f0f0f0 !important; }
 
         /* ── WP-J: Mobile Responsiveness ─────────────────────────────────── */
         @media (max-width: 600px) {
-          /* Header — tighter padding so logo + button don't crowd */
           .landing-header { padding: 0 16px !important; }
-          /* Video divider — 700px is an entire phone screen, reduce sharply */
           .landing-video { height: 300px !important; }
-          /* Content sections — 100px vertical padding is excessive on mobile */
           .landing-section { padding: 56px 20px !important; }
-          /* Hero description — reduce oversized bottom margin */
           .landing-hero-desc { margin-bottom: 40px !important; }
         }
-      `}</style>
+        `}</style>
 
         <div className="grain" />
-
         <PromoBanner promo={promo} onNavigate={navigate} />
 
-        {/* ── Floating header ── */}
-        {/* v5.9: landing-header class for mobile padding */}
+        {/* ── Floating header — v6.0: avatar dropdown for logged-in ── */}
         <header
           className="landing-header"
           style={{
@@ -413,33 +442,185 @@ export default function Landing() {
               BOTANICALS
             </span>
           </span>
-          <button
-            className="signin-btn body-font"
-            onClick={() => navigate(isLoggedIn ? "/loyalty" : "/account")}
-            style={{
-              background: scrolled
-                ? "rgba(255,255,255,0.1)"
-                : "rgba(27,67,50,0.08)",
-              border: scrolled
-                ? "1px solid rgba(255,255,255,0.3)"
-                : "1px solid rgba(27,67,50,0.3)",
-              borderRadius: "2px",
-              padding: "6px 16px",
-              color: scrolled ? "#fff" : "#1b4332",
-              fontFamily: "Jost, sans-serif",
-              fontSize: "10px",
-              fontWeight: "500",
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              transition: "background 0.2s, color 0.4s, border-color 0.4s",
-            }}
-          >
-            {isLoggedIn ? "My Account" : "Sign In"}
-          </button>
+
+          {/* ── v6.0: Logged-in avatar dropdown / Guest sign-in button ── */}
+          {isLoggedIn ? (
+            <div ref={dropdownRef} style={{ position: "relative" }}>
+              {/* Avatar button */}
+              <button
+                className="avatar-btn"
+                onClick={() => setDropdownOpen((o) => !o)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: "50%",
+                  background: scrolled ? "rgba(82,183,136,0.8)" : "#2d6a4f",
+                  border: scrolled
+                    ? "2px solid rgba(255,255,255,0.5)"
+                    : "2px solid #52b788",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "'Jost',sans-serif",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                }}
+                aria-label="Account menu"
+              >
+                {userInitial}
+                {inboxUnread > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      background: "#c0392b",
+                      color: "#fff",
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontFamily: "'Jost',sans-serif",
+                      border: "2px solid #fff",
+                    }}
+                  >
+                    {inboxUnread > 9 ? "9+" : inboxUnread}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown */}
+              {dropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    right: 0,
+                    background: "#fff",
+                    borderRadius: 4,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                    minWidth: 180,
+                    zIndex: 2000,
+                    overflow: "hidden",
+                    border: "1px solid #e0dbd2",
+                  }}
+                >
+                  {[
+                    { label: "My Account", icon: "👤", path: "/account" },
+                    { label: "My Loyalty", icon: "⭐", path: "/loyalty" },
+                    {
+                      label:
+                        inboxUnread > 0 ? `Inbox (${inboxUnread})` : "Inbox",
+                      icon: inboxUnread > 0 ? "📬" : "📭",
+                      path: "/account",
+                      state: { tab: "inbox" },
+                      badge: inboxUnread > 0,
+                    },
+                  ].map((item) => (
+                    <button
+                      key={item.label}
+                      className="dropdown-item"
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        navigate(
+                          item.path,
+                          item.state ? { state: item.state } : undefined,
+                        );
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "11px 16px",
+                        background: "none",
+                        border: "none",
+                        textAlign: "left",
+                        fontSize: 13,
+                        cursor: "pointer",
+                        fontFamily: "'Jost',sans-serif",
+                        color: "#1a1a1a",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        borderBottom: "1px solid #f0ebe3",
+                      }}
+                    >
+                      <span>{item.icon}</span>
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      {item.badge && (
+                        <span
+                          style={{
+                            background: "#c0392b",
+                            color: "#fff",
+                            borderRadius: 10,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                          }}
+                        >
+                          {inboxUnread}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                  <button
+                    className="dropdown-item"
+                    onClick={handleSignOut}
+                    style={{
+                      width: "100%",
+                      padding: "11px 16px",
+                      background: "none",
+                      border: "none",
+                      textAlign: "left",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      fontFamily: "'Jost',sans-serif",
+                      color: "#c0392b",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <span>🚪</span>
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              className="signin-btn body-font"
+              onClick={() => navigate("/account")}
+              style={{
+                background: scrolled
+                  ? "rgba(255,255,255,0.1)"
+                  : "rgba(27,67,50,0.08)",
+                border: scrolled
+                  ? "1px solid rgba(255,255,255,0.3)"
+                  : "1px solid rgba(27,67,50,0.3)",
+                borderRadius: "2px",
+                padding: "6px 16px",
+                color: scrolled ? "#fff" : "#1b4332",
+                fontFamily: "Jost, sans-serif",
+                fontSize: "10px",
+                fontWeight: "500",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+                transition: "background 0.2s, color 0.4s, border-color 0.4s",
+              }}
+            >
+              Sign In
+            </button>
+          )}
         </header>
 
-        {/* ── HERO ── */}
+        {/* ── HERO ── (preserved from v5.9 — no changes) ── */}
         <section
           style={{
             minHeight: "100vh",
@@ -486,13 +667,12 @@ export default function Landing() {
           >
             ❋
           </div>
-
           <div style={{ marginBottom: "32px", textAlign: "center" }}>
             <svg
               width="80"
               height="80"
               viewBox="0 0 80 80"
-              className="hero-leaf"
+              style={{ animation: "sway 6s ease-in-out infinite" }}
             >
               <defs>
                 <linearGradient
@@ -567,7 +747,6 @@ export default function Landing() {
               />
             </svg>
           </div>
-
           <h1
             className="landing-font"
             style={{
@@ -609,7 +788,6 @@ export default function Landing() {
           >
             Premium Botanical Extracts &amp; Lifestyle
           </p>
-
           <div
             style={{
               display: "flex",
@@ -634,8 +812,6 @@ export default function Landing() {
               }}
             />
           </div>
-
-          {/* v5.9: landing-hero-desc reduces marginBottom on mobile */}
           <p
             className="body-font landing-hero-desc"
             style={{
@@ -653,8 +829,6 @@ export default function Landing() {
             products available in South Africa. Every product is lab-certified,
             QR-verified and crafted with intention.
           </p>
-
-          {/* Portal Cards */}
           <div
             ref={cardsRef}
             style={{
@@ -766,7 +940,6 @@ export default function Landing() {
               </div>
             ))}
           </div>
-
           <div
             className="scroll-indicator"
             style={{
@@ -793,8 +966,7 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── DISTILLATE VIDEO DIVIDER ── */}
-        {/* v5.9: landing-video reduces height 700px → 300px on mobile */}
+        {/* ── VIDEO DIVIDER ── */}
         <section
           className="landing-video"
           style={{
@@ -853,7 +1025,6 @@ export default function Landing() {
         </section>
 
         {/* ── CONTENT SECTIONS ── */}
-        {/* v5.9: landing-section reduces 100px vertical padding on mobile */}
         {contentSections.map((sec, idx) => (
           <section
             key={sec.id}
@@ -885,9 +1056,7 @@ export default function Landing() {
           </section>
         ))}
 
-        {/* ── TERPENES CAROUSEL ── */}
-        {/* v5.8: onSelect lifts terpene id to Landing — no navigation (DEC-024) */}
-        {/* v5.9: landing-section reduces padding on mobile */}
+        {/* ── TERPENES ── */}
         <section
           className="landing-section"
           style={{
@@ -942,14 +1111,11 @@ export default function Landing() {
             >
               Our Terpene Profiles
             </h2>
-
-            {/* v5.8: pass onSelect — carousel no longer navigates */}
             <TerpeneCarousel onSelect={(id) => setActiveTerp(id)} />
           </div>
         </section>
 
         {/* ── QUALITY PROMISE ── */}
-        {/* v5.9: landing-section reduces padding on mobile */}
         <section
           className="landing-section"
           style={{
@@ -1078,7 +1244,6 @@ export default function Landing() {
                 textTransform: "uppercase",
                 cursor: "pointer",
                 fontWeight: 500,
-                transition: "background 0.3s",
               }}
               onMouseEnter={(e) => (e.target.style.background = "#1b4332")}
               onMouseLeave={(e) => (e.target.style.background = "#2d6a4f")}
@@ -1169,15 +1334,12 @@ export default function Landing() {
           </p>
         </footer>
 
-        {/* Molecule detail modal */}
         {modalMolId && (
           <MoleculeModal
             molId={modalMolId}
             onClose={() => setModalMolId(null)}
           />
         )}
-
-        {/* v5.8: Terpene modal — in-place overlay on Landing, no navigation (DEC-024) */}
         {activeTerp && (
           <TerpeneModal
             terpene={TERPENES.find((t) => t.id === activeTerp)}

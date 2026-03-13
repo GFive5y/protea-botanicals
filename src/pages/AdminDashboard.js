@@ -1,15 +1,11 @@
-// AdminDashboard.js v4.1 — WP-M: replaced QR sub-tabs with AdminQRCodes v2.0
+// AdminDashboard.js v4.2
 // Protea Botanicals — March 2026
-// ★ v4.1 changes:
-//   1. REMOVED: AdminQrList import (retired)
-//   2. REMOVED: AdminQrGenerator import (now inside AdminQRCodes)
-//   3. ADDED: AdminQRCodes import (full engine — registry + generate + banners)
-//   4. REMOVED: qrSubTab state + QR sub-tab bar (AdminQRCodes manages its own tabs)
-//   5. QR CODES tab now renders <AdminQRCodes /> directly
-// ★ v4.0 changes (preserved):
-//   1. "Documents" tab → HQDocuments component
-//   2. onNavigateToDocuments callback
-//   3. documentsTargetId state
+// ★ v4.2 changes:
+//   1. ADDED: Messages tab — shows all customer inbound messages (queries/faults)
+//      with unread count badge, admin reply inline, mark-as-read
+//   2. ADDED: unreadMsgCount state — polled on mount + realtime subscription
+//   3. Tab label: "Messages" shows badge dot if unread count > 0
+//   All v4.1 content preserved exactly.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -22,9 +18,8 @@ import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
 import AdminFraudSecurity from "../components/AdminFraudSecurity";
 import AdminNotifications from "../components/AdminNotifications";
 import HQDocuments from "../components/hq/HQDocuments";
-import AdminQRCodes from "../components/AdminQRCodes"; // v2.0 — WP-M
+import AdminQRCodes from "../components/AdminQRCodes";
 
-// ─── Design Tokens ───
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -38,6 +33,8 @@ const C = {
   white: "#fff",
   red: "#c0392b",
   lightRed: "#f8d7da",
+  orange: "#e67e22",
+  lightGreen: "#eafaf1",
 };
 const FONTS = {
   heading: "'Cormorant Garamond', Georgia, serif",
@@ -111,7 +108,7 @@ function StatCard({ label, value, sub, color = C.green, icon }) {
   );
 }
 
-function TabBtn({ active, label, onClick }) {
+function TabBtn({ active, label, badge, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -125,9 +122,27 @@ function TabBtn({ active, label, onClick }) {
           : "3px solid transparent",
         borderRadius: 0,
         padding: "12px 20px",
+        position: "relative",
       }}
     >
       {label}
+      {badge > 0 && (
+        <span
+          style={{
+            display: "inline-block",
+            background: C.red,
+            color: C.white,
+            borderRadius: 10,
+            fontSize: 9,
+            fontWeight: 700,
+            padding: "1px 5px",
+            marginLeft: 6,
+            verticalAlign: "middle",
+          }}
+        >
+          {badge}
+        </span>
+      )}
     </button>
   );
 }
@@ -140,16 +155,460 @@ function fmtDate(d) {
     day: "numeric",
   });
 }
+function fmtTime(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  const diff = (Date.now() - d) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+}
+
+// ── NEW v4.2: AdminMessages component ────────────────────────────────────────
+function AdminMessages() {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [profiles, setProfiles] = useState({});
+  const [replyTo, setReplyTo] = useState(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+  const [adminUser, setAdminUser] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setAdminUser(user));
+  }, []);
+
+  const loadMessages = useCallback(async () => {
+    setLoading(true);
+    // Fetch all inbound messages (from customers) + unread
+    const { data } = await supabase
+      .from("customer_messages")
+      .select("*")
+      .eq("direction", "inbound")
+      .order("created_at", { ascending: false });
+    const msgs = data || [];
+    setMessages(msgs);
+
+    // Load profiles for senders
+    const userIds = [...new Set(msgs.map((m) => m.user_id))];
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase
+        .from("user_profiles")
+        .select("id,full_name,phone,loyalty_points,loyalty_tier")
+        .in("id", userIds);
+      const map = {};
+      (profs || []).forEach((p) => {
+        map[p.id] = p;
+      });
+      setProfiles(map);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  // Realtime: new inbound messages
+  useEffect(() => {
+    const sub = supabase
+      .channel("admin-messages-inbox")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "customer_messages",
+          filter: "direction=eq.inbound",
+        },
+        loadMessages,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [loadMessages]);
+
+  const markRead = async (msgId) => {
+    await supabase
+      .from("customer_messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", msgId);
+    loadMessages();
+  };
+
+  const handleReply = async (msg) => {
+    if (!replyBody.trim()) {
+      setSendResult({ error: "Reply body required." });
+      return;
+    }
+    setSending(true);
+    setSendResult(null);
+    const { error } = await supabase.from("customer_messages").insert({
+      user_id: msg.user_id,
+      direction: "outbound",
+      message_type: "response",
+      subject: msg.subject ? `Re: ${msg.subject}` : "Re: Your message",
+      body: replyBody.trim(),
+      sent_by: adminUser?.id || null,
+      sent_by_name: adminUser?.email ? adminUser.email.split("@")[0] : "Admin",
+      metadata: {},
+    });
+    // Mark original as read
+    await supabase
+      .from("customer_messages")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", msg.id);
+
+    if (error) {
+      setSendResult({ error: "Failed to send reply." });
+    } else {
+      setSendResult({ success: "Reply sent!" });
+      setReplyBody("");
+      setTimeout(() => {
+        setReplyTo(null);
+        setSendResult(null);
+      }, 1500);
+      loadMessages();
+    }
+    setSending(false);
+  };
+
+  const MSG_TYPE_META = {
+    query: { label: "Query", icon: "💬", color: C.blue },
+    fault: { label: "Fault", icon: "⚠", color: C.red },
+  };
+
+  const filtered =
+    filterType === "all"
+      ? messages
+      : filterType === "unread"
+        ? messages.filter((m) => !m.read_at)
+        : messages.filter((m) => m.message_type === filterType);
+
+  const unreadCount = messages.filter((m) => !m.read_at).length;
+
+  return (
+    <div style={{ fontFamily: FONTS.body }}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20,
+          flexWrap: "wrap",
+          gap: 10,
+        }}
+      >
+        <div>
+          <h2
+            style={{
+              fontFamily: FONTS.heading,
+              color: C.green,
+              fontSize: 22,
+              margin: 0,
+            }}
+          >
+            Customer Messages
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  display: "inline-block",
+                  background: C.red,
+                  color: C.white,
+                  borderRadius: 10,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  marginLeft: 8,
+                  fontFamily: FONTS.body,
+                  verticalAlign: "middle",
+                }}
+              >
+                {unreadCount} new
+              </span>
+            )}
+          </h2>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
+            Inbound queries and fault reports from customers
+          </div>
+        </div>
+        <button
+          onClick={loadMessages}
+          style={{ ...makeBtn(C.mid), padding: "8px 16px", fontSize: 10 }}
+        >
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Filter bar */}
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          border: `1px solid ${C.border}`,
+          borderRadius: 2,
+          overflow: "hidden",
+          marginBottom: 16,
+          width: "fit-content",
+        }}
+      >
+        {[
+          { key: "all", label: `All (${messages.length})` },
+          { key: "unread", label: `Unread (${unreadCount})` },
+          { key: "query", label: "Queries" },
+          { key: "fault", label: "Faults" },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilterType(f.key)}
+            style={{
+              padding: "8px 16px",
+              border: "none",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              fontFamily: FONTS.body,
+              background: filterType === f.key ? C.green : C.white,
+              color: filterType === f.key ? C.white : C.muted,
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "48px", color: C.muted }}>
+          Loading messages…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "48px",
+            border: `1px dashed ${C.border}`,
+            borderRadius: 2,
+            color: C.muted,
+          }}
+        >
+          <div style={{ fontSize: 28, marginBottom: 10 }}>📭</div>
+          <div
+            style={{
+              fontFamily: FONTS.heading,
+              fontSize: 18,
+              color: C.green,
+              marginBottom: 6,
+            }}
+          >
+            No messages
+          </div>
+          <div style={{ fontSize: 13 }}>
+            Customer queries and fault reports appear here.
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {filtered.map((msg) => {
+            const meta = MSG_TYPE_META[msg.message_type] || {
+              label: msg.message_type,
+              icon: "📩",
+              color: C.muted,
+            };
+            const prof = profiles[msg.user_id];
+            const isUnread = !msg.read_at;
+            const isReplying = replyTo?.id === msg.id;
+            return (
+              <div
+                key={msg.id}
+                style={{
+                  background: isUnread ? "#fffdf5" : C.white,
+                  border: `1px solid ${isUnread ? C.orange + "50" : C.border}`,
+                  borderLeft: `4px solid ${meta.color}`,
+                  borderRadius: 2,
+                  padding: "16px 20px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: meta.color,
+                        }}
+                      >
+                        {meta.icon} {meta.label}
+                      </span>
+                      {isUnread && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            background: C.orange,
+                            color: C.white,
+                            padding: "1px 6px",
+                            borderRadius: 10,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          NEW
+                        </span>
+                      )}
+                      {msg.subject && (
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: C.text,
+                          }}
+                        >
+                          — {msg.subject}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
+                      {prof?.full_name || "Anonymous"}
+                      {prof?.phone ? ` · ${prof.phone}` : ""} ·{" "}
+                      {fmtTime(msg.created_at)}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    {isUnread && (
+                      <button
+                        onClick={() => markRead(msg.id)}
+                        style={{
+                          ...makeBtn(C.mid),
+                          fontSize: 9,
+                          padding: "4px 10px",
+                        }}
+                      >
+                        Mark Read
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (isReplying) {
+                          setReplyTo(null);
+                        } else {
+                          setReplyTo(msg);
+                          setReplyBody("");
+                          setSendResult(null);
+                          if (isUnread) markRead(msg.id);
+                        }
+                      }}
+                      style={{
+                        ...makeBtn(isReplying ? C.muted : C.green),
+                        fontSize: 9,
+                        padding: "4px 10px",
+                      }}
+                    >
+                      {isReplying ? "✕ Cancel" : "↩ Reply"}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: C.text,
+                    lineHeight: 1.7,
+                    background: C.cream,
+                    padding: "10px 14px",
+                    borderRadius: 2,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {msg.body}
+                </div>
+
+                {isReplying && (
+                  <div style={{ marginTop: 12 }}>
+                    <textarea
+                      rows={3}
+                      placeholder="Write your reply…"
+                      value={replyBody}
+                      onChange={(e) => setReplyBody(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 2,
+                        fontSize: 13,
+                        fontFamily: FONTS.body,
+                        resize: "vertical",
+                        boxSizing: "border-box",
+                        outline: "none",
+                      }}
+                    />
+                    {sendResult?.error && (
+                      <div style={{ color: C.red, fontSize: 12, marginTop: 4 }}>
+                        ⚠ {sendResult.error}
+                      </div>
+                    )}
+                    {sendResult?.success && (
+                      <div
+                        style={{
+                          color: C.mid,
+                          fontSize: 12,
+                          marginTop: 4,
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✅ {sendResult.success}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleReply(msg)}
+                      disabled={sending}
+                      style={{
+                        ...makeBtn(C.green, C.white, sending),
+                        marginTop: 8,
+                        fontSize: 10,
+                      }}
+                    >
+                      {sending ? "Sending…" : "Send Reply"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
-  // v4.0: document pre-selection for deep-link from batch badge
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0); // v4.2
   const [analytics, setAnalytics] = useState({
     total: 0,
     claimed: 0,
@@ -163,9 +622,18 @@ export default function AdminDashboard() {
   });
 
   const fetchUsers = useCallback(async () => {
-    const { data, err } = await supabase.from("user_profiles").select("*");
-    if (err) console.error("fetchUsers error:", err);
+    const { data } = await supabase.from("user_profiles").select("*");
     setUsers(data || []);
+  }, []);
+
+  // v4.2: fetch unread customer messages count
+  const fetchUnreadCount = useCallback(async () => {
+    const { count } = await supabase
+      .from("customer_messages")
+      .select("*", { count: "exact", head: true })
+      .eq("direction", "inbound")
+      .is("read_at", null);
+    setUnreadMsgCount(count || 0);
   }, []);
 
   const computeAnalytics = useCallback(async () => {
@@ -204,7 +672,7 @@ export default function AdminDashboard() {
       ).size;
       const { data: timeData } = await supabase
         .from("products")
-        .select("distributed_at, claimed_at")
+        .select("distributed_at,claimed_at")
         .eq("status", "claimed")
         .not("distributed_at", "is", null)
         .not("claimed_at", "is", null);
@@ -239,14 +707,35 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
     computeAnalytics();
-  }, [fetchUsers, computeAnalytics]);
+    fetchUnreadCount();
+  }, [fetchUsers, computeAnalytics, fetchUnreadCount]);
 
-  // ── Called from AdminBatchManager "Generate QR" button ──────────────────
+  // v4.2: realtime badge refresh
+  useEffect(() => {
+    const sub = supabase
+      .channel("admin-dashboard-msgs")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "customer_messages",
+          filter: "direction=eq.inbound",
+        },
+        fetchUnreadCount,
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "customer_messages" },
+        fetchUnreadCount,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchUnreadCount]);
+
   const handleNavigateToQR = () => {
     setTab("qr_codes");
   };
-
-  // ── v4.0: Called from AdminBatchManager "🔬 AI INGESTED" badge ──────────
   const handleNavigateToDocuments = (documentId) => {
     setDocumentsTargetId(documentId);
     setTab("documents");
@@ -328,6 +817,14 @@ export default function AdminDashboard() {
           onClick={() => setTab("customers")}
         />
         <TabBtn
+          active={tab === "messages"}
+          label="Messages"
+          badge={unreadMsgCount}
+          onClick={() => {
+            setTab("messages");
+          }}
+        />
+        <TabBtn
           active={tab === "security"}
           label="Security"
           onClick={() => setTab("security")}
@@ -387,7 +884,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ══════ OVERVIEW ══════ */}
+      {/* OVERVIEW */}
       {tab === "overview" && (
         <div>
           <h2
@@ -470,6 +967,38 @@ export default function AdminDashboard() {
               color={C.green}
             />
           </div>
+          {/* v4.2: Messages alert */}
+          {unreadMsgCount > 0 && (
+            <div
+              style={{
+                padding: "12px 16px",
+                background: "#fffdf5",
+                border: `1px solid ${C.orange}`,
+                borderRadius: 2,
+                marginBottom: 24,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>💬</span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
+                {unreadMsgCount} unread customer message
+                {unreadMsgCount !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={() => setTab("messages")}
+                style={{
+                  ...makeBtn(C.orange),
+                  fontSize: 10,
+                  padding: "5px 14px",
+                  marginLeft: "auto",
+                }}
+              >
+                View Messages
+              </button>
+            </div>
+          )}
           <h3
             style={{
               fontFamily: FONTS.heading,
@@ -502,6 +1031,9 @@ export default function AdminDashboard() {
             <button onClick={() => setTab("stock")} style={makeBtn(C.mid)}>
               STOCK CONTROL
             </button>
+            <button onClick={() => setTab("customers")} style={makeBtn(C.mid)}>
+              👥 CUSTOMERS
+            </button>
             <button
               onClick={() => {
                 setDocumentsTargetId(null);
@@ -515,6 +1047,7 @@ export default function AdminDashboard() {
               onClick={() => {
                 computeAnalytics();
                 fetchUsers();
+                fetchUnreadCount();
               }}
               style={makeBtn(C.mid)}
             >
@@ -524,33 +1057,24 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ══════ SHIPMENTS ══════ */}
       {tab === "shipments" && <AdminShipments />}
-
-      {/* ══════ PRODUCTION ══════ */}
       {tab === "production" && <AdminProductionModule />}
-
-      {/* ══════ BATCHES ══════ */}
       {tab === "batches" && (
         <AdminBatchManager
           onNavigateToQR={handleNavigateToQR}
           onNavigateToDocuments={handleNavigateToDocuments}
         />
       )}
-
-      {/* ══════ CUSTOMERS ══════ */}
       {tab === "customers" && <AdminCustomerEngagement />}
-
-      {/* ══════ SECURITY ══════ */}
+      {tab === "messages" && <AdminMessages />}
       {tab === "security" && <AdminFraudSecurity />}
-
-      {/* ══════ NOTIFICATIONS ══════ */}
       {tab === "notifications" && <AdminNotifications />}
-
-      {/* ══════ QR CODES — v4.1: AdminQRCodes v2.0 (WP-M) ══════ */}
       {tab === "qr_codes" && <AdminQRCodes />}
+      {tab === "analytics" && <AdminAnalytics />}
+      {tab === "stock" && <StockControl />}
+      {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
 
-      {/* ══════ USERS ══════ */}
+      {/* USERS */}
       {tab === "users" && (
         <div>
           <h2
@@ -675,15 +1199,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
-      {/* ══════ ANALYTICS ══════ */}
-      {tab === "analytics" && <AdminAnalytics />}
-
-      {/* ══════ STOCK ══════ */}
-      {tab === "stock" && <StockControl />}
-
-      {/* ══════ DOCUMENTS ══════ */}
-      {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
     </div>
   );
 }

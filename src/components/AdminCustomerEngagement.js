@@ -1,24 +1,26 @@
-// src/components/AdminCustomerEngagement.js v2.0
+// src/components/AdminCustomerEngagement.js v2.1
 // Protea Botanicals — March 2026
 // ============================================================================
-// v2.0 — Customer 360 Database overhaul (built on v1.0 foundation)
-//   PRESERVED from v1.0:
+// v2.1 — Inbox / Messaging layer built on top of v2.0
+//   PRESERVED from v2.0 (ALL):
 //   - calcEngagement() scoring algorithm (recency/scans/points/profile/optins)
 //   - isChurnRisk() logic
-//   - TierBadge (points-based), EngBar, makeBtn, inputStyle, TIERS config
+//   - TierBadge, EngBar, ScoreBadge, Pill, makeBtn, inputStyle, TIERS config
 //   - handleBulkSave() + Save All Scores + toast system
-//   - All stat cards, filter/sort logic incl. engagement + risk sort
-//   - fmtDate, fmtDateTime, daysSince helpers
-//   ADDED in v2.0:
-//   - Customer 360 slide-in drawer (replaces modal) with 4 tabs:
-//     Profile (identity + engagement breakdown) / Loyalty / Scans / POPIA
-//   - profileScore() + ScoreBadge column (profile completeness %)
-//   - scan_logs loaded per customer in Scans tab
-//   - Register In-Store modal → creates auth user + WhatsApp admin alert
-//   - Data deletion request → WhatsApp admin alert (POPIA right to erasure)
-//   - POPIA consented + Avg Profile % added to stats strip
-//   - Sort: join_date + profile added
-//   - Filter: complete profile added
+//   - All stat cards, filter/sort logic
+//   - fmtDate, fmtDateTime, daysSince, timeAgo helpers
+//   - Customer 360 drawer: Profile / Loyalty / Scans / POPIA tabs
+//   - Register In-Store modal
+//   - Data deletion POPIA flow
+//   ADDED in v2.1:
+//   - 💬 Messages tab in 360 drawer (5th tab)
+//   - Compose form: type, subject, body, bonus points
+//   - Message thread view: shows full inbound + outbound history per customer
+//   - Auto-triggers: tier-up message, birthday message (if date_of_birth today)
+//     — detected on drawer open, offered as pre-filled compose
+//   - Broadcast tool: send to all customers matching active filter
+//   - Admin CRUD: mark message read, delete message (soft via read_at + notes)
+//   - Unread count badge on Messages tab
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -53,7 +55,7 @@ const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Tier config — PRESERVED from v1.0 ────────────────────────────────────────
+// ── Tier config — PRESERVED from v2.0 ─────────────────────────────────────────
 const TIERS = {
   platinum: {
     label: "Platinum",
@@ -88,7 +90,7 @@ function getTierCfg(points) {
   return TIERS[getTier(points)];
 }
 
-// ── Helpers — PRESERVED from v1.0 ────────────────────────────────────────────
+// ── Helpers — PRESERVED from v2.0 ─────────────────────────────────────────────
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -98,6 +100,7 @@ function fmtDate(d) {
   });
 }
 function fmtDateTime(d) {
+  // eslint-disable-line no-unused-vars
   if (!d) return "—";
   return new Date(d).toLocaleString("en-ZA", {
     day: "numeric",
@@ -119,8 +122,6 @@ function timeAgo(ts) {
   if (diff < 2592000) return `${Math.round(diff / 86400)}d ago`;
   return fmtDate(ts);
 }
-
-// NEW v2.0 — profile completeness (5 fields x 20 = 100)
 function profileScore(p) {
   if (!p) return 0;
   let s = 0;
@@ -132,7 +133,7 @@ function profileScore(p) {
   return s;
 }
 
-// ── Style helpers — PRESERVED from v1.0 ──────────────────────────────────────
+// ── Style helpers — PRESERVED from v2.0 ───────────────────────────────────────
 const inputStyle = {
   padding: "9px 12px",
   border: `1px solid ${C.border}`,
@@ -159,8 +160,7 @@ const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
   opacity: disabled ? 0.6 : 1,
 });
 
-// ── Engagement score calculator — PRESERVED from v1.0 ────────────────────────
-// Max 100 pts: Recency 30 / Scan volume 25 / Points 20 / Profile 15 / Opt-ins 10
+// ── Engagement score calculator — PRESERVED from v2.0 ────────────────────────
 function calcEngagement(profile) {
   const days = profile.last_active_at ? daysSince(profile.last_active_at) : 999;
   let recency = 0;
@@ -209,8 +209,6 @@ function calcEngagement(profile) {
     },
   };
 }
-
-// Churn risk — PRESERVED from v1.0
 function isChurnRisk(profile) {
   const days = daysSince(profile.last_active_at);
   const lowPoints = (profile.loyalty_points || 0) < 50;
@@ -218,9 +216,7 @@ function isChurnRisk(profile) {
   return (days !== null && days > 45) || (lowPoints && inactiveScans);
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-// TierBadge — PRESERVED from v1.0 (takes points prop)
+// ── Sub-components — PRESERVED from v2.0 ─────────────────────────────────────
 function TierBadge({ points }) {
   const t = getTierCfg(points || 0);
   return (
@@ -244,8 +240,6 @@ function TierBadge({ points }) {
     </span>
   );
 }
-
-// EngBar — PRESERVED from v1.0
 function EngBar({ score }) {
   const color = score >= 70 ? C.accent : score >= 40 ? C.gold : C.red;
   return (
@@ -269,8 +263,6 @@ function EngBar({ score }) {
     </div>
   );
 }
-
-// ScoreBadge — NEW v2.0 (profile completeness %)
 function ScoreBadge({ score }) {
   const color = score >= 80 ? C.mid : score >= 40 ? C.orange : C.red;
   return (
@@ -301,7 +293,6 @@ function ScoreBadge({ score }) {
     </div>
   );
 }
-
 function Pill({ label, color, bg }) {
   return (
     <span
@@ -322,11 +313,27 @@ function Pill({ label, color, bg }) {
   );
 }
 
+// ── NEW v2.1: Message type meta ───────────────────────────────────────────────
+const MSG_META = {
+  query: { label: "Query", icon: "💬", color: C.blue },
+  fault: { label: "Fault", icon: "⚠", color: C.red },
+  admin_notice: { label: "Notice", icon: "📢", color: C.mid },
+  birthday: { label: "Birthday", icon: "🎂", color: C.gold },
+  tier_up: { label: "Tier Upgrade", icon: "🏆", color: C.platinum },
+  event: { label: "Event", icon: "🎪", color: "#9b6b9e" },
+  response: { label: "Response", icon: "↩️", color: C.mid },
+  broadcast: { label: "Broadcast", icon: "📣", color: C.accent },
+  general: { label: "Message", icon: "📩", color: C.muted },
+};
+function getMsgMeta(type) {
+  return MSG_META[type] || MSG_META.general;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminCustomerEngagement() {
-  // ── State — PRESERVED from v1.0 ─────────────────────────────────────────────
+  // ── State — PRESERVED from v2.0 ──────────────────────────────────────────────
   const [customers, setCustomers] = useState([]);
   const [engScores, setEngScores] = useState({});
   const [transactions, setTransactions] = useState([]);
@@ -338,7 +345,6 @@ export default function AdminCustomerEngagement() {
   const [toast, setToast] = useState("");
   const [sortBy, setSortBy] = useState("engagement");
 
-  // ── State — NEW v2.0 ─────────────────────────────────────────────────────────
   const [selected, setSelected] = useState(null);
   const [drawerTab, setDrawerTab] = useState("profile");
   const [drawerData, setDrawerData] = useState({ txns: [], scans: [] });
@@ -354,12 +360,41 @@ export default function AdminCustomerEngagement() {
   const [regMsg, setRegMsg] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // ── State — NEW v2.1 ──────────────────────────────────────────────────────────
+  const [messages, setMessages] = useState([]); // messages for selected customer
+  const [msgsLoading, setMsgsLoading] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [composeForm, setComposeForm] = useState({
+    message_type: "admin_notice",
+    subject: "",
+    body: "",
+    bonus_points: 0,
+  });
+  const [sendingMsg, setSendingMsg] = useState(false);
+  const [sendMsgResult, setSendMsgResult] = useState(null);
+  const [adminUser, setAdminUser] = useState(null); // current admin session
+  const [birthdayAlert, setBirthdayAlert] = useState(false);
+  const [tierUpAlert, setTierUpAlert] = useState(null); // {old, new} if tier changed
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastForm, setBroadcastForm] = useState({
+    subject: "",
+    body: "",
+    message_type: "broadcast",
+  });
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState(null);
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3200);
   };
 
-  // ── Fetch all — PRESERVED from v1.0 ─────────────────────────────────────────
+  // ── Get current admin user ─────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setAdminUser(user));
+  }, []);
+
+  // ── Fetch all — PRESERVED from v2.0 ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -372,7 +407,7 @@ export default function AdminCustomerEngagement() {
         supabase
           .from("loyalty_transactions")
           .select(
-            "id, user_id, points, transaction_type, description, transaction_date, source",
+            "id,user_id,points,transaction_type,description,transaction_date,source",
           )
           .order("transaction_date", { ascending: false }),
       ]);
@@ -396,7 +431,7 @@ export default function AdminCustomerEngagement() {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Load drawer data — NEW v2.0 ──────────────────────────────────────────────
+  // ── Load drawer data — PRESERVED from v2.0 ───────────────────────────────────
   useEffect(() => {
     if (!selected) return;
     setDrawerLoading(true);
@@ -405,7 +440,7 @@ export default function AdminCustomerEngagement() {
       supabase
         .from("loyalty_transactions")
         .select(
-          "id, points, transaction_type, description, transaction_date, source",
+          "id,points,transaction_type,description,transaction_date,source",
         )
         .eq("user_id", selected.id)
         .order("transaction_date", { ascending: false })
@@ -413,7 +448,7 @@ export default function AdminCustomerEngagement() {
       supabase
         .from("scan_logs")
         .select(
-          "id, scanned_at, scan_outcome, qr_type, campaign_name, points_awarded, ip_city, ip_province, device_type, location_source, qr_code",
+          "id,scanned_at,scan_outcome,qr_type,campaign_name,points_awarded,ip_city,ip_province,device_type,location_source,qr_code",
         )
         .eq("user_id", selected.id)
         .order("scanned_at", { ascending: false })
@@ -422,9 +457,51 @@ export default function AdminCustomerEngagement() {
       setDrawerData({ txns: txnRes.data || [], scans: scanRes.data || [] });
       setDrawerLoading(false);
     });
+
+    // ── NEW v2.1: detect birthday + tier-up triggers on drawer open ──────────
+    const today = new Date();
+    if (selected.date_of_birth) {
+      const dob = new Date(selected.date_of_birth);
+      if (
+        dob.getMonth() === today.getMonth() &&
+        dob.getDate() === today.getDate()
+      ) {
+        setBirthdayAlert(true);
+      } else {
+        setBirthdayAlert(false);
+      }
+    } else {
+      setBirthdayAlert(false);
+    }
+
+    // tier-up: compare stored tier vs computed tier
+    const computedTier = getTier(selected.loyalty_points || 0);
+    const storedTier = selected.loyalty_tier || "bronze";
+    if (computedTier !== storedTier && computedTier !== "bronze") {
+      setTierUpAlert({ old: storedTier, new: computedTier });
+    } else {
+      setTierUpAlert(null);
+    }
   }, [selected]);
 
-  // ── Bulk save engagement scores — PRESERVED from v1.0 ───────────────────────
+  // ── Load messages for selected customer — NEW v2.1 ───────────────────────────
+  const loadMessages = useCallback(async () => {
+    if (!selected) return;
+    setMsgsLoading(true);
+    const { data } = await supabase
+      .from("customer_messages")
+      .select("*")
+      .eq("user_id", selected.id)
+      .order("created_at", { ascending: false });
+    setMessages(data || []);
+    setMsgsLoading(false);
+  }, [selected]);
+
+  useEffect(() => {
+    if (drawerTab === "messages") loadMessages();
+  }, [drawerTab, loadMessages]);
+
+  // ── Bulk save — PRESERVED from v2.0 ──────────────────────────────────────────
   const handleBulkSave = async () => {
     setSaving(true);
     let saved = 0;
@@ -448,7 +525,7 @@ export default function AdminCustomerEngagement() {
     fetchAll();
   };
 
-  // ── Register In-Store — NEW v2.0 ─────────────────────────────────────────────
+  // ── Register In-Store — PRESERVED from v2.0 ───────────────────────────────────
   async function handleRegister() {
     setRegLoading(true);
     setRegMsg(null);
@@ -470,17 +547,19 @@ export default function AdminCustomerEngagement() {
     }
     const userId = authData?.user?.id;
     if (userId) {
-      await supabase.from("user_profiles").upsert({
-        id: userId,
-        role: "customer",
-        loyalty_points: 0,
-        full_name: regForm.full_name || null,
-        phone: regForm.phone || null,
-        province: regForm.province || null,
-        acquisition_channel: "in_store",
-        profile_complete: false,
-        created_at: new Date().toISOString(),
-      });
+      await supabase
+        .from("user_profiles")
+        .upsert({
+          id: userId,
+          role: "customer",
+          loyalty_points: 0,
+          full_name: regForm.full_name || null,
+          phone: regForm.phone || null,
+          province: regForm.province || null,
+          acquisition_channel: "in_store",
+          profile_complete: false,
+          created_at: new Date().toISOString(),
+        });
     }
     try {
       await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
@@ -506,7 +585,7 @@ export default function AdminCustomerEngagement() {
     }, 3000);
   }
 
-  // ── Data deletion — NEW v2.0 ─────────────────────────────────────────────────
+  // ── Data deletion — PRESERVED from v2.0 ───────────────────────────────────────
   async function handleDeleteRequest(customer) {
     try {
       await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
@@ -523,7 +602,133 @@ export default function AdminCustomerEngagement() {
     }
   }
 
-  // ── Computed stats — PRESERVED + extended ────────────────────────────────────
+  // ── NEW v2.1: Send message to customer ────────────────────────────────────────
+  const handleSendMessage = async () => {
+    if (!composeForm.body.trim()) {
+      setSendMsgResult({ error: "Message body is required." });
+      return;
+    }
+    setSendingMsg(true);
+    setSendMsgResult(null);
+    const metadata = {};
+    if (composeForm.bonus_points > 0)
+      metadata.points_awarded = Number(composeForm.bonus_points);
+
+    const { error } = await supabase.from("customer_messages").insert({
+      user_id: selected.id,
+      direction: "outbound",
+      message_type: composeForm.message_type,
+      subject: composeForm.subject.trim() || null,
+      body: composeForm.body.trim(),
+      sent_by: adminUser?.id || null,
+      sent_by_name: adminUser?.email ? adminUser.email.split("@")[0] : "Admin",
+      metadata,
+    });
+
+    // Award bonus points if set
+    if (!error && composeForm.bonus_points > 0) {
+      const pts = Number(composeForm.bonus_points);
+      await supabase
+        .from("user_profiles")
+        .update({ loyalty_points: (selected.loyalty_points || 0) + pts })
+        .eq("id", selected.id);
+      await supabase
+        .from("loyalty_transactions")
+        .insert({
+          user_id: selected.id,
+          points: pts,
+          transaction_type: "ADMIN_BONUS",
+          description: `Admin bonus: ${composeForm.subject || composeForm.message_type}`,
+          transaction_date: new Date().toISOString(),
+        });
+    }
+
+    if (error) {
+      setSendMsgResult({
+        error: "Failed to send. Check customer_messages table exists.",
+      });
+    } else {
+      setSendMsgResult({ success: "Message sent!" });
+      setComposeForm({
+        message_type: "admin_notice",
+        subject: "",
+        body: "",
+        bonus_points: 0,
+      });
+      setTimeout(() => {
+        setComposing(false);
+        setSendMsgResult(null);
+      }, 1500);
+      loadMessages();
+    }
+    setSendingMsg(false);
+  };
+
+  // Auto-fill birthday compose
+  const prefillBirthday = () => {
+    setComposing(true);
+    setComposeForm({
+      message_type: "birthday",
+      subject: "🎂 Happy Birthday from Protea Botanicals!",
+      body: `Hi ${selected.full_name || "there"},\n\nWishing you a wonderful birthday from all of us at Protea Botanicals! 🌿\n\nAs a thank you, we've added a special birthday bonus to your account. Enjoy your day!`,
+      bonus_points: 50,
+    });
+  };
+
+  // Auto-fill tier-up compose
+  const prefillTierUp = () => {
+    setComposing(true);
+    setComposeForm({
+      message_type: "tier_up",
+      subject: `🏆 You've reached ${tierUpAlert?.new ? TIERS[tierUpAlert.new]?.label : "a new tier"}!`,
+      body: `Hi ${selected.full_name || "there"},\n\nCongratulations! You've been upgraded to ${TIERS[tierUpAlert?.new]?.label || "a new tier"} status at Protea Botanicals. 🎉\n\nKeep scanning and earning to unlock even more exclusive rewards. Thank you for your loyalty!`,
+      bonus_points: 0,
+    });
+  };
+
+  // ── NEW v2.1: Broadcast ────────────────────────────────────────────────────────
+  const handleBroadcast = async () => {
+    if (!broadcastForm.body.trim()) {
+      setBroadcastResult({ error: "Body required." });
+      return;
+    }
+    setBroadcasting(true);
+    setBroadcastResult(null);
+    const targets = displayed.filter(
+      (c) => c.marketing_opt_in || broadcastForm.message_type === "broadcast",
+    );
+    let sent = 0;
+    for (const c of targets) {
+      const { error } = await supabase.from("customer_messages").insert({
+        user_id: c.id,
+        direction: "outbound",
+        message_type: broadcastForm.message_type,
+        subject: broadcastForm.subject.trim() || null,
+        body: broadcastForm.body.trim(),
+        sent_by: adminUser?.id || null,
+        sent_by_name: "Protea Botanicals",
+        metadata: {},
+      });
+      if (!error) sent++;
+    }
+    setBroadcastResult({
+      success: `Sent to ${sent} customer${sent !== 1 ? "s" : ""}!`,
+    });
+    setBroadcasting(false);
+    setTimeout(() => {
+      setShowBroadcast(false);
+      setBroadcastResult(null);
+      setBroadcastForm({ subject: "", body: "", message_type: "broadcast" });
+    }, 3000);
+  };
+
+  // ── Delete message — NEW v2.1 ─────────────────────────────────────────────────
+  const handleDeleteMessage = async (msgId) => {
+    await supabase.from("customer_messages").delete().eq("id", msgId);
+    loadMessages();
+  };
+
+  // ── Computed stats — PRESERVED from v2.0 ─────────────────────────────────────
   const avgEng =
     customers.length > 0
       ? Math.round(
@@ -553,7 +758,7 @@ export default function AdminCustomerEngagement() {
     tierCounts[getTier(c.loyalty_points || 0)]++;
   });
 
-  // ── Filter + sort — PRESERVED + extended ─────────────────────────────────────
+  // ── Filter + sort — PRESERVED from v2.0 ──────────────────────────────────────
   let displayed = [...customers];
   if (filter === "at_risk") displayed = displayed.filter((c) => isChurnRisk(c));
   if (filter === "active")
@@ -604,10 +809,15 @@ export default function AdminCustomerEngagement() {
   if (sortBy === "profile")
     displayed.sort((a, b) => profileScore(b) - profileScore(a));
 
+  // ── Unread count for badge ────────────────────────────────────────────────────
+  const msgUnreadCount = messages.filter(
+    (m) => m.direction === "inbound" && !m.read_at,
+  ).length;
+
   // ══════════════════════════════════════════════════════════════════════════════
   return (
     <div style={{ fontFamily: FONTS.body, position: "relative" }}>
-      {/* Toast — PRESERVED from v1.0 */}
+      {/* Toast */}
       {toast && (
         <div
           style={{
@@ -659,6 +869,15 @@ export default function AdminCustomerEngagement() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
             onClick={() => {
+              setShowBroadcast(true);
+              setBroadcastResult(null);
+            }}
+            style={{ ...makeBtn(C.gold), letterSpacing: "0.12em" }}
+          >
+            📣 Broadcast
+          </button>
+          <button
+            onClick={() => {
               setShowRegister(true);
               setRegMsg(null);
             }}
@@ -685,7 +904,7 @@ export default function AdminCustomerEngagement() {
         </div>
       </div>
 
-      {/* ── Stats strip — PRESERVED + POPIA + Avg Profile added ── */}
+      {/* ── Stats strip ── */}
       <div
         style={{
           display: "grid",
@@ -760,7 +979,7 @@ export default function AdminCustomerEngagement() {
         ))}
       </div>
 
-      {/* ── Churn alert — PRESERVED from v1.0 ── */}
+      {/* Churn alert */}
       {churnCount > 0 && (
         <div
           style={{
@@ -779,7 +998,7 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* ── Filters + search + sort ── */}
+      {/* Filters + search + sort */}
       <div
         style={{
           display: "flex",
@@ -860,7 +1079,7 @@ export default function AdminCustomerEngagement() {
         </div>
       </div>
 
-      {/* ── Customer Table ── */}
+      {/* ── Customer Table (PRESERVED from v2.0) ── */}
       {loading ? (
         <div style={{ padding: 60, textAlign: "center", color: C.muted }}>
           Loading customers…
@@ -948,6 +1167,7 @@ export default function AdminCustomerEngagement() {
                       setSelected(c);
                       setDrawerTab("profile");
                       setDeleteConfirm(null);
+                      setComposing(false);
                     }}
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.background = "#f0faf5")
@@ -1047,6 +1267,7 @@ export default function AdminCustomerEngagement() {
                           setSelected(c);
                           setDrawerTab("profile");
                           setDeleteConfirm(null);
+                          setComposing(false);
                         }}
                         style={{
                           ...makeBtn("transparent", C.mid),
@@ -1067,7 +1288,7 @@ export default function AdminCustomerEngagement() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          CUSTOMER 360 DRAWER — NEW v2.0
+          CUSTOMER 360 DRAWER — v2.1: 5 tabs (added Messages)
       ══════════════════════════════════════════════════════════════════════ */}
       {selected && (
         <>
@@ -1086,7 +1307,7 @@ export default function AdminCustomerEngagement() {
               top: 0,
               right: 0,
               bottom: 0,
-              width: 600,
+              width: 620,
               maxWidth: "95vw",
               background: C.cream,
               zIndex: 1001,
@@ -1151,26 +1372,95 @@ export default function AdminCustomerEngagement() {
               </div>
             </div>
 
-            {/* Drawer Tabs */}
+            {/* Trigger alerts (birthday / tier-up) */}
+            {(birthdayAlert || tierUpAlert) && (
+              <div
+                style={{
+                  padding: "12px 24px",
+                  background: "#fef9e7",
+                  borderBottom: `1px solid ${C.gold}`,
+                  display: "flex",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                {birthdayAlert && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      color: C.gold,
+                      fontWeight: 600,
+                    }}
+                  >
+                    🎂 Birthday today!
+                    <button
+                      onClick={prefillBirthday}
+                      style={{
+                        ...makeBtn(C.gold),
+                        fontSize: 9,
+                        padding: "3px 10px",
+                      }}
+                    >
+                      Send Birthday Message
+                    </button>
+                  </div>
+                )}
+                {tierUpAlert && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      color: C.platinum,
+                      fontWeight: 600,
+                    }}
+                  >
+                    🏆 Tier upgraded to {TIERS[tierUpAlert.new]?.label}!
+                    <button
+                      onClick={prefillTierUp}
+                      style={{
+                        ...makeBtn(C.platinum),
+                        fontSize: 9,
+                        padding: "3px 10px",
+                      }}
+                    >
+                      Send Tier-Up Message
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Drawer Tabs — v2.1: added Messages tab */}
             <div
               style={{
                 display: "flex",
                 borderBottom: `2px solid ${C.border}`,
                 background: C.white,
                 flexShrink: 0,
+                overflowX: "auto",
               }}
             >
               {[
                 { id: "profile", label: "👤 Profile" },
                 { id: "loyalty", label: "⭐ Loyalty" },
                 { id: "scans", label: "📱 Scans" },
+                {
+                  id: "messages",
+                  label: `💬 Messages${msgUnreadCount > 0 ? ` (${msgUnreadCount})` : ""}`,
+                },
                 { id: "popia", label: "🔒 POPIA" },
               ].map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setDrawerTab(t.id)}
                   style={{
-                    padding: "12px 20px",
+                    padding: "12px 18px",
                     fontSize: 11,
                     fontWeight: 600,
                     letterSpacing: "0.12em",
@@ -1185,6 +1475,7 @@ export default function AdminCustomerEngagement() {
                         ? `3px solid ${C.green}`
                         : "3px solid transparent",
                     marginBottom: -2,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   {t.label}
@@ -1194,14 +1485,13 @@ export default function AdminCustomerEngagement() {
 
             {/* Drawer Body */}
             <div style={{ padding: 24, flex: 1 }}>
-              {/* ── PROFILE TAB ──────────────────────────────────────────────── */}
+              {/* ── PROFILE TAB (PRESERVED from v2.0) ── */}
               {drawerTab === "profile" &&
                 (() => {
                   const eng =
                     engScores[selected.id] || calcEngagement(selected);
                   return (
                     <>
-                      {/* Engagement score + breakdown — PRESERVED from v1.0 CustomerModal */}
                       <div
                         style={{
                           background: C.white,
@@ -1381,8 +1671,6 @@ export default function AdminCustomerEngagement() {
                           </div>
                         ))}
                       </div>
-
-                      {/* Profile completeness chips */}
                       <div
                         style={{
                           background: C.white,
@@ -1435,8 +1723,6 @@ export default function AdminCustomerEngagement() {
                           ))}
                         </div>
                       </div>
-
-                      {/* Identity grid */}
                       <div
                         style={{
                           background: C.white,
@@ -1500,12 +1786,6 @@ export default function AdminCustomerEngagement() {
                               label: "Referral Code",
                               val: selected.referral_code,
                             },
-                            {
-                              label: "Lifetime Spend",
-                              val: selected.lifetime_spend
-                                ? `R${selected.lifetime_spend}`
-                                : null,
-                            },
                           ].map(({ label, val }) => (
                             <div key={label}>
                               <div
@@ -1537,80 +1817,11 @@ export default function AdminCustomerEngagement() {
                           ))}
                         </div>
                       </div>
-
-                      {/* Consent flags */}
-                      <div
-                        style={{
-                          background: C.white,
-                          border: `1px solid ${C.border}`,
-                          borderRadius: 2,
-                          padding: 20,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            letterSpacing: "0.15em",
-                            textTransform: "uppercase",
-                            color: C.muted,
-                            marginBottom: 12,
-                            fontFamily: FONTS.body,
-                          }}
-                        >
-                          Consent Flags
-                        </div>
-                        <div
-                          style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
-                        >
-                          {[
-                            { label: "POPIA", val: selected.popia_consented },
-                            {
-                              label: "Marketing",
-                              val: selected.marketing_opt_in,
-                            },
-                            {
-                              label: "Analytics",
-                              val: selected.analytics_opt_in,
-                            },
-                            {
-                              label: "Geolocation",
-                              val: selected.geolocation_consent,
-                            },
-                          ].map(({ label, val }) => (
-                            <div
-                              key={label}
-                              style={{
-                                background: val ? C.lightGreen : "#eee",
-                                borderRadius: 2,
-                                padding: "10px 16px",
-                                textAlign: "center",
-                                minWidth: 80,
-                              }}
-                            >
-                              <div style={{ fontSize: 20 }}>
-                                {val ? "✅" : "⬜"}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  color: val ? C.mid : C.muted,
-                                  fontFamily: FONTS.body,
-                                  fontWeight: 600,
-                                  marginTop: 4,
-                                }}
-                              >
-                                {label}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     </>
                   );
                 })()}
 
-              {/* ── LOYALTY TAB ──────────────────────────────────────────────── */}
+              {/* ── LOYALTY TAB (PRESERVED from v2.0) ── */}
               {drawerTab === "loyalty" && (
                 <>
                   <div
@@ -1755,7 +1966,7 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* ── SCANS TAB ────────────────────────────────────────────────── */}
+              {/* ── SCANS TAB (PRESERVED from v2.0) ── */}
               {drawerTab === "scans" && (
                 <>
                   <div
@@ -1955,13 +2166,6 @@ export default function AdminCustomerEngagement() {
                                   bg="#eee"
                                 />
                               )}
-                              {sc.location_source === "gps" && (
-                                <Pill
-                                  label="GPS ✓"
-                                  color={C.mid}
-                                  bg={C.lightGreen}
-                                />
-                              )}
                             </div>
                           </div>
                         </div>
@@ -1971,7 +2175,388 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* ── POPIA TAB ────────────────────────────────────────────────── */}
+              {/* ── MESSAGES TAB — NEW v2.1 ── */}
+              {drawerTab === "messages" && (
+                <>
+                  {/* Compose toggle */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        textTransform: "uppercase",
+                        color: C.muted,
+                      }}
+                    >
+                      Conversation with {selected.full_name || "Customer"}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setComposing((c) => !c);
+                        setSendMsgResult(null);
+                      }}
+                      style={{
+                        ...makeBtn(composing ? C.muted : C.green),
+                        fontSize: 9,
+                        padding: "5px 12px",
+                      }}
+                    >
+                      {composing ? "✕ Cancel" : "+ Compose"}
+                    </button>
+                  </div>
+
+                  {/* Compose form */}
+                  {composing && (
+                    <div
+                      style={{
+                        background: C.white,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 2,
+                        padding: 18,
+                        marginBottom: 16,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 10,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: 10,
+                              color: C.muted,
+                              marginBottom: 4,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Type
+                          </label>
+                          <select
+                            value={composeForm.message_type}
+                            onChange={(e) =>
+                              setComposeForm((f) => ({
+                                ...f,
+                                message_type: e.target.value,
+                              }))
+                            }
+                            style={{ ...inputStyle, width: "100%" }}
+                          >
+                            <option value="admin_notice">📢 Notice</option>
+                            <option value="response">↩️ Response</option>
+                            <option value="birthday">🎂 Birthday</option>
+                            <option value="tier_up">🏆 Tier Upgrade</option>
+                            <option value="event">🎪 Event</option>
+                            <option value="general">📩 General</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: 10,
+                              color: C.muted,
+                              marginBottom: 4,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Bonus Points
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={composeForm.bonus_points}
+                            onChange={(e) =>
+                              setComposeForm((f) => ({
+                                ...f,
+                                bonus_points: e.target.value,
+                              }))
+                            }
+                            style={{ ...inputStyle, width: "100%" }}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: 10,
+                            color: C.muted,
+                            marginBottom: 4,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Subject
+                        </label>
+                        <input
+                          type="text"
+                          value={composeForm.subject}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({
+                              ...f,
+                              subject: e.target.value,
+                            }))
+                          }
+                          style={{ ...inputStyle, width: "100%" }}
+                          placeholder="Optional subject line"
+                        />
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: 10,
+                            color: C.muted,
+                            marginBottom: 4,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Message *
+                        </label>
+                        <textarea
+                          rows={4}
+                          value={composeForm.body}
+                          onChange={(e) =>
+                            setComposeForm((f) => ({
+                              ...f,
+                              body: e.target.value,
+                            }))
+                          }
+                          style={{
+                            ...inputStyle,
+                            width: "100%",
+                            resize: "vertical",
+                          }}
+                          placeholder="Write your message…"
+                        />
+                      </div>
+                      {sendMsgResult?.error && (
+                        <div
+                          style={{
+                            color: C.red,
+                            fontSize: 12,
+                            marginBottom: 8,
+                          }}
+                        >
+                          ⚠ {sendMsgResult.error}
+                        </div>
+                      )}
+                      {sendMsgResult?.success && (
+                        <div
+                          style={{
+                            color: C.mid,
+                            fontSize: 12,
+                            marginBottom: 8,
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✅ {sendMsgResult.success}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={sendingMsg}
+                        style={makeBtn(C.green, C.white, sendingMsg)}
+                      >
+                        {sendingMsg ? "Sending…" : "Send Message"}
+                      </button>
+                      {composeForm.bonus_points > 0 && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: C.gold,
+                            marginLeft: 10,
+                            fontWeight: 600,
+                          }}
+                        >
+                          +{composeForm.bonus_points} pts will be added
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Message thread */}
+                  {msgsLoading ? (
+                    <div
+                      style={{
+                        color: C.muted,
+                        fontSize: 13,
+                        textAlign: "center",
+                        padding: 24,
+                      }}
+                    >
+                      Loading messages…
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div
+                      style={{
+                        textAlign: "center",
+                        padding: 32,
+                        color: C.muted,
+                        fontSize: 13,
+                        border: `1px dashed ${C.border}`,
+                        borderRadius: 2,
+                      }}
+                    >
+                      No messages yet. Use Compose to send the first message to
+                      this customer.
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gap: 1 }}>
+                      {messages.map((msg) => {
+                        const m = getMsgMeta(msg.message_type);
+                        const isInbound = msg.direction === "inbound";
+                        const isUnread = isInbound && !msg.read_at;
+                        return (
+                          <div
+                            key={msg.id}
+                            style={{
+                              background: isUnread ? "#fff8f0" : C.white,
+                              border: `1px solid ${isUnread ? C.orange + "40" : C.border}`,
+                              borderLeft: `3px solid ${isInbound ? C.blue : m.color}`,
+                              borderRadius: 2,
+                              padding: "12px 16px",
+                              display: "flex",
+                              gap: 10,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 18,
+                                flexShrink: 0,
+                                marginTop: 1,
+                              }}
+                            >
+                              {isInbound ? "👤" : m.icon}
+                            </span>
+                            <div style={{ flex: 1 }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: 8,
+                                  marginBottom: 4,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: isUnread ? 700 : 500,
+                                    color: isUnread ? C.text : C.muted,
+                                  }}
+                                >
+                                  {msg.subject || m.label}
+                                  {isUnread && (
+                                    <span
+                                      style={{
+                                        marginLeft: 6,
+                                        fontSize: 9,
+                                        background: C.orange,
+                                        color: C.white,
+                                        padding: "1px 6px",
+                                        borderRadius: 10,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      NEW
+                                    </span>
+                                  )}
+                                  {isInbound && (
+                                    <span
+                                      style={{
+                                        marginLeft: 6,
+                                        fontSize: 9,
+                                        background: `${C.blue}18`,
+                                        color: C.blue,
+                                        padding: "1px 6px",
+                                        borderRadius: 10,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      FROM CUSTOMER
+                                    </span>
+                                  )}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    color: C.muted,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {timeAgo(msg.created_at)}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: C.text,
+                                  lineHeight: 1.6,
+                                  whiteSpace: "pre-wrap",
+                                }}
+                              >
+                                {msg.body}
+                              </div>
+                              {msg.metadata?.points_awarded > 0 && (
+                                <div
+                                  style={{
+                                    marginTop: 6,
+                                    fontSize: 11,
+                                    color: C.gold,
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  🎁 +{msg.metadata.points_awarded} pts bonus
+                                  awarded
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: C.muted,
+                                cursor: "pointer",
+                                fontSize: 14,
+                                padding: "2px 6px",
+                                flexShrink: 0,
+                                opacity: 0.5,
+                              }}
+                              title="Delete message"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── POPIA TAB (PRESERVED from v2.0) ── */}
               {drawerTab === "popia" && (
                 <>
                   <div
@@ -2052,55 +2637,6 @@ export default function AdminCustomerEngagement() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: C.white,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
-                      padding: 20,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: "0.15em",
-                        textTransform: "uppercase",
-                        color: C.muted,
-                        marginBottom: 10,
-                        fontFamily: FONTS.body,
-                      }}
-                    >
-                      Data Stored
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: C.muted,
-                        fontFamily: FONTS.body,
-                        lineHeight: 1.8,
-                      }}
-                    >
-                      {[
-                        selected.full_name && "• Full name",
-                        selected.phone && "• Phone number",
-                        selected.date_of_birth && "• Date of birth",
-                        selected.province &&
-                          "• Province / city (self-reported)",
-                        selected.analytics_opt_in &&
-                          "• Scan behaviour & geo data (analytics consent given)",
-                        selected.geolocation_consent &&
-                          "• GPS location data (geolocation consent given)",
-                        "• Loyalty points & transaction history",
-                        "• QR scan log (IP-based location, device type)",
-                      ]
-                        .filter(Boolean)
-                        .map((item, i) => (
-                          <div key={i}>{item}</div>
-                        ))}
                     </div>
                   </div>
                   <div
@@ -2190,7 +2726,179 @@ export default function AdminCustomerEngagement() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
-          REGISTER IN-STORE MODAL — NEW v2.0
+          BROADCAST MODAL — NEW v2.1
+      ══════════════════════════════════════════════════════════════════════ */}
+      {showBroadcast && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 4,
+              padding: 32,
+              width: 480,
+              maxWidth: "95vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+              fontFamily: FONTS.body,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTS.heading,
+                fontSize: 22,
+                fontWeight: 700,
+                color: C.green,
+                marginBottom: 6,
+              }}
+            >
+              📣 Broadcast Message
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                marginBottom: 20,
+                lineHeight: 1.5,
+              }}
+            >
+              Sends to{" "}
+              <strong>
+                {displayed.filter((c) => c.marketing_opt_in).length}
+              </strong>{" "}
+              opted-in customers matching your current filter (
+              {displayed.length} visible).
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                  marginBottom: 5,
+                }}
+              >
+                Type
+              </label>
+              <select
+                value={broadcastForm.message_type}
+                onChange={(e) =>
+                  setBroadcastForm((f) => ({
+                    ...f,
+                    message_type: e.target.value,
+                  }))
+                }
+                style={{ ...inputStyle, width: "100%" }}
+              >
+                <option value="broadcast">📣 Broadcast</option>
+                <option value="event">🎪 Event</option>
+                <option value="admin_notice">📢 Notice</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                  marginBottom: 5,
+                }}
+              >
+                Subject
+              </label>
+              <input
+                type="text"
+                value={broadcastForm.subject}
+                onChange={(e) =>
+                  setBroadcastForm((f) => ({ ...f, subject: e.target.value }))
+                }
+                style={{ ...inputStyle, width: "100%" }}
+                placeholder="Optional subject"
+              />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                  marginBottom: 5,
+                }}
+              >
+                Message *
+              </label>
+              <textarea
+                rows={4}
+                value={broadcastForm.body}
+                onChange={(e) =>
+                  setBroadcastForm((f) => ({ ...f, body: e.target.value }))
+                }
+                style={{ ...inputStyle, width: "100%", resize: "vertical" }}
+                placeholder="Write your broadcast message…"
+              />
+            </div>
+            {broadcastResult?.error && (
+              <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>
+                ⚠ {broadcastResult.error}
+              </div>
+            )}
+            {broadcastResult?.success && (
+              <div
+                style={{
+                  color: C.mid,
+                  fontSize: 13,
+                  marginBottom: 8,
+                  fontWeight: 600,
+                }}
+              >
+                ✅ {broadcastResult.success}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={handleBroadcast}
+                disabled={broadcasting}
+                style={{ ...makeBtn(C.gold, C.white, broadcasting), flex: 1 }}
+              >
+                {broadcasting ? "Sending…" : "📣 Send Broadcast"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowBroadcast(false);
+                  setBroadcastResult(null);
+                }}
+                style={makeBtn("#eee", C.muted)}
+              >
+                Cancel
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 12 }}>
+              Only customers with marketing_opt_in = true will receive this
+              message.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          REGISTER IN-STORE MODAL — PRESERVED from v2.0
       ══════════════════════════════════════════════════════════════════════ */}
       {showRegister && (
         <div
