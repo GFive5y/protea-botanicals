@@ -1,6 +1,12 @@
-// src/pages/Account.js — Protea Botanicals v5.9
+// src/pages/Account.js — Protea Botanicals v6.0
 // ============================================================================
-// v5.9 — Two-tier Account Redesign
+// v6.0 — ClientHeader WP-N Integration
+//
+//   CHANGES from v5.9:
+//     - Added ClientHeader variant="light" to all three render branches
+//     - useLocation() reads location.state?.tab for inbox deep-link from drawer
+//     - Removed top padding from AccountView (ClientHeader spacer handles it)
+//     - No other changes — all v5.9 functionality preserved
 //
 //   TIER 1 — My Details (always accessible)
 //     Simple order-focused form: name, phone, delivery address
@@ -18,19 +24,13 @@
 //     Floating ⚙ button bottom-right
 //
 //   TABS: Details | Earn Rewards | Inbox | Activity
-//
-//   PRESERVED from v5.8:
-//     - ensureProfile(), session check, doRedirect()
-//     - Login/signup form (unchanged)
-//     - forceSignOut, spinner flow
-//     - CustomerInbox component import
-//     - All loyalty transaction/scan data loading
 // ============================================================================
 
 import { useState, useEffect, useContext, useRef, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { RoleContext } from "../App";
+import ClientHeader from "../components/ClientHeader";
 import CustomerInbox, {
   getInboxUnreadCount,
 } from "../components/CustomerInbox";
@@ -548,11 +548,6 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
     }
     // Award points for phone verification
     const ptsToAward = config.phone_verified?.points || 50;
-    await supabase
-      .from("user_profiles")
-      .update({ loyalty_points: supabase.rpc ? undefined : undefined })
-      .eq("id", userId);
-    // Use RPC or manual fetch for points increment
     const { data: currentProfile } = await supabase
       .from("user_profiles")
       .select("loyalty_points")
@@ -831,7 +826,6 @@ function RewardField({ fieldKey, config, profile, onSave }) {
   const cfg = config[fieldKey];
   if (!cfg) return null;
 
-  // Determine if this field is already filled
   const getFieldValue = () => {
     switch (fieldKey) {
       case "date_of_birth":
@@ -963,7 +957,7 @@ function RewardField({ fieldKey, config, profile, onSave }) {
       case "geolocation_consent":
       case "marketing_opt_in":
       case "analytics_opt_in":
-        return null; // handled as toggle, no input needed
+        return null;
       default:
         return (
           <input
@@ -1002,7 +996,6 @@ function RewardField({ fieldKey, config, profile, onSave }) {
           flexWrap: "wrap",
         }}
       >
-        {/* Icon + Label */}
         <div style={{ fontSize: 24, flexShrink: 0, marginTop: 2 }}>
           {cfg.icon}
         </div>
@@ -1050,7 +1043,6 @@ function RewardField({ fieldKey, config, profile, onSave }) {
           )}
         </div>
 
-        {/* Action */}
         <div
           style={{
             display: "flex",
@@ -1142,8 +1134,9 @@ function AccountView({
   onProfileUpdate,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState(initialProfile || {});
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState(location.state?.tab || "details");
   const [config, setConfig] = useState(loadConfig);
   const [showConfig, setShowConfig] = useState(false);
   const [inboxUnread, setInboxUnread] = useState(0);
@@ -1276,7 +1269,6 @@ function AccountView({
 
   const tier = getTier(profile.loyalty_points || 0);
 
-  // Earned vs possible for Earn tab
   const rewardFields = Object.keys(config).filter(
     (k) => k !== "phone_verified",
   );
@@ -1331,14 +1323,13 @@ function AccountView({
     { id: "activity", label: "📱 Activity" },
   ];
 
-  // ── STYLES ──────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
         minHeight: "100vh",
         background: C.cream,
         fontFamily: F.body,
-        padding: "32px 16px 60px",
+        paddingBottom: 60,
       }}
     >
       <style>{`
@@ -1372,7 +1363,7 @@ function AccountView({
         </div>
       )}
 
-      <div style={{ maxWidth: 660, margin: "0 auto" }}>
+      <div style={{ maxWidth: 660, margin: "0 auto", padding: "32px 16px 0" }}>
         {/* ── HEADER CARD ── */}
         <div
           style={{
@@ -1503,7 +1494,6 @@ function AccountView({
               )}
             </div>
           </div>
-          {/* Tier progress bar */}
           {tier.next && (
             <div
               style={{
@@ -1578,7 +1568,6 @@ function AccountView({
           {/* ══════════════════════════════════════════ DETAILS TAB */}
           {activeTab === "details" && (
             <div className="reward-tab-enter">
-              {/* What this is for */}
               <div
                 style={{
                   background: "#edf7f2",
@@ -1885,7 +1874,6 @@ function AccountView({
                 )}
               </div>
 
-              {/* Edit / Save buttons */}
               {!isEditing ? (
                 <button
                   onClick={() => setDetailsForm({ ...profile })}
@@ -1971,7 +1959,6 @@ function AccountView({
                 />
               ) : (
                 <>
-                  {/* Progress summary */}
                   <div
                     style={{
                       background: C.lightGold,
@@ -2069,7 +2056,6 @@ function AccountView({
                     )}
                   </div>
 
-                  {/* Info */}
                   <div
                     style={{
                       background: C.lightBlue,
@@ -2088,7 +2074,6 @@ function AccountView({
                     parties. You can remove any data at any time.
                   </div>
 
-                  {/* Reward fields */}
                   <div style={{ display: "grid", gap: 8 }}>
                     {rewardFields.map((k) => (
                       <RewardField
@@ -2118,7 +2103,6 @@ function AccountView({
           {/* ══════════════════════════════════════════ ACTIVITY TAB */}
           {activeTab === "activity" && (
             <div className="reward-tab-enter">
-              {/* Stats */}
               <div
                 style={{
                   display: "grid",
@@ -2222,7 +2206,6 @@ function AccountView({
                 </div>
               ) : (
                 <>
-                  {/* Geo summary */}
                   {scanHistory.some((sc) => sc.ip_city || sc.ip_province) && (
                     <div
                       style={{
@@ -2641,344 +2624,353 @@ export default function Account() {
   // ── Spinner ──────────────────────────────────────────────────────────────────
   if (checkingSession)
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#faf9f6",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: F.body,
-        }}
-      >
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <>
+        <ClientHeader variant="light" />
         <div
           style={{
-            width: 32,
-            height: 32,
-            border: "3px solid #e0dbd2",
-            borderTopColor: "#1b4332",
-            borderRadius: "50%",
-            animation: "spin .8s linear infinite",
+            minHeight: "100vh",
+            background: "#faf9f6",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: F.body,
           }}
-        />
-        <p style={{ color: "#888", marginTop: 16, fontSize: 13 }}>
-          Checking session…
-        </p>
-        {showForceLogout && (
-          <div style={{ marginTop: 20, textAlign: "center" }}>
-            <p style={{ color: "#888", fontSize: 12, marginBottom: 12 }}>
-              Taking too long?
-            </p>
-            <button
-              onClick={handleForceSignOut}
-              style={{
-                background: "#c0392b",
-                color: "#fff",
-                border: "none",
-                borderRadius: 2,
-                padding: "10px 24px",
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                fontFamily: F.body,
-                cursor: "pointer",
-              }}
-            >
-              Force Sign Out &amp; Reset
-            </button>
-          </div>
-        )}
-      </div>
+        >
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              border: "3px solid #e0dbd2",
+              borderTopColor: "#1b4332",
+              borderRadius: "50%",
+              animation: "spin .8s linear infinite",
+            }}
+          />
+          <p style={{ color: "#888", marginTop: 16, fontSize: 13 }}>
+            Checking session…
+          </p>
+          {showForceLogout && (
+            <div style={{ marginTop: 20, textAlign: "center" }}>
+              <p style={{ color: "#888", fontSize: 12, marginBottom: 12 }}>
+                Taking too long?
+              </p>
+              <button
+                onClick={handleForceSignOut}
+                style={{
+                  background: "#c0392b",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 2,
+                  padding: "10px 24px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  fontFamily: F.body,
+                  cursor: "pointer",
+                }}
+              >
+                Force Sign Out &amp; Reset
+              </button>
+            </div>
+          )}
+        </div>
+      </>
     );
 
   // ── Logged-in account view ────────────────────────────────────────────────────
   if (loggedInUser)
     return (
-      <AccountView
-        user={loggedInUser}
-        profile={loggedInProfile}
-        role={loggedInRole}
-        onSignOut={handleSignOut}
-        onProfileUpdate={(updated) => setLoggedInProfile(updated)}
-      />
+      <>
+        <ClientHeader variant="light" />
+        <AccountView
+          user={loggedInUser}
+          profile={loggedInProfile}
+          role={loggedInRole}
+          onSignOut={handleSignOut}
+          onProfileUpdate={(updated) => setLoggedInProfile(updated)}
+        />
+      </>
     );
 
   // ── Login / Sign Up ───────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#faf9f6",
-        fontFamily: F.body,
-        padding: "40px 20px",
-        maxWidth: 480,
-        margin: "0 auto",
-      }}
-    >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`}</style>
-      {returnUrl && (
-        <div
-          style={{
-            background: "#e8f5e9",
-            border: "1px solid #52b788",
-            borderRadius: 8,
-            padding: "14px 20px",
-            marginBottom: 24,
-            fontSize: 14,
-            color: "#1b4332",
-          }}
-        >
-          🔑 Sign in to claim your points — you'll be taken straight back.
-        </div>
-      )}
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: ".35em",
-            textTransform: "uppercase",
-            color: "#52b788",
-            marginBottom: 8,
-          }}
-        >
-          Protea Botanicals
-        </div>
-        <h1
-          style={{
-            fontFamily: F.heading,
-            fontSize: 32,
-            fontWeight: 600,
-            color: "#1a1a1a",
-            margin: 0,
-          }}
-        >
-          Sign In
-        </h1>
-      </div>
-      {error && (
-        <div
-          style={{
-            background: "#fce4ec",
-            border: "1px solid #e0dbd2",
-            borderRadius: 8,
-            padding: "12px 16px",
-            marginBottom: 16,
-            fontSize: 14,
-            color: "#c0392b",
-          }}
-        >
-          {error}
-        </div>
-      )}
-      {message && (
-        <div
-          style={{
-            background: "#e8f5e9",
-            border: "1px solid #52b788",
-            borderRadius: 8,
-            padding: "12px 16px",
-            marginBottom: 16,
-            fontSize: 14,
-            color: "#1b4332",
-          }}
-        >
-          {message}
-        </div>
-      )}
-      <form onSubmit={handleSignIn}>
-        <div style={{ marginBottom: 16 }}>
-          <label
+    <>
+      <ClientHeader variant="light" />
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#faf9f6",
+          fontFamily: F.body,
+          padding: "40px 20px",
+          maxWidth: 480,
+          margin: "0 auto",
+        }}
+      >
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`}</style>
+        {returnUrl && (
+          <div
             style={{
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: ".1em",
-              textTransform: "uppercase",
-              color: "#888",
-              display: "block",
-              marginBottom: 6,
+              background: "#e8f5e9",
+              border: "1px solid #52b788",
+              borderRadius: 8,
+              padding: "14px 20px",
+              marginBottom: 24,
+              fontSize: 14,
+              color: "#1b4332",
             }}
           >
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="your@email.com"
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              border: "1px solid #e0dbd2",
-              borderRadius: 4,
-              fontSize: 15,
-              fontFamily: F.body,
-              background: "#fff",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-        <div style={{ marginBottom: 24 }}>
-          <label
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: ".1em",
-              textTransform: "uppercase",
-              color: "#888",
-              display: "block",
-              marginBottom: 6,
-            }}
-          >
-            Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            placeholder="••••••••"
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              border: "1px solid #e0dbd2",
-              borderRadius: 4,
-              fontSize: 15,
-              fontFamily: F.body,
-              background: "#fff",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            background: loading ? "#888" : "#1b4332",
-            color: "#fff",
-            border: "none",
-            borderRadius: 2,
-            padding: 14,
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: ".2em",
-            textTransform: "uppercase",
-            cursor: loading ? "wait" : "pointer",
-            fontFamily: F.body,
-            marginBottom: 12,
-          }}
-        >
-          {loading ? "Signing In…" : "Sign In"}
-        </button>
-        <button
-          type="button"
-          onClick={handleSignUp}
-          disabled={loading}
-          style={{
-            width: "100%",
-            background: "transparent",
-            color: "#1b4332",
-            border: "1.5px solid #1b4332",
-            borderRadius: 2,
-            padding: 14,
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: ".2em",
-            textTransform: "uppercase",
-            cursor: loading ? "wait" : "pointer",
-            fontFamily: F.body,
-          }}
-        >
-          Create Account
-        </button>
-      </form>
-      {isDev && (
-        <div
-          style={{
-            marginTop: 40,
-            border: "2px solid #e67e22",
-            borderRadius: 8,
-            padding: 20,
-            background: "#fff3e0",
-          }}
-        >
+            🔑 Sign in to claim your points — you'll be taken straight back.
+          </div>
+        )}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div
             style={{
               fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: ".2em",
+              fontWeight: 600,
+              letterSpacing: ".35em",
               textTransform: "uppercase",
-              color: "#e67e22",
-              marginBottom: 16,
-              textAlign: "center",
+              color: "#52b788",
+              marginBottom: 8,
             }}
           >
-            ⚠ Dev Test Logins
+            Protea Botanicals
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() =>
-                handleDevLogin("customer@protea.dev", "customer123")
-              }
-              style={{
-                padding: "10px 16px",
-                background: "#1b4332",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: F.body,
-              }}
-            >
-              🛒 Customer → /loyalty
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleDevLogin("admin@protea.dev", "admin123")}
-              style={{
-                padding: "10px 16px",
-                background: "#2c4a6e",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: F.body,
-              }}
-            >
-              🔧 Admin → /admin
-            </button>
-          </div>
+          <h1
+            style={{
+              fontFamily: F.heading,
+              fontSize: 32,
+              fontWeight: 600,
+              color: "#1a1a1a",
+              margin: 0,
+            }}
+          >
+            Sign In
+          </h1>
         </div>
-      )}
-      <div style={{ marginTop: 32, textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#888",
-            fontSize: 13,
-            cursor: "pointer",
-            textDecoration: "underline",
-            fontFamily: F.body,
-          }}
-        >
-          Sign out of current session
-        </button>
+        {error && (
+          <div
+            style={{
+              background: "#fce4ec",
+              border: "1px solid #e0dbd2",
+              borderRadius: 8,
+              padding: "12px 16px",
+              marginBottom: 16,
+              fontSize: 14,
+              color: "#c0392b",
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {message && (
+          <div
+            style={{
+              background: "#e8f5e9",
+              border: "1px solid #52b788",
+              borderRadius: 8,
+              padding: "12px 16px",
+              marginBottom: 16,
+              fontSize: 14,
+              color: "#1b4332",
+            }}
+          >
+            {message}
+          </div>
+        )}
+        <form onSubmit={handleSignIn}>
+          <div style={{ marginBottom: 16 }}>
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                letterSpacing: ".1em",
+                textTransform: "uppercase",
+                color: "#888",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="your@email.com"
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                border: "1px solid #e0dbd2",
+                borderRadius: 4,
+                fontSize: 15,
+                fontFamily: F.body,
+                background: "#fff",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                letterSpacing: ".1em",
+                textTransform: "uppercase",
+                color: "#888",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                border: "1px solid #e0dbd2",
+                borderRadius: 4,
+                fontSize: 15,
+                fontFamily: F.body,
+                background: "#fff",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%",
+              background: loading ? "#888" : "#1b4332",
+              color: "#fff",
+              border: "none",
+              borderRadius: 2,
+              padding: 14,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: ".2em",
+              textTransform: "uppercase",
+              cursor: loading ? "wait" : "pointer",
+              fontFamily: F.body,
+              marginBottom: 12,
+            }}
+          >
+            {loading ? "Signing In…" : "Sign In"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSignUp}
+            disabled={loading}
+            style={{
+              width: "100%",
+              background: "transparent",
+              color: "#1b4332",
+              border: "1.5px solid #1b4332",
+              borderRadius: 2,
+              padding: 14,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: ".2em",
+              textTransform: "uppercase",
+              cursor: loading ? "wait" : "pointer",
+              fontFamily: F.body,
+            }}
+          >
+            Create Account
+          </button>
+        </form>
+        {isDev && (
+          <div
+            style={{
+              marginTop: 40,
+              border: "2px solid #e67e22",
+              borderRadius: 8,
+              padding: 20,
+              background: "#fff3e0",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: ".2em",
+                textTransform: "uppercase",
+                color: "#e67e22",
+                marginBottom: 16,
+                textAlign: "center",
+              }}
+            >
+              ⚠ Dev Test Logins
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() =>
+                  handleDevLogin("customer@protea.dev", "customer123")
+                }
+                style={{
+                  padding: "10px 16px",
+                  background: "#1b4332",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: F.body,
+                }}
+              >
+                🛒 Customer → /loyalty
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => handleDevLogin("admin@protea.dev", "admin123")}
+                style={{
+                  padding: "10px 16px",
+                  background: "#2c4a6e",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: F.body,
+                }}
+              >
+                🔧 Admin → /admin
+              </button>
+            </div>
+          </div>
+        )}
+        <div style={{ marginTop: 32, textAlign: "center" }}>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#888",
+              fontSize: 13,
+              cursor: "pointer",
+              textDecoration: "underline",
+              fontFamily: F.body,
+            }}
+          >
+            Sign out of current session
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

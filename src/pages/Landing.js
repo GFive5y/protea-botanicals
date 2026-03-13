@@ -1,19 +1,13 @@
-// src/pages/Landing.js v6.0
+// src/pages/Landing.js v6.1
 // ============================================================================
-// v6.0: Inbox-aware header + avatar dropdown (DEC-025)
-//   - Logged-in header: avatar circle → dropdown menu with:
-//       My Account → /account
-//       My Loyalty → /loyalty
-//       Inbox      → /account#inbox  (with unread count badge if > 0)
-//       Sign Out
-//   - Guest header: unchanged — "Sign In" button → /account
-//   - Inbox unread count fetched on session load via getInboxUnreadCount()
-//   - Avatar shows first initial of email or full_name
-//   - Dropdown closes on outside click or Escape key
-//   - Zero impact on desktop or mobile layout beyond the header button
+// v6.1: WP-N — Replaced manual floating header with <ClientHeader variant="transparent" />.
+//       Removed: isLoggedIn, userInitial, inboxUnread, dropdownOpen, currentUserId states.
+//       Removed: auth/inbox/dropdown/scroll useEffects, handleSignOut, dropdownRef, cardsRef.
+//       Removed: getInboxUnreadCount import.
+//       All page content, fonts, colours, sections, footer unchanged from v6.0.
 //
-// v5.9: WP-J Mobile Responsiveness — 375px pass (landing-header, landing-video,
-//       landing-section, landing-hero-desc media-query classes)
+// v6.0: Inbox-aware header + avatar dropdown (DEC-025)
+// v5.9: WP-J Mobile Responsiveness — 375px pass
 // v5.8: TerpeneModal overlay fix (DEC-024)
 // v5.7: Header hide-on-scroll
 // v5.6: Terpene entourage eyebrow label
@@ -24,14 +18,13 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useContext, useRef } from "react";
 import { RoleContext } from "../App";
-import { supabase } from "../services/supabaseClient";
 import AgeGate from "../components/AgeGate";
 import PromoBanner from "../components/PromoBanner";
 import MoleculePulse from "../components/MoleculePulse";
 import MoleculeModal from "../components/MoleculeModal";
 import TerpeneCarousel from "../components/TerpeneCarousel";
 import TerpeneModal, { TERPENES } from "../components/TerpeneModal";
-import { getInboxUnreadCount } from "../components/CustomerInbox";
+import ClientHeader from "../components/ClientHeader";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -39,118 +32,12 @@ export default function Landing() {
   const promo = searchParams.get("promo");
   const ctx = useContext(RoleContext);
   const role = typeof ctx === "string" ? ctx : ctx?.role || null; // eslint-disable-line no-unused-vars
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInitial, setUserInitial] = useState("?");
-  const [inboxUnread, setInboxUnread] = useState(0);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState(null);
 
   const [modalMolId, setModalMolId] = useState(null);
   const [activeTerp, setActiveTerp] = useState(null);
-  const [scrolled, setScrolled] = useState(false);
-  const [headerVisible, setHeaderVisible] = useState(true);
-  const cardsRef = useRef(null);
-  const dropdownRef = useRef(null);
   const [, setVisibleSections] = useState({});
 
-  // ── Auth + inbox unread ────────────────────────────────────────────────────
-  useEffect(() => {
-    const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        setIsLoggedIn(true);
-        setCurrentUserId(session.user.id);
-        const name =
-          session.user.user_metadata?.full_name || session.user.email || "";
-        setUserInitial((name[0] || "?").toUpperCase());
-        const unread = await getInboxUnreadCount(session.user.id);
-        setInboxUnread(unread);
-      }
-    };
-    init();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_e, session) => {
-      if (session?.user) {
-        setIsLoggedIn(true);
-        setCurrentUserId(session.user.id);
-        const name =
-          session.user.user_metadata?.full_name || session.user.email || "";
-        setUserInitial((name[0] || "?").toUpperCase());
-        const unread = await getInboxUnreadCount(session.user.id);
-        setInboxUnread(unread);
-      } else {
-        setIsLoggedIn(false);
-        setCurrentUserId(null);
-        setInboxUnread(0);
-        setUserInitial("?");
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // ── Close dropdown on outside click / Escape ──────────────────────────────
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
-    };
-    const handleKey = (e) => {
-      if (e.key === "Escape") setDropdownOpen(false);
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, []);
-
-  // ── Realtime inbox updates while on Landing ───────────────────────────────
-  useEffect(() => {
-    if (!currentUserId) return;
-    const sub = supabase
-      .channel(`landing-inbox-${currentUserId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "customer_messages",
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        async () => {
-          const n = await getInboxUnreadCount(currentUserId);
-          setInboxUnread(n);
-        },
-      )
-      .subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [currentUserId]);
-
-  // ── Scroll hide/show header (preserved v5.7) ──────────────────────────────
-  useEffect(() => {
-    let lastY = window.scrollY;
-    const handleScroll = () => {
-      const y = window.scrollY;
-      setScrolled(y > 50);
-      const threshold = cardsRef.current
-        ? cardsRef.current.getBoundingClientRect().top + y - 52
-        : 9999;
-      if (y > threshold) {
-        setHeaderVisible(y < lastY);
-      } else {
-        setHeaderVisible(true);
-      }
-      lastY = y;
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
+  // ── Section reveal observer ───────────────────────────────────────────────
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -164,15 +51,6 @@ export default function Landing() {
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
-
-  // ── Sign out from dropdown ────────────────────────────────────────────────
-  const handleSignOut = async () => {
-    setDropdownOpen(false);
-    await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setCurrentUserId(null);
-    setInboxUnread(0);
-  };
 
   const cards = [
     {
@@ -388,14 +266,9 @@ export default function Landing() {
         .grain { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0.025; z-index: 999; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); }
         .hero-leaf { animation: sway 6s ease-in-out infinite; }
         @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
-        .signin-btn:hover { background: rgba(255,255,255,0.15) !important; }
-        .avatar-btn { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .avatar-btn:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-        .dropdown-item:hover { background: #f0f0f0 !important; }
 
         /* ── WP-J: Mobile Responsiveness ─────────────────────────────────── */
         @media (max-width: 600px) {
-          .landing-header { padding: 0 16px !important; }
           .landing-video { height: 300px !important; }
           .landing-section { padding: 56px 20px !important; }
           .landing-hero-desc { margin-bottom: 40px !important; }
@@ -405,222 +278,10 @@ export default function Landing() {
         <div className="grain" />
         <PromoBanner promo={promo} onNavigate={navigate} />
 
-        {/* ── Floating header — v6.0: avatar dropdown for logged-in ── */}
-        <header
-          className="landing-header"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1000,
-            background: scrolled ? "rgba(27,67,50,0.95)" : "rgba(27,67,50,0.0)",
-            backdropFilter: scrolled ? "blur(8px)" : "none",
-            height: "52px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 28px",
-            transform: headerVisible ? "translateY(0)" : "translateY(-100%)",
-            transition:
-              "background 0.4s ease, backdrop-filter 0.4s ease, transform 0.35s ease",
-            borderBottom: scrolled ? "1px solid rgba(82,183,136,0.15)" : "none",
-          }}
-        >
-          <span
-            className="landing-font"
-            style={{
-              fontSize: "15px",
-              color: scrolled ? "#faf9f6" : "#1a1a1a",
-              letterSpacing: "0.2em",
-              opacity: scrolled ? 1 : 0.85,
-              transition: "opacity 0.4s ease, color 0.4s ease",
-            }}
-          >
-            PROTEA{" "}
-            <span style={{ color: scrolled ? "#52b788" : "#2d6a4f" }}>
-              BOTANICALS
-            </span>
-          </span>
+        {/* ── WP-N: Unified header — transparent over hero, green on scroll ── */}
+        <ClientHeader variant="transparent" />
 
-          {/* ── v6.0: Logged-in avatar dropdown / Guest sign-in button ── */}
-          {isLoggedIn ? (
-            <div ref={dropdownRef} style={{ position: "relative" }}>
-              {/* Avatar button */}
-              <button
-                className="avatar-btn"
-                onClick={() => setDropdownOpen((o) => !o)}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "50%",
-                  background: scrolled ? "rgba(82,183,136,0.8)" : "#2d6a4f",
-                  border: scrolled
-                    ? "2px solid rgba(255,255,255,0.5)"
-                    : "2px solid #52b788",
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  fontFamily: "'Jost',sans-serif",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "relative",
-                }}
-                aria-label="Account menu"
-              >
-                {userInitial}
-                {inboxUnread > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: -4,
-                      right: -4,
-                      background: "#c0392b",
-                      color: "#fff",
-                      width: 16,
-                      height: 16,
-                      borderRadius: "50%",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "'Jost',sans-serif",
-                      border: "2px solid #fff",
-                    }}
-                  >
-                    {inboxUnread > 9 ? "9+" : inboxUnread}
-                  </span>
-                )}
-              </button>
-
-              {/* Dropdown */}
-              {dropdownOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: 0,
-                    background: "#fff",
-                    borderRadius: 4,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                    minWidth: 180,
-                    zIndex: 2000,
-                    overflow: "hidden",
-                    border: "1px solid #e0dbd2",
-                  }}
-                >
-                  {[
-                    { label: "My Account", icon: "👤", path: "/account" },
-                    { label: "My Loyalty", icon: "⭐", path: "/loyalty" },
-                    {
-                      label:
-                        inboxUnread > 0 ? `Inbox (${inboxUnread})` : "Inbox",
-                      icon: inboxUnread > 0 ? "📬" : "📭",
-                      path: "/account",
-                      state: { tab: "inbox" },
-                      badge: inboxUnread > 0,
-                    },
-                  ].map((item) => (
-                    <button
-                      key={item.label}
-                      className="dropdown-item"
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        navigate(
-                          item.path,
-                          item.state ? { state: item.state } : undefined,
-                        );
-                      }}
-                      style={{
-                        width: "100%",
-                        padding: "11px 16px",
-                        background: "none",
-                        border: "none",
-                        textAlign: "left",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        fontFamily: "'Jost',sans-serif",
-                        color: "#1a1a1a",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        borderBottom: "1px solid #f0ebe3",
-                      }}
-                    >
-                      <span>{item.icon}</span>
-                      <span style={{ flex: 1 }}>{item.label}</span>
-                      {item.badge && (
-                        <span
-                          style={{
-                            background: "#c0392b",
-                            color: "#fff",
-                            borderRadius: 10,
-                            fontSize: 9,
-                            fontWeight: 700,
-                            padding: "1px 6px",
-                          }}
-                        >
-                          {inboxUnread}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                  <button
-                    className="dropdown-item"
-                    onClick={handleSignOut}
-                    style={{
-                      width: "100%",
-                      padding: "11px 16px",
-                      background: "none",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      fontFamily: "'Jost',sans-serif",
-                      color: "#c0392b",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
-                  >
-                    <span>🚪</span>
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <button
-              className="signin-btn body-font"
-              onClick={() => navigate("/account")}
-              style={{
-                background: scrolled
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(27,67,50,0.08)",
-                border: scrolled
-                  ? "1px solid rgba(255,255,255,0.3)"
-                  : "1px solid rgba(27,67,50,0.3)",
-                borderRadius: "2px",
-                padding: "6px 16px",
-                color: scrolled ? "#fff" : "#1b4332",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "10px",
-                fontWeight: "500",
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                cursor: "pointer",
-                transition: "background 0.2s, color 0.4s, border-color 0.4s",
-              }}
-            >
-              Sign In
-            </button>
-          )}
-        </header>
-
-        {/* ── HERO ── (preserved from v5.9 — no changes) ── */}
+        {/* ── HERO ── */}
         <section
           style={{
             minHeight: "100vh",
@@ -667,6 +328,7 @@ export default function Landing() {
           >
             ❋
           </div>
+
           <div style={{ marginBottom: "32px", textAlign: "center" }}>
             <svg
               width="80"
@@ -747,6 +409,7 @@ export default function Landing() {
               />
             </svg>
           </div>
+
           <h1
             className="landing-font"
             style={{
@@ -788,6 +451,7 @@ export default function Landing() {
           >
             Premium Botanical Extracts &amp; Lifestyle
           </p>
+
           <div
             style={{
               display: "flex",
@@ -812,6 +476,7 @@ export default function Landing() {
               }}
             />
           </div>
+
           <p
             className="body-font landing-hero-desc"
             style={{
@@ -829,8 +494,8 @@ export default function Landing() {
             products available in South Africa. Every product is lab-certified,
             QR-verified and crafted with intention.
           </p>
+
           <div
-            ref={cardsRef}
             style={{
               display: "flex",
               gap: "24px",
@@ -940,6 +605,7 @@ export default function Landing() {
               </div>
             ))}
           </div>
+
           <div
             className="scroll-indicator"
             style={{
