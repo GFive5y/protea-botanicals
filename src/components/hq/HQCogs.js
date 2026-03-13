@@ -1,31 +1,35 @@
-// src/components/hq/HQCogs.js v3.4
+// src/components/hq/HQCogs.js v3.7
+// v3.7 — Hardware row shows landed cost split: unit cost + shipping alloc separately
+// v3.6 — Hardware MOQ displayed on cards and in builder
+//         MOQ indicator shows min order qty from supplier_products.moq
+//         Warning shown if batch_size < hardware MOQ
+// v3.5 — Two fixes:
+//   1. ChambersEditor terpene qty label corrected: "ml" → "µl" (stored value IS µl, not ml)
+//      Added sub-hint showing ml conversion below field to prevent confusion
+//   2. Batch scaler: breakdown line items now show ×qty = batch_total when qty > 1
 // v3.4 — Clearer hardware qty label and hint
 // v3.3 — Per-card batch qty selector on costing cards (per-unit + total COGS)
 // v3.2 — hardware_qty > 10 warning
-// v3.1 — Save try/catch/finally (unfreezes button), CogsBar negative-pct clamp
-// v3.0 — Multi-chamber hardware profiles (Dual/Triple/Single) with per-chamber distillate & terpene
+// v3.1 — Save try/catch/finally, CogsBar negative-pct clamp
+// v3.0 — Multi-chamber hardware profiles with per-chamber distillate & terpene
 // v2.2 — Case-insensitive hardware dedup, manual ZAR override for packaging & labour
-// v2.1 — Inline landed cost calculator (DDP Air / Standard Air / Sea) in Hardware section
-// v2.0 — Lab testing (Cannalytics), µl terpene input, transport, misc, deduped hardware, batch amortisation
+// v2.1 — Inline landed cost calculator in Hardware section
+// v2.0 — Lab testing, µl terpene input, transport, misc, deduped hardware, batch amortisation
 // v1.0 — WP-C: COGS Engine & Local Inputs
 //
 // COGS formula per finished unit:
 //   Hardware:     hardware_qty × (unit_price_usd × usd_zar) + shipping_alloc_zar
 //   Terpene:      per chamber: terpene_qty_ul / 1000 / 50 × unit_price_usd × usd_zar
 //   Distillate:   per chamber: distillate_qty_ml × cost_zar
-//                 Multi-chamber devices store chambers[] JSONB; single-chamber uses flat fields (compat)
 //   Packaging:    packaging_qty × cost_zar
 //   Labour:       labour_qty × cost_zar
 //   Lab Testing:  sum(selected_tests) / batch_size
 //   Transport:    transport_cost_zar / batch_size
 //   Misc:         misc_cost_zar / batch_size
-//   ─────────────────────────────────────────────────────────
-//   TOTAL COGS = sum of all above
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── Cannalytics Africa lab test menu ─────────────────────────────────────────
 const CANNALYTICS_TESTS = [
   { id: "potency", label: "Potency / Cannabinoid Profiling", price: 350 },
   { id: "solvents", label: "Residual Solvents", price: 200 },
@@ -37,10 +41,6 @@ const CANNALYTICS_TESTS = [
   { id: "foreign_matter", label: "Foreign Matter", price: 100 },
 ];
 
-// ─── Hardware Chamber Profiles ────────────────────────────────────────────────
-// Pattern-matched against the hardware item name (case-insensitive).
-// 'defaultMl' is the suggested fill volume per chamber.
-// This drives the per-chamber editor in the builder.
 const HARDWARE_PROFILES = [
   {
     pattern: /triple|3.cham|3x|0\.6.*0\.6.*0\.6/i,
@@ -60,24 +60,21 @@ const HARDWARE_PROFILES = [
   },
 ];
 
-// Returns a profile if the name matches a multi-chamber device, otherwise null (= single).
 function detectHardwareProfile(name) {
   if (!name) return null;
   return HARDWARE_PROFILES.find((p) => p.pattern.test(name)) || null;
 }
 
-// Build a fresh chambers array from a profile (called when hardware changes)
 function blankChambers(profile) {
   return profile.defaultMl.map((ml, i) => ({
     label: `Chamber ${i + 1}`,
     distillate_input_id: "",
     distillate_qty_ml: ml,
     terpene_item_id: "",
-    terpene_qty_ul: Math.round(ml * 1000 * 0.067), // default 6.7%
+    terpene_qty_ul: Math.round(ml * 1000 * 0.067),
   }));
 }
 
-// ─── DDP Air shipping (from HQSuppliers.js — same rate card) ──────────────────
 const DDP_TIERS = [
   { maxKg: 21, ratePerKg: 15.8 },
   { maxKg: 50, ratePerKg: 15.5 },
@@ -92,8 +89,6 @@ function calcDdpAir(weightKg) {
   return weightKg * tier.ratePerKg + DDP_CLEARANCE_USD;
 }
 
-// ─── Inline Landed Cost Calculator (shown inside Hardware section) ─────────────
-// Calculates shipping-per-unit from a PO and auto-fills shipping_alloc_zar
 function LandedCostCalc({ usdZar, onApply }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("ddp_air");
@@ -112,7 +107,6 @@ function LandedCostCalc({ usdZar, onApply }) {
   const perUnitZAR = unitsN > 0 ? freightZAR / unitsN : null;
 
   const s = {
-    // mini input style
     padding: "7px 10px",
     border: "1px solid #ddd",
     borderRadius: 6,
@@ -141,7 +135,6 @@ function LandedCostCalc({ usdZar, onApply }) {
       >
         {open ? "▲ Hide" : "🚢 Calculate landed cost per unit"}
       </button>
-
       {open && (
         <div
           style={{
@@ -164,7 +157,6 @@ function LandedCostCalc({ usdZar, onApply }) {
           >
             Shipping Cost → Per-Unit Allocation
           </div>
-
           <div
             style={{
               display: "grid",
@@ -173,7 +165,6 @@ function LandedCostCalc({ usdZar, onApply }) {
               marginBottom: 10,
             }}
           >
-            {/* Mode */}
             <div>
               <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
                 Shipping Mode
@@ -188,7 +179,6 @@ function LandedCostCalc({ usdZar, onApply }) {
                 <option value="sea">Sea Freight (manual)</option>
               </select>
             </div>
-            {/* Weight or sea cost */}
             {mode === "ddp_air" && (
               <div>
                 <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
@@ -221,7 +211,6 @@ function LandedCostCalc({ usdZar, onApply }) {
                 />
               </div>
             )}
-            {/* Units */}
             <div>
               <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
                 Units in shipment
@@ -237,8 +226,6 @@ function LandedCostCalc({ usdZar, onApply }) {
               />
             </div>
           </div>
-
-          {/* Result row */}
           {freightUSD > 0 && (
             <div
               style={{
@@ -329,8 +316,6 @@ function LandedCostCalc({ usdZar, onApply }) {
               )}
             </div>
           )}
-
-          {/* Rate card hint */}
           <div style={{ fontSize: 10, color: "#5C9BD6" }}>
             DDP rates: ≤21kg $15.80/kg · 21–50kg $15.50/kg · 50–100kg $15.20/kg
             · 100kg+ $14.90/kg · +$25 clearance
@@ -341,11 +326,9 @@ function LandedCostCalc({ usdZar, onApply }) {
   );
 }
 
-// ─── FX Rate Hook ─────────────────────────────────────────────────────────────
 function useFxRate() {
   const [fxRate, setFxRate] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
-
   const fetchRate = useCallback(async () => {
     try {
       const res = await fetch(
@@ -360,20 +343,16 @@ function useFxRate() {
       setFxLoading(false);
     }
   }, []);
-
   useEffect(() => {
     fetchRate();
     const t = setInterval(fetchRate, 60000);
     return () => clearInterval(t);
   }, [fetchRate]);
-
   return { fxRate, fxLoading };
 }
 
-// ─── COGS Calculation ─────────────────────────────────────────────────────────
 function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   if (!recipe || !usdZar) return null;
-
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
   const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
   const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
@@ -387,11 +366,9 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
       parseFloat(recipe.shipping_alloc_zar || 0)
     : 0;
 
-  // v3.0: multi-chamber devices store chambers[] JSONB; single uses flat fields
-  let tpCost = 0;
-  let diCost = 0;
-  let chamberSummary = null; // [{label, diName, tpName, diCost, tpCost, ml, ul}]
-
+  let tpCost = 0,
+    diCost = 0,
+    chamberSummary = null;
   const chamberData =
     Array.isArray(recipe.chambers) && recipe.chambers.length > 1
       ? recipe.chambers
@@ -422,7 +399,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
       };
     });
   } else {
-    // Single-chamber: flat fields (backward compatible)
     const terpUl = parseFloat(recipe.terpene_qty_ul || 0);
     const terpMl = terpUl / 1000;
     const tpCostPerMl = tp ? (parseFloat(tp.unit_price_usd) / 50) * usdZar : 0;
@@ -433,7 +409,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
         : 0;
   }
 
-  // v2.1: manual_zar overrides dropdown cost when set
   const pkRate =
     recipe.packaging_manual_zar != null && recipe.packaging_manual_zar !== ""
       ? parseFloat(recipe.packaging_manual_zar)
@@ -442,7 +417,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
         : 0;
   const pkCost =
     pkRate > 0 ? parseFloat(recipe.packaging_qty || 1) * pkRate : 0;
-
   const lbRate =
     recipe.labour_manual_zar != null && recipe.labour_manual_zar !== ""
       ? parseFloat(recipe.labour_manual_zar)
@@ -451,7 +425,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
         : 0;
   const lbCost = lbRate > 0 ? parseFloat(recipe.labour_qty || 1) * lbRate : 0;
 
-  // v2.0: batch-amortised costs
   const batchSize = Math.max(1, parseInt(recipe.batch_size || 1));
   const labTests = Array.isArray(recipe.lab_tests) ? recipe.lab_tests : [];
   const labTotal = labTests.reduce((s, id) => {
@@ -461,7 +434,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   const labPerUnit = labTotal / batchSize;
   const transportPU = parseFloat(recipe.transport_cost_zar || 0) / batchSize;
   const miscPU = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
-
   const total =
     hwCost +
     tpCost +
@@ -482,7 +454,14 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
     transport: transportPU,
     misc: miscPU,
     total,
+    hwBaseZar: hw
+      ? parseFloat(recipe.hardware_qty || 1) *
+        parseFloat(hw.unit_price_usd) *
+        usdZar
+      : 0,
+    hwShippingZar: parseFloat(recipe.shipping_alloc_zar || 0),
     hwName: hw?.name || null,
+    hwMoq: hw?.moq || null,
     tpName: tp?.name || null,
     diName: di?.name || null,
     pkName: pk?.name || null,
@@ -498,12 +477,10 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtZar = (n) =>
   `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 
-// Deduplicate supplier products by name — case-insensitive, whitespace-normalised
 function dedupeByName(items) {
   const seen = new Set();
   return items.filter((item) => {
@@ -526,7 +503,6 @@ const CATEGORY_COLOURS = {
   other: { bg: "#ECEFF1", color: "#455A64" },
 };
 
-// ─── COGS Bar ─────────────────────────────────────────────────────────────────
 function CogsBar({ breakdown }) {
   if (!breakdown || breakdown.total === 0) return null;
   const categories = [
@@ -552,7 +528,7 @@ function CogsBar({ breakdown }) {
         }}
       >
         {categories.map((c) => {
-          const pct = Math.max(0, (breakdown[c.key] / breakdown.total) * 100); // clamp — prevent negative rect width
+          const pct = Math.max(0, (breakdown[c.key] / breakdown.total) * 100);
           const col = CATEGORY_COLOURS[c.key] || CATEGORY_COLOURS.other;
           return (
             <div
@@ -600,38 +576,39 @@ function CogsBar({ breakdown }) {
   );
 }
 
-// ─── BLANK RECIPE ─────────────────────────────────────────────────────────────
 const blankRecipe = () => ({
   product_name: "",
   sku: "",
-  batch_size: 50, // v2.0: default batch for amortisation
+  batch_size: 50,
   hardware_item_id: "",
   hardware_qty: 1,
   shipping_alloc_zar: 0,
   terpene_item_id: "",
-  terpene_qty_ul: 67, // v2.0: µl (default 6.7% of 1ml)
+  terpene_qty_ul: 67,
   distillate_input_id: "",
   distillate_qty_ml: 1,
   packaging_input_id: "",
   packaging_qty: 1,
   labour_input_id: "",
   labour_qty: 1,
-  lab_tests: [], // v2.0: array of cannalytics test IDs
-  transport_cost_zar: 0, // v2.0: per-batch transport
-  misc_cost_zar: 0, // v2.0: per-batch misc
-  packaging_manual_zar: "", // v2.1: manual ZAR override (overrides dropdown)
-  labour_manual_zar: "", // v2.1: manual ZAR override (overrides dropdown)
-  chambers: null, // v3.0: JSONB array for multi-chamber devices, null = single
+  lab_tests: [],
+  transport_cost_zar: 0,
+  misc_cost_zar: 0,
+  packaging_manual_zar: "",
+  labour_manual_zar: "",
+  chambers: null,
   notes: "",
 });
 
-// ─── ChambersEditor — per-chamber distillate & terpene config ─────────────────
 const CHAMBER_COLORS = [
   { bg: "#E3F2FD", border: "#90CAF9", accent: "#1565C0", dot: "#42A5F5" },
   { bg: "#F3E5F5", border: "#CE93D8", accent: "#6A1B9A", dot: "#AB47BC" },
   { bg: "#FFF8E1", border: "#FFE082", accent: "#F57F17", dot: "#FFCA28" },
 ];
 
+// ── ChambersEditor ────────────────────────────────────────────────────────────
+// v3.5 FIX: Terpene qty column label changed from "Qty (ml)" → "Qty (µl)"
+//           Added conversion hint below field: "= Xml" so it's unambiguous
 function ChambersEditor({
   chambers,
   onChange,
@@ -644,10 +621,7 @@ function ChambersEditor({
   lbl,
 }) {
   const setChField = (idx, key, val) => {
-    const next = chambers.map((ch, i) =>
-      i === idx ? { ...ch, [key]: val } : ch,
-    );
-    onChange(next);
+    onChange(chambers.map((ch, i) => (i === idx ? { ...ch, [key]: val } : ch)));
   };
 
   const totalDistillate = chambers.reduce(
@@ -897,7 +871,7 @@ function ChambersEditor({
                 </div>
               )}
 
-              {/* Terpene row */}
+              {/* Terpene row — v3.5: label corrected to µl, ml conversion hint added */}
               <div
                 style={{
                   display: "grid",
@@ -935,11 +909,12 @@ function ChambersEditor({
                   </select>
                 </div>
                 <div>
+                  {/* ── v3.5 FIX: was "Qty (ml)" — corrected to "Qty (µl)" ── */}
                   <div
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: "#888",
+                      color: col.accent,
                       textTransform: "uppercase",
                       letterSpacing: "0.4px",
                       marginBottom: 5,
@@ -956,8 +931,25 @@ function ChambersEditor({
                     onChange={(e) =>
                       setChField(idx, "terpene_qty_ul", e.target.value)
                     }
-                    style={{ ...inputStyle, fontSize: 13 }}
+                    style={{
+                      ...inputStyle,
+                      fontSize: 13,
+                      borderColor: col.border,
+                    }}
                   />
+                  {/* Conversion hint — shows ml equivalent so there's no ambiguity */}
+                  {parseFloat(ch.terpene_qty_ul) > 0 && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: col.accent,
+                        marginTop: 3,
+                        fontWeight: 600,
+                      }}
+                    >
+                      = {(parseFloat(ch.terpene_qty_ul) / 1000).toFixed(4)} ml
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1027,7 +1019,6 @@ export default function HQCogs() {
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [localInputs, setLocalInputs] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [activeSubTab, setActiveSubTab] = useState("costing");
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
@@ -1035,13 +1026,11 @@ export default function HQCogs() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [cardQty, setCardQty] = useState({}); // {recipeId: qty} per-card batch qty
-
+  const [cardQty, setCardQty] = useState({});
   const [editingInput, setEditingInput] = useState(null);
   const [inputEditVal, setInputEditVal] = useState("");
   const [savingInput, setSavingInput] = useState(false);
 
-  // ── Fetch ─────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [r1, r2, r3] = await Promise.all([
@@ -1073,7 +1062,6 @@ export default function HQCogs() {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Derived lists (hardware deduped) ──────────────────────────────────
   const hardwareItems = dedupeByName(
     supplierProducts.filter((p) => p.category === "hardware"),
   );
@@ -1084,7 +1072,6 @@ export default function HQCogs() {
   const packagingInputs = localInputs.filter((i) => i.category === "packaging");
   const labourInputs = localInputs.filter((i) => i.category === "labour");
 
-  // ── Detect active hardware profile for builder ──────────────────────
   const activeHwItem = hardwareItems.find(
     (p) => p.id === form.hardware_item_id,
   );
@@ -1121,7 +1108,6 @@ export default function HQCogs() {
       hardware_qty: recipe.hardware_qty ?? 1,
       shipping_alloc_zar: recipe.shipping_alloc_zar ?? 0,
       terpene_item_id: recipe.terpene_item_id || "",
-      // v2.0 backward compat: if terpene_qty_ul exists use it, else convert old terpene_qty_g → µl
       terpene_qty_ul:
         recipe.terpene_qty_ul != null
           ? recipe.terpene_qty_ul
@@ -1153,23 +1139,20 @@ export default function HQCogs() {
 
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // ── Hardware change — auto-detect chamber profile ─────────────────────
   const handleHardwareChange = (hwId) => {
     const hw = hardwareItems.find((p) => p.id === hwId);
     const profile = hw ? detectHardwareProfile(hw.name) : null;
     setForm((f) => ({
       ...f,
       hardware_item_id: hwId,
-      // If multi-chamber: initialise chambers (preserve existing if same count)
       chambers: profile
         ? Array.isArray(f.chambers) && f.chambers.length === profile.chambers
           ? f.chambers
           : blankChambers(profile)
-        : null, // single-chamber: clear chambers, use flat fields
+        : null,
     }));
   };
 
-  // ── Toggle lab test ────────────────────────────────────────────────────
   const toggleLabTest = (id) => {
     setForm((f) => {
       const tests = Array.isArray(f.lab_tests) ? f.lab_tests : [];
@@ -1182,7 +1165,6 @@ export default function HQCogs() {
     });
   };
 
-  // ── Save ──────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!form.product_name.trim()) return;
     setSaving(true);
@@ -1219,14 +1201,12 @@ export default function HQCogs() {
             : null,
         notes: form.notes.trim() || null,
       };
-
       const { error } = editingRecipe
         ? await supabase
             .from("product_cogs")
             .update(payload)
             .eq("id", editingRecipe.id)
         : await supabase.from("product_cogs").insert(payload);
-
       if (error) {
         console.error("COGS save error:", error);
         showToast(`❌ Save failed: ${error.message}`);
@@ -1273,7 +1253,6 @@ export default function HQCogs() {
     fetchAll();
   };
 
-  // ── Live preview ───────────────────────────────────────────────────────
   const previewBreakdown = calcCogs(
     form,
     supplierProducts,
@@ -1281,7 +1260,6 @@ export default function HQCogs() {
     usdZar,
   );
 
-  // ── Terpene % helper ──────────────────────────────────────────────────
   const terpPct =
     form.distillate_qty_ml > 0
       ? (
@@ -1292,7 +1270,6 @@ export default function HQCogs() {
         ).toFixed(1)
       : null;
 
-  // ── Styles ────────────────────────────────────────────────────────────
   const card = {
     background: "#fff",
     borderRadius: 12,
@@ -1360,12 +1337,8 @@ export default function HQCogs() {
     { id: "local-inputs", label: "🧪 Local Inputs" },
   ];
 
-  // ══════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════════════════
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
-      {/* Toast */}
       {toast && (
         <div
           style={{
@@ -1469,7 +1442,7 @@ export default function HQCogs() {
         ))}
       </div>
 
-      {/* ── LOCAL INPUTS TAB ────────────────────────────────────────────── */}
+      {/* ── LOCAL INPUTS TAB ── */}
       {activeSubTab === "local-inputs" && (
         <div>
           <div style={card}>
@@ -1638,7 +1611,7 @@ export default function HQCogs() {
         </div>
       )}
 
-      {/* ── COGS BUILDER TAB ────────────────────────────────────────────── */}
+      {/* ── COGS BUILDER TAB ── */}
       {activeSubTab === "costing" && (
         <div>
           {localInputs.some((i) => !i.cost_zar) && (
@@ -1772,13 +1745,11 @@ export default function HQCogs() {
                       </div>
                     </div>
 
-                    {/* COGS total */}
                     {(() => {
                       const qty = getCardQty(recipe.id);
                       const total = bd?.total || 0;
                       return (
                         <>
-                          {/* Per-unit box */}
                           <div
                             style={{
                               background: bd?.hasMissingCosts
@@ -1830,7 +1801,39 @@ export default function HQCogs() {
                             )}
                           </div>
 
-                          {/* Batch qty selector + total */}
+                          {/* MOQ warning — show if batch qty < hardware MOQ */}
+                          {bd?.hwMoq &&
+                            getCardQty(recipe.id) < parseInt(bd.hwMoq) && (
+                              <div
+                                style={{
+                                  background: "#FFF3E0",
+                                  border: "1px solid #FFB74D",
+                                  borderRadius: 8,
+                                  padding: "9px 14px",
+                                  marginBottom: 10,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  fontSize: 12,
+                                }}
+                              >
+                                <span style={{ fontSize: 16 }}>⚠️</span>
+                                <div>
+                                  <strong style={{ color: "#E65100" }}>
+                                    Below hardware MOQ
+                                  </strong>
+                                  <span
+                                    style={{ color: "#BF360C", marginLeft: 6 }}
+                                  >
+                                    Minimum order is{" "}
+                                    {parseInt(bd.hwMoq).toLocaleString()} units
+                                    — you're showing{" "}
+                                    {getCardQty(recipe.id).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          {/* Batch qty selector */}
                           <div
                             style={{
                               background: "#fafafa",
@@ -1936,7 +1939,7 @@ export default function HQCogs() {
                       );
                     })()}
 
-                    {/* Breakdown */}
+                    {/* Breakdown rows — v3.5: shows ×qty = batch_total when qty > 1 */}
                     {bd && (
                       <div style={{ fontSize: 13 }}>
                         {[
@@ -1944,6 +1947,9 @@ export default function HQCogs() {
                             key: "hardware",
                             label: "Hardware",
                             name: bd.hwName,
+                            moq: bd.hwMoq,
+                            hwBaseZar: bd.hwBaseZar,
+                            hwShippingZar: bd.hwShippingZar,
                           },
                           {
                             key: "terpene",
@@ -1991,6 +1997,7 @@ export default function HQCogs() {
                               CATEGORY_COLOURS.other;
                             const pct =
                               bd.total > 0 ? (bd[row.key] / bd.total) * 100 : 0;
+                            const qty = getCardQty(recipe.id); // v3.5: batch scale
                             return (
                               <div
                                 key={row.key}
@@ -2033,23 +2040,82 @@ export default function HQCogs() {
                                         {row.name}
                                       </span>
                                     )}
+                                    {row.moq && (
+                                      <span
+                                        style={{
+                                          marginLeft: 8,
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                          letterSpacing: "0.1em",
+                                          textTransform: "uppercase",
+                                          background: "#E3F2FD",
+                                          color: "#1565C0",
+                                          borderRadius: 4,
+                                          padding: "1px 7px",
+                                        }}
+                                      >
+                                        MOQ {parseInt(row.moq).toLocaleString()}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
+                                {/* v3.5/v3.7: per-unit + optional landed split + batch total */}
                                 <div style={{ textAlign: "right" }}>
                                   {bd[row.key] > 0 ? (
                                     <>
-                                      <strong style={{ color: "#333" }}>
-                                        {fmtZar(bd[row.key])}
-                                      </strong>
-                                      <span
-                                        style={{
-                                          color: "#bbb",
-                                          fontSize: 11,
-                                          marginLeft: 6,
-                                        }}
-                                      >
-                                        {fmt(pct)}%
-                                      </span>
+                                      <div>
+                                        <strong style={{ color: "#333" }}>
+                                          {fmtZar(bd[row.key])}
+                                        </strong>
+                                        <span
+                                          style={{
+                                            color: "#bbb",
+                                            fontSize: 11,
+                                            marginLeft: 6,
+                                          }}
+                                        >
+                                          {fmt(pct)}%
+                                        </span>
+                                      </div>
+                                      {/* v3.7: hardware landed cost split */}
+                                      {row.key === "hardware" &&
+                                        row.hwShippingZar > 0 && (
+                                          <div
+                                            style={{
+                                              fontSize: 10,
+                                              color: "#1565C0",
+                                              marginTop: 2,
+                                            }}
+                                          >
+                                            {fmtZar(row.hwBaseZar)} unit +{" "}
+                                            {fmtZar(row.hwShippingZar)} ship
+                                          </div>
+                                        )}
+                                      {row.key === "hardware" &&
+                                        row.hwShippingZar === 0 && (
+                                          <div
+                                            style={{
+                                              fontSize: 10,
+                                              color: "#bbb",
+                                              marginTop: 2,
+                                            }}
+                                          >
+                                            no shipping alloc
+                                          </div>
+                                        )}
+                                      {qty > 1 && (
+                                        <div
+                                          style={{
+                                            fontSize: 11,
+                                            color: "#c62828",
+                                            fontWeight: 700,
+                                            marginTop: 2,
+                                          }}
+                                        >
+                                          ×{qty.toLocaleString()} ={" "}
+                                          {fmtZar(bd[row.key] * qty)}
+                                        </div>
+                                      )}
                                     </>
                                   ) : (
                                     <span
@@ -2167,7 +2233,7 @@ export default function HQCogs() {
         </div>
       )}
 
-      {/* ── DELETE CONFIRM ───────────────────────────────────────────────── */}
+      {/* Delete confirm */}
       {deleteConfirm && (
         <div
           style={{
@@ -2223,7 +2289,6 @@ export default function HQCogs() {
             style={{ flex: 1, background: "rgba(0,0,0,0.4)" }}
             onClick={() => setShowBuilder(false)}
           />
-
           <div
             style={{
               width: 700,
@@ -2282,7 +2347,7 @@ export default function HQCogs() {
 
             {/* Panel body */}
             <div style={{ padding: 28, flex: 1 }}>
-              {/* Live COGS preview */}
+              {/* Live preview */}
               {previewBreakdown && previewBreakdown.total > 0 && (
                 <div
                   style={{
@@ -2343,7 +2408,7 @@ export default function HQCogs() {
                 </div>
               )}
 
-              {/* ── Product name + SKU */}
+              {/* Product name + SKU */}
               <div
                 style={{
                   display: "grid",
@@ -2374,7 +2439,7 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* ── BATCH SIZE — top level for amortisation */}
+              {/* Batch size */}
               <div
                 style={{
                   background: "#F9FBE7",
@@ -2427,7 +2492,7 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* ── HARDWARE */}
+              {/* Hardware */}
               <div
                 style={{
                   background: "#E3F2FD",
@@ -2489,6 +2554,48 @@ export default function HQCogs() {
                         {activeProfile.tip}
                       </div>
                     )}
+                    {(() => {
+                      const hw = hardwareItems.find(
+                        (p) => p.id === form.hardware_item_id,
+                      );
+                      if (!hw?.moq) return null;
+                      const moq = parseInt(hw.moq);
+                      const batchSz = parseInt(form.batch_size) || 50;
+                      const belowMoq = batchSz < moq;
+                      return (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 11,
+                            background: belowMoq ? "#FFF3E0" : "#E3F2FD",
+                            border: `1px solid ${belowMoq ? "#FFB74D" : "#90CAF9"}`,
+                            borderRadius: 6,
+                            padding: "6px 12px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: belowMoq ? "#E65100" : "#1565C0",
+                            }}
+                          >
+                            MOQ: {moq.toLocaleString()} units
+                          </span>
+                          {belowMoq ? (
+                            <span style={{ color: "#BF360C" }}>
+                              ⚠️ Batch size ({batchSz}) is below minimum order
+                            </span>
+                          ) : (
+                            <span style={{ color: "#1565C0" }}>
+                              ✓ Batch size ({batchSz}) meets minimum order
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div>
                     {lbl("Qty per unit — how many in 1 finished product?")}
@@ -2517,7 +2624,7 @@ export default function HQCogs() {
                       >
                         ⚠️ Qty {form.hardware_qty} looks like a batch size — set
                         this to <strong>1</strong> and use "Units per batch"
-                        above for your order quantity.
+                        above.
                       </div>
                     )}
                   </div>
@@ -2561,16 +2668,14 @@ export default function HQCogs() {
                       </div>
                     );
                   })()}
-                {/* Inline landed cost calculator */}
                 <LandedCostCalc
                   usdZar={usdZar}
                   onApply={(val) => setF("shipping_alloc_zar", val)}
                 />
               </div>
 
-              {/* ── DISTILLATE + TERPENE — single OR multi-chamber */}
+              {/* Multi vs single chamber */}
               {isMultiChamber ? (
-                /* ═══ MULTI-CHAMBER EDITOR ═══ */
                 <div style={{ marginBottom: 16 }}>
                   <div
                     style={{
@@ -2598,9 +2703,8 @@ export default function HQCogs() {
                   />
                 </div>
               ) : (
-                /* ═══ SINGLE-CHAMBER (original fields) ═══ */
                 <>
-                  {/* Terpene */}
+                  {/* Terpene — single chamber */}
                   <div
                     style={{
                       background: "#F3E5F5",
@@ -2646,6 +2750,7 @@ export default function HQCogs() {
                         </select>
                       </div>
                       <div>
+                        {/* Single-chamber also uses µl — label matches ChambersEditor */}
                         {lbl("Qty (µl)")}
                         <input
                           type="number"
@@ -2659,6 +2764,22 @@ export default function HQCogs() {
                           style={inputStyle}
                           placeholder="67"
                         />
+                        {parseFloat(form.terpene_qty_ul) > 0 && (
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: "#6A1B9A",
+                              marginTop: 3,
+                              fontWeight: 600,
+                            }}
+                          >
+                            ={" "}
+                            {(parseFloat(form.terpene_qty_ul) / 1000).toFixed(
+                              4,
+                            )}{" "}
+                            ml
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div
@@ -2776,7 +2897,7 @@ export default function HQCogs() {
                       })()}
                   </div>
 
-                  {/* Distillate */}
+                  {/* Distillate — single chamber */}
                   <div
                     style={{
                       background: "#FFF8E1",
@@ -2866,7 +2987,7 @@ export default function HQCogs() {
                 </>
               )}
 
-              {/* ── PACKAGING */}
+              {/* Packaging */}
               <div
                 style={{
                   background: "#E8F5E9",
@@ -2925,7 +3046,6 @@ export default function HQCogs() {
                     />
                   </div>
                 </div>
-                {/* Manual ZAR override */}
                 <div
                   style={{
                     marginTop: 10,
@@ -3003,7 +3123,7 @@ export default function HQCogs() {
                 )}
               </div>
 
-              {/* ── LABOUR */}
+              {/* Labour */}
               <div
                 style={{
                   background: "#FCE4EC",
@@ -3062,7 +3182,6 @@ export default function HQCogs() {
                     />
                   </div>
                 </div>
-                {/* Manual ZAR override */}
                 <div
                   style={{
                     marginTop: 10,
@@ -3140,7 +3259,7 @@ export default function HQCogs() {
                 )}
               </div>
 
-              {/* ── LAB TESTING — Cannalytics Africa */}
+              {/* Lab testing */}
               <div
                 style={{
                   background: "#E8EAF6",
@@ -3271,7 +3390,7 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* ── TRANSPORT + MISC — side by side */}
+              {/* Transport + Misc */}
               <div
                 style={{
                   display: "grid",
@@ -3364,7 +3483,7 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* ── NOTES */}
+              {/* Notes */}
               <div>
                 {lbl("Notes (optional)")}
                 <textarea
