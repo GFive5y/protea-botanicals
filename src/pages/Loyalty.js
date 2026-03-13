@@ -1,5 +1,9 @@
 // src/pages/Loyalty.js
 // Protea Botanicals — Loyalty Programme Page
+// v5.4 — WP-N ClientHeader Integration
+//        - ClientHeader variant="light" added to all three render branches
+//        - Top padding removed from all outer divs (ClientHeader spacer handles it)
+//        - No other changes — all v5.3 data logic preserved exactly
 // v5.3 — WP-J Mobile Responsiveness — 375px pass
 //        - loyalty-browse-btn: full-width + box-sizing on mobile (≤600px)
 //        All clamp/flexWrap patterns from v5.2 preserved — no other layout changes.
@@ -14,6 +18,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
+import ClientHeader from "../components/ClientHeader";
 
 // ─── TIER CONFIGURATION ───
 const TIERS = [
@@ -221,11 +226,12 @@ export default function Loyalty() {
   if (loading) {
     return (
       <>
+        <ClientHeader variant="light" />
         <style>{injectedStyles}</style>
         <div
           style={{
             fontFamily: "'Jost', sans-serif",
-            padding: "40px 20px",
+            padding: "20px 20px",
             maxWidth: 800,
             margin: "0 auto",
           }}
@@ -330,11 +336,12 @@ export default function Loyalty() {
   if (error) {
     return (
       <>
+        <ClientHeader variant="light" />
         <style>{injectedStyles}</style>
         <div
           style={{
             fontFamily: "'Jost', sans-serif",
-            padding: "40px 20px",
+            padding: "20px 20px",
             maxWidth: 800,
             margin: "0 auto",
             textAlign: "center",
@@ -396,12 +403,13 @@ export default function Loyalty() {
   // ─── MAIN RENDER ───
   return (
     <>
+      <ClientHeader variant="light" />
       <style>{injectedStyles}</style>
 
       <div
         style={{
           fontFamily: "'Jost', sans-serif",
-          padding: "40px 20px 0",
+          padding: "20px 20px 0",
           maxWidth: 800,
           margin: "0 auto",
           color: "#1a1a1a",
@@ -745,10 +753,6 @@ export default function Loyalty() {
                 {transactions.map((txn, i) => {
                   // Normalise transaction type (handle legacy "scan", "earned", "EARNED", "SPENT" etc.)
                   const rawType = (txn.transaction_type || "").toUpperCase();
-                  const isEarned =
-                    rawType === "EARNED" ||
-                    rawType === "SCAN" ||
-                    rawType === "EARNED_POINTS";
                   const isSpent = rawType === "SPENT" || rawType === "REDEEMED";
                   const type = isSpent ? "SPENT" : "EARNED";
                   const displayPoints = txn.points || 0;

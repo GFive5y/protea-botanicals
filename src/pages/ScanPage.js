@@ -1,24 +1,18 @@
-// src/pages/ScanPage.js
+// src/pages/ScanPage.js v1.1
 // ─────────────────────────────────────────────────────────────────────────────
-// STANDALONE page — must be placed OUTSIDE the shared NavBar layout in App.js
-// (same tier as Landing.js and Shop.js)
-//
-// Layout:
-//   • Slim top bar — logo left, auth-aware right (username+settings+logout OR sign-in)
-//   • Hero section — "Scan to Earn" headline
-//   • Three animated method cards — Camera Scan / Upload QR Image / Enter Code
-//   • Active method expands inline below the cards
-//   • QR detection navigates to /scan/:qrCode
-//
-// Auth-aware header logic:
-//   • Logged out: "Sign In to Earn Points" button → /account
-//   • Logged in: username pill + ⚙ settings icon + 🛒 basket stub + Log Out
+// v1.1  WP-N: Replaced manual auth-aware <header> with <ClientHeader variant="light" />.
+//       Card titles updated to Cormorant Garamond serif to match site typography.
+//       Removed userEmail state and handleLogout (owned by ClientHeader).
+//       Kept user state — used for hero text conditional.
+//       All scanning logic (camera / upload / manual) unchanged from v1.0.
+// v1.0  Initial build — Camera Scan / Upload QR Image / Enter Code methods.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "../services/supabaseClient";
+import ClientHeader from "../components/ClientHeader";
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
 
@@ -36,10 +30,8 @@ const C = {
 };
 
 // ── Normalize a scanned value → extract bare QR code ─────────────────────────
-// Handles full URLs like https://protea-botanicals.co.za/scan/PROTEA-PE-001
 const extractQRCode = (raw) => {
   const trimmed = raw.trim();
-  // If it looks like a URL, extract the last path segment
   if (trimmed.startsWith("http")) {
     try {
       const url = new URL(trimmed);
@@ -52,7 +44,6 @@ const extractQRCode = (raw) => {
   return trimmed;
 };
 
-// ── Method card definitions ───────────────────────────────────────────────────
 const METHODS = [
   {
     id: "camera",
@@ -80,9 +71,8 @@ const METHODS = [
 export default function ScanPage() {
   const navigate = useNavigate();
 
-  // Auth state
+  // user state — kept for hero text conditional (ClientHeader handles auth UI)
   const [user, setUser] = useState(null);
-  const [userEmail, setUserEmail] = useState("");
 
   // UI state
   const [activeMethod, setActiveMethod] = useState(null);
@@ -95,24 +85,20 @@ export default function ScanPage() {
   const scannerRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // ── Auth check ──────────────────────────────────────────────────────────
+  // ── Auth check (user state only — header handled by ClientHeader) ─────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        setUserEmail(session.user.email || "");
-      }
+      if (session?.user) setUser(session.user);
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user || null);
-      setUserEmail(session?.user?.email || "");
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Navigate to scan result ──────────────────────────────────────────────
+  // ── Navigate to scan result ───────────────────────────────────────────────
   const goToResult = useCallback(
     (rawCode) => {
       const code = extractQRCode(rawCode);
@@ -122,9 +108,9 @@ export default function ScanPage() {
     [navigate],
   );
 
-  // ── Camera scanner lifecycle ─────────────────────────────────────────────
+  // ── Camera scanner lifecycle ──────────────────────────────────────────────
   const startCamera = useCallback(async () => {
-    if (scannerRef.current) return; // already running
+    if (scannerRef.current) return;
     try {
       const scanner = new Html5Qrcode("pb-camera-reader");
       scannerRef.current = scanner;
@@ -135,7 +121,7 @@ export default function ScanPage() {
           stopCamera();
           goToResult(decodedText);
         },
-        () => {}, // ignore per-frame errors
+        () => {},
       );
       setScanMsg("");
     } catch (err) {
@@ -159,7 +145,6 @@ export default function ScanPage() {
     }
   }, []);
 
-  // Start camera when method = 'camera'
   useEffect(() => {
     if (activeMethod === "camera") {
       startCamera();
@@ -169,31 +154,28 @@ export default function ScanPage() {
     return () => stopCamera();
   }, [activeMethod, startCamera, stopCamera]);
 
-  // ── Upload handler ───────────────────────────────────────────────────────
+  // ── Upload handler ────────────────────────────────────────────────────────
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     setScanMsg("");
-
     try {
       const scanner = new Html5Qrcode("pb-upload-scratch");
       const result = await scanner.scanFile(file, true);
       await scanner.clear();
       goToResult(result);
-    } catch (err) {
+    } catch {
       setScanMsg(
         "Could not read a QR code from that image. Try a clearer photo, or use Enter Code.",
       );
     } finally {
       setUploading(false);
-      // Reset input so the same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // ── Manual submit ────────────────────────────────────────────────────────
+  // ── Manual submit ─────────────────────────────────────────────────────────
   const handleManualSubmit = (e) => {
     e.preventDefault();
     const code = manualCode.trim();
@@ -204,19 +186,11 @@ export default function ScanPage() {
     goToResult(code);
   };
 
-  // ── Select method ────────────────────────────────────────────────────────
+  // ── Select method ─────────────────────────────────────────────────────────
   const selectMethod = (id) => {
     setScanMsg("");
     setManualCode("");
     setActiveMethod((prev) => (prev === id ? null : id));
-  };
-
-  // ── Logout ───────────────────────────────────────────────────────────────
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("protea_role");
-    localStorage.removeItem("protea_dev_mode");
-    setUser(null);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -248,12 +222,9 @@ export default function ScanPage() {
           border-color: #52b788 !important;
           box-shadow: 0 0 0 2px rgba(82,183,136,0.3) !important;
         }
-        .pb-expand {
-          animation: pb-fadein 0.25s ease both;
-        }
+        .pb-expand { animation: pb-fadein 0.25s ease both; }
         #pb-camera-reader video { border-radius: 4px; }
         #pb-camera-reader img   { display: none; }
-        /* Hide the default html5-qrcode UI chrome */
         #pb-camera-reader > div:last-child { display: none !important; }
         #pb-upload-scratch { display: none; }
         .pb-scan-btn {
@@ -281,8 +252,11 @@ export default function ScanPage() {
           .pb-cards { flex-direction: column !important; }
           .pb-method-card { min-width: unset !important; }
         }
-      `}
+        `}
       </style>
+
+      {/* ── WP-N: Unified header — light variant (cream → green on scroll) ── */}
+      <ClientHeader variant="light" />
 
       <div
         style={{
@@ -291,133 +265,7 @@ export default function ScanPage() {
           fontFamily: "Jost, sans-serif",
         }}
       >
-        {/* ── Slim auth-aware header ─────────────────────────────────────── */}
-        <header
-          style={{
-            background: C.green,
-            padding: "0 24px",
-            height: "56px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          {/* Logo */}
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "Cormorant Garamond, serif",
-              fontSize: "18px",
-              fontWeight: "600",
-              color: "#fff",
-              letterSpacing: "0.06em",
-              padding: 0,
-            }}
-          >
-            Protea Botanicals
-          </button>
-
-          {/* Auth right side */}
-          {user ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              {/* Username pill */}
-              <button
-                onClick={() => navigate("/my-account")}
-                style={{
-                  background: "rgba(255,255,255,0.12)",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                  borderRadius: "20px",
-                  padding: "5px 14px",
-                  fontFamily: "Jost, sans-serif",
-                  fontSize: "11px",
-                  fontWeight: "500",
-                  color: "#fff",
-                  cursor: "pointer",
-                  letterSpacing: "0.05em",
-                  maxWidth: "160px",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                ● {userEmail.split("@")[0]}
-              </button>
-              {/* Loyalty icon */}
-              <button
-                onClick={() => navigate("/loyalty")}
-                title="My Loyalty Points"
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "18px",
-                  lineHeight: 1,
-                  padding: "4px",
-                }}
-              >
-                ⭐
-              </button>
-              {/* Settings icon */}
-              <button
-                onClick={() => navigate("/my-account")}
-                title="Account Settings"
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "18px",
-                  lineHeight: 1,
-                  padding: "4px",
-                }}
-              >
-                ⚙️
-              </button>
-              {/* Log out */}
-              <button
-                onClick={handleLogout}
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  borderRadius: "2px",
-                  padding: "5px 12px",
-                  fontFamily: "Jost, sans-serif",
-                  fontSize: "10px",
-                  fontWeight: "600",
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  color: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                Log Out
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => navigate("/account")}
-              style={{
-                background: C.accent,
-                border: "none",
-                borderRadius: "2px",
-                padding: "8px 20px",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "11px",
-                fontWeight: "600",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: C.green,
-                cursor: "pointer",
-              }}
-            >
-              Sign In to Earn Points
-            </button>
-          )}
-        </header>
-
-        {/* ── Hero ──────────────────────────────────────────────────────── */}
+        {/* ── Hero ───────────────────────────────────────────────────────── */}
         <div
           style={{
             background: `linear-gradient(160deg, ${C.green} 0%, ${C.mid} 100%)`,
@@ -463,7 +311,6 @@ export default function ScanPage() {
               : "Sign in first, then scan the QR code inside your product packaging."}
           </p>
 
-          {/* Not logged in nudge */}
           {!user && (
             <div
               style={{
@@ -486,7 +333,7 @@ export default function ScanPage() {
           )}
         </div>
 
-        {/* ── Method cards ──────────────────────────────────────────────── */}
+        {/* ── Method cards ───────────────────────────────────────────────── */}
         <div
           style={{
             maxWidth: "700px",
@@ -496,11 +343,7 @@ export default function ScanPage() {
         >
           <div
             className="pb-cards"
-            style={{
-              display: "flex",
-              gap: "16px",
-              marginBottom: "8px",
-            }}
+            style={{ display: "flex", gap: "16px", marginBottom: "8px" }}
           >
             {METHODS.map((m, i) => (
               <div
@@ -530,8 +373,8 @@ export default function ScanPage() {
                 </div>
                 <div
                   style={{
-                    fontFamily: "Jost, sans-serif",
-                    fontSize: "13px",
+                    fontFamily: "Cormorant Garamond, Georgia, serif",
+                    fontSize: "17px",
                     fontWeight: "600",
                     color: activeMethod === m.id ? C.green : C.text,
                     marginBottom: "6px",
@@ -561,7 +404,6 @@ export default function ScanPage() {
                 >
                   {m.note}
                 </div>
-                {/* Active indicator dot */}
                 <div
                   style={{
                     width: "6px",
@@ -596,9 +438,7 @@ export default function ScanPage() {
             </div>
           )}
 
-          {/* ── Expanded panels ─────────────────────────────────────────── */}
-
-          {/* Camera */}
+          {/* ── Camera panel ─────────────────────────────────────────────── */}
           {activeMethod === "camera" && (
             <div
               className="pb-expand"
@@ -622,7 +462,6 @@ export default function ScanPage() {
               >
                 Camera Active
               </div>
-              {/* html5-qrcode mounts here */}
               <div
                 id="pb-camera-reader"
                 style={{
@@ -652,7 +491,7 @@ export default function ScanPage() {
             </div>
           )}
 
-          {/* Upload */}
+          {/* ── Upload panel ─────────────────────────────────────────────── */}
           {activeMethod === "upload" && (
             <div
               className="pb-expand"
@@ -687,8 +526,6 @@ export default function ScanPage() {
                 Take a clear photo of the QR code (inside the packaging) and
                 select it below. The QR must be visible and in focus.
               </p>
-
-              {/* Drop zone */}
               <div
                 onClick={() => fileInputRef.current?.click()}
                 style={{
@@ -719,7 +556,6 @@ export default function ScanPage() {
                   JPG, PNG, WEBP — max 10MB
                 </div>
               </div>
-
               <input
                 ref={fileInputRef}
                 type="file"
@@ -727,10 +563,7 @@ export default function ScanPage() {
                 onChange={handleFileUpload}
                 style={{ display: "none" }}
               />
-
-              {/* Hidden div for html5-qrcode file scanning */}
               <div id="pb-upload-scratch" />
-
               <button
                 className="pb-scan-btn"
                 onClick={() => fileInputRef.current?.click()}
@@ -741,7 +574,7 @@ export default function ScanPage() {
             </div>
           )}
 
-          {/* Manual entry */}
+          {/* ── Manual entry panel ───────────────────────────────────────── */}
           {activeMethod === "manual" && (
             <div
               className="pb-expand"

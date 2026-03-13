@@ -1,4 +1,8 @@
-// src/pages/Shop.js v4.2
+// src/pages/Shop.js v4.3
+// v4.3: WP-N Unified Client Header — ClientHeader replaces NavBar injection from App.js.
+//       Added: import ClientHeader + <ClientHeader variant="light" /> as first element.
+//       App.js /shop route must be simplified to: <Route path="/shop" element={<Shop />} />
+//       Zero impact on all other Shop functionality.
 // v4.2: WP-K Publish to Shop — reads sell_price from inventory_items
 //       Price is no longer hardcoded. buildProductFromInventory uses
 //       item.sell_price from DB. fetchProducts SELECT includes sell_price.
@@ -22,6 +26,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
+import ClientHeader from "../components/ClientHeader";
 
 // ── Distillate COA ────────────────────────────────────────────────────────────
 const DISTILLATE_COA = {
@@ -2242,6 +2247,9 @@ export default function Shop() {
         color: "#1a1a1a",
       }}
     >
+      {/* ── WP-N: Unified Client Header ── */}
+      <ClientHeader variant="light" />
+
       <style>{shopStyles}</style>
 
       {/* ── ADMIN: Below-COGS Warning Banner (WP-H) ── */}

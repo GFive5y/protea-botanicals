@@ -1,29 +1,18 @@
-// src/pages/OrderSuccess.js — Protea Botanicals v2.0
+// src/pages/OrderSuccess.js — Protea Botanicals v2.1
+// v2.1: WP-N — Added <ClientHeader variant="light" />, font @import restored (PageShell removed)
 // ─────────────────────────────────────────────────────────────────────────────
 // ★ v2.0 CHANGELOG (Phase 2G — PayFast Production Integration):
-//   1. ADD: Reads order_ref from URL search param (?ref=xxx)
-//   2. ADD: Queries orders + order_items table from Supabase
-//   3. ADD: Polls order status every 3s for up to 60s (waits for ITN)
-//   4. ADD: Three states: "Verifying payment…", "Payment confirmed ✓",
-//      "Payment pending — check back shortly"
-//   5. ADD: Displays loyalty points earned from purchase
-//   6. ADD: Falls back to localStorage if no URL param (backwards compat)
-//   7. REMOVE: Primary reliance on localStorage for order data
-//   Version bump v1.0 → v2.0
-//
+//   Reads order_ref from URL param, queries orders+order_items, polls status.
+//   Falls back to localStorage. Displays loyalty points earned.
 // v1.0: Read order from localStorage only, no DB validation
-// ─────────────────────────────────────────────────────────────────────────────
-// Post-payment confirmation page.
-// Rendered inside PageShell via WithNav.
-// Per LL-017: no own wrapper, footer, or font import (PageShell provides).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { C } from "../styles/tokens";
+import ClientHeader from "../components/ClientHeader";
 
-// ── Polling config ──────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_DURATION_MS = 60000;
 
@@ -33,16 +22,14 @@ export default function OrderSuccess() {
 
   const [order, setOrder] = useState(null);
   const [orderItems, setOrderItems] = useState([]);
-  const [status, setStatus] = useState("loading"); // loading | verifying | paid | failed | timeout | not_found
+  const [status, setStatus] = useState("loading");
   const [pointsEarned, setPointsEarned] = useState(0);
   const [localFallback, setLocalFallback] = useState(null);
   const pollTimerRef = useRef(null);
   const pollStartRef = useRef(null);
 
-  // Get order reference from URL or localStorage
   const orderRef = searchParams.get("ref");
 
-  // ── Fetch order from DB ───────────────────────────────────────────────────
   const fetchOrder = useCallback(async (ref) => {
     try {
       const { data: orderData, error: orderErr } = await supabase
@@ -50,119 +37,85 @@ export default function OrderSuccess() {
         .select("*")
         .eq("order_ref", ref)
         .single();
-
-      if (orderErr || !orderData) {
-        console.warn("[OrderSuccess] Order not found for ref:", ref);
-        return null;
-      }
-
-      // Fetch order items
+      if (orderErr || !orderData) return null;
       const { data: items } = await supabase
         .from("order_items")
         .select("*")
         .eq("order_id", orderData.id)
         .order("created_at");
-
       return { order: orderData, items: items || [] };
     } catch (err) {
-      console.error("[OrderSuccess] Fetch error:", err);
       return null;
     }
   }, []);
 
-  // ── Poll for payment confirmation ─────────────────────────────────────────
   const startPolling = useCallback(
     (ref) => {
       pollStartRef.current = Date.now();
-
       const poll = async () => {
         const result = await fetchOrder(ref);
         if (!result) {
           setStatus("not_found");
           return;
         }
-
         setOrder(result.order);
         setOrderItems(result.items);
-
         if (result.order.status === "paid") {
           setStatus("paid");
           setPointsEarned(Math.floor(result.order.total / 100));
-          // Clean up localStorage
           try {
             localStorage.removeItem("protea_last_order");
-          } catch (_e) {
-            /* ignore */
-          }
-          return; // Stop polling
+          } catch (_e) {}
+          return;
         }
-
-        if (result.order.status === "failed") {
-          setStatus("failed");
-          return; // Stop polling
-        }
-
-        if (result.order.status === "cancelled") {
+        if (
+          result.order.status === "failed" ||
+          result.order.status === "cancelled"
+        ) {
           setStatus("failed");
           return;
         }
-
-        // Still pending — check timeout
         const elapsed = Date.now() - pollStartRef.current;
         if (elapsed >= POLL_MAX_DURATION_MS) {
           setStatus("timeout");
           setPointsEarned(Math.floor(result.order.total / 100));
-          return; // Stop polling
+          return;
         }
-
-        // Continue polling
         setStatus("verifying");
         pollTimerRef.current = setTimeout(() => poll(), POLL_INTERVAL_MS);
       };
-
       poll();
     },
     [fetchOrder],
   );
 
-  // ── Initialize on mount ───────────────────────────────────────────────────
   useEffect(() => {
     if (orderRef) {
-      // URL has order ref — fetch from DB
-      console.log("[OrderSuccess] Loading order from DB:", orderRef);
       startPolling(orderRef);
     } else {
-      // Fallback: try localStorage (backwards compat with v1.0)
       try {
         const raw = localStorage.getItem("protea_last_order");
         if (raw) {
           const parsed = JSON.parse(raw);
           setLocalFallback(parsed);
           localStorage.removeItem("protea_last_order");
-
-          // If localStorage has a ref, try to fetch from DB
           if (parsed.ref) {
             startPolling(parsed.ref);
           } else {
-            // Pure localStorage fallback (no DB order)
-            setStatus("paid"); // Assume paid since PayFast redirected here
+            setStatus("paid");
           }
         } else {
           setStatus("not_found");
         }
       } catch (e) {
-        console.warn("[OrderSuccess] Could not read localStorage:", e);
         setStatus("not_found");
       }
     }
-
-    // Cleanup polling on unmount
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, [orderRef, startPolling]);
 
-  // ── Derive display data ───────────────────────────────────────────────────
   const displayOrder = order
     ? {
         ref: order.order_ref,
@@ -176,18 +129,26 @@ export default function OrderSuccess() {
       }
     : localFallback;
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
+      <ClientHeader variant="light" />
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500;600&display=swap');
         .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
         .body-font { font-family: 'Jost', sans-serif; }
         @keyframes protea-spin { to { transform: rotate(360deg); } }
         @keyframes protea-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
       `}</style>
 
-      <div style={{ textAlign: "center", padding: "40px 20px" }}>
-        {/* ── Loading state ──────────────────────────────────────────────── */}
+      <div
+        style={{
+          textAlign: "center",
+          padding: "40px 20px",
+          maxWidth: 640,
+          margin: "0 auto",
+        }}
+      >
+        {/* Loading */}
         {status === "loading" && (
           <>
             <div
@@ -210,7 +171,7 @@ export default function OrderSuccess() {
           </>
         )}
 
-        {/* ── Verifying state (polling) ──────────────────────────────────── */}
+        {/* Verifying */}
         {status === "verifying" && (
           <>
             <div
@@ -228,7 +189,6 @@ export default function OrderSuccess() {
             >
               <span style={{ fontSize: "32px" }}>⏳</span>
             </div>
-
             <div
               className="body-font"
               style={{
@@ -241,7 +201,6 @@ export default function OrderSuccess() {
             >
               VERIFYING PAYMENT
             </div>
-
             <h1
               className="shop-font"
               style={{
@@ -253,7 +212,6 @@ export default function OrderSuccess() {
             >
               Processing Your Payment
             </h1>
-
             <p
               className="body-font"
               style={{
@@ -268,7 +226,6 @@ export default function OrderSuccess() {
               We're confirming your payment with PayFast. This usually takes a
               few seconds…
             </p>
-
             <div
               style={{
                 width: "24px",
@@ -283,10 +240,9 @@ export default function OrderSuccess() {
           </>
         )}
 
-        {/* ── Paid / Success state ───────────────────────────────────────── */}
+        {/* Paid / Timeout */}
         {(status === "paid" || status === "timeout") && (
           <>
-            {/* Success icon */}
             <div
               style={{
                 width: "72px",
@@ -311,7 +267,6 @@ export default function OrderSuccess() {
                 {status === "paid" ? "✓" : "⏳"}
               </span>
             </div>
-
             <div
               className="body-font"
               style={{
@@ -324,7 +279,6 @@ export default function OrderSuccess() {
             >
               {status === "paid" ? "ORDER CONFIRMED" : "ORDER RECEIVED"}
             </div>
-
             <h1
               className="shop-font"
               style={{
@@ -338,7 +292,6 @@ export default function OrderSuccess() {
                 ? "Thank You for Your Order"
                 : "Order Submitted Successfully"}
             </h1>
-
             <p
               className="body-font"
               style={{
@@ -352,10 +305,9 @@ export default function OrderSuccess() {
             >
               {status === "paid"
                 ? "Your payment has been confirmed. You'll receive a confirmation email shortly."
-                : "Your payment is being verified by PayFast. This can take up to a minute. You'll receive a confirmation email once complete."}
+                : "Your payment is being verified by PayFast. You'll receive a confirmation email once complete."}
             </p>
 
-            {/* Loyalty points earned */}
             {pointsEarned > 0 && (
               <div
                 className="body-font"
@@ -392,11 +344,7 @@ export default function OrderSuccess() {
                   +{pointsEarned} point{pointsEarned !== 1 ? "s" : ""}
                 </div>
                 <div
-                  style={{
-                    fontSize: "11px",
-                    color: C.muted,
-                    marginTop: "4px",
-                  }}
+                  style={{ fontSize: "11px", color: C.muted, marginTop: "4px" }}
                 >
                   {status === "paid"
                     ? "Added to your loyalty balance"
@@ -405,7 +353,6 @@ export default function OrderSuccess() {
               </div>
             )}
 
-            {/* Order details card */}
             {displayOrder && (
               <div
                 style={{
@@ -432,59 +379,54 @@ export default function OrderSuccess() {
                   ORDER DETAILS
                 </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <span
-                    className="body-font"
-                    style={{ fontSize: "12px", color: C.muted }}
-                  >
-                    Reference
-                  </span>
-                  <span
-                    className="body-font"
-                    style={{
-                      fontSize: "12px",
-                      color: C.text,
-                      fontWeight: 600,
-                      fontFamily: "monospace",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {displayOrder.ref}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <span
-                    className="body-font"
-                    style={{ fontSize: "12px", color: C.muted }}
-                  >
-                    Date
-                  </span>
-                  <span
-                    className="body-font"
-                    style={{ fontSize: "12px", color: C.text }}
-                  >
-                    {new Date(displayOrder.date).toLocaleDateString("en-ZA", {
+                {[
+                  [
+                    "Reference",
+                    <span
+                      style={{
+                        fontFamily: "monospace",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      {displayOrder.ref}
+                    </span>,
+                  ],
+                  [
+                    "Date",
+                    new Date(displayOrder.date).toLocaleDateString("en-ZA", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
-                    })}
-                  </span>
-                </div>
+                    }),
+                  ],
+                ].map(([label, val]) => (
+                  <div
+                    key={label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    <span
+                      className="body-font"
+                      style={{ fontSize: "12px", color: C.muted }}
+                    >
+                      {label}
+                    </span>
+                    <span
+                      className="body-font"
+                      style={{
+                        fontSize: "12px",
+                        color: C.text,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {val}
+                    </span>
+                  </div>
+                ))}
 
-                {/* Status badge */}
                 <div
                   style={{
                     display: "flex",
@@ -518,7 +460,6 @@ export default function OrderSuccess() {
                   </span>
                 </div>
 
-                {/* Item list */}
                 {displayOrder.items && displayOrder.items.length > 0 && (
                   <div
                     style={{
@@ -557,7 +498,6 @@ export default function OrderSuccess() {
                   </div>
                 )}
 
-                {/* Total */}
                 <div
                   style={{
                     borderTop: `1px solid ${C.border}`,
@@ -593,7 +533,6 @@ export default function OrderSuccess() {
               </div>
             )}
 
-            {/* Action buttons */}
             <div
               style={{
                 display: "flex",
@@ -616,7 +555,6 @@ export default function OrderSuccess() {
                   letterSpacing: "0.2em",
                   textTransform: "uppercase",
                   cursor: "pointer",
-                  transition: "background 0.15s",
                 }}
                 onMouseEnter={(e) => (e.target.style.background = "#2d6a4f")}
                 onMouseLeave={(e) => (e.target.style.background = "#1b4332")}
@@ -637,7 +575,6 @@ export default function OrderSuccess() {
                   letterSpacing: "0.2em",
                   textTransform: "uppercase",
                   cursor: "pointer",
-                  transition: "all 0.15s",
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.background = "#2d6a4f";
@@ -654,7 +591,7 @@ export default function OrderSuccess() {
           </>
         )}
 
-        {/* ── Failed state ───────────────────────────────────────────────── */}
+        {/* Failed */}
         {status === "failed" && (
           <>
             <div
@@ -671,7 +608,6 @@ export default function OrderSuccess() {
             >
               <span style={{ fontSize: "32px", color: "#c0392b" }}>✕</span>
             </div>
-
             <div
               className="body-font"
               style={{
@@ -684,7 +620,6 @@ export default function OrderSuccess() {
             >
               PAYMENT FAILED
             </div>
-
             <h1
               className="shop-font"
               style={{
@@ -696,7 +631,6 @@ export default function OrderSuccess() {
             >
               Payment Could Not Be Processed
             </h1>
-
             <p
               className="body-font"
               style={{
@@ -709,9 +643,8 @@ export default function OrderSuccess() {
               }}
             >
               Unfortunately your payment was not successful. No charges have
-              been made. Please try again or use a different payment method.
+              been made. Please try again.
             </p>
-
             <button
               className="body-font"
               onClick={() => navigate("/shop")}
@@ -733,7 +666,7 @@ export default function OrderSuccess() {
           </>
         )}
 
-        {/* ── Not found state ────────────────────────────────────────────── */}
+        {/* Not Found */}
         {status === "not_found" && (
           <>
             <div
@@ -750,7 +683,6 @@ export default function OrderSuccess() {
             >
               <span style={{ fontSize: "32px", color: C.muted }}>?</span>
             </div>
-
             <h1
               className="shop-font"
               style={{
@@ -762,7 +694,6 @@ export default function OrderSuccess() {
             >
               No Order Found
             </h1>
-
             <p
               className="body-font"
               style={{
@@ -777,7 +708,6 @@ export default function OrderSuccess() {
               We couldn't find an order to display. If you just completed a
               payment, please check your email for confirmation.
             </p>
-
             <button
               className="body-font"
               onClick={() => navigate("/shop")}

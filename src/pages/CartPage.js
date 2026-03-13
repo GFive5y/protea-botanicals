@@ -1,12 +1,14 @@
-// src/pages/CartPage.js — Protea Botanicals v1.0
+// src/pages/CartPage.js — Protea Botanicals v1.1
 // ─────────────────────────────────────────────────────────────────────────────
-// Full cart view with item list, quantity controls, subtotals, cart total,
-// "Proceed to Checkout" button, empty cart state. Matches Protea aesthetic.
-// No PageShell wrapper (like /shop — has full-bleed hero).
+// v1.1  WP-N: ClientHeader variant="light" added. No other changes.
+// v1.0  Full cart view — item list, quantity controls, subtotals, cart total,
+//       "Proceed to Checkout", empty cart state. Matches Protea aesthetic.
+//       No PageShell wrapper (like /shop — has full-bleed hero).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
+import ClientHeader from "../components/ClientHeader";
 
 export default function CartPage() {
   const { cartItems, removeFromCart, updateQuantity, getCartTotal, clearCart } =
@@ -31,6 +33,9 @@ export default function CartPage() {
         .remove-btn { transition: all 0.15s; }
         .remove-btn:hover { color: #c0392b !important; }
       `}</style>
+
+      {/* ── WP-N: Unified header ── */}
+      <ClientHeader variant="light" />
 
       {/* Hero */}
       <div
@@ -128,7 +133,7 @@ export default function CartPage() {
           <>
             {/* ── Cart items ── */}
             <div style={{ marginBottom: "32px" }}>
-              {/* Header row — desktop only */}
+              {/* Header row */}
               <div
                 className="body-font"
                 style={{
@@ -172,7 +177,6 @@ export default function CartPage() {
                       alignItems: "center",
                     }}
                   >
-                    {/* Strain gradient swatch */}
                     <div
                       style={{
                         width: "52px",
@@ -556,7 +560,7 @@ export default function CartPage() {
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer — preserved from v1.0 */}
       <footer
         style={{
           background: "#1a1a1a",
@@ -566,21 +570,13 @@ export default function CartPage() {
       >
         <span
           className="shop-font"
-          style={{
-            fontSize: "18px",
-            color: "#faf9f6",
-            letterSpacing: "0.2em",
-          }}
+          style={{ fontSize: "18px", color: "#faf9f6", letterSpacing: "0.2em" }}
         >
           PROTEA
         </span>
         <span
           className="shop-font"
-          style={{
-            fontSize: "18px",
-            color: "#52b788",
-            letterSpacing: "0.2em",
-          }}
+          style={{ fontSize: "18px", color: "#52b788", letterSpacing: "0.2em" }}
         >
           {" "}
           BOTANICALS

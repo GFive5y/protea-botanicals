@@ -1,18 +1,15 @@
-// src/pages/ScanResult.js v4.1
+// src/pages/ScanResult.js v4.2
 // Protea Botanicals — WP-M QR Engine v2.0
 // March 2026
-// ★ v4.1 changes (from v4.0):
-//   1. ADDED: scan_logs insert on every valid scan (success + blocked)
-//   2. ADDED: loyalty_transactions insert on every points award
-//   3. ADDED: IP geolocation via ipapi.co (city/province/lat/lng — no consent needed)
-//   4. ADDED: GPS opt-in prompt AFTER scan result renders (POPIA compliant)
-//   5. ADDED: device_type + browser detection from userAgent
-//   6. ADDED: scan_outcome field — success | blocked_inactive | blocked_expired | blocked_max_scans
-//   7. FIXED: points description includes product/campaign name for readable transaction log
+// ★ v4.2 changes (from v4.1):
+//   - WP-N: Replaced manual green <header> with <ClientHeader variant="light" />
+//   - All scan engine logic, logging, GPS flow unchanged from v4.1
+// ★ v4.1: scan_logs, loyalty_transactions, IP geo, GPS opt-in, device detection, scan_outcome
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
+import ClientHeader from "../components/ClientHeader";
 
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
 
@@ -35,7 +32,6 @@ const C = {
   lightRed: "#fdf0ef",
 };
 
-// ── Device detection ─────────────────────────────────────────────────────────
 function detectDevice() {
   const ua = navigator.userAgent || "";
   const device = /Mobile|Android|iPhone|iPad|iPod/i.test(ua)
@@ -56,7 +52,6 @@ function detectDevice() {
   return { device, browser, userAgent: ua.slice(0, 200) };
 }
 
-// ── IP Geolocation (free, no key, city-level only — not personal data under POPIA) ─
 async function fetchIpGeo() {
   try {
     const res = await fetch("https://ipapi.co/json/", {
@@ -76,7 +71,6 @@ async function fetchIpGeo() {
   }
 }
 
-// ── GPS prompt (POPIA: after result renders, not as gate) ─────────────────────
 function requestGps() {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
@@ -95,7 +89,6 @@ function requestGps() {
   });
 }
 
-// ── Shared styles ────────────────────────────────────────────────────────────
 const pill = (bg, color) => ({
   display: "inline-block",
   background: bg,
@@ -143,9 +136,8 @@ const QR_TYPE_LABELS = {
   retail_display: { icon: "🏪", label: "Retail Display" },
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// SUB-COMPONENTS (unchanged from v4.0)
-// ════════════════════════════════════════════════════════════════════════════
+// ── Sub-components ───────────────────────────────────────────────────────────
+
 function BannerDisplay({ banner }) {
   const navigate = useNavigate();
   if (!banner) return null;
@@ -460,8 +452,7 @@ function GuardScreen({ type }) {
   );
 }
 
-// ── GPS consent banner (shown after result renders) ──────────────────────────
-function GpsConsentBanner({ onAllow, onDeny, scanLogId }) {
+function GpsConsentBanner({ onAllow, onDeny }) {
   return (
     <div
       style={{
@@ -475,12 +466,11 @@ function GpsConsentBanner({ onAllow, onDeny, scanLogId }) {
     >
       <div
         style={{
-          fontSize: 13,
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 18,
           fontWeight: 600,
           color: C.green,
           marginBottom: 6,
-          fontFamily: "Cormorant Garamond, serif",
-          fontSize: 18,
         }}
       >
         📍 Improve Your Experience
@@ -531,11 +521,9 @@ export default function ScanResult() {
 
   const [phase, setPhase] = useState("loading");
   const [guardType, setGuardType] = useState("error");
-
   const [qrRecord, setQrRecord] = useState(null);
   const [user, setUser] = useState(null);
 
-  // Action outputs
   const [banner, setBanner] = useState(null);
   const [showProduct, setShowProduct] = useState(false);
   const [showCoa, setShowCoa] = useState(false);
@@ -547,18 +535,15 @@ export default function ScanResult() {
   const [eventCheckins, setEventCheckins] = useState([]);
   const [hasPoints, setHasPoints] = useState(false);
 
-  // GPS consent flow
   const [showGpsPrompt, setShowGpsPrompt] = useState(false);
   const [scanLogId, setScanLogId] = useState(null);
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) setUser(session.user);
     });
   }, []);
 
-  // ── Write scan log helper ─────────────────────────────────────────────────
   const writeScanLog = useCallback(
     async ({
       qrId,
@@ -614,7 +599,6 @@ export default function ScanResult() {
     [],
   );
 
-  // ── Write loyalty transaction helper ──────────────────────────────────────
   const writeLoyaltyTransaction = useCallback(
     async ({
       userId,
@@ -628,13 +612,13 @@ export default function ScanResult() {
         await supabase.from("loyalty_transactions").insert({
           user_id: userId,
           transaction_type: "EARNED",
-          points: points,
-          balance_after: balanceAfter, // new column (added via ALTER)
+          points,
+          balance_after: balanceAfter,
           source: "qr_scan",
-          source_id: qrCodeStr, // new column (added via ALTER)
-          description: description,
-          scan_log_id: scanLogId || null, // new column (added via ALTER)
-          transaction_date: new Date().toISOString(), // existing column
+          source_id: qrCodeStr,
+          description,
+          scan_log_id: scanLogId || null,
+          transaction_date: new Date().toISOString(),
         });
       } catch (err) {
         console.error("writeLoyaltyTransaction error:", err);
@@ -643,7 +627,6 @@ export default function ScanResult() {
     [],
   );
 
-  // ── Update scan log with GPS after consent ────────────────────────────────
   const updateScanLogWithGps = useCallback(async (logId, gpsData) => {
     if (!logId || !gpsData) return;
     try {
@@ -660,7 +643,6 @@ export default function ScanResult() {
     }
   }, []);
 
-  // ── Main scan engine ──────────────────────────────────────────────────────
   const executeScan = useCallback(async () => {
     setPhase("loading");
     if (!qrCode) {
@@ -669,14 +651,12 @@ export default function ScanResult() {
       return;
     }
 
-    // Fire IP geo + device detection in parallel (non-blocking)
     const [ipGeo, deviceInfo] = await Promise.all([
       fetchIpGeo(),
       Promise.resolve(detectDevice()),
     ]);
 
     try {
-      // ── Fetch QR record ────────────────────────────────────────────────────
       const { data: qrRows, error: qrErr } = await supabase
         .from("qr_codes")
         .select(
@@ -686,7 +666,6 @@ export default function ScanResult() {
         .limit(1);
 
       if (qrErr || !qrRows || qrRows.length === 0) {
-        // Log the failed attempt too
         await writeScanLog({
           qrCodeStr: qrCode,
           outcome: "not_found",
@@ -701,7 +680,6 @@ export default function ScanResult() {
       const qr = qrRows[0];
       setQrRecord(qr);
 
-      // ── Guards ─────────────────────────────────────────────────────────────
       if (!qr.is_active) {
         await writeScanLog({
           qrId: qr.id,
@@ -742,7 +720,6 @@ export default function ScanResult() {
         return;
       }
 
-      // ── Fetch user session ─────────────────────────────────────────────────
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -759,7 +736,6 @@ export default function ScanResult() {
         profile = prof;
       }
 
-      // ── Parse action stack ─────────────────────────────────────────────────
       let actions = [];
       if (Array.isArray(qr.scan_actions)) {
         actions = qr.scan_actions;
@@ -770,8 +746,6 @@ export default function ScanResult() {
           actions = [];
         }
       }
-
-      // Legacy fallback for old product_insert codes with no scan_actions
       if (actions.length === 0 && qr.qr_type === "product_insert") {
         actions = [
           {
@@ -783,7 +757,6 @@ export default function ScanResult() {
         ];
       }
 
-      // ── Execute actions ────────────────────────────────────────────────────
       let pointsAwardedAmt = 0;
       let pointsWasSkipped = false;
       let pointsWasSkipReason = "";
@@ -801,7 +774,6 @@ export default function ScanResult() {
               break;
             }
             const pts = action.points || qr.points_value || 10;
-
             if (
               action.one_time &&
               qr.claimed &&
@@ -815,7 +787,6 @@ export default function ScanResult() {
               pointsWasSkipReason = "already_claimed";
               break;
             }
-
             if (!action.one_time && action.cooldown_hrs && qr.last_scan_at) {
               const hrs =
                 (Date.now() - new Date(qr.last_scan_at).getTime()) / 3600000;
@@ -830,20 +801,16 @@ export default function ScanResult() {
                 break;
               }
             }
-
             const currentPts = profile?.loyalty_points || 0;
             const newTotal = currentPts + pts;
-
             const { error: ptErr } = await supabase
               .from("user_profiles")
               .update({ loyalty_points: newTotal })
               .eq("id", currentUser.id);
-
             if (!ptErr) {
               pointsAwardedAmt = pts;
               setPointsAwarded(pts);
               setTotalPoints(newTotal);
-
               if (action.one_time && !qr.claimed) {
                 await supabase
                   .from("qr_codes")
@@ -857,7 +824,6 @@ export default function ScanResult() {
             }
             break;
           }
-
           case "show_banner": {
             if (action.banner_id) {
               const { data: bannerData } = await supabase
@@ -869,13 +835,11 @@ export default function ScanResult() {
             }
             break;
           }
-
           case "show_product": {
             setShowProduct(true);
             setShowCoa(action.show_coa !== false);
             break;
           }
-
           case "event_checkin": {
             setEventCheckins((prev) => [
               ...prev,
@@ -886,17 +850,14 @@ export default function ScanResult() {
             ]);
             break;
           }
-
           case "custom_message": {
             setCustomMessages((prev) => [...prev, action]);
             break;
           }
-
           case "redirect": {
             pendingRedirect = { url: action.url, delay: action.delay_ms || 0 };
             break;
           }
-
           case "loyalty_signup": {
             if (!currentUser) {
               setCustomMessages((prev) => [
@@ -912,13 +873,11 @@ export default function ScanResult() {
             }
             break;
           }
-
           default:
             break;
         }
       }
 
-      // ── Increment scan_count on qr_codes ──────────────────────────────────
       await supabase
         .from("qr_codes")
         .update({
@@ -927,7 +886,6 @@ export default function ScanResult() {
         })
         .eq("id", qr.id);
 
-      // ── Write scan_log ─────────────────────────────────────────────────────
       const productLabel =
         qr.batches?.product_name || qr.campaign_name || qr.qr_type;
       const logId = await writeScanLog({
@@ -944,10 +902,8 @@ export default function ScanResult() {
         ipGeo,
         deviceInfo,
       });
-
       setScanLogId(logId);
 
-      // ── Write loyalty_transaction if points were awarded ───────────────────
       if (pointsAwardedAmt > 0 && currentUser) {
         const currentPts = profile?.loyalty_points || 0;
         await writeLoyaltyTransaction({
@@ -960,13 +916,10 @@ export default function ScanResult() {
         });
       }
 
-      // ── Show GPS prompt after a short delay (POPIA compliant — post-result) ─
-      // Only show on mobile, only for logged-in users who haven't dismissed
       if (currentUser && deviceInfo?.device === "mobile") {
         setTimeout(() => setShowGpsPrompt(true), 2500);
       }
 
-      // ── Fire redirect (delayed) ────────────────────────────────────────────
       if (pendingRedirect) {
         setTimeout(() => {
           if (pendingRedirect.url.startsWith("http")) {
@@ -995,18 +948,13 @@ export default function ScanResult() {
     executeScan();
   }, [executeScan]);
 
-  // ── GPS consent handlers ──────────────────────────────────────────────────
   const handleGpsAllow = async () => {
     setShowGpsPrompt(false);
     const gpsData = await requestGps();
-    if (gpsData && scanLogId) {
-      await updateScanLogWithGps(scanLogId, gpsData);
-    }
+    if (gpsData && scanLogId) await updateScanLogWithGps(scanLogId, gpsData);
   };
-
   const handleGpsDeny = () => setShowGpsPrompt(false);
 
-  // ── RENDER ────────────────────────────────────────────────────────────────
   const typeInfo = qrRecord
     ? QR_TYPE_LABELS[qrRecord.qr_type] || {
         icon: "🔍",
@@ -1029,8 +977,11 @@ export default function ScanResult() {
           50% { transform: scale(1.04); }
         }
         .sr-pts { animation: sr-pulse 0.6s ease 0.3s 2; }
-      `}
+        `}
       </style>
+
+      {/* ── WP-N: light variant — cream unscrolled → green on scroll ── */}
+      <ClientHeader variant="light" />
 
       <div
         style={{
@@ -1039,76 +990,9 @@ export default function ScanResult() {
           fontFamily: "Jost, sans-serif",
         }}
       >
-        {/* Header */}
-        <header
-          style={{
-            background: C.green,
-            padding: "0 24px",
-            height: 56,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "Cormorant Garamond, serif",
-              fontSize: 18,
-              fontWeight: 600,
-              color: C.white,
-              padding: 0,
-              letterSpacing: "0.05em",
-            }}
-          >
-            Protea Botanicals
-          </button>
-          {user ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-                {user.email?.split("@")[0]}
-              </span>
-              <button
-                onClick={() => navigate("/loyalty")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 16,
-                }}
-              >
-                ⭐
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => navigate("/account")}
-              style={{
-                background: C.accent,
-                border: "none",
-                borderRadius: 2,
-                padding: "7px 16px",
-                fontFamily: "Jost, sans-serif",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: C.green,
-                cursor: "pointer",
-              }}
-            >
-              Sign In
-            </button>
-          )}
-        </header>
-
         <div
           style={{ maxWidth: 500, margin: "0 auto", padding: "32px 20px 60px" }}
         >
-          {/* Loading */}
           {phase === "loading" && (
             <div style={{ textAlign: "center", padding: "60px 0" }}>
               <div style={{ fontSize: 36, marginBottom: 16 }}>🔍</div>
@@ -1120,13 +1004,10 @@ export default function ScanResult() {
             </div>
           )}
 
-          {/* Guard screen */}
           {phase === "guard" && <GuardScreen type={guardType} />}
 
-          {/* Success */}
           {phase === "done" && (
             <>
-              {/* Type header */}
               <div
                 className="sr-card"
                 style={{ textAlign: "center", marginBottom: 20 }}
@@ -1157,7 +1038,6 @@ export default function ScanResult() {
                 )}
               </div>
 
-              {/* Points */}
               {hasPoints && (
                 <div
                   className="sr-card sr-pts"
@@ -1172,21 +1052,18 @@ export default function ScanResult() {
                 </div>
               )}
 
-              {/* Banner */}
               {banner && (
                 <div className="sr-card" style={{ animationDelay: "0.1s" }}>
                   <BannerDisplay banner={banner} />
                 </div>
               )}
 
-              {/* Product */}
               {showProduct && qrRecord?.batches && (
                 <div className="sr-card" style={{ animationDelay: "0.15s" }}>
                   <ProductCard batch={qrRecord.batches} showCoa={showCoa} />
                 </div>
               )}
 
-              {/* Event checkins */}
               {eventCheckins.map((ec, i) => (
                 <div
                   key={i}
@@ -1200,7 +1077,6 @@ export default function ScanResult() {
                 </div>
               ))}
 
-              {/* Custom messages */}
               {customMessages.map((msg, i) => (
                 <div
                   key={i}
@@ -1211,18 +1087,15 @@ export default function ScanResult() {
                 </div>
               ))}
 
-              {/* GPS consent prompt (appears after 2.5s, mobile only) */}
               {showGpsPrompt && (
                 <div className="sr-card" style={{ animationDelay: "0s" }}>
                   <GpsConsentBanner
                     onAllow={handleGpsAllow}
                     onDeny={handleGpsDeny}
-                    scanLogId={scanLogId}
                   />
                 </div>
               )}
 
-              {/* Not signed in nudge */}
               {!user && hasPoints && (
                 <div
                   className="sr-card"
@@ -1251,7 +1124,6 @@ export default function ScanResult() {
                 </div>
               )}
 
-              {/* Loyalty shortcut */}
               {user && pointsAwarded > 0 && (
                 <div className="sr-card" style={{ animationDelay: "0.4s" }}>
                   <button
@@ -1263,7 +1135,6 @@ export default function ScanResult() {
                 </div>
               )}
 
-              {/* Scan another */}
               <div
                 className="sr-card"
                 style={{

@@ -1,20 +1,27 @@
-// src/pages/Redeem.js — v1.2 WP3 Cream Redesign
+// src/pages/Redeem.js — v1.3 WP-N ClientHeader Integration
 // ─────────────────────────────────────────────────────────────────────────────
-// v1.0  Initial build — standalone page with own wrapper, footer, fonts
-// v1.1  PageShell integration — removed duplicate wrapper/footer/font-import,
-//       adjusted padding for 900px PageShell container, imported C from tokens,
-//       simplified loading state
+// v1.3  WP-N: ClientHeader variant="light" added to all render branches.
+//       PageShell removed — Google Fonts @import and .shop-font / .body-font
+//       class definitions restored into sharedStyles (were provided by PageShell).
+//       All v1.2 data logic and layout preserved exactly.
 // v1.2  WP3 Cream Redesign — white cards (#e8e0d4 border), gold points cost,
 //       refined hero, EARNED/SPENT badges, dark footer, mobile responsive.
-//       ALL data logic preserved exactly from v1.1.
+// v1.1  PageShell integration — removed duplicate wrapper/footer/font-import.
+// v1.0  Initial build.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { C } from "../styles/tokens";
+import ClientHeader from "../components/ClientHeader";
 
-// CSS classes — font @import removed (PageShell handles Google Fonts)
 const sharedStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Jost:wght@300;400;500;600&display=swap');
+
+  /* Font utility classes (previously provided by PageShell) */
+  .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .body-font  { font-family: 'Jost', sans-serif; }
+
   .pb-btn {
     font-family: 'Jost', sans-serif;
     padding: 12px 32px;
@@ -132,10 +139,11 @@ export default function Redeem() {
     setRedeeming(null);
   };
 
-  // Simplified loading state — PageShell provides background
-  if (loading)
+  // ── Loading ──────────────────────────────────────────────────────────────
+  if (loading) {
     return (
       <>
+        <ClientHeader variant="light" />
         <style>{sharedStyles}</style>
         <div
           style={{
@@ -159,9 +167,12 @@ export default function Redeem() {
         </div>
       </>
     );
+  }
 
+  // ── Main render ──────────────────────────────────────────────────────────
   return (
     <>
+      <ClientHeader variant="light" />
       <style>{sharedStyles}</style>
 
       {/* ─── HERO ─── */}
@@ -207,7 +218,6 @@ export default function Redeem() {
         >
           Exchange your loyalty points for exclusive rewards.
         </p>
-        {/* Points display in hero */}
         <div style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>
           <span
             className="shop-font"
@@ -310,9 +320,7 @@ export default function Redeem() {
                   flexDirection: "column",
                 }}
               >
-                {/* Card content */}
                 <div style={{ padding: "24px 24px 0" }}>
-                  {/* Icon + Category */}
                   <div
                     style={{
                       display: "flex",
@@ -322,7 +330,7 @@ export default function Redeem() {
                     }}
                   >
                     <span style={{ fontSize: 32 }}>{reward.icon}</span>
-                    {canAfford && (
+                    {canAfford ? (
                       <span
                         style={{
                           fontSize: 9,
@@ -337,8 +345,7 @@ export default function Redeem() {
                       >
                         Available
                       </span>
-                    )}
-                    {!canAfford && (
+                    ) : (
                       <span
                         style={{
                           fontSize: 9,
@@ -355,8 +362,6 @@ export default function Redeem() {
                       </span>
                     )}
                   </div>
-
-                  {/* Name */}
                   <h3
                     className="shop-font"
                     style={{
@@ -369,8 +374,6 @@ export default function Redeem() {
                   >
                     {reward.name}
                   </h3>
-
-                  {/* Description */}
                   <p
                     className="body-font"
                     style={{
@@ -384,8 +387,6 @@ export default function Redeem() {
                     {reward.desc}
                   </p>
                 </div>
-
-                {/* Cost + button footer */}
                 <div
                   style={{
                     padding: "16px 24px",
