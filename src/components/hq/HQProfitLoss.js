@@ -1,13 +1,22 @@
-// src/components/hq/HQProfitLoss.js v1.0 — WP-E: Live P&L Waterfall Dashboard
+// src/components/hq/HQProfitLoss.js v2.2 — WP-Q: Live Data Integration
 // Protea Botanicals · Phase 2 · March 2026
-// New file — add to src/components/hq/
 //
-// Data sources:
-//   Revenue:   orders table (website) + shipments (wholesale estimate)
-//   Import COGS: purchase_orders.landed_cost_zar (received POs)
-//   Local COGS:  product_cogs × local_inputs (live calculation)
-//   OpEx:        manual entry, stored in localStorage for session
-//   Net Profit:  Gross Profit − OpEx
+// v2.2 — COGS methodology fix: Cost of Goods SOLD not Cost of Goods PURCHASED.
+//         Uses recipe engine (calcCogsTotal) × units sold — the correct source
+//         since recipes already know full per-cart cost (hardware, terpenes,
+//         distillate, packaging, labour). PO totals shown as balance-sheet ref only.
+// v2.1 — CRITICAL FIX: Use landed_cost_zar directly instead of subtotal × rate.
+//         Recalculating with null usd_zar_rate fell back to live FX → phantom R67k COGS.
+//         Incomplete POs (landed_cost_zar = R0) now flagged, not counted.
+// v2.0 — WP-Q Live Data Integration fixes:
+//   ★ CRITICAL FIX: orders.total_amount → orders.total (misnamed in v1.0 → silent R0 revenue bug)
+//   ★ orders status filter now excludes BOTH 'cancelled' AND 'failed'
+//   ★ Units estimate uses orders.items_count (replaces broken length × 2 hack)
+//   ★ Loyalty programme cost added as P&L line (loyalty_transactions EARNED pts × est. cost/pt)
+//   ★ Loyalty config fetched for real redemption_value_zar + breakage_rate
+//   ★ Per-source error indicators — no more silent R0 data gaps
+//   ★ Last-updated timestamp + manual refresh button
+//   ★ Data source status strip (shows which queries returned data vs 0 rows)
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -38,48 +47,110 @@ function useFxRate() {
   return { fxRate, fxLoading };
 }
 
-// ─── COGS calculation (mirrors HQCogs pattern) ────────────────────────────────
+// ─── COGS calculation — mirrors HQCogs v3.7 exactly ─────────────────────────
+// Supports chambers (multi-chamber JSONB), packaging_manual_zar, labour_manual_zar,
+// shipping_alloc_zar, terpene_qty_ul (µl), lab tests, transport, misc.
+const CANNALYTICS_TESTS = [
+  { id: "potency", price: 350 },
+  { id: "solvents", price: 200 },
+  { id: "microbial", price: 150 },
+  { id: "mycotoxins", price: 1800 },
+  { id: "heavy_metal", price: 1200 },
+  { id: "pesticide", price: 1000 },
+  { id: "terpene_profile", price: 750 },
+  { id: "foreign_matter", price: 100 },
+];
+
 function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
   if (!recipe || !usdZar) return 0;
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
-  const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
-  const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
   const pk = localInputs.find((i) => i.id === recipe.packaging_input_id);
   const lb = localInputs.find((i) => i.id === recipe.labour_input_id);
+
   const hwCost = hw
     ? parseFloat(recipe.hardware_qty || 1) *
         parseFloat(hw.unit_price_usd) *
         usdZar +
       parseFloat(recipe.shipping_alloc_zar || 0)
     : 0;
-  const tpCost = tp
-    ? parseFloat(recipe.terpene_qty_g || 0) *
-      (parseFloat(tp.unit_price_usd) / 50) *
-      usdZar
-    : 0;
-  const diCost = di?.cost_zar
-    ? parseFloat(recipe.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
-    : 0;
-  const pkCost = pk?.cost_zar
-    ? parseFloat(recipe.packaging_qty || 1) * parseFloat(pk.cost_zar)
-    : 0;
-  const lbCost = lb?.cost_zar
-    ? parseFloat(recipe.labour_qty || 1) * parseFloat(lb.cost_zar)
-    : 0;
+
+  let tpCost = 0;
+  let diCost = 0;
+  const chamberData =
+    Array.isArray(recipe.chambers) && recipe.chambers.length > 1
+      ? recipe.chambers
+      : null;
+
+  if (chamberData) {
+    chamberData.forEach((ch) => {
+      const chTp = supplierProducts.find((p) => p.id === ch.terpene_item_id);
+      const chDi = localInputs.find((i) => i.id === ch.distillate_input_id);
+      const ul = parseFloat(ch.terpene_qty_ul || 0);
+      const cpml = chTp ? (parseFloat(chTp.unit_price_usd) / 50) * usdZar : 0;
+      tpCost += chTp ? (ul / 1000) * cpml : 0;
+      diCost +=
+        chDi && chDi.cost_zar
+          ? parseFloat(ch.distillate_qty_ml || 0) * parseFloat(chDi.cost_zar)
+          : 0;
+    });
+  } else {
+    const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
+    const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
+    const terpUl = parseFloat(recipe.terpene_qty_ul || 0);
+    const tpCostPerMl = tp ? (parseFloat(tp.unit_price_usd) / 50) * usdZar : 0;
+    tpCost = tp ? (terpUl / 1000) * tpCostPerMl : 0;
+    diCost =
+      di && di.cost_zar
+        ? parseFloat(recipe.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
+        : 0;
+  }
+
+  const pkRate =
+    recipe.packaging_manual_zar != null && recipe.packaging_manual_zar !== ""
+      ? parseFloat(recipe.packaging_manual_zar)
+      : pk && pk.cost_zar
+        ? parseFloat(pk.cost_zar)
+        : 0;
+  const pkCost =
+    pkRate > 0 ? parseFloat(recipe.packaging_qty || 1) * pkRate : 0;
+
+  const lbRate =
+    recipe.labour_manual_zar != null && recipe.labour_manual_zar !== ""
+      ? parseFloat(recipe.labour_manual_zar)
+      : lb && lb.cost_zar
+        ? parseFloat(lb.cost_zar)
+        : 0;
+  const lbCost = lbRate > 0 ? parseFloat(recipe.labour_qty || 1) * lbRate : 0;
+
+  const batchSize = Math.max(1, parseInt(recipe.batch_size || 1));
+  const labTests = Array.isArray(recipe.lab_tests) ? recipe.lab_tests : [];
+  const labTotal = labTests.reduce((s, id) => {
+    const t = CANNALYTICS_TESTS.find((x) => x.id === id);
+    return s + (t ? t.price : 0);
+  }, 0);
+  const labPerUnit = labTotal / batchSize;
+  const transPerU = parseFloat(recipe.transport_cost_zar || 0) / batchSize;
+  const miscPerU = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
+
   return (
     hwCost +
     tpCost +
     diCost +
     pkCost +
     lbCost +
-    parseFloat(recipe.other_cost_zar || 0)
+    labPerUnit +
+    transPerU +
+    miscPerU
   );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtZar = (n, abs = false) => {
   const val = abs ? Math.abs(parseFloat(n) || 0) : parseFloat(n) || 0;
-  return `R${val.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `R${val.toLocaleString("en-ZA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 const pctColour = (pct) =>
@@ -93,18 +164,21 @@ const PERIODS = [
   { id: "all", label: "All time" },
 ];
 
+function periodStart(period) {
+  const now = new Date();
+  if (period === "30d") return new Date(now - 30 * 86400000).toISOString();
+  if (period === "90d") return new Date(now - 90 * 86400000).toISOString();
+  if (period === "mtd")
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  if (period === "ytd") return new Date(now.getFullYear(), 0, 1).toISOString();
+  return null; // all time — no filter
+}
+
 function periodFilter(dateStr, period) {
   if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  if (period === "30d") return d >= new Date(now - 30 * 86400000);
-  if (period === "90d") return d >= new Date(now - 90 * 86400000);
-  if (period === "mtd")
-    return (
-      d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-    );
-  if (period === "ytd") return d.getFullYear() === now.getFullYear();
-  return true; // all
+  const start = periodStart(period);
+  if (!start) return true;
+  return new Date(dateStr) >= new Date(start);
 }
 
 // ─── Waterfall Row ────────────────────────────────────────────────────────────
@@ -168,7 +242,6 @@ function WRow({
   );
 }
 
-// ─── Section Header ───────────────────────────────────────────────────────────
 function SectionHeader({ label, icon }) {
   return (
     <div
@@ -191,6 +264,41 @@ function SectionHeader({ label, icon }) {
   );
 }
 
+// ─── Data Source Status Badge ─────────────────────────────────────────────────
+function DataBadge({ label, ok, count }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "4px 10px",
+        background: ok ? "rgba(46,125,50,0.07)" : "rgba(198,40,40,0.07)",
+        border: `1px solid ${ok ? "#a5d6a7" : "#ef9a9a"}`,
+        borderRadius: 20,
+        fontSize: 11,
+        color: ok ? "#2E7D32" : "#c62828",
+        fontWeight: 500,
+      }}
+    >
+      <span>{ok ? "✓" : "⚠"}</span>
+      {label}
+      {count !== undefined && (
+        <span
+          style={{
+            background: ok ? "#c8e6c9" : "#ffcdd2",
+            borderRadius: 10,
+            padding: "0 6px",
+            fontWeight: 700,
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
@@ -205,12 +313,16 @@ export default function HQProfitLoss() {
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [localInputs, setLocalInputs] = useState([]);
   const [pricing, setPricing] = useState([]);
+  const [loyaltyTxns, setLoyaltyTxns] = useState([]);
+  const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [dataErrors, setDataErrors] = useState({});
 
   // Period
   const [period, setPeriod] = useState("30d");
 
-  // Manual OpEx (session state — no DB persistence needed for MVP)
+  // Manual OpEx
   const [opexItems, setOpexItems] = useState([
     { id: 1, label: "Shipping out to stores", amount: "" },
     { id: 2, label: "Other overheads", amount: "" },
@@ -221,14 +333,18 @@ export default function HQProfitLoss() {
   // FX sensitivity
   const [fxScenario, setFxScenario] = useState("");
 
-  // ── Fetch ────────────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [r1, r2, r3, r4, r5, r6] = await Promise.all([
+    const errors = {};
+
+    // ── FIXED v2.0: column is `total` not `total_amount` ──────────────
+    // Also added items_count, and excluded both 'cancelled' AND 'failed'
+    const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
       supabase
         .from("orders")
-        .select("id, created_at, total_amount, status")
-        .neq("status", "cancelled"),
+        .select("id, created_at, total, status, items_count, currency")
+        .not("status", "in", '("cancelled","failed")'),
       supabase
         .from("purchase_orders")
         .select(
@@ -239,13 +355,32 @@ export default function HQProfitLoss() {
       supabase.from("supplier_products").select("*").eq("is_active", true),
       supabase.from("local_inputs").select("*").eq("is_active", true),
       supabase.from("product_pricing").select("*"),
+      // v2.0: loyalty transactions for programme cost
+      supabase
+        .from("loyalty_transactions")
+        .select("points, transaction_type, created_at"),
+      // v2.0: loyalty config for real redemption value + breakage rate
+      supabase
+        .from("loyalty_config")
+        .select("redemption_value_zar, breakage_rate")
+        .maybeSingle(),
     ]);
+
+    if (r1.error) errors.orders = r1.error.message;
+    if (r2.error) errors.pos = r2.error.message;
+    if (r3.error) errors.cogs = r3.error.message;
+    if (r7.error) errors.loyalty = r7.error.message;
+
     setOrders(r1.data || []);
     setPurchaseOrders(r2.data || []);
     setRecipes(r3.data || []);
     setSupplierProducts(r4.data || []);
     setLocalInputs(r5.data || []);
     setPricing(r6.data || []);
+    setLoyaltyTxns(r7.data || []);
+    setLoyaltyConfig(r8.data || null);
+    setDataErrors(errors);
+    setLastUpdated(new Date());
     setLoading(false);
   }, []);
 
@@ -272,69 +407,113 @@ export default function HQProfitLoss() {
 
   // ── P&L Calculations ──────────────────────────────────────────────────
 
-  // Revenue: website orders
+  // Revenue: website orders — FIXED v2.0: field is `total` not `total_amount`
   const filteredOrders = orders.filter((o) =>
     periodFilter(o.created_at, period),
   );
   const websiteRevenue = filteredOrders.reduce(
-    (s, o) => s + (parseFloat(o.total_amount) || 0),
+    (s, o) => s + (parseFloat(o.total) || 0), // ← FIXED: was total_amount
+    0,
+  );
+  // Units sold: use items_count (FIXED v2.0: replaces broken length × 2 hack)
+  const totalUnitsSold = filteredOrders.reduce(
+    (s, o) => s + (parseInt(o.items_count) || 1),
     0,
   );
 
-  // Import COGS: landed_cost_zar from received POs in period
+  // PO data for inventory investment reference (balance sheet display only)
   const filteredPOs = purchaseOrders.filter((po) =>
     periodFilter(po.order_date, period),
   );
-  const importCogsHardware = filteredPOs.reduce((s, po) => {
-    // Approximate split: subtotal × rate = import product cost, rest = shipping
-    const productCost =
-      (parseFloat(po.subtotal) || 0) * (parseFloat(po.usd_zar_rate) || usdZar);
-    return s + productCost;
-  }, 0);
-  const importCogsShipping = filteredPOs.reduce((s, po) => {
-    return (
-      s +
-      (parseFloat(po.shipping_cost_usd) || 0) *
-        (parseFloat(po.usd_zar_rate) || usdZar)
-    );
-  }, 0);
-  const totalImportCogs = importCogsHardware + importCogsShipping;
+  const completedPOs = filteredPOs.filter(
+    (po) => parseFloat(po.landed_cost_zar) > 0,
+  );
+  const incompletePOs = filteredPOs.filter(
+    (po) => parseFloat(po.landed_cost_zar) <= 0 && parseFloat(po.subtotal) > 0,
+  );
+  const totalInventoryInvestment = completedPOs.reduce(
+    (s, po) => s + parseFloat(po.landed_cost_zar),
+    0,
+  );
 
-  // Live COGS per unit for each recipe (used for per-unit cost reference)
+  // ── v2.2 COGS: Recipe-engine × units sold ──────────────────────────────
+  // The recipe engine (calcCogsTotal) already knows the full cost to produce
+  // one finished cart — hardware (import), terpenes (import), distillate,
+  // packaging, labour, lab tests, etc. This is the correct per-unit COGS.
+  // Total COGS = avg recipe COGS/unit × actual units sold this period.
+  // PO totals are shown as "Inventory investment" reference (balance sheet).
   const recipesWithCogs = recipes.map((r) => ({
     ...r,
     cogsPerUnit: calcCogsTotal(r, supplierProducts, localInputs, usdZar),
   }));
 
-  // Local COGS estimate from local_inputs (distillate, packaging, labour)
-  // Approximate: sum of all local input cost × units sold (from orders)
-  // Since we don't have per-order item breakdown yet, show as reference only
-  const localCogsPerUnit =
+  // Avg full COGS/unit across all active recipes
+  const avgFullCogsPerUnit =
+    recipesWithCogs.length > 0
+      ? recipesWithCogs.reduce((s, r) => s + r.cogsPerUnit, 0) /
+        recipesWithCogs.length
+      : 0;
+
+  // Split import vs local for waterfall display
+  const avgImportCogsPerUnit =
     recipesWithCogs.length > 0
       ? recipesWithCogs.reduce((s, r) => {
-          const di = localInputs.find((i) => i.id === r.distillate_input_id);
-          const pk = localInputs.find((i) => i.id === r.packaging_input_id);
-          const lb = localInputs.find((i) => i.id === r.labour_input_id);
-          const diC = di?.cost_zar
-            ? parseFloat(r.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
+          const hw = supplierProducts.find((p) => p.id === r.hardware_item_id);
+          const tp = supplierProducts.find((p) => p.id === r.terpene_item_id);
+          const hwCost = hw
+            ? parseFloat(r.hardware_qty || 1) *
+                parseFloat(hw.unit_price_usd) *
+                usdZar +
+              parseFloat(r.shipping_alloc_zar || 0)
             : 0;
-          const pkC = pk?.cost_zar
-            ? parseFloat(r.packaging_qty || 1) * parseFloat(pk.cost_zar)
+          const tpUl = parseFloat(r.terpene_qty_ul || 0);
+          const tpCostPerMl = tp
+            ? (parseFloat(tp.unit_price_usd) / 50) * usdZar
             : 0;
-          const lbC = lb?.cost_zar
-            ? parseFloat(r.labour_qty || 1) * parseFloat(lb.cost_zar)
-            : 0;
-          return s + diC + pkC + lbC;
+          const tpCost = tp ? (tpUl / 1000) * tpCostPerMl : 0;
+          return s + hwCost + tpCost;
         }, 0) / recipesWithCogs.length
       : 0;
-  const estUnits = filteredOrders.length > 0 ? filteredOrders.length * 2 : 0; // rough estimate 2 units per order
-  const localCogsTotal = localCogsPerUnit * estUnits;
 
-  const totalCogs = totalImportCogs + localCogsTotal;
+  const avgLocalCogsPerUnit = avgFullCogsPerUnit - avgImportCogsPerUnit;
+
+  const importCogsSold = avgImportCogsPerUnit * totalUnitsSold;
+  const localCogsTotal = avgLocalCogsPerUnit * totalUnitsSold;
+  const importCogsHardware = importCogsSold;
+  const importCogsShipping = 0; // baked into shipping_alloc_zar in recipe
+
+  const totalCogs = avgFullCogsPerUnit * totalUnitsSold;
   const grossProfit = websiteRevenue - totalCogs;
   const grossMarginPct =
     websiteRevenue > 0 ? (grossProfit / websiteRevenue) * 100 : 0;
-  const netProfit = grossProfit - totalOpex;
+
+  // NEW v2.0: Loyalty programme cost
+  // Earned points × estimated cost per point (redemption_value × (1 - breakage))
+  const redemptionValue = loyaltyConfig?.redemption_value_zar ?? 0.1;
+  const breakageRate = loyaltyConfig?.breakage_rate ?? 0.3;
+  const costPerPointIssued = redemptionValue * (1 - breakageRate);
+
+  const filteredLoyaltyEarned = loyaltyTxns.filter(
+    (t) =>
+      periodFilter(t.created_at, period) &&
+      [
+        "EARNED",
+        "earned",
+        "EARNED_POINTS",
+        "SCAN",
+        "survey",
+        "birthday_bonus",
+      ].includes(t.transaction_type),
+  );
+  const earnedPoints = filteredLoyaltyEarned.reduce(
+    (s, t) => s + (t.points || 0),
+    0,
+  );
+  const loyaltyCost = earnedPoints * costPerPointIssued;
+
+  const totalOpexIncLoyalty = totalOpex + loyaltyCost;
+
+  const netProfit = grossProfit - totalOpexIncLoyalty;
   const netMarginPct =
     websiteRevenue > 0 ? (netProfit / websiteRevenue) * 100 : 0;
 
@@ -360,7 +539,7 @@ export default function HQProfitLoss() {
     return best;
   })();
 
-  // Break-even: at avg COGS per unit, how many units to cover all costs
+  // Break-even
   const avgCogsPerUnit =
     recipesWithCogs.length > 0
       ? recipesWithCogs.reduce((s, r) => s + r.cogsPerUnit, 0) /
@@ -376,16 +555,19 @@ export default function HQProfitLoss() {
       : 0;
   })();
   const breakEvenUnits =
-    avgSellPrice > avgCogsPerUnit && totalOpex > 0
-      ? Math.ceil(totalOpex / (avgSellPrice - avgCogsPerUnit))
+    avgSellPrice > avgCogsPerUnit && totalOpexIncLoyalty > 0
+      ? Math.ceil(totalOpexIncLoyalty / (avgSellPrice - avgCogsPerUnit))
       : null;
 
-  // FX sensitivity
+  // FX sensitivity — scales import portion of recipe COGS
   const scenarioRate = parseFloat(fxScenario) || usdZar;
-  const scenarioCogs = totalImportCogs * (scenarioRate / usdZar);
-  const scenarioGross = websiteRevenue - scenarioCogs - localCogsTotal;
+  const scenarioImportCogs =
+    usdZar > 0 ? importCogsSold * (scenarioRate / usdZar) : importCogsSold;
+  const scenarioGross = websiteRevenue - scenarioImportCogs - localCogsTotal;
   const scenarioGrossMargin =
     websiteRevenue > 0 ? (scenarioGross / websiteRevenue) * 100 : 0;
+
+  const hasDataErrors = Object.keys(dataErrors).length > 0;
 
   // ── Styles ────────────────────────────────────────────────────────────
   const card = {
@@ -404,9 +586,6 @@ export default function HQProfitLoss() {
     boxSizing: "border-box",
   };
 
-  // ══════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════════════════
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
       {/* Header */}
@@ -415,7 +594,9 @@ export default function HQProfitLoss() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 28,
+          marginBottom: 20,
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
         <div>
@@ -430,19 +611,28 @@ export default function HQProfitLoss() {
           >
             P&L Dashboard
           </h2>
-          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>
+          <p style={{ margin: "4px 0 0", color: "#888", fontSize: 13 }}>
             Live profit & loss · supplier cost to customer sale
+            {lastUpdated && (
+              <span style={{ color: "#bbb", marginLeft: 10 }}>
+                · Updated{" "}
+                {lastUpdated.toLocaleTimeString("en-ZA", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </span>
+            )}
           </p>
         </div>
         <div
           style={{
             display: "flex",
-            gap: 12,
+            gap: 10,
             alignItems: "center",
             flexWrap: "wrap",
           }}
         >
-          {/* FX pill */}
           <div
             style={{
               background: fxLoading ? "#f5f5f5" : "#e8f5e9",
@@ -458,7 +648,6 @@ export default function HQProfitLoss() {
               ? "Loading FX…"
               : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
           </div>
-          {/* Period selector */}
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
@@ -476,7 +665,100 @@ export default function HQProfitLoss() {
               </option>
             ))}
           </select>
+          <button
+            onClick={fetchAll}
+            disabled={loading}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "1px solid #e0e0e0",
+              background: "#fafafa",
+              color: "#555",
+              cursor: loading ? "wait" : "pointer",
+              fontFamily: "Jost, sans-serif",
+              fontSize: 13,
+              fontWeight: 600,
+              opacity: loading ? 0.5 : 1,
+            }}
+          >
+            ↻ Refresh
+          </button>
         </div>
+      </div>
+
+      {/* ── Data source status strip ─────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          marginBottom: 20,
+          padding: "12px 16px",
+          background: hasDataErrors ? "#fff8f8" : "#f8fdf9",
+          border: `1px solid ${hasDataErrors ? "#ffcdd2" : "#c8e6c9"}`,
+          borderRadius: 8,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            color: "#888",
+            alignSelf: "center",
+            marginRight: 4,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}
+        >
+          Data sources:
+        </span>
+        <DataBadge
+          label="Orders"
+          ok={!dataErrors.orders && orders.length >= 0}
+          count={filteredOrders.length}
+        />
+        <DataBadge
+          label="Purchase Orders"
+          ok={!dataErrors.pos && purchaseOrders.length >= 0}
+          count={completedPOs.length}
+        />
+        {incompletePOs.length > 0 && (
+          <DataBadge
+            label={`${incompletePOs.length} PO${incompletePOs.length !== 1 ? "s" : ""} incomplete (R0 landed — not counted)`}
+            ok={false}
+          />
+        )}
+        <DataBadge
+          label="COGS Recipes"
+          ok={!dataErrors.cogs && recipes.length >= 0}
+          count={recipes.length}
+        />
+        <DataBadge
+          label="Pricing"
+          ok={pricing.length > 0}
+          count={pricing.length}
+        />
+        <DataBadge
+          label="Loyalty"
+          ok={!dataErrors.loyalty}
+          count={filteredLoyaltyEarned.length}
+        />
+        {hasDataErrors && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "#c62828",
+              alignSelf: "center",
+              marginLeft: 4,
+            }}
+          >
+            {Object.entries(dataErrors).map(([k, v]) => (
+              <span key={k} style={{ marginRight: 8 }}>
+                ⚠ {k}: {v}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -492,21 +774,21 @@ export default function HQProfitLoss() {
             alignItems: "start",
           }}
         >
-          {/* ── LEFT: WATERFALL ─────────────────────────────────────── */}
+          {/* ── LEFT: WATERFALL ──────────────────────────────────────── */}
           <div>
             <div style={card}>
-              {/* ── REVENUE ── */}
+              {/* REVENUE */}
               <SectionHeader icon="💰" label="Revenue" />
               <WRow
-                label="Website sales"
-                sub={`${filteredOrders.length} orders · ${PERIODS.find((p) => p.id === period)?.label}`}
+                label="Website / direct sales"
+                sub={`${filteredOrders.length} orders · ${totalUnitsSold} units · ${PERIODS.find((p) => p.id === period)?.label}`}
                 value={websiteRevenue}
                 indent={1}
                 highlight={websiteRevenue > 0 ? "green" : undefined}
               />
               <WRow
                 label="Wholesale / store sales"
-                sub="Manual entry — add below in OpEx section"
+                sub="Not yet tracked — add wholesale invoices to orders table or enter manually below"
                 value={0}
                 indent={1}
                 dim
@@ -518,33 +800,31 @@ export default function HQProfitLoss() {
                 highlight={websiteRevenue > 0 ? "green" : undefined}
               />
 
-              {/* ── COST OF GOODS SOLD ── */}
+              {/* COGS */}
               <SectionHeader icon="📦" label="Cost of Goods Sold" />
               <WRow
-                label="Imported hardware (landed cost)"
-                sub={`${filteredPOs.length} received POs · locked FX rates`}
+                label="Imported hardware & terpenes (recipe cost)"
+                sub={
+                  avgImportCogsPerUnit > 0
+                    ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded from investment ref` : ""}`
+                    : "⚠ Set hardware & terpene prices in HQ → Suppliers"
+                }
                 value={importCogsHardware}
                 indent={1}
                 negative
-              />
-              <WRow
-                label="Import shipping & clearance"
-                sub="DDP Air fees from received POs"
-                value={importCogsShipping}
-                indent={1}
-                negative
+                dim={avgImportCogsPerUnit === 0}
               />
               <WRow
                 label="Local inputs (distillate · packaging · labour)"
                 sub={
-                  localCogsPerUnit > 0
-                    ? `~R${fmt(localCogsPerUnit)}/unit avg · ${estUnits} est. units`
-                    : "Set costs in HQ → Costing → Local Inputs"
+                  avgLocalCogsPerUnit > 0
+                    ? `R${fmt(avgLocalCogsPerUnit)} avg local/unit × ${totalUnitsSold} units sold`
+                    : "⚠ Set costs in HQ → Costing → Local Inputs tab"
                 }
                 value={localCogsTotal}
                 indent={1}
                 negative
-                dim={localCogsPerUnit === 0}
+                dim={avgLocalCogsPerUnit === 0}
               />
               <WRow
                 label="Total COGS"
@@ -553,12 +833,46 @@ export default function HQProfitLoss() {
                 negative
                 highlight={totalCogs > 0 ? "red" : undefined}
               />
+              {/* Inventory investment reference — NOT part of COGS */}
+              {totalInventoryInvestment > 0 && (
+                <div
+                  style={{
+                    margin: "0 16px 8px",
+                    padding: "8px 12px",
+                    background: "#f8f9fa",
+                    border: "1px solid #e8e8e8",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    color: "#999",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span>
+                    📦 Inventory investment this period (balance sheet, not P&L)
+                    — {completedPOs.length} PO
+                    {completedPOs.length !== 1 ? "s" : ""} totalling{" "}
+                    <strong style={{ color: "#666" }}>
+                      {fmtZar(totalInventoryInvestment)}
+                    </strong>
+                  </span>
+                  <span
+                    style={{
+                      color: "#bbb",
+                      marginLeft: 8,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    P&L shows {totalUnitsSold} units sold only
+                  </span>
+                </div>
+              )}
 
-              {/* ── GROSS PROFIT ── */}
+              {/* GROSS PROFIT */}
               <SectionHeader icon="📊" label="Gross Profit" />
               <WRow
                 label="Gross Profit"
-                sub={`Margin: ${fmt(grossMarginPct)}%`}
+                sub={`Gross margin: ${fmt(grossMarginPct)}%`}
                 value={grossProfit}
                 bold
                 borderTop
@@ -571,8 +885,44 @@ export default function HQProfitLoss() {
                 }
               />
 
-              {/* ── OPERATING COSTS ── */}
-              <SectionHeader icon="⚙️" label="Operating Costs (manual)" />
+              {/* OPERATING COSTS */}
+              <SectionHeader icon="⚙️" label="Operating Costs" />
+
+              {/* NEW v2.0: Loyalty programme cost as a real P&L line */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "8px 16px 8px 36px",
+                  background:
+                    loyaltyCost > 0 ? "rgba(181,147,90,0.04)" : "transparent",
+                }}
+              >
+                <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
+                  Loyalty programme cost
+                </span>
+                <span style={{ fontSize: 11, color: "#aaa", flex: 2 }}>
+                  {earnedPoints.toLocaleString()} pts × R
+                  {fmt(costPerPointIssued, 4)}/pt
+                  {loyaltyConfig
+                    ? ` (R${fmt(redemptionValue, 2)} val · ${Math.round(breakageRate * 100)}% breakage)`
+                    : " (default rates)"}
+                </span>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: loyaltyCost > 0 ? "#c62828" : "#bbb",
+                    minWidth: 100,
+                    textAlign: "right",
+                  }}
+                >
+                  {loyaltyCost > 0 ? `−${fmtZar(loyaltyCost)}` : "—"}
+                </span>
+                <div style={{ width: 24 }} />
+              </div>
+
+              {/* Manual OpEx items */}
               {opexItems.map((item) => (
                 <div
                   key={item.id}
@@ -612,7 +962,7 @@ export default function HQProfitLoss() {
                     style={{
                       fontSize: 13,
                       color: "#c62828",
-                      minWidth: 90,
+                      minWidth: 100,
                       textAlign: "right",
                     }}
                   >
@@ -632,6 +982,7 @@ export default function HQProfitLoss() {
                   </button>
                 </div>
               ))}
+
               {/* Add OpEx row */}
               <div
                 style={{
@@ -676,14 +1027,14 @@ export default function HQProfitLoss() {
                 </button>
               </div>
               <WRow
-                label="Total OpEx"
-                value={totalOpex}
+                label="Total OpEx (incl. loyalty)"
+                value={totalOpexIncLoyalty}
                 bold
                 negative
-                highlight={totalOpex > 0 ? "red" : undefined}
+                highlight={totalOpexIncLoyalty > 0 ? "red" : undefined}
               />
 
-              {/* ── NET PROFIT ── */}
+              {/* NET PROFIT */}
               <SectionHeader icon="🏁" label="Net Profit / Loss" />
               <div
                 style={{
@@ -734,7 +1085,6 @@ export default function HQProfitLoss() {
                     </div>
                   </div>
                 </div>
-                {/* Gross vs Net margin bar */}
                 {websiteRevenue > 0 && (
                   <div style={{ marginTop: 16 }}>
                     <div
@@ -744,6 +1094,7 @@ export default function HQProfitLoss() {
                         fontSize: 12,
                         color: "#888",
                         marginBottom: 6,
+                        flexWrap: "wrap",
                       }}
                     >
                       <span>
@@ -756,6 +1107,13 @@ export default function HQProfitLoss() {
                         Net margin:{" "}
                         <strong style={{ color: pctColour(netMarginPct) }}>
                           {fmt(netMarginPct)}%
+                        </strong>
+                      </span>
+                      <span>
+                        Loyalty cost:{" "}
+                        <strong style={{ color: "#b5935a" }}>
+                          {fmtZar(loyaltyCost)} ({earnedPoints.toLocaleString()}{" "}
+                          pts)
                         </strong>
                       </span>
                     </div>
@@ -783,15 +1141,15 @@ export default function HQProfitLoss() {
             </div>
           </div>
 
-          {/* ── RIGHT: INTEL PANELS ─────────────────────────────────── */}
+          {/* ── RIGHT: INTEL PANELS ──────────────────────────────────── */}
           <div>
-            {/* FX Impact strip */}
+            {/* FX Impact */}
             <div style={{ ...card, padding: 0 }}>
               <SectionHeader icon="📡" label="Live FX Impact" />
               <div style={{ padding: "16px 20px" }}>
                 <p style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}>
                   What if USD/ZAR moves? Enter a scenario rate to see the impact
-                  on your gross margin.
+                  on gross margin.
                 </p>
                 <div
                   style={{
@@ -830,41 +1188,29 @@ export default function HQProfitLoss() {
                       padding: "14px 16px",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 13,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span style={{ color: "#888" }}>Current rate</span>
-                      <strong>R{usdZar.toFixed(4)}/USD</strong>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 13,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span style={{ color: "#888" }}>Scenario rate</span>
-                      <strong>R{fmt(scenarioRate, 4)}/USD</strong>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 13,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span style={{ color: "#888" }}>Est. import COGS</span>
-                      <strong style={{ color: "#c62828" }}>
-                        {fmtZar(scenarioCogs)}
-                      </strong>
-                    </div>
+                    {[
+                      ["Current rate", `R${usdZar.toFixed(4)}/USD`],
+                      ["Scenario rate", `R${fmt(scenarioRate, 4)}/USD`],
+                      [
+                        "Est. import COGS (sold units)",
+                        fmtZar(scenarioImportCogs),
+                      ],
+                    ].map(([label, val], i) => (
+                      <div
+                        key={label}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <span style={{ color: "#888" }}>{label}</span>
+                        <strong style={{ color: i === 2 ? "#c62828" : "#333" }}>
+                          {val}
+                        </strong>
+                      </div>
+                    ))}
                     <div
                       style={{
                         display: "flex",
@@ -896,6 +1242,69 @@ export default function HQProfitLoss() {
                     </strong>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Loyalty Programme Summary — NEW v2.0 */}
+            <div style={{ ...card, padding: 0 }}>
+              <SectionHeader icon="⭐" label="Loyalty Programme Cost" />
+              <div style={{ padding: "16px 20px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  {[
+                    ["Points Issued", earnedPoints.toLocaleString(), "#b5935a"],
+                    ["Est. Programme Cost", fmtZar(loyaltyCost), "#c62828"],
+                    [
+                      "Cost/Revenue %",
+                      websiteRevenue > 0
+                        ? `${fmt((loyaltyCost / websiteRevenue) * 100)}%`
+                        : "—",
+                      "#E65100",
+                    ],
+                    ["Cost/Point", `R${fmt(costPerPointIssued, 4)}`, "#2d4a2d"],
+                  ].map(([label, val, color]) => (
+                    <div
+                      key={label}
+                      style={{
+                        background: "#fafaf8",
+                        borderRadius: 8,
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <div
+                        style={{ fontSize: 11, color: "#aaa", marginBottom: 3 }}
+                      >
+                        {label}
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color }}>
+                        {val}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#999",
+                    background: "#f9f9f9",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Cost/pt = R{fmt(redemptionValue, 2)} redemption value ×{" "}
+                  {100 - Math.round(breakageRate * 100)}% expected redemption
+                  rate.
+                  {loyaltyConfig
+                    ? " Config from loyalty_config table."
+                    : " Using default rates — link loyalty_config for live values."}
+                </div>
               </div>
             </div>
 
@@ -966,7 +1375,7 @@ export default function HQProfitLoss() {
               </div>
             </div>
 
-            {/* Break-Even Calculator */}
+            {/* Break-Even */}
             <div style={{ ...card, padding: 0 }}>
               <SectionHeader icon="⚖️" label="Break-Even Calculator" />
               <div style={{ padding: "16px 20px" }}>
@@ -975,9 +1384,8 @@ export default function HQProfitLoss() {
                     <div
                       style={{ fontSize: 13, color: "#888", marginBottom: 14 }}
                     >
-                      At avg retail price{" "}
-                      <strong>{fmtZar(avgSellPrice)}</strong> and avg COGS{" "}
-                      <strong>{fmtZar(avgCogsPerUnit)}</strong> per unit:
+                      At avg retail <strong>{fmtZar(avgSellPrice)}</strong> and
+                      avg COGS <strong>{fmtZar(avgCogsPerUnit)}</strong>:
                     </div>
                     <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
                       <div
@@ -1035,7 +1443,7 @@ export default function HQProfitLoss() {
                         >
                           {breakEvenUnits
                             ? breakEvenUnits.toLocaleString()
-                            : totalOpex === 0
+                            : totalOpexIncLoyalty === 0
                               ? "Set OpEx ←"
                               : "∞"}
                         </div>
@@ -1052,8 +1460,9 @@ export default function HQProfitLoss() {
                         }}
                       >
                         You need to sell <strong>{breakEvenUnits}</strong> units
-                        at retail to cover your operating costs of{" "}
-                        <strong>{fmtZar(totalOpex)}</strong>.
+                        at retail to cover{" "}
+                        <strong>{fmtZar(totalOpexIncLoyalty)}</strong> in
+                        operating costs.
                       </div>
                     )}
                   </div>
@@ -1103,8 +1512,36 @@ export default function HQProfitLoss() {
                           <span style={{ color: "#ddd" }}>No prices set</span>
                         </div>
                       );
+                    const validPrices = chPrices.filter((p) =>
+                      recipesWithCogs.find((r) => r.id === p.product_cogs_id),
+                    );
+                    if (validPrices.length === 0)
+                      return (
+                        <div
+                          key={ch}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            padding: "8px 0",
+                            fontSize: 13,
+                            borderBottom: "1px solid #f5f5f5",
+                          }}
+                        >
+                          <span
+                            style={{
+                              textTransform: "capitalize",
+                              color: "#888",
+                            }}
+                          >
+                            {ch}
+                          </span>
+                          <span style={{ color: "#ccc", fontSize: 11 }}>
+                            COGS not configured
+                          </span>
+                        </div>
+                      );
                     const avgMargin =
-                      chPrices.reduce((s, p) => {
+                      validPrices.reduce((s, p) => {
                         const recipe = recipesWithCogs.find(
                           (r) => r.id === p.product_cogs_id,
                         );
@@ -1115,10 +1552,10 @@ export default function HQProfitLoss() {
                             parseFloat(p.sell_price_zar)) *
                             100
                         );
-                      }, 0) / chPrices.length;
+                      }, 0) / validPrices.length;
                     const col = pctColour(avgMargin);
                     return (
-                      <div key={ch} style={{ marginBottom: 12 }}>
+                      <div key={ch} style={{ marginBottom: 14 }}>
                         <div
                           style={{
                             display: "flex",
@@ -1162,6 +1599,12 @@ export default function HQProfitLoss() {
                               transition: "width 0.4s",
                             }}
                           />
+                        </div>
+                        <div
+                          style={{ fontSize: 11, color: "#bbb", marginTop: 3 }}
+                        >
+                          {validPrices.length} SKU
+                          {validPrices.length !== 1 ? "s" : ""} with pricing
                         </div>
                       </div>
                     );
