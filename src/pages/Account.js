@@ -1,18 +1,18 @@
-// src/pages/Account.js — Protea Botanicals v6.1
+// src/pages/Account.js — Protea Botanicals v6.2
 // ============================================================================
+// v6.2 — WP-8 POPIA Data Deletion Request
+//
+//   CHANGES from v6.1:
+//     - AccountView: deletionRequested + deletionLoading state vars added
+//     - AccountView: handleRequestDeletion() — inserts to deletion_requests
+//     - Details tab: POPIA section with "Request Data Deletion" button
+//     - All v6.1 functionality preserved exactly
+//
 // v6.1 — WP-O Loyalty Engine Integration
-//
-//   CHANGES from v6.0:
-//     - AccountView: loads loyalty_config (pts_referral_referrer/referee)
-//     - AccountView: loads/generates referral code from referral_codes table
-//     - Earn Rewards tab: referral code card with copy + WhatsApp share
-//     - Earn Rewards tab: tier multiplier shown in profile completion summary
-//     - No other changes — all v6.0 functionality preserved exactly
-//
 //   TIER 1 — My Details (always accessible)
 //   TIER 2 — Earn Rewards (OTP phone verification required)
 //   ADMIN CONFIG PANEL (admin role only)
-//   TABS: Details | Earn Rewards | Inbox | Activity
+//   TABS: Details | Earn Rewards | Inbox | Activity | Support
 // ============================================================================
 
 import { useState, useEffect, useContext, useRef, useCallback } from "react";
@@ -320,8 +320,7 @@ function AdminConfigModal({ config, onSave, onClose }) {
               ⚙ Points Config
             </div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
-              Admin only · Changes saved to localStorage · Total possible:{" "}
-              <strong>{totalPossible} pts</strong>
+              Admin only · Total possible: <strong>{totalPossible} pts</strong>
             </div>
           </div>
           <button
@@ -588,9 +587,7 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
           <strong style={{ color: C.gold }}>
             {totalPossible} bonus points
           </strong>{" "}
-          by completing your rewards profile. In exchange for sharing a little
-          more about yourself, you unlock exclusive perks, birthday gifts, and
-          early access to new drops.
+          by completing your rewards profile.
         </p>
         <div
           style={{
@@ -1134,7 +1131,7 @@ function AccountView({
   const [scansLoading, setScansLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
 
-  // ── v6.1: WP-O additions ─────────────────────────────────────────────────────
+  // v6.1: WP-O
   const [loyaltyConfig, setLoyaltyConfig] = useState({
     pts_referral_referrer: 100,
     pts_referral_referee: 50,
@@ -1142,6 +1139,10 @@ function AccountView({
   const [referralCode, setReferralCode] = useState(null);
   const [referralUses, setReferralUses] = useState(0);
   const [refCopied, setRefCopied] = useState(false);
+
+  // ── v6.2: WP-8 POPIA deletion ──────────────────────────────────────────────
+  const [deletionRequested, setDeletionRequested] = useState(false);
+  const [deletionLoading, setDeletionLoading] = useState(false);
 
   const isAdmin = role === "admin" || role === "hq";
 
@@ -1170,7 +1171,6 @@ function AccountView({
   // v6.1: load loyalty config + referral code
   useEffect(() => {
     async function loadRewardsMeta() {
-      // Fetch loyalty config (pts for referral display)
       const { data: cfg } = await supabase
         .from("loyalty_config")
         .select(
@@ -1178,11 +1178,8 @@ function AccountView({
         )
         .single();
       if (cfg) setLoyaltyConfig(cfg);
-
-      // Load or generate referral code
       let code = profile.referral_code;
       if (!code) {
-        // Check referral_codes table first
         const { data: existing } = await supabase
           .from("referral_codes")
           .select("code, uses_count")
@@ -1192,21 +1189,19 @@ function AccountView({
         if (existing) {
           code = existing.code;
           setReferralUses(existing.uses_count || 0);
-          // Backfill user_profiles.referral_code
           await supabase
             .from("user_profiles")
             .update({ referral_code: code })
             .eq("id", user.id);
         } else {
-          // Generate new code
           const name =
             (profile.full_name || "USER")
               .split(" ")[0]
               .toUpperCase()
               .replace(/[^A-Z]/g, "")
               .slice(0, 6) || "USER";
-          let newCode = name + Math.floor(Math.random() * 90 + 10);
-          let attempts = 0;
+          let newCode = name + Math.floor(Math.random() * 90 + 10),
+            attempts = 0;
           while (attempts < 5) {
             const { error: insertErr } = await supabase
               .from("referral_codes")
@@ -1239,6 +1234,32 @@ function AccountView({
   const showToast = (msg, color = C.accent) => {
     setToastMsg({ msg, color });
     setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  // v6.2: POPIA deletion request handler
+  const handleRequestDeletion = async () => {
+    if (
+      !window.confirm(
+        "Request deletion of your personal data?\n\nThis cannot be undone. A Protea Botanicals team member will process your request within 30 days as required by POPIA.",
+      )
+    )
+      return;
+    setDeletionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("deletion_requests")
+        .insert({ user_id: user.id });
+      if (error) throw error;
+      setDeletionRequested(true);
+      showToast(
+        "Deletion request submitted. We will process it within 30 days.",
+        C.blue,
+      );
+    } catch (err) {
+      showToast("Failed to submit request: " + err.message, C.red);
+    } finally {
+      setDeletionLoading(false);
+    }
   };
 
   // v6.1: referral helpers
@@ -1987,6 +2008,80 @@ function AccountView({
                 </div>
               )}
 
+              {/* ── v6.2: POPIA Data Deletion Request ────────────────────── */}
+              <div
+                style={{
+                  marginTop: 28,
+                  paddingTop: 20,
+                  borderTop: `1px solid ${C.border}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    color: C.muted,
+                    marginBottom: 10,
+                  }}
+                >
+                  Privacy & Data Rights (POPIA)
+                </div>
+                {deletionRequested ? (
+                  <div
+                    style={{
+                      background: C.lightBlue,
+                      border: `1px solid ${C.blue}30`,
+                      borderRadius: 3,
+                      padding: "14px 18px",
+                      fontSize: 13,
+                      color: C.blue,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    ✓ <strong>Deletion request submitted.</strong> We will
+                    process it within 30 days as required by POPIA. You will be
+                    contacted at {user.email} when complete.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      background: C.cream,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 3,
+                      padding: "14px 18px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: C.muted,
+                        lineHeight: 1.6,
+                        marginBottom: 12,
+                      }}
+                    >
+                      Under POPIA, you have the right to request deletion of
+                      your personal data. Submitting this request will notify
+                      our team to remove your data within 30 days.
+                    </div>
+                    <button
+                      onClick={handleRequestDeletion}
+                      disabled={deletionLoading}
+                      style={{
+                        ...btn(C.red, C.white, deletionLoading),
+                        fontSize: 10,
+                        padding: "8px 18px",
+                      }}
+                    >
+                      {deletionLoading
+                        ? "Submitting…"
+                        : "🗑️ Request Data Deletion"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {!profile.phone_verified && (
                 <div
                   onClick={() => setActiveTab("rewards")}
@@ -2043,7 +2138,6 @@ function AccountView({
                 />
               ) : (
                 <>
-                  {/* Progress summary */}
                   <div
                     style={{
                       background: C.lightGold,
@@ -2167,9 +2261,8 @@ function AccountView({
                     }}
                   >
                     🔒 <strong>Data exchange policy:</strong> Each field you
-                    complete earns you real points you can spend on prizes. Your
-                    data is protected under POPIA and is never sold to third
-                    parties. You can remove any data at any time.
+                    complete earns you real points. Your data is protected under
+                    POPIA and is never sold to third parties.
                   </div>
 
                   <div style={{ display: "grid", gap: 8 }}>
@@ -2184,7 +2277,6 @@ function AccountView({
                     ))}
                   </div>
 
-                  {/* ── v6.1: REFERRAL CODE CARD ── */}
                   {referralCode && (
                     <div
                       style={{
@@ -2556,7 +2648,7 @@ function AccountView({
             </div>
           )}
 
-          {/* ── Support tab ── */}
+          {/* ══ SUPPORT TAB ══ */}
           {activeTab === "support" && (
             <div style={{ animation: "fadeIn 0.3s ease" }}>
               <CustomerSupportWidget userId={user?.id} profile={profile} />

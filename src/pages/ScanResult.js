@@ -1,12 +1,10 @@
-// src/pages/ScanResult.js v4.5
-// Protea Botanicals — WP-P Phase 1 Communications build
-// v4.5 changes from v4.3:
-//   - Import SurveyWidget — fires on user's 5th successful scan only
-//   - Fetches active double_points_campaigns on each scan
-//   - If campaign active today: applies campaign.multiplier on top of tier mult
-//   - Shows 2× banner (CampaignBanner component) when campaign is live
-//   - Tracks totalScans state — passed to SurveyWidget
-//   All v4.3 scan engine logic, tier/streak/WhatsApp logic — unchanged
+// src/pages/ScanResult.js v4.6
+// Protea Botanicals — WP-8: Suspension check
+// v4.6 changes from v4.5:
+//   - After fetching profile, checks is_suspended flag
+//   - Suspended users: scan is logged (outcome: suspended_blocked),
+//     points are NOT awarded, SuspendedCard shown instead of points card
+//   - All other v4.5 logic — campaigns, survey, streak — unchanged
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -181,7 +179,60 @@ const QR_TYPE_LABELS = {
   retail_display: { icon: "🏪", label: "Retail Display" },
 };
 
-// ── v4.5: Campaign Banner ────────────────────────────────────────────────────
+// ── v4.6: Suspended Account Card ─────────────────────────────────────────────
+function SuspendedCard({ navigate }) {
+  return (
+    <div
+      style={card({
+        background: C.lightRed,
+        border: `1px solid ${C.error}40`,
+        textAlign: "center",
+      })}
+    >
+      <div style={{ fontSize: 36, marginBottom: 10 }}>🚫</div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 20,
+          fontWeight: 600,
+          color: C.error,
+          marginBottom: 8,
+        }}
+      >
+        Account Suspended
+      </div>
+      <div
+        style={{
+          fontSize: 13,
+          color: C.muted,
+          lineHeight: 1.6,
+          marginBottom: 16,
+        }}
+      >
+        Your account has been temporarily suspended. You can still scan and
+        verify products, but points cannot be awarded until your account is
+        reinstated.
+      </div>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+        If you believe this is an error, please contact us via the Support tab
+        in your account.
+      </div>
+      <button
+        onClick={() => navigate("/account")}
+        style={{
+          ...actionBtn("#f0ebe3", C.muted),
+          width: "auto",
+          display: "inline-block",
+          padding: "10px 24px",
+        }}
+      >
+        Contact Support →
+      </button>
+    </div>
+  );
+}
+
+// ── v4.5: Campaign Banner ─────────────────────────────────────────────────────
 function CampaignBanner({ campaign }) {
   if (!campaign) return null;
   const mult = parseFloat(campaign.multiplier) || 2;
@@ -222,8 +273,6 @@ function CampaignBanner({ campaign }) {
     </div>
   );
 }
-
-// ── Sub-components (unchanged from v4.3) ────────────────────────────────────
 
 function BannerDisplay({ banner }) {
   const navigate = useNavigate();
@@ -678,6 +727,9 @@ export default function ScanResult() {
   const [user, setUser] = useState(null);
   const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
 
+  // v4.6: suspension state
+  const [isSuspended, setIsSuspended] = useState(false);
+
   // v4.5: campaign state
   const [activeCampaign, setActiveCampaign] = useState(null);
   const [campaignMultUsed, setCampaignMultUsed] = useState(1);
@@ -700,7 +752,6 @@ export default function ScanResult() {
   const [scanLogId, setScanLogId] = useState(null);
   const [streakBonus, setStreakBonus] = useState(0);
   const [streakCount, setStreakCount] = useState(0);
-  // v4.5: total scans for SurveyWidget eligibility
   const [totalScans, setTotalScans] = useState(0);
   const [surveyBonusAwarded, setSurveyBonusAwarded] = useState(0);
 
@@ -843,10 +894,10 @@ export default function ScanResult() {
       if (cfgData) config = cfgData;
     } catch (_) {}
 
-    // v4.5: Fetch active double-points campaign for today
+    // v4.5: Fetch active campaign
     let campaign = null;
     try {
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split("T")[0];
       const { data: camps } = await supabase
         .from("double_points_campaigns")
         .select("*")
@@ -867,7 +918,6 @@ export default function ScanResult() {
         )
         .eq("qr_code", qrCode)
         .limit(1);
-
       if (qrErr || !qrRows || qrRows.length === 0) {
         await writeScanLog({
           qrCodeStr: qrCode,
@@ -937,6 +987,36 @@ export default function ScanResult() {
           .eq("id", currentUser.id)
           .single();
         profile = prof;
+
+        // v4.6: Suspension check — log scan but skip all points logic
+        if (profile?.is_suspended) {
+          setIsSuspended(true);
+          setShowProduct(true);
+          setShowCoa(true);
+          await supabase
+            .from("qr_codes")
+            .update({
+              scan_count: (qr.scan_count || 0) + 1,
+              last_scan_at: new Date().toISOString(),
+            })
+            .eq("id", qr.id);
+          await writeScanLog({
+            qrId: qr.id,
+            qrCodeStr: qrCode,
+            userId: currentUser.id,
+            outcome: "suspended_blocked",
+            pointsAmt: 0,
+            skipped: true,
+            skipReason: "account_suspended",
+            qrType: qr.qr_type,
+            campaignName: qr.campaign_name,
+            batchId: qr.batch_id,
+            ipGeo,
+            deviceInfo,
+          });
+          setPhase("done");
+          return;
+        }
       }
 
       let actions = [];
@@ -960,10 +1040,10 @@ export default function ScanResult() {
         ];
       }
 
-      let pointsAwardedAmt = 0;
-      let pointsWasSkipped = false;
-      let pointsWasSkipReason = "";
-      let pendingRedirect = null;
+      let pointsAwardedAmt = 0,
+        pointsWasSkipped = false,
+        pointsWasSkipReason = "",
+        pendingRedirect = null;
 
       for (const action of actions) {
         switch (action.action) {
@@ -979,7 +1059,6 @@ export default function ScanResult() {
             const currentPts = profile?.loyalty_points || 0;
             const userTier = getTierLabel(currentPts, config);
             const multiplier = getTierMult(userTier, config);
-            // v4.5: apply campaign multiplier on top of tier multiplier
             const finalPoints = Math.round(
               basePoints * multiplier * campaignMult,
             );
@@ -1040,7 +1119,6 @@ export default function ScanResult() {
               setCampaignMultUsed(campaignMult);
               setTotalPoints(newTotal);
 
-              // Tier upgrade check
               const newTier = getTierLabel(newTotal, config);
               if (newTier !== userTier) {
                 await supabase
@@ -1072,16 +1150,17 @@ export default function ScanResult() {
                   Gold: "1.5×",
                   Platinum: "2×",
                 };
-                await supabase.from("customer_messages").insert({
-                  user_id: currentUser.id,
-                  subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
-                  content: `Congratulations ${profile?.full_name ? profile.full_name.split(" ")[0] : ""}! 🎉\n\nYou've just unlocked ${newTier} tier status.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan. 🌿`,
-                  type: "tier_upgrade",
-                  read: false,
-                  created_at: new Date().toISOString(),
-                });
+                await supabase
+                  .from("customer_messages")
+                  .insert({
+                    user_id: currentUser.id,
+                    subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
+                    content: `Congratulations! 🎉 You've just unlocked ${newTier} tier status.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan. 🌿`,
+                    type: "tier_upgrade",
+                    read: false,
+                    created_at: new Date().toISOString(),
+                  });
               }
-
               if (action.one_time && !qr.claimed) {
                 await supabase
                   .from("qr_codes")
@@ -1189,7 +1268,7 @@ export default function ScanResult() {
         });
       }
 
-      // Streak bonus
+      // Streak + scan count
       if (currentUser && pointsAwardedAmt > 0) {
         try {
           const sevenDaysAgo = new Date(
@@ -1201,10 +1280,8 @@ export default function ScanResult() {
             .eq("user_id", currentUser.id)
             .eq("scan_outcome", "points_awarded")
             .gte("scanned_at", sevenDaysAgo);
-
-          const STREAK_BONUS_PTS = 200;
-          const STREAK_INTERVAL = 5;
-
+          const STREAK_BONUS_PTS = 200,
+            STREAK_INTERVAL = 5;
           if (weekCount && weekCount % STREAK_INTERVAL === 0) {
             const { data: freshPts } = await supabase
               .from("user_profiles")
@@ -1217,32 +1294,37 @@ export default function ScanResult() {
               .from("user_profiles")
               .update({ loyalty_points: afterStreak })
               .eq("id", currentUser.id);
-            await supabase.from("loyalty_transactions").insert({
-              user_id: currentUser.id,
-              transaction_type: "EARNED",
-              points: STREAK_BONUS_PTS,
-              balance_after: afterStreak,
-              source: "streak_bonus",
-              description: `Streak bonus — ${weekCount} scans this week!`,
-              transaction_date: new Date().toISOString(),
-              channel: "streak_bonus",
-              multiplier_applied: 1.0,
-              tier_at_time: getTierLabel(freshPts?.loyalty_points || 0, config),
-            });
-            await supabase.from("customer_messages").insert({
-              user_id: currentUser.id,
-              subject: `🔥 Streak Bonus — +${STREAK_BONUS_PTS} pts!`,
-              content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus. Keep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
-              type: "streak_bonus",
-              read: false,
-              created_at: new Date().toISOString(),
-            });
+            await supabase
+              .from("loyalty_transactions")
+              .insert({
+                user_id: currentUser.id,
+                transaction_type: "EARNED",
+                points: STREAK_BONUS_PTS,
+                balance_after: afterStreak,
+                source: "streak_bonus",
+                description: `Streak bonus — ${weekCount} scans this week!`,
+                transaction_date: new Date().toISOString(),
+                channel: "streak_bonus",
+                multiplier_applied: 1.0,
+                tier_at_time: getTierLabel(
+                  freshPts?.loyalty_points || 0,
+                  config,
+                ),
+              });
+            await supabase
+              .from("customer_messages")
+              .insert({
+                user_id: currentUser.id,
+                subject: `🔥 Streak Bonus — +${STREAK_BONUS_PTS} pts!`,
+                content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus. Keep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
+                type: "streak_bonus",
+                read: false,
+                created_at: new Date().toISOString(),
+              });
             setStreakBonus(STREAK_BONUS_PTS);
             setStreakCount(weekCount);
             setTotalPoints(afterStreak);
           }
-
-          // v4.5: Get total lifetime successful scans for SurveyWidget
           const { count: lifetimeCount } = await supabase
             .from("scan_logs")
             .select("id", { count: "exact", head: true })
@@ -1370,74 +1452,134 @@ export default function ScanResult() {
                 )}
               </div>
 
-              {/* v4.5: Campaign banner — shown before points card */}
-              {activeCampaign && (
-                <div className="sr-card" style={{ animationDelay: "0.02s" }}>
-                  <CampaignBanner campaign={activeCampaign} />
+              {/* v4.6: Suspension card — replaces points flow entirely */}
+              {isSuspended && (
+                <div className="sr-card" style={{ animationDelay: "0.05s" }}>
+                  <SuspendedCard navigate={navigate} />
                 </div>
               )}
 
-              {hasPoints && (
-                <div
-                  className="sr-card sr-pts"
-                  style={{ animationDelay: "0.05s" }}
-                >
-                  <PointsCard
-                    pointsAwarded={pointsAwarded}
-                    totalPoints={totalPoints}
-                    skipped={pointsSkipped}
-                    skipReason={pointsSkipReason}
-                    tierLabel={tierLabelUsed}
-                    multiplier={tierMultiplierUsed}
-                    basePoints={basePointsAwarded}
-                    campaignMult={
-                      campaignMultUsed > 1 ? campaignMultUsed : null
-                    }
-                  />
-                </div>
-              )}
-
-              {/* Streak Bonus Card */}
-              {streakBonus > 0 && (
-                <div
-                  className="sr-card"
-                  style={{
-                    animationDelay: "0.08s",
-                    background: "#fff8e7",
-                    border: "2px solid #b5935a",
-                    borderRadius: 2,
-                    padding: "18px 20px",
-                    marginBottom: 12,
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 32, marginBottom: 6 }}>🔥</div>
-                  <div
-                    style={{
-                      fontFamily: "Cormorant Garamond, serif",
-                      fontSize: 22,
-                      fontWeight: 700,
-                      color: "#b5935a",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Streak Bonus!
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: "Cormorant Garamond, serif",
-                      fontSize: 36,
-                      fontWeight: 700,
-                      color: "#1b4332",
-                      lineHeight: 1,
-                    }}
-                  >
-                    +{streakBonus} pts
-                  </div>
-                  <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
-                    {streakCount} scans this week — keep the streak alive! 🌿
-                  </div>
-                </div>
+              {!isSuspended && (
+                <>
+                  {activeCampaign && (
+                    <div
+                      className="sr-card"
+                      style={{ animationDelay: "0.02s" }}
+                    >
+                      <CampaignBanner campaign={activeCampaign} />
+                    </div>
+                  )}
+                  {hasPoints && (
+                    <div
+                      className="sr-card sr-pts"
+                      style={{ animationDelay: "0.05s" }}
+                    >
+                      <PointsCard
+                        pointsAwarded={pointsAwarded}
+                        totalPoints={totalPoints}
+                        skipped={pointsSkipped}
+                        skipReason={pointsSkipReason}
+                        tierLabel={tierLabelUsed}
+                        multiplier={tierMultiplierUsed}
+                        basePoints={basePointsAwarded}
+                        campaignMult={
+                          campaignMultUsed > 1 ? campaignMultUsed : null
+                        }
+                      />
+                    </div>
+                  )}
+                  {streakBonus > 0 && (
+                    <div
+                      className="sr-card"
+                      style={{
+                        animationDelay: "0.08s",
+                        background: "#fff8e7",
+                        border: "2px solid #b5935a",
+                        borderRadius: 2,
+                        padding: "18px 20px",
+                        marginBottom: 12,
+                        textAlign: "center",
+                      }}
+                    >
+                      <div style={{ fontSize: 32, marginBottom: 6 }}>🔥</div>
+                      <div
+                        style={{
+                          fontFamily: "Cormorant Garamond, serif",
+                          fontSize: 22,
+                          fontWeight: 700,
+                          color: "#b5935a",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Streak Bonus!
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "Cormorant Garamond, serif",
+                          fontSize: 36,
+                          fontWeight: 700,
+                          color: "#1b4332",
+                          lineHeight: 1,
+                        }}
+                      >
+                        +{streakBonus} pts
+                      </div>
+                      <div
+                        style={{ fontSize: 12, color: "#888", marginTop: 6 }}
+                      >
+                        {streakCount} scans this week — keep the streak alive!
+                        🌿
+                      </div>
+                    </div>
+                  )}
+                  {user && (
+                    <SurveyWidget
+                      userId={user.id}
+                      totalScans={totalScans}
+                      onComplete={(bonusPts) => {
+                        setSurveyBonusAwarded(bonusPts);
+                        setTotalPoints((prev) => prev + bonusPts);
+                      }}
+                    />
+                  )}
+                  {!user && hadPointsAction && (
+                    <div
+                      className="sr-card"
+                      style={{
+                        animationDelay: "0.35s",
+                        ...card({ background: C.warm, textAlign: "center" }),
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: C.text,
+                          marginBottom: 12,
+                          lineHeight: 1.6,
+                        }}
+                      >
+                        <strong>Sign in to earn points</strong> — your scan was
+                        verified but points require an account.
+                      </div>
+                      <button
+                        onClick={() => navigate("/account")}
+                        style={actionBtn(C.green)}
+                      >
+                        Create Account / Sign In
+                      </button>
+                    </div>
+                  )}
+                  {user && pointsAwarded > 0 && (
+                    <div className="sr-card" style={{ animationDelay: "0.4s" }}>
+                      <button
+                        onClick={() => navigate("/loyalty")}
+                        style={actionBtn(C.mid)}
+                      >
+                        View My Loyalty Points
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
 
               {banner && (
@@ -1471,19 +1613,6 @@ export default function ScanResult() {
                   <CustomMessageCard action={msg} navigate={navigate} />
                 </div>
               ))}
-
-              {/* v4.5: SurveyWidget — fires on 5th scan, one-time only */}
-              {user && (
-                <SurveyWidget
-                  userId={user.id}
-                  totalScans={totalScans}
-                  onComplete={(bonusPts) => {
-                    setSurveyBonusAwarded(bonusPts);
-                    setTotalPoints((prev) => prev + bonusPts);
-                  }}
-                />
-              )}
-
               {showGpsPrompt && (
                 <div className="sr-card" style={{ animationDelay: "0s" }}>
                   <GpsConsentBanner
@@ -1492,43 +1621,7 @@ export default function ScanResult() {
                   />
                 </div>
               )}
-              {!user && hadPointsAction && (
-                <div
-                  className="sr-card"
-                  style={{
-                    animationDelay: "0.35s",
-                    ...card({ background: C.warm, textAlign: "center" }),
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: C.text,
-                      marginBottom: 12,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <strong>Sign in to earn points</strong> — your scan was
-                    verified but points require an account.
-                  </div>
-                  <button
-                    onClick={() => navigate("/account")}
-                    style={actionBtn(C.green)}
-                  >
-                    Create Account / Sign In
-                  </button>
-                </div>
-              )}
-              {user && pointsAwarded > 0 && (
-                <div className="sr-card" style={{ animationDelay: "0.4s" }}>
-                  <button
-                    onClick={() => navigate("/loyalty")}
-                    style={actionBtn(C.mid)}
-                  >
-                    View My Loyalty Points
-                  </button>
-                </div>
-              )}
+
               <div
                 className="sr-card"
                 style={{

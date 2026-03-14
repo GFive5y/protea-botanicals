@@ -1,14 +1,9 @@
-// src/pages/HQDashboard.js v3.4
+// src/pages/HQDashboard.js v3.5
 // Protea Botanicals — HQ Command Centre
+// v3.5: WP-8 Fraud tab added (17th tab)
 // v3.4: Loyalty tab added (WP-O)
 // v3.3: All ERP tabs — procurement, costing, pricing, p&l, reorder, documents
 // v3.1: Supply Chain + Production + Distribution + Shops
-// v2.5: Suppliers tab (WP-A)
-// v2.4: Retailer Health (WP6)
-// v2.3: Analytics tab
-// v2.2: Distribution tab
-// v2.1: Supply Chain + Production tabs
-// v2.0: Overview + Shops tabs
 
 import { useState } from "react";
 import { useTenant } from "../services/tenantService";
@@ -43,6 +38,9 @@ import HQProduction from "../components/hq/HQProduction";
 // ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
 
+// ── WP-8 ─────────────────────────────────────────────────────────────────────
+import HQFraud from "../components/hq/HQFraud";
+
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
   bg: "#faf9f6",
@@ -55,6 +53,7 @@ const C = {
   muted: "#888888",
   border: "#e8e0d4",
   white: "#ffffff",
+  red: "#c62828",
 };
 
 const TABS = [
@@ -74,6 +73,13 @@ const TABS = [
   { id: "documents", label: "Documents", icon: "📄", ready: true },
   { id: "hq-production", label: "HQ Production", icon: "⚙️", ready: true },
   { id: "loyalty", label: "Loyalty", icon: "💎", ready: true },
+  {
+    id: "fraud",
+    label: "Fraud & Security",
+    icon: "🛡️",
+    ready: true,
+    alert: true,
+  },
 ];
 
 export default function HQDashboard() {
@@ -198,7 +204,7 @@ export default function HQDashboard() {
               border: "none",
               borderBottom:
                 activeTab === tab.id
-                  ? "2px solid " + C.primaryDark
+                  ? `2px solid ${tab.alert ? C.red : C.primaryDark}`
                   : "2px solid transparent",
               padding: "12px 20px",
               fontFamily: "Jost, sans-serif",
@@ -206,7 +212,12 @@ export default function HQDashboard() {
               fontWeight: activeTab === tab.id ? 600 : 400,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
-              color: activeTab === tab.id ? C.primaryDark : C.muted,
+              color:
+                activeTab === tab.id
+                  ? tab.alert
+                    ? C.red
+                    : C.primaryDark
+                  : C.muted,
               cursor: "pointer",
               transition: "all 0.15s",
               whiteSpace: "nowrap",
@@ -223,7 +234,7 @@ export default function HQDashboard() {
                   width: "5px",
                   height: "5px",
                   borderRadius: "50%",
-                  background: C.accentGreen,
+                  background: tab.alert ? C.red : C.accentGreen,
                   display: "inline-block",
                 }}
               />
@@ -250,6 +261,7 @@ export default function HQDashboard() {
         {activeTab === "documents" && <HQDocuments />}
         {activeTab === "hq-production" && <HQProduction />}
         {activeTab === "loyalty" && <HQLoyalty />}
+        {activeTab === "fraud" && <HQFraud />}
       </div>
     </div>
   );
