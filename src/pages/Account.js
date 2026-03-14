@@ -3160,6 +3160,26 @@ export default function Account() {
               >
                 🔧 Admin → /admin
               </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() =>
+                  handleDevLogin("wholesale@protea.dev", "wholesale123")
+                }
+                style={{
+                  padding: "10px 16px",
+                  background: "#5c3d1e",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: F.body,
+                }}
+              >
+                🏪 Retailer → /wholesale
+              </button>
             </div>
           </div>
         )}
