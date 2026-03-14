@@ -1,1093 +1,1457 @@
-// src/pages/ScanResult.js v3.1
-// v3.1: Fix 1 — added authentic:true check compatibility with scanService v7.0
-//       Fix 2 — useRef guard prevents React StrictMode double-invoke claiming product twice
+// src/pages/ScanResult.js v4.3
+// Protea Botanicals — WP-O: loyalty_config integration
+// v4.3 changes from v4.2:
+//   - Fetches loyalty_config on mount (pts_qr_scan, tier multipliers, thresholds)
+//   - award_points applies tier multiplier: finalPts = pts_qr_scan × mult_[tier]
+//   - PointsCard shows "Gold tier: 1.5× bonus applied"
+//   - loyalty_transactions enriched: multiplier_applied, tier_at_time, channel
+//   - Tier upgrade detected + WhatsApp notification fired
+//   All v4.2 scan engine logic unchanged
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { authenticateQR } from "../services/scanService";
-import {
-  requestGPSLocation,
-  findNearestStockist,
-  saveGPSConsent,
-} from "../services/geoService";
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
+import ClientHeader from "../components/ClientHeader";
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500;600&display=swap');
-  .shop-font { font-family: 'Cormorant Garamond', Georgia, serif; }
-  .body-font { font-family: 'Jost', sans-serif; }
-  .sr-btn {
-    font-family: 'Jost', sans-serif; padding: 12px 28px; border: none;
-    border-radius: 2px; font-size: 11px; letter-spacing: 0.2em;
-    text-transform: uppercase; cursor: pointer; transition: all 0.2s;
-    font-weight: 500; text-decoration: none; display: inline-block; text-align: center;
-  }
-  .sr-btn-green { background: #1b4332; color: white; }
-  .sr-btn-green:hover { background: #2d6a4f; }
-  .sr-btn-outline { background: transparent; border: 1px solid #1b4332; color: #1b4332; }
-  .sr-btn-outline:hover { background: #1b4332; color: white; }
-  .sr-btn-gold { background: #b5935a; color: white; }
-  .sr-btn-gold:hover { background: #9a7a48; }
-  .sr-card {
-    background: white; border: 1px solid #e8e0d4; border-radius: 2px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-  }
-  .sr-badge {
-    display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px;
-    border-radius: 2px; font-family: 'Jost', sans-serif; font-size: 10px;
-    letter-spacing: 0.15em; text-transform: uppercase; font-weight: 500;
-  }
-  .gps-prompt {
-    animation: slideUp 0.4s ease forwards;
-    border-left: 3px solid #b5935a;
-  }
-  .stockist-card {
-    animation: slideUp 0.4s 0.2s ease forwards; opacity: 0;
-  }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-  .pulse { animation: pulse 1.5s infinite; }
-  @media (max-width: 600px) {
-    .sr-inner { padding: 24px 16px !important; }
-    .sr-hero-inner { padding: 32px 16px 36px !important; }
-    .sr-cta-row { flex-direction: column !important; }
-    .sr-cta-row .sr-btn { width: 100%; text-align: center; }
-  }
-`;
+const SUPABASE_FUNCTIONS_URL =
+  process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
+  "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
+
+const DEFAULT_LOYALTY_CONFIG = {
+  pts_qr_scan: 10,
+  mult_bronze: 1.0,
+  mult_silver: 1.25,
+  mult_gold: 1.5,
+  mult_platinum: 2.0,
+  threshold_silver: 200,
+  threshold_gold: 500,
+  threshold_platinum: 1000,
+  redemption_value_zar: 0.1,
+  breakage_rate: 0.3,
+};
+
+// ── Tier helpers (config-driven) ─────────────────────────────────────────────
+function getTierLabel(pts, cfg) {
+  if (pts >= cfg.threshold_platinum) return "Platinum";
+  if (pts >= cfg.threshold_gold) return "Gold";
+  if (pts >= cfg.threshold_silver) return "Silver";
+  return "Bronze";
+}
+function getTierMult(tier, cfg) {
+  return (
+    {
+      Bronze: cfg.mult_bronze,
+      Silver: cfg.mult_silver,
+      Gold: cfg.mult_gold,
+      Platinum: cfg.mult_platinum,
+    }[tier] || 1.0
+  );
+}
+function getTierColor(tier) {
+  return (
+    {
+      Bronze: "#a0674b",
+      Silver: "#8e9ba8",
+      Gold: "#b5935a",
+      Platinum: "#7b68ee",
+    }[tier] || "#52b788"
+  );
+}
+
+const C = {
+  green: "#1b4332",
+  mid: "#2d6a4f",
+  accent: "#52b788",
+  gold: "#b5935a",
+  blue: "#2c4a6e",
+  cream: "#faf9f6",
+  warm: "#f4f0e8",
+  text: "#1a1a1a",
+  muted: "#888888",
+  border: "#e0dbd2",
+  white: "#fff",
+  error: "#c0392b",
+  success: "#27ae60",
+  warning: "#e67e22",
+  lightGreen: "#eafaf1",
+  lightRed: "#fdf0ef",
+};
+
+function detectDevice() {
+  const ua = navigator.userAgent || "";
+  const device = /Mobile|Android|iPhone|iPad|iPod/i.test(ua)
+    ? "mobile"
+    : /Tablet|iPad/i.test(ua)
+      ? "tablet"
+      : "desktop";
+  const browser =
+    /Chrome/i.test(ua) && !/Edge/i.test(ua)
+      ? "Chrome"
+      : /Firefox/i.test(ua)
+        ? "Firefox"
+        : /Safari/i.test(ua) && !/Chrome/i.test(ua)
+          ? "Safari"
+          : /Edge/i.test(ua)
+            ? "Edge"
+            : "Other";
+  return { device, browser, userAgent: ua.slice(0, 200) };
+}
+async function fetchIpGeo() {
+  try {
+    const res = await fetch("https://ipapi.co/json/", {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return {
+      ip_lat: d.latitude || null,
+      ip_lng: d.longitude || null,
+      ip_city: d.city || null,
+      ip_province: d.region || null,
+      ip_country: d.country_code || "ZA",
+    };
+  } catch {
+    return null;
+  }
+}
+function requestGps() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          gps_lat: pos.coords.latitude,
+          gps_lng: pos.coords.longitude,
+        }),
+      () => resolve(null),
+      { timeout: 8000, maximumAge: 60000 },
+    );
+  });
+}
+
+const pill = (bg, color) => ({
+  display: "inline-block",
+  background: bg,
+  color,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.15em",
+  textTransform: "uppercase",
+  padding: "4px 12px",
+  borderRadius: 20,
+  fontFamily: "Jost, sans-serif",
+});
+const actionBtn = (bg = C.green, color = C.white) => ({
+  display: "block",
+  width: "100%",
+  padding: "13px 20px",
+  background: bg,
+  color,
+  border: "none",
+  borderRadius: 2,
+  fontFamily: "Jost, sans-serif",
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "0.2em",
+  textTransform: "uppercase",
+  cursor: "pointer",
+  textAlign: "center",
+  transition: "opacity 0.18s",
+});
+const card = (extra = {}) => ({
+  background: C.white,
+  border: `1px solid ${C.border}`,
+  borderRadius: 2,
+  padding: 20,
+  marginBottom: 12,
+  ...extra,
+});
+
+const QR_TYPE_LABELS = {
+  product_insert: { icon: "📦", label: "Product Insert" },
+  packaging_exterior: { icon: "🌐", label: "Exterior Packaging" },
+  promotional: { icon: "📣", label: "Promotional" },
+  event: { icon: "🎪", label: "Event" },
+  wearable: { icon: "👕", label: "Wearable / Merch" },
+  retail_display: { icon: "🏪", label: "Retail Display" },
+};
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function BannerDisplay({ banner }) {
+  const navigate = useNavigate();
+  if (!banner) return null;
+  return (
+    <div
+      style={{
+        background: banner.bg_color || C.green,
+        color: banner.text_color || C.white,
+        padding: "24px 28px",
+        borderRadius: 2,
+        marginBottom: 12,
+      }}
+    >
+      {banner.headline && (
+        <div
+          style={{
+            fontFamily: "Cormorant Garamond, serif",
+            fontSize: 22,
+            fontWeight: 600,
+            marginBottom: 8,
+          }}
+        >
+          {banner.headline}
+        </div>
+      )}
+      {banner.body && (
+        <div
+          style={{
+            fontSize: 13,
+            opacity: 0.85,
+            lineHeight: 1.6,
+            marginBottom: 14,
+          }}
+        >
+          {banner.body}
+        </div>
+      )}
+      {banner.cta_text && banner.cta_link && (
+        <button
+          onClick={() => navigate(banner.cta_link)}
+          style={{
+            background: "rgba(255,255,255,0.2)",
+            border: "1px solid rgba(255,255,255,0.4)",
+            color: "inherit",
+            borderRadius: 2,
+            padding: "8px 20px",
+            fontFamily: "Jost, sans-serif",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            cursor: "pointer",
+          }}
+        >
+          {banner.cta_text} →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ProductCard({ batch, showCoa }) {
+  if (!batch) return null;
+  return (
+    <div style={card({ borderLeft: `3px solid ${C.accent}` })}>
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.3em",
+          textTransform: "uppercase",
+          color: C.accent,
+          marginBottom: 8,
+          fontWeight: 600,
+        }}
+      >
+        Verified Product
+      </div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 20,
+          fontWeight: 600,
+          color: C.green,
+          marginBottom: 4,
+        }}
+      >
+        {batch.product_name}
+      </div>
+      {batch.strain && (
+        <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+          Strain: {batch.strain.replace(/-/g, " ")}
+        </div>
+      )}
+      <div
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}
+      >
+        <span style={pill(C.lightGreen, C.success)}>✓ Authentic</span>
+        <span style={pill(C.cream, C.blue)}>Batch {batch.batch_number}</span>
+        {batch.volume && (
+          <span style={pill(C.cream, C.muted)}>{batch.volume}</span>
+        )}
+      </div>
+      {showCoa && batch.coa_document_id && (
+        <a
+          href={`/documents/${batch.coa_document_id}`}
+          style={{
+            fontSize: 12,
+            color: C.accent,
+            textDecoration: "none",
+            fontWeight: 600,
+          }}
+        >
+          📄 View Certificate of Analysis →
+        </a>
+      )}
+    </div>
+  );
+}
+
+// ── v4.3: Enhanced PointsCard showing tier multiplier ────────────────────────
+function PointsCard({
+  pointsAwarded,
+  totalPoints,
+  skipped,
+  skipReason,
+  tierLabel,
+  multiplier,
+  basePoints,
+}) {
+  if (skipped) {
+    return (
+      <div style={card({ background: C.cream })}>
+        <div style={{ fontSize: 12, color: C.muted, textAlign: "center" }}>
+          {skipReason}
+        </div>
+      </div>
+    );
+  }
+  const tierColor = getTierColor(tierLabel);
+  const showMultiplier = multiplier && multiplier > 1 && tierLabel;
+  return (
+    <div
+      style={card({
+        background: C.lightGreen,
+        border: `1px solid ${C.accent}`,
+        textAlign: "center",
+      })}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: "0.3em",
+          textTransform: "uppercase",
+          color: C.accent,
+          marginBottom: 8,
+          fontWeight: 700,
+        }}
+      >
+        Points Earned
+      </div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 48,
+          fontWeight: 700,
+          color: C.green,
+          lineHeight: 1,
+        }}
+      >
+        +{pointsAwarded}
+      </div>
+      {showMultiplier && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          <span style={{ fontSize: 10, color: C.muted }}>
+            {basePoints} base pts
+          </span>
+          <span style={{ fontSize: 10, color: C.muted }}>×</span>
+          <span
+            style={{
+              background: tierColor,
+              color: C.white,
+              fontSize: 10,
+              fontWeight: 700,
+              padding: "2px 8px",
+              borderRadius: 10,
+            }}
+          >
+            {tierLabel} {multiplier}×
+          </span>
+          <span style={{ fontSize: 10, color: C.muted }}>
+            = {pointsAwarded} pts
+          </span>
+        </div>
+      )}
+      <div style={{ fontSize: 12, color: C.mid, marginTop: 8 }}>
+        Your total: <strong>{totalPoints}</strong> pts
+      </div>
+      {showMultiplier && (
+        <div
+          style={{
+            fontSize: 11,
+            color: C.muted,
+            marginTop: 6,
+            fontStyle: "italic",
+          }}
+        >
+          🏆 {tierLabel} tier bonus active — earn more at every tier
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomMessageCard({ action, navigate }) {
+  return (
+    <div style={card({ textAlign: "center" })}>
+      {action.headline && (
+        <div
+          style={{
+            fontFamily: "Cormorant Garamond, serif",
+            fontSize: 22,
+            fontWeight: 600,
+            color: C.green,
+            marginBottom: 8,
+          }}
+        >
+          {action.headline}
+        </div>
+      )}
+      {action.body && (
+        <div
+          style={{
+            fontSize: 13,
+            color: C.muted,
+            lineHeight: 1.6,
+            marginBottom: 16,
+          }}
+        >
+          {action.body}
+        </div>
+      )}
+      {action.cta && action.cta_url && (
+        <button
+          onClick={() => navigate(action.cta_url)}
+          style={{
+            ...actionBtn(C.accent, C.green),
+            width: "auto",
+            display: "inline-block",
+            padding: "10px 24px",
+          }}
+        >
+          {action.cta}
+        </button>
+      )}
+    </div>
+  );
+}
+function EventCheckinCard({ eventName, checkedIn }) {
+  return (
+    <div
+      style={card({
+        textAlign: "center",
+        background: checkedIn ? C.lightGreen : C.cream,
+      })}
+    >
+      <div style={{ fontSize: 28, marginBottom: 8 }}>🎪</div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 20,
+          fontWeight: 600,
+          color: C.green,
+          marginBottom: 4,
+        }}
+      >
+        {checkedIn ? "Checked In!" : "Event"}
+      </div>
+      <div style={{ fontSize: 14, color: C.text, fontWeight: 500 }}>
+        {eventName}
+      </div>
+      {checkedIn && (
+        <div style={{ fontSize: 12, color: C.success, marginTop: 8 }}>
+          ✓ Your attendance has been recorded
+        </div>
+      )}
+    </div>
+  );
+}
+function GuardScreen({ type }) {
+  const navigate = useNavigate();
+  const msgs = {
+    not_found: {
+      icon: "❓",
+      title: "Code Not Found",
+      body: "This QR code isn't in our system.",
+    },
+    inactive: {
+      icon: "⏸",
+      title: "Code Inactive",
+      body: "This QR code has been paused.",
+    },
+    expired: {
+      icon: "⏰",
+      title: "Code Expired",
+      body: "This QR code has expired.",
+    },
+    max_scans: {
+      icon: "🔒",
+      title: "Scan Limit Reached",
+      body: "This QR code has reached its maximum number of scans.",
+    },
+    error: {
+      icon: "⚠️",
+      title: "Something Went Wrong",
+      body: "We couldn't process this code. Please try again.",
+    },
+  };
+  const m = msgs[type] || msgs.error;
+  return (
+    <div style={{ textAlign: "center", padding: "48px 24px" }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>{m.icon}</div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 26,
+          color: C.green,
+          marginBottom: 12,
+        }}
+      >
+        {m.title}
+      </div>
+      <div
+        style={{
+          fontSize: 14,
+          color: C.muted,
+          lineHeight: 1.6,
+          marginBottom: 28,
+          maxWidth: 340,
+          margin: "0 auto 28px",
+        }}
+      >
+        {m.body}
+      </div>
+      <button
+        onClick={() => navigate("/")}
+        style={{
+          ...actionBtn(C.green),
+          width: "auto",
+          display: "inline-block",
+          padding: "12px 28px",
+        }}
+      >
+        Go to Home
+      </button>
+    </div>
+  );
+}
+function GpsConsentBanner({ onAllow, onDeny }) {
+  return (
+    <div
+      style={{
+        background: C.warm,
+        border: `1px solid ${C.border}`,
+        borderRadius: 2,
+        padding: 16,
+        marginBottom: 12,
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 18,
+          fontWeight: 600,
+          color: C.green,
+          marginBottom: 6,
+        }}
+      >
+        📍 Improve Your Experience
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: C.muted,
+          marginBottom: 12,
+          lineHeight: 1.5,
+        }}
+      >
+        Allow location access so we can show you the nearest stockist and
+        improve our service. Your precise location is never stored permanently.
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+        <button
+          onClick={onAllow}
+          style={{
+            ...actionBtn(C.accent, C.green),
+            width: "auto",
+            padding: "8px 20px",
+          }}
+        >
+          Allow
+        </button>
+        <button
+          onClick={onDeny}
+          style={{
+            ...actionBtn("#f0f0f0", C.muted),
+            width: "auto",
+            padding: "8px 20px",
+          }}
+        >
+          No Thanks
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
 export default function ScanResult() {
   const { qrCode } = useParams();
   const navigate = useNavigate();
 
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [gpsState, setGpsState] = useState("idle");
-  const [stockist, setStockist] = useState(null);
-  const [stockistLoading, setStockistLoading] = useState(false);
-  const [scanLocation, setScanLocation] = useState(null);
+  const [phase, setPhase] = useState("loading");
+  const [guardType, setGuardType] = useState("error");
+  const [qrRecord, setQrRecord] = useState(null);
   const [user, setUser] = useState(null);
+  const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
 
-  // ── FIX 2: Ref guard — prevents StrictMode double-invoke ──────────────────
-  const hasRun = useRef(false);
+  const [banner, setBanner] = useState(null);
+  const [showProduct, setShowProduct] = useState(false);
+  const [showCoa, setShowCoa] = useState(false);
+  const [pointsAwarded, setPointsAwarded] = useState(0);
+  const [basePointsAwarded, setBasePointsAwarded] = useState(0);
+  const [tierMultiplierUsed, setTierMultiplierUsed] = useState(1);
+  const [tierLabelUsed, setTierLabelUsed] = useState("Bronze");
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [pointsSkipped, setPointsSkipped] = useState(false);
+  const [pointsSkipReason, setPointsSkipReason] = useState("");
+  const [customMessages, setCustomMessages] = useState([]);
+  const [eventCheckins, setEventCheckins] = useState([]);
+  const [hasPoints, setHasPoints] = useState(false);
+  const [hadPointsAction, setHadPointsAction] = useState(false); // true if QR had award_points action regardless of login
+  const [showGpsPrompt, setShowGpsPrompt] = useState(false);
+  const [scanLogId, setScanLogId] = useState(null);
+  const [streakBonus, setStreakBonus] = useState(0); // pts awarded for streak
+  const [streakCount, setStreakCount] = useState(0); // how many scans this week
 
-  // ── Authenticate QR on mount ──────────────────────────────────────────────
+  // Fetch loyalty_config on mount
   useEffect(() => {
-    // StrictMode in development runs effects twice — this guard ensures
-    // authenticateQR (which claims the product) only fires once.
-    if (hasRun.current) return;
-    hasRun.current = true;
+    supabase
+      .from("loyalty_config")
+      .select("*")
+      .single()
+      .then(({ data }) => {
+        if (data) setLoyaltyConfig(data);
+      });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setUser(session.user);
+    });
+  }, []);
 
-    let cancelled = false;
-
-    async function run() {
-      const {
-        data: { user: u },
-      } = await supabase.auth.getUser();
-      if (!cancelled) setUser(u);
-
-      const res = await authenticateQR(qrCode);
-      if (!cancelled) {
-        setResult(res);
-        setLoading(false);
-
-        // Show GPS prompt 2 seconds after result — never before
-        // FIX 1: check res.success OR res.authentic (support both)
-        if ((res.success || res.authentic) && u && res.requiresGPSPrompt) {
-          setTimeout(() => {
-            if (!cancelled) setGpsState("prompting");
-          }, 2000);
+  const writeScanLog = useCallback(
+    async ({
+      qrId,
+      qrCodeStr,
+      userId,
+      outcome,
+      pointsAmt,
+      skipped,
+      skipReason,
+      qrType,
+      campaignName,
+      batchId,
+      ipGeo,
+      deviceInfo,
+    }) => {
+      try {
+        const payload = {
+          qr_code_id: qrId || null,
+          qr_code: qrCodeStr,
+          user_id: userId || null,
+          scan_outcome: outcome,
+          points_awarded: pointsAmt || 0,
+          points_skipped: skipped || false,
+          skip_reason: skipReason || null,
+          qr_type: qrType || null,
+          campaign_name: campaignName || null,
+          batch_id: batchId || null,
+          ip_lat: ipGeo?.ip_lat || null,
+          ip_lng: ipGeo?.ip_lng || null,
+          ip_city: ipGeo?.ip_city || null,
+          ip_province: ipGeo?.ip_province || null,
+          ip_country: ipGeo?.ip_country || "ZA",
+          location_source: ipGeo ? "ip" : "none",
+          device_type: deviceInfo?.device || null,
+          browser: deviceInfo?.browser || null,
+          user_agent: deviceInfo?.userAgent || null,
+        };
+        const { data, error } = await supabase
+          .from("scan_logs")
+          .insert(payload)
+          .select("id")
+          .single();
+        if (error) {
+          console.error("scan_log insert error:", error);
+          return null;
         }
+        return data?.id || null;
+      } catch (err) {
+        console.error("writeScanLog error:", err);
+        return null;
       }
+    },
+    [],
+  );
+
+  // v4.3: enriched with multiplier_applied, tier_at_time, channel
+  const writeLoyaltyTransaction = useCallback(
+    async ({
+      userId,
+      points,
+      balanceAfter,
+      qrCodeStr,
+      description,
+      scanLogId,
+      multiplierApplied,
+      tierAtTime,
+    }) => {
+      try {
+        await supabase.from("loyalty_transactions").insert({
+          user_id: userId,
+          transaction_type: "EARNED",
+          points,
+          balance_after: balanceAfter,
+          source: "qr_scan",
+          source_id: qrCodeStr,
+          description,
+          scan_log_id: scanLogId || null,
+          transaction_date: new Date().toISOString(),
+          // WP-O new columns
+          multiplier_applied: multiplierApplied || 1.0,
+          tier_at_time: tierAtTime || "Bronze",
+          channel: "qr_scan",
+        });
+      } catch (err) {
+        console.error("writeLoyaltyTransaction error:", err);
+      }
+    },
+    [],
+  );
+
+  const updateScanLogWithGps = useCallback(async (logId, gpsData) => {
+    if (!logId || !gpsData) return;
+    try {
+      await supabase
+        .from("scan_logs")
+        .update({
+          gps_lat: gpsData.gps_lat,
+          gps_lng: gpsData.gps_lng,
+          location_source: "gps",
+        })
+        .eq("id", logId);
+    } catch (err) {
+      console.error("GPS update error:", err);
     }
+  }, []);
 
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [qrCode]);
-
-  // ── GPS grant handler ──────────────────────────────────────────────────────
-  const handleGrantGPS = useCallback(async () => {
-    setGpsState("requesting");
-    const gps = await requestGPSLocation();
-    if (!gps) {
-      setGpsState("denied");
+  const executeScan = useCallback(async () => {
+    setPhase("loading");
+    if (!qrCode) {
+      setGuardType("not_found");
+      setPhase("guard");
       return;
     }
-    setGpsState("updating");
-    setScanLocation({ lat: gps.lat, lng: gps.lng, source: "gps" });
 
-    if (user) await saveGPSConsent(user.id, true);
+    const [ipGeo, deviceInfo] = await Promise.all([
+      fetchIpGeo(),
+      Promise.resolve(detectDevice()),
+    ]);
 
-    setStockistLoading(true);
-    const near = await findNearestStockist(gps.lat, gps.lng);
-    setStockist(near);
-    setStockistLoading(false);
-    setGpsState("granted");
-  }, [user]);
+    // Fetch loyalty config fresh for this scan
+    let config = DEFAULT_LOYALTY_CONFIG;
+    try {
+      const { data: cfgData } = await supabase
+        .from("loyalty_config")
+        .select("*")
+        .single();
+      if (cfgData) config = cfgData;
+    } catch (_) {}
 
-  const handleDenyGPS = useCallback(async () => {
-    setGpsState("denied");
-    if (user) await saveGPSConsent(user.id, false);
-  }, [user]);
+    try {
+      const { data: qrRows, error: qrErr } = await supabase
+        .from("qr_codes")
+        .select(
+          "*, batches(batch_number, product_name, strain, volume, coa_document_id)",
+        )
+        .eq("qr_code", qrCode)
+        .limit(1);
 
-  // ── Loading state ─────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#faf9f6",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <style>{styles}</style>
-        <div style={{ textAlign: "center" }}>
-          <div className="pulse" style={{ fontSize: 48, marginBottom: 16 }}>
-            🔍
-          </div>
-          <p
-            className="body-font"
-            style={{
-              fontSize: 13,
-              color: "#888",
-              fontWeight: 300,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-            }}
-          >
-            Verifying product…
-          </p>
-        </div>
-      </div>
-    );
-  }
+      if (qrErr || !qrRows || qrRows.length === 0) {
+        await writeScanLog({
+          qrCodeStr: qrCode,
+          outcome: "not_found",
+          deviceInfo,
+          ipGeo,
+        });
+        setGuardType("not_found");
+        setPhase("guard");
+        return;
+      }
 
-  // ── FIX 1: check both result.success and result.authentic ────────────────
-  const isAuthentic = result?.success || result?.authentic;
+      const qr = qrRows[0];
+      setQrRecord(qr);
 
-  // ── Not authentic ─────────────────────────────────────────────────────────
-  if (!isAuthentic) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#faf9f6",
-          fontFamily: "'Jost', sans-serif",
-        }}
-      >
-        <style>{styles}</style>
-        <div
-          className="sr-inner"
-          style={{
-            maxWidth: 640,
-            margin: "0 auto",
-            padding: "60px 24px",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 64, marginBottom: 24 }}>⚠</div>
-          <h1
-            className="shop-font"
-            style={{
-              fontSize: 36,
-              fontWeight: 300,
-              color: "#1a1a1a",
-              marginBottom: 12,
-            }}
-          >
-            Unverified Product
-          </h1>
-          <p
-            className="body-font"
-            style={{
-              fontSize: 14,
-              color: "#888",
-              fontWeight: 300,
-              lineHeight: 1.7,
-              marginBottom: 32,
-              maxWidth: 420,
-              margin: "0 auto 32px",
-            }}
-          >
-            {result?.error ||
-              result?.message ||
-              "This QR code could not be verified. If you believe this is an error, please contact us."}
-          </p>
-          <div
-            className="sr-card"
-            style={{
-              padding: "20px 24px",
-              marginBottom: 32,
-              borderLeft: "3px solid #dc2626",
-              textAlign: "left",
-            }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#dc2626",
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                marginBottom: 6,
-              }}
-            >
-              What this means
-            </p>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 13,
-                color: "#666",
-                fontWeight: 300,
-                lineHeight: 1.7,
-                margin: 0,
-              }}
-            >
-              This product may be counterfeit or the QR code may have been
-              tampered with. Do not consume this product. All authentic Protea
-              Botanicals products carry a digitally signed QR code.
-            </p>
-          </div>
-          <button
-            className="sr-btn sr-btn-green"
-            onClick={() => navigate("/scan")}
-          >
-            Scan Another Code
-          </button>
-        </div>
-      </div>
-    );
-  }
+      if (!qr.is_active) {
+        await writeScanLog({
+          qrId: qr.id,
+          qrCodeStr: qrCode,
+          qrType: qr.qr_type,
+          outcome: "blocked_inactive",
+          deviceInfo,
+          ipGeo,
+        });
+        setGuardType("inactive");
+        setPhase("guard");
+        return;
+      }
+      if (qr.expires_at && new Date() > new Date(qr.expires_at)) {
+        await writeScanLog({
+          qrId: qr.id,
+          qrCodeStr: qrCode,
+          qrType: qr.qr_type,
+          outcome: "blocked_expired",
+          deviceInfo,
+          ipGeo,
+        });
+        setGuardType("expired");
+        setPhase("guard");
+        return;
+      }
+      if (qr.max_scans != null && (qr.scan_count || 0) >= qr.max_scans) {
+        await writeScanLog({
+          qrId: qr.id,
+          qrCodeStr: qrCode,
+          qrType: qr.qr_type,
+          outcome: "blocked_max_scans",
+          deviceInfo,
+          ipGeo,
+        });
+        setGuardType("max_scans");
+        setPhase("guard");
+        return;
+      }
 
-  const { batch, pointsEarned, isFirstScan, anomalyFlags, userProfile } =
-    result;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+
+      let profile = null;
+      if (currentUser) {
+        const { data: prof } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", currentUser.id)
+          .single();
+        profile = prof;
+      }
+
+      let actions = [];
+      if (Array.isArray(qr.scan_actions)) {
+        actions = qr.scan_actions;
+      } else if (qr.scan_actions) {
+        try {
+          actions = JSON.parse(qr.scan_actions);
+        } catch {
+          actions = [];
+        }
+      }
+      if (actions.length === 0 && qr.qr_type === "product_insert") {
+        actions = [
+          {
+            action: "award_points",
+            points: config.pts_qr_scan || 10,
+            one_time: true,
+          },
+          { action: "show_product", show_coa: true },
+        ];
+      }
+
+      let pointsAwardedAmt = 0;
+      let pointsWasSkipped = false;
+      let pointsWasSkipReason = "";
+      let pendingRedirect = null;
+
+      for (const action of actions) {
+        switch (action.action) {
+          case "award_points": {
+            // v4.3 fix: run ALL skip checks BEFORE setting hasPoints
+            // so there's no flash of the points card before the skip reason appears
+            if (!currentUser) {
+              // Not logged in — show inline upsell instead of a grey "skipped" card
+              pointsWasSkipped = true;
+              pointsWasSkipReason = "not_logged_in";
+              setHadPointsAction(true); // so the sign-in CTA still shows
+              break;
+            }
+            // v4.3: use config pts_qr_scan, apply tier multiplier
+            const basePoints =
+              config.pts_qr_scan || action.points || qr.points_value || 10;
+            const currentPts = profile?.loyalty_points || 0;
+            const userTier = getTierLabel(currentPts, config);
+            const multiplier = getTierMult(userTier, config);
+            const finalPoints = Math.round(basePoints * multiplier);
+
+            if (
+              action.one_time &&
+              qr.claimed &&
+              qr.claimed_by === currentUser.id
+            ) {
+              // Already claimed — don't show a points card, just add a quiet note to custom messages
+              pointsWasSkipped = true;
+              pointsWasSkipReason = "already_claimed";
+              setCustomMessages((prev) => [
+                ...prev,
+                {
+                  action: "custom_message",
+                  headline: null,
+                  body: "✓ You've already earned points from this product — check your loyalty balance for your total.",
+                  cta: "View My Points",
+                  cta_url: "/loyalty",
+                },
+              ]);
+              break;
+            }
+            if (!action.one_time && action.cooldown_hrs && qr.last_scan_at) {
+              const hrs =
+                (Date.now() - new Date(qr.last_scan_at).getTime()) / 3600000;
+              if (hrs < action.cooldown_hrs) {
+                const remaining = Math.ceil(action.cooldown_hrs - hrs);
+                // Cooldown — quiet note, no flash
+                pointsWasSkipped = true;
+                pointsWasSkipReason = "cooldown";
+                setCustomMessages((prev) => [
+                  ...prev,
+                  {
+                    action: "custom_message",
+                    headline: null,
+                    body: `⏱ Scan cooldown active — you can earn points again in ${remaining}h.`,
+                    cta: null,
+                    cta_url: null,
+                  },
+                ]);
+                break;
+              }
+            }
+            // All checks passed — NOW set hasPoints so the card renders with correct data from the start
+            setHasPoints(true);
+            setHadPointsAction(true);
+            const newTotal = currentPts + finalPoints;
+            const { error: ptErr } = await supabase
+              .from("user_profiles")
+              .update({ loyalty_points: newTotal })
+              .eq("id", currentUser.id);
+            if (!ptErr) {
+              pointsAwardedAmt = finalPoints;
+              setPointsAwarded(finalPoints);
+              setBasePointsAwarded(basePoints);
+              setTierMultiplierUsed(multiplier);
+              setTierLabelUsed(userTier);
+              setTotalPoints(newTotal);
+
+              // Check tier upgrade
+              const newTier = getTierLabel(newTotal, config);
+              if (newTier !== userTier) {
+                // Update stored tier
+                await supabase
+                  .from("user_profiles")
+                  .update({ loyalty_tier: newTier })
+                  .eq("id", currentUser.id);
+                // Fire tier upgrade notification + inbox message
+                try {
+                  await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      type: "whatsapp",
+                      trigger: "tier_upgrade",
+                      recipient: {
+                        phone: profile?.phone || "",
+                        name: profile?.full_name || "",
+                      },
+                      data: {
+                        old_tier: userTier,
+                        new_tier: newTier,
+                        points: newTotal,
+                      },
+                    }),
+                  });
+                } catch (_) {}
+                // Inbox message for tier upgrade
+                const tierIcons = { Silver: "🥈", Gold: "🥇", Platinum: "💎" };
+                const tierMults = {
+                  Silver: "1.25×",
+                  Gold: "1.5×",
+                  Platinum: "2×",
+                };
+                await supabase.from("customer_messages").insert({
+                  user_id: currentUser.id,
+                  subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
+                  content: `Congratulations ${profile?.full_name ? profile.full_name.split(" ")[0] : ""}! 🎉\n\nYou've just unlocked ${newTier} tier status on the Protea Botanicals loyalty programme.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan.\n\nKeep scanning and shopping to climb to the next tier. 🌿`,
+                  type: "tier_upgrade",
+                  read: false,
+                  created_at: new Date().toISOString(),
+                });
+              }
+
+              if (action.one_time && !qr.claimed) {
+                await supabase
+                  .from("qr_codes")
+                  .update({
+                    claimed: true,
+                    claimed_by: currentUser.id,
+                    claimed_at: new Date().toISOString(),
+                  })
+                  .eq("id", qr.id);
+              }
+            }
+            break;
+          }
+          case "show_banner": {
+            if (action.banner_id) {
+              const { data: bannerData } = await supabase
+                .from("qr_banners")
+                .select("*")
+                .eq("id", action.banner_id)
+                .single();
+              if (bannerData) setBanner(bannerData);
+            }
+            break;
+          }
+          case "show_product": {
+            setShowProduct(true);
+            setShowCoa(action.show_coa !== false);
+            break;
+          }
+          case "event_checkin": {
+            setEventCheckins((prev) => [
+              ...prev,
+              {
+                eventName: action.event_name || "Event",
+                checkedIn: !!currentUser,
+              },
+            ]);
+            break;
+          }
+          case "custom_message": {
+            setCustomMessages((prev) => [...prev, action]);
+            break;
+          }
+          case "redirect": {
+            pendingRedirect = { url: action.url, delay: action.delay_ms || 0 };
+            break;
+          }
+          case "loyalty_signup": {
+            if (!currentUser) {
+              setCustomMessages((prev) => [
+                ...prev,
+                {
+                  action: "custom_message",
+                  headline: "Join Our Loyalty Program",
+                  body: "Create a free account to earn and track your points.",
+                  cta: "Sign Up Free",
+                  cta_url: "/account",
+                },
+              ]);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+
+      await supabase
+        .from("qr_codes")
+        .update({
+          scan_count: (qr.scan_count || 0) + 1,
+          last_scan_at: new Date().toISOString(),
+        })
+        .eq("id", qr.id);
+
+      const productLabel =
+        qr.batches?.product_name || qr.campaign_name || qr.qr_type;
+      const logId = await writeScanLog({
+        qrId: qr.id,
+        qrCodeStr: qrCode,
+        userId: currentUser?.id || null,
+        outcome: pointsWasSkipped ? "already_claimed" : "points_awarded",
+        pointsAmt: pointsAwardedAmt,
+        skipped: pointsWasSkipped,
+        skipReason: pointsWasSkipReason,
+        qrType: qr.qr_type,
+        campaignName: qr.campaign_name,
+        batchId: qr.batch_id,
+        ipGeo,
+        deviceInfo,
+      });
+      setScanLogId(logId);
+
+      if (pointsAwardedAmt > 0 && currentUser) {
+        const currentPts = profile?.loyalty_points || 0;
+        await writeLoyaltyTransaction({
+          userId: currentUser.id,
+          points: pointsAwardedAmt,
+          balanceAfter: currentPts + pointsAwardedAmt,
+          qrCodeStr: qrCode,
+          description: `Scanned ${productLabel}`,
+          scanLogId: logId,
+          multiplierApplied: tierMultiplierUsed,
+          tierAtTime: tierLabelUsed,
+        });
+      }
+
+      // Streak bonus — reward every 5th scan in a rolling 7-day window
+      if (currentUser && pointsAwardedAmt > 0) {
+        try {
+          const sevenDaysAgo = new Date(
+            Date.now() - 7 * 24 * 60 * 60 * 1000,
+          ).toISOString();
+          const { count: weekCount } = await supabase
+            .from("scan_logs")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", currentUser.id)
+            .eq("scan_outcome", "points_awarded")
+            .gte("scanned_at", sevenDaysAgo);
+
+          const STREAK_BONUS_PTS = 200;
+          const STREAK_INTERVAL = 5;
+
+          if (weekCount && weekCount % STREAK_INTERVAL === 0) {
+            const { data: freshPts } = await supabase
+              .from("user_profiles")
+              .select("loyalty_points")
+              .eq("id", currentUser.id)
+              .single();
+            const afterStreak =
+              (freshPts?.loyalty_points || 0) + STREAK_BONUS_PTS;
+            await supabase
+              .from("user_profiles")
+              .update({ loyalty_points: afterStreak })
+              .eq("id", currentUser.id);
+            await supabase.from("loyalty_transactions").insert({
+              user_id: currentUser.id,
+              transaction_type: "EARNED",
+              points: STREAK_BONUS_PTS,
+              balance_after: afterStreak,
+              source: "streak_bonus",
+              description: `Streak bonus — ${weekCount} scans this week!`,
+              transaction_date: new Date().toISOString(),
+              channel: "streak_bonus",
+              multiplier_applied: 1.0,
+              tier_at_time: getTierLabel(freshPts?.loyalty_points || 0, config),
+            });
+            await supabase.from("customer_messages").insert({
+              user_id: currentUser.id,
+              subject: `🔥 Streak Bonus — +${STREAK_BONUS_PTS} pts!`,
+              content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus.\n\nKeep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
+              type: "streak_bonus",
+              read: false,
+              created_at: new Date().toISOString(),
+            });
+            setStreakBonus(STREAK_BONUS_PTS);
+            setStreakCount(weekCount);
+            setTotalPoints(afterStreak);
+          }
+        } catch (streakErr) {
+          console.error("Streak check error:", streakErr);
+        }
+      }
+
+      if (currentUser && deviceInfo?.device === "mobile") {
+        setTimeout(() => setShowGpsPrompt(true), 2500);
+      }
+      if (pendingRedirect) {
+        setTimeout(() => {
+          if (pendingRedirect.url.startsWith("http")) {
+            window.location.href = pendingRedirect.url;
+          } else {
+            navigate(pendingRedirect.url);
+          }
+        }, pendingRedirect.delay);
+      }
+      setPhase("done");
+    } catch (err) {
+      console.error("Scan engine error:", err);
+      await writeScanLog({
+        qrCodeStr: qrCode,
+        outcome: "error",
+        deviceInfo,
+        ipGeo,
+      });
+      setGuardType("error");
+      setPhase("guard");
+    }
+  }, [
+    qrCode,
+    navigate,
+    writeScanLog,
+    writeLoyaltyTransaction,
+    tierMultiplierUsed,
+    tierLabelUsed,
+  ]);
+
+  useEffect(() => {
+    executeScan();
+  }, [executeScan]);
+
+  const handleGpsAllow = async () => {
+    setShowGpsPrompt(false);
+    const gpsData = await requestGps();
+    if (gpsData && scanLogId) await updateScanLogWithGps(scanLogId, gpsData);
+  };
+  const handleGpsDeny = () => setShowGpsPrompt(false);
+
+  const typeInfo = qrRecord
+    ? QR_TYPE_LABELS[qrRecord.qr_type] || {
+        icon: "🔍",
+        label: qrRecord.qr_type,
+      }
+    : { icon: "🔍", label: "QR Code" };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#faf9f6",
-        fontFamily: "'Jost', sans-serif",
-      }}
-    >
-      <style>{styles}</style>
-
-      {/* ── HERO: Authenticated ── */}
+    <>
+      <style>
+        {FONTS}
+        {`
+        @keyframes sr-fadein { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .sr-card { animation: sr-fadein 0.35s ease both; }
+        @keyframes sr-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        .sr-pts { animation: sr-pulse 0.6s ease 0.3s 2; }
+      `}
+      </style>
+      <ClientHeader variant="light" />
       <div
         style={{
-          background:
-            "linear-gradient(160deg, #1b4332 0%, #2d6a4f 60%, #1b4332dd 100%)",
-          position: "relative",
-          overflow: "hidden",
+          minHeight: "100vh",
+          background: C.cream,
+          fontFamily: "Jost, sans-serif",
         }}
       >
         <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 60%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          className="sr-hero-inner"
-          style={{ maxWidth: 720, margin: "0 auto", padding: "48px 32px 44px" }}
+          style={{ maxWidth: 500, margin: "0 auto", padding: "32px 20px 60px" }}
         >
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginBottom: 16,
-              flexWrap: "wrap",
-            }}
-          >
-            <span
-              className="sr-badge"
-              style={{
-                background: "rgba(82,183,136,0.15)",
-                color: "#52b788",
-                border: "1px solid rgba(82,183,136,0.3)",
-              }}
-            >
-              ✓ Authentic Product
-            </span>
-            {isFirstScan && (
-              <span
-                className="sr-badge"
-                style={{
-                  background: "rgba(181,147,90,0.15)",
-                  color: "#e8c870",
-                  border: "1px solid rgba(181,147,90,0.3)",
-                }}
+          {phase === "loading" && (
+            <div style={{ textAlign: "center", padding: "60px 0" }}>
+              <div style={{ fontSize: 36, marginBottom: 16 }}>🔍</div>
+              <div
+                style={{ fontSize: 14, color: C.muted, letterSpacing: "0.1em" }}
               >
-                ★ First Scan
-              </span>
-            )}
-            {!isFirstScan && (
-              <span
-                className="sr-badge"
-                style={{
-                  background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.5)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                }}
-              >
-                Previously Verified
-              </span>
-            )}
-          </div>
-
-          <h1
-            className="shop-font"
-            style={{
-              fontSize: "clamp(36px, 7vw, 60px)",
-              fontWeight: 300,
-              color: "#faf9f6",
-              lineHeight: 1,
-              marginBottom: 8,
-              letterSpacing: "0.03em",
-            }}
-          >
-            {batch?.product_name || "Verified Product"}
-          </h1>
-          <p
-            className="body-font"
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.4)",
-              letterSpacing: "0.25em",
-              textTransform: "uppercase",
-              marginBottom: 0,
-              fontWeight: 300,
-            }}
-          >
-            Batch {batch?.batch_number || "—"} · QR Authenticated
-          </p>
-        </div>
-      </div>
-
-      {/* ── BODY ── */}
-      <div
-        className="sr-inner"
-        style={{ maxWidth: 720, margin: "0 auto", padding: "36px 24px" }}
-      >
-        {/* Anomaly warning */}
-        {anomalyFlags?.length > 0 && (
-          <div
-            className="sr-card"
-            style={{
-              padding: "16px 20px",
-              marginBottom: 20,
-              borderLeft: "3px solid #f59e0b",
-            }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                color: "#f59e0b",
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                marginBottom: 4,
-              }}
-            >
-              Scan Notice
-            </p>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 13,
-                color: "#666",
-                fontWeight: 300,
-                margin: 0,
-              }}
-            >
-              {anomalyFlags.includes("daily_cap") &&
-                "Daily scan limit reached — no additional points awarded today. "}
-              {anomalyFlags.includes("velocity") &&
-                "This code has been scanned many times recently. "}
-              Points are awarded on first verified scan only.
-            </p>
-          </div>
-        )}
-
-        {/* Points earned */}
-        {user && (
-          <div
-            className="sr-card"
-            style={{
-              padding: "24px 28px",
-              marginBottom: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.3em",
-                  textTransform: "uppercase",
-                  color: "#aaa",
-                  marginBottom: 6,
-                }}
-              >
-                {isFirstScan && anomalyFlags?.length === 0
-                  ? "Points Earned"
-                  : "Points"}
-              </p>
-              <p
-                className="shop-font"
-                style={{
-                  fontSize: 40,
-                  fontWeight: 300,
-                  color: "#1b4332",
-                  lineHeight: 1,
-                }}
-              >
-                {isFirstScan && anomalyFlags?.length === 0
-                  ? `+${pointsEarned}`
-                  : "0"}
-              </p>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 11,
-                  color: "#aaa",
-                  marginTop: 4,
-                  fontWeight: 300,
-                }}
-              >
-                {isFirstScan && anomalyFlags?.length === 0
-                  ? "Added to your balance"
-                  : isFirstScan
-                    ? "Withheld — scan limit reached"
-                    : "Already claimed on first scan"}
-              </p>
+                Verifying code…
+              </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.3em",
-                  textTransform: "uppercase",
-                  color: "#aaa",
-                  marginBottom: 6,
-                }}
+          )}
+          {phase === "guard" && <GuardScreen type={guardType} />}
+          {phase === "done" && (
+            <>
+              <div
+                className="sr-card"
+                style={{ textAlign: "center", marginBottom: 20 }}
               >
-                Your Total
-              </p>
-              <p
-                className="shop-font"
-                style={{
-                  fontSize: 32,
-                  fontWeight: 300,
-                  color: "#b5935a",
-                  lineHeight: 1,
-                }}
-              >
-                {(userProfile?.loyalty_points || 0) +
-                  (isFirstScan && anomalyFlags?.length === 0
-                    ? pointsEarned
-                    : 0)}
-              </p>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 11,
-                  color: "#aaa",
-                  marginTop: 4,
-                  fontWeight: 300,
-                }}
-              >
-                {(userProfile?.loyalty_tier || "bronze").toUpperCase()} tier
-              </p>
-            </div>
-          </div>
-        )}
-
-        {!user && (
-          <div
-            className="sr-card"
-            style={{
-              padding: "24px 28px",
-              marginBottom: 20,
-              borderLeft: "3px solid #b5935a",
-              background: "#faf5ed",
-            }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 13,
-                color: "#666",
-                fontWeight: 300,
-                marginBottom: 16,
-                lineHeight: 1.7,
-              }}
-            >
-              <strong style={{ color: "#1a1a1a", fontWeight: 500 }}>
-                Create a free account
-              </strong>{" "}
-              to claim 10 loyalty points for this scan and unlock exclusive
-              rewards.
-            </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                className="sr-btn sr-btn-green"
-                onClick={() => navigate("/account")}
-              >
-                Create Account
-              </button>
-              <button
-                className="sr-btn sr-btn-outline"
-                onClick={() => navigate("/account?mode=login")}
-              >
-                Sign In
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Product details */}
-        <div
-          className="sr-card"
-          style={{ padding: "24px 28px", marginBottom: 20 }}
-        >
-          <p
-            className="body-font"
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.35em",
-              textTransform: "uppercase",
-              color: "#52b788",
-              marginBottom: 14,
-            }}
-          >
-            Product Details
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              gap: "16px 24px",
-            }}
-          >
-            {[
-              ["Product", batch?.product_name],
-              ["Batch", batch?.batch_number],
-              [
-                "THC Content",
-                batch?.thc_content ? `${batch.thc_content}%` : null,
-              ],
-              ["Lab Certified", batch?.lab_certified ? "Yes" : "No"],
-              ["Organic", batch?.organic ? "Yes" : "No"],
-            ]
-              .filter(([, v]) => v)
-              .map(([label, val]) => (
-                <div key={label}>
-                  <p
-                    className="body-font"
+                <div
+                  style={{
+                    fontSize: 9,
+                    letterSpacing: "0.4em",
+                    textTransform: "uppercase",
+                    color: C.accent,
+                    marginBottom: 6,
+                    fontWeight: 700,
+                  }}
+                >
+                  {typeInfo.icon} {typeInfo.label}
+                </div>
+                {qrRecord?.campaign_name && (
+                  <div
                     style={{
-                      fontSize: 9,
-                      letterSpacing: "0.25em",
-                      textTransform: "uppercase",
-                      color: "#aaa",
+                      fontFamily: "Cormorant Garamond, serif",
+                      fontSize: 22,
+                      color: C.green,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {qrRecord.campaign_name}
+                  </div>
+                )}
+              </div>
+              {hasPoints && (
+                <div
+                  className="sr-card sr-pts"
+                  style={{ animationDelay: "0.05s" }}
+                >
+                  <PointsCard
+                    pointsAwarded={pointsAwarded}
+                    totalPoints={totalPoints}
+                    skipped={pointsSkipped}
+                    skipReason={pointsSkipReason}
+                    tierLabel={tierLabelUsed}
+                    multiplier={tierMultiplierUsed}
+                    basePoints={basePointsAwarded}
+                  />
+                </div>
+              )}
+              {/* Streak Bonus Card */}
+              {streakBonus > 0 && (
+                <div
+                  className="sr-card"
+                  style={{
+                    animationDelay: "0.08s",
+                    background: "#fff8e7",
+                    border: "2px solid #b5935a",
+                    borderRadius: 2,
+                    padding: "18px 20px",
+                    marginBottom: 12,
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: 32, marginBottom: 6 }}>🔥</div>
+                  <div
+                    style={{
+                      fontFamily: "Cormorant Garamond, serif",
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: "#b5935a",
                       marginBottom: 4,
                     }}
                   >
-                    {label}
-                  </p>
-                  <p
-                    className="body-font"
-                    style={{ fontSize: 14, color: "#1a1a1a", fontWeight: 400 }}
+                    Streak Bonus!
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "Cormorant Garamond, serif",
+                      fontSize: 36,
+                      fontWeight: 700,
+                      color: "#1b4332",
+                      lineHeight: 1,
+                    }}
                   >
-                    {val}
-                  </p>
+                    +{streakBonus} pts
+                  </div>
+                  <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
+                    {streakCount} scans this week — keep the streak alive! 🌿
+                  </div>
+                </div>
+              )}
+              {banner && (
+                <div className="sr-card" style={{ animationDelay: "0.1s" }}>
+                  <BannerDisplay banner={banner} />
+                </div>
+              )}
+              {showProduct && qrRecord?.batches && (
+                <div className="sr-card" style={{ animationDelay: "0.15s" }}>
+                  <ProductCard batch={qrRecord.batches} showCoa={showCoa} />
+                </div>
+              )}
+              {eventCheckins.map((ec, i) => (
+                <div
+                  key={i}
+                  className="sr-card"
+                  style={{ animationDelay: `${0.2 + i * 0.05}s` }}
+                >
+                  <EventCheckinCard
+                    eventName={ec.eventName}
+                    checkedIn={ec.checkedIn}
+                  />
                 </div>
               ))}
-          </div>
-        </div>
-
-        {/* COA button */}
-        <div
-          className="sr-card"
-          style={{
-            padding: "20px 28px",
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.35em",
-                textTransform: "uppercase",
-                color: "#52b788",
-                marginBottom: 4,
-              }}
-            >
-              Certificate of Analysis
-            </p>
-            <p
-              className="body-font"
-              style={{ fontSize: 13, color: "#555", fontWeight: 300 }}
-            >
-              Full cannabinoid profile · Lab verified · SANAS accredited
-            </p>
-          </div>
-          <a
-            href={batch?.coa_url || "https://example.com/coa/PB-001-2026.pdf"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="sr-btn sr-btn-green"
-          >
-            📄 View COA
-          </a>
-        </div>
-
-        {/* ── GPS CONSENT PROMPT ── */}
-        {gpsState === "prompting" && (
-          <div
-            className="sr-card gps-prompt"
-            style={{
-              padding: "20px 24px",
-              marginBottom: 20,
-              background: "#faf5ed",
-            }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.3em",
-                textTransform: "uppercase",
-                color: "#b5935a",
-                marginBottom: 8,
-              }}
-            >
-              Optional · Location
-            </p>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 14,
-                color: "#1a1a1a",
-                fontWeight: 400,
-                marginBottom: 6,
-              }}
-            >
-              Find your nearest stockist
-            </p>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 13,
-                color: "#666",
-                fontWeight: 300,
-                lineHeight: 1.65,
-                marginBottom: 16,
-              }}
-            >
-              Enable location to see the closest dispensary carrying Protea
-              Botanicals products and get personalised strain recommendations
-              for your area.
-            </p>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 11,
-                color: "#bbb",
-                fontWeight: 300,
-                marginBottom: 16,
-                fontStyle: "italic",
-              }}
-            >
-              Your location is never stored permanently and is never shared with
-              third parties. You can withdraw consent at any time in your
-              account settings.
-            </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button className="sr-btn sr-btn-gold" onClick={handleGrantGPS}>
-                Enable Location
-              </button>
-              <button
-                className="sr-btn"
-                style={{
-                  background: "transparent",
-                  border: "1px solid #d8d0c4",
-                  color: "#888",
-                  padding: "12px 24px",
-                  fontSize: 11,
-                  letterSpacing: "0.2em",
-                  textTransform: "uppercase",
-                  cursor: "pointer",
-                  fontFamily: "'Jost', sans-serif",
-                  borderRadius: 2,
-                }}
-                onClick={handleDenyGPS}
-              >
-                No Thanks
-              </button>
-            </div>
-          </div>
-        )}
-
-        {gpsState === "requesting" && (
-          <div
-            className="sr-card"
-            style={{
-              padding: "20px 24px",
-              marginBottom: 20,
-              textAlign: "center",
-            }}
-          >
-            <p
-              className="body-font pulse"
-              style={{ fontSize: 13, color: "#888", fontWeight: 300 }}
-            >
-              Requesting location…
-            </p>
-          </div>
-        )}
-
-        {gpsState === "denied" && (
-          <div
-            className="sr-card"
-            style={{ padding: "16px 20px", marginBottom: 20 }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 12,
-                color: "#aaa",
-                fontWeight: 300,
-                margin: 0,
-              }}
-            >
-              Location disabled. You can enable it anytime in{" "}
-              <Link
-                to="/account"
-                style={{
-                  color: "#b5935a",
-                  textDecoration: "none",
-                  fontWeight: 500,
-                }}
-              >
-                your account settings
-              </Link>
-              .
-            </p>
-          </div>
-        )}
-
-        {/* ── NEAREST STOCKIST CARD ── */}
-        {stockistLoading && (
-          <div
-            className="sr-card"
-            style={{
-              padding: "20px 24px",
-              marginBottom: 20,
-              textAlign: "center",
-            }}
-          >
-            <p
-              className="body-font pulse"
-              style={{ fontSize: 13, color: "#888", fontWeight: 300 }}
-            >
-              Finding nearest stockist…
-            </p>
-          </div>
-        )}
-
-        {stockist && !stockistLoading && (
-          <div
-            className="sr-card stockist-card"
-            style={{
-              padding: "24px 28px",
-              marginBottom: 20,
-              borderLeft: "3px solid #52b788",
-            }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.35em",
-                textTransform: "uppercase",
-                color: "#52b788",
-                marginBottom: 10,
-              }}
-            >
-              Nearest Stockist
-            </p>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 16,
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <p
-                  className="shop-font"
+              {customMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className="sr-card"
+                  style={{ animationDelay: `${0.25 + i * 0.05}s` }}
+                >
+                  <CustomMessageCard action={msg} navigate={navigate} />
+                </div>
+              ))}
+              {showGpsPrompt && (
+                <div className="sr-card" style={{ animationDelay: "0s" }}>
+                  <GpsConsentBanner
+                    onAllow={handleGpsAllow}
+                    onDeny={handleGpsDeny}
+                  />
+                </div>
+              )}
+              {!user && hadPointsAction && (
+                <div
+                  className="sr-card"
                   style={{
-                    fontSize: 24,
-                    fontWeight: 400,
-                    color: "#1a1a1a",
-                    marginBottom: 4,
+                    animationDelay: "0.35s",
+                    ...card({ background: C.warm, textAlign: "center" }),
                   }}
                 >
-                  {stockist.name}
-                </p>
-                <p
-                  className="body-font"
-                  style={{ fontSize: 13, color: "#666", fontWeight: 300 }}
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: C.text,
+                      marginBottom: 12,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    <strong>Sign in to earn points</strong> — your scan was
+                    verified but points require an account.
+                  </div>
+                  <button
+                    onClick={() => navigate("/account")}
+                    style={actionBtn(C.green)}
+                  >
+                    Create Account / Sign In
+                  </button>
+                </div>
+              )}
+              {user && pointsAwarded > 0 && (
+                <div className="sr-card" style={{ animationDelay: "0.4s" }}>
+                  <button
+                    onClick={() => navigate("/loyalty")}
+                    style={actionBtn(C.mid)}
+                  >
+                    View My Loyalty Points
+                  </button>
+                </div>
+              )}
+              <div
+                className="sr-card"
+                style={{
+                  animationDelay: "0.45s",
+                  textAlign: "center",
+                  marginTop: 8,
+                }}
+              >
+                <button
+                  onClick={() => navigate("/scan")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: C.accent,
+                    cursor: "pointer",
+                    fontFamily: "Jost, sans-serif",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textDecoration: "underline",
+                  }}
                 >
-                  {stockist.location_city && `${stockist.location_city}, `}
-                  {stockist.location_province}
-                </p>
+                  ← Scan Another Code
+                </button>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <p
-                  className="shop-font"
-                  style={{
-                    fontSize: 32,
-                    fontWeight: 300,
-                    color: "#1b4332",
-                    lineHeight: 1,
-                  }}
-                >
-                  {stockist.distance_m < 1000
-                    ? `${stockist.distance_m}m`
-                    : `${(stockist.distance_m / 1000).toFixed(1)}km`}
-                </p>
-                <p
-                  className="body-font"
-                  style={{
-                    fontSize: 10,
-                    color: "#aaa",
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    marginTop: 4,
-                  }}
-                >
-                  from your location
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── IP-INFERRED LOCATION ── */}
-        {(gpsState === "idle" || gpsState === "denied") &&
-          result?.userProfile?.city && (
-            <div
-              className="sr-card"
-              style={{
-                padding: "14px 20px",
-                marginBottom: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <span style={{ fontSize: 16, color: "#aaa" }}>📍</span>
-              <p
-                className="body-font"
-                style={{
-                  fontSize: 12,
-                  color: "#aaa",
-                  fontWeight: 300,
-                  margin: 0,
-                }}
-              >
-                Scan detected near{" "}
-                <strong style={{ color: "#555", fontWeight: 500 }}>
-                  {result.userProfile.city}
-                </strong>
-                {result.userProfile.province &&
-                  `, ${result.userProfile.province}`}
-              </p>
-            </div>
+            </>
           )}
-
-        {/* ── PROFILE COMPLETION NUDGE ── */}
-        {user && userProfile && !userProfile.profile_complete && (
-          <div
-            className="sr-card"
-            style={{
-              padding: "20px 24px",
-              marginBottom: 20,
-              background: "#f0f9f4",
-              borderLeft: "3px solid #52b788",
-            }}
-          >
-            <p
-              className="body-font"
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.3em",
-                textTransform: "uppercase",
-                color: "#52b788",
-                marginBottom: 6,
-              }}
-            >
-              Earn 50 Bonus Points
-            </p>
-            <p
-              className="body-font"
-              style={{
-                fontSize: 13,
-                color: "#555",
-                fontWeight: 300,
-                marginBottom: 14,
-                lineHeight: 1.65,
-              }}
-            >
-              Complete your profile to unlock personalised strain
-              recommendations and earn 50 bonus points.
-            </p>
-            <Link
-              to="/account?tab=profile"
-              className="sr-btn sr-btn-green"
-              style={{ fontSize: 10 }}
-            >
-              Complete Profile
-            </Link>
-          </div>
-        )}
-
-        {/* CTA row */}
-        <div
-          className="sr-cta-row"
-          style={{
-            display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
-            marginBottom: 24,
-          }}
-        >
-          <Link
-            to="/shop"
-            className="sr-btn sr-btn-outline"
-            style={{ flex: 1, minWidth: 140 }}
-          >
-            Browse Shop
-          </Link>
-          <Link
-            to="/loyalty"
-            className="sr-btn sr-btn-green"
-            style={{ flex: 1, minWidth: 140 }}
-          >
-            My Points
-          </Link>
-          <button
-            className="sr-btn"
-            style={{
-              flex: 1,
-              minWidth: 140,
-              background: "transparent",
-              border: "1px solid #d8d0c4",
-              color: "#888",
-              fontFamily: "'Jost', sans-serif",
-              cursor: "pointer",
-              fontSize: 11,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              borderRadius: 2,
-            }}
-            onClick={() => navigate("/scan")}
-          >
-            Scan Another
-          </button>
-        </div>
-
-        {/* Strain profile link */}
-        {batch?.strain_id && (
-          <div style={{ textAlign: "center" }}>
-            <Link
-              to={`/verify/${batch.strain_id}`}
-              className="body-font"
-              style={{
-                fontSize: 11,
-                color: "#aaa",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                textDecoration: "none",
-                borderBottom: "1px solid #ddd",
-                paddingBottom: 2,
-              }}
-            >
-              View full strain profile →
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* Footer strip */}
-      <div
-        style={{ background: "#060e09", padding: "24px 32px", marginTop: 32 }}
-      >
-        <div
-          style={{
-            maxWidth: 720,
-            margin: "0 auto",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 16,
-          }}
-        >
-          <span
-            className="shop-font"
-            style={{ fontSize: 16, color: "#faf9f6", letterSpacing: "0.2em" }}
-          >
-            Protea <span style={{ color: "#52b788" }}>Botanicals</span>
-          </span>
-          <p
-            className="body-font"
-            style={{
-              fontSize: 10,
-              color: "#333",
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              margin: 0,
-            }}
-          >
-            Lab Verified · QR Authenticated · South Africa
-          </p>
         </div>
       </div>
-    </div>
+    </>
   );
 }

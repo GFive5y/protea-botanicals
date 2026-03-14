@@ -153,6 +153,7 @@ export default function Loyalty() {
   const [freshScan, setFreshScan] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [referralBanner, setReferralBanner] = useState(null); // unread referral_reward message
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -243,6 +244,31 @@ export default function Loyalty() {
           setReferralUses(refData?.uses_count || 0);
         }
         setReferralCode(code || null);
+      }
+
+      // Check for unread notification banners (referral reward, tier upgrade, streak)
+      const sevenDaysAgo = new Date(
+        Date.now() - 7 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const { data: bannerMsg } = await supabase
+        .from("customer_messages")
+        .select("id, subject, content, type")
+        .eq("user_id", user.id)
+        .in("type", ["referral_reward", "tier_upgrade", "streak_bonus"])
+        .eq("read", false)
+        .gte("created_at", sevenDaysAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (bannerMsg) {
+        setReferralBanner(bannerMsg);
+        setTimeout(async () => {
+          await supabase
+            .from("customer_messages")
+            .update({ read: true })
+            .eq("id", bannerMsg.id);
+          setReferralBanner(null);
+        }, 8000);
       }
     } catch (err) {
       console.error("Loyalty error:", err);
@@ -438,6 +464,82 @@ export default function Loyalty() {
           color: C.text,
         }}
       >
+        {/* First-login notification banner: referral reward / tier upgrade / streak */}
+        {referralBanner && (
+          <div
+            style={{
+              background:
+                referralBanner.type === "tier_upgrade"
+                  ? "linear-gradient(135deg, #1b4332, #2d6a4f)"
+                  : referralBanner.type === "streak_bonus"
+                    ? "#fff8e7"
+                    : "linear-gradient(135deg, #b5935a, #a07840)",
+              border:
+                referralBanner.type === "streak_bonus"
+                  ? "2px solid #b5935a"
+                  : "none",
+              borderRadius: 2,
+              padding: "16px 24px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 14,
+              animation: "loyaltyFadeUp 0.4s ease",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+            }}
+          >
+            <div style={{ fontSize: 28, flexShrink: 0 }}>
+              {referralBanner.type === "tier_upgrade"
+                ? "🏆"
+                : referralBanner.type === "streak_bonus"
+                  ? "🔥"
+                  : "🎉"}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color:
+                    referralBanner.type === "streak_bonus" ? "#b5935a" : "#fff",
+                  marginBottom: 4,
+                }}
+              >
+                {referralBanner.subject}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color:
+                    referralBanner.type === "streak_bonus"
+                      ? "#666"
+                      : "rgba(255,255,255,0.8)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {referralBanner.content?.split("\n")[0]}
+              </div>
+            </div>
+            <button
+              onClick={() => setReferralBanner(null)}
+              style={{
+                background: "none",
+                border: "none",
+                color:
+                  referralBanner.type === "streak_bonus"
+                    ? "#b5935a"
+                    : "rgba(255,255,255,0.6)",
+                fontSize: 18,
+                cursor: "pointer",
+                flexShrink: 0,
+                padding: 0,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {freshScan && (
           <div
             style={{

@@ -349,13 +349,47 @@ export default function OrderSuccess() {
           }
         }
 
-        // 7. Check for tier upgrade
+        // 7. Check for tier upgrade — update profile + write inbox message
         const newTier = getTierLabel(newPts, cfg);
         if (newTier !== tier) {
           await supabase
             .from("user_profiles")
             .update({ loyalty_tier: newTier })
             .eq("id", userId);
+          const tierIcons = { Silver: "🥈", Gold: "🥇", Platinum: "💎" };
+          const tierMults = { Silver: "1.25×", Gold: "1.5×", Platinum: "2×" };
+          const firstName = profile?.full_name
+            ? profile.full_name.split(" ")[0]
+            : "";
+          await supabase.from("customer_messages").insert({
+            user_id: userId,
+            subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
+            content: `Congratulations${firstName ? " " + firstName : ""}! 🎉 Your purchase just pushed you into ${newTier} tier status on the Protea Botanicals loyalty programme.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan — effective immediately.\n\nThank you for being a loyal Protea customer. 🌿`,
+            type: "tier_upgrade",
+            read: false,
+            created_at: new Date().toISOString(),
+          });
+          // WhatsApp tier upgrade notification
+          if (profile?.phone) {
+            try {
+              const SUPABASE_FUNCTIONS_URL =
+                process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
+                "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
+              await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "whatsapp",
+                  trigger: "tier_upgrade",
+                  recipient: {
+                    phone: profile.phone,
+                    name: profile.full_name || "",
+                  },
+                  data: { old_tier: tier, new_tier: newTier, points: newPts },
+                }),
+              });
+            } catch (_) {}
+          }
         }
 
         setNewBalance(newPts);
