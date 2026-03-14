@@ -1,6 +1,7 @@
-// src/components/hq/HQOverview.js — Protea Botanicals v1.5
-// v1.5: Clickable KPI cards (navigate to relevant tab), clickable panel headers,
-//       USD/ZAR live auto-refresh every 60s with countdown + last-updated display
+// src/components/hq/HQOverview.js — Protea Botanicals v1.7
+// v1.7: Birthday KPI tiles — how many birthdays today + this week
+// v1.6: Open tickets KPI + live USD/ZAR + clickable cards → onNavigate
+// v1.5: Clickable KPI cards, clickable panel headers, USD/ZAR auto-refresh every 60s
 // v1.4 FIXED: scans → scan_logs, scan_date → scanned_at
 // v1.3 WP-H: ERP KPI tiles added
 
@@ -20,6 +21,7 @@ const C = {
   white: "#ffffff",
   red: "#c0392b",
   orange: "#E65100",
+  purple: "#6A1B9A",
 };
 
 const SUPABASE_FUNCTIONS_URL =
@@ -34,6 +36,9 @@ export default function HQOverview({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // v1.7: birthday stats
+  const [birthdayStats, setBirthdayStats] = useState({ today: 0, thisWeek: 0 });
+
   // ── USD/ZAR live state ──────────────────────────────────────────────────────
   const [fxRate, setFxRate] = useState(null);
   const [fxUpdatedAt, setFxUpdatedAt] = useState(null);
@@ -42,11 +47,9 @@ export default function HQOverview({ onNavigate }) {
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
 
-  // ── Live FX fetch ───────────────────────────────────────────────────────────
   const fetchFx = useCallback(async (silent = false) => {
     if (!silent) setFxRefreshing(true);
     try {
-      // Try Edge Function first (live rate)
       const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/get-fx-rate`);
       if (res.ok) {
         const json = await res.json();
@@ -55,7 +58,6 @@ export default function HQOverview({ onNavigate }) {
           setFxRate(parseFloat(rate));
           setFxUpdatedAt(new Date());
           setFxCountdown(60);
-          // Also update erpStats so the tile reflects the new rate
           setErpStats((prev) =>
             prev ? { ...prev, fxRate: parseFloat(rate) } : prev,
           );
@@ -63,7 +65,6 @@ export default function HQOverview({ onNavigate }) {
         }
       }
     } catch (_) {}
-    // Fallback: read from fx_rates table
     try {
       const r = await supabase
         .from("fx_rates")
@@ -84,30 +85,66 @@ export default function HQOverview({ onNavigate }) {
     setFxRefreshing(false);
   }, []);
 
-  // ── Start FX auto-refresh loop ──────────────────────────────────────────────
   useEffect(() => {
     fetchFx(false);
-
-    // Countdown ticker
     fxCountRef.current = setInterval(() => {
       setFxCountdown((n) => {
         if (n <= 1) return 60;
         return n - 1;
       });
     }, 1000);
-
-    // Refresh every 60s
     fxTimerRef.current = setInterval(() => {
       fetchFx(true);
     }, 60000);
-
     return () => {
       clearInterval(fxTimerRef.current);
       clearInterval(fxCountRef.current);
     };
   }, [fetchFx]);
 
-  // ── Main stats fetch ────────────────────────────────────────────────────────
+  // ── v1.7: Birthday stats fetch ──────────────────────────────────────────────
+  const fetchBirthdayStats = useCallback(async () => {
+    try {
+      const now = new Date();
+      const todayMonth = now.getMonth() + 1; // 1-12
+      const todayDay = now.getDate();
+
+      // Build 7-day window (month/day pairs)
+      const weekDays = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(now);
+        d.setDate(now.getDate() + i);
+        weekDays.push({ month: d.getMonth() + 1, day: d.getDate() });
+      }
+
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("date_of_birth")
+        .not("date_of_birth", "is", null);
+
+      if (!profiles) return;
+
+      let todayCount = 0;
+      let weekCount = 0;
+
+      profiles.forEach(({ date_of_birth }) => {
+        if (!date_of_birth) return;
+        try {
+          const dob = new Date(date_of_birth);
+          const dobMonth = dob.getMonth() + 1;
+          const dobDay = dob.getDate();
+          if (dobMonth === todayMonth && dobDay === todayDay) todayCount++;
+          if (weekDays.some((d) => d.month === dobMonth && d.day === dobDay))
+            weekCount++;
+        } catch (_) {}
+      });
+
+      setBirthdayStats({ today: todayCount, thisWeek: weekCount });
+    } catch (err) {
+      console.error("[HQOverview] Birthday stats error:", err);
+    }
+  }, []);
+
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -187,7 +224,6 @@ export default function HQOverview({ onNavigate }) {
         if (!r.error) lowStockData = r.data || [];
       } catch (_) {}
 
-      // Open support tickets count
       let openTickets = 0;
       try {
         const r = await supabase
@@ -209,7 +245,6 @@ export default function HQOverview({ onNavigate }) {
       setRecentScans(scansData);
       setLowStock(lowStockData);
 
-      // ERP stats (non-FX parts)
       let reorderCount = 0,
         avgMarginPct = null,
         activeImportPOs = 0;
@@ -288,19 +323,21 @@ export default function HQOverview({ onNavigate }) {
         activeImportPOs,
         fxRate: currentFx,
       });
+
+      // v1.7: fetch birthday stats in parallel
+      await fetchBirthdayStats();
     } catch (err) {
       console.error("[HQOverview] Fatal:", err);
       setError("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
-  }, [fxRate]);
+  }, [fxRate, fetchBirthdayStats]);
 
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  // ── Loading / error states ───────────────────────────────────────────────────
   if (loading)
     return (
       <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
@@ -439,6 +476,36 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
+      {/* ── v1.7: BIRTHDAY KPI CARDS ── */}
+      <SectionLabel label="Birthdays" />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+          gap: "14px",
+          marginBottom: "28px",
+        }}
+      >
+        <KPICard
+          icon="🎂"
+          label="Birthdays Today"
+          value={birthdayStats.today}
+          color={birthdayStats.today > 0 ? C.purple : C.muted}
+          sub={
+            birthdayStats.today > 0
+              ? "bonus points sent at 06:00"
+              : "none today"
+          }
+        />
+        <KPICard
+          icon="🎉"
+          label="Birthdays This Week"
+          value={birthdayStats.thisWeek}
+          color={birthdayStats.thisWeek > 0 ? C.gold : C.muted}
+          sub="next 7 days"
+        />
+      </div>
+
       {/* ── IMPORT ERP TILES ── */}
       {erpStats && (
         <>
@@ -483,7 +550,7 @@ export default function HQOverview({ onNavigate }) {
               onClick={() => nav("procurement")}
             />
 
-            {/* ── LIVE USD/ZAR TILE ── */}
+            {/* LIVE USD/ZAR TILE */}
             <div
               style={{
                 background: "#E8F5E9",
@@ -739,7 +806,7 @@ export default function HQOverview({ onNavigate }) {
                   fontFamily: "Jost,sans-serif",
                 }}
               >
-                {lowStock.length > 0 ? "→ Supply Chain" : "→ Supply Chain"}
+                → Supply Chain
               </span>
             </h3>
             {lowStock.length > 0 && (
@@ -871,6 +938,7 @@ export default function HQOverview({ onNavigate }) {
           <QA label="QR Generator" href="/admin/qr" icon="📷" />
           <QA label="View Shop" href="/shop" icon="🛒" />
           <QA label="Loyalty Page" href="/loyalty" icon="⭐" />
+          <QA label="Leaderboard" href="/leaderboard" icon="🏆" />
         </div>
         {onNavigate && (
           <>
@@ -990,12 +1058,7 @@ function KPICard({ icon, label, value, color, sub, onClick, hint }) {
         </div>
         {clickable && hint && (
           <span
-            style={{
-              fontSize: "9px",
-              color: color,
-              fontWeight: 600,
-              opacity: 0.7,
-            }}
+            style={{ fontSize: "9px", color, fontWeight: 600, opacity: 0.7 }}
           >
             ↗
           </span>

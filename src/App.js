@@ -1,23 +1,19 @@
-// src/App.js — Protea Botanicals v3.8
+// src/App.js — Protea Botanicals v3.9
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v3.9 CHANGELOG:
+//   1. ADD: import Leaderboard from "./pages/Leaderboard"
+//   2. ADD: public /leaderboard route (no RequireAuth — visible to all)
+//   All v3.8 nav, auth, cart, route logic — untouched.
+//
 // ★ v3.8 CHANGELOG (NavBar redesign):
-//   1. MODIFY: NavBar background changed from solid green (#1b4332) to
-//      scroll-aware cream/green (matches Landing.js header behaviour exactly)
-//   2. ADD: scroll state + auto-hide behaviour in NavBar (useState, useEffect)
-//   3. MODIFY: Brand "Protea Botanicals" text — dark green when unscrolled,
-//      cream when scrolled (was always gold #b5935a)
-//   4. MODIFY: NavLink text — dark (#1a1a1a) when unscrolled, white when scrolled
-//   5. MODIFY: Cart SVG stroke — dark when unscrolled, white when scrolled
-//   6. MODIFY: "Sign In" button — matches Landing.js sign-in style (no gold bg)
-//   7. ADD: position:fixed + translateY hide/show on NavBar header
-//   8. ADD: paddingTop:56px spacer div below NavBar on nav-wrapped routes
-//   NO OTHER CHANGES. All routes, auth, cart logic — untouched.
+//   1. MODIFY: NavBar background — scroll-aware cream/green
+//   2. ADD: scroll state + auto-hide in NavBar
+//   3–8. Various nav style changes (see v3.8 notes)
 //
 // ★ v3.7 CHANGELOG (Phase 2F — Shop Admin Scoping):
-//   1. ADD: import ShopDashboard from "./pages/ShopDashboard"
+//   1. ADD: import ShopDashboard
 //   2. ADD: AdminDashboardRouter component
 //   3. MODIFY: /admin route uses AdminDashboardRouter
-//   4. Version bump v3.6 → v3.7
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useState, useEffect, useContext } from "react";
@@ -37,6 +33,7 @@ import Landing from "./pages/Landing";
 import ScanPage from "./pages/ScanPage";
 import ScanResult from "./pages/ScanResult";
 import Loyalty from "./pages/Loyalty";
+import Leaderboard from "./pages/Leaderboard"; // ★ v3.9
 import Account from "./pages/Account";
 import AdminDashboard from "./pages/AdminDashboard";
 import WholesalePortal from "./pages/WholesalePortal";
@@ -55,7 +52,7 @@ import AdminQrGenerator from "./pages/AdminQrGenerator";
 import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
 import ShopDashboard from "./pages/ShopDashboard";
-import TerpenePage from "./pages/TerpenePage"; // ← ADD THIS
+import TerpenePage from "./pages/TerpenePage";
 
 import PageShell from "./components/PageShell";
 import { CartProvider, useCart } from "./contexts/CartContext";
@@ -81,7 +78,6 @@ function NavBar() {
   const isLoggedIn = !!role;
   const cartCount = getCartCount();
 
-  // ★ v3.8: Scroll-aware state — mirrors Landing.js header exactly
   const [scrolled, setScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
 
@@ -129,7 +125,6 @@ function NavBar() {
 
   return (
     <>
-      {/* Dev mode banner */}
       {isDevMode && (
         <div
           style={{
@@ -174,7 +169,6 @@ function NavBar() {
         </div>
       )}
 
-      {/* ★ v3.8: Main nav — fixed, scroll-aware, auto-hide */}
       <header
         style={{
           position: "fixed",
@@ -199,7 +193,6 @@ function NavBar() {
             "background 0.4s ease, border-color 0.4s ease, transform 0.35s ease, backdrop-filter 0.4s ease",
         }}
       >
-        {/* Left: brand + nav links */}
         <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
           <Link
             to="/"
@@ -251,9 +244,7 @@ function NavBar() {
           )}
         </nav>
 
-        {/* Right: cart + user */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* Cart icon */}
           <button
             onClick={() => navigate("/cart")}
             style={{
@@ -405,7 +396,6 @@ function NavBar() {
               </button>
             </>
           ) : (
-            /* ★ v3.8: Sign In — matches Landing.js style, no gold */
             <Link
               to="/account"
               style={{
@@ -447,7 +437,6 @@ function NavBar() {
   );
 }
 
-// ★ v3.8: NavLink now accepts scrolled prop for text color
 function NavLink({ to, children, scrolled }) {
   return (
     <Link
@@ -480,7 +469,6 @@ function NavLink({ to, children, scrolled }) {
   );
 }
 
-// ★ v3.8: WithNav adds a 56px spacer so content isn't hidden under fixed nav
 function WithNav({ children }) {
   return (
     <>
@@ -493,12 +481,11 @@ function WithNav({ children }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH GUARDS (unchanged from v3.7)
+// AUTH GUARDS
 // ─────────────────────────────────────────────────────────────────────────────
 function RequireAuth({ children }) {
   const { role, loading } = useContext(RoleContext);
   const location = useLocation();
-
   const storedRole = localStorage.getItem("protea_role");
 
   if (role || storedRole) return children;
@@ -656,7 +643,7 @@ function AdminDashboardRouter() {
   return <AdminDashboard />;
 }
 
-// ────────localStorage.getItem─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -705,8 +692,6 @@ export default function App() {
           if (profile?.role) setRole(profile.role);
           setUserEmail(session.user.email);
         } else {
-          // Don't clear role here — getSession() can return null briefly on page
-          // load while Supabase initializes. SIGNED_OUT event handles real logouts.
           setUserEmail(null);
         }
       } catch (err) {
@@ -769,7 +754,7 @@ export default function App() {
             <Routes>
               {/* ── STANDALONE — no nav ─────────────────────────────── */}
               <Route path="/" element={<Landing />} />
-              {/* ★ v3.8: /shop + /verify + /cart get NavBar with 56px spacer */}
+
               <Route
                 path="/shop"
                 element={
@@ -791,7 +776,7 @@ export default function App() {
                     </div>
                   </>
                 }
-              />{" "}
+              />
               <Route
                 path="/terpenes/:terpeneId"
                 element={
@@ -814,9 +799,24 @@ export default function App() {
                   </>
                 }
               />
+
+              {/* ★ v3.9: Leaderboard — public, no auth required */}
+              <Route
+                path="/leaderboard"
+                element={
+                  <>
+                    <NavBar />
+                    <div style={{ paddingTop: "56px" }}>
+                      <Leaderboard />
+                    </div>
+                  </>
+                }
+              />
+
               {/* Scan routes — standalone, no nav */}
               <Route path="/scan" element={<ScanPage />} />
               <Route path="/scan/:qrCode" element={<ScanResult />} />
+
               {/* ── WITH nav + auth guard ───────────────────────────── */}
               <Route
                 path="/loyalty"
@@ -921,6 +921,7 @@ export default function App() {
                   </>
                 }
               />
+
               {/* ── WITH nav, no auth required ──────────────────────── */}
               <Route
                 path="/account"
@@ -938,6 +939,7 @@ export default function App() {
                   </WithNav>
                 }
               />
+
               {/* Fallback */}
               <Route path="/404" element={<NotFound />} />
               <Route path="*" element={<Navigate to="/404" replace />} />

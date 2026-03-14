@@ -1,17 +1,18 @@
-// src/pages/ScanResult.js v4.3
-// Protea Botanicals — WP-O: loyalty_config integration
-// v4.3 changes from v4.2:
-//   - Fetches loyalty_config on mount (pts_qr_scan, tier multipliers, thresholds)
-//   - award_points applies tier multiplier: finalPts = pts_qr_scan × mult_[tier]
-//   - PointsCard shows "Gold tier: 1.5× bonus applied"
-//   - loyalty_transactions enriched: multiplier_applied, tier_at_time, channel
-//   - Tier upgrade detected + WhatsApp notification fired
-//   All v4.2 scan engine logic unchanged
+// src/pages/ScanResult.js v4.5
+// Protea Botanicals — WP-P Phase 1 Communications build
+// v4.5 changes from v4.3:
+//   - Import SurveyWidget — fires on user's 5th successful scan only
+//   - Fetches active double_points_campaigns on each scan
+//   - If campaign active today: applies campaign.multiplier on top of tier mult
+//   - Shows 2× banner (CampaignBanner component) when campaign is live
+//   - Tracks totalScans state — passed to SurveyWidget
+//   All v4.3 scan engine logic, tier/streak/WhatsApp logic — unchanged
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import ClientHeader from "../components/ClientHeader";
+import SurveyWidget from "../components/SurveyWidget";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -32,7 +33,6 @@ const DEFAULT_LOYALTY_CONFIG = {
   breakage_rate: 0.3,
 };
 
-// ── Tier helpers (config-driven) ─────────────────────────────────────────────
 function getTierLabel(pts, cfg) {
   if (pts >= cfg.threshold_platinum) return "Platinum";
   if (pts >= cfg.threshold_gold) return "Gold";
@@ -181,7 +181,49 @@ const QR_TYPE_LABELS = {
   retail_display: { icon: "🏪", label: "Retail Display" },
 };
 
-// ── Sub-components ──────────────────────────────────────────────────────────
+// ── v4.5: Campaign Banner ────────────────────────────────────────────────────
+function CampaignBanner({ campaign }) {
+  if (!campaign) return null;
+  const mult = parseFloat(campaign.multiplier) || 2;
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg, #b5935a, #8a6c3a)",
+        borderRadius: 2,
+        padding: "16px 20px",
+        marginBottom: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+      }}
+    >
+      <div style={{ fontSize: 28, flexShrink: 0 }}>🎉</div>
+      <div>
+        <div
+          style={{
+            fontFamily: "Cormorant Garamond, serif",
+            fontSize: 18,
+            fontWeight: 700,
+            color: "#fff",
+            marginBottom: 2,
+          }}
+        >
+          {mult}× Points Active — {campaign.name}
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
+          All points earned today are multiplied ×{mult}. Ends{" "}
+          {new Date(campaign.end_date).toLocaleDateString("en-ZA", {
+            day: "numeric",
+            month: "short",
+          })}
+          .
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-components (unchanged from v4.3) ────────────────────────────────────
 
 function BannerDisplay({ banner }) {
   const navigate = useNavigate();
@@ -302,7 +344,6 @@ function ProductCard({ batch, showCoa }) {
   );
 }
 
-// ── v4.3: Enhanced PointsCard showing tier multiplier ────────────────────────
 function PointsCard({
   pointsAwarded,
   totalPoints,
@@ -311,6 +352,7 @@ function PointsCard({
   tierLabel,
   multiplier,
   basePoints,
+  campaignMult,
 }) {
   if (skipped) {
     return (
@@ -323,6 +365,7 @@ function PointsCard({
   }
   const tierColor = getTierColor(tierLabel);
   const showMultiplier = multiplier && multiplier > 1 && tierLabel;
+  const showCampaign = campaignMult && campaignMult > 1;
   return (
     <div
       style={card({
@@ -362,12 +405,12 @@ function PointsCard({
             justifyContent: "center",
             gap: 6,
             marginTop: 8,
+            flexWrap: "wrap",
           }}
         >
           <span style={{ fontSize: 10, color: C.muted }}>
-            {basePoints} base pts
+            {basePoints} base
           </span>
-          <span style={{ fontSize: 10, color: C.muted }}>×</span>
           <span
             style={{
               background: tierColor,
@@ -380,6 +423,20 @@ function PointsCard({
           >
             {tierLabel} {multiplier}×
           </span>
+          {showCampaign && (
+            <span
+              style={{
+                background: C.gold,
+                color: C.white,
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 10,
+              }}
+            >
+              Campaign {campaignMult}×
+            </span>
+          )}
           <span style={{ fontSize: 10, color: C.muted }}>
             = {pointsAwarded} pts
           </span>
@@ -621,6 +678,10 @@ export default function ScanResult() {
   const [user, setUser] = useState(null);
   const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
 
+  // v4.5: campaign state
+  const [activeCampaign, setActiveCampaign] = useState(null);
+  const [campaignMultUsed, setCampaignMultUsed] = useState(1);
+
   const [banner, setBanner] = useState(null);
   const [showProduct, setShowProduct] = useState(false);
   const [showCoa, setShowCoa] = useState(false);
@@ -634,13 +695,15 @@ export default function ScanResult() {
   const [customMessages, setCustomMessages] = useState([]);
   const [eventCheckins, setEventCheckins] = useState([]);
   const [hasPoints, setHasPoints] = useState(false);
-  const [hadPointsAction, setHadPointsAction] = useState(false); // true if QR had award_points action regardless of login
+  const [hadPointsAction, setHadPointsAction] = useState(false);
   const [showGpsPrompt, setShowGpsPrompt] = useState(false);
   const [scanLogId, setScanLogId] = useState(null);
-  const [streakBonus, setStreakBonus] = useState(0); // pts awarded for streak
-  const [streakCount, setStreakCount] = useState(0); // how many scans this week
+  const [streakBonus, setStreakBonus] = useState(0);
+  const [streakCount, setStreakCount] = useState(0);
+  // v4.5: total scans for SurveyWidget eligibility
+  const [totalScans, setTotalScans] = useState(0);
+  const [surveyBonusAwarded, setSurveyBonusAwarded] = useState(0);
 
-  // Fetch loyalty_config on mount
   useEffect(() => {
     supabase
       .from("loyalty_config")
@@ -709,7 +772,6 @@ export default function ScanResult() {
     [],
   );
 
-  // v4.3: enriched with multiplier_applied, tier_at_time, channel
   const writeLoyaltyTransaction = useCallback(
     async ({
       userId,
@@ -732,7 +794,6 @@ export default function ScanResult() {
           description,
           scan_log_id: scanLogId || null,
           transaction_date: new Date().toISOString(),
-          // WP-O new columns
           multiplier_applied: multiplierApplied || 1.0,
           tier_at_time: tierAtTime || "Bronze",
           channel: "qr_scan",
@@ -773,7 +834,6 @@ export default function ScanResult() {
       Promise.resolve(detectDevice()),
     ]);
 
-    // Fetch loyalty config fresh for this scan
     let config = DEFAULT_LOYALTY_CONFIG;
     try {
       const { data: cfgData } = await supabase
@@ -782,6 +842,22 @@ export default function ScanResult() {
         .single();
       if (cfgData) config = cfgData;
     } catch (_) {}
+
+    // v4.5: Fetch active double-points campaign for today
+    let campaign = null;
+    try {
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const { data: camps } = await supabase
+        .from("double_points_campaigns")
+        .select("*")
+        .eq("is_active", true)
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .limit(1);
+      if (camps && camps.length > 0) campaign = camps[0];
+    } catch (_) {}
+    setActiveCampaign(campaign);
+    const campaignMult = campaign ? parseFloat(campaign.multiplier) || 1 : 1;
 
     try {
       const { data: qrRows, error: qrErr } = await supabase
@@ -892,29 +968,27 @@ export default function ScanResult() {
       for (const action of actions) {
         switch (action.action) {
           case "award_points": {
-            // v4.3 fix: run ALL skip checks BEFORE setting hasPoints
-            // so there's no flash of the points card before the skip reason appears
             if (!currentUser) {
-              // Not logged in — show inline upsell instead of a grey "skipped" card
               pointsWasSkipped = true;
               pointsWasSkipReason = "not_logged_in";
-              setHadPointsAction(true); // so the sign-in CTA still shows
+              setHadPointsAction(true);
               break;
             }
-            // v4.3: use config pts_qr_scan, apply tier multiplier
             const basePoints =
               config.pts_qr_scan || action.points || qr.points_value || 10;
             const currentPts = profile?.loyalty_points || 0;
             const userTier = getTierLabel(currentPts, config);
             const multiplier = getTierMult(userTier, config);
-            const finalPoints = Math.round(basePoints * multiplier);
+            // v4.5: apply campaign multiplier on top of tier multiplier
+            const finalPoints = Math.round(
+              basePoints * multiplier * campaignMult,
+            );
 
             if (
               action.one_time &&
               qr.claimed &&
               qr.claimed_by === currentUser.id
             ) {
-              // Already claimed — don't show a points card, just add a quiet note to custom messages
               pointsWasSkipped = true;
               pointsWasSkipReason = "already_claimed";
               setCustomMessages((prev) => [
@@ -934,7 +1008,6 @@ export default function ScanResult() {
                 (Date.now() - new Date(qr.last_scan_at).getTime()) / 3600000;
               if (hrs < action.cooldown_hrs) {
                 const remaining = Math.ceil(action.cooldown_hrs - hrs);
-                // Cooldown — quiet note, no flash
                 pointsWasSkipped = true;
                 pointsWasSkipReason = "cooldown";
                 setCustomMessages((prev) => [
@@ -950,7 +1023,7 @@ export default function ScanResult() {
                 break;
               }
             }
-            // All checks passed — NOW set hasPoints so the card renders with correct data from the start
+
             setHasPoints(true);
             setHadPointsAction(true);
             const newTotal = currentPts + finalPoints;
@@ -964,17 +1037,16 @@ export default function ScanResult() {
               setBasePointsAwarded(basePoints);
               setTierMultiplierUsed(multiplier);
               setTierLabelUsed(userTier);
+              setCampaignMultUsed(campaignMult);
               setTotalPoints(newTotal);
 
-              // Check tier upgrade
+              // Tier upgrade check
               const newTier = getTierLabel(newTotal, config);
               if (newTier !== userTier) {
-                // Update stored tier
                 await supabase
                   .from("user_profiles")
                   .update({ loyalty_tier: newTier })
                   .eq("id", currentUser.id);
-                // Fire tier upgrade notification + inbox message
                 try {
                   await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
                     method: "POST",
@@ -994,7 +1066,6 @@ export default function ScanResult() {
                     }),
                   });
                 } catch (_) {}
-                // Inbox message for tier upgrade
                 const tierIcons = { Silver: "🥈", Gold: "🥇", Platinum: "💎" };
                 const tierMults = {
                   Silver: "1.25×",
@@ -1004,7 +1075,7 @@ export default function ScanResult() {
                 await supabase.from("customer_messages").insert({
                   user_id: currentUser.id,
                   subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
-                  content: `Congratulations ${profile?.full_name ? profile.full_name.split(" ")[0] : ""}! 🎉\n\nYou've just unlocked ${newTier} tier status on the Protea Botanicals loyalty programme.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan.\n\nKeep scanning and shopping to climb to the next tier. 🌿`,
+                  content: `Congratulations ${profile?.full_name ? profile.full_name.split(" ")[0] : ""}! 🎉\n\nYou've just unlocked ${newTier} tier status.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan. 🌿`,
                   type: "tier_upgrade",
                   read: false,
                   created_at: new Date().toISOString(),
@@ -1111,14 +1182,14 @@ export default function ScanResult() {
           points: pointsAwardedAmt,
           balanceAfter: currentPts + pointsAwardedAmt,
           qrCodeStr: qrCode,
-          description: `Scanned ${productLabel}`,
+          description: `Scanned ${productLabel}${campaign ? ` (${campaign.multiplier}× campaign)` : ""}`,
           scanLogId: logId,
-          multiplierApplied: tierMultiplierUsed,
+          multiplierApplied: tierMultiplierUsed * campaignMult,
           tierAtTime: tierLabelUsed,
         });
       }
 
-      // Streak bonus — reward every 5th scan in a rolling 7-day window
+      // Streak bonus
       if (currentUser && pointsAwardedAmt > 0) {
         try {
           const sevenDaysAgo = new Date(
@@ -1161,7 +1232,7 @@ export default function ScanResult() {
             await supabase.from("customer_messages").insert({
               user_id: currentUser.id,
               subject: `🔥 Streak Bonus — +${STREAK_BONUS_PTS} pts!`,
-              content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus.\n\nKeep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
+              content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus. Keep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
               type: "streak_bonus",
               read: false,
               created_at: new Date().toISOString(),
@@ -1170,8 +1241,16 @@ export default function ScanResult() {
             setStreakCount(weekCount);
             setTotalPoints(afterStreak);
           }
+
+          // v4.5: Get total lifetime successful scans for SurveyWidget
+          const { count: lifetimeCount } = await supabase
+            .from("scan_logs")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", currentUser.id)
+            .eq("scan_outcome", "points_awarded");
+          setTotalScans(lifetimeCount || 0);
         } catch (streakErr) {
-          console.error("Streak check error:", streakErr);
+          console.error("Streak/scan count error:", streakErr);
         }
       }
 
@@ -1290,6 +1369,14 @@ export default function ScanResult() {
                   </div>
                 )}
               </div>
+
+              {/* v4.5: Campaign banner — shown before points card */}
+              {activeCampaign && (
+                <div className="sr-card" style={{ animationDelay: "0.02s" }}>
+                  <CampaignBanner campaign={activeCampaign} />
+                </div>
+              )}
+
               {hasPoints && (
                 <div
                   className="sr-card sr-pts"
@@ -1303,9 +1390,13 @@ export default function ScanResult() {
                     tierLabel={tierLabelUsed}
                     multiplier={tierMultiplierUsed}
                     basePoints={basePointsAwarded}
+                    campaignMult={
+                      campaignMultUsed > 1 ? campaignMultUsed : null
+                    }
                   />
                 </div>
               )}
+
               {/* Streak Bonus Card */}
               {streakBonus > 0 && (
                 <div
@@ -1348,6 +1439,7 @@ export default function ScanResult() {
                   </div>
                 </div>
               )}
+
               {banner && (
                 <div className="sr-card" style={{ animationDelay: "0.1s" }}>
                   <BannerDisplay banner={banner} />
@@ -1379,6 +1471,19 @@ export default function ScanResult() {
                   <CustomMessageCard action={msg} navigate={navigate} />
                 </div>
               ))}
+
+              {/* v4.5: SurveyWidget — fires on 5th scan, one-time only */}
+              {user && (
+                <SurveyWidget
+                  userId={user.id}
+                  totalScans={totalScans}
+                  onComplete={(bonusPts) => {
+                    setSurveyBonusAwarded(bonusPts);
+                    setTotalPoints((prev) => prev + bonusPts);
+                  }}
+                />
+              )}
+
               {showGpsPrompt && (
                 <div className="sr-card" style={{ animationDelay: "0s" }}>
                   <GpsConsentBanner

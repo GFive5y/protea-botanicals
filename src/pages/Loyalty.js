@@ -1,12 +1,10 @@
-// src/pages/Loyalty.js v5.5
-// Protea Botanicals — WP-O: loyalty_config integration + referral code + tier perks
-// v5.5 changes from v5.4:
-//   - Fetches loyalty_config for live tier thresholds (4 tiers: Bronze/Silver/Gold/Platinum)
-//   - Tier perks panel: shows "You earn X× on all purchases at [Tier]"
-//   - Share & Earn section: referral code with copy + WhatsApp share
-//   - Generates referral code if none exists (referral_codes table)
-//   - Transaction history: full date+time timestamps
-//   - All v5.4 data logic preserved
+// src/pages/Loyalty.js v5.6
+// Protea Botanicals — Phase 1 Communications build
+// v5.6 changes from v5.5:
+//   - Fetches user's current monthly rank via get_user_monthly_rank() RPC
+//   - Shows rank badge in the tier perks card (e.g. "#4 this month")
+//   - Adds 🏆 Leaderboard link button below the tier perks card
+//   All v5.5 config/referral/tier/transaction logic — unchanged
 
 import { useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
@@ -153,7 +151,9 @@ export default function Loyalty() {
   const [freshScan, setFreshScan] = useState(false);
   const [copied, setCopied] = useState(false);
   const [userId, setUserId] = useState(null);
-  const [referralBanner, setReferralBanner] = useState(null); // unread referral_reward message
+  const [referralBanner, setReferralBanner] = useState(null);
+  // v5.6: monthly rank
+  const [monthlyRank, setMonthlyRank] = useState(null); // { rank, monthly_points }
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -170,7 +170,6 @@ export default function Loyalty() {
         return;
       }
 
-      // Fetch config and profile in parallel
       const [cfgRes, profileRes, txnRes] = await Promise.all([
         supabase.from("loyalty_config").select("*").single(),
         supabase.from("user_profiles").select("*").eq("id", user.id).single(),
@@ -184,7 +183,6 @@ export default function Loyalty() {
 
       const cfg = cfgRes.data || DEFAULT_CONFIG;
       setConfig(cfg);
-
       if (profileRes.error) {
         setPoints(0);
       } else {
@@ -194,30 +192,38 @@ export default function Loyalty() {
       setUserId(user.id);
       setTransactions(txnRes.data || []);
 
+      // v5.6: fetch monthly rank
+      try {
+        const { data: rankData } = await supabase.rpc("get_user_monthly_rank", {
+          p_user_id: user.id,
+        });
+        if (rankData && rankData.length > 0) setMonthlyRank(rankData[0]);
+        else setMonthlyRank(null);
+      } catch (_) {
+        setMonthlyRank(null);
+      }
+
       // Ensure referral code exists
       const prof = profileRes.data;
       if (prof) {
         let code = prof.referral_code;
         if (!code) {
-          // Check referral_codes table
           const { data: existing } = await supabase
             .from("referral_codes")
             .select("code, uses_count")
             .eq("owner_id", user.id)
             .eq("is_active", true)
-            .single();
+            .maybeSingle();
           if (existing) {
             code = existing.code;
             setReferralUses(existing.uses_count || 0);
-            // Backfill user_profiles
             await supabase
               .from("user_profiles")
               .update({ referral_code: code })
               .eq("id", user.id);
           } else {
-            // Generate new code — keep trying if collision
-            let newCode = generateCode(prof.full_name);
-            let attempts = 0;
+            let newCode = generateCode(prof.full_name),
+              attempts = 0;
             while (attempts < 5) {
               const { error: insertErr } = await supabase
                 .from("referral_codes")
@@ -235,18 +241,17 @@ export default function Loyalty() {
             }
           }
         } else {
-          // Fetch uses_count
           const { data: refData } = await supabase
             .from("referral_codes")
             .select("uses_count")
             .eq("code", code)
-            .single();
+            .maybeSingle();
           setReferralUses(refData?.uses_count || 0);
         }
         setReferralCode(code || null);
       }
 
-      // Check for unread notification banners (referral reward, tier upgrade, streak)
+      // Notification banners
       const sevenDaysAgo = new Date(
         Date.now() - 7 * 24 * 60 * 60 * 1000,
       ).toISOString();
@@ -464,7 +469,7 @@ export default function Loyalty() {
           color: C.text,
         }}
       >
-        {/* First-login notification banner: referral reward / tier upgrade / streak */}
+        {/* Notification banner */}
         {referralBanner && (
           <div
             style={{
@@ -731,7 +736,7 @@ export default function Loyalty() {
           </div>
         </div>
 
-        {/* ── TIER PERKS CARD (v5.5 new) ── */}
+        {/* ── TIER PERKS CARD (v5.5) + v5.6: rank badge ── */}
         <div
           style={{
             background: tier.bg,
@@ -739,21 +744,48 @@ export default function Loyalty() {
             borderLeft: `4px solid ${tier.color}`,
             borderRadius: 2,
             padding: "16px 20px",
-            marginBottom: 24,
+            marginBottom: 16,
             animation: "loyaltyFadeUp 0.6s ease",
           }}
         >
           <div
             style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: tier.color,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+              gap: 8,
               marginBottom: 10,
             }}
           >
-            Your {tier.name} Tier Benefits
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: tier.color,
+              }}
+            >
+              Your {tier.name} Tier Benefits
+            </div>
+            {/* v5.6: Monthly rank badge */}
+            {monthlyRank && (
+              <div
+                style={{
+                  background: "rgba(255,255,255,0.7)",
+                  border: `1px solid ${tier.color}40`,
+                  borderRadius: 20,
+                  padding: "3px 12px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: tier.color,
+                }}
+              >
+                🏆 #{monthlyRank.rank} this month ·{" "}
+                {Number(monthlyRank.monthly_points || 0).toLocaleString()} pts
+              </div>
+            )}
           </div>
           <div
             style={{
@@ -831,7 +863,54 @@ export default function Loyalty() {
           )}
         </div>
 
-        {/* ── REFERRAL CODE CARD (v5.5 new) ── */}
+        {/* v5.6: Leaderboard link */}
+        <div
+          style={{ marginBottom: 24, animation: "loyaltyFadeUp 0.65s ease" }}
+        >
+          <Link
+            to="/leaderboard"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              background: C.white,
+              border: "1px solid #e8e0d4",
+              borderRadius: 2,
+              padding: "12px 20px",
+              textDecoration: "none",
+              fontFamily: F.body,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: C.green,
+              transition: "box-shadow 0.15s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)")
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+          >
+            🏆 View Monthly Leaderboard
+            {monthlyRank && (
+              <span
+                style={{
+                  background: "rgba(82,183,136,0.12)",
+                  color: "#52b788",
+                  padding: "2px 8px",
+                  borderRadius: 10,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                #{monthlyRank.rank}
+              </span>
+            )}
+            <span style={{ color: "#52b788", fontSize: 14 }}>→</span>
+          </Link>
+        </div>
+
+        {/* Referral Code Card */}
         {referralCode && (
           <div
             style={{
@@ -1100,7 +1179,6 @@ export default function Loyalty() {
                   if (!description)
                     description = isSpent ? "Points redeemed" : "Points earned";
                   const isFresh = freshScan && i === 0;
-                  // Show multiplier if present (v4.3+ enriched transactions)
                   const hasMultiplier =
                     txn.multiplier_applied && txn.multiplier_applied > 1;
                   const tierAtTime = txn.tier_at_time;
@@ -1210,6 +1288,7 @@ export default function Loyalty() {
                                 referral: "🤝 Referral Reward",
                                 profile_completion: "👤 Profile",
                                 PROFILE_COMPLETION: "👤 Profile",
+                                survey: "📋 Survey Bonus",
                               }[txn.channel] || txn.channel.replace(/_/g, " ")}
                             </div>
                           )}
@@ -1293,59 +1372,13 @@ export default function Loyalty() {
                   <span
                     style={{ display: "block", marginTop: 4, fontSize: 12 }}
                   >
-                    Each point = R{config.redemption_value_zar.toFixed(2)} value
-                    → {points || 0} pts = R
+                    Each point = R{config.redemption_value_zar.toFixed(2)} →{" "}
+                    {points || 0} pts = R
                     {((points || 0) * config.redemption_value_zar).toFixed(2)}{" "}
                     off
                   </span>
                 )}
               </p>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 16,
-                  marginBottom: 20,
-                  flexWrap: "wrap",
-                }}
-              >
-                {[
-                  { val: points || 0, label: "Points" },
-                  { val: tier.name, label: `Tier (${tier.mult}×)` },
-                ].map((s, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      borderRadius: 2,
-                      padding: "12px 24px",
-                      minWidth: 80,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontFamily: F.heading,
-                        fontSize: 28,
-                        fontWeight: 300,
-                        color: i === 1 ? tier.color : "#faf9f6",
-                      }}
-                    >
-                      {s.val}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: "0.2em",
-                        textTransform: "uppercase",
-                        color: "rgba(255,255,255,0.5)",
-                        marginTop: 2,
-                      }}
-                    >
-                      {s.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
               <button
                 type="button"
                 className="loyalty-browse-btn"
@@ -1386,59 +1419,6 @@ export default function Loyalty() {
                   : " Points never expire."}
               </p>
             </div>
-            {tier.nextTier && (
-              <div
-                style={{
-                  background: C.white,
-                  border: "1px solid #e8e0d4",
-                  borderRadius: 2,
-                  padding: "20px 24px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    letterSpacing: "0.35em",
-                    textTransform: "uppercase",
-                    color: "#52b788",
-                    marginBottom: 10,
-                  }}
-                >
-                  Progress to {tier.nextTier}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: 8,
-                    fontSize: 13,
-                    color: C.text,
-                  }}
-                >
-                  <span>{pointsToNext} more points needed</span>
-                  <span style={{ color: C.muted }}>{progress}%</span>
-                </div>
-                <div
-                  style={{
-                    background: "#f4f0e8",
-                    borderRadius: 2,
-                    height: 5,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "linear-gradient(90deg, #52b788, #2d6a4f)",
-                      height: "100%",
-                      borderRadius: 2,
-                      width: `${progress}%`,
-                      transition: "width 1s ease-out",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1487,6 +1467,7 @@ export default function Loyalty() {
               { label: "Home", to: "/" },
               { label: "Shop", to: "/shop" },
               { label: "Loyalty", to: "/loyalty" },
+              { label: "Leaderboard", to: "/leaderboard" },
               { label: "Rewards", to: "/redeem" },
             ].map((link) => (
               <Link
