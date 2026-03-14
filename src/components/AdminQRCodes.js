@@ -206,16 +206,6 @@ function fmtDate(d) {
     day: "numeric",
   });
 }
-function fmtDateTime(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-ZA", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DETAIL PANEL (right slide-in)
@@ -995,9 +985,6 @@ function RegistryTab({ batches }) {
                   Object.entries(grps).map(([grpKey, items]) => {
                     const grpCollapsed =
                       collapsedGroups[`${type.value}::${grpKey}`];
-                    const isGroup =
-                      items.length > 1 || grpKey !== "— Ungrouped —";
-
                     return (
                       <div
                         key={grpKey}
@@ -1140,7 +1127,6 @@ function RegistryTab({ batches }) {
 }
 
 function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
-  const typeInfo = TYPE_MAP[code.qr_type] || { icon: "❓" };
   const isExpired = code.expires_at && new Date() > new Date(code.expires_at);
 
   return (
@@ -1343,7 +1329,6 @@ function GenerateTab({ batches, banners, onGenerated }) {
   };
 
   const generateOne = async (codeNum, batchId) => {
-    const typeDef = QR_TYPES.find((t) => t.value === selectedType);
     let qrCode;
     if (selectedType === "product_insert" && batchId) {
       const fullCode = `PB-001-2026-${String(codeNum).padStart(4, "0")}`;
@@ -1381,8 +1366,10 @@ function GenerateTab({ batches, banners, onGenerated }) {
     setGenError("");
     setGenerating(true);
     setGeneratedCodes([]);
-    const typeDef = QR_TYPES.find((t) => t.value === selectedType);
-    if (typeDef?.batchRequired && !selectedBatchId) {
+    if (
+      QR_TYPES.find((t) => t.value === selectedType)?.batchRequired &&
+      !selectedBatchId
+    ) {
       setGenError("Please select a batch for this QR type.");
       setGenerating(false);
       return;
