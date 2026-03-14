@@ -18,6 +18,7 @@
 import { useState, useEffect, useContext, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
+import CustomerSupportWidget from "../components/CustomerSupportWidget";
 import { RoleContext } from "../App";
 import ClientHeader from "../components/ClientHeader";
 import CustomerInbox, {
@@ -1396,6 +1397,7 @@ function AccountView({
       label: `📬 Inbox${inboxUnread > 0 ? ` (${inboxUnread})` : ""}`,
     },
     { id: "activity", label: "📱 Activity" },
+    { id: "support", label: "🎫 Support" },
   ];
 
   return (
@@ -2551,6 +2553,13 @@ function AccountView({
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* ── Support tab ── */}
+          {activeTab === "support" && (
+            <div style={{ animation: "fadeIn 0.3s ease" }}>
+              <CustomerSupportWidget userId={user?.id} profile={profile} />
             </div>
           )}
         </div>
