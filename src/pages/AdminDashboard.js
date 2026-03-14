@@ -1,11 +1,10 @@
-// AdminDashboard.js v4.2
+// AdminDashboard.js v4.3
 // Protea Botanicals — March 2026
-// ★ v4.2 changes:
-//   1. ADDED: Messages tab — shows all customer inbound messages (queries/faults)
-//      with unread count badge, admin reply inline, mark-as-read
-//   2. ADDED: unreadMsgCount state — polled on mount + realtime subscription
-//   3. Tab label: "Messages" shows badge dot if unread count > 0
-//   All v4.1 content preserved exactly.
+// ★ v4.3 changes:
+//   1. ADDED: Support tab — full ticket management via AdminSupportPanel
+//      (WP-P Customer Communications Platform — tickets, templates, broadcast)
+//   2. ADDED: open ticket badge on Support tab button
+//   All v4.2 content preserved exactly.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -19,6 +18,7 @@ import AdminFraudSecurity from "../components/AdminFraudSecurity";
 import AdminNotifications from "../components/AdminNotifications";
 import HQDocuments from "../components/hq/HQDocuments";
 import AdminQRCodes from "../components/AdminQRCodes";
+import AdminSupportPanel from "../components/AdminSupportPanel";
 
 const C = {
   green: "#1b4332",
@@ -165,7 +165,7 @@ function fmtTime(ts) {
   return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
 }
 
-// ── NEW v4.2: AdminMessages component ────────────────────────────────────────
+// ── AdminMessages (v4.2 — preserved exactly) ─────────────────────────────────
 function AdminMessages() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +183,6 @@ function AdminMessages() {
 
   const loadMessages = useCallback(async () => {
     setLoading(true);
-    // Fetch all inbound messages (from customers) + unread
     const { data } = await supabase
       .from("customer_messages")
       .select("*")
@@ -191,8 +190,6 @@ function AdminMessages() {
       .order("created_at", { ascending: false });
     const msgs = data || [];
     setMessages(msgs);
-
-    // Load profiles for senders
     const userIds = [...new Set(msgs.map((m) => m.user_id))];
     if (userIds.length > 0) {
       const { data: profs } = await supabase
@@ -212,7 +209,6 @@ function AdminMessages() {
     loadMessages();
   }, [loadMessages]);
 
-  // Realtime: new inbound messages
   useEffect(() => {
     const sub = supabase
       .channel("admin-messages-inbox")
@@ -255,12 +251,10 @@ function AdminMessages() {
       sent_by_name: adminUser?.email ? adminUser.email.split("@")[0] : "Admin",
       metadata: {},
     });
-    // Mark original as read
     await supabase
       .from("customer_messages")
       .update({ read_at: new Date().toISOString() })
       .eq("id", msg.id);
-
     if (error) {
       setSendResult({ error: "Failed to send reply." });
     } else {
@@ -291,7 +285,6 @@ function AdminMessages() {
 
   return (
     <div style={{ fontFamily: FONTS.body }}>
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -343,7 +336,6 @@ function AdminMessages() {
         </button>
       </div>
 
-      {/* Filter bar */}
       <div
         style={{
           display: "flex",
@@ -527,7 +519,6 @@ function AdminMessages() {
                     </button>
                   </div>
                 </div>
-
                 <div
                   style={{
                     fontSize: 13,
@@ -541,7 +532,6 @@ function AdminMessages() {
                 >
                   {msg.body}
                 </div>
-
                 {isReplying && (
                   <div style={{ marginTop: 12 }}>
                     <textarea
@@ -608,7 +598,8 @@ export default function AdminDashboard() {
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
-  const [unreadMsgCount, setUnreadMsgCount] = useState(0); // v4.2
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const [openTicketCount, setOpenTicketCount] = useState(0); // v4.3
   const [analytics, setAnalytics] = useState({
     total: 0,
     claimed: 0,
@@ -626,7 +617,6 @@ export default function AdminDashboard() {
     setUsers(data || []);
   }, []);
 
-  // v4.2: fetch unread customer messages count
   const fetchUnreadCount = useCallback(async () => {
     const { count } = await supabase
       .from("customer_messages")
@@ -634,6 +624,15 @@ export default function AdminDashboard() {
       .eq("direction", "inbound")
       .is("read_at", null);
     setUnreadMsgCount(count || 0);
+  }, []);
+
+  // v4.3: fetch open support ticket count
+  const fetchOpenTickets = useCallback(async () => {
+    const { count } = await supabase
+      .from("support_tickets")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["open", "pending_reply"]);
+    setOpenTicketCount(count || 0);
   }, []);
 
   const computeAnalytics = useCallback(async () => {
@@ -708,9 +707,10 @@ export default function AdminDashboard() {
     fetchUsers();
     computeAnalytics();
     fetchUnreadCount();
-  }, [fetchUsers, computeAnalytics, fetchUnreadCount]);
+    fetchOpenTickets();
+  }, [fetchUsers, computeAnalytics, fetchUnreadCount, fetchOpenTickets]);
 
-  // v4.2: realtime badge refresh
+  // Realtime badge refresh — messages
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-msgs")
@@ -733,9 +733,20 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchUnreadCount]);
 
-  const handleNavigateToQR = () => {
-    setTab("qr_codes");
-  };
+  // Realtime badge refresh — support tickets (v4.3)
+  useEffect(() => {
+    const sub = supabase
+      .channel("admin-dashboard-tickets")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "support_tickets" },
+        fetchOpenTickets,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchOpenTickets]);
+
+  const handleNavigateToQR = () => setTab("qr_codes");
   const handleNavigateToDocuments = (documentId) => {
     setDocumentsTargetId(documentId);
     setTab("documents");
@@ -820,9 +831,13 @@ export default function AdminDashboard() {
           active={tab === "messages"}
           label="Messages"
           badge={unreadMsgCount}
-          onClick={() => {
-            setTab("messages");
-          }}
+          onClick={() => setTab("messages")}
+        />
+        <TabBtn
+          active={tab === "support"}
+          label="🎫 Support"
+          badge={openTicketCount}
+          onClick={() => setTab("support")}
         />
         <TabBtn
           active={tab === "security"}
@@ -967,7 +982,8 @@ export default function AdminDashboard() {
               color={C.green}
             />
           </div>
-          {/* v4.2: Messages alert */}
+
+          {/* Unread messages alert */}
           {unreadMsgCount > 0 && (
             <div
               style={{
@@ -975,7 +991,7 @@ export default function AdminDashboard() {
                 background: "#fffdf5",
                 border: `1px solid ${C.orange}`,
                 borderRadius: 2,
-                marginBottom: 24,
+                marginBottom: 16,
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
@@ -999,6 +1015,40 @@ export default function AdminDashboard() {
               </button>
             </div>
           )}
+
+          {/* Open support tickets alert (v4.3) */}
+          {openTicketCount > 0 && (
+            <div
+              style={{
+                padding: "12px 16px",
+                background: "#f0f9f4",
+                border: `1px solid ${C.accent}`,
+                borderRadius: 2,
+                marginBottom: 24,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>🎫</span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
+                {openTicketCount} open support ticket
+                {openTicketCount !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={() => setTab("support")}
+                style={{
+                  ...makeBtn(C.mid),
+                  fontSize: 10,
+                  padding: "5px 14px",
+                  marginLeft: "auto",
+                }}
+              >
+                View Tickets
+              </button>
+            </div>
+          )}
+
           <h3
             style={{
               fontFamily: FONTS.heading,
@@ -1034,6 +1084,9 @@ export default function AdminDashboard() {
             <button onClick={() => setTab("customers")} style={makeBtn(C.mid)}>
               👥 CUSTOMERS
             </button>
+            <button onClick={() => setTab("support")} style={makeBtn(C.mid)}>
+              🎫 SUPPORT
+            </button>
             <button
               onClick={() => {
                 setDocumentsTargetId(null);
@@ -1048,6 +1101,7 @@ export default function AdminDashboard() {
                 computeAnalytics();
                 fetchUsers();
                 fetchUnreadCount();
+                fetchOpenTickets();
               }}
               style={makeBtn(C.mid)}
             >
@@ -1067,6 +1121,7 @@ export default function AdminDashboard() {
       )}
       {tab === "customers" && <AdminCustomerEngagement />}
       {tab === "messages" && <AdminMessages />}
+      {tab === "support" && <AdminSupportPanel />}
       {tab === "security" && <AdminFraudSecurity />}
       {tab === "notifications" && <AdminNotifications />}
       {tab === "qr_codes" && <AdminQRCodes />}

@@ -251,7 +251,6 @@ export default function CustomerSupportWidget({ userId, profile }) {
 
   // ── RENDER ───────────────────────────────────────────────────────────────────
 
-  const firstName = profile?.full_name?.split(" ")[0] || "there";
   const openCount = tickets.filter(
     (t) => t.status === "open" || t.status === "pending_reply",
   ).length;
