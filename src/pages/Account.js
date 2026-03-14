@@ -1,28 +1,17 @@
-// src/pages/Account.js — Protea Botanicals v6.0
+// src/pages/Account.js — Protea Botanicals v6.1
 // ============================================================================
-// v6.0 — ClientHeader WP-N Integration
+// v6.1 — WP-O Loyalty Engine Integration
 //
-//   CHANGES from v5.9:
-//     - Added ClientHeader variant="light" to all three render branches
-//     - useLocation() reads location.state?.tab for inbox deep-link from drawer
-//     - Removed top padding from AccountView (ClientHeader spacer handles it)
-//     - No other changes — all v5.9 functionality preserved
+//   CHANGES from v6.0:
+//     - AccountView: loads loyalty_config (pts_referral_referrer/referee)
+//     - AccountView: loads/generates referral code from referral_codes table
+//     - Earn Rewards tab: referral code card with copy + WhatsApp share
+//     - Earn Rewards tab: tier multiplier shown in profile completion summary
+//     - No other changes — all v6.0 functionality preserved exactly
 //
 //   TIER 1 — My Details (always accessible)
-//     Simple order-focused form: name, phone, delivery address
-//     "These details are used for orders and delivery communication"
-//
 //   TIER 2 — Earn Rewards (OTP phone verification required)
-//     Gamified data exchange: each field = explicit points reward
-//     Customer clearly understands: "I share X → I earn Y pts"
-//     OTP via send-notification edge function (WhatsApp/SMS)
-//     Progress bar, tier display, animated unlock state
-//
 //   ADMIN CONFIG PANEL (admin role only)
-//     Edit all points values, field labels, toggle visibility
-//     Saved to localStorage (DB migration planned)
-//     Floating ⚙ button bottom-right
-//
 //   TABS: Details | Earn Rewards | Inbox | Activity
 // ============================================================================
 
@@ -39,7 +28,6 @@ const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -64,7 +52,6 @@ const F = {
   body: "'Jost','Helvetica Neue',sans-serif",
 };
 
-// ── Default points config (admin-editable) ────────────────────────────────────
 const DEFAULT_CONFIG = {
   phone_verified: {
     label: "Phone Verification",
@@ -197,6 +184,7 @@ function getTier(pts) {
       icon: "💎",
       next: null,
       nextAt: null,
+      mult: 2.0,
     };
   if (pts >= 500)
     return {
@@ -205,6 +193,7 @@ function getTier(pts) {
       icon: "🥇",
       next: "Platinum",
       nextAt: 1000,
+      mult: 1.5,
     };
   if (pts >= 200)
     return {
@@ -213,6 +202,7 @@ function getTier(pts) {
       icon: "🥈",
       next: "Gold",
       nextAt: 500,
+      mult: 1.25,
     };
   return {
     label: "Bronze",
@@ -220,6 +210,7 @@ function getTier(pts) {
     icon: "🥉",
     next: "Silver",
     nextAt: 200,
+    mult: 1.0,
   };
 }
 
@@ -235,7 +226,6 @@ function fmtTime(ts) {
   });
 }
 
-// ── Shared input styles ───────────────────────────────────────────────────────
 const inp = {
   width: "100%",
   padding: "11px 14px",
@@ -455,7 +445,7 @@ function AdminConfigModal({ config, onSave, onClose }) {
 // OTP VERIFICATION PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function OTPPanel({ currentPhone, userId, onVerified, config }) {
-  const [phase, setPhase] = useState("intro"); // intro | enter_phone | enter_otp | success
+  const [phase, setPhase] = useState("intro");
   const [phone, setPhone] = useState(currentPhone || "");
   const [otp, setOtp] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState(null);
@@ -465,7 +455,6 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
   const [error, setError] = useState("");
   const [countdown, setCountdown] = useState(0);
 
-  // Countdown timer
   useEffect(() => {
     if (!otpExpiry) return;
     const interval = setInterval(() => {
@@ -504,17 +493,15 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
         }),
       });
     } catch {
-      /* non-blocking — code still works in dev */
+      /* non-blocking */
     }
     setGeneratedOtp(code);
     setOtpExpiry(Date.now() + 5 * 60 * 1000);
     setCountdown(300);
-    // DEV: log OTP to console so flow can be tested without WhatsApp
     console.log(
       `%c🔑 OTP CODE: ${code}`,
       "font-size:20px;color:green;font-weight:bold;background:#e8f5e9;padding:8px 16px;border-radius:4px",
     );
-    // Save phone to profile
     await supabase
       .from("user_profiles")
       .update({ phone: phone.trim() })
@@ -546,7 +533,6 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
       setVerifying(false);
       return;
     }
-    // Award points for phone verification
     const ptsToAward = config.phone_verified?.points || 50;
     const { data: currentProfile } = await supabase
       .from("user_profiles")
@@ -558,13 +544,15 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
       .from("user_profiles")
       .update({ loyalty_points: newPts })
       .eq("id", userId);
-    await supabase.from("loyalty_transactions").insert({
-      user_id: userId,
-      points: ptsToAward,
-      transaction_type: "PROFILE_COMPLETION",
-      description: `Phone verified — +${ptsToAward} bonus points`,
-      transaction_date: new Date().toISOString(),
-    });
+    await supabase
+      .from("loyalty_transactions")
+      .insert({
+        user_id: userId,
+        points: ptsToAward,
+        transaction_type: "PROFILE_COMPLETION",
+        description: `Phone verified — +${ptsToAward} bonus points`,
+        transaction_date: new Date().toISOString(),
+      });
     setPhase("success");
     setVerifying(false);
     setTimeout(() => onVerified(ptsToAward, phone.trim()), 1500);
@@ -816,7 +804,7 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// REWARD FIELD ROW — one gamified data field
+// REWARD FIELD ROW
 // ═══════════════════════════════════════════════════════════════════════════════
 function RewardField({ fieldKey, config, profile, onSave }) {
   const [editing, setEditing] = useState(false);
@@ -853,7 +841,6 @@ function RewardField({ fieldKey, config, profile, onSave }) {
 
   const currentValue = getFieldValue();
   const earned = !!currentValue;
-
   const handleEdit = () => {
     setValue(currentValue && currentValue !== "yes" ? currentValue : "");
     setEditing(true);
@@ -863,7 +850,7 @@ function RewardField({ fieldKey, config, profile, onSave }) {
     setSaving(true);
     const wasEmpty = !earned;
     let updatePayload = {};
-    let boolField = [
+    const boolField = [
       "geolocation_consent",
       "marketing_opt_in",
       "analytics_opt_in",
@@ -1042,7 +1029,6 @@ function RewardField({ fieldKey, config, profile, onSave }) {
             </div>
           )}
         </div>
-
         <div
           style={{
             display: "flex",
@@ -1124,7 +1110,7 @@ function RewardField({ fieldKey, config, profile, onSave }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ACCOUNT VIEW — main logged-in component
+// ACCOUNT VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
 function AccountView({
   user,
@@ -1146,6 +1132,15 @@ function AccountView({
   const [scanHistory, setScanHistory] = useState([]);
   const [scansLoading, setScansLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+
+  // ── v6.1: WP-O additions ─────────────────────────────────────────────────────
+  const [loyaltyConfig, setLoyaltyConfig] = useState({
+    pts_referral_referrer: 100,
+    pts_referral_referee: 50,
+  });
+  const [referralCode, setReferralCode] = useState(null);
+  const [referralUses, setReferralUses] = useState(0);
+  const [refCopied, setRefCopied] = useState(false);
 
   const isAdmin = role === "admin" || role === "hq";
 
@@ -1171,12 +1166,94 @@ function AccountView({
     if (activeTab === "activity") loadScans();
   }, [activeTab, loadScans]);
 
+  // v6.1: load loyalty config + referral code
+  useEffect(() => {
+    async function loadRewardsMeta() {
+      // Fetch loyalty config (pts for referral display)
+      const { data: cfg } = await supabase
+        .from("loyalty_config")
+        .select(
+          "pts_referral_referrer,pts_referral_referee,mult_bronze,mult_silver,mult_gold,mult_platinum",
+        )
+        .single();
+      if (cfg) setLoyaltyConfig(cfg);
+
+      // Load or generate referral code
+      let code = profile.referral_code;
+      if (!code) {
+        // Check referral_codes table first
+        const { data: existing } = await supabase
+          .from("referral_codes")
+          .select("code, uses_count")
+          .eq("owner_id", user.id)
+          .eq("is_active", true)
+          .single();
+        if (existing) {
+          code = existing.code;
+          setReferralUses(existing.uses_count || 0);
+          // Backfill user_profiles.referral_code
+          await supabase
+            .from("user_profiles")
+            .update({ referral_code: code })
+            .eq("id", user.id);
+        } else {
+          // Generate new code
+          const name =
+            (profile.full_name || "USER")
+              .split(" ")[0]
+              .toUpperCase()
+              .replace(/[^A-Z]/g, "")
+              .slice(0, 6) || "USER";
+          let newCode = name + Math.floor(Math.random() * 90 + 10);
+          let attempts = 0;
+          while (attempts < 5) {
+            const { error: insertErr } = await supabase
+              .from("referral_codes")
+              .insert({ code: newCode, owner_id: user.id });
+            if (!insertErr) {
+              await supabase
+                .from("user_profiles")
+                .update({ referral_code: newCode })
+                .eq("id", user.id);
+              code = newCode;
+              break;
+            }
+            newCode = name + Math.floor(Math.random() * 900 + 100);
+            attempts++;
+          }
+        }
+      } else {
+        const { data: refData } = await supabase
+          .from("referral_codes")
+          .select("uses_count")
+          .eq("code", code)
+          .single();
+        setReferralUses(refData?.uses_count || 0);
+      }
+      setReferralCode(code || null);
+    }
+    if (profile && user && profile.phone_verified) loadRewardsMeta();
+  }, [profile.phone_verified, user.id]); // eslint-disable-line
+
   const showToast = (msg, color = C.accent) => {
     setToastMsg({ msg, color });
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // ── Save basic details ──────────────────────────────────────────────────────
+  // v6.1: referral helpers
+  const copyReferralCode = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode).then(() => {
+      setRefCopied(true);
+      setTimeout(() => setRefCopied(false), 2000);
+    });
+  };
+  const shareReferralWhatsApp = () => {
+    if (!referralCode) return;
+    const msg = `🌿 Hey! I use Protea Botanicals' loyalty programme and earn great rewards. Sign up with my referral code *${referralCode}* at checkout and you'll get ${loyaltyConfig.pts_referral_referee} bonus points on your first order! 👉 https://proteabotanicals.co.za`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
   const handleSaveDetails = async () => {
     if (!detailsForm) return;
     setDetailsSaving(true);
@@ -1212,7 +1289,6 @@ function AccountView({
     setDetailsSaving(false);
   };
 
-  // ── Save a single reward field ──────────────────────────────────────────────
   const handleRewardSave = async (payload, pointsToAward, fieldLabel) => {
     const { data: savedRow, error } = await supabase
       .from("user_profiles")
@@ -1233,13 +1309,15 @@ function AccountView({
         .from("user_profiles")
         .update({ loyalty_points: newPts })
         .eq("id", user.id);
-      await supabase.from("loyalty_transactions").insert({
-        user_id: user.id,
-        points: pointsToAward,
-        transaction_type: "PROFILE_COMPLETION",
-        description: `Profile: ${fieldLabel} added`,
-        transaction_date: new Date().toISOString(),
-      });
+      await supabase
+        .from("loyalty_transactions")
+        .insert({
+          user_id: user.id,
+          points: pointsToAward,
+          transaction_type: "PROFILE_COMPLETION",
+          description: `Profile: ${fieldLabel} added`,
+          transaction_date: new Date().toISOString(),
+        });
       updatedProfile = { ...updatedProfile, loyalty_points: newPts };
       showToast(
         `🎉 +${pointsToAward} points earned for adding ${fieldLabel}!`,
@@ -1250,7 +1328,6 @@ function AccountView({
     onProfileUpdate?.(updatedProfile);
   };
 
-  // ── OTP verified callback ───────────────────────────────────────────────────
   const handleOtpVerified = async (ptsAwarded, verifiedPhone) => {
     const { data: freshProfile } = await supabase
       .from("user_profiles")
@@ -1268,7 +1345,6 @@ function AccountView({
   };
 
   const tier = getTier(profile.loyalty_points || 0);
-
   const rewardFields = Object.keys(config).filter(
     (k) => k !== "phone_verified",
   );
@@ -1306,7 +1382,6 @@ function AccountView({
   );
   const pctComplete =
     totalEarnable > 0 ? Math.round((totalEarned / totalEarnable) * 100) : 0;
-
   const isEditing = !!detailsForm;
   const df = detailsForm || profile;
 
@@ -1339,7 +1414,6 @@ function AccountView({
         @media (max-width:500px) { .acct-tabs button { padding: 10px 10px !important; font-size: 9px !important; } }
       `}</style>
 
-      {/* Toast */}
       {toastMsg && (
         <div
           style={{
@@ -1460,6 +1534,19 @@ function AccountView({
                 }}
               >
                 {tier.icon} {tier.label}
+                {tier.mult > 1 && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      background: `${tier.color}30`,
+                      padding: "1px 6px",
+                      borderRadius: 8,
+                      marginLeft: 4,
+                    }}
+                  >
+                    {tier.mult}×
+                  </span>
+                )}
               </div>
               <div
                 style={{
@@ -1565,7 +1652,7 @@ function AccountView({
             marginBottom: 16,
           }}
         >
-          {/* ══════════════════════════════════════════ DETAILS TAB */}
+          {/* ══ DETAILS TAB ══ */}
           {activeTab === "details" && (
             <div className="reward-tab-enter">
               <div
@@ -1584,7 +1671,6 @@ function AccountView({
                 basics we need to process your orders and get in touch. No
                 loyalty required.
               </div>
-
               {detailsMsg?.success && (
                 <div
                   style={{
@@ -1617,7 +1703,6 @@ function AccountView({
                 </div>
               )}
 
-              {/* PERSONAL */}
               <div
                 style={{
                   fontSize: 11,
@@ -1684,7 +1769,6 @@ function AccountView({
                 ))}
               </div>
 
-              {/* DELIVERY ADDRESS */}
               <div
                 style={{
                   fontSize: 11,
@@ -1837,7 +1921,6 @@ function AccountView({
                 </div>
               </div>
 
-              {/* PREFERRED CONTACT */}
               <div style={{ marginBottom: 24 }}>
                 <label
                   style={{
@@ -1902,7 +1985,6 @@ function AccountView({
                 </div>
               )}
 
-              {/* Loyalty upsell */}
               {!profile.phone_verified && (
                 <div
                   onClick={() => setActiveTab("rewards")}
@@ -1947,7 +2029,7 @@ function AccountView({
             </div>
           )}
 
-          {/* ══════════════════════════════════════════ EARN REWARDS TAB */}
+          {/* ══ EARN REWARDS TAB ══ */}
           {activeTab === "rewards" && (
             <div className="reward-tab-enter">
               {!profile.phone_verified ? (
@@ -1959,6 +2041,7 @@ function AccountView({
                 />
               ) : (
                 <>
+                  {/* Progress summary */}
                   <div
                     style={{
                       background: C.lightGold,
@@ -2001,6 +2084,19 @@ function AccountView({
                           {earnedFields.length} of {rewardFields.length} fields
                           complete · {totalEarned} / {totalEarnable} pts earned
                         </div>
+                        {tier.mult > 1 && (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: tier.color,
+                              marginTop: 4,
+                              fontWeight: 600,
+                            }}
+                          >
+                            ✦ {tier.label} tier: {tier.mult}× multiplier active
+                            on all purchases
+                          </div>
+                        )}
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div
@@ -2085,12 +2181,132 @@ function AccountView({
                       />
                     ))}
                   </div>
+
+                  {/* ── v6.1: REFERRAL CODE CARD ── */}
+                  {referralCode && (
+                    <div
+                      style={{
+                        marginTop: 20,
+                        background: C.lightGold,
+                        border: `1px solid ${C.gold}30`,
+                        borderLeft: `4px solid ${C.gold}`,
+                        borderRadius: 3,
+                        padding: "18px 20px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.15em",
+                          textTransform: "uppercase",
+                          color: C.gold,
+                          marginBottom: 4,
+                        }}
+                      >
+                        Share & Earn
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: F.heading,
+                          fontSize: 18,
+                          color: C.green,
+                          marginBottom: 8,
+                        }}
+                      >
+                        Your Referral Code
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: C.muted,
+                          lineHeight: 1.6,
+                          marginBottom: 14,
+                        }}
+                      >
+                        Share your code with friends — you earn{" "}
+                        <strong style={{ color: C.gold }}>
+                          {loyaltyConfig.pts_referral_referrer} pts
+                        </strong>{" "}
+                        when they place their first order, and they get{" "}
+                        <strong style={{ color: C.gold }}>
+                          {loyaltyConfig.pts_referral_referee} pts
+                        </strong>{" "}
+                        as a welcome bonus.
+                        {referralUses > 0 && (
+                          <span
+                            style={{
+                              color: C.accent,
+                              fontWeight: 600,
+                              display: "block",
+                              marginTop: 4,
+                            }}
+                          >
+                            ✓ You've earned from {referralUses} referral
+                            {referralUses !== 1 ? "s" : ""} so far!
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "#f4f0e8",
+                            border: "2px dashed #e8e0d4",
+                            borderRadius: 4,
+                            padding: "10px 20px",
+                            fontFamily: "monospace",
+                            fontSize: 20,
+                            fontWeight: 700,
+                            letterSpacing: "0.2em",
+                            color: C.green,
+                          }}
+                        >
+                          {referralCode}
+                        </div>
+                        <button
+                          onClick={copyReferralCode}
+                          style={{
+                            ...btn(refCopied ? C.accent : C.mid),
+                            fontSize: 10,
+                            padding: "8px 16px",
+                          }}
+                        >
+                          {refCopied ? "✓ Copied!" : "📋 Copy Code"}
+                        </button>
+                        <button
+                          onClick={shareReferralWhatsApp}
+                          style={{
+                            padding: "8px 16px",
+                            background: "#25D366",
+                            color: C.white,
+                            border: "none",
+                            borderRadius: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            letterSpacing: "0.15em",
+                            textTransform: "uppercase",
+                            fontFamily: F.body,
+                            cursor: "pointer",
+                          }}
+                        >
+                          💬 Share via WhatsApp
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
           )}
 
-          {/* ══════════════════════════════════════════ INBOX TAB */}
+          {/* ══ INBOX TAB ══ */}
           {activeTab === "inbox" && (
             <div className="reward-tab-enter">
               <CustomerInbox
@@ -2100,7 +2316,7 @@ function AccountView({
             </div>
           )}
 
-          {/* ══════════════════════════════════════════ ACTIVITY TAB */}
+          {/* ══ ACTIVITY TAB ══ */}
           {activeTab === "activity" && (
             <div className="reward-tab-enter">
               <div
@@ -2168,7 +2384,6 @@ function AccountView({
                   </div>
                 ))}
               </div>
-
               {scansLoading ? (
                 <div
                   style={{
@@ -2404,7 +2619,6 @@ function AccountView({
         </div>
       </div>
 
-      {/* ── Admin config FAB ── */}
       {isAdmin && (
         <button
           onClick={() => setShowConfig(true)}
@@ -2431,7 +2645,6 @@ function AccountView({
           ⚙
         </button>
       )}
-
       {showConfig && (
         <AdminConfigModal
           config={config}
@@ -2621,7 +2834,6 @@ export default function Account() {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // ── Spinner ──────────────────────────────────────────────────────────────────
   if (checkingSession)
     return (
       <>
@@ -2680,7 +2892,6 @@ export default function Account() {
       </>
     );
 
-  // ── Logged-in account view ────────────────────────────────────────────────────
   if (loggedInUser)
     return (
       <>
@@ -2695,7 +2906,6 @@ export default function Account() {
       </>
     );
 
-  // ── Login / Sign Up ───────────────────────────────────────────────────────────
   return (
     <>
       <ClientHeader variant="light" />

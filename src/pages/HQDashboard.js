@@ -1,32 +1,43 @@
-// src/pages/HQDashboard.js — Protea Botanicals v3.3
-// v3.3: WP-K — SystemHealthProvider wraps all tabs (shared live data layer)
-// v3.2: WP-I — Documents tab added (14th tab, HQDocuments.js)
-// v3.1: WP-H — pass onNavigate to HQOverview (ERP quick-action tiles)
-// v3.0: Reorder & Scoring tab (WP-F+G)
-// v2.9: P&L tab (WP-E)
+// src/pages/HQDashboard.js — Protea Botanicals v2.5
+// ─────────────────────────────────────────────────────────────────────────────
+// v2.5: Suppliers tab added (WP-A — Phase 2 Import ERP)
+// v2.4: Retailer Health tab added (WP6 — DEC-031)
+// v2.3: Analytics tab (Phase 2E)
+// v2.2: Distribution tab (Phase 2D)
+// v2.1: Supply Chain + Production tabs (Phase 2C)
+// v2.0: Overview + Shops tabs (Phase 2B)
 
 import { useState } from "react";
 import { useTenant } from "../services/tenantService";
-import { SystemHealthProvider } from "../services/systemHealthContext";
 
+// ── Phase 2B Tab Components ───────────────────────────────────────────────
 import HQOverview from "../components/hq/HQOverview";
 import ShopManager from "../components/hq/ShopManager";
-import SupplyChain from "../components/hq/SupplyChain";
-import HQProduction from "../components/hq/HQProduction";
-import Distribution from "../components/hq/Distribution";
-import HQAnalytics from "../components/hq/HQAnalytics";
-import RetailerHealth from "../components/hq/RetailerHealth";
-import HQSuppliers from "../components/hq/HQSuppliers";
-import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
-import HQCogs from "../components/hq/HQCogs";
-import HQPricing from "../components/hq/HQPricing";
-import HQProfitLoss from "../components/hq/HQProfitLoss";
-import HQReorderScoring from "../components/hq/HQReorderScoring";
-import HQDocuments from "../components/hq/HQDocuments";
 
+// ── Phase 2C Tab Components ───────────────────────────────────────────────
+import SupplyChain from "../components/hq/SupplyChain";
+import Production from "../components/hq/Production";
+
+// ── Phase 2D Tab Components ───────────────────────────────────────────────
+import Distribution from "../components/hq/Distribution";
+
+// ── Phase 2E Tab Components ───────────────────────────────────────────────
+import HQAnalytics from "../components/hq/HQAnalytics";
+
+// ── Phase 2F Tab Components ───────────────────────────────────────────────
+import RetailerHealth from "../components/hq/RetailerHealth";
+
+// ── Phase 2 Import ERP ────────────────────────────────────────────────────
+import HQSuppliers from "../components/hq/HQSuppliers";
+
+// ── Design Tokens ─────────────────────────────────────────────────────────
 const C = {
+  bg: "#faf9f6",
+  warmBg: "#f4f0e8",
   primaryDark: "#1b4332",
+  primaryMid: "#2d6a4f",
   accentGreen: "#52b788",
+  gold: "#b5935a",
   text: "#1a1a1a",
   muted: "#888888",
   border: "#e8e0d4",
@@ -34,20 +45,14 @@ const C = {
 };
 
 const TABS = [
-  { id: "overview", label: "Overview", icon: "📊" },
-  { id: "supply-chain", label: "Supply Chain", icon: "📦" },
-  { id: "production", label: "Production", icon: "🔧" },
-  { id: "distribution", label: "Distribution", icon: "🚚" },
-  { id: "shops", label: "Shops", icon: "🏪" },
-  { id: "analytics", label: "Analytics", icon: "📈" },
-  { id: "retailer-health", label: "Retailer Health", icon: "🏆" },
-  { id: "suppliers", label: "Suppliers", icon: "🌍" },
-  { id: "procurement", label: "Procurement", icon: "🛒" },
-  { id: "costing", label: "Costing", icon: "🧮" },
-  { id: "pricing", label: "Pricing", icon: "💰" },
-  { id: "pl", label: "P&L", icon: "📉" },
-  { id: "reorder", label: "Reorder", icon: "🔔" },
-  { id: "documents", label: "Documents", icon: "📄" },
+  { id: "overview",        label: "Overview",        icon: "📊", ready: true },
+  { id: "supply-chain",    label: "Supply Chain",    icon: "📦", ready: true },
+  { id: "production",      label: "Production",      icon: "🔧", ready: true },
+  { id: "distribution",    label: "Distribution",    icon: "🚚", ready: true },
+  { id: "shops",           label: "Shops",           icon: "🏪", ready: true },
+  { id: "analytics",       label: "Analytics",       icon: "📈", ready: true },
+  { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
+  { id: "suppliers",       label: "Suppliers",       icon: "🌍", ready: true },
 ];
 
 export default function HQDashboard() {
@@ -55,139 +60,139 @@ export default function HQDashboard() {
   const { tenant, allTenants, tenantName, isHQ, switchTenant } = useTenant();
 
   return (
-    // ── SystemHealthProvider wraps ALL tabs ──
-    // Every child component can now call useSystemHealth() to get
-    // live, consistent stats without independent fetches.
-    // Realtime subscriptions auto-refresh all stats on any DB change.
-    <SystemHealthProvider>
-      <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
-        <div style={{ marginBottom: "24px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "8px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <h1
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: "28px",
-                  fontWeight: 300,
-                  color: C.primaryDark,
-                  margin: 0,
-                }}
-              >
-                HQ Command Centre
-              </h1>
-              <span
-                style={{
-                  background: "rgba(82,183,136,0.15)",
-                  color: C.accentGreen,
-                  padding: "3px 10px",
-                  borderRadius: "2px",
-                  fontSize: "9px",
-                  fontWeight: 700,
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                }}
-              >
-                All Tabs Live
-              </span>
-            </div>
-            {isHQ && allTenants.length > 1 && (
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-              >
-                <span
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    color: C.muted,
-                  }}
-                >
-                  Viewing:
-                </span>
-                <select
-                  value={tenant?.id || ""}
-                  onChange={(e) => {
-                    const s = allTenants.find((t) => t.id === e.target.value);
-                    if (s) switchTenant(s);
-                  }}
-                  style={{
-                    padding: "6px 10px",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: "2px",
-                    fontFamily: "Jost, sans-serif",
-                    fontSize: "12px",
-                    color: C.text,
-                    background: C.white,
-                    cursor: "pointer",
-                  }}
-                >
-                  {allTenants.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-          <p
-            style={{
-              color: C.muted,
-              fontSize: "13px",
-              fontWeight: 300,
-              margin: 0,
-            }}
-          >
-            {tenantName || "Protea Botanicals HQ"} — {allTenants.length} tenant
-            {allTenants.length !== 1 ? "s" : ""} registered
-          </p>
-        </div>
-
+    <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: "24px" }}>
         <div
           style={{
             display: "flex",
-            gap: "4px",
-            borderBottom: `1px solid ${C.border}`,
-            marginBottom: "28px",
-            overflowX: "auto",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "8px",
           }}
         >
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <h1
               style={{
-                background: activeTab === tab.id ? C.white : "transparent",
-                border: "none",
-                borderBottom:
-                  activeTab === tab.id
-                    ? `2px solid ${C.primaryDark}`
-                    : "2px solid transparent",
-                padding: "12px 20px",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "11px",
-                fontWeight: activeTab === tab.id ? 600 : 400,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                color: activeTab === tab.id ? C.primaryDark : C.muted,
-                cursor: "pointer",
-                transition: "all 0.15s",
-                whiteSpace: "nowrap",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
+                fontFamily: "'Cormorant Garamond', serif",
+                fontSize: "28px",
+                fontWeight: 300,
+                color: C.primaryDark,
+                margin: 0,
               }}
             >
-              <span style={{ fontSize: "14px" }}>{tab.icon}</span>
-              {tab.label}
+              HQ Command Centre
+            </h1>
+            <span
+              style={{
+                background: "rgba(82,183,136,0.15)",
+                color: C.accentGreen,
+                padding: "3px 10px",
+                borderRadius: "2px",
+                fontSize: "9px",
+                fontWeight: 700,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+              }}
+            >
+              All Tabs Live
+            </span>
+          </div>
+
+          {/* Tenant Switcher */}
+          {isHQ && allTenants.length > 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                }}
+              >
+                Viewing:
+              </span>
+              <select
+                value={tenant?.id || ""}
+                onChange={(e) => {
+                  const selected = allTenants.find(
+                    (t) => t.id === e.target.value,
+                  );
+                  if (selected) switchTenant(selected);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: "2px",
+                  fontFamily: "Jost, sans-serif",
+                  fontSize: "12px",
+                  color: C.text,
+                  background: C.white,
+                  cursor: "pointer",
+                }}
+              >
+                {allTenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        <p
+          style={{
+            color: C.muted,
+            fontSize: "13px",
+            fontWeight: 300,
+            margin: 0,
+          }}
+        >
+          {tenantName || "Protea Botanicals HQ"} — {allTenants.length} tenant
+          {allTenants.length !== 1 ? "s" : ""} registered
+        </p>
+      </div>
+
+      {/* ── Tab Navigation ──────────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          gap: "4px",
+          borderBottom: `1px solid ${C.border}`,
+          marginBottom: "28px",
+          overflowX: "auto",
+        }}
+      >
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              background: activeTab === tab.id ? C.white : "transparent",
+              border: "none",
+              borderBottom:
+                activeTab === tab.id
+                  ? `2px solid ${C.primaryDark}`
+                  : "2px solid transparent",
+              padding: "12px 20px",
+              fontFamily: "Jost, sans-serif",
+              fontSize: "11px",
+              fontWeight: activeTab === tab.id ? 600 : 400,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              color: activeTab === tab.id ? C.primaryDark : C.muted,
+              cursor: "pointer",
+              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <span style={{ fontSize: "14px" }}>{tab.icon}</span>
+            {tab.label}
+            {tab.ready && (
               <span
                 style={{
                   width: "5px",
@@ -197,31 +202,22 @@ export default function HQDashboard() {
                   display: "inline-block",
                 }}
               />
-            </button>
-          ))}
-        </div>
-
-        <div>
-          {activeTab === "overview" && (
-            <HQOverview onNavigate={(tab) => setActiveTab(tab)} />
-          )}
-          {activeTab === "supply-chain" && <SupplyChain />}
-          {activeTab === "production" && <HQProduction />}
-          {activeTab === "distribution" && <Distribution />}
-          {activeTab === "shops" && <ShopManager />}
-          {activeTab === "analytics" && <HQAnalytics />}
-          {activeTab === "retailer-health" && <RetailerHealth />}
-          {activeTab === "suppliers" && <HQSuppliers />}
-          {activeTab === "procurement" && <HQPurchaseOrders />}
-          {activeTab === "costing" && <HQCogs />}
-          {activeTab === "pricing" && <HQPricing />}
-          {activeTab === "pl" && <HQProfitLoss />}
-          {activeTab === "reorder" && (
-            <HQReorderScoring onNavigate={(tab) => setActiveTab(tab)} />
-          )}
-          {activeTab === "documents" && <HQDocuments />}
-        </div>
+            )}
+          </button>
+        ))}
       </div>
-    </SystemHealthProvider>
+
+      {/* ── Tab Content ─────────────────────────────────────────────── */}
+      <div>
+        {activeTab === "overview"        && <HQOverview />}
+        {activeTab === "supply-chain"    && <SupplyChain />}
+        {activeTab === "production"      && <Production />}
+        {activeTab === "distribution"    && <Distribution />}
+        {activeTab === "shops"           && <ShopManager />}
+        {activeTab === "analytics"       && <HQAnalytics />}
+        {activeTab === "retailer-health" && <RetailerHealth />}
+        {activeTab === "suppliers"       && <HQSuppliers />}
+      </div>
+    </div>
   );
 }
