@@ -1,5 +1,13 @@
 // src/components/hq/HQAnalytics.js
-// v3.1 — FIXED March 2026
+// v3.2 — March 2026
+//
+// CHANGES v3.2:
+//   - FIX: Potential Margin now filters to finished_product category only.
+//          Raw materials have cost_price but sell_price=0 → skewed negative margin.
+//   - FIX: Active POs pipeline card uses p.po_status (workflow field) not p.status.
+//          p.status is a secondary field; po_status is the source of truth.
+//          Also excludes 'complete' (was missing from exclusion list).
+//   - FIX: PO Pipeline in Supply Chain uses p.po_status throughout + shows 'complete' status.
 //
 // CHANGES v3.1:
 //   - CRITICAL FIX: scans table → scan_logs (ScanResult v4.1 writes here)
@@ -118,7 +126,7 @@ export default function HQAnalytics() {
         const r = await supabase
           .from("purchase_orders")
           .select(
-            "id,po_number,supplier_id,status,subtotal,currency,order_date,received_date,created_at,purchase_order_items(*)",
+            "id,po_number,supplier_id,po_status,status,subtotal,currency,order_date,received_date,created_at,purchase_order_items(*)",
           );
         result.purchaseOrders = r.data || [];
       } catch {
@@ -154,7 +162,7 @@ export default function HQAnalytics() {
         result.shipments = [];
       }
 
-      // ── FIXED: scan_logs with scanned_at ──────────────────────────────
+      // FIXED v3.1: scan_logs with scanned_at
       try {
         const r = await supabase
           .from("scan_logs")
@@ -216,7 +224,7 @@ export default function HQAnalytics() {
   useEffect(() => {
     fetchAll();
 
-    // ── FIXED: subscribe to scan_logs ────────────────────────────────────
+    // FIXED v3.1: subscribe to scan_logs
     const scanSub = supabase
       .channel("hq-scan-logs")
       .on(
@@ -545,11 +553,14 @@ function OverviewAnalytics({ data }) {
   const runs = data.productionRuns;
   const shipments = data.shipments;
 
-  const stockValue = inv.reduce(
+  // v3.2 FIX: Only finished_product items have a meaningful sell_price.
+  // Raw materials / hardware have cost_price but sell_price=0 → -777% if included.
+  const finishedInv = inv.filter((i) => i.category === "finished_product");
+  const stockValue = finishedInv.reduce(
     (s, i) => s + (i.quantity_on_hand || 0) * (i.sell_price || 0),
     0,
   );
-  const stockCost = inv.reduce(
+  const stockCost = finishedInv.reduce(
     (s, i) => s + (i.quantity_on_hand || 0) * (i.cost_price || 0),
     0,
   );
@@ -557,6 +568,8 @@ function OverviewAnalytics({ data }) {
     stockValue > 0
       ? (((stockValue - stockCost) / stockValue) * 100).toFixed(1)
       : 0;
+
+  // Full inv still used for low-stock counts etc.
   const lowStock = inv.filter(
     (i) => i.reorder_level > 0 && i.quantity_on_hand <= i.reorder_level,
   );
@@ -596,7 +609,7 @@ function OverviewAnalytics({ data }) {
   );
 
   const now = new Date();
-  // FIXED: scanned_at
+  // FIXED v3.1: scanned_at
   const scans7d = data.scans.filter(
     (s) => new Date(s.scanned_at) >= new Date(now - 7 * 86400000),
   ).length;
@@ -699,12 +712,12 @@ function OverviewAnalytics({ data }) {
         }}
       >
         <KPI
-          label="Stock Value"
+          label="Finished Stock Value"
           value={`R${stockValue.toLocaleString()}`}
           color={C.primaryDark}
         />
         <KPI
-          label="Stock Cost"
+          label="Finished Stock Cost"
           value={`R${stockCost.toLocaleString()}`}
           color={C.blue}
         />
@@ -712,6 +725,7 @@ function OverviewAnalytics({ data }) {
           label="Potential Margin"
           value={`${potentialMargin}%`}
           color={C.accent}
+          sub="finished goods only"
         />
         <KPI label="Active SKUs" value={inv.length} color={C.primaryMid} />
         <KPI
@@ -812,8 +826,12 @@ function OverviewAnalytics({ data }) {
             items={[
               {
                 label: "Active POs",
+                // v3.2 FIX: use po_status (workflow field), exclude complete + received + cancelled + draft
                 value: data.purchaseOrders.filter(
-                  (p) => !["received", "cancelled"].includes(p.status),
+                  (p) =>
+                    !["received", "complete", "cancelled", "draft"].includes(
+                      p.po_status,
+                    ),
                 ).length,
               },
               { label: "Suppliers", value: data.suppliers.length },
@@ -954,13 +972,17 @@ function SupplyChainAnalytics({ data }) {
     categories[cat].value += (i.quantity_on_hand || 0) * (i.sell_price || 0);
     categories[cat].cost += (i.quantity_on_hand || 0) * (i.cost_price || 0);
   });
+
+  // v3.2 FIX: use po_status (the actual workflow field) not status (secondary field).
   const poStatuses = {};
   pos.forEach((p) => {
-    poStatuses[p.status] = (poStatuses[p.status] || 0) + 1;
+    const s = p.po_status || p.status || "unknown";
+    poStatuses[s] = (poStatuses[s] || 0) + 1;
   });
+
   const supplierSpend = {};
   pos
-    .filter((p) => p.status === "received")
+    .filter((p) => ["received", "complete"].includes(p.po_status))
     .forEach((p) => {
       supplierSpend[p.supplier_id || "unknown"] =
         (supplierSpend[p.supplier_id || "unknown"] || 0) + (p.subtotal || 0);
@@ -979,6 +1001,7 @@ function SupplyChainAnalytics({ data }) {
     }))
     .sort((a, b) => b.totalValue - a.totalValue)
     .slice(0, 8);
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div style={sCard}>
@@ -1039,21 +1062,31 @@ function SupplyChainAnalytics({ data }) {
         <div style={sCard}>
           <div style={sLabel}>Purchase Order Pipeline</div>
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+            {/* v3.2 FIX: includes 'complete' status, uses po_status field */}
             {[
               "draft",
+              "ordered",
               "submitted",
               "confirmed",
-              "shipped",
+              "in_transit",
               "received",
+              "complete",
               "cancelled",
             ].map((status) => {
               const count = poStatuses[status] || 0;
+              if (
+                count === 0 &&
+                !["received", "complete", "cancelled"].includes(status)
+              )
+                return null;
               const colors = {
                 draft: C.muted,
+                ordered: C.blue,
                 submitted: C.blue,
                 confirmed: C.accent,
-                shipped: C.gold,
-                received: C.primaryDark,
+                in_transit: C.gold,
+                received: C.primaryMid,
+                complete: C.primaryDark,
                 cancelled: C.red,
               };
               return (
@@ -1094,7 +1127,7 @@ function SupplyChainAnalytics({ data }) {
           </div>
         </div>
         <div style={sCard}>
-          <div style={sLabel}>Supplier Spend (Received POs)</div>
+          <div style={sLabel}>Supplier Spend (Received/Complete POs)</div>
           {supplierSpendList.length === 0 ? (
             <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
               No received POs yet
@@ -1247,6 +1280,7 @@ function ProductionAnalytics({ data }) {
     batchName: batches.find((b) => b.id === r.batch_id)?.batch_number || "—",
     productName: batches.find((b) => b.id === r.batch_id)?.product_name || "—",
   }));
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div
@@ -1476,6 +1510,7 @@ function DistributionAnalytics({ data }) {
       !["delivered", "confirmed", "cancelled"].includes(s.status) &&
       new Date(s.estimated_arrival) < now,
   );
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       {overdue.length > 0 && (
@@ -1589,7 +1624,7 @@ function DistributionAnalytics({ data }) {
 }
 
 // ───────────────────────────────────────────────────────
-// SCANS & LOYALTY — FIXED: scan_logs schema
+// SCANS & LOYALTY — FIXED v3.1: scan_logs schema
 // ───────────────────────────────────────────────────────
 function ScansAnalytics({ data }) {
   const scans = data.scans; // from scan_logs
@@ -1605,7 +1640,6 @@ function ScansAnalytics({ data }) {
     { label: "All time", from: new Date(0) },
   ];
 
-  // By QR Type (replaces legacy source field)
   const typeMap = {};
   scans.forEach((s) => {
     const t = s.qr_type || "unknown";
@@ -1615,7 +1649,6 @@ function ScansAnalytics({ data }) {
     .map(([qrType, count]) => ({ qrType, count }))
     .sort((a, b) => b.count - a.count);
 
-  // Top scanned qr_code_id
   const codeMap = {};
   scans.forEach((s) => {
     const id = s.qr_code_id || "unknown";
@@ -1626,7 +1659,6 @@ function ScansAnalytics({ data }) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // Province
   const provMap = {};
   scans.forEach((s) => {
     if (s.ip_province)
@@ -1637,7 +1669,6 @@ function ScansAnalytics({ data }) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
-  // Outcomes
   const outcomeMap = {};
   scans.forEach((s) => {
     const o = s.scan_outcome || "unknown";
@@ -1662,7 +1693,7 @@ function ScansAnalytics({ data }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* Period KPIs — FIXED: scanned_at */}
+      {/* Period KPIs — FIXED v3.1: scanned_at */}
       <div
         style={{
           display: "grid",
@@ -1681,7 +1712,6 @@ function ScansAnalytics({ data }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* QR Type */}
         <div style={sCard}>
           <div style={sLabel}>Scans by QR Type</div>
           {typeList.length === 0 ? (
@@ -1741,7 +1771,6 @@ function ScansAnalytics({ data }) {
           )}
         </div>
 
-        {/* Top codes */}
         <div style={sCard}>
           <div style={sLabel}>Top Scanned Codes</div>
           {topCodes.length === 0 ? (
@@ -1802,7 +1831,6 @@ function ScansAnalytics({ data }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* Province */}
         <div style={sCard}>
           <div style={sLabel}>Scans by Province (IP)</div>
           {topProvinces.length === 0 ? (
@@ -1861,7 +1889,6 @@ function ScansAnalytics({ data }) {
           )}
         </div>
 
-        {/* Outcomes */}
         <div style={sCard}>
           <div style={sLabel}>Scan Outcomes</div>
           {outcomeList.length === 0 ? (
@@ -2015,6 +2042,7 @@ function KPI({ label, value, color, sub }) {
     </div>
   );
 }
+
 function PipelineCard({ stage, icon, items, color }) {
   return (
     <div

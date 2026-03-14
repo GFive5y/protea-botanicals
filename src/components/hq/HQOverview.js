@@ -1,9 +1,9 @@
-// src/components/hq/HQOverview.js — Protea Botanicals v1.7
-// v1.7: Birthday KPI tiles — how many birthdays today + this week
-// v1.6: Open tickets KPI + live USD/ZAR + clickable cards → onNavigate
-// v1.5: Clickable KPI cards, clickable panel headers, USD/ZAR auto-refresh every 60s
+// src/components/hq/HQOverview.js — Protea Botanicals v1.8
+// v1.8: FIX Products KPI — queries product_cogs (is_active) not products table.
+//        products table ≠ COGS recipes. HQ costing shows product_cogs so KPI must match.
+// v1.7: Birthday KPI tiles
+// v1.6: Open tickets KPI + live USD/ZAR
 // v1.4 FIXED: scans → scan_logs, scan_date → scanned_at
-// v1.3 WP-H: ERP KPI tiles added
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -35,11 +35,7 @@ export default function HQOverview({ onNavigate }) {
   const [erpStats, setErpStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // v1.7: birthday stats
   const [birthdayStats, setBirthdayStats] = useState({ today: 0, thisWeek: 0 });
-
-  // ── USD/ZAR live state ──────────────────────────────────────────────────────
   const [fxRate, setFxRate] = useState(null);
   const [fxUpdatedAt, setFxUpdatedAt] = useState(null);
   const [fxRefreshing, setFxRefreshing] = useState(false);
@@ -81,52 +77,40 @@ export default function HQOverview({ onNavigate }) {
         );
       }
     } catch (_) {}
-    if (!silent) setFxRefreshing(false);
     setFxRefreshing(false);
   }, []);
 
   useEffect(() => {
     fetchFx(false);
-    fxCountRef.current = setInterval(() => {
-      setFxCountdown((n) => {
-        if (n <= 1) return 60;
-        return n - 1;
-      });
-    }, 1000);
-    fxTimerRef.current = setInterval(() => {
-      fetchFx(true);
-    }, 60000);
+    fxCountRef.current = setInterval(
+      () => setFxCountdown((n) => (n <= 1 ? 60 : n - 1)),
+      1000,
+    );
+    fxTimerRef.current = setInterval(() => fetchFx(true), 60000);
     return () => {
       clearInterval(fxTimerRef.current);
       clearInterval(fxCountRef.current);
     };
   }, [fetchFx]);
 
-  // ── v1.7: Birthday stats fetch ──────────────────────────────────────────────
   const fetchBirthdayStats = useCallback(async () => {
     try {
       const now = new Date();
-      const todayMonth = now.getMonth() + 1; // 1-12
+      const todayMonth = now.getMonth() + 1;
       const todayDay = now.getDate();
-
-      // Build 7-day window (month/day pairs)
       const weekDays = [];
       for (let i = 0; i < 7; i++) {
         const d = new Date(now);
         d.setDate(now.getDate() + i);
         weekDays.push({ month: d.getMonth() + 1, day: d.getDate() });
       }
-
       const { data: profiles } = await supabase
         .from("user_profiles")
         .select("date_of_birth")
         .not("date_of_birth", "is", null);
-
       if (!profiles) return;
-
-      let todayCount = 0;
-      let weekCount = 0;
-
+      let todayCount = 0,
+        weekCount = 0;
       profiles.forEach(({ date_of_birth }) => {
         if (!date_of_birth) return;
         try {
@@ -138,7 +122,6 @@ export default function HQOverview({ onNavigate }) {
             weekCount++;
         } catch (_) {}
       });
-
       setBirthdayStats({ today: todayCount, thisWeek: weekCount });
     } catch (err) {
       console.error("[HQOverview] Birthday stats error:", err);
@@ -158,10 +141,13 @@ export default function HQOverview({ onNavigate }) {
       let scansData = [],
         lowStockData = [];
 
+      // v1.8 FIX: query product_cogs (active COGS recipes) not legacy products table.
+      // The Products KPI links to Costing which shows product_cogs — they must match.
       try {
         const r = await supabase
-          .from("products")
-          .select("id", { count: "exact", head: true });
+          .from("product_cogs")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true);
         products = r.count || 0;
       } catch (_) {}
       try {
@@ -306,6 +292,7 @@ export default function HQOverview({ onNavigate }) {
           avgMarginPct = margins.reduce((s, m) => s + m, 0) / margins.length;
       } catch (_) {}
       try {
+        // v1.8: po_status is the workflow field; exclude complete + received + cancelled + draft
         const r = await supabase
           .from("purchase_orders")
           .select("id", { count: "exact", head: true })
@@ -323,8 +310,6 @@ export default function HQOverview({ onNavigate }) {
         activeImportPOs,
         fxRate: currentFx,
       });
-
-      // v1.7: fetch birthday stats in parallel
       await fetchBirthdayStats();
     } catch (err) {
       console.error("[HQOverview] Fatal:", err);
@@ -409,7 +394,6 @@ export default function HQOverview({ onNavigate }) {
 
   return (
     <div>
-      {/* ── PLATFORM KPI CARDS ── */}
       <SectionLabel label="Platform" />
       <div
         style={{
@@ -476,7 +460,6 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ── v1.7: BIRTHDAY KPI CARDS ── */}
       <SectionLabel label="Birthdays" />
       <div
         style={{
@@ -506,7 +489,6 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ── IMPORT ERP TILES ── */}
       {erpStats && (
         <>
           <SectionLabel label="Import ERP" />
@@ -549,8 +531,6 @@ export default function HQOverview({ onNavigate }) {
               sub="in transit / pending"
               onClick={() => nav("procurement")}
             />
-
-            {/* LIVE USD/ZAR TILE */}
             <div
               style={{
                 background: "#E8F5E9",
@@ -648,7 +628,6 @@ export default function HQOverview({ onNavigate }) {
         </>
       )}
 
-      {/* ── RECENT SCANS + LOW STOCK ── */}
       <div
         style={{
           display: "grid",
@@ -657,7 +636,6 @@ export default function HQOverview({ onNavigate }) {
           marginBottom: "24px",
         }}
       >
-        {/* Recent Scans */}
         <div
           style={{
             background: C.white,
@@ -685,7 +663,7 @@ export default function HQOverview({ onNavigate }) {
             <h3
               style={{ ...sH, display: "flex", alignItems: "center", gap: 8 }}
             >
-              Recent Scans
+              Recent Scans{" "}
               <span
                 style={{
                   fontSize: 11,
@@ -769,7 +747,6 @@ export default function HQOverview({ onNavigate }) {
           </div>
         </div>
 
-        {/* Low Stock Alerts */}
         <div
           style={{
             background: C.white,
@@ -797,7 +774,7 @@ export default function HQOverview({ onNavigate }) {
             <h3
               style={{ ...sH, display: "flex", alignItems: "center", gap: 8 }}
             >
-              Low Stock Alerts
+              Low Stock Alerts{" "}
               <span
                 style={{
                   fontSize: 11,
@@ -915,7 +892,6 @@ export default function HQOverview({ onNavigate }) {
         </div>
       </div>
 
-      {/* ── QUICK ACTIONS ── */}
       <div
         style={{
           background: C.white,
@@ -987,8 +963,6 @@ export default function HQOverview({ onNavigate }) {
     </div>
   );
 }
-
-// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
 
 function SectionLabel({ label, small }) {
   return (
