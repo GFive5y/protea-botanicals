@@ -1,36 +1,49 @@
-// src/pages/HQDashboard.js — Protea Botanicals v2.5
-// ─────────────────────────────────────────────────────────────────────────────
-// v2.5: Suppliers tab added (WP-A — Phase 2 Import ERP)
-// v2.4: Retailer Health tab added (WP6 — DEC-031)
-// v2.3: Analytics tab (Phase 2E)
-// v2.2: Distribution tab (Phase 2D)
-// v2.1: Supply Chain + Production tabs (Phase 2C)
-// v2.0: Overview + Shops tabs (Phase 2B)
+// src/pages/HQDashboard.js v3.4
+// Protea Botanicals — HQ Command Centre
+// v3.4: Loyalty tab added (WP-O)
+// v3.3: All ERP tabs — procurement, costing, pricing, p&l, reorder, documents
+// v3.1: Supply Chain + Production + Distribution + Shops
+// v2.5: Suppliers tab (WP-A)
+// v2.4: Retailer Health (WP6)
+// v2.3: Analytics tab
+// v2.2: Distribution tab
+// v2.1: Supply Chain + Production tabs
+// v2.0: Overview + Shops tabs
 
 import { useState } from "react";
 import { useTenant } from "../services/tenantService";
 
-// ── Phase 2B Tab Components ───────────────────────────────────────────────
+// ── Phase 2B ──────────────────────────────────────────────────────────────────
 import HQOverview from "../components/hq/HQOverview";
 import ShopManager from "../components/hq/ShopManager";
 
-// ── Phase 2C Tab Components ───────────────────────────────────────────────
+// ── Phase 2C ──────────────────────────────────────────────────────────────────
 import SupplyChain from "../components/hq/SupplyChain";
 import Production from "../components/hq/Production";
 
-// ── Phase 2D Tab Components ───────────────────────────────────────────────
+// ── Phase 2D ──────────────────────────────────────────────────────────────────
 import Distribution from "../components/hq/Distribution";
 
-// ── Phase 2E Tab Components ───────────────────────────────────────────────
+// ── Phase 2E ──────────────────────────────────────────────────────────────────
 import HQAnalytics from "../components/hq/HQAnalytics";
 
-// ── Phase 2F Tab Components ───────────────────────────────────────────────
+// ── Phase 2F ──────────────────────────────────────────────────────────────────
 import RetailerHealth from "../components/hq/RetailerHealth";
 
-// ── Phase 2 Import ERP ────────────────────────────────────────────────────
+// ── Import ERP (WP-A through WP-H) ───────────────────────────────────────────
 import HQSuppliers from "../components/hq/HQSuppliers";
+import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
+import HQCogs from "../components/hq/HQCogs";
+import HQPricing from "../components/hq/HQPricing";
+import HQProfitLoss from "../components/hq/HQProfitLoss";
+import HQReorderScoring from "../components/hq/HQReorderScoring";
+import HQDocuments from "../components/hq/HQDocuments";
+import HQProduction from "../components/hq/HQProduction";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────
+// ── WP-O ─────────────────────────────────────────────────────────────────────
+import HQLoyalty from "../components/hq/HQLoyalty";
+
+// ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
   bg: "#faf9f6",
   warmBg: "#f4f0e8",
@@ -45,23 +58,35 @@ const C = {
 };
 
 const TABS = [
-  { id: "overview",        label: "Overview",        icon: "📊", ready: true },
-  { id: "supply-chain",    label: "Supply Chain",    icon: "📦", ready: true },
-  { id: "production",      label: "Production",      icon: "🔧", ready: true },
-  { id: "distribution",    label: "Distribution",    icon: "🚚", ready: true },
-  { id: "shops",           label: "Shops",           icon: "🏪", ready: true },
-  { id: "analytics",       label: "Analytics",       icon: "📈", ready: true },
+  { id: "overview", label: "Overview", icon: "📊", ready: true },
+  { id: "supply-chain", label: "Supply Chain", icon: "📦", ready: true },
+  { id: "production", label: "Production", icon: "🔧", ready: true },
+  { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
+  { id: "shops", label: "Shops", icon: "🏪", ready: true },
+  { id: "analytics", label: "Analytics", icon: "📈", ready: true },
   { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
-  { id: "suppliers",       label: "Suppliers",       icon: "🌍", ready: true },
+  { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
+  { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
+  { id: "costing", label: "Costing", icon: "🧮", ready: true },
+  { id: "pricing", label: "Pricing", icon: "💲", ready: true },
+  { id: "pl", label: "P&L", icon: "📉", ready: true },
+  { id: "reorder", label: "Reorder", icon: "🔔", ready: true },
+  { id: "documents", label: "Documents", icon: "📄", ready: true },
+  { id: "hq-production", label: "HQ Production", icon: "⚙️", ready: true },
+  { id: "loyalty", label: "Loyalty", icon: "💎", ready: true },
 ];
 
 export default function HQDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const { tenant, allTenants, tenantName, isHQ, switchTenant } = useTenant();
 
+  const handleNavigate = (tabId) => {
+    if (TABS.find((t) => t.id === tabId)) setActiveTab(tabId);
+  };
+
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
-      {/* ── Header ──────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: "24px" }}>
         <div
           style={{
@@ -123,7 +148,7 @@ export default function HQDashboard() {
                 }}
                 style={{
                   padding: "6px 10px",
-                  border: `1px solid ${C.border}`,
+                  border: "1px solid " + C.border,
                   borderRadius: "2px",
                   fontFamily: "Jost, sans-serif",
                   fontSize: "12px",
@@ -154,12 +179,12 @@ export default function HQDashboard() {
         </p>
       </div>
 
-      {/* ── Tab Navigation ──────────────────────────────────────────── */}
+      {/* ── Tab Navigation ───────────────────────────────────────────────── */}
       <div
         style={{
           display: "flex",
           gap: "4px",
-          borderBottom: `1px solid ${C.border}`,
+          borderBottom: "1px solid " + C.border,
           marginBottom: "28px",
           overflowX: "auto",
         }}
@@ -173,7 +198,7 @@ export default function HQDashboard() {
               border: "none",
               borderBottom:
                 activeTab === tab.id
-                  ? `2px solid ${C.primaryDark}`
+                  ? "2px solid " + C.primaryDark
                   : "2px solid transparent",
               padding: "12px 20px",
               fontFamily: "Jost, sans-serif",
@@ -207,16 +232,24 @@ export default function HQDashboard() {
         ))}
       </div>
 
-      {/* ── Tab Content ─────────────────────────────────────────────── */}
+      {/* ── Tab Content ──────────────────────────────────────────────────── */}
       <div>
-        {activeTab === "overview"        && <HQOverview />}
-        {activeTab === "supply-chain"    && <SupplyChain />}
-        {activeTab === "production"      && <Production />}
-        {activeTab === "distribution"    && <Distribution />}
-        {activeTab === "shops"           && <ShopManager />}
-        {activeTab === "analytics"       && <HQAnalytics />}
+        {activeTab === "overview" && <HQOverview onNavigate={handleNavigate} />}
+        {activeTab === "supply-chain" && <SupplyChain />}
+        {activeTab === "production" && <Production />}
+        {activeTab === "distribution" && <Distribution />}
+        {activeTab === "shops" && <ShopManager />}
+        {activeTab === "analytics" && <HQAnalytics />}
         {activeTab === "retailer-health" && <RetailerHealth />}
-        {activeTab === "suppliers"       && <HQSuppliers />}
+        {activeTab === "suppliers" && <HQSuppliers />}
+        {activeTab === "procurement" && <HQPurchaseOrders />}
+        {activeTab === "costing" && <HQCogs />}
+        {activeTab === "pricing" && <HQPricing />}
+        {activeTab === "pl" && <HQProfitLoss />}
+        {activeTab === "reorder" && <HQReorderScoring />}
+        {activeTab === "documents" && <HQDocuments />}
+        {activeTab === "hq-production" && <HQProduction />}
+        {activeTab === "loyalty" && <HQLoyalty />}
       </div>
     </div>
   );
