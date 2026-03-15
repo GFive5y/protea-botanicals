@@ -1,8 +1,13 @@
-// src/components/hq/HQProduction.js v1.3
-// v1.3 — Terpene unit fix: ml (post SQL conversion), % input now accepts 3–15 (not ratio)
-//         terpeneRatio = input% / 100  |  all terpene labels updated g → ml
-// v1.2 — Admin controls on History: Edit (notes/actual/status), Cancel, Delete w/ stock reversal
-// v1.1 — Schema fix: aligned to real DB columns
+// src/components/hq/HQProduction.js v1.5
+// v1.5 — FORMAT expansion: vape (0.5/1/2/3ml + custom), edible, flower, beverage, topical, other
+//         Triple Chamber: distillate_needed = units × fill_ml × 3 chambers
+//         Non-vape formats: material BOM hidden — run tracks units only
+//         Batch Edit added to BatchesPanel (product_name, product_type, strain, status, units_produced, expiry_date, lab_certified)
+//         No updated_at in batches UPDATE (column does not exist)
+// v1.4 — BUG-001 FIX: direct batches query ordered by production_date
+// v1.3 — Terpene unit fix: ml, % input 3–15
+// v1.2 — History admin controls: Edit/Cancel/Delete w/ stock reversal
+// v1.1 — Schema fix
 // v1.0 — WP-L: Production Module
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -90,20 +95,101 @@ const sTd = {
   verticalAlign: "middle",
 };
 
-const FORMAT_BOM = {
-  "1ml_cart": {
+// ─── FORMAT CATALOGUE ────────────────────────────────────────────────────────
+// is_vape: true  → shows distillate + terpene + hardware BOM gauges
+// is_vape: false → BOM section hidden, runs track units only
+// distillate_ml: ml per chamber per unit (vape only)
+// chambers: multiplier for multi-chamber devices (default 1)
+// custom_fill: true → user enters fill_ml field
+const FORMAT_CATALOGUE = {
+  vape_05ml: {
+    label: "0.5ml Cartridge (510)",
+    category: "vape",
+    is_vape: true,
+    distillate_ml: 0.5,
+    chambers: 1,
+    terpene_pct: 10,
+    format_short: "0.5ml Cart",
+  },
+  vape_1ml: {
     label: "1ml Cartridge (510 Thread)",
+    category: "vape",
+    is_vape: true,
     distillate_ml: 1.0,
-    terpene_pct: 10, // default 10% — stored as percentage now
+    chambers: 1,
+    terpene_pct: 10,
     format_short: "1ml Cart",
   },
-  "2ml_pen": {
-    label: "2ml Disposable Pen (All-in-One)",
+  vape_2ml: {
+    label: "2ml Disposable Pen (AiO)",
+    category: "vape",
+    is_vape: true,
     distillate_ml: 2.0,
+    chambers: 1,
     terpene_pct: 10,
     format_short: "2ml Pen",
   },
+  vape_3x1ml: {
+    label: "Triple Chamber (3 × 1ml)",
+    category: "vape",
+    is_vape: true,
+    distillate_ml: 1.0,
+    chambers: 3,
+    terpene_pct: 10,
+    format_short: "3×1ml Triple",
+  },
+  vape_custom: {
+    label: "Custom Vape (enter ml)",
+    category: "vape",
+    is_vape: true,
+    distillate_ml: 0,
+    chambers: 1,
+    terpene_pct: 10,
+    format_short: "Custom Vape",
+    custom_fill: true,
+  },
+  edible: {
+    label: "Edible / Capsule",
+    category: "other",
+    is_vape: false,
+    format_short: "Edible",
+  },
+  flower: {
+    label: "Flower / Pre-roll",
+    category: "other",
+    is_vape: false,
+    format_short: "Flower",
+  },
+  beverage: {
+    label: "Beverage / Drink",
+    category: "other",
+    is_vape: false,
+    format_short: "Beverage",
+  },
+  topical: {
+    label: "Topical / Cream",
+    category: "other",
+    is_vape: false,
+    format_short: "Topical",
+  },
+  other: {
+    label: "Other / Custom",
+    category: "other",
+    is_vape: false,
+    format_short: "Custom",
+  },
 };
+
+const FORMAT_GROUPS = [
+  {
+    groupLabel: "── Vape ──",
+    keys: ["vape_05ml", "vape_1ml", "vape_2ml", "vape_3x1ml", "vape_custom"],
+  },
+  {
+    groupLabel: "── Other Products ──",
+    keys: ["edible", "flower", "beverage", "topical", "other"],
+  },
+];
 
 const STRAIN_OPTIONS = [
   "Pineapple Express",
@@ -126,16 +212,20 @@ const STRAIN_OPTIONS = [
   "Sherblato+",
 ];
 
-function genRunNumber(strain, format) {
+function genRunNumber(nameStr, formatKey) {
   const d = new Date();
   const y = String(d.getFullYear()).slice(2);
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  const sc = strain
+  const sc = nameStr
     .replace(/[^a-zA-Z]/g, "")
     .slice(0, 3)
     .toUpperCase();
-  const fc = format === "1ml_cart" ? "1ML" : "2ML";
+  const fc = formatKey
+    .replace("vape_", "")
+    .replace(/_/g, "")
+    .toUpperCase()
+    .slice(0, 4);
   return `PR-${y}${m}${day}-${sc}-${fc}`;
 }
 
@@ -158,6 +248,14 @@ function StatusBadge({ status, yieldPct }) {
     bg = "#fff3e8";
     color = C.orange;
     label = "In Progress";
+  } else if (status === "active") {
+    bg = "#d4edda";
+    color = C.green;
+    label = "Active";
+  } else if (status === "archived") {
+    bg = C.warm;
+    color = C.muted;
+    label = "Archived";
   } else {
     bg = C.warm;
     color = C.muted;
@@ -246,6 +344,7 @@ export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const [items, setItems] = useState([]);
   const [runs, setRuns] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [partners, setPartners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -254,7 +353,7 @@ export default function HQProduction() {
     setLoading(true);
     setError(null);
     try {
-      const [itemsR, runsR, partnersR] = await Promise.all([
+      const [itemsR, runsR, batchesR, partnersR] = await Promise.all([
         supabase
           .from("inventory_items")
           .select("*")
@@ -264,29 +363,36 @@ export default function HQProduction() {
           .from("production_runs")
           .select(
             `
-            id, batch_id, run_number, status, planned_units, actual_units,
-            started_at, completed_at, notes, created_at,
-            batches ( batch_number, product_name, strain, product_type, volume ),
-            production_run_inputs (
-              id, run_id, item_id, quantity_planned, quantity_actual, notes,
-              inventory_items ( name, sku, unit, category )
-            )
-          `,
+          id, batch_id, run_number, status, planned_units, actual_units,
+          started_at, completed_at, notes, created_at,
+          batches ( batch_number, product_name, strain, product_type, volume ),
+          production_run_inputs (
+            id, run_id, item_id, quantity_planned, quantity_actual, notes,
+            inventory_items ( name, sku, unit, category )
+          )
+        `,
           )
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
+          .from("batches")
+          .select(
+            "id,batch_number,product_name,product_type,strain,volume,status,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id",
+          )
+          .eq("is_archived", false)
+          .order("production_date", { ascending: false }),
+        supabase
           .from("wholesale_partners")
-          .select("id, name, contact_name")
+          .select("id,name,contact_name")
           .eq("is_active", true)
           .order("name"),
       ]);
-
       if (itemsR.error) throw itemsR.error;
       if (runsR.error) throw runsR.error;
-
+      if (batchesR.error) throw batchesR.error;
       setItems(itemsR.data || []);
       setRuns(runsR.data || []);
+      setBatches(batchesR.data || []);
       setPartners(partnersR.data || []);
     } catch (err) {
       console.error("[HQProduction] Fetch error:", err);
@@ -302,12 +408,13 @@ export default function HQProduction() {
 
   const SUB_TABS = [
     { id: "overview", label: "Overview", icon: "◎" },
+    { id: "batches", label: "Batches", icon: "📦" },
     { id: "new-run", label: "New Production Run", icon: "⊕" },
     { id: "history", label: "History", icon: "📋" },
     { id: "allocate", label: "Allocate Stock", icon: "→" },
   ];
 
-  if (error) {
+  if (error)
     return (
       <div
         style={{
@@ -325,7 +432,6 @@ export default function HQProduction() {
         </button>
       </div>
     );
-  }
 
   return (
     <div>
@@ -357,6 +463,21 @@ export default function HQProduction() {
             }}
           >
             {t.icon} {t.label}
+            {t.id === "batches" && batches.length > 0 && (
+              <span
+                style={{
+                  marginLeft: "6px",
+                  background: C.accent,
+                  color: C.white,
+                  borderRadius: "10px",
+                  fontSize: "9px",
+                  padding: "1px 6px",
+                  fontWeight: 700,
+                }}
+              >
+                {batches.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -368,7 +489,17 @@ export default function HQProduction() {
         </div>
       ) : (
         <>
-          {subTab === "overview" && <OverviewPanel items={items} runs={runs} />}
+          {subTab === "overview" && (
+            <OverviewPanel
+              items={items}
+              runs={runs}
+              batches={batches}
+              onNavBatches={() => setSubTab("batches")}
+            />
+          )}
+          {subTab === "batches" && (
+            <BatchesPanel batches={batches} runs={runs} onRefresh={fetchAll} />
+          )}
           {subTab === "new-run" && (
             <NewRunPanel
               items={items}
@@ -397,34 +528,31 @@ export default function HQProduction() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // OVERVIEW
 // ═══════════════════════════════════════════════════════════════════════════════
-function OverviewPanel({ items, runs }) {
+function OverviewPanel({ items, runs, batches, onNavBatches }) {
   const distillate = items.filter(
     (i) => i.category === "raw_material" && i.unit === "ml",
   );
   const terpenes = items.filter((i) => i.category === "terpene");
   const hardware = items.filter((i) => i.category === "hardware");
   const finished = items.filter((i) => i.category === "finished_product");
-
-  const totalDistillate = distillate.reduce(
+  const totalDist = distillate.reduce(
     (s, i) => s + parseFloat(i.quantity_on_hand || 0),
     0,
   );
-  const totalTerpenes = terpenes.reduce(
+  const totalTerp = terpenes.reduce(
     (s, i) => s + parseFloat(i.quantity_on_hand || 0),
     0,
   );
-  const totalHardware = hardware.reduce(
+  const totalHw = hardware.reduce(
     (s, i) => s + parseFloat(i.quantity_on_hand || 0),
     0,
   );
-  const totalFinished = finished.reduce(
+  const totalFin = finished.reduce(
     (s, i) => s + parseFloat(i.quantity_on_hand || 0),
     0,
   );
-
-  const capacity1ml = Math.floor(totalDistillate / 1.0);
-  const capacity2ml = Math.floor(totalDistillate / 2.0);
-
+  const cap1ml = Math.floor(totalDist / 1.0);
+  const activeBatches = batches.filter((b) => b.status === "active");
   const now = new Date();
   const monthRuns = runs.filter((r) => {
     const d = new Date(r.created_at);
@@ -436,7 +564,6 @@ function OverviewPanel({ items, runs }) {
     (s, r) => s + (r.actual_units || r.planned_units || 0),
     0,
   );
-
   const yieldsArr = runs
     .filter((r) => r.actual_units && r.planned_units)
     .map((r) => calcYield(r.actual_units, r.planned_units))
@@ -448,55 +575,6 @@ function OverviewPanel({ items, runs }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {distillate.length === 0 && (
-        <div
-          style={{
-            ...sCard,
-            borderLeft: `4px solid ${C.orange}`,
-            background: C.lightOrange,
-          }}
-        >
-          <div style={{ ...sLabel, color: C.orange }}>
-            ⚠ No Distillate in Inventory
-          </div>
-          <p
-            style={{
-              fontSize: "13px",
-              color: C.text,
-              margin: "8px 0 4px",
-              fontFamily: F.body,
-            }}
-          >
-            Distillate must be added as a raw_material inventory item (unit: ml)
-            before production runs can begin.
-          </p>
-          <pre
-            style={{
-              fontSize: "11px",
-              background: "#1a1a2e",
-              color: "#52b788",
-              padding: "10px 14px",
-              borderRadius: "2px",
-              margin: "8px 0 0",
-              overflowX: "auto",
-              fontFamily: "monospace",
-            }}
-          >{`INSERT INTO inventory_items (sku, name, category, unit, quantity_on_hand, cost_price, is_active)
-VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre>
-          <p
-            style={{
-              fontSize: "11px",
-              color: C.muted,
-              margin: "6px 0 0",
-              fontFamily: F.body,
-            }}
-          >
-            Then record a purchase_in movement in StockControl → Movements to
-            set your opening balance.
-          </p>
-        </div>
-      )}
-
       <div
         style={{
           display: "grid",
@@ -506,40 +584,41 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
       >
         {[
           {
+            label: "Active Batches",
+            value: activeBatches.length,
+            sub: `${batches.length} total`,
+            color: C.green,
+            click: onNavBatches,
+          },
+          {
             label: "Distillate",
-            value: `${totalDistillate.toFixed(1)}ml`,
+            value: `${totalDist.toFixed(1)}ml`,
             sub: `${distillate.length} SKU`,
             color: C.blue,
           },
           {
             label: "Terpenes",
-            value: `${totalTerpenes.toFixed(2)}ml`,
+            value: `${totalTerp.toFixed(2)}ml`,
             sub: `${terpenes.length} strains`,
             color: C.purple,
           },
           {
             label: "Hardware",
-            value: totalHardware.toLocaleString(),
+            value: totalHw.toLocaleString(),
             sub: `${hardware.length} types`,
             color: C.gold,
           },
           {
             label: "Finished Stock",
-            value: totalFinished.toLocaleString(),
+            value: totalFin.toLocaleString(),
             sub: "units ready",
             color: C.accent,
           },
           {
-            label: "Capacity (1ml)",
-            value: capacity1ml.toLocaleString(),
+            label: "1ml Capacity",
+            value: cap1ml.toLocaleString(),
             sub: "carts possible",
             color: C.green,
-          },
-          {
-            label: "Capacity (2ml)",
-            value: capacity2ml.toLocaleString(),
-            sub: "pens possible",
-            color: C.mid,
           },
           {
             label: "Runs (Month)",
@@ -556,10 +635,20 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
         ].map((c) => (
           <div
             key={c.label}
+            onClick={c.click || undefined}
             style={{
               ...sCard,
               borderTop: `3px solid ${c.color}`,
               textAlign: "center",
+              cursor: c.click ? "pointer" : "default",
+            }}
+            onMouseEnter={(e) => {
+              if (c.click)
+                e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
+            }}
+            onMouseLeave={(e) => {
+              if (c.click)
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)";
             }}
           >
             <div
@@ -597,6 +686,93 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
           </div>
         ))}
       </div>
+
+      {batches.length > 0 && (
+        <div style={sCard}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "14px",
+            }}
+          >
+            <div style={sLabel}>Recent Batches</div>
+            <button
+              onClick={onNavBatches}
+              style={{
+                ...sBtn("outline"),
+                padding: "4px 12px",
+                fontSize: "9px",
+              }}
+            >
+              View All →
+            </button>
+          </div>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "12px",
+              fontFamily: F.body,
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={sTh}>Batch #</th>
+                <th style={sTh}>Product</th>
+                <th style={sTh}>Type</th>
+                <th style={sTh}>Strain</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Units</th>
+                <th style={sTh}>Date</th>
+                <th style={sTh}>Status</th>
+                <th style={sTh}>Lab</th>
+              </tr>
+            </thead>
+            <tbody>
+              {batches.slice(0, 6).map((b) => (
+                <tr key={b.id}>
+                  <td
+                    style={{
+                      ...sTd,
+                      fontFamily: "monospace",
+                      fontSize: "11px",
+                      color: C.muted,
+                    }}
+                  >
+                    {b.batch_number}
+                  </td>
+                  <td style={{ ...sTd, fontWeight: 500 }}>
+                    {b.product_name || "—"}
+                  </td>
+                  <td style={{ ...sTd, color: C.muted }}>
+                    {b.product_type || "—"}
+                  </td>
+                  <td style={sTd}>{b.strain || "—"}</td>
+                  <td style={{ ...sTd, textAlign: "right", fontWeight: 600 }}>
+                    {b.units_produced ?? "—"}
+                  </td>
+                  <td style={{ ...sTd, color: C.muted }}>
+                    {b.production_date
+                      ? new Date(b.production_date).toLocaleDateString("en-ZA")
+                      : "—"}
+                  </td>
+                  <td style={sTd}>
+                    <StatusBadge status={b.status} yieldPct={null} />
+                  </td>
+                  <td style={sTd}>
+                    {b.lab_certified ? (
+                      <span style={{ color: C.green }}>✓</span>
+                    ) : (
+                      <span style={{ color: C.muted }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
@@ -685,77 +861,612 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
           </div>
         ))}
       </div>
+    </div>
+  );
+}
 
-      {runs.length > 0 && (
-        <div style={sCard}>
-          <div style={sLabel}>Recent Production Runs</div>
-          <table
+// ═══════════════════════════════════════════════════════════════════════════════
+// BATCHES PANEL — v1.5: inline edit per batch row
+// ═══════════════════════════════════════════════════════════════════════════════
+function BatchesPanel({ batches, runs, onRefresh }) {
+  const [filter, setFilter] = useState("all");
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const runByBatch = {};
+  runs.forEach((r) => {
+    if (r.batch_id) runByBatch[r.batch_id] = r;
+  });
+
+  const filtered =
+    filter === "all" ? batches : batches.filter((b) => b.status === filter);
+
+  const openEdit = (b) => {
+    setEditing(b.id);
+    setEditForm({
+      product_name: b.product_name || "",
+      product_type: b.product_type || "",
+      strain: b.strain || "",
+      status: b.status || "active",
+      units_produced: b.units_produced ?? "",
+      expiry_date: b.expiry_date || "",
+      lab_certified: b.lab_certified || false,
+    });
+  };
+
+  const handleSaveEdit = async (b) => {
+    setSaving(true);
+    try {
+      // IMPORTANT: batches table has NO updated_at column — never include it
+      const { error } = await supabase
+        .from("batches")
+        .update({
+          product_name: editForm.product_name || null,
+          product_type: editForm.product_type || null,
+          strain: editForm.strain || null,
+          status: editForm.status,
+          units_produced: parseInt(editForm.units_produced) || null,
+          expiry_date: editForm.expiry_date || null,
+          lab_certified: editForm.lab_certified,
+        })
+        .eq("id", b.id);
+      if (error) throw error;
+      setEditing(null);
+      onRefresh();
+      showToast("Batch updated.");
+    } catch (err) {
+      showToast("Save failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const FILTER_OPTIONS = [
+    { id: "all", label: `All (${batches.length})` },
+    {
+      id: "active",
+      label: `Active (${batches.filter((b) => b.status === "active").length})`,
+    },
+    {
+      id: "archived",
+      label: `Archived (${batches.filter((b) => b.status === "archived").length})`,
+    },
+  ];
+  const BATCH_STATUSES = ["active", "in_progress", "completed", "archived"];
+
+  return (
+    <div style={{ display: "grid", gap: "20px" }}>
+      {toast && (
+        <div
+          style={{
+            padding: "10px 16px",
+            borderRadius: "2px",
+            fontSize: "12px",
+            fontFamily: F.body,
+            fontWeight: 500,
+            background: toast.type === "error" ? "#fff0f0" : "#f0faf5",
+            color: toast.type === "error" ? C.red : C.green,
+            border: `1px solid ${toast.type === "error" ? C.red : C.accent}`,
+          }}
+        >
+          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.msg}
+        </div>
+      )}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "12px",
+        }}
+      >
+        {[
+          { label: "Total Batches", value: batches.length, color: C.green },
+          {
+            label: "Active",
+            value: batches.filter((b) => b.status === "active").length,
+            color: C.accent,
+          },
+          {
+            label: "Lab Certified",
+            value: batches.filter((b) => b.lab_certified).length,
+            color: C.blue,
+          },
+          {
+            label: "With Production Run",
+            value: Object.keys(runByBatch).length,
+            color: C.gold,
+          },
+          {
+            label: "No Run Yet",
+            value: batches.filter((b) => !runByBatch[b.id]).length,
+            color: C.orange,
+          },
+        ].map((c) => (
+          <div
+            key={c.label}
             style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "12px",
-              fontFamily: F.body,
-              marginTop: "10px",
+              ...sCard,
+              borderTop: `3px solid ${c.color}`,
+              textAlign: "center",
             }}
           >
-            <thead>
-              <tr>
-                <th style={sTh}>Date</th>
-                <th style={sTh}>Run #</th>
-                <th style={sTh}>Product</th>
-                <th style={{ ...sTh, textAlign: "right" }}>Planned</th>
-                <th style={{ ...sTh, textAlign: "right" }}>Actual</th>
-                <th style={{ ...sTh, textAlign: "right" }}>Yield</th>
-                <th style={sTh}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.slice(0, 8).map((r) => {
-                const yp =
-                  r.actual_units && r.planned_units
-                    ? calcYield(r.actual_units, r.planned_units)
-                    : null;
-                return (
-                  <tr key={r.id}>
-                    <td style={sTd}>
-                      {new Date(r.created_at).toLocaleDateString("en-ZA")}
-                    </td>
-                    <td
+            <div
+              style={{
+                fontSize: "9px",
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: C.muted,
+                marginBottom: "6px",
+                fontFamily: F.body,
+              }}
+            >
+              {c.label}
+            </div>
+            <div
+              style={{
+                fontSize: "24px",
+                fontWeight: 600,
+                color: c.color,
+                fontFamily: F.heading,
+              }}
+            >
+              {c.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        {FILTER_OPTIONS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            style={{
+              padding: "6px 14px",
+              background: filter === f.id ? C.green : C.white,
+              color: filter === f.id ? C.white : C.muted,
+              border: `1px solid ${filter === f.id ? C.green : C.border}`,
+              borderRadius: "2px",
+              fontSize: "9px",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              fontFamily: F.body,
+              fontWeight: filter === f.id ? 600 : 400,
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+        <button
+          onClick={onRefresh}
+          style={{
+            ...sBtn("outline"),
+            padding: "6px 12px",
+            fontSize: "9px",
+            marginLeft: "auto",
+          }}
+        >
+          ↻ Refresh
+        </button>
+      </div>
+
+      <div style={sCard}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
+            <div style={{ fontSize: "32px", marginBottom: "12px" }}>📦</div>
+            <p style={{ fontFamily: F.body, fontSize: "14px" }}>
+              No batches found.
+            </p>
+          </div>
+        ) : (
+          <div>
+            {/* Table header */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "140px 1fr 110px 100px 55px 95px 95px 45px 115px 75px 70px",
+                gap: 0,
+                padding: "0 0 6px 0",
+                borderBottom: `2px solid ${C.border}`,
+              }}
+            >
+              {[
+                "BATCH #",
+                "PRODUCT",
+                "TYPE",
+                "STRAIN",
+                "UNITS",
+                "PROD DATE",
+                "EXPIRY",
+                "LAB",
+                "RUN",
+                "STATUS",
+                "",
+              ].map((h, i) => (
+                <div
+                  key={i}
+                  style={{ ...sTh, borderBottom: "none", paddingLeft: "8px" }}
+                >
+                  {h}
+                </div>
+              ))}
+            </div>
+
+            {filtered.map((b) => {
+              const linkedRun = runByBatch[b.id];
+              const isEditing = editing === b.id;
+              return (
+                <div key={b.id}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "140px 1fr 110px 100px 55px 95px 95px 45px 115px 75px 70px",
+                      gap: 0,
+                      borderBottom: `1px solid ${C.border}`,
+                      alignItems: "center",
+                      background: isEditing ? "#f0faf5" : "transparent",
+                    }}
+                  >
+                    <div
                       style={{
                         ...sTd,
                         fontFamily: "monospace",
-                        fontSize: "11px",
+                        fontSize: "10px",
                         color: C.muted,
+                        paddingLeft: "8px",
                       }}
                     >
-                      {r.run_number || "—"}
-                    </td>
-                    <td style={{ ...sTd, fontWeight: 500 }}>
-                      {r.batches?.product_name || r.batches?.strain || "—"}
-                    </td>
-                    <td style={{ ...sTd, textAlign: "right" }}>
-                      {r.planned_units || "—"}
-                    </td>
-                    <td style={{ ...sTd, textAlign: "right", fontWeight: 600 }}>
-                      {r.actual_units || "—"}
-                    </td>
-                    <td
+                      {b.batch_number}
+                    </div>
+                    <div style={{ ...sTd, fontWeight: 500 }}>
+                      {b.product_name || "—"}
+                    </div>
+                    <div
                       style={{
                         ...sTd,
-                        textAlign: "right",
-                        color: yp && yp >= 95 ? C.accent : C.gold,
+                        color: !b.product_type ? C.orange : C.muted,
+                        fontSize: "11px",
                       }}
                     >
-                      {yp ? `${yp}%` : "—"}
-                    </td>
-                    <td style={sTd}>
-                      <StatusBadge status={r.status} yieldPct={yp} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      {b.product_type || <span>⚠ empty</span>}
+                    </div>
+                    <div style={sTd}>{b.strain || "—"}</div>
+                    <div
+                      style={{ ...sTd, textAlign: "right", fontWeight: 600 }}
+                    >
+                      {b.units_produced ?? "—"}
+                    </div>
+                    <div style={{ ...sTd, color: C.muted, fontSize: "11px" }}>
+                      {b.production_date
+                        ? new Date(b.production_date).toLocaleDateString(
+                            "en-ZA",
+                          )
+                        : "—"}
+                    </div>
+                    <div style={{ ...sTd, color: C.muted, fontSize: "11px" }}>
+                      {b.expiry_date
+                        ? new Date(b.expiry_date).toLocaleDateString("en-ZA")
+                        : "—"}
+                    </div>
+                    <div style={sTd}>
+                      {b.lab_certified ? (
+                        <span style={{ color: C.green, fontWeight: 600 }}>
+                          ✓
+                        </span>
+                      ) : (
+                        <span style={{ color: C.muted }}>—</span>
+                      )}
+                    </div>
+                    <div style={{ ...sTd, fontSize: "10px" }}>
+                      {linkedRun ? (
+                        <span
+                          style={{ color: C.green, fontFamily: "monospace" }}
+                        >
+                          {linkedRun.run_number || "✓"}
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            padding: "2px 6px",
+                            borderRadius: "2px",
+                            background: C.lightOrange,
+                            color: C.orange,
+                            fontWeight: 600,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          No Run
+                        </span>
+                      )}
+                    </div>
+                    <div style={sTd}>
+                      <StatusBadge status={b.status} yieldPct={null} />
+                    </div>
+                    <div style={{ ...sTd, textAlign: "center" }}>
+                      <button
+                        onClick={() =>
+                          isEditing ? setEditing(null) : openEdit(b)
+                        }
+                        style={{
+                          ...sBtn("outline"),
+                          padding: "3px 8px",
+                          fontSize: "9px",
+                          color: isEditing ? C.muted : C.mid,
+                          borderColor: isEditing ? C.muted : C.mid,
+                        }}
+                      >
+                        {isEditing ? "✕" : "✎ Edit"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isEditing && (
+                    <div
+                      style={{
+                        padding: "16px 12px",
+                        background: "#f0faf5",
+                        borderBottom: `1px solid ${C.accent}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr 1fr 1fr 90px 130px",
+                          gap: "12px",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Product Name
+                          </label>
+                          <input
+                            style={sInput}
+                            value={editForm.product_name}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                product_name: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Product Type
+                          </label>
+                          <input
+                            style={sInput}
+                            value={editForm.product_type}
+                            placeholder="e.g. 1ml Cart"
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                product_type: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Strain
+                          </label>
+                          <input
+                            style={sInput}
+                            value={editForm.strain}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                strain: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Status
+                          </label>
+                          <select
+                            style={sSelect}
+                            value={editForm.status}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                status: e.target.value,
+                              }))
+                            }
+                          >
+                            {BATCH_STATUSES.map((s) => (
+                              <option key={s} value={s}>
+                                {s.charAt(0).toUpperCase() + s.slice(1)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Units
+                          </label>
+                          <input
+                            style={sInput}
+                            type="number"
+                            min="0"
+                            value={editForm.units_produced}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                units_produced: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Expiry Date
+                          </label>
+                          <input
+                            style={sInput}
+                            type="date"
+                            value={editForm.expiry_date}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                expiry_date: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "16px",
+                          alignItems: "center",
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontFamily: F.body,
+                            color: C.text,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={editForm.lab_certified}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                lab_certified: e.target.checked,
+                              }))
+                            }
+                            style={{ width: "14px", height: "14px" }}
+                          />
+                          Lab Certified
+                        </label>
+                        <button
+                          onClick={() => handleSaveEdit(b)}
+                          disabled={saving}
+                          style={sBtn()}
+                        >
+                          {saving ? "Saving..." : "✓ Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditing(null)}
+                          style={sBtn("outline")}
+                        >
+                          Cancel
+                        </button>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            color: C.muted,
+                            fontFamily: F.body,
+                          }}
+                        >
+                          ℹ Editing updates batch record only. Stock levels
+                          unchanged.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {batches.filter((b) => !runByBatch[b.id]).length > 0 && (
+        <div
+          style={{
+            ...sCard,
+            borderLeft: `4px solid ${C.orange}`,
+            background: C.lightOrange,
+          }}
+        >
+          <div style={{ ...sLabel, color: C.orange }}>
+            ⚠ Batches Without Production Runs
+          </div>
+          <p
+            style={{
+              fontSize: "13px",
+              color: C.text,
+              margin: "8px 0 0",
+              fontFamily: F.body,
+              lineHeight: "1.7",
+            }}
+          >
+            {batches.filter((b) => !runByBatch[b.id]).length} batch(es) have no
+            linked production run. Use New Production Run to log material
+            consumption going forward.
+          </p>
         </div>
       )}
     </div>
@@ -763,19 +1474,21 @@ VALUES ('RM-DIST-D9', 'D9 Distillate', 'raw_material', 'ml', 0, 0, true);`}</pre
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NEW RUN
+// NEW RUN — v1.5: expanded formats, non-vape skips BOM, triple chamber calc
 // ═══════════════════════════════════════════════════════════════════════════════
 function NewRunPanel({ items, onComplete }) {
   const [form, setForm] = useState({
     strain: "",
-    format: "1ml_cart",
+    format_key: "vape_1ml",
     planned_units: "",
     terpene_item_id: "",
     hardware_item_id: "",
     distillate_item_id: "",
     actual_units: "",
     notes: "",
-    terpene_pct_override: "", // v1.3: stored as % (e.g. 6.67), not ratio
+    terpene_pct_override: "",
+    custom_fill_ml: "",
+    product_name_override: "",
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -784,53 +1497,61 @@ function NewRunPanel({ items, onComplete }) {
     setConfirmed(false);
   };
 
-  const bom = FORMAT_BOM[form.format] || FORMAT_BOM["1ml_cart"];
+  const fmt = FORMAT_CATALOGUE[form.format_key] || FORMAT_CATALOGUE["vape_1ml"];
+  const isVape = fmt.is_vape;
   const planned = parseInt(form.planned_units) || 0;
 
-  // v1.3 FIX: user enters a percentage (e.g. 6.67 or 10), divide by 100 for ratio
-  const terpeneOverridePct = parseFloat(form.terpene_pct_override);
-  const terpenePct =
-    terpeneOverridePct > 0 ? terpeneOverridePct : bom.terpene_pct;
-  const terpeneRatio = terpenePct / 100; // e.g. 6.67 → 0.0667
+  const fillMlPerChamber = fmt.custom_fill
+    ? parseFloat(form.custom_fill_ml) || 0
+    : fmt.distillate_ml;
+  const chambers = fmt.chambers || 1;
+  const distMlPerUnit = fillMlPerChamber * chambers;
 
-  const distillateNeeded = +(planned * bom.distillate_ml).toFixed(2);
-  // terpeneNeeded in ml = units × distillate_ml_per_unit × ratio
-  const terpeneNeeded = +(planned * bom.distillate_ml * terpeneRatio).toFixed(
-    3,
-  );
-  const hardwareNeeded = planned;
+  const terpPct =
+    parseFloat(form.terpene_pct_override) > 0
+      ? parseFloat(form.terpene_pct_override)
+      : fmt.terpene_pct || 10;
+  const terpRatio = terpPct / 100;
 
-  const distillateItems = items.filter(
+  const distNeeded = isVape ? +(planned * distMlPerUnit).toFixed(2) : 0;
+  const terpNeeded = isVape
+    ? +(planned * distMlPerUnit * terpRatio).toFixed(3)
+    : 0;
+  const hwNeeded = isVape ? planned : 0;
+
+  const distItems = items.filter(
     (i) => i.category === "raw_material" && i.unit === "ml",
   );
-  const terpeneItems = items.filter((i) => i.category === "terpene");
-  const hardwareItems = items.filter((i) => i.category === "hardware");
+  const terpItems = items.filter((i) => i.category === "terpene");
+  const hwItems = items.filter((i) => i.category === "hardware");
 
-  const selDist = distillateItems.find((i) => i.id === form.distillate_item_id);
-  const selTerp = terpeneItems.find((i) => i.id === form.terpene_item_id);
-  const selHw = hardwareItems.find((i) => i.id === form.hardware_item_id);
+  const selDist = distItems.find((i) => i.id === form.distillate_item_id);
+  const selTerp = terpItems.find((i) => i.id === form.terpene_item_id);
+  const selHw = hwItems.find((i) => i.id === form.hardware_item_id);
 
   const distAvail = parseFloat(selDist?.quantity_on_hand || 0);
   const terpAvail = parseFloat(selTerp?.quantity_on_hand || 0);
   const hwAvail = parseFloat(selHw?.quantity_on_hand || 0);
 
-  const canRun =
-    planned > 0 &&
-    form.strain &&
-    form.distillate_item_id &&
-    distAvail >= distillateNeeded &&
-    form.terpene_item_id &&
-    terpAvail >= terpeneNeeded &&
-    form.hardware_item_id &&
-    hwAvail >= hardwareNeeded;
+  const vapeMatsOk =
+    !isVape ||
+    (form.distillate_item_id &&
+      distAvail >= distNeeded &&
+      form.terpene_item_id &&
+      terpAvail >= terpNeeded &&
+      form.hardware_item_id &&
+      hwAvail >= hwNeeded &&
+      distMlPerUnit > 0);
+  const hasName = form.strain || form.product_name_override;
+  const canRun = planned > 0 && vapeMatsOk && hasName;
 
   const distCost = selDist
-    ? parseFloat(selDist.cost_price || 0) * distillateNeeded
+    ? parseFloat(selDist.cost_price || 0) * distNeeded
     : 0;
   const terpCost = selTerp
-    ? parseFloat(selTerp.cost_price || 0) * terpeneNeeded
+    ? parseFloat(selTerp.cost_price || 0) * terpNeeded
     : 0;
-  const hwCost = selHw ? parseFloat(selHw.cost_price || 0) * hardwareNeeded : 0;
+  const hwCost = selHw ? parseFloat(selHw.cost_price || 0) * hwNeeded : 0;
   const totalCost = distCost + terpCost + hwCost;
   const costPerUnit = planned > 0 ? (totalCost / planned).toFixed(2) : 0;
 
@@ -838,169 +1559,18 @@ function NewRunPanel({ items, onComplete }) {
   const yieldPct = calcYield(finalActual, planned);
   const yieldFlagged = yieldPct !== null && yieldPct < 95;
 
-  const strainSlug = form.strain.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
-  const finishedName = form.strain ? `${form.strain} ${bom.format_short}` : "";
-  const finishedSku = `FP-${strainSlug}-${form.format === "1ml_cart" ? "1ml" : "2ml"}`;
-  const runNumber = form.strain ? genRunNumber(form.strain, form.format) : "";
-
-  const handleConfirm = async () => {
-    if (!canRun) return;
-    setSaving(true);
-    try {
-      const now = new Date().toISOString();
-
-      // 1. Create batch
-      const { data: batch, error: batchErr } = await supabase
-        .from("batches")
-        .insert({
-          batch_number: runNumber,
-          product_name: finishedName,
-          product_type: bom.format_short,
-          strain: form.strain,
-          volume: `${bom.distillate_ml}ml`,
-          production_date: now.split("T")[0],
-          units_produced: finalActual,
-          status: "active",
-          is_archived: false,
-        })
-        .select()
-        .single();
-      if (batchErr) throw batchErr;
-
-      // 2. Create production_run
-      const { data: run, error: runErr } = await supabase
-        .from("production_runs")
-        .insert({
-          batch_id: batch.id,
-          run_number: runNumber,
-          status: "completed",
-          planned_units: planned,
-          actual_units: finalActual,
-          started_at: now,
-          completed_at: now,
-          notes: form.notes || null,
-        })
-        .select()
-        .single();
-      if (runErr) throw runErr;
-
-      // 3. Log inputs (run_id FK)
-      await supabase.from("production_run_inputs").insert([
-        {
-          run_id: run.id,
-          item_id: form.distillate_item_id,
-          quantity_planned: distillateNeeded,
-          quantity_actual: distillateNeeded,
-          notes: "Distillate",
-        },
-        {
-          run_id: run.id,
-          item_id: form.terpene_item_id,
-          quantity_planned: terpeneNeeded,
-          quantity_actual: terpeneNeeded,
-          notes: "Terpene",
-        },
-        {
-          run_id: run.id,
-          item_id: form.hardware_item_id,
-          quantity_planned: hardwareNeeded,
-          quantity_actual: hardwareNeeded,
-          notes: "Hardware",
-        },
-      ]);
-
-      // 4. Deduct raw materials
-      await supabase.from("stock_movements").insert([
-        {
-          item_id: form.distillate_item_id,
-          quantity: -distillateNeeded,
-          movement_type: "production_out",
-          reference: runNumber,
-          notes: `Run ${runNumber}: distillate`,
-        },
-        {
-          item_id: form.terpene_item_id,
-          quantity: -terpeneNeeded,
-          movement_type: "production_out",
-          reference: runNumber,
-          notes: `Run ${runNumber}: ${selTerp?.name}`,
-        },
-        {
-          item_id: form.hardware_item_id,
-          quantity: -hardwareNeeded,
-          movement_type: "production_out",
-          reference: runNumber,
-          notes: `Run ${runNumber}: ${selHw?.name}`,
-        },
-      ]);
-
-      // 5. Update raw material quantities
-      await supabase
-        .from("inventory_items")
-        .update({ quantity_on_hand: distAvail - distillateNeeded })
-        .eq("id", form.distillate_item_id);
-      await supabase
-        .from("inventory_items")
-        .update({ quantity_on_hand: terpAvail - terpeneNeeded })
-        .eq("id", form.terpene_item_id);
-      await supabase
-        .from("inventory_items")
-        .update({ quantity_on_hand: hwAvail - hardwareNeeded })
-        .eq("id", form.hardware_item_id);
-
-      // 6. Find or create finished product inventory item
-      const existingFinished = items.find(
-        (i) => i.category === "finished_product" && i.name === finishedName,
-      );
-      let finishedItemId;
-      if (existingFinished) {
-        finishedItemId = existingFinished.id;
-      } else {
-        const { data: newItem, error: itemErr } = await supabase
-          .from("inventory_items")
-          .insert({
-            sku: finishedSku,
-            name: finishedName,
-            category: "finished_product",
-            unit: "pcs",
-            quantity_on_hand: 0,
-            cost_price: parseFloat(costPerUnit) || 0,
-            sell_price: 0,
-            is_active: true,
-            description: `Produced via run ${runNumber}`,
-          })
-          .select()
-          .single();
-        if (itemErr) throw itemErr;
-        finishedItemId = newItem.id;
-      }
-
-      // 7. Add finished goods movement
-      await supabase.from("stock_movements").insert({
-        item_id: finishedItemId,
-        quantity: finalActual,
-        movement_type: "production_in",
-        reference: runNumber,
-        notes: `Batch ${runNumber}: ${finishedName}`,
-      });
-
-      // 8. Update finished product qty + cost
-      const currentQty = parseFloat(existingFinished?.quantity_on_hand || 0);
-      await supabase
-        .from("inventory_items")
-        .update({
-          quantity_on_hand: currentQty + finalActual,
-          cost_price: parseFloat(costPerUnit) || 0,
-        })
-        .eq("id", finishedItemId);
-
-      onComplete();
-    } catch (err) {
-      console.error("[HQProduction] Run error:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const nameBase = form.strain
+    ? `${form.strain} ${fmt.format_short}`
+    : fmt.format_short;
+  const finishedName = form.product_name_override || nameBase;
+  const finishedSku =
+    `FP-${finishedName.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`.slice(
+      0,
+      50,
+    );
+  const runNumber = hasName
+    ? genRunNumber(form.strain || form.product_name_override, form.format_key)
+    : "";
 
   const fLabel = (text, hint) => (
     <label
@@ -1021,8 +1591,159 @@ function NewRunPanel({ items, onComplete }) {
     </label>
   );
 
+  const handleConfirm = async () => {
+    if (!canRun) return;
+    setSaving(true);
+    try {
+      const now = new Date().toISOString();
+      const { data: batch, error: batchErr } = await supabase
+        .from("batches")
+        .insert({
+          batch_number: runNumber,
+          product_name: finishedName,
+          product_type: fmt.format_short,
+          strain: form.strain || null,
+          volume: isVape ? `${distMlPerUnit}ml` : null,
+          production_date: now.split("T")[0],
+          units_produced: finalActual,
+          status: "active",
+          is_archived: false,
+        })
+        .select()
+        .single();
+      if (batchErr) throw batchErr;
+
+      const { data: run, error: runErr } = await supabase
+        .from("production_runs")
+        .insert({
+          batch_id: batch.id,
+          run_number: runNumber,
+          status: "completed",
+          planned_units: planned,
+          actual_units: finalActual,
+          started_at: now,
+          completed_at: now,
+          notes: form.notes || null,
+        })
+        .select()
+        .single();
+      if (runErr) throw runErr;
+
+      if (isVape) {
+        await supabase.from("production_run_inputs").insert([
+          {
+            run_id: run.id,
+            item_id: form.distillate_item_id,
+            quantity_planned: distNeeded,
+            quantity_actual: distNeeded,
+            notes: "Distillate",
+          },
+          {
+            run_id: run.id,
+            item_id: form.terpene_item_id,
+            quantity_planned: terpNeeded,
+            quantity_actual: terpNeeded,
+            notes: "Terpene",
+          },
+          {
+            run_id: run.id,
+            item_id: form.hardware_item_id,
+            quantity_planned: hwNeeded,
+            quantity_actual: hwNeeded,
+            notes: "Hardware",
+          },
+        ]);
+        await supabase.from("stock_movements").insert([
+          {
+            item_id: form.distillate_item_id,
+            quantity: -distNeeded,
+            movement_type: "production_out",
+            reference: runNumber,
+            notes: `Run ${runNumber}: distillate`,
+          },
+          {
+            item_id: form.terpene_item_id,
+            quantity: -terpNeeded,
+            movement_type: "production_out",
+            reference: runNumber,
+            notes: `Run ${runNumber}: ${selTerp?.name}`,
+          },
+          {
+            item_id: form.hardware_item_id,
+            quantity: -hwNeeded,
+            movement_type: "production_out",
+            reference: runNumber,
+            notes: `Run ${runNumber}: ${selHw?.name}`,
+          },
+        ]);
+        await supabase
+          .from("inventory_items")
+          .update({ quantity_on_hand: distAvail - distNeeded })
+          .eq("id", form.distillate_item_id);
+        await supabase
+          .from("inventory_items")
+          .update({ quantity_on_hand: terpAvail - terpNeeded })
+          .eq("id", form.terpene_item_id);
+        await supabase
+          .from("inventory_items")
+          .update({ quantity_on_hand: hwAvail - hwNeeded })
+          .eq("id", form.hardware_item_id);
+      }
+
+      const existingFin = items.find(
+        (i) => i.category === "finished_product" && i.name === finishedName,
+      );
+      let finId;
+      if (existingFin) {
+        finId = existingFin.id;
+      } else {
+        const { data: ni, error: niErr } = await supabase
+          .from("inventory_items")
+          .insert({
+            sku: finishedSku,
+            name: finishedName,
+            category: "finished_product",
+            unit: "pcs",
+            quantity_on_hand: 0,
+            cost_price: isVape ? parseFloat(costPerUnit) || 0 : 0,
+            sell_price: 0,
+            is_active: true,
+            description: `Produced via run ${runNumber}`,
+          })
+          .select()
+          .single();
+        if (niErr) throw niErr;
+        finId = ni.id;
+      }
+      await supabase
+        .from("stock_movements")
+        .insert({
+          item_id: finId,
+          quantity: finalActual,
+          movement_type: "production_in",
+          reference: runNumber,
+          notes: `Batch ${runNumber}: ${finishedName}`,
+        });
+      const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
+      await supabase
+        .from("inventory_items")
+        .update({
+          quantity_on_hand: curQty + finalActual,
+          ...(isVape ? { cost_price: parseFloat(costPerUnit) || 0 } : {}),
+        })
+        .eq("id", finId);
+
+      onComplete();
+    } catch (err) {
+      console.error("[HQProduction] Run error:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div style={{ display: "grid", gap: "20px", maxWidth: "800px" }}>
+    <div style={{ display: "grid", gap: "20px", maxWidth: "820px" }}>
+      {/* Step 1 — Define */}
       <div style={{ ...sCard, borderLeft: `4px solid ${C.accent}` }}>
         <div style={{ ...sLabel, marginBottom: "16px" }}>
           Step 1 — Define Run
@@ -1035,7 +1756,62 @@ function NewRunPanel({ items, onComplete }) {
           }}
         >
           <div>
-            {fLabel("Strain *")}
+            {fLabel("Format / Product Type *")}
+            <select
+              style={sSelect}
+              value={form.format_key}
+              onChange={(e) => set("format_key", e.target.value)}
+            >
+              {FORMAT_GROUPS.map((g) => (
+                <optgroup key={g.groupLabel} label={g.groupLabel}>
+                  {g.keys.map((k) => (
+                    <option key={k} value={k}>
+                      {FORMAT_CATALOGUE[k].label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {fmt.custom_fill && (
+            <div>
+              {fLabel("Fill Volume per Chamber (ml) *")}
+              <input
+                style={sInput}
+                type="number"
+                step="0.1"
+                min="0.1"
+                placeholder="e.g. 0.6"
+                value={form.custom_fill_ml}
+                onChange={(e) => set("custom_fill_ml", e.target.value)}
+              />
+            </div>
+          )}
+
+          {fmt.chambers > 1 && (
+            <div
+              style={{
+                padding: "10px 14px",
+                background: C.warm,
+                borderRadius: "2px",
+                fontSize: "12px",
+                fontFamily: F.body,
+                color: C.text,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              ℹ Triple Chamber:{" "}
+              <strong style={{ margin: "0 4px" }}>
+                {distMlPerUnit.toFixed(2)}ml distillate/unit
+              </strong>{" "}
+              ({fillMlPerChamber}ml × {chambers} chambers)
+            </div>
+          )}
+
+          <div>
+            {fLabel(isVape ? "Strain *" : "Strain (optional)")}
             <select
               style={sSelect}
               value={form.strain}
@@ -1049,20 +1825,19 @@ function NewRunPanel({ items, onComplete }) {
               ))}
             </select>
           </div>
-          <div>
-            {fLabel("Format *")}
-            <select
-              style={sSelect}
-              value={form.format}
-              onChange={(e) => set("format", e.target.value)}
-            >
-              {Object.entries(FORMAT_BOM).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-          </div>
+
+          {!isVape && (
+            <div>
+              {fLabel("Product Name *", "e.g. CBD Gummy Bear 25mg")}
+              <input
+                style={sInput}
+                placeholder="Full product name"
+                value={form.product_name_override}
+                onChange={(e) => set("product_name_override", e.target.value)}
+              />
+            </div>
+          )}
+
           <div>
             {fLabel("Units to Produce *")}
             <input
@@ -1075,112 +1850,151 @@ function NewRunPanel({ items, onComplete }) {
               onChange={(e) => set("planned_units", e.target.value)}
             />
           </div>
-          <div>
-            {/* v1.3: input is now a real percentage (3–15), not a ratio */}
-            {fLabel("Terpene %", `default ${bom.terpene_pct}% · range 3–15%`)}
-            <input
-              style={sInput}
-              type="number"
-              step="0.1"
-              min="3"
-              max="15"
-              placeholder={`${bom.terpene_pct} (default)`}
-              value={form.terpene_pct_override}
-              onChange={(e) => set("terpene_pct_override", e.target.value)}
-            />
-            {terpeneNeeded > 0 && planned > 0 && (
-              <p
-                style={{
-                  fontSize: "10px",
-                  color: C.accent,
-                  margin: "4px 0 0",
-                  fontFamily: F.body,
-                }}
-              >
-                = {terpeneNeeded.toFixed(3)}ml terpene for {planned} unit
-                {planned !== 1 ? "s" : ""}
-              </p>
-            )}
-          </div>
+
+          {isVape && (
+            <div>
+              {fLabel("Terpene %", `default ${fmt.terpene_pct}% · range 3–15%`)}
+              <input
+                style={sInput}
+                type="number"
+                step="0.1"
+                min="3"
+                max="15"
+                placeholder={`${fmt.terpene_pct} (default)`}
+                value={form.terpene_pct_override}
+                onChange={(e) => set("terpene_pct_override", e.target.value)}
+              />
+              {terpNeeded > 0 && planned > 0 && (
+                <p
+                  style={{
+                    fontSize: "10px",
+                    color: C.accent,
+                    margin: "4px 0 0",
+                    fontFamily: F.body,
+                  }}
+                >
+                  = {terpNeeded.toFixed(3)}ml terpene for {planned} unit
+                  {planned !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
-        <div style={{ ...sLabel, marginBottom: "16px" }}>
-          Step 2 — Select Materials
+      {/* Step 2 — Materials (vape only) */}
+      {isVape && (
+        <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
+          <div style={{ ...sLabel, marginBottom: "16px" }}>
+            Step 2 — Select Materials
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "12px",
+            }}
+          >
+            <div>
+              {fLabel("Distillate *")}
+              <select
+                style={sSelect}
+                value={form.distillate_item_id}
+                onChange={(e) => set("distillate_item_id", e.target.value)}
+              >
+                <option value="">— Select —</option>
+                {distItems.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(1)}
+                    ml)
+                  </option>
+                ))}
+              </select>
+              {distItems.length === 0 && (
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: C.red,
+                    margin: "4px 0 0",
+                    fontFamily: F.body,
+                  }}
+                >
+                  Add distillate via StockControl first
+                </p>
+              )}
+            </div>
+            <div>
+              {fLabel("Terpene *")}
+              <select
+                style={sSelect}
+                value={form.terpene_item_id}
+                onChange={(e) => set("terpene_item_id", e.target.value)}
+              >
+                <option value="">— Select —</option>
+                {terpItems.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(2)}
+                    ml)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              {fLabel("Hardware *")}
+              <select
+                style={sSelect}
+                value={form.hardware_item_id}
+                onChange={(e) => set("hardware_item_id", e.target.value)}
+              >
+                <option value="">— Select —</option>
+                {hwItems.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({Math.floor(parseFloat(i.quantity_on_hand || 0))}{" "}
+                    pcs)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Non-vape info */}
+      {!isVape && planned > 0 && (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: "12px",
+            ...sCard,
+            borderLeft: `4px solid ${C.gold}`,
+            background: "#fffdf5",
           }}
         >
-          <div>
-            {fLabel("Distillate *")}
-            <select
-              style={sSelect}
-              value={form.distillate_item_id}
-              onChange={(e) => set("distillate_item_id", e.target.value)}
-            >
-              <option value="">— Select —</option>
-              {distillateItems.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(1)}ml)
-                </option>
-              ))}
-            </select>
-            {distillateItems.length === 0 && (
-              <p
-                style={{
-                  fontSize: "11px",
-                  color: C.red,
-                  margin: "4px 0 0",
-                  fontFamily: F.body,
-                }}
-              >
-                Add distillate via StockControl first
-              </p>
-            )}
+          <div style={{ ...sLabel, color: C.gold, marginBottom: "8px" }}>
+            Non-Vape Run — Units Only
           </div>
-          <div>
-            {fLabel("Terpene *")}
-            <select
-              style={sSelect}
-              value={form.terpene_item_id}
-              onChange={(e) => set("terpene_item_id", e.target.value)}
-            >
-              <option value="">— Select —</option>
-              {terpeneItems.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(2)}ml)
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            {fLabel("Hardware *")}
-            <select
-              style={sSelect}
-              value={form.hardware_item_id}
-              onChange={(e) => set("hardware_item_id", e.target.value)}
-            >
-              <option value="">— Select —</option>
-              {hardwareItems.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({Math.floor(parseFloat(i.quantity_on_hand || 0))}{" "}
-                  pcs)
-                </option>
-              ))}
-            </select>
-          </div>
+          <p
+            style={{
+              fontSize: "12px",
+              color: C.text,
+              margin: 0,
+              fontFamily: F.body,
+              lineHeight: "1.7",
+            }}
+          >
+            No material BOM for this format. The run will create a batch record
+            and add <strong>{planned} units</strong> of{" "}
+            <strong>{finishedName || "product"}</strong> to finished stock. Log
+            material consumption manually in StockControl → Movements if needed.
+          </p>
         </div>
-      </div>
+      )}
 
-      {planned > 0 &&
+      {/* Step 3 — BOM (vape only) */}
+      {isVape &&
+        planned > 0 &&
         form.distillate_item_id &&
         form.terpene_item_id &&
-        form.hardware_item_id && (
+        form.hardware_item_id &&
+        distMlPerUnit > 0 && (
           <div
             style={{
               ...sCard,
@@ -1203,22 +2017,21 @@ function NewRunPanel({ items, onComplete }) {
             <StockGauge
               label="Distillate"
               available={distAvail}
-              needed={distillateNeeded}
+              needed={distNeeded}
               unit="ml"
               color={C.blue}
             />
-            {/* v1.3: terpene gauge now uses ml */}
             <StockGauge
               label={`Terpene (${selTerp?.name || "—"})`}
               available={terpAvail}
-              needed={terpeneNeeded}
+              needed={terpNeeded}
               unit="ml"
               color={C.purple}
             />
             <StockGauge
               label={`Hardware (${selHw?.name || "—"})`}
               available={hwAvail}
-              needed={hardwareNeeded}
+              needed={hwNeeded}
               unit=" pcs"
               color={C.gold}
             />
@@ -1234,6 +2047,7 @@ function NewRunPanel({ items, onComplete }) {
             >
               {[
                 ["Output", `${planned} × ${finishedName || "—"}`, C.green],
+                ["Dist / Unit", `${distMlPerUnit.toFixed(2)}ml`, C.blue],
                 ["Cost / Unit", `R${costPerUnit}`, C.gold],
                 ["Total Material Cost", `R${totalCost.toFixed(2)}`, C.blue],
                 ["Run Number", runNumber, C.muted],
@@ -1268,10 +2082,11 @@ function NewRunPanel({ items, onComplete }) {
           </div>
         )}
 
+      {/* Step 4 — Confirm */}
       {canRun && (
         <div style={{ ...sCard, borderLeft: `4px solid ${C.gold}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
-            Step 4 — Confirm & Log
+            Step {isVape ? "4" : "3"} — Confirm & Log
           </div>
           <div
             style={{
@@ -1336,18 +2151,21 @@ function NewRunPanel({ items, onComplete }) {
                   lineHeight: "1.9",
                 }}
               >
-                <li>
-                  Deduct <strong>{distillateNeeded}ml</strong> from{" "}
-                  {selDist?.name}
-                </li>
-                <li>
-                  Deduct <strong>{terpeneNeeded.toFixed(3)}ml</strong> from{" "}
-                  {selTerp?.name}
-                </li>
-                <li>
-                  Deduct <strong>{hardwareNeeded} pcs</strong> from{" "}
-                  {selHw?.name}
-                </li>
+                {isVape && (
+                  <>
+                    <li>
+                      Deduct <strong>{distNeeded}ml</strong> from{" "}
+                      {selDist?.name}
+                    </li>
+                    <li>
+                      Deduct <strong>{terpNeeded.toFixed(3)}ml</strong> from{" "}
+                      {selTerp?.name}
+                    </li>
+                    <li>
+                      Deduct <strong>{hwNeeded} pcs</strong> from {selHw?.name}
+                    </li>
+                  </>
+                )}
                 <li>
                   Add <strong>{finalActual} units</strong> of {finishedName} to
                   finished stock
@@ -1391,7 +2209,7 @@ function NewRunPanel({ items, onComplete }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HISTORY  (v1.2 — Admin controls: Edit · Cancel · Delete w/ optional reversal)
+// HISTORY — unchanged from v1.4
 // ═══════════════════════════════════════════════════════════════════════════════
 function HistoryPanel({ runs, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
@@ -1407,7 +2225,6 @@ function HistoryPanel({ runs, onRefresh }) {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
-
   const openEdit = (run) => {
     setEditing(run.id);
     setEditForm({
@@ -1417,12 +2234,6 @@ function HistoryPanel({ runs, onRefresh }) {
     });
     setExpanded(run.id);
   };
-
-  const cancelEdit = () => {
-    setEditing(null);
-    setEditForm({});
-  };
-
   const handleSaveEdit = async (run) => {
     setSaving(true);
     try {
@@ -1443,7 +2254,6 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
-
   const handleCancel = async (run) => {
     setSaving(true);
     try {
@@ -1460,60 +2270,48 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
-
   const handleDelete = async (run) => {
     setSaving(true);
     try {
       if (reverseStock) {
-        const { data: movements, error: mErr } = await supabase
+        const { data: mvs } = await supabase
           .from("stock_movements")
-          .select("id, item_id, quantity, movement_type")
+          .select("id,item_id,quantity,movement_type")
           .eq("reference", run.run_number);
-        if (mErr) throw mErr;
-
-        if (movements && movements.length > 0) {
-          for (const mv of movements) {
-            const reversal = -mv.quantity;
-            const { error: revErr } = await supabase
+        if (mvs?.length > 0) {
+          for (const mv of mvs) {
+            const rev = -mv.quantity;
+            await supabase
               .from("stock_movements")
               .insert({
                 item_id: mv.item_id,
-                quantity: reversal,
+                quantity: rev,
                 movement_type: "adjustment",
                 reference: `VOID-${run.run_number}`,
                 notes: `Reversal: deleted run ${run.run_number}`,
               });
-            if (revErr) throw revErr;
-
-            const { data: item, error: iErr } = await supabase
+            const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
               .eq("id", mv.item_id)
               .single();
-            if (iErr) throw iErr;
-
-            const newQty = parseFloat(item.quantity_on_hand || 0) + reversal;
-            const { error: uErr } = await supabase
+            await supabase
               .from("inventory_items")
-              .update({ quantity_on_hand: Math.max(0, newQty) })
+              .update({
+                quantity_on_hand: Math.max(
+                  0,
+                  parseFloat(item.quantity_on_hand || 0) + rev,
+                ),
+              })
               .eq("id", mv.item_id);
-            if (uErr) throw uErr;
           }
         }
       }
-
-      const { error: inpErr } = await supabase
+      await supabase
         .from("production_run_inputs")
         .delete()
         .eq("run_id", run.id);
-      if (inpErr) throw inpErr;
-
-      const { error: runErr } = await supabase
-        .from("production_runs")
-        .delete()
-        .eq("id", run.id);
-      if (runErr) throw runErr;
-
+      await supabase.from("production_runs").delete().eq("id", run.id);
       setDeleting(null);
       onRefresh();
       showToast(
@@ -1527,7 +2325,6 @@ function HistoryPanel({ runs, onRefresh }) {
   };
 
   const ALL_STATUSES = ["planned", "in_progress", "completed", "cancelled"];
-
   return (
     <div>
       {toast && (
@@ -1566,7 +2363,6 @@ function HistoryPanel({ runs, onRefresh }) {
           ↻ Refresh
         </button>
       </div>
-
       {runs.length === 0 ? (
         <div
           style={{
@@ -1580,6 +2376,16 @@ function HistoryPanel({ runs, onRefresh }) {
           <p style={{ fontFamily: F.body, fontSize: "14px" }}>
             No production runs yet.
           </p>
+          <p
+            style={{
+              fontFamily: F.body,
+              fontSize: "12px",
+              color: C.muted,
+              marginTop: "8px",
+            }}
+          >
+            Batches exist — use the Batches tab to view them.
+          </p>
         </div>
       ) : (
         <div style={{ display: "grid", gap: "12px" }}>
@@ -1588,16 +2394,15 @@ function HistoryPanel({ runs, onRefresh }) {
               run.actual_units && run.planned_units
                 ? calcYield(run.actual_units, run.planned_units)
                 : null;
-            const isOpen = expanded === run.id;
-            const isEditing = editing === run.id;
-            const isDeleting = deleting === run.id;
+            const isOpen = expanded === run.id,
+              isEditing = editing === run.id,
+              isDeleting = deleting === run.id;
             const productLabel =
               run.batches?.product_name ||
               run.batches?.strain ||
               run.run_number ||
               "Production Run";
             const isCancelled = run.status === "cancelled";
-
             return (
               <div
                 key={run.id}
@@ -1662,7 +2467,6 @@ function HistoryPanel({ runs, onRefresh }) {
                         ...sBtn("outline"),
                         padding: "4px 10px",
                         fontSize: "9px",
-                        letterSpacing: "0.1em",
                       }}
                     >
                       ✎ Edit
@@ -1678,7 +2482,7 @@ function HistoryPanel({ runs, onRefresh }) {
                           borderColor: C.orange,
                         }}
                       >
-                        ✕ Cancel Run
+                        ✕ Cancel
                       </button>
                     )}
                     {cancelling === run.id && (
@@ -1690,7 +2494,7 @@ function HistoryPanel({ runs, onRefresh }) {
                             fontFamily: F.body,
                           }}
                         >
-                          Cancel this run?
+                          Cancel?
                         </span>
                         <button
                           onClick={() => handleCancel(run)}
@@ -1745,7 +2549,6 @@ function HistoryPanel({ runs, onRefresh }) {
                     </button>
                   </div>
                 </div>
-
                 <div
                   style={{
                     display: "flex",
@@ -1796,7 +2599,6 @@ function HistoryPanel({ runs, onRefresh }) {
                     </div>
                   ))}
                 </div>
-
                 {yp !== null && yp < 95 && (
                   <div
                     style={{
@@ -1809,11 +2611,9 @@ function HistoryPanel({ runs, onRefresh }) {
                       fontFamily: F.body,
                     }}
                   >
-                    ⚠ Yield {yp}% — below 95% threshold. Review for waste or
-                    filling losses.
+                    ⚠ Yield {yp}% — below 95% threshold.
                   </div>
                 )}
-
                 {isOpen && (
                   <div
                     style={{
@@ -1843,18 +2643,6 @@ function HistoryPanel({ runs, onRefresh }) {
                         >
                           ⚠ Delete Run {run.run_number}?
                         </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: C.text,
-                            fontFamily: F.body,
-                            marginBottom: "12px",
-                            lineHeight: "1.7",
-                          }}
-                        >
-                          This permanently deletes the production run record and
-                          all its input logs.
-                        </div>
                         <label
                           style={{
                             display: "flex",
@@ -1874,33 +2662,10 @@ function HistoryPanel({ runs, onRefresh }) {
                             style={{ width: "15px", height: "15px" }}
                           />
                           <span>
-                            <strong>Reverse stock movements</strong> — add raw
-                            materials back to inventory and deduct finished
-                            goods
-                            <br />
-                            <span style={{ fontSize: "11px", color: C.muted }}>
-                              Looks for stock_movements with reference = "
-                              {run.run_number}" and inserts adjustment entries
-                              to undo them.
-                            </span>
+                            <strong>Reverse stock movements</strong> — restore
+                            raw materials + deduct finished goods
                           </span>
                         </label>
-                        {!reverseStock && (
-                          <div
-                            style={{
-                              padding: "8px 12px",
-                              background: C.lightOrange,
-                              borderRadius: "2px",
-                              fontSize: "11px",
-                              color: C.orange,
-                              fontFamily: F.body,
-                              marginBottom: "12px",
-                            }}
-                          >
-                            ⚠ Without reversal, stock levels will NOT change.
-                            Only the run record is removed.
-                          </div>
-                        )}
                         <div style={{ display: "flex", gap: "10px" }}>
                           <button
                             onClick={() => handleDelete(run)}
@@ -1918,7 +2683,6 @@ function HistoryPanel({ runs, onRefresh }) {
                         </div>
                       </div>
                     )}
-
                     {isEditing && (
                       <div
                         style={{
@@ -2029,21 +2793,6 @@ function HistoryPanel({ runs, onRefresh }) {
                             />
                           </div>
                         </div>
-                        <div
-                          style={{
-                            padding: "8px 12px",
-                            background: C.warm,
-                            borderRadius: "2px",
-                            fontSize: "11px",
-                            color: C.muted,
-                            fontFamily: F.body,
-                            marginBottom: "12px",
-                          }}
-                        >
-                          ℹ Edit only updates the run record. To correct stock
-                          levels, use Delete + Reverse Stock, then log a new
-                          run.
-                        </div>
                         <div style={{ display: "flex", gap: "10px" }}>
                           <button
                             onClick={() => handleSaveEdit(run)}
@@ -2052,84 +2801,71 @@ function HistoryPanel({ runs, onRefresh }) {
                           >
                             {saving ? "Saving..." : "✓ Save Changes"}
                           </button>
-                          <button onClick={cancelEdit} style={sBtn("outline")}>
+                          <button
+                            onClick={() => setEditing(null)}
+                            style={sBtn("outline")}
+                          >
                             ← Cancel
                           </button>
                         </div>
                       </div>
                     )}
-
                     {run.production_run_inputs?.length > 0 && (
-                      <>
-                        <div
-                          style={{
-                            fontSize: "9px",
-                            letterSpacing: "0.2em",
-                            textTransform: "uppercase",
-                            color: C.muted,
-                            fontFamily: F.body,
-                            marginBottom: "10px",
-                          }}
-                        >
-                          Materials Consumed
-                        </div>
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fill, minmax(180px, 1fr))",
-                            gap: "10px",
-                            marginBottom: "12px",
-                          }}
-                        >
-                          {run.production_run_inputs.map((inp) => (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(180px, 1fr))",
+                          gap: "10px",
+                        }}
+                      >
+                        {run.production_run_inputs.map((inp) => (
+                          <div
+                            key={inp.id}
+                            style={{
+                              padding: "10px 14px",
+                              background: C.warm,
+                              borderRadius: "2px",
+                            }}
+                          >
                             <div
-                              key={inp.id}
                               style={{
-                                padding: "10px 14px",
-                                background: C.warm,
-                                borderRadius: "2px",
+                                fontSize: "9px",
+                                letterSpacing: "0.2em",
+                                textTransform: "uppercase",
+                                color: C.muted,
+                                fontFamily: F.body,
                               }}
                             >
-                              <div
-                                style={{
-                                  fontSize: "9px",
-                                  letterSpacing: "0.2em",
-                                  textTransform: "uppercase",
-                                  color: C.muted,
-                                  fontFamily: F.body,
-                                }}
-                              >
-                                {inp.inventory_items?.name || "Material"}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "16px",
-                                  fontWeight: 600,
-                                  fontFamily: F.heading,
-                                  color: C.text,
-                                  marginTop: "4px",
-                                }}
-                              >
-                                {parseFloat(
-                                  inp.quantity_actual ||
-                                    inp.quantity_planned ||
-                                    0,
-                                ).toFixed(3)}
-                                <span
-                                  style={{
-                                    fontSize: "11px",
-                                    color: C.muted,
-                                    marginLeft: "3px",
-                                  }}
-                                >
-                                  {inp.inventory_items?.unit || ""}
-                                </span>
-                              </div>
+                              {inp.inventory_items?.name || "Material"}
                             </div>
-                          ))}
-                        </div>
-                      </>
+                            <div
+                              style={{
+                                fontSize: "16px",
+                                fontWeight: 600,
+                                fontFamily: F.heading,
+                                color: C.text,
+                                marginTop: "4px",
+                              }}
+                            >
+                              {parseFloat(
+                                inp.quantity_actual ||
+                                  inp.quantity_planned ||
+                                  0,
+                              ).toFixed(3)}
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  color: C.muted,
+                                  marginLeft: "3px",
+                                }}
+                              >
+                                {inp.inventory_items?.unit || ""}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     {run.notes && !isEditing && (
                       <p
@@ -2137,7 +2873,7 @@ function HistoryPanel({ runs, onRefresh }) {
                           fontSize: "12px",
                           color: C.muted,
                           fontStyle: "italic",
-                          margin: 0,
+                          margin: "10px 0 0",
                           fontFamily: F.body,
                         }}
                       >
@@ -2156,7 +2892,7 @@ function HistoryPanel({ runs, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ALLOCATE
+// ALLOCATE — unchanged from v1.4
 // ═══════════════════════════════════════════════════════════════════════════════
 function AllocatePanel({ items, partners, onRefresh }) {
   const finished = items.filter(
@@ -2173,12 +2909,10 @@ function AllocatePanel({ items, partners, onRefresh }) {
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-
   const selItem = finished.find((i) => i.id === form.item_id);
   const available = parseFloat(selItem?.quantity_on_hand || 0);
   const qty = parseInt(form.quantity) || 0;
   const valid = qty > 0 && qty <= available && form.item_id;
-
   const CHANNELS = [
     {
       id: "wholesale",
@@ -2199,7 +2933,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
       desc: "Damaged or destroyed units",
     },
   ];
-
   const handleAllocate = async () => {
     if (!valid) return;
     setSaving(true);
@@ -2207,20 +2940,19 @@ function AllocatePanel({ items, partners, onRefresh }) {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
         form.channel === "wholesale" && partner ? partner.name : form.channel;
-
-      await supabase.from("stock_movements").insert({
-        item_id: form.item_id,
-        quantity: -qty,
-        movement_type: "sale_out",
-        reference: ref,
-        notes: form.notes || `Allocated to ${ref}`,
-      });
-
+      await supabase
+        .from("stock_movements")
+        .insert({
+          item_id: form.item_id,
+          quantity: -qty,
+          movement_type: "sale_out",
+          reference: ref,
+          notes: form.notes || `Allocated to ${ref}`,
+        });
       await supabase
         .from("inventory_items")
         .update({ quantity_on_hand: available - qty })
         .eq("id", form.item_id);
-
       setForm({
         item_id: "",
         quantity: "",
@@ -2235,7 +2967,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
       setSaving(false);
     }
   };
-
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div
@@ -2283,7 +3014,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
           </div>
         ))}
       </div>
-
       <div style={sCard}>
         <div style={sLabel}>📦 Available Finished Stock</div>
         {finished.length === 0 ? (
@@ -2295,7 +3025,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
               fontFamily: F.body,
             }}
           >
-            No finished products in stock. Run a production batch first.
+            No finished products in stock.
           </p>
         ) : (
           <table
@@ -2363,7 +3093,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
           </table>
         )}
       </div>
-
       {form.item_id && (
         <div style={{ ...sCard, borderLeft: `4px solid ${C.gold}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
@@ -2463,13 +3192,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
                 {qty} × {selItem.name}
               </strong>{" "}
               → {CHANNELS.find((c) => c.id === form.channel)?.label}
-              {form.channel === "wholesale" &&
-                partners.find((p) => p.id === form.partner_id) && (
-                  <span style={{ color: C.muted }}>
-                    {" "}
-                    · {partners.find((p) => p.id === form.partner_id).name}
-                  </span>
-                )}
               {qty > available && (
                 <span
                   style={{ color: C.red, marginLeft: "8px", fontWeight: 600 }}
@@ -2488,7 +3210,6 @@ function AllocatePanel({ items, partners, onRefresh }) {
           </button>
         </div>
       )}
-
       <div
         style={{
           ...sCard,
@@ -2508,7 +3229,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
         >
           Finished products with <strong>sell_price &gt; R0</strong> and{" "}
           <strong>quantity &gt; 0</strong> are automatically live in the
-          customer shop. Set sell prices in StockControl → Items → Edit.
+          customer shop.
         </p>
       </div>
     </div>
