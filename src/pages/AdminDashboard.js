@@ -1,5 +1,6 @@
-// AdminDashboard.js v4.5
+// AdminDashboard.js v4.6
 // Protea Botanicals — March 2026
+// ★ v4.6: WP-R Phase 6 — realtime subscription for Overview KPI strip (qr_codes table)
 // ★ v4.5 changes (WP-S: Batch QR Chain):
 //   - handleNavigateToQR now accepts batchId and stores it in state
 //   - AdminQRCodes receives initialBatchId + initialTab="generate" props
@@ -747,6 +748,19 @@ export default function AdminDashboard() {
       .subscribe();
     return () => supabase.removeChannel(sub);
   }, [fetchOpenTickets]);
+
+  // v4.6: WP-R Phase 6 — realtime KPI strip (any qr_codes change → recompute)
+  useEffect(() => {
+    const sub = supabase
+      .channel("admin-dashboard-kpi")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "qr_codes" },
+        computeAnalytics,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [computeAnalytics]);
 
   // v4.5: store batchId so QR generator can pre-select it
   const handleNavigateToQR = (batchId) => {

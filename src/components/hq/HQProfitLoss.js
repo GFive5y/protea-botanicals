@@ -1,6 +1,8 @@
-// src/components/hq/HQProfitLoss.js v2.2 — WP-Q: Live Data Integration
+// src/components/hq/HQProfitLoss.js v2.3 — WP-R Phase 6: Realtime subscriptions
 // Protea Botanicals · Phase 2 · March 2026
 //
+// v2.3 — WP-R Phase 6: realtime subscription for revenue tiles (orders table).
+//         Any INSERT/UPDATE/DELETE on orders triggers fetchAll automatically.
 // v2.2 — COGS methodology fix: Cost of Goods SOLD not Cost of Goods PURCHASED.
 //         Uses recipe engine (calcCogsTotal) × units sold — the correct source
 //         since recipes already know full per-cart cost (hardware, terpenes,
@@ -386,6 +388,19 @@ export default function HQProfitLoss() {
 
   useEffect(() => {
     fetchAll();
+  }, [fetchAll]);
+
+  // v2.3: WP-R Phase 6 — realtime revenue tiles (any orders change → refetch)
+  useEffect(() => {
+    const sub = supabase
+      .channel("hq-pl-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        fetchAll,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
   }, [fetchAll]);
 
   // ── OpEx helpers ──────────────────────────────────────────────────────
