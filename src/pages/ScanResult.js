@@ -1,5 +1,9 @@
-// src/pages/ScanResult.js v4.6
-// Protea Botanicals — WP-8: Suspension check
+// src/pages/ScanResult.js v4.7
+// Protea Botanicals — WP-T: Regulatory batch provenance on scan result
+// v4.7 changes from v4.6:
+//   - batches select extended: lab_certified, expiry_date, thc_content, cbd_content, lab_name
+//   - ProductCard now shows: Lab Certified badge, Expiry date, THC/CBD %, lab name
+//   - Expiry warning shown if batch expires within 90 days
 // v4.6 changes from v4.5:
 //   - After fetching profile, checks is_suspended flag
 //   - Suspended users: scan is logged (outcome: suspended_blocked),
@@ -337,6 +341,13 @@ function BannerDisplay({ banner }) {
 
 function ProductCard({ batch, showCoa }) {
   if (!batch) return null;
+
+  const daysToExpiry = batch.expiry_date
+    ? Math.ceil((new Date(batch.expiry_date) - new Date()) / 86400000)
+    : null;
+  const expiryWarning = daysToExpiry !== null && daysToExpiry <= 90;
+  const isExpired = daysToExpiry !== null && daysToExpiry < 0;
+
   return (
     <div style={card({ borderLeft: `3px solid ${C.accent}` })}>
       <div
@@ -367,6 +378,8 @@ function ProductCard({ batch, showCoa }) {
           Strain: {batch.strain.replace(/-/g, " ")}
         </div>
       )}
+
+      {/* Authenticity + batch badges */}
       <div
         style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}
       >
@@ -375,7 +388,126 @@ function ProductCard({ batch, showCoa }) {
         {batch.volume && (
           <span style={pill(C.cream, C.muted)}>{batch.volume}</span>
         )}
+        {batch.lab_certified && (
+          <span style={pill("#eafaf1", "#1b4332")}>🔬 Lab Certified</span>
+        )}
       </div>
+
+      {/* Lab details */}
+      {(batch.thc_content || batch.cbd_content || batch.lab_name) && (
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            flexWrap: "wrap",
+            marginBottom: 12,
+            padding: "10px 12px",
+            background: "#f8faf8",
+            borderRadius: 2,
+            border: "1px solid #e0dbd2",
+          }}
+        >
+          {batch.thc_content && (
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: "#888",
+                  marginBottom: 2,
+                }}
+              >
+                THC
+              </div>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  fontFamily: "Cormorant Garamond, serif",
+                  color: "#1b4332",
+                }}
+              >
+                {parseFloat(batch.thc_content).toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {batch.cbd_content && (
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: "#888",
+                  marginBottom: 2,
+                }}
+              >
+                CBD
+              </div>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  fontFamily: "Cormorant Garamond, serif",
+                  color: "#2c4a6e",
+                }}
+              >
+                {parseFloat(batch.cbd_content).toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {batch.lab_name && (
+            <div>
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  color: "#888",
+                  marginBottom: 2,
+                }}
+              >
+                Lab
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a" }}>
+                {batch.lab_name}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Expiry */}
+      {batch.expiry_date && (
+        <div
+          style={{
+            fontSize: 12,
+            marginBottom: 10,
+            padding: "6px 10px",
+            borderRadius: 2,
+            background: isExpired
+              ? "#fdf0ef"
+              : expiryWarning
+                ? "#fff3e8"
+                : "#f0faf5",
+            color: isExpired
+              ? "#c0392b"
+              : expiryWarning
+                ? "#e67e22"
+                : "#2d6a4f",
+            border: `1px solid ${isExpired ? "#c0392b40" : expiryWarning ? "#e67e2240" : "#52b78840"}`,
+          }}
+        >
+          {isExpired
+            ? "⚠ Batch expired"
+            : expiryWarning
+              ? `⚠ Expires in ${daysToExpiry} days — ${new Date(batch.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`
+              : `✓ Best before ${new Date(batch.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`}
+        </div>
+      )}
+
+      {/* COA link */}
       {showCoa && batch.coa_document_id && (
         <a
           href={`/documents/${batch.coa_document_id}`}
@@ -914,7 +1046,7 @@ export default function ScanResult() {
       const { data: qrRows, error: qrErr } = await supabase
         .from("qr_codes")
         .select(
-          "*, batches(batch_number, product_name, strain, volume, coa_document_id)",
+          "*, batches(batch_number, product_name, strain, volume, coa_document_id, lab_certified, lab_name, expiry_date, thc_content, cbd_content)",
         )
         .eq("qr_code", qrCode)
         .limit(1);
@@ -1150,16 +1282,14 @@ export default function ScanResult() {
                   Gold: "1.5×",
                   Platinum: "2×",
                 };
-                await supabase
-                  .from("customer_messages")
-                  .insert({
-                    user_id: currentUser.id,
-                    subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
-                    content: `Congratulations! 🎉 You've just unlocked ${newTier} tier status.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan. 🌿`,
-                    type: "tier_upgrade",
-                    read: false,
-                    created_at: new Date().toISOString(),
-                  });
+                await supabase.from("customer_messages").insert({
+                  user_id: currentUser.id,
+                  subject: `${tierIcons[newTier] || "🏆"} You've reached ${newTier} tier!`,
+                  content: `Congratulations! 🎉 You've just unlocked ${newTier} tier status.\n\nYour new earning rate: ${tierMults[newTier] || "2×"} points on every purchase and QR scan. 🌿`,
+                  type: "tier_upgrade",
+                  read: false,
+                  created_at: new Date().toISOString(),
+                });
               }
               if (action.one_time && !qr.claimed) {
                 await supabase
@@ -1294,33 +1424,26 @@ export default function ScanResult() {
               .from("user_profiles")
               .update({ loyalty_points: afterStreak })
               .eq("id", currentUser.id);
-            await supabase
-              .from("loyalty_transactions")
-              .insert({
-                user_id: currentUser.id,
-                transaction_type: "EARNED",
-                points: STREAK_BONUS_PTS,
-                balance_after: afterStreak,
-                source: "streak_bonus",
-                description: `Streak bonus — ${weekCount} scans this week!`,
-                transaction_date: new Date().toISOString(),
-                channel: "streak_bonus",
-                multiplier_applied: 1.0,
-                tier_at_time: getTierLabel(
-                  freshPts?.loyalty_points || 0,
-                  config,
-                ),
-              });
-            await supabase
-              .from("customer_messages")
-              .insert({
-                user_id: currentUser.id,
-                subject: `🔥 Streak Bonus — +${STREAK_BONUS_PTS} pts!`,
-                content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus. Keep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
-                type: "streak_bonus",
-                read: false,
-                created_at: new Date().toISOString(),
-              });
+            await supabase.from("loyalty_transactions").insert({
+              user_id: currentUser.id,
+              transaction_type: "EARNED",
+              points: STREAK_BONUS_PTS,
+              balance_after: afterStreak,
+              source: "streak_bonus",
+              description: `Streak bonus — ${weekCount} scans this week!`,
+              transaction_date: new Date().toISOString(),
+              channel: "streak_bonus",
+              multiplier_applied: 1.0,
+              tier_at_time: getTierLabel(freshPts?.loyalty_points || 0, config),
+            });
+            await supabase.from("customer_messages").insert({
+              user_id: currentUser.id,
+              subject: `🔥 Streak Bonus — +${STREAK_BONUS_PTS} pts!`,
+              content: `You're on fire! 🔥 You've scanned ${weekCount} products this week and earned a ${STREAK_BONUS_PTS}-point streak bonus. Keep scanning every week to keep the streak alive and stack those bonus points. 🌿`,
+              type: "streak_bonus",
+              read: false,
+              created_at: new Date().toISOString(),
+            });
             setStreakBonus(STREAK_BONUS_PTS);
             setStreakCount(weekCount);
             setTotalPoints(afterStreak);
