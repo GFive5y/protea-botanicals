@@ -1,13 +1,13 @@
-// AdminDashboard.js v4.6
+// AdminDashboard.js v4.7
 // Protea Botanicals — March 2026
-// ★ v4.6: WP-R Phase 6 — realtime subscription for Overview KPI strip (qr_codes table)
-// ★ v4.5 changes (WP-S: Batch QR Chain):
-//   - handleNavigateToQR now accepts batchId and stores it in state
-//   - AdminQRCodes receives initialBatchId + initialTab="generate" props
-//     so clicking "Generate QR" on a batch card lands directly on the
-//     Generate tab with that batch pre-selected
+// ★ v4.7: WP-U Unified Comms Centre
+//   - New "comms" tab replaces separate "messages" and "support" tabs
+//   - AdminCommsCenter.js handles customer_messages + support_tickets + wholesale_messages
+//   - commsBadge = unread inbound messages + open tickets combined
+//   - AdminSupportPanel + AdminMessages imports removed
+// ★ v4.6: WP-R Phase 6 — realtime KPI strip (qr_codes table)
+// ★ v4.5: WP-S Batch QR Chain
 // ★ v4.4: BUG-002 fix — Overview KPIs rewired to qr_codes table
-// ★ v4.3: Support tab + open ticket badge
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -21,7 +21,7 @@ import AdminFraudSecurity from "../components/AdminFraudSecurity";
 import AdminNotifications from "../components/AdminNotifications";
 import HQDocuments from "../components/hq/HQDocuments";
 import AdminQRCodes from "../components/AdminQRCodes";
-import AdminSupportPanel from "../components/AdminSupportPanel";
+import AdminCommsCenter from "../components/AdminCommsCenter";
 
 const C = {
   green: "#1b4332",
@@ -158,438 +158,6 @@ function fmtDate(d) {
     day: "numeric",
   });
 }
-function fmtTime(ts) {
-  if (!ts) return "—";
-  const d = new Date(ts);
-  const diff = (Date.now() - d) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
-}
-
-// ── AdminMessages (v4.2 — preserved exactly) ─────────────────────────────────
-function AdminMessages() {
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [profiles, setProfiles] = useState({});
-  const [replyTo, setReplyTo] = useState(null);
-  const [replyBody, setReplyBody] = useState("");
-  const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState(null);
-  const [filterType, setFilterType] = useState("all");
-  const [adminUser, setAdminUser] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setAdminUser(user));
-  }, []);
-
-  const loadMessages = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("customer_messages")
-      .select("*")
-      .eq("direction", "inbound")
-      .order("created_at", { ascending: false });
-    const msgs = data || [];
-    setMessages(msgs);
-    const userIds = [...new Set(msgs.map((m) => m.user_id))];
-    if (userIds.length > 0) {
-      const { data: profs } = await supabase
-        .from("user_profiles")
-        .select("id,full_name,phone,loyalty_points,loyalty_tier")
-        .in("id", userIds);
-      const map = {};
-      (profs || []).forEach((p) => {
-        map[p.id] = p;
-      });
-      setProfiles(map);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    loadMessages();
-  }, [loadMessages]);
-
-  useEffect(() => {
-    const sub = supabase
-      .channel("admin-messages-inbox")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "customer_messages",
-          filter: "direction=eq.inbound",
-        },
-        loadMessages,
-      )
-      .subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [loadMessages]);
-
-  const markRead = async (msgId) => {
-    await supabase
-      .from("customer_messages")
-      .update({ read_at: new Date().toISOString() })
-      .eq("id", msgId);
-    loadMessages();
-  };
-
-  const handleReply = async (msg) => {
-    if (!replyBody.trim()) {
-      setSendResult({ error: "Reply body required." });
-      return;
-    }
-    setSending(true);
-    setSendResult(null);
-    const { error } = await supabase.from("customer_messages").insert({
-      user_id: msg.user_id,
-      direction: "outbound",
-      message_type: "response",
-      subject: msg.subject ? `Re: ${msg.subject}` : "Re: Your message",
-      body: replyBody.trim(),
-      sent_by: adminUser?.id || null,
-      sent_by_name: adminUser?.email ? adminUser.email.split("@")[0] : "Admin",
-      metadata: {},
-    });
-    await supabase
-      .from("customer_messages")
-      .update({ read_at: new Date().toISOString() })
-      .eq("id", msg.id);
-    if (error) {
-      setSendResult({ error: "Failed to send reply." });
-    } else {
-      setSendResult({ success: "Reply sent!" });
-      setReplyBody("");
-      setTimeout(() => {
-        setReplyTo(null);
-        setSendResult(null);
-      }, 1500);
-      loadMessages();
-    }
-    setSending(false);
-  };
-
-  const MSG_TYPE_META = {
-    query: { label: "Query", icon: "💬", color: C.blue },
-    fault: { label: "Fault", icon: "⚠", color: C.red },
-  };
-  const filtered =
-    filterType === "all"
-      ? messages
-      : filterType === "unread"
-        ? messages.filter((m) => !m.read_at)
-        : messages.filter((m) => m.message_type === filterType);
-  const unreadCount = messages.filter((m) => !m.read_at).length;
-
-  return (
-    <div style={{ fontFamily: FONTS.body }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-          flexWrap: "wrap",
-          gap: 10,
-        }}
-      >
-        <div>
-          <h2
-            style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: 22,
-              margin: 0,
-            }}
-          >
-            Customer Messages
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  display: "inline-block",
-                  background: C.red,
-                  color: C.white,
-                  borderRadius: 10,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  marginLeft: 8,
-                  fontFamily: FONTS.body,
-                  verticalAlign: "middle",
-                }}
-              >
-                {unreadCount} new
-              </span>
-            )}
-          </h2>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
-            Inbound queries and fault reports from customers
-          </div>
-        </div>
-        <button
-          onClick={loadMessages}
-          style={{ ...makeBtn(C.mid), padding: "8px 16px", fontSize: 10 }}
-        >
-          ↻ Refresh
-        </button>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          gap: 0,
-          border: `1px solid ${C.border}`,
-          borderRadius: 2,
-          overflow: "hidden",
-          marginBottom: 16,
-          width: "fit-content",
-        }}
-      >
-        {[
-          { key: "all", label: `All (${messages.length})` },
-          { key: "unread", label: `Unread (${unreadCount})` },
-          { key: "query", label: "Queries" },
-          { key: "fault", label: "Faults" },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilterType(f.key)}
-            style={{
-              padding: "8px 16px",
-              border: "none",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              fontFamily: FONTS.body,
-              background: filterType === f.key ? C.green : C.white,
-              color: filterType === f.key ? C.white : C.muted,
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "48px", color: C.muted }}>
-          Loading messages…
-        </div>
-      ) : filtered.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "48px",
-            border: `1px dashed ${C.border}`,
-            borderRadius: 2,
-            color: C.muted,
-          }}
-        >
-          <div style={{ fontSize: 28, marginBottom: 10 }}>📭</div>
-          <div
-            style={{
-              fontFamily: FONTS.heading,
-              fontSize: 18,
-              color: C.green,
-              marginBottom: 6,
-            }}
-          >
-            No messages
-          </div>
-          <div style={{ fontSize: 13 }}>
-            Customer queries and fault reports appear here.
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 8 }}>
-          {filtered.map((msg) => {
-            const meta = MSG_TYPE_META[msg.message_type] || {
-              label: msg.message_type,
-              icon: "📩",
-              color: C.muted,
-            };
-            const prof = profiles[msg.user_id];
-            const isUnread = !msg.read_at;
-            const isReplying = replyTo?.id === msg.id;
-            return (
-              <div
-                key={msg.id}
-                style={{
-                  background: isUnread ? "#fffdf5" : C.white,
-                  border: `1px solid ${isUnread ? C.orange + "50" : C.border}`,
-                  borderLeft: `4px solid ${meta.color}`,
-                  borderRadius: 2,
-                  padding: "16px 20px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    marginBottom: 8,
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: meta.color,
-                        }}
-                      >
-                        {meta.icon} {meta.label}
-                      </span>
-                      {isUnread && (
-                        <span
-                          style={{
-                            fontSize: 9,
-                            background: C.orange,
-                            color: C.white,
-                            padding: "1px 6px",
-                            borderRadius: 10,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          NEW
-                        </span>
-                      )}
-                      {msg.subject && (
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: C.text,
-                          }}
-                        >
-                          — {msg.subject}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
-                      {prof?.full_name || "Anonymous"}
-                      {prof?.phone ? ` · ${prof.phone}` : ""} ·{" "}
-                      {fmtTime(msg.created_at)}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    {isUnread && (
-                      <button
-                        onClick={() => markRead(msg.id)}
-                        style={{
-                          ...makeBtn(C.mid),
-                          fontSize: 9,
-                          padding: "4px 10px",
-                        }}
-                      >
-                        Mark Read
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (isReplying) {
-                          setReplyTo(null);
-                        } else {
-                          setReplyTo(msg);
-                          setReplyBody("");
-                          setSendResult(null);
-                          if (isUnread) markRead(msg.id);
-                        }
-                      }}
-                      style={{
-                        ...makeBtn(isReplying ? C.muted : C.green),
-                        fontSize: 9,
-                        padding: "4px 10px",
-                      }}
-                    >
-                      {isReplying ? "✕ Cancel" : "↩ Reply"}
-                    </button>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: C.text,
-                    lineHeight: 1.7,
-                    background: C.cream,
-                    padding: "10px 14px",
-                    borderRadius: 2,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {msg.body}
-                </div>
-                {isReplying && (
-                  <div style={{ marginTop: 12 }}>
-                    <textarea
-                      rows={3}
-                      placeholder="Write your reply…"
-                      value={replyBody}
-                      onChange={(e) => setReplyBody(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "9px 12px",
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 2,
-                        fontSize: 13,
-                        fontFamily: FONTS.body,
-                        resize: "vertical",
-                        boxSizing: "border-box",
-                        outline: "none",
-                      }}
-                    />
-                    {sendResult?.error && (
-                      <div style={{ color: C.red, fontSize: 12, marginTop: 4 }}>
-                        ⚠ {sendResult.error}
-                      </div>
-                    )}
-                    {sendResult?.success && (
-                      <div
-                        style={{
-                          color: C.mid,
-                          fontSize: 12,
-                          marginTop: 4,
-                          fontWeight: 600,
-                        }}
-                      >
-                        ✅ {sendResult.success}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => handleReply(msg)}
-                      disabled={sending}
-                      style={{
-                        ...makeBtn(C.green, C.white),
-                        marginTop: 8,
-                        fontSize: 10,
-                      }}
-                    >
-                      {sending ? "Sending…" : "Send Reply"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -597,12 +165,10 @@ function AdminMessages() {
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
-  // v4.5: track which batch to pre-select when navigating to QR generator
   const [qrInitialBatchId, setQrInitialBatchId] = useState(null);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
-  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
-  const [openTicketCount, setOpenTicketCount] = useState(0);
+  const [commsBadge, setCommsBadge] = useState(0);
   const [analytics, setAnalytics] = useState({
     total: 0,
     claimed: 0,
@@ -620,24 +186,24 @@ export default function AdminDashboard() {
     setUsers(data || []);
   }, []);
 
-  const fetchUnreadCount = useCallback(async () => {
-    const { count } = await supabase
-      .from("customer_messages")
-      .select("*", { count: "exact", head: true })
-      .eq("direction", "inbound")
-      .is("read_at", null);
-    setUnreadMsgCount(count || 0);
+  // v4.7: combined comms badge = unread inbound messages + open tickets
+  const fetchCommsBadge = useCallback(async () => {
+    try {
+      const [msgRes, tickRes] = await Promise.all([
+        supabase
+          .from("customer_messages")
+          .select("*", { count: "exact", head: true })
+          .eq("direction", "inbound")
+          .is("read_at", null),
+        supabase
+          .from("support_tickets")
+          .select("*", { count: "exact", head: true })
+          .in("status", ["open", "pending_reply"]),
+      ]);
+      setCommsBadge((msgRes.count || 0) + (tickRes.count || 0));
+    } catch (_) {}
   }, []);
 
-  const fetchOpenTickets = useCallback(async () => {
-    const { count } = await supabase
-      .from("support_tickets")
-      .select("*", { count: "exact", head: true })
-      .in("status", ["open", "pending_reply"]);
-    setOpenTicketCount(count || 0);
-  }, []);
-
-  // v4.4: computeAnalytics rewired to qr_codes (was legacy products table)
   const computeAnalytics = useCallback(async () => {
     try {
       const { count: total } = await supabase
@@ -711,10 +277,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
     computeAnalytics();
-    fetchUnreadCount();
-    fetchOpenTickets();
-  }, [fetchUsers, computeAnalytics, fetchUnreadCount, fetchOpenTickets]);
+    fetchCommsBadge();
+  }, [fetchUsers, computeAnalytics, fetchCommsBadge]);
 
+  // Realtime: customer_messages → refresh comms badge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-msgs")
@@ -726,30 +292,31 @@ export default function AdminDashboard() {
           table: "customer_messages",
           filter: "direction=eq.inbound",
         },
-        fetchUnreadCount,
+        fetchCommsBadge,
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "customer_messages" },
-        fetchUnreadCount,
+        fetchCommsBadge,
       )
       .subscribe();
     return () => supabase.removeChannel(sub);
-  }, [fetchUnreadCount]);
+  }, [fetchCommsBadge]);
 
+  // Realtime: support_tickets → refresh comms badge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-tickets")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "support_tickets" },
-        fetchOpenTickets,
+        fetchCommsBadge,
       )
       .subscribe();
     return () => supabase.removeChannel(sub);
-  }, [fetchOpenTickets]);
+  }, [fetchCommsBadge]);
 
-  // v4.6: WP-R Phase 6 — realtime KPI strip (any qr_codes change → recompute)
+  // Realtime: qr_codes → refresh KPI strip
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-kpi")
@@ -762,12 +329,10 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [computeAnalytics]);
 
-  // v4.5: store batchId so QR generator can pre-select it
   const handleNavigateToQR = (batchId) => {
     setQrInitialBatchId(batchId || null);
     setTab("qr_codes");
   };
-
   const handleNavigateToDocuments = (documentId) => {
     setDocumentsTargetId(documentId);
     setTab("documents");
@@ -852,16 +417,10 @@ export default function AdminDashboard() {
           onClick={() => setTab("customers")}
         />
         <TabBtn
-          active={tab === "messages"}
-          label="Messages"
-          badge={unreadMsgCount}
-          onClick={() => setTab("messages")}
-        />
-        <TabBtn
-          active={tab === "support"}
-          label="🎫 Support"
-          badge={openTicketCount}
-          onClick={() => setTab("support")}
+          active={tab === "comms"}
+          label="💬 Comms"
+          badge={commsBadge}
+          onClick={() => setTab("comms")}
         />
         <TabBtn
           active={tab === "security"}
@@ -893,7 +452,6 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Error banner */}
       {error && (
         <div
           style={{
@@ -1007,43 +565,12 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {unreadMsgCount > 0 && (
+          {commsBadge > 0 && (
             <div
               style={{
                 padding: "12px 16px",
                 background: "#fffdf5",
                 border: `1px solid ${C.orange}`,
-                borderRadius: 2,
-                marginBottom: 16,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>💬</span>
-              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
-                {unreadMsgCount} unread customer message
-                {unreadMsgCount !== 1 ? "s" : ""}
-              </span>
-              <button
-                onClick={() => setTab("messages")}
-                style={{
-                  ...makeBtn(C.orange),
-                  fontSize: 10,
-                  padding: "5px 14px",
-                  marginLeft: "auto",
-                }}
-              >
-                View Messages
-              </button>
-            </div>
-          )}
-          {openTicketCount > 0 && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "#f0f9f4",
-                border: `1px solid ${C.accent}`,
                 borderRadius: 2,
                 marginBottom: 24,
                 display: "flex",
@@ -1051,21 +578,21 @@ export default function AdminDashboard() {
                 gap: 12,
               }}
             >
-              <span style={{ fontSize: 18 }}>🎫</span>
+              <span style={{ fontSize: 18 }}>💬</span>
               <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
-                {openTicketCount} open support ticket
-                {openTicketCount !== 1 ? "s" : ""}
+                {commsBadge} item{commsBadge !== 1 ? "s" : ""} need attention in
+                Comms
               </span>
               <button
-                onClick={() => setTab("support")}
+                onClick={() => setTab("comms")}
                 style={{
-                  ...makeBtn(C.mid),
+                  ...makeBtn(C.orange),
                   fontSize: 10,
                   padding: "5px 14px",
                   marginLeft: "auto",
                 }}
               >
-                View Tickets
+                View Comms
               </button>
             </div>
           )}
@@ -1108,8 +635,8 @@ export default function AdminDashboard() {
             <button onClick={() => setTab("customers")} style={makeBtn(C.mid)}>
               👥 CUSTOMERS
             </button>
-            <button onClick={() => setTab("support")} style={makeBtn(C.mid)}>
-              🎫 SUPPORT
+            <button onClick={() => setTab("comms")} style={makeBtn(C.mid)}>
+              💬 COMMS
             </button>
             <button
               onClick={() => {
@@ -1124,8 +651,7 @@ export default function AdminDashboard() {
               onClick={() => {
                 computeAnalytics();
                 fetchUsers();
-                fetchUnreadCount();
-                fetchOpenTickets();
+                fetchCommsBadge();
               }}
               style={makeBtn(C.mid)}
             >
@@ -1144,11 +670,10 @@ export default function AdminDashboard() {
         />
       )}
       {tab === "customers" && <AdminCustomerEngagement />}
-      {tab === "messages" && <AdminMessages />}
-      {tab === "support" && <AdminSupportPanel />}
+      {/* v4.7: Unified Comms Centre — customer_messages + support_tickets + wholesale */}
+      {tab === "comms" && <AdminCommsCenter />}
       {tab === "security" && <AdminFraudSecurity />}
       {tab === "notifications" && <AdminNotifications />}
-      {/* v4.5: pass initialBatchId + initialTab to AdminQRCodes */}
       {tab === "qr_codes" && (
         <AdminQRCodes
           initialBatchId={qrInitialBatchId}

@@ -1,4 +1,7 @@
-// src/components/hq/HQOverview.js — Protea Botanicals v1.8
+// src/components/hq/HQOverview.js — Protea Botanicals v1.9
+// v1.9: WP-U: Comms KPI tile expanded — open tickets + unread customer messages + unread wholesale
+//        Queries: support_tickets (open/pending_reply) + customer_messages (inbound unread) + wholesale_messages (inbound unread)
+//        Single "Comms" tile links to /admin → Comms tab
 // v1.8: FIX Products KPI — queries product_cogs (is_active) not products table.
 //        products table ≠ COGS recipes. HQ costing shows product_cogs so KPI must match.
 // v1.7: Birthday KPI tiles
@@ -141,8 +144,6 @@ export default function HQOverview({ onNavigate }) {
       let scansData = [],
         lowStockData = [];
 
-      // v1.8 FIX: query product_cogs (active COGS recipes) not legacy products table.
-      // The Products KPI links to Costing which shows product_cogs — they must match.
       try {
         const r = await supabase
           .from("product_cogs")
@@ -219,6 +220,26 @@ export default function HQOverview({ onNavigate }) {
         openTickets = r.count || 0;
       } catch (_) {}
 
+      // v1.9: unread customer messages + wholesale messages for Comms tile
+      let unreadMsgs = 0;
+      try {
+        const r = await supabase
+          .from("customer_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("direction", "inbound")
+          .is("read_at", null);
+        unreadMsgs = r.count || 0;
+      } catch (_) {}
+      let unreadWholesale = 0;
+      try {
+        const r = await supabase
+          .from("wholesale_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("direction", "inbound")
+          .is("read_at", null);
+        unreadWholesale = r.count || 0;
+      } catch (_) {}
+
       setStats({
         products,
         scans,
@@ -227,6 +248,8 @@ export default function HQOverview({ onNavigate }) {
         tenants,
         recentScanCount,
         openTickets,
+        unreadMsgs,
+        unreadWholesale,
       });
       setRecentScans(scansData);
       setLowStock(lowStockData);
@@ -292,7 +315,6 @@ export default function HQOverview({ onNavigate }) {
           avgMarginPct = margins.reduce((s, m) => s + m, 0) / margins.length;
       } catch (_) {}
       try {
-        // v1.8: po_status is the workflow field; exclude complete + received + cancelled + draft
         const r = await supabase
           .from("purchase_orders")
           .select("id", { count: "exact", head: true })
@@ -350,6 +372,7 @@ export default function HQOverview({ onNavigate }) {
         </span>
       </div>
     );
+
   if (error)
     return (
       <div
@@ -391,6 +414,10 @@ export default function HQOverview({ onNavigate }) {
         ? C.orange
         : C.red;
   const nav = (tab) => onNavigate && onNavigate(tab);
+  const commsTotal =
+    (stats.openTickets || 0) +
+    (stats.unreadMsgs || 0) +
+    (stats.unreadWholesale || 0);
 
   return (
     <div>
@@ -450,13 +477,29 @@ export default function HQOverview({ onNavigate }) {
           value={stats.tenants}
           color={C.primaryDark}
         />
+        {/* v1.9: expanded Comms tile — open tickets + unread messages + wholesale */}
         <KPICard
-          icon="🎫"
-          label="Open Tickets"
-          value={stats.openTickets || 0}
-          color={stats.openTickets > 0 ? C.red : C.accentGreen}
+          icon="💬"
+          label="Comms"
+          value={commsTotal}
+          sub={
+            [
+              stats.openTickets > 0
+                ? `${stats.openTickets} open ticket${stats.openTickets !== 1 ? "s" : ""}`
+                : null,
+              stats.unreadMsgs > 0
+                ? `${stats.unreadMsgs} unread msg${stats.unreadMsgs !== 1 ? "s" : ""}`
+                : null,
+              stats.unreadWholesale > 0
+                ? `${stats.unreadWholesale} wholesale`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "all clear"
+          }
+          color={commsTotal > 0 ? C.red : C.accentGreen}
           onClick={() => (window.location.href = "/admin")}
-          hint="→ Admin Support"
+          hint="→ Admin Comms"
         />
       </div>
 
