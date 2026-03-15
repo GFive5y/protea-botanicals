@@ -1,4 +1,5 @@
-// src/components/hq/HQProduction.js v1.5
+// src/components/hq/HQProduction.js v1.6
+// v1.6 — WP-T: Audit Export sub-tab — batch→QR→scan chain, CSV export, QR recall tool
 // v1.5 — FORMAT expansion: vape (0.5/1/2/3ml + custom), edible, flower, beverage, topical, other
 //         Triple Chamber: distillate_needed = units × fill_ml × 3 chambers
 //         Non-vape formats: material BOM hidden — run tracks units only
@@ -96,11 +97,6 @@ const sTd = {
 };
 
 // ─── FORMAT CATALOGUE ────────────────────────────────────────────────────────
-// is_vape: true  → shows distillate + terpene + hardware BOM gauges
-// is_vape: false → BOM section hidden, runs track units only
-// distillate_ml: ml per chamber per unit (vape only)
-// chambers: multiplier for multi-chamber devices (default 1)
-// custom_fill: true → user enters fill_ml field
 const FORMAT_CATALOGUE = {
   vape_05ml: {
     label: "0.5ml Cartridge (510)",
@@ -412,6 +408,7 @@ export default function HQProduction() {
     { id: "new-run", label: "New Production Run", icon: "⊕" },
     { id: "history", label: "History", icon: "📋" },
     { id: "allocate", label: "Allocate Stock", icon: "→" },
+    { id: "audit", label: "Audit Export", icon: "🔍" },
   ];
 
   if (error)
@@ -519,6 +516,7 @@ export default function HQProduction() {
               onRefresh={fetchAll}
             />
           )}
+          {subTab === "audit" && <AuditPanel batches={batches} />}
         </>
       )}
     </div>
@@ -1070,7 +1068,6 @@ function BatchesPanel({ batches, runs, onRefresh }) {
           </div>
         ) : (
           <div>
-            {/* Table header */}
             <div
               style={{
                 display: "grid",
@@ -1102,7 +1099,6 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                 </div>
               ))}
             </div>
-
             {filtered.map((b) => {
               const linkedRun = runByBatch[b.id];
               const isEditing = editing === b.id;
@@ -1213,7 +1209,6 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                       </button>
                     </div>
                   </div>
-
                   {isEditing && (
                     <div
                       style={{
@@ -1230,76 +1225,52 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                           marginBottom: "12px",
                         }}
                       >
-                        <div>
-                          <label
-                            style={{
-                              fontSize: "10px",
-                              color: C.muted,
-                              display: "block",
-                              marginBottom: "3px",
-                              fontFamily: F.body,
-                            }}
-                          >
-                            Product Name
-                          </label>
-                          <input
-                            style={sInput}
-                            value={editForm.product_name}
-                            onChange={(e) =>
-                              setEditForm((p) => ({
-                                ...p,
-                                product_name: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label
-                            style={{
-                              fontSize: "10px",
-                              color: C.muted,
-                              display: "block",
-                              marginBottom: "3px",
-                              fontFamily: F.body,
-                            }}
-                          >
-                            Product Type
-                          </label>
-                          <input
-                            style={sInput}
-                            value={editForm.product_type}
-                            placeholder="e.g. 1ml Cart"
-                            onChange={(e) =>
-                              setEditForm((p) => ({
-                                ...p,
-                                product_type: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label
-                            style={{
-                              fontSize: "10px",
-                              color: C.muted,
-                              display: "block",
-                              marginBottom: "3px",
-                              fontFamily: F.body,
-                            }}
-                          >
-                            Strain
-                          </label>
-                          <input
-                            style={sInput}
-                            value={editForm.strain}
-                            onChange={(e) =>
-                              setEditForm((p) => ({
-                                ...p,
-                                strain: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
+                        {[
+                          {
+                            lbl: "Product Name",
+                            key: "product_name",
+                            type: "text",
+                            placeholder: "",
+                          },
+                          {
+                            lbl: "Product Type",
+                            key: "product_type",
+                            type: "text",
+                            placeholder: "e.g. 1ml Cart",
+                          },
+                          {
+                            lbl: "Strain",
+                            key: "strain",
+                            type: "text",
+                            placeholder: "",
+                          },
+                        ].map(({ lbl, key, type, placeholder }) => (
+                          <div key={key}>
+                            <label
+                              style={{
+                                fontSize: "10px",
+                                color: C.muted,
+                                display: "block",
+                                marginBottom: "3px",
+                                fontFamily: F.body,
+                              }}
+                            >
+                              {lbl}
+                            </label>
+                            <input
+                              style={sInput}
+                              type={type}
+                              placeholder={placeholder}
+                              value={editForm[key]}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  [key]: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        ))}
                         <div>
                           <label
                             style={{
@@ -1474,7 +1445,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NEW RUN — v1.5: expanded formats, non-vape skips BOM, triple chamber calc
+// NEW RUN — v1.5
 // ═══════════════════════════════════════════════════════════════════════════════
 function NewRunPanel({ items, onComplete }) {
   const [form, setForm] = useState({
@@ -1500,19 +1471,16 @@ function NewRunPanel({ items, onComplete }) {
   const fmt = FORMAT_CATALOGUE[form.format_key] || FORMAT_CATALOGUE["vape_1ml"];
   const isVape = fmt.is_vape;
   const planned = parseInt(form.planned_units) || 0;
-
   const fillMlPerChamber = fmt.custom_fill
     ? parseFloat(form.custom_fill_ml) || 0
     : fmt.distillate_ml;
   const chambers = fmt.chambers || 1;
   const distMlPerUnit = fillMlPerChamber * chambers;
-
   const terpPct =
     parseFloat(form.terpene_pct_override) > 0
       ? parseFloat(form.terpene_pct_override)
       : fmt.terpene_pct || 10;
   const terpRatio = terpPct / 100;
-
   const distNeeded = isVape ? +(planned * distMlPerUnit).toFixed(2) : 0;
   const terpNeeded = isVape
     ? +(planned * distMlPerUnit * terpRatio).toFixed(3)
@@ -1715,15 +1683,13 @@ function NewRunPanel({ items, onComplete }) {
         if (niErr) throw niErr;
         finId = ni.id;
       }
-      await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: finId,
-          quantity: finalActual,
-          movement_type: "production_in",
-          reference: runNumber,
-          notes: `Batch ${runNumber}: ${finishedName}`,
-        });
+      await supabase.from("stock_movements").insert({
+        item_id: finId,
+        quantity: finalActual,
+        movement_type: "production_in",
+        reference: runNumber,
+        notes: `Batch ${runNumber}: ${finishedName}`,
+      });
       const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
       await supabase
         .from("inventory_items")
@@ -1743,7 +1709,6 @@ function NewRunPanel({ items, onComplete }) {
 
   return (
     <div style={{ display: "grid", gap: "20px", maxWidth: "820px" }}>
-      {/* Step 1 — Define */}
       <div style={{ ...sCard, borderLeft: `4px solid ${C.accent}` }}>
         <div style={{ ...sLabel, marginBottom: "16px" }}>
           Step 1 — Define Run
@@ -1773,7 +1738,6 @@ function NewRunPanel({ items, onComplete }) {
               ))}
             </select>
           </div>
-
           {fmt.custom_fill && (
             <div>
               {fLabel("Fill Volume per Chamber (ml) *")}
@@ -1788,7 +1752,6 @@ function NewRunPanel({ items, onComplete }) {
               />
             </div>
           )}
-
           {fmt.chambers > 1 && (
             <div
               style={{
@@ -1809,7 +1772,6 @@ function NewRunPanel({ items, onComplete }) {
               ({fillMlPerChamber}ml × {chambers} chambers)
             </div>
           )}
-
           <div>
             {fLabel(isVape ? "Strain *" : "Strain (optional)")}
             <select
@@ -1825,7 +1787,6 @@ function NewRunPanel({ items, onComplete }) {
               ))}
             </select>
           </div>
-
           {!isVape && (
             <div>
               {fLabel("Product Name *", "e.g. CBD Gummy Bear 25mg")}
@@ -1837,7 +1798,6 @@ function NewRunPanel({ items, onComplete }) {
               />
             </div>
           )}
-
           <div>
             {fLabel("Units to Produce *")}
             <input
@@ -1850,7 +1810,6 @@ function NewRunPanel({ items, onComplete }) {
               onChange={(e) => set("planned_units", e.target.value)}
             />
           </div>
-
           {isVape && (
             <div>
               {fLabel("Terpene %", `default ${fmt.terpene_pct}% · range 3–15%`)}
@@ -1882,7 +1841,6 @@ function NewRunPanel({ items, onComplete }) {
         </div>
       </div>
 
-      {/* Step 2 — Materials (vape only) */}
       {isVape && (
         <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
@@ -1959,7 +1917,6 @@ function NewRunPanel({ items, onComplete }) {
         </div>
       )}
 
-      {/* Non-vape info */}
       {!isVape && planned > 0 && (
         <div
           style={{
@@ -1982,13 +1939,11 @@ function NewRunPanel({ items, onComplete }) {
           >
             No material BOM for this format. The run will create a batch record
             and add <strong>{planned} units</strong> of{" "}
-            <strong>{finishedName || "product"}</strong> to finished stock. Log
-            material consumption manually in StockControl → Movements if needed.
+            <strong>{finishedName || "product"}</strong> to finished stock.
           </p>
         </div>
       )}
 
-      {/* Step 3 — BOM (vape only) */}
       {isVape &&
         planned > 0 &&
         form.distillate_item_id &&
@@ -2051,8 +2006,8 @@ function NewRunPanel({ items, onComplete }) {
                 ["Cost / Unit", `R${costPerUnit}`, C.gold],
                 ["Total Material Cost", `R${totalCost.toFixed(2)}`, C.blue],
                 ["Run Number", runNumber, C.muted],
-              ].map(([label, val, color]) => (
-                <div key={label}>
+              ].map(([lbl, val, color]) => (
+                <div key={lbl}>
                   <div
                     style={{
                       fontSize: "9px",
@@ -2063,14 +2018,14 @@ function NewRunPanel({ items, onComplete }) {
                       fontFamily: F.body,
                     }}
                   >
-                    {label}
+                    {lbl}
                   </div>
                   <div
                     style={{
-                      fontSize: label === "Run Number" ? "13px" : "18px",
+                      fontSize: lbl === "Run Number" ? "13px" : "18px",
                       fontWeight: 600,
                       fontFamily:
-                        label === "Run Number" ? "monospace" : F.heading,
+                        lbl === "Run Number" ? "monospace" : F.heading,
                       color,
                     }}
                   >
@@ -2082,7 +2037,6 @@ function NewRunPanel({ items, onComplete }) {
           </div>
         )}
 
-      {/* Step 4 — Confirm */}
       {canRun && (
         <div style={{ ...sCard, borderLeft: `4px solid ${C.gold}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
@@ -2130,7 +2084,6 @@ function NewRunPanel({ items, onComplete }) {
               />
             </div>
           </div>
-
           {!confirmed && (
             <div
               style={{
@@ -2174,7 +2127,6 @@ function NewRunPanel({ items, onComplete }) {
               </ul>
             </div>
           )}
-
           <div style={{ display: "flex", gap: "10px" }}>
             {!confirmed ? (
               <button onClick={() => setConfirmed(true)} style={sBtn()}>
@@ -2209,7 +2161,7 @@ function NewRunPanel({ items, onComplete }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HISTORY — unchanged from v1.4
+// HISTORY
 // ═══════════════════════════════════════════════════════════════════════════════
 function HistoryPanel({ runs, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
@@ -2225,6 +2177,7 @@ function HistoryPanel({ runs, onRefresh }) {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
+
   const openEdit = (run) => {
     setEditing(run.id);
     setEditForm({
@@ -2234,6 +2187,7 @@ function HistoryPanel({ runs, onRefresh }) {
     });
     setExpanded(run.id);
   };
+
   const handleSaveEdit = async (run) => {
     setSaving(true);
     try {
@@ -2254,6 +2208,7 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
+
   const handleCancel = async (run) => {
     setSaving(true);
     try {
@@ -2270,6 +2225,7 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
+
   const handleDelete = async (run) => {
     setSaving(true);
     try {
@@ -2281,15 +2237,13 @@ function HistoryPanel({ runs, onRefresh }) {
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
-            await supabase
-              .from("stock_movements")
-              .insert({
-                item_id: mv.item_id,
-                quantity: rev,
-                movement_type: "adjustment",
-                reference: `VOID-${run.run_number}`,
-                notes: `Reversal: deleted run ${run.run_number}`,
-              });
+            await supabase.from("stock_movements").insert({
+              item_id: mv.item_id,
+              quantity: rev,
+              movement_type: "adjustment",
+              reference: `VOID-${run.run_number}`,
+              notes: `Reversal: deleted run ${run.run_number}`,
+            });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
@@ -2325,6 +2279,7 @@ function HistoryPanel({ runs, onRefresh }) {
   };
 
   const ALL_STATUSES = ["planned", "in_progress", "completed", "cancelled"];
+
   return (
     <div>
       {toast && (
@@ -2561,8 +2516,8 @@ function HistoryPanel({ runs, onRefresh }) {
                     ["Planned", run.planned_units || "—", "units"],
                     ["Actual", run.actual_units || "—", "units"],
                     ["Yield", yp ? `${yp}%` : "—", ""],
-                  ].map(([label, val, unit]) => (
-                    <div key={label}>
+                  ].map(([lbl, val, unit]) => (
+                    <div key={lbl}>
                       <div
                         style={{
                           fontSize: "9px",
@@ -2572,7 +2527,7 @@ function HistoryPanel({ runs, onRefresh }) {
                           fontFamily: F.body,
                         }}
                       >
-                        {label}
+                        {lbl}
                       </div>
                       <div
                         style={{
@@ -2580,7 +2535,7 @@ function HistoryPanel({ runs, onRefresh }) {
                           fontWeight: 600,
                           fontFamily: F.heading,
                           color:
-                            label === "Yield" && yp && yp < 95
+                            lbl === "Yield" && yp && yp < 95
                               ? C.orange
                               : C.text,
                         }}
@@ -2892,7 +2847,7 @@ function HistoryPanel({ runs, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ALLOCATE — unchanged from v1.4
+// ALLOCATE
 // ═══════════════════════════════════════════════════════════════════════════════
 function AllocatePanel({ items, partners, onRefresh }) {
   const finished = items.filter(
@@ -2933,6 +2888,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
       desc: "Damaged or destroyed units",
     },
   ];
+
   const handleAllocate = async () => {
     if (!valid) return;
     setSaving(true);
@@ -2940,15 +2896,13 @@ function AllocatePanel({ items, partners, onRefresh }) {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
         form.channel === "wholesale" && partner ? partner.name : form.channel;
-      await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: form.item_id,
-          quantity: -qty,
-          movement_type: "sale_out",
-          reference: ref,
-          notes: form.notes || `Allocated to ${ref}`,
-        });
+      await supabase.from("stock_movements").insert({
+        item_id: form.item_id,
+        quantity: -qty,
+        movement_type: "sale_out",
+        reference: ref,
+        notes: form.notes || `Allocated to ${ref}`,
+      });
       await supabase
         .from("inventory_items")
         .update({ quantity_on_hand: available - qty })
@@ -2967,6 +2921,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
       setSaving(false);
     }
   };
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div
@@ -3232,6 +3187,668 @@ function AllocatePanel({ items, partners, onRefresh }) {
           customer shop.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUDIT PANEL — v1.6: Regulatory batch→QR→scan traceability + CSV export
+// ═══════════════════════════════════════════════════════════════════════════════
+function AuditPanel({ batches }) {
+  const [auditData, setAuditData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [recallBatchId, setRecallBatchId] = useState(null);
+  const [recallLoading, setRecallLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const loadAudit = async () => {
+    setLoading(true);
+    try {
+      const { data: qrs, error } = await supabase
+        .from("qr_codes")
+        .select(
+          `
+          id, qr_code, qr_type, claimed, claimed_by, claimed_at,
+          scan_count, points_value, is_active, created_at, batch_id,
+          batches ( id, batch_number, product_name, strain, product_type,
+                    production_date, expiry_date, lab_certified, lab_name,
+                    units_produced, status )
+        `,
+        )
+        .not("batch_id", "is", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const qrIds = (qrs || []).map((q) => q.id);
+      let scanMap = {};
+      if (qrIds.length > 0) {
+        const { data: scans } = await supabase
+          .from("scan_logs")
+          .select(
+            "qr_code_id, scan_outcome, scanned_at, user_id, ip_city, ip_province",
+          )
+          .in("qr_code_id", qrIds)
+          .order("scanned_at", { ascending: false });
+        for (const s of scans || []) {
+          if (!scanMap[s.qr_code_id]) scanMap[s.qr_code_id] = [];
+          scanMap[s.qr_code_id].push(s);
+        }
+      }
+      setAuditData(
+        (qrs || []).map((q) => ({ ...q, scans: scanMap[q.id] || [] })),
+      );
+      setLoaded(true);
+    } catch (err) {
+      showToast("Failed to load audit data: " + err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportCSV = () => {
+    if (!auditData.length) return;
+    const headers = [
+      "Batch #",
+      "Product",
+      "Strain",
+      "Product Type",
+      "Production Date",
+      "Expiry Date",
+      "Lab Certified",
+      "Lab Name",
+      "Units Produced",
+      "Batch Status",
+      "QR Code",
+      "QR Type",
+      "QR Active",
+      "Claimed",
+      "Claimed At",
+      "Total Scans",
+      "Points Value",
+      "QR Created At",
+    ];
+    const rows = auditData.map((r) => [
+      r.batches?.batch_number || "",
+      r.batches?.product_name || "",
+      r.batches?.strain || "",
+      r.batches?.product_type || "",
+      r.batches?.production_date || "",
+      r.batches?.expiry_date || "",
+      r.batches?.lab_certified ? "YES" : "NO",
+      r.batches?.lab_name || "",
+      r.batches?.units_produced || "",
+      r.batches?.status || "",
+      r.qr_code,
+      r.qr_type,
+      r.is_active ? "YES" : "NO",
+      r.claimed ? "YES" : "NO",
+      r.claimed_at || "",
+      r.scan_count || 0,
+      r.points_value || 0,
+      r.created_at || "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `protea-batch-audit-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("CSV exported successfully");
+  };
+
+  const handleRecall = async (batchId, batchNumber) => {
+    if (
+      !window.confirm(
+        `Flag ALL QR codes from batch ${batchNumber} as INACTIVE?\n\nThis is a quality recall action. It can be reversed by re-activating codes individually.`,
+      )
+    )
+      return;
+    setRecallLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("qr_codes")
+        .update({ is_active: false })
+        .eq("batch_id", batchId)
+        .select("id");
+      if (error) throw error;
+      showToast(
+        `✓ ${data?.length || 0} QR codes from ${batchNumber} flagged inactive`,
+      );
+      await loadAudit();
+    } catch (err) {
+      showToast("Recall failed: " + err.message, "error");
+    } finally {
+      setRecallLoading(false);
+      setRecallBatchId(null);
+    }
+  };
+
+  // Group by batch
+  const byBatch = {};
+  for (const row of auditData) {
+    const bid = row.batches?.batch_number || row.batch_id;
+    if (!byBatch[bid])
+      byBatch[bid] = { batch: row.batches, batch_id: row.batch_id, qrs: [] };
+    byBatch[bid].qrs.push(row);
+  }
+
+  return (
+    <div style={{ display: "grid", gap: "20px" }}>
+      {toast && (
+        <div
+          style={{
+            padding: "10px 16px",
+            borderRadius: "2px",
+            fontSize: "12px",
+            fontFamily: F.body,
+            fontWeight: 500,
+            background: toast.type === "error" ? "#fff0f0" : "#f0faf5",
+            color: toast.type === "error" ? C.red : C.green,
+            border: `1px solid ${toast.type === "error" ? C.red : C.accent}`,
+          }}
+        >
+          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header card */}
+      <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
+          <div>
+            <div style={{ ...sLabel, color: C.blue }}>
+              🔍 Regulatory Audit Export
+            </div>
+            <p
+              style={{
+                fontSize: "13px",
+                color: C.muted,
+                margin: "6px 0 0",
+                fontFamily: F.body,
+                lineHeight: "1.6",
+              }}
+            >
+              Full traceability chain: Batch → QR codes → Scans → Customers.
+              <br />
+              Export CSV for regulatory compliance. Use QR Recall to flag a
+              batch inactive on quality issues.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {!loaded ? (
+              <button
+                onClick={loadAudit}
+                disabled={loading}
+                style={{
+                  ...sBtn(),
+                  background: loading ? C.muted : C.blue,
+                  minWidth: "140px",
+                }}
+              >
+                {loading ? "Loading..." : "🔍 Load Audit Data"}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={loadAudit}
+                  disabled={loading}
+                  style={{
+                    ...sBtn("outline"),
+                    fontSize: "9px",
+                    padding: "6px 12px",
+                  }}
+                >
+                  ↻ Refresh
+                </button>
+                <button
+                  onClick={exportCSV}
+                  style={{ ...sBtn(), background: C.green }}
+                >
+                  ⬇ Export CSV
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {loaded && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: "10px",
+              marginTop: "16px",
+            }}
+          >
+            {[
+              {
+                label: "Batches",
+                value: Object.keys(byBatch).length,
+                color: C.green,
+              },
+              { label: "QR Codes", value: auditData.length, color: C.blue },
+              {
+                label: "Claimed",
+                value: auditData.filter((r) => r.claimed).length,
+                color: C.accent,
+              },
+              {
+                label: "Total Scans",
+                value: auditData.reduce((s, r) => s + (r.scan_count || 0), 0),
+                color: C.gold,
+              },
+              {
+                label: "Inactive",
+                value: auditData.filter((r) => !r.is_active).length,
+                color: C.muted,
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{
+                  background: C.cream,
+                  borderRadius: "2px",
+                  padding: "10px 12px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 600,
+                    color: s.color,
+                    fontFamily: F.heading,
+                  }}
+                >
+                  {s.value}
+                </div>
+                <div
+                  style={{
+                    fontSize: "9px",
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    color: C.muted,
+                    fontFamily: F.body,
+                  }}
+                >
+                  {s.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Batch breakdown */}
+      {loaded &&
+        Object.entries(byBatch).map(([batchNum, { batch, batch_id, qrs }]) => {
+          const totalScans = qrs.reduce((s, r) => s + (r.scan_count || 0), 0);
+          const claimed = qrs.filter((r) => r.claimed).length;
+          const inactive = qrs.filter((r) => !r.is_active).length;
+          const daysToExpiry = batch?.expiry_date
+            ? Math.ceil((new Date(batch.expiry_date) - new Date()) / 86400000)
+            : null;
+          const isExpired = daysToExpiry !== null && daysToExpiry < 0;
+          const isRecalling = recallBatchId === batch_id;
+
+          return (
+            <div
+              key={batchNum}
+              style={{
+                ...sCard,
+                borderLeft: `3px solid ${isExpired ? C.red : inactive > 0 ? C.orange : C.accent}`,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                  marginBottom: "14px",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 600,
+                      fontFamily: F.heading,
+                      color: C.green,
+                    }}
+                  >
+                    {batch?.product_name || batchNum}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: C.muted,
+                      fontFamily: "monospace",
+                      marginTop: "2px",
+                    }}
+                  >
+                    {batchNum}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                      marginTop: "6px",
+                    }}
+                  >
+                    {batch?.lab_certified && (
+                      <span
+                        style={{
+                          fontSize: "9px",
+                          padding: "2px 8px",
+                          borderRadius: "2px",
+                          background: "#eafaf1",
+                          color: C.green,
+                          fontWeight: 700,
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          fontFamily: F.body,
+                        }}
+                      >
+                        🔬 Lab Certified
+                      </span>
+                    )}
+                    {batch?.strain && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: C.muted,
+                          fontFamily: F.body,
+                        }}
+                      >
+                        🌿 {batch.strain}
+                      </span>
+                    )}
+                    {batch?.expiry_date && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: isExpired ? C.red : C.muted,
+                          fontFamily: F.body,
+                          fontWeight: isExpired ? 600 : 400,
+                        }}
+                      >
+                        {isExpired
+                          ? "⚠ EXPIRED"
+                          : `Expires ${new Date(batch.expiry_date).toLocaleDateString("en-ZA")}`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div
+                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                >
+                  {!isRecalling ? (
+                    <button
+                      onClick={() => setRecallBatchId(batch_id)}
+                      style={{
+                        ...sBtn("outline"),
+                        fontSize: "9px",
+                        padding: "5px 12px",
+                        color: C.orange,
+                        borderColor: C.orange,
+                      }}
+                    >
+                      ⚠ QR Recall
+                    </button>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "6px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: C.orange,
+                          fontFamily: F.body,
+                        }}
+                      >
+                        Flag all QRs inactive?
+                      </span>
+                      <button
+                        onClick={() => handleRecall(batch_id, batchNum)}
+                        disabled={recallLoading}
+                        style={{
+                          ...sBtn("outline"),
+                          fontSize: "9px",
+                          padding: "4px 10px",
+                          color: C.red,
+                          borderColor: C.red,
+                        }}
+                      >
+                        {recallLoading ? "..." : "✓ Confirm"}
+                      </button>
+                      <button
+                        onClick={() => setRecallBatchId(null)}
+                        style={{
+                          ...sBtn("outline"),
+                          fontSize: "9px",
+                          padding: "4px 10px",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "24px",
+                  marginBottom: "14px",
+                  flexWrap: "wrap",
+                }}
+              >
+                {[
+                  ["QR Codes", qrs.length, C.blue],
+                  ["Claimed", claimed, C.accent],
+                  ["Total Scans", totalScans, C.gold],
+                  ["Inactive", inactive, inactive > 0 ? C.orange : C.muted],
+                ].map(([lbl, val, color]) => (
+                  <div key={lbl}>
+                    <div
+                      style={{
+                        fontSize: "9px",
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: C.muted,
+                        fontFamily: F.body,
+                      }}
+                    >
+                      {lbl}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "20px",
+                        fontWeight: 600,
+                        fontFamily: F.heading,
+                        color,
+                      }}
+                    >
+                      {val}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "11px",
+                    fontFamily: F.body,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {[
+                        "QR Code",
+                        "Type",
+                        "Active",
+                        "Claimed",
+                        "Scans",
+                        "Last Scan",
+                        "Claimed At",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            ...sTh,
+                            fontSize: "9px",
+                            padding: "6px 8px",
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {qrs.map((r) => (
+                      <tr
+                        key={r.id}
+                        style={{
+                          background: !r.is_active ? "#fafafa" : "transparent",
+                          opacity: r.is_active ? 1 : 0.6,
+                        }}
+                      >
+                        <td
+                          style={{
+                            ...sTd,
+                            fontFamily: "monospace",
+                            fontSize: "10px",
+                            color: C.muted,
+                            padding: "6px 8px",
+                          }}
+                        >
+                          {r.qr_code?.slice(0, 32)}
+                          {r.qr_code?.length > 32 ? "…" : ""}
+                        </td>
+                        <td
+                          style={{ ...sTd, padding: "6px 8px", color: C.muted }}
+                        >
+                          {r.qr_type}
+                        </td>
+                        <td style={{ ...sTd, padding: "6px 8px" }}>
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              padding: "1px 6px",
+                              borderRadius: "2px",
+                              background: r.is_active ? "#d4edda" : "#f5f5f5",
+                              color: r.is_active ? C.green : C.muted,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {r.is_active ? "YES" : "NO"}
+                          </span>
+                        </td>
+                        <td style={{ ...sTd, padding: "6px 8px" }}>
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              padding: "1px 6px",
+                              borderRadius: "2px",
+                              background: r.claimed ? "#eafaf1" : C.cream,
+                              color: r.claimed ? C.green : C.muted,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {r.claimed ? "YES" : "NO"}
+                          </span>
+                        </td>
+                        <td
+                          style={{
+                            ...sTd,
+                            padding: "6px 8px",
+                            textAlign: "right",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {r.scan_count || 0}
+                        </td>
+                        <td
+                          style={{ ...sTd, padding: "6px 8px", color: C.muted }}
+                        >
+                          {r.scans?.[0]?.scanned_at
+                            ? new Date(
+                                r.scans[0].scanned_at,
+                              ).toLocaleDateString("en-ZA")
+                            : "—"}
+                        </td>
+                        <td
+                          style={{ ...sTd, padding: "6px 8px", color: C.muted }}
+                        >
+                          {r.claimed_at
+                            ? new Date(r.claimed_at).toLocaleDateString("en-ZA")
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+
+      {!loaded && (
+        <div
+          style={{
+            ...sCard,
+            textAlign: "center",
+            padding: "60px",
+            color: C.muted,
+          }}
+        >
+          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔍</div>
+          <p
+            style={{
+              fontFamily: F.body,
+              fontSize: "14px",
+              marginBottom: "16px",
+            }}
+          >
+            Click "Load Audit Data" to fetch the full batch → QR → scan
+            traceability chain.
+          </p>
+          <p style={{ fontFamily: F.body, fontSize: "12px", color: C.muted }}>
+            Data loads on demand to keep the page fast. Export as CSV for
+            regulatory submissions.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
