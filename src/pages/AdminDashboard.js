@@ -1,14 +1,12 @@
-// AdminDashboard.js v4.4
+// AdminDashboard.js v4.5
 // Protea Botanicals — March 2026
-// ★ v4.4 changes:
-//   BUG-002 FIX: computeAnalytics rewritten to query qr_codes table
-//   (was querying legacy 'products' table — all KPIs showed 0)
-//   qr_codes columns used: claimed(bool), distributed_at, is_active,
-//   points_value, stockist_id, claimed_at, created_at
-//   All v4.3 content preserved exactly — only computeAnalytics changed.
-// ★ v4.3 changes:
-//   1. ADDED: Support tab — full ticket management via AdminSupportPanel
-//   2. ADDED: open ticket badge on Support tab button
+// ★ v4.5 changes (WP-S: Batch QR Chain):
+//   - handleNavigateToQR now accepts batchId and stores it in state
+//   - AdminQRCodes receives initialBatchId + initialTab="generate" props
+//     so clicking "Generate QR" on a batch card lands directly on the
+//     Generate tab with that batch pre-selected
+// ★ v4.4: BUG-002 fix — Overview KPIs rewired to qr_codes table
+// ★ v4.3: Support tab + open ticket badge
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -277,7 +275,6 @@ function AdminMessages() {
     query: { label: "Query", icon: "💬", color: C.blue },
     fault: { label: "Fault", icon: "⚠", color: C.red },
   };
-
   const filtered =
     filterType === "all"
       ? messages
@@ -575,7 +572,7 @@ function AdminMessages() {
                       onClick={() => handleReply(msg)}
                       disabled={sending}
                       style={{
-                        ...makeBtn(C.green, C.white, sending),
+                        ...makeBtn(C.green, C.white),
                         marginTop: 8,
                         fontSize: 10,
                       }}
@@ -599,6 +596,8 @@ function AdminMessages() {
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
+  // v4.5: track which batch to pre-select when navigating to QR generator
+  const [qrInitialBatchId, setQrInitialBatchId] = useState(null);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
@@ -637,38 +636,28 @@ export default function AdminDashboard() {
     setOpenTicketCount(count || 0);
   }, []);
 
-  // ─── v4.4: computeAnalytics — rewired to qr_codes (was querying legacy products table) ───
+  // v4.4: computeAnalytics rewired to qr_codes (was legacy products table)
   const computeAnalytics = useCallback(async () => {
     try {
-      // Total QR codes
       const { count: total } = await supabase
         .from("qr_codes")
         .select("*", { count: "exact", head: true });
-
-      // Claimed (claimed boolean = true)
       const { count: claimed } = await supabase
         .from("qr_codes")
         .select("*", { count: "exact", head: true })
         .eq("claimed", true);
-
-      // Distributed (distributed_at is set, not yet claimed)
       const { count: distributed } = await supabase
         .from("qr_codes")
         .select("*", { count: "exact", head: true })
         .not("distributed_at", "is", null)
         .eq("claimed", false);
-
-      // In stock (active, not yet distributed)
       const { count: inStock } = await supabase
         .from("qr_codes")
         .select("*", { count: "exact", head: true })
         .eq("is_active", true)
         .is("distributed_at", null);
-
       const claimRate =
         total > 0 ? (((claimed || 0) / total) * 100).toFixed(1) : 0;
-
-      // Total points distributed to claimed QRs
       const { data: pointsData } = await supabase
         .from("qr_codes")
         .select("points_value")
@@ -677,8 +666,6 @@ export default function AdminDashboard() {
         (s, p) => s + (p.points_value || 0),
         0,
       );
-
-      // Active stockists (distinct stockist_id on distributed QRs)
       const { data: stockistData } = await supabase
         .from("qr_codes")
         .select("stockist_id")
@@ -686,8 +673,6 @@ export default function AdminDashboard() {
       const activeStockists = new Set(
         (stockistData || []).map((p) => p.stockist_id),
       ).size;
-
-      // Avg hours from distributed_at → claimed_at
       const { data: timeData } = await supabase
         .from("qr_codes")
         .select("distributed_at, claimed_at")
@@ -703,12 +688,9 @@ export default function AdminDashboard() {
         );
         avgTimeToClaim = (hrs / timeData.length).toFixed(1);
       }
-
-      // User count
       const { count: userCount } = await supabase
         .from("user_profiles")
         .select("*", { count: "exact", head: true });
-
       setAnalytics({
         total: total || 0,
         claimed: claimed || 0,
@@ -724,7 +706,6 @@ export default function AdminDashboard() {
       console.error("[AdminDashboard] Analytics error:", e);
     }
   }, []);
-  // ─── end v4.4 fix ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchUsers();
@@ -733,7 +714,6 @@ export default function AdminDashboard() {
     fetchOpenTickets();
   }, [fetchUsers, computeAnalytics, fetchUnreadCount, fetchOpenTickets]);
 
-  // Realtime badge refresh — messages
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-msgs")
@@ -756,7 +736,6 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchUnreadCount]);
 
-  // Realtime badge refresh — support tickets
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-tickets")
@@ -769,7 +748,12 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchOpenTickets]);
 
-  const handleNavigateToQR = () => setTab("qr_codes");
+  // v4.5: store batchId so QR generator can pre-select it
+  const handleNavigateToQR = (batchId) => {
+    setQrInitialBatchId(batchId || null);
+    setTab("qr_codes");
+  };
+
   const handleNavigateToDocuments = (documentId) => {
     setDocumentsTargetId(documentId);
     setTab("documents");
@@ -838,7 +822,10 @@ export default function AdminDashboard() {
         <TabBtn
           active={tab === "qr_codes"}
           label="QR Codes"
-          onClick={() => setTab("qr_codes")}
+          onClick={() => {
+            setQrInitialBatchId(null);
+            setTab("qr_codes");
+          }}
         />
         <TabBtn
           active={tab === "users"}
@@ -896,7 +883,7 @@ export default function AdminDashboard() {
       {error && (
         <div
           style={{
-            background: C.lightRed,
+            background: "#f8d7da",
             border: `1px solid ${C.red}`,
             padding: "12px 16px",
             borderRadius: "2px",
@@ -1006,7 +993,6 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* Unread messages alert */}
           {unreadMsgCount > 0 && (
             <div
               style={{
@@ -1038,8 +1024,6 @@ export default function AdminDashboard() {
               </button>
             </div>
           )}
-
-          {/* Open support tickets alert */}
           {openTicketCount > 0 && (
             <div
               style={{
@@ -1096,7 +1080,10 @@ export default function AdminDashboard() {
               🌿 MANAGE BATCHES
             </button>
             <button
-              onClick={() => setTab("qr_codes")}
+              onClick={() => {
+                setQrInitialBatchId(null);
+                setTab("qr_codes");
+              }}
               style={makeBtn(C.accent)}
             >
               QR ENGINE v2
@@ -1147,7 +1134,13 @@ export default function AdminDashboard() {
       {tab === "support" && <AdminSupportPanel />}
       {tab === "security" && <AdminFraudSecurity />}
       {tab === "notifications" && <AdminNotifications />}
-      {tab === "qr_codes" && <AdminQRCodes />}
+      {/* v4.5: pass initialBatchId + initialTab to AdminQRCodes */}
+      {tab === "qr_codes" && (
+        <AdminQRCodes
+          initialBatchId={qrInitialBatchId}
+          initialTab={qrInitialBatchId ? "generate" : "registry"}
+        />
+      )}
       {tab === "analytics" && <AdminAnalytics />}
       {tab === "stock" && <StockControl />}
       {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}

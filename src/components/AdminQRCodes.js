@@ -1237,7 +1237,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERATE TAB — 3-step wizard
 // ═══════════════════════════════════════════════════════════════════════════════
-function GenerateTab({ batches, banners, onGenerated }) {
+function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
   const [step, setStep] = useState(1);
   const [selectedType, setSelectedType] = useState("product_insert");
   const [campaignName, setCampaignName] = useState("");
@@ -1282,6 +1282,14 @@ function GenerateTab({ batches, banners, onGenerated }) {
     if (batches.length) setSelectedBatchId(batches[0].id);
     if (banners.length) setBannerId(banners[0].id);
   }, [batches, banners]);
+
+  useEffect(() => {
+    if (initialBatchId && batches.length > 0) {
+      setSelectedBatchId(initialBatchId);
+      setSelectedType("product_insert");
+      setStep(1);
+    }
+  }, [initialBatchId, batches]);
 
   useEffect(() => {
     const t = QR_TYPES.find((t) => t.value === selectedType);

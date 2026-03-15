@@ -1133,7 +1133,7 @@ export default function AdminBatchManager({
 
       // Get QR + claim stats for all batches in one query
       const { data: productData } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("batch_id, claimed")
         .not("batch_id", "is", null);
 
