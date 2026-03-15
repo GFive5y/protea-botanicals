@@ -1,18 +1,14 @@
-// src/pages/Account.js — Protea Botanicals v6.2
+// src/pages/Account.js — Protea Botanicals v6.3
 // ============================================================================
+// v6.3 — Inbox tab removed. CustomerInbox now renders inside Support tab
+//         (above CustomerSupportWidget). Keeps full inbox functionality:
+//         tier_upgrade notices, streak_bonus notices, admin replies, compose.
+//         inboxUnread state retained for Support tab badge.
+//         ClientHeader still shows unread badge via getInboxUnreadCount.
+//
 // v6.2 — WP-8 POPIA Data Deletion Request
-//
-//   CHANGES from v6.1:
-//     - AccountView: deletionRequested + deletionLoading state vars added
-//     - AccountView: handleRequestDeletion() — inserts to deletion_requests
-//     - Details tab: POPIA section with "Request Data Deletion" button
-//     - All v6.1 functionality preserved exactly
-//
 // v6.1 — WP-O Loyalty Engine Integration
-//   TIER 1 — My Details (always accessible)
-//   TIER 2 — Earn Rewards (OTP phone verification required)
-//   ADMIN CONFIG PANEL (admin role only)
-//   TABS: Details | Earn Rewards | Inbox | Activity | Support
+//   TABS: Details | Earn Rewards | Activity | Support
 // ============================================================================
 
 import { useState, useEffect, useContext, useRef, useCallback } from "react";
@@ -1130,8 +1126,6 @@ function AccountView({
   const [scanHistory, setScanHistory] = useState([]);
   const [scansLoading, setScansLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
-
-  // v6.1: WP-O
   const [loyaltyConfig, setLoyaltyConfig] = useState({
     pts_referral_referrer: 100,
     pts_referral_referee: 50,
@@ -1139,8 +1133,6 @@ function AccountView({
   const [referralCode, setReferralCode] = useState(null);
   const [referralUses, setReferralUses] = useState(0);
   const [refCopied, setRefCopied] = useState(false);
-
-  // ── v6.2: WP-8 POPIA deletion ──────────────────────────────────────────────
   const [deletionRequested, setDeletionRequested] = useState(false);
   const [deletionLoading, setDeletionLoading] = useState(false);
 
@@ -1168,7 +1160,6 @@ function AccountView({
     if (activeTab === "activity") loadScans();
   }, [activeTab, loadScans]);
 
-  // v6.1: load loyalty config + referral code
   useEffect(() => {
     async function loadRewardsMeta() {
       const { data: cfg } = await supabase
@@ -1236,7 +1227,6 @@ function AccountView({
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // v6.2: POPIA deletion request handler
   const handleRequestDeletion = async () => {
     if (
       !window.confirm(
@@ -1262,7 +1252,6 @@ function AccountView({
     }
   };
 
-  // v6.1: referral helpers
   const copyReferralCode = () => {
     if (!referralCode) return;
     navigator.clipboard.writeText(referralCode).then(() => {
@@ -1407,18 +1396,18 @@ function AccountView({
   const isEditing = !!detailsForm;
   const df = detailsForm || profile;
 
+  // v6.3: 4 tabs — Inbox merged into Support tab
   const TABS = [
     { id: "details", label: "📋 My Details" },
     {
       id: "rewards",
       label: `⭐ Earn Rewards${earnedFields.length < rewardFields.length ? " ●" : ""}`,
     },
-    {
-      id: "inbox",
-      label: `📬 Inbox${inboxUnread > 0 ? ` (${inboxUnread})` : ""}`,
-    },
     { id: "activity", label: "📱 Activity" },
-    { id: "support", label: "🎫 Support" },
+    {
+      id: "support",
+      label: `🎫 Support${inboxUnread > 0 ? ` (${inboxUnread})` : ""}`,
+    },
   ];
 
   return (
@@ -1461,7 +1450,7 @@ function AccountView({
       )}
 
       <div style={{ maxWidth: 660, margin: "0 auto", padding: "32px 16px 0" }}>
-        {/* ── HEADER CARD ── */}
+        {/* Header card */}
         <div
           style={{
             background: C.green,
@@ -1626,7 +1615,7 @@ function AccountView({
           )}
         </div>
 
-        {/* ── TABS ── */}
+        {/* Tabs */}
         <div
           className="acct-tabs"
           style={{
@@ -1675,7 +1664,7 @@ function AccountView({
             marginBottom: 16,
           }}
         >
-          {/* ══ DETAILS TAB ══ */}
+          {/* DETAILS TAB */}
           {activeTab === "details" && (
             <div className="reward-tab-enter">
               <div
@@ -2008,7 +1997,7 @@ function AccountView({
                 </div>
               )}
 
-              {/* ── v6.2: POPIA Data Deletion Request ────────────────────── */}
+              {/* POPIA */}
               <div
                 style={{
                   marginTop: 28,
@@ -2126,7 +2115,7 @@ function AccountView({
             </div>
           )}
 
-          {/* ══ EARN REWARDS TAB ══ */}
+          {/* EARN REWARDS TAB */}
           {activeTab === "rewards" && (
             <div className="reward-tab-enter">
               {!profile.phone_verified ? (
@@ -2247,7 +2236,6 @@ function AccountView({
                       </div>
                     )}
                   </div>
-
                   <div
                     style={{
                       background: C.lightBlue,
@@ -2264,7 +2252,6 @@ function AccountView({
                     complete earns you real points. Your data is protected under
                     POPIA and is never sold to third parties.
                   </div>
-
                   <div style={{ display: "grid", gap: 8 }}>
                     {rewardFields.map((k) => (
                       <RewardField
@@ -2276,7 +2263,6 @@ function AccountView({
                       />
                     ))}
                   </div>
-
                   {referralCode && (
                     <div
                       style={{
@@ -2400,17 +2386,7 @@ function AccountView({
             </div>
           )}
 
-          {/* ══ INBOX TAB ══ */}
-          {activeTab === "inbox" && (
-            <div className="reward-tab-enter">
-              <CustomerInbox
-                userId={user.id}
-                onUnreadChange={(n) => setInboxUnread(n)}
-              />
-            </div>
-          )}
-
-          {/* ══ ACTIVITY TAB ══ */}
+          {/* ACTIVITY TAB */}
           {activeTab === "activity" && (
             <div className="reward-tab-enter">
               <div
@@ -2648,9 +2624,42 @@ function AccountView({
             </div>
           )}
 
-          {/* ══ SUPPORT TAB ══ */}
+          {/* SUPPORT TAB — CustomerInbox first, then CustomerSupportWidget */}
           {activeTab === "support" && (
             <div style={{ animation: "fadeIn 0.3s ease" }}>
+              {/* Inbox: admin messages, tier upgrades, streak bonuses, referral notices */}
+              <CustomerInbox
+                userId={user.id}
+                onUnreadChange={(n) => setInboxUnread(n)}
+              />
+              {/* Divider */}
+              <div
+                style={{
+                  borderTop: `2px solid ${C.border}`,
+                  margin: "28px 0 24px",
+                  position: "relative",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -10,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: C.white,
+                    padding: "0 12px",
+                    fontSize: 10,
+                    color: C.muted,
+                    fontWeight: 600,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    fontFamily: F.body,
+                  }}
+                >
+                  Support Tickets
+                </span>
+              </div>
+              {/* Support tickets with auto-reply */}
               <CustomerSupportWidget userId={user?.id} profile={profile} />
             </div>
           )}
@@ -2758,7 +2767,7 @@ function AccountView({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN EXPORT — handles session / auth gating
+// MAIN EXPORT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Account() {
   const [email, setEmail] = useState("");

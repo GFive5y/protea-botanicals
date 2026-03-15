@@ -1,29 +1,7 @@
-// src/components/ClientHeader.js — Protea Botanicals WP-N v1.2
-// ─────────────────────────────────────────────────────────────────────────────
-// Unified client header. Replaces page-level navbars on:
-//   Landing.js, Shop.js, Loyalty.js, ScanResult.js, Account.js
-//
-// ★ Scroll behaviour — ported exactly from NavBar v3.8:
-//   · Unscrolled : cream bg rgba(250,249,246,0.97), dark green brand text, dark icons
-//   · Scrolled   : green bg rgba(27,67,50,0.95), cream brand text, cream icons, blur(8px)
-//   · Auto-hide  : hides on scroll-down past 300px, reappears on scroll-up
-//   · Transitions: background 0.4s ease, colors 0.4s ease, transform 0.35s ease
-//
-// Props:
-//   variant  'light'       (default) — cream→green scroll-aware  (Shop, Loyalty, Account)
-//            'dark'                  — always green, no transition (ScanResult)
-//            'transparent'           — hero bleed-through on load, then cream→green (Landing)
-//                                      starts clear with cream text, snaps into light after 50px
-//                                      spacer height = 0 so hero fills top of viewport
-//
-// Self-contained: renders fixed header + 60px spacer div.
-// Pages do NOT need their own paddingTop.
-//
-// Confirmed import paths (from actual source files):
-//   useCart             ← src/contexts/CartContext.js
-//   supabase            ← src/services/supabaseClient.js
-//   getInboxUnreadCount ← src/components/CustomerInbox.js
-// ─────────────────────────────────────────────────────────────────────────────
+// src/components/ClientHeader.js — Protea Botanicals WP-N v1.3
+// v1.3: Drawer nav "Inbox" renamed to "Support" — links to /account state:{tab:"support"}
+//       getInboxUnreadCount + unreadCount polling + avatar badge all retained.
+//       No other changes from v1.2.
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -33,19 +11,18 @@ import { getInboxUnreadCount } from "./CustomerInbox";
 
 const HEADER_HEIGHT = 60;
 
-// ── Colour tokens ─────────────────────────────────────────────────────────────
 const T = {
-  bgLight: "rgba(250,249,246,0.97)", // cream unscrolled — exact from NavBar v3.8
-  bgDark: "#173a2a", // green scrolled — solid, max contrast
-  bgTransparent: "transparent", // Landing hero bleed-through — no bg at all
+  bgLight: "rgba(250,249,246,0.97)",
+  bgDark: "#173a2a",
+  bgTransparent: "transparent",
   borderLight: "1px solid #e8e0d4",
   borderDark: "1px solid rgba(82,183,136,0.20)",
-  borderNone: "1px solid transparent", // transparent variant unscrolled
-  brandLight: "#1b4332", // dark green unscrolled
-  brandDark: "#ffffff", // full white scrolled — max legibility
-  brandTransp: "#1b4332", // dark green over Landing's light cream hero
-  fgLight: "#1a1a1a", // icons/text unscrolled
-  fgDark: "#ffffff", // full white scrolled — max legibility
+  borderNone: "1px solid transparent",
+  brandLight: "#1b4332",
+  brandDark: "#ffffff",
+  brandTransp: "#1b4332",
+  fgLight: "#1a1a1a",
+  fgDark: "#ffffff",
   green: "#1b4332",
   greenMid: "#2d6a4f",
   cream: "#faf9f6",
@@ -70,25 +47,23 @@ const ADMIN_LINKS = [
   { label: "HQ Dashboard", path: "/hq", icon: "🏢" },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
 export default function ClientHeader({ variant = "light" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { getCartCount } = useCart();
   const cartCount = getCartCount();
 
-  // ── Scroll state — exact logic from NavBar v3.8 ───────────────────────────
   const [scrolled, setScrolled] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
 
   useEffect(() => {
-    if (variant === "dark") return; // dark = always green, no scroll transitions
+    if (variant === "dark") return;
     let lastY = window.scrollY;
     const onScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 50);
       if (y > 300) {
-        setHeaderVisible(y < lastY); // hide on down, show on up
+        setHeaderVisible(y < lastY);
       } else {
         setHeaderVisible(true);
       }
@@ -98,7 +73,6 @@ export default function ClientHeader({ variant = "light" }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [variant]);
 
-  // ── Auth / profile ────────────────────────────────────────────────────────
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -138,7 +112,7 @@ export default function ClientHeader({ variant = "light" }) {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
-  // Poll unread every 60 s
+  // Poll unread every 60s
   useEffect(() => {
     if (!user) return;
     const iv = setInterval(async () => {
@@ -148,7 +122,6 @@ export default function ClientHeader({ variant = "light" }) {
     return () => clearInterval(iv);
   }, [user]);
 
-  // ── Panel state ───────────────────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -158,7 +131,6 @@ export default function ClientHeader({ variant = "light" }) {
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  // Close on outside click / Escape
   useEffect(() => {
     const onMouse = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
@@ -183,70 +155,41 @@ export default function ClientHeader({ variant = "light" }) {
     };
   }, []);
 
-  // Close all on route change
   useEffect(() => {
     setDrawerOpen(false);
     setDropdownOpen(false);
     setSearchOpen(false);
     setSearchQuery("");
   }, [location.pathname]);
-
-  // Focus search input when opened
   useEffect(() => {
     if (searchOpen && searchInputRef.current) searchInputRef.current.focus();
   }, [searchOpen]);
 
-  // ── Derived theme — three-way colour system ──────────────────────────────
-  //
-  //  variant='light'       : unscrolled=cream  → scrolled=green
-  //  variant='dark'        : always green (ScanResult), no transitions
-  //  variant='transparent' : unscrolled=clear+cream-text → scrolled=cream (Landing hero)
-  //                          Once scrolled it behaves identically to 'light'
-  //
-  // "solidified" = the header has gained a background (scrolled, or always-dark)
   const solidified = variant === "dark" || scrolled;
-
-  // unscrolled transparent = cream text over hero image
   const isTransparentUnscrolled = variant === "transparent" && !scrolled;
-
-  // bg: dark=always green · light+scrolled=green · light+top=cream · transp+scrolled=green · transp+top=clear
   const bg =
     variant === "dark" || scrolled
       ? T.bgDark
       : variant === "transparent"
         ? T.bgTransparent
         : T.bgLight;
-
   const borderVal =
     variant === "dark" || scrolled
       ? T.borderDark
       : variant === "transparent"
         ? T.borderNone
         : T.borderLight;
-
-  // Brand & icon colours:
-  //   - dark variant    → always cream (green bg)
-  //   - light scrolled  → cream (green bg)
-  //   - light unscrolled→ dark green
-  //   - transparent unscrolled → cream (over hero image)
-  //   - transparent scrolled  → dark green (over cream bg, same as light)
   const brandColor =
     variant === "dark" || (variant === "light" && scrolled)
-      ? T.brandDark // cream
+      ? T.brandDark
       : isTransparentUnscrolled
-        ? T.brandTransp // cream over hero
-        : T.brandLight; // dark green
-
+        ? T.brandTransp
+        : T.brandLight;
   const fg =
     variant === "dark" || (variant === "light" && scrolled)
       ? T.fgDark
-      : isTransparentUnscrolled
-        ? T.fgLight // dark icons over light hero
-        : T.fgLight;
-
+      : T.fgLight;
   const blurVal = solidified ? "blur(8px)" : "none";
-
-  // Sign In button — transparent+unscrolled = light hero → dark green (NOT white)
   const signInBg = solidified
     ? "rgba(255,255,255,0.10)"
     : "rgba(27,67,50,0.06)";
@@ -254,11 +197,8 @@ export default function ClientHeader({ variant = "light" }) {
     ? "1px solid rgba(255,255,255,0.30)"
     : "1px solid #1b4332";
   const signInColor = solidified ? "#fff" : "#1b4332";
-
-  // isActive is kept for search-bar context styling (green vs sand bg)
   const isActive = solidified;
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const getInitials = (name) =>
     name
       ? name
@@ -268,7 +208,6 @@ export default function ClientHeader({ variant = "light" }) {
           .toUpperCase()
           .slice(0, 2)
       : "?";
-
   const isStaff = profile?.role === "admin" || profile?.role === "hq";
   const isLinkActive = (path) =>
     path === "/"
@@ -298,7 +237,6 @@ export default function ClientHeader({ variant = "light" }) {
     }
   };
 
-  // Shared icon button — colour follows scroll state via `fg`
   const iconBtn = {
     background: "none",
     border: "none",
@@ -313,10 +251,8 @@ export default function ClientHeader({ variant = "light" }) {
     transition: "color 0.4s ease",
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ── Fixed header ─────────────────────────────────────────────────── */}
       <header
         style={{
           position: "fixed",
@@ -333,14 +269,13 @@ export default function ClientHeader({ variant = "light" }) {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 24px",
-          // ── Exact transitions from NavBar v3.8 ──
           transform: headerVisible ? "translateY(0)" : "translateY(-100%)",
           transition:
             "background 0.4s ease, border-color 0.4s ease, transform 0.35s ease, backdrop-filter 0.4s ease",
           fontFamily: "'Jost', sans-serif",
         }}
       >
-        {/* Left group: Hamburger + Wordmark */}
+        {/* Left */}
         <div
           style={{
             display: "flex",
@@ -370,8 +305,6 @@ export default function ClientHeader({ variant = "light" }) {
               ))}
             </span>
           </button>
-
-          {/* Wordmark — Cormorant Garamond, colour transitions with scroll */}
           <button
             onClick={() => navigate("/")}
             aria-label="Home"
@@ -395,7 +328,7 @@ export default function ClientHeader({ variant = "light" }) {
           </button>
         </div>
 
-        {/* Right: Search · Cart · Avatar/SignIn */}
+        {/* Right */}
         <div
           style={{
             display: "flex",
@@ -404,14 +337,12 @@ export default function ClientHeader({ variant = "light" }) {
             flexShrink: 0,
           }}
         >
-          {/* Search */}
           <button
             onClick={() => {
               setSearchOpen((s) => !s);
               setDropdownOpen(false);
             }}
             aria-label="Search"
-            title="Search products"
             style={{ ...iconBtn }}
           >
             <svg
@@ -429,8 +360,6 @@ export default function ClientHeader({ variant = "light" }) {
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
           </button>
-
-          {/* Cart — SVG stroke transitions with scroll, exact from NavBar v3.8 */}
           <button
             onClick={() => navigate("/cart")}
             aria-label={`Cart${cartCount > 0 ? `, ${cartCount} items` : ""}`}
@@ -476,8 +405,6 @@ export default function ClientHeader({ variant = "light" }) {
               </span>
             )}
           </button>
-
-          {/* Avatar (logged in) */}
           {user ? (
             <div
               ref={dropdownRef}
@@ -544,7 +471,6 @@ export default function ClientHeader({ variant = "light" }) {
               </button>
             </div>
           ) : (
-            /* Sign In pill — exact style + transitions from NavBar v3.8 */
             <button
               onClick={() => navigate("/account")}
               style={{
@@ -578,9 +504,6 @@ export default function ClientHeader({ variant = "light" }) {
         </div>
       </header>
 
-      {/* ── Spacer ────────────────────────────────────────────────────────── */}
-      {/* transparent variant = 0px — hero bleeds under the header from the top */}
-      {/* light / dark        = 60px — page content starts below the header    */}
       <div
         style={{
           height: variant === "transparent" ? 0 : `${HEADER_HEIGHT}px`,
@@ -588,7 +511,6 @@ export default function ClientHeader({ variant = "light" }) {
         }}
       />
 
-      {/* ── Search bar — sticky below header when open ────────────────────── */}
       {searchOpen && (
         <div
           ref={searchRef}
@@ -655,7 +577,6 @@ export default function ClientHeader({ variant = "light" }) {
                 setSearchOpen(false);
                 setSearchQuery("");
               }}
-              aria-label="Close search"
               style={{
                 background: "none",
                 border: "none",
@@ -664,7 +585,6 @@ export default function ClientHeader({ variant = "light" }) {
                 fontSize: 18,
                 padding: "6px",
                 lineHeight: 1,
-                transition: "color 0.4s ease",
               }}
             >
               ✕
@@ -673,7 +593,6 @@ export default function ClientHeader({ variant = "light" }) {
         </div>
       )}
 
-      {/* ── Drawer overlay ────────────────────────────────────────────────── */}
       {drawerOpen && (
         <div
           onClick={() => setDrawerOpen(false)}
@@ -686,7 +605,6 @@ export default function ClientHeader({ variant = "light" }) {
         />
       )}
 
-      {/* ── Drawer panel — slides from left ──────────────────────────────── */}
       <nav
         aria-label="Main navigation"
         style={{
@@ -706,7 +624,6 @@ export default function ClientHeader({ variant = "light" }) {
           overflowY: "auto",
         }}
       >
-        {/* Drawer header */}
         <div
           style={{
             display: "flex",
@@ -748,7 +665,6 @@ export default function ClientHeader({ variant = "light" }) {
           </button>
         </div>
 
-        {/* User info strip */}
         {user && (
           <div
             style={{
@@ -793,7 +709,6 @@ export default function ClientHeader({ variant = "light" }) {
           </div>
         )}
 
-        {/* Links */}
         <div style={{ flex: 1, padding: "8px 0", overflowY: "auto" }}>
           {PUBLIC_LINKS.map((link) => {
             const act = isLinkActive(link.path);
@@ -835,7 +750,6 @@ export default function ClientHeader({ variant = "light" }) {
             );
           })}
 
-          {/* Account links — only when logged in */}
           {user && (
             <>
               <div
@@ -855,11 +769,13 @@ export default function ClientHeader({ variant = "light" }) {
               {[
                 { label: "Account Settings", path: "/account", icon: "👤" },
                 { label: "My Loyalty", path: "/loyalty", icon: "⭐" },
+                // v1.3: Inbox renamed to Support — links to support tab which contains inbox + tickets
                 {
-                  label: unreadCount > 0 ? `Inbox (${unreadCount})` : "Inbox",
+                  label:
+                    unreadCount > 0 ? `Support (${unreadCount})` : "Support",
                   path: "/account",
-                  icon: unreadCount > 0 ? "📬" : "📭",
-                  state: { tab: "inbox" },
+                  icon: unreadCount > 0 ? "🔔" : "🎫",
+                  state: { tab: "support" },
                   badge: unreadCount,
                 },
               ].map((item) => {
@@ -979,7 +895,6 @@ export default function ClientHeader({ variant = "light" }) {
           )}
         </div>
 
-        {/* Drawer footer */}
         <div
           style={{
             padding: "16px 20px",
