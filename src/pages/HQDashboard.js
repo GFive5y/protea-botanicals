@@ -1,5 +1,7 @@
-// src/pages/HQDashboard.js v3.6
+// src/pages/HQDashboard.js v3.7
 // Protea Botanicals — HQ Command Centre
+// v3.7: Removed "Production" tab (id: production) — "HQ Production" is the canonical tab
+// v3.6: Tab 3 now renders HQProduction (dead Production.js placeholder removed)
 // v3.5: WP-8 Fraud tab added (17th tab)
 // v3.4: Loyalty tab added (WP-O)
 // v3.3: All ERP tabs — procurement, costing, pricing, p&l, reorder, documents
@@ -14,7 +16,6 @@ import ShopManager from "../components/hq/ShopManager";
 
 // ── Phase 2C ──────────────────────────────────────────────────────────────────
 import SupplyChain from "../components/hq/SupplyChain";
-
 
 // ── Phase 2D ──────────────────────────────────────────────────────────────────
 import Distribution from "../components/hq/Distribution";
@@ -59,7 +60,6 @@ const C = {
 const TABS = [
   { id: "overview", label: "Overview", icon: "📊", ready: true },
   { id: "supply-chain", label: "Supply Chain", icon: "📦", ready: true },
-  { id: "production", label: "Production", icon: "🔧", ready: true },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   { id: "shops", label: "Shops", icon: "🏪", ready: true },
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
@@ -247,7 +247,6 @@ export default function HQDashboard() {
       <div>
         {activeTab === "overview" && <HQOverview onNavigate={handleNavigate} />}
         {activeTab === "supply-chain" && <SupplyChain />}
-        {activeTab === "production" && <HQProduction />}
         {activeTab === "distribution" && <Distribution />}
         {activeTab === "shops" && <ShopManager />}
         {activeTab === "analytics" && <HQAnalytics />}
