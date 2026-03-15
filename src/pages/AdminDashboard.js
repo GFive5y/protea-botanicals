@@ -1,10 +1,14 @@
-// AdminDashboard.js v4.3
+// AdminDashboard.js v4.4
 // Protea Botanicals — March 2026
+// ★ v4.4 changes:
+//   BUG-002 FIX: computeAnalytics rewritten to query qr_codes table
+//   (was querying legacy 'products' table — all KPIs showed 0)
+//   qr_codes columns used: claimed(bool), distributed_at, is_active,
+//   points_value, stockist_id, claimed_at, created_at
+//   All v4.3 content preserved exactly — only computeAnalytics changed.
 // ★ v4.3 changes:
 //   1. ADDED: Support tab — full ticket management via AdminSupportPanel
-//      (WP-P Customer Communications Platform — tickets, templates, broadcast)
 //   2. ADDED: open ticket badge on Support tab button
-//   All v4.2 content preserved exactly.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -280,7 +284,6 @@ function AdminMessages() {
       : filterType === "unread"
         ? messages.filter((m) => !m.read_at)
         : messages.filter((m) => m.message_type === filterType);
-
   const unreadCount = messages.filter((m) => !m.read_at).length;
 
   return (
@@ -599,7 +602,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
-  const [openTicketCount, setOpenTicketCount] = useState(0); // v4.3
+  const [openTicketCount, setOpenTicketCount] = useState(0);
   const [analytics, setAnalytics] = useState({
     total: 0,
     claimed: 0,
@@ -626,7 +629,6 @@ export default function AdminDashboard() {
     setUnreadMsgCount(count || 0);
   }, []);
 
-  // v4.3: fetch open support ticket count
   const fetchOpenTickets = useCallback(async () => {
     const { count } = await supabase
       .from("support_tickets")
@@ -635,44 +637,61 @@ export default function AdminDashboard() {
     setOpenTicketCount(count || 0);
   }, []);
 
+  // ─── v4.4: computeAnalytics — rewired to qr_codes (was querying legacy products table) ───
   const computeAnalytics = useCallback(async () => {
     try {
+      // Total QR codes
       const { count: total } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("*", { count: "exact", head: true });
+
+      // Claimed (claimed boolean = true)
       const { count: claimed } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("*", { count: "exact", head: true })
-        .eq("status", "claimed");
+        .eq("claimed", true);
+
+      // Distributed (distributed_at is set, not yet claimed)
       const { count: distributed } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("*", { count: "exact", head: true })
-        .eq("status", "distributed");
+        .not("distributed_at", "is", null)
+        .eq("claimed", false);
+
+      // In stock (active, not yet distributed)
       const { count: inStock } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("*", { count: "exact", head: true })
-        .eq("status", "in_stock");
+        .eq("is_active", true)
+        .is("distributed_at", null);
+
       const claimRate =
         total > 0 ? (((claimed || 0) / total) * 100).toFixed(1) : 0;
+
+      // Total points distributed to claimed QRs
       const { data: pointsData } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("points_value")
-        .eq("status", "claimed");
+        .eq("claimed", true);
       const totalPointsDistributed = (pointsData || []).reduce(
-        (s, p) => s + (p.points_value || 10),
+        (s, p) => s + (p.points_value || 0),
         0,
       );
+
+      // Active stockists (distinct stockist_id on distributed QRs)
       const { data: stockistData } = await supabase
-        .from("products")
+        .from("qr_codes")
         .select("stockist_id")
         .not("stockist_id", "is", null);
       const activeStockists = new Set(
         (stockistData || []).map((p) => p.stockist_id),
       ).size;
+
+      // Avg hours from distributed_at → claimed_at
       const { data: timeData } = await supabase
-        .from("products")
-        .select("distributed_at,claimed_at")
-        .eq("status", "claimed")
+        .from("qr_codes")
+        .select("distributed_at, claimed_at")
+        .eq("claimed", true)
         .not("distributed_at", "is", null)
         .not("claimed_at", "is", null);
       let avgTimeToClaim = null;
@@ -684,9 +703,12 @@ export default function AdminDashboard() {
         );
         avgTimeToClaim = (hrs / timeData.length).toFixed(1);
       }
+
+      // User count
       const { count: userCount } = await supabase
         .from("user_profiles")
         .select("*", { count: "exact", head: true });
+
       setAnalytics({
         total: total || 0,
         claimed: claimed || 0,
@@ -699,9 +721,10 @@ export default function AdminDashboard() {
         userCount: userCount || 0,
       });
     } catch (e) {
-      console.error("Analytics error:", e);
+      console.error("[AdminDashboard] Analytics error:", e);
     }
   }, []);
+  // ─── end v4.4 fix ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchUsers();
@@ -733,7 +756,7 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchUnreadCount]);
 
-  // Realtime badge refresh — support tickets (v4.3)
+  // Realtime badge refresh — support tickets
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-tickets")
@@ -1016,7 +1039,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Open support tickets alert (v4.3) */}
+          {/* Open support tickets alert */}
           {openTicketCount > 0 && (
             <div
               style={{
