@@ -1,4 +1,4 @@
-// src/pages/HQDashboard.js v3.5
+// src/pages/HQDashboard.js v3.6
 // Protea Botanicals — HQ Command Centre
 // v3.5: WP-8 Fraud tab added (17th tab)
 // v3.4: Loyalty tab added (WP-O)
@@ -14,7 +14,7 @@ import ShopManager from "../components/hq/ShopManager";
 
 // ── Phase 2C ──────────────────────────────────────────────────────────────────
 import SupplyChain from "../components/hq/SupplyChain";
-import Production from "../components/hq/Production";
+
 
 // ── Phase 2D ──────────────────────────────────────────────────────────────────
 import Distribution from "../components/hq/Distribution";
@@ -247,7 +247,7 @@ export default function HQDashboard() {
       <div>
         {activeTab === "overview" && <HQOverview onNavigate={handleNavigate} />}
         {activeTab === "supply-chain" && <SupplyChain />}
-        {activeTab === "production" && <Production />}
+        {activeTab === "production" && <HQProduction />}
         {activeTab === "distribution" && <Distribution />}
         {activeTab === "shops" && <ShopManager />}
         {activeTab === "analytics" && <HQAnalytics />}
