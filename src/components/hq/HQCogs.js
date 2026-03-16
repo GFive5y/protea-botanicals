@@ -28,6 +28,8 @@
 //   Misc:         misc_cost_zar / batch_size
 
 import { useState, useEffect, useCallback } from "react";
+import WorkflowGuide from "../WorkflowGuide";
+import { GUIDE_COSTING } from "../WorkflowGuideContent";
 import { supabase } from "../../services/supabaseClient";
 
 const CANNALYTICS_TESTS = [
@@ -1339,6 +1341,7 @@ export default function HQCogs() {
 
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
+      <WorkflowGuide {...GUIDE_COSTING} />
       {toast && (
         <div
           style={{
