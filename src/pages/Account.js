@@ -511,13 +511,18 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
       setError("Please enter the 6-digit code.");
       return;
     }
-    if (!generatedOtp) {
-      setError("Code expired — please request a new one.");
-      return;
-    }
-    if (otp.trim() !== generatedOtp) {
-      setError("Incorrect code. Please try again.");
-      return;
+    // DEV BYPASS: type 000000 on localhost to skip OTP check
+    const isDevBypass =
+      process.env.NODE_ENV === "development" && otp.trim() === "000000";
+    if (!isDevBypass) {
+      if (!generatedOtp) {
+        setError("Code expired — please request a new one.");
+        return;
+      }
+      if (otp.trim() !== generatedOtp) {
+        setError("Incorrect code. Please try again.");
+        return;
+      }
     }
     setVerifying(true);
     const { error: dbErr } = await supabase
@@ -540,15 +545,13 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
       .from("user_profiles")
       .update({ loyalty_points: newPts })
       .eq("id", userId);
-    await supabase
-      .from("loyalty_transactions")
-      .insert({
-        user_id: userId,
-        points: ptsToAward,
-        transaction_type: "PROFILE_COMPLETION",
-        description: `Phone verified — +${ptsToAward} bonus points`,
-        transaction_date: new Date().toISOString(),
-      });
+    await supabase.from("loyalty_transactions").insert({
+      user_id: userId,
+      points: ptsToAward,
+      transaction_type: "PROFILE_COMPLETION",
+      description: `Phone verified — +${ptsToAward} bonus points`,
+      transaction_date: new Date().toISOString(),
+    });
     setPhase("success");
     setVerifying(false);
     setTimeout(() => onVerified(ptsToAward, phone.trim()), 1500);
@@ -708,6 +711,22 @@ function OTPPanel({ currentPhone, userId, onVerified, config }) {
           </h3>
           <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
             Code sent to <strong>{phone}</strong> via WhatsApp.
+            {process.env.NODE_ENV === "development" && (
+              <span
+                style={{
+                  display: "block",
+                  marginTop: 8,
+                  color: "#e67e22",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: "#fff3e0",
+                  padding: "6px 10px",
+                  borderRadius: 3,
+                }}
+              >
+                🔧 Dev mode: enter <code>000000</code> to bypass verification
+              </span>
+            )}
             {countdown > 0 && (
               <span style={{ color: C.gold }}>
                 {" "}
@@ -1271,6 +1290,7 @@ function AccountView({
     setDetailsMsg(null);
     const payload = {
       full_name: detailsForm.full_name || null,
+      display_name: detailsForm.display_name || null,
       phone: detailsForm.phone || null,
       street_address: detailsForm.street_address || null,
       suburb: detailsForm.suburb || null,
@@ -1320,15 +1340,13 @@ function AccountView({
         .from("user_profiles")
         .update({ loyalty_points: newPts })
         .eq("id", user.id);
-      await supabase
-        .from("loyalty_transactions")
-        .insert({
-          user_id: user.id,
-          points: pointsToAward,
-          transaction_type: "PROFILE_COMPLETION",
-          description: `Profile: ${fieldLabel} added`,
-          transaction_date: new Date().toISOString(),
-        });
+      await supabase.from("loyalty_transactions").insert({
+        user_id: user.id,
+        points: pointsToAward,
+        transaction_type: "PROFILE_COMPLETION",
+        description: `Profile: ${fieldLabel} added`,
+        transaction_date: new Date().toISOString(),
+      });
       updatedProfile = { ...updatedProfile, loyalty_points: newPts };
       showToast(
         `🎉 +${pointsToAward} points earned for adding ${fieldLabel}!`,
@@ -1737,6 +1755,11 @@ function AccountView({
               >
                 {[
                   { field: "full_name", label: "Full Name", type: "text" },
+                  {
+                    field: "display_name",
+                    label: "Display Name — Leaderboard",
+                    type: "text",
+                  },
                   { field: "phone", label: "Phone / WhatsApp", type: "tel" },
                 ].map((f) => (
                   <div key={f.field}>
