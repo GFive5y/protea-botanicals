@@ -686,8 +686,195 @@ function HowItWorksBanner() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN
+// SET PRICE PANEL v2.4
 // ═══════════════════════════════════════════════════════════════════════════════
+function SetPricePanel({ items, onRefresh }) {
+  const finished = items.filter((i) => i.category === "finished_product");
+  const [prices, setPrices] = useState({});
+  const [saving, setSaving] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const init = {};
+    finished.forEach((i) => {
+      init[i.id] = parseFloat(i.sell_price || 0).toFixed(0);
+    });
+    setPrices(init);
+  }, [items]); // eslint-disable-line
+
+  const handleSave = async (item) => {
+    setSaving(item.id);
+    try {
+      const { error } = await supabase
+        .from("inventory_items")
+        .update({ sell_price: parseFloat(prices[item.id]) || 0 })
+        .eq("id", item.id);
+      if (error) throw error;
+      setToast({
+        msg: `✓ ${item.name} updated to R${prices[item.id]}`,
+        type: "success",
+      });
+      setTimeout(() => setToast(null), 3000);
+      onRefresh();
+    } catch (err) {
+      setToast({ msg: "Save failed: " + err.message, type: "error" });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        ...sCard,
+        borderLeft: `3px solid ${C.accent}`,
+        background: "#f0faf5",
+      }}
+    >
+      <div style={sLabel}>💰 Set Sell Prices — Website Shop</div>
+      <p
+        style={{
+          fontSize: "12px",
+          color: C.mid,
+          margin: "6px 0 12px",
+          fontFamily: F.body,
+          lineHeight: "1.7",
+        }}
+      >
+        Products with <strong>sell_price &gt; R0</strong> and{" "}
+        <strong>quantity &gt; 0</strong> appear automatically in the shop.
+      </p>
+      {toast && (
+        <div
+          style={{
+            padding: "8px 12px",
+            marginBottom: 10,
+            borderRadius: 2,
+            fontSize: 12,
+            fontFamily: F.body,
+            background: toast.type === "success" ? "#f0faf5" : "#fff0f0",
+            color: toast.type === "success" ? C.green : C.red,
+            border: `1px solid ${toast.type === "success" ? C.accent : C.red}`,
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
+      {finished.length === 0 ? (
+        <p style={{ fontSize: "12px", color: C.muted, fontFamily: F.body }}>
+          No finished products in inventory yet.
+        </p>
+      ) : (
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "12px",
+            fontFamily: F.body,
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={sTh}>Product</th>
+              <th style={sTh}>SKU</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Stock</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Sell Price (R)</th>
+              <th style={sTh}>Shop Status</th>
+              <th style={sTh}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {finished.map((i) => {
+              const qty = parseFloat(i.quantity_on_hand || 0);
+              const price = parseFloat(prices[i.id] || 0);
+              const isLive = qty > 0 && price > 0;
+              return (
+                <tr key={i.id}>
+                  <td style={{ ...sTd, fontWeight: 500 }}>{i.name}</td>
+                  <td
+                    style={{
+                      ...sTd,
+                      fontFamily: "monospace",
+                      fontSize: "11px",
+                      color: C.muted,
+                    }}
+                  >
+                    {i.sku}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      color: qty <= 0 ? C.red : C.green,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {Math.floor(qty)} pcs
+                  </td>
+                  <td style={{ ...sTd, textAlign: "right" }}>
+                    <input
+                      type="number"
+                      min="0"
+                      step="10"
+                      value={prices[i.id] || ""}
+                      onChange={(e) =>
+                        setPrices((p) => ({ ...p, [i.id]: e.target.value }))
+                      }
+                      style={{
+                        ...sInput,
+                        width: "90px",
+                        textAlign: "right",
+                        padding: "6px 8px",
+                      }}
+                      placeholder="0"
+                    />
+                  </td>
+                  <td style={sTd}>
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        padding: "2px 8px",
+                        borderRadius: 2,
+                        fontWeight: 700,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        background: isLive
+                          ? "#d4edda"
+                          : qty <= 0
+                            ? "#ffebee"
+                            : "#fff3e8",
+                        color: isLive ? C.green : qty <= 0 ? C.red : C.orange,
+                      }}
+                    >
+                      {isLive
+                        ? "🟢 Live"
+                        : qty <= 0
+                          ? "🔴 No Stock"
+                          : "🟡 Price Needed"}
+                    </span>
+                  </td>
+                  <td style={{ ...sTd, textAlign: "center" }}>
+                    <button
+                      onClick={() => handleSave(i)}
+                      disabled={saving === i.id}
+                      style={{
+                        ...sBtn(),
+                        padding: "5px 14px",
+                        fontSize: "9px",
+                      }}
+                    >
+                      {saving === i.id ? "..." : "Save"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const [items, setItems] = useState([]);
@@ -4337,28 +4524,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
           </button>
         </div>
       )}
-      <div
-        style={{
-          ...sCard,
-          borderLeft: `3px solid ${C.accent}`,
-          background: "#f0faf5",
-        }}
-      >
-        <div style={sLabel}>🛍 Website Shop — Automatic</div>
-        <p
-          style={{
-            fontSize: "12px",
-            color: C.mid,
-            margin: "6px 0 0",
-            fontFamily: F.body,
-            lineHeight: "1.7",
-          }}
-        >
-          Finished products with <strong>sell_price &gt; R0</strong> and{" "}
-          <strong>quantity &gt; 0</strong> are automatically live in the
-          customer shop. No manual activation needed.
-        </p>
-      </div>
+      <SetPricePanel items={items} onRefresh={onRefresh} />
     </div>
   );
 }
