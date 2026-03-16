@@ -23,6 +23,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
 const C = {
   green: "#1b4332",
@@ -877,6 +879,7 @@ function SetPricePanel({ items, onRefresh }) {
 }
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
+  const ctx = usePageContext("hq-production", null);
   const [items, setItems] = useState([]);
   const [runs, setRuns] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -1120,6 +1123,12 @@ export default function HQProduction() {
         </div>
       )}
 
+      <WorkflowGuide
+        context={ctx}
+        tabId="hq-production"
+        onAction={(action) => action.tab && setSubTab(action.tab)}
+        defaultOpen={true}
+      />
       {/* ── How It Works — persistent onboarding strip ── */}
       <HowItWorksBanner />
 

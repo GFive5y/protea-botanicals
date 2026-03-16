@@ -8,6 +8,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
 const C = {
   bg: "#f9f8f5",
@@ -2614,6 +2616,7 @@ function TabCampaigns({ showToast }) {
 // MAIN COMPONENT v2.1 — WP-Z: added recalculate_all_tiers() RPC
 // ═══════════════════════════════════════════════════════════════════════════
 export default function HQLoyalty() {
+  const ctx = usePageContext("loyalty", null);
   const [config, setConfig] = useState(null);
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2759,6 +2762,7 @@ export default function HQLoyalty() {
       const newConfig = { ...config, ...schemaValues };
       setConfig(newConfig);
       setDraft({ ...newConfig });
+      if (ctx?.refresh) ctx.refresh();
       showToast(
         `✓ ${schema.label} schema applied — all customer tiers updated live`,
       );
@@ -2792,6 +2796,7 @@ export default function HQLoyalty() {
       await recalculateAllTiers();
       setConfig({ ...draft, active_schema: schemaToSave });
       setDraft((d) => ({ ...d, active_schema: schemaToSave }));
+      if (ctx?.refresh) ctx.refresh();
       showToast("Loyalty config saved — all customer tiers updated live");
     } catch (err) {
       console.error("HQLoyalty save error:", err);
@@ -2823,6 +2828,12 @@ export default function HQLoyalty() {
   return (
     <div style={{ fontFamily: FONT_BODY, background: C.bg, minHeight: "100%" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@400;500;600;700&display=swap');`}</style>
+      <WorkflowGuide
+        context={ctx}
+        tabId="loyalty"
+        onAction={(action) => action.tab && setActiveTab(action.tab)}
+        defaultOpen={true}
+      />
       <div
         style={{
           padding: "24px 28px 0",

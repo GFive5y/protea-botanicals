@@ -1,527 +1,589 @@
-// src/components/WorkflowGuide.js — v1.0
-// Protea Botanicals — WP-X System Intelligence Layer
-// Reusable contextual onboarding + workflow guide for Admin and HQ tabs.
-// Dismissable, never blocks UI, remembers state via localStorage per tab.
+// src/components/WorkflowGuide.js
+// WP-GUIDE Phase A — Context Panel Component
+// Version: 2.0.0
+//
+// ─── DESIGN PHILOSOPHY ────────────────────────────────────────────────────────
+// This component is a PURE PRESENTATION LAYER. It knows nothing about tabs,
+// business domains, or what any status means. It receives a `context` object
+// from usePageContext() and renders it. That is its entire responsibility.
+//
+// It is intentionally opinionated about visual design and intentionally
+// unopinionated about data. Swap the query engine — the component doesn't care.
+// Change the business domain — the component doesn't care.
+//
+// API:
+//   <WorkflowGuide
+//     context    = { object from usePageContext() }
+//     onAction   = { (action) => void }     — called when action button clicked
+//     defaultOpen = { bool }                — initial expanded state (default: true)
+//     tabId       = { string }              — used for localStorage key isolation
+//   />
+//
+// Styling: inline styles only. Fonts: Jost (body/UI). No external dependencies.
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
-const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  blue: "#2c4a6e",
-  amber: "#f39c12",
-  border: "#e8e0d4",
-  muted: "#888",
-  white: "#fff",
-  red: "#c0392b",
+// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+
+const STATUS_CONFIG = {
+  setup: {
+    border: "#7c5cbf",
+    dot: "#7c5cbf",
+    bg: "rgba(124,92,191,0.04)",
+    headlineC: "#4a3875",
+    labelText: "Setup guide",
+    labelBg: "rgba(124,92,191,0.10)",
+    labelColor: "#4a3875",
+  },
+  ok: {
+    border: "#52b788",
+    dot: "#52b788",
+    bg: "rgba(82,183,136,0.04)",
+    headlineC: "#2d4a2d",
+    labelText: "All clear",
+    labelBg: "rgba(82,183,136,0.12)",
+    labelColor: "#2d4a2d",
+  },
+  info: {
+    border: "#3a7bd5",
+    dot: "#3a7bd5",
+    bg: "rgba(58,123,213,0.04)",
+    headlineC: "#1a3a6e",
+    labelText: "Note",
+    labelBg: "rgba(58,123,213,0.10)",
+    labelColor: "#1a3a6e",
+  },
+  warn: {
+    border: "#e9a84c",
+    dot: "#e9a84c",
+    bg: "rgba(233,168,76,0.05)",
+    headlineC: "#7a4f10",
+    labelText: "Action needed",
+    labelBg: "rgba(233,168,76,0.14)",
+    labelColor: "#7a4f10",
+  },
+  critical: {
+    border: "#c0392b",
+    dot: "#c0392b",
+    bg: "rgba(192,57,43,0.04)",
+    headlineC: "#7a1a12",
+    labelText: "Critical",
+    labelBg: "rgba(192,57,43,0.12)",
+    labelColor: "#7a1a12",
+  },
 };
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
 
-// ─── Step status colours ────────────────────────────────────────────────────
-function stepBg(status) {
-  if (status === "auto") return "rgba(82,183,136,0.07)";
-  if (status === "optional") return "rgba(136,136,136,0.05)";
-  return "rgba(27,67,50,0.04)";
-}
-function stepBorder(status) {
-  if (status === "auto") return "rgba(82,183,136,0.22)";
-  if (status === "optional") return "#e8e0d4";
-  return "rgba(27,67,50,0.12)";
-}
-function stepNumBg(status) {
-  if (status === "auto") return C.accent;
-  if (status === "optional") return C.muted;
-  return C.green;
-}
+const FONT = "'Jost', sans-serif";
 
-// ─── Sub-tab button ─────────────────────────────────────────────────────────
-function InnerTab({ id, label, badge, active, onClick }) {
+// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
+
+/** Animated status dot — pulses during loading, solid when stable */
+function StatusDot({ color, loading }) {
+  const pulseStyle = loading
+    ? {
+        animation: "wg-pulse 1.2s ease-in-out infinite",
+      }
+    : {};
+
   return (
-    <button
-      onClick={() => onClick(id)}
+    <>
+      <style>{`
+        @keyframes wg-pulse {
+          0%,100% { opacity: 1; }
+          50%      { opacity: 0.35; }
+        }
+        @keyframes wg-expand {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      <span
+        style={{
+          display: "inline-block",
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+          ...pulseStyle,
+        }}
+      />
+    </>
+  );
+}
+
+/** Collapse/expand chevron */
+function Chevron({ open, color }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
       style={{
-        background: "none",
-        border: "none",
-        borderBottom: active ? `2px solid ${C.green}` : "2px solid transparent",
-        padding: "6px 14px",
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.12em",
-        textTransform: "uppercase",
-        color: active ? C.green : C.muted,
-        cursor: "pointer",
-        fontFamily: F.body,
-        marginBottom: -1,
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        transition: "color 0.15s",
+        transform: open ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform 0.22s ease",
+        flexShrink: 0,
       }}
     >
-      {label}
-      {badge > 0 && (
-        <span
-          style={{
-            background: "rgba(243,156,18,0.2)",
-            color: C.amber,
-            fontSize: 9,
-            fontWeight: 700,
-            padding: "1px 5px",
-            borderRadius: 8,
-          }}
-        >
-          {badge}
-        </span>
-      )}
+      <path
+        d="M2 4l4 4 4-4"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Warning line — amber prefix + message */
+function WarningLine({ text }) {
+  // Strip leading ⚠ if present (we render it ourselves for consistent styling)
+  const clean = text.replace(/^⚠\s*/, "");
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "flex-start",
+        padding: "5px 0",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT,
+          fontSize: 12,
+          color: "#e9a84c",
+          flexShrink: 0,
+          marginTop: 1,
+        }}
+      >
+        ⚠
+      </span>
+      <span
+        style={{
+          fontFamily: FONT,
+          fontSize: 12,
+          color: "#7a4f10",
+          lineHeight: 1.55,
+        }}
+      >
+        {clean}
+      </span>
+    </div>
+  );
+}
+
+/** Item line — neutral bullet + message */
+function ItemLine({ text }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "flex-start",
+        padding: "3px 0",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: FONT,
+          fontSize: 12,
+          color: "#aaa",
+          flexShrink: 0,
+          marginTop: 2,
+          lineHeight: 1,
+        }}
+      >
+        •
+      </span>
+      <span
+        style={{
+          fontFamily: FONT,
+          fontSize: 12,
+          color: "#666",
+          lineHeight: 1.55,
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  );
+}
+
+/** Action button — calls onAction with the action object */
+function ActionButton({ action, onAction, borderColor }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      onClick={() => onAction && onAction(action)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        fontFamily: FONT,
+        fontSize: 11,
+        fontWeight: 500,
+        color: borderColor,
+        background: hovered ? `${borderColor}18` : `${borderColor}0c`,
+        border: `1px solid ${borderColor}55`,
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        transition: "background 0.15s",
+        letterSpacing: "0.02em",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {action.label}
     </button>
   );
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
-export default function WorkflowGuide({
-  title,
-  description,
-  steps = [],
-  warnings = [],
-  dataFlow = [],
-  tips = [],
-  storageKey,
-  defaultOpen = false,
-  // aiContext reserved for WP-Y integration
-}) {
-  const lsKey = `wb_guide_${storageKey || (title || "").replace(/\s+/g, "_").toLowerCase()}`;
+/** Refresh icon button */
+function RefreshButton({ onClick, color, spinning }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title="Refresh"
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        padding: "2px 4px",
+        display: "flex",
+        alignItems: "center",
+        opacity: 0.55,
+        lineHeight: 1,
+        flexShrink: 0,
+      }}
+    >
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 13 13"
+        style={{
+          animation: spinning ? "wg-spin 0.8s linear infinite" : "none",
+        }}
+      >
+        <style>{`@keyframes wg-spin { to { transform: rotate(360deg); } }`}</style>
+        <path
+          d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5"
+          fill="none"
+          stroke={color}
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+        <polyline
+          points="8.5,1 8.5,3.5 11,3.5"
+          fill="none"
+          stroke={color}
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
 
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+
+/**
+ * WorkflowGuide v2.0
+ *
+ * Renders a collapsible context panel driven entirely by the `context` object
+ * returned from usePageContext(). No hardcoded strings, no domain knowledge.
+ */
+export default function WorkflowGuide({
+  context,
+  onAction,
+  defaultOpen = true,
+  tabId = "default",
+}) {
+  const storageKey = `wg_open_${tabId}`;
+
+  // Initialise collapse state from localStorage
   const [open, setOpen] = useState(() => {
     try {
-      const saved = localStorage.getItem(lsKey);
-      return saved !== null ? saved === "true" : defaultOpen;
+      const stored = localStorage.getItem(storageKey);
+      return stored !== null ? JSON.parse(stored) : defaultOpen;
     } catch {
       return defaultOpen;
     }
   });
-  const [innerTab, setInnerTab] = useState("workflow");
 
+  const [refreshing, setRefreshing] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Persist collapse state
   useEffect(() => {
     try {
-      localStorage.setItem(lsKey, String(open));
-    } catch {}
-  }, [open, lsKey]);
-
-  const visibleTabs = [
-    { id: "workflow", label: "📋 Workflow", show: steps.length > 0, badge: 0 },
-    {
-      id: "dataflow",
-      label: "🔄 Data Flow",
-      show: dataFlow.length > 0,
-      badge: 0,
-    },
-    {
-      id: "warnings",
-      label: "⚠ Rules",
-      show: warnings.length > 0,
-      badge: warnings.length,
-    },
-    { id: "tips", label: "💡 Tips", show: tips.length > 0, badge: 0 },
-  ].filter((t) => t.show);
-
-  // keep innerTab valid when tabs change
-  useEffect(() => {
-    if (visibleTabs.length > 0 && !visibleTabs.find((t) => t.id === innerTab)) {
-      setInnerTab(visibleTabs[0].id);
+      localStorage.setItem(storageKey, JSON.stringify(open));
+    } catch {
+      /* localStorage unavailable */
     }
-  }, [innerTab, visibleTabs]);
+  }, [open, storageKey]);
 
-  return (
+  // Handle refresh with brief spinner feedback
+  const handleRefresh = async () => {
+    if (!context?.refresh) return;
+    setRefreshing(true);
+    await context.refresh();
+    if (mountedRef.current) {
+      setTimeout(() => setRefreshing(false), 600);
+    }
+  };
+
+  // Determine visual config from status
+  const status = context?.status || "ok";
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.ok;
+  const loading = context?.loading ?? true;
+  const headline =
+    context?.headline || (loading ? "Checking system state…" : "");
+  const items = context?.items || [];
+  const warnings = context?.warnings || [];
+  const actions = context?.actions || [];
+  const timestamp = context?.relativeTime || null;
+
+  const hasContent =
+    warnings.length > 0 || items.length > 0 || actions.length > 0;
+
+  // ── COLLAPSED BAR ──────────────────────────────────────────────────────────
+  const collapsedBar = (
     <div
+      onClick={() => setOpen(true)}
       style={{
-        marginBottom: 16,
-        border: `1px solid ${C.border}`,
-        borderLeft: `4px solid ${C.accent}`,
-        borderRadius: 2,
-        background: C.white,
-        fontFamily: F.body,
-        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        height: 42,
+        paddingLeft: 14,
+        paddingRight: 10,
+        cursor: "pointer",
+        userSelect: "none",
+        borderLeft: `4px solid ${cfg.border}`,
+        background: cfg.bg,
+        borderRadius: "0 6px 6px 0",
+        transition: "background 0.15s",
       }}
     >
-      {/* ── Collapsed bar ── */}
-      <button
-        onClick={() => setOpen((o) => !o)}
+      <StatusDot color={cfg.dot} loading={loading} />
+
+      <span
         style={{
-          width: "100%",
-          background: open ? "rgba(82,183,136,0.06)" : "transparent",
-          border: "none",
-          padding: "9px 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          cursor: "pointer",
-          fontFamily: F.body,
-          textAlign: "left",
-          borderBottom: open ? `1px solid ${C.border}` : "none",
-          transition: "background 0.15s",
+          fontFamily: FONT,
+          fontSize: 12,
+          fontWeight: 500,
+          color: cfg.headlineC,
+          flex: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 14, color: C.accent, lineHeight: 1 }}>
-            ℹ
-          </span>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              color: C.mid,
-            }}
-          >
-            How this tab works
-          </span>
-          {warnings.length > 0 && !open && (
-            <span
-              style={{
-                background: "rgba(243,156,18,0.15)",
-                color: C.amber,
-                fontSize: 9,
-                fontWeight: 700,
-                padding: "1px 7px",
-                borderRadius: 10,
-                letterSpacing: "0.08em",
-              }}
-            >
-              {warnings.length} rule{warnings.length !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span
-            style={{
-              fontSize: 9,
-              color: C.muted,
-              letterSpacing: "0.08em",
-              opacity: 0.5,
-              fontStyle: "italic",
-            }}
-          >
-            💬 AI assist — coming soon
-          </span>
-          <span style={{ color: C.muted, fontSize: 11, lineHeight: 1 }}>
-            {open ? "▲" : "▾"}
-          </span>
-        </div>
-      </button>
+        {headline}
+      </span>
 
-      {/* ── Expanded content ── */}
-      {open && (
-        <div style={{ padding: "16px 20px 20px" }}>
-          {/* Title + description */}
-          {(title || description) && (
-            <div style={{ marginBottom: 14 }}>
-              {title && (
-                <div
-                  style={{
-                    fontFamily: F.heading,
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: C.green,
-                    marginBottom: 4,
-                  }}
-                >
-                  {title}
-                </div>
-              )}
-              {description && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.muted,
-                    lineHeight: 1.7,
-                    maxWidth: 700,
-                  }}
-                >
-                  {description}
-                </div>
-              )}
+      {/* Status label pill */}
+      <span
+        style={{
+          fontFamily: FONT,
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: cfg.labelColor,
+          background: cfg.labelBg,
+          padding: "2px 8px",
+          borderRadius: 100,
+          flexShrink: 0,
+        }}
+      >
+        {cfg.labelText}
+      </span>
+
+      <RefreshButton
+        onClick={handleRefresh}
+        color={cfg.border}
+        spinning={refreshing}
+      />
+
+      <Chevron open={false} color={cfg.border} />
+    </div>
+  );
+
+  // ── EXPANDED PANEL ─────────────────────────────────────────────────────────
+  const expandedPanel = (
+    <div
+      style={{
+        borderLeft: `4px solid ${cfg.border}`,
+        background: cfg.bg,
+        borderRadius: "0 6px 6px 0",
+        overflow: "hidden",
+        animation: "wg-expand 0.18s ease",
+      }}
+    >
+      {/* Header row */}
+      <div
+        onClick={() => setOpen(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          height: 42,
+          paddingLeft: 14,
+          paddingRight: 10,
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <StatusDot color={cfg.dot} loading={loading} />
+
+        <span
+          style={{
+            fontFamily: FONT,
+            fontSize: 12,
+            fontWeight: 600,
+            color: cfg.headlineC,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {headline}
+        </span>
+
+        {/* Status label pill */}
+        <span
+          style={{
+            fontFamily: FONT,
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            color: cfg.labelColor,
+            background: cfg.labelBg,
+            padding: "2px 8px",
+            borderRadius: 100,
+            flexShrink: 0,
+          }}
+        >
+          {cfg.labelText}
+        </span>
+
+        <RefreshButton
+          onClick={handleRefresh}
+          color={cfg.border}
+          spinning={refreshing}
+        />
+        <Chevron open={true} color={cfg.border} />
+      </div>
+
+      {/* Content — only if we have something to show */}
+      {!loading && hasContent && (
+        <div
+          style={{
+            paddingLeft: 18,
+            paddingRight: 16,
+            paddingBottom: 12,
+            borderTop: `1px solid ${cfg.border}22`,
+          }}
+        >
+          {/* Warnings first — most important */}
+          {warnings.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {warnings.map((w, i) => (
+                <WarningLine key={i} text={w} />
+              ))}
             </div>
           )}
 
-          {/* Inner tab bar */}
-          {visibleTabs.length > 1 && (
+          {/* Items — factual live state */}
+          {items.length > 0 && (
+            <div style={{ marginTop: warnings.length > 0 ? 8 : 10 }}>
+              {items.map((item, i) => (
+                <ItemLine key={i} text={item} />
+              ))}
+            </div>
+          )}
+
+          {/* Actions + timestamp */}
+          {(actions.length > 0 || timestamp) && (
             <div
               style={{
                 display: "flex",
-                gap: 0,
-                borderBottom: `1px solid ${C.border}`,
-                marginBottom: 14,
+                alignItems: "center",
+                gap: 8,
+                marginTop: 12,
+                flexWrap: "wrap",
               }}
             >
-              {visibleTabs.map((t) => (
-                <InnerTab
-                  key={t.id}
-                  id={t.id}
-                  label={t.label}
-                  badge={t.badge}
-                  active={innerTab === t.id}
-                  onClick={setInnerTab}
+              {actions.map((action, i) => (
+                <ActionButton
+                  key={i}
+                  action={action}
+                  onAction={onAction}
+                  borderColor={cfg.border}
                 />
               ))}
-            </div>
-          )}
-
-          {/* ── Workflow steps ── */}
-          {(innerTab === "workflow" ||
-            (visibleTabs.length === 1 && visibleTabs[0].id === "workflow")) &&
-            steps.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {steps.map((step, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      padding: "9px 13px",
-                      background: stepBg(step.status),
-                      border: `1px solid ${stepBorder(step.status)}`,
-                      borderRadius: 2,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: stepNumBg(step.status),
-                        color: C.white,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: step.status === "auto" ? 10 : 10,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                        marginTop: 1,
-                      }}
-                    >
-                      {step.status === "auto" ? "⚡" : step.number || i + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: C.green,
-                          marginBottom: step.desc ? 2 : 0,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 7,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {step.label}
-                        {step.status === "optional" && (
-                          <span
-                            style={{
-                              fontSize: 9,
-                              color: C.muted,
-                              fontWeight: 400,
-                            }}
-                          >
-                            OPTIONAL
-                          </span>
-                        )}
-                        {step.status === "auto" && (
-                          <span
-                            style={{
-                              fontSize: 9,
-                              color: C.accent,
-                              fontWeight: 600,
-                            }}
-                          >
-                            AUTO
-                          </span>
-                        )}
-                      </div>
-                      {step.desc && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: C.muted,
-                            lineHeight: 1.55,
-                          }}
-                        >
-                          {step.desc}
-                        </div>
-                      )}
-                    </div>
-                    {step.link && (
-                      <a
-                        href={step.link}
-                        style={{
-                          fontSize: 9,
-                          color: C.accent,
-                          fontWeight: 700,
-                          letterSpacing: "0.1em",
-                          textDecoration: "none",
-                          textTransform: "uppercase",
-                          flexShrink: 0,
-                          padding: "3px 8px",
-                          border: `1px solid ${C.accent}`,
-                          borderRadius: 2,
-                          marginTop: 1,
-                        }}
-                      >
-                        Go →
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-          {/* ── Data Flow ── */}
-          {innerTab === "dataflow" && dataFlow.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {dataFlow.map((item, i) => {
-                const isIn = item.direction === "in";
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 10,
-                      padding: "8px 12px",
-                      background: isIn
-                        ? "rgba(82,183,136,0.06)"
-                        : "rgba(44,74,110,0.05)",
-                      border: `1px solid ${isIn ? "rgba(82,183,136,0.2)" : "rgba(44,74,110,0.15)"}`,
-                      borderRadius: 2,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        color: isIn ? C.accent : C.blue,
-                        letterSpacing: "0.12em",
-                        textTransform: "uppercase",
-                        flexShrink: 0,
-                        minWidth: 26,
-                        paddingTop: 2,
-                        fontFamily: F.body,
-                      }}
-                    >
-                      {isIn ? "IN" : "OUT"}
-                    </span>
-                    <div>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: C.green,
-                        }}
-                      >
-                        {item.from}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: C.muted,
-                          margin: "0 6px",
-                        }}
-                      >
-                        →
-                      </span>
-                      <span style={{ fontSize: 12, color: C.green }}>
-                        {item.to}
-                      </span>
-                      {item.note && (
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: C.muted,
-                            marginTop: 2,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {item.note}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ── Warnings / Rules ── */}
-          {innerTab === "warnings" && warnings.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {warnings.map((w, i) => (
-                <div
-                  key={i}
+              {timestamp && (
+                <span
                   style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    padding: "8px 12px",
-                    background: "rgba(243,156,18,0.05)",
-                    border: "1px solid rgba(243,156,18,0.22)",
-                    borderLeft: "3px solid #f39c12",
-                    borderRadius: 2,
+                    fontFamily: FONT,
+                    fontSize: 10,
+                    color: "#bbb",
+                    marginLeft: "auto",
                   }}
                 >
-                  <span
-                    style={{ fontSize: 12, flexShrink: 0, lineHeight: 1.5 }}
-                  >
-                    ⚠
-                  </span>
-                  <span
-                    style={{ fontSize: 12, color: "#7d5a00", lineHeight: 1.6 }}
-                  >
-                    {w}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Tips ── */}
-          {innerTab === "tips" && tips.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {tips.map((tip, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    padding: "8px 12px",
-                    background: "rgba(44,74,110,0.05)",
-                    border: "1px solid rgba(44,74,110,0.13)",
-                    borderRadius: 2,
-                  }}
-                >
-                  <span
-                    style={{ fontSize: 12, flexShrink: 0, lineHeight: 1.5 }}
-                  >
-                    💡
-                  </span>
-                  <span
-                    style={{ fontSize: 12, color: C.blue, lineHeight: 1.6 }}
-                  >
-                    {tip}
-                  </span>
-                </div>
-              ))}
+                  {timestamp}
+                </span>
+              )}
             </div>
           )}
         </div>
       )}
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div
+          style={{
+            paddingLeft: 18,
+            paddingRight: 16,
+            paddingBottom: 12,
+            borderTop: `1px solid ${cfg.border}22`,
+          }}
+        >
+          {[100, 75, 60].map((w, i) => (
+            <div
+              key={i}
+              style={{
+                height: 10,
+                width: `${w}%`,
+                background: `${cfg.border}18`,
+                borderRadius: 4,
+                marginTop: i === 0 ? 12 : 6,
+                animation: "wg-pulse 1.2s ease-in-out infinite",
+                animationDelay: `${i * 0.15}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
+
+  return open ? expandedPanel : collapsedBar;
 }

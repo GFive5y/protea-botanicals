@@ -29,7 +29,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import WorkflowGuide from "../WorkflowGuide";
-import { GUIDE_COSTING } from "../WorkflowGuideContent";
+import { usePageContext } from "../../hooks/usePageContext";
 import { supabase } from "../../services/supabaseClient";
 
 const CANNALYTICS_TESTS = [
@@ -1016,6 +1016,7 @@ function ChambersEditor({
 export default function HQCogs() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
+  const ctx = usePageContext("costing", null);
 
   const [recipes, setRecipes] = useState([]);
   const [supplierProducts, setSupplierProducts] = useState([]);
@@ -1341,7 +1342,12 @@ export default function HQCogs() {
 
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
-      <WorkflowGuide {...GUIDE_COSTING} />
+      <WorkflowGuide
+        context={ctx}
+        tabId="costing"
+        onAction={(action) => action.tab && setActiveSubTab(action.tab)}
+        defaultOpen={true}
+      />
       {toast && (
         <div
           style={{
