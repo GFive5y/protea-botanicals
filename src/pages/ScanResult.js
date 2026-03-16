@@ -1412,8 +1412,7 @@ export default function ScanResult() {
             .eq("user_id", currentUser.id)
             .eq("scan_outcome", "points_awarded")
             .gte("scanned_at", sevenDaysAgo);
-          const STREAK_BONUS_PTS = 200,
-            STREAK_INTERVAL = 5;
+          const STREAK_BONUS_PTS = config.pts_streak_bonus || 200, STREAK_INTERVAL = config.streak_interval || 5;
           if (weekCount && weekCount % STREAK_INTERVAL === 0) {
             const { data: freshPts } = await supabase
               .from("user_profiles")
@@ -1778,3 +1777,4 @@ export default function ScanResult() {
     </>
   );
 }
+
