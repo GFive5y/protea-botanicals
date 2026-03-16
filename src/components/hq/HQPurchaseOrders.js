@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import InfoTooltip from "../InfoTooltip";
 
 // ─── FX Rate Hook ─────────────────────────────────────────────────────────────
 function useFxRate() {
@@ -714,6 +715,7 @@ export default function HQPurchaseOrders() {
             {fxLoading
               ? "Loading FX…"
               : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+            <InfoTooltip id="po-fx-rate" position="top" />
           </div>
           <button
             style={btn("primary")}
@@ -724,6 +726,7 @@ export default function HQPurchaseOrders() {
           >
             + New Purchase Order
           </button>
+          <InfoTooltip id="po-what-is" />
         </div>
       </div>
 
@@ -1102,7 +1105,8 @@ export default function HQPurchaseOrders() {
               {step === 1 && (
                 <div>
                   <p style={{ color: "#666", marginTop: 0, fontSize: 14 }}>
-                    Choose the supplier for this purchase order.
+                    Choose the supplier for this purchase order.{" "}
+                    <InfoTooltip id="po-select-supplier" />
                   </p>
                   {suppliers.map((s) => (
                     <div
@@ -1403,7 +1407,7 @@ export default function HQPurchaseOrders() {
                         marginBottom: 10,
                       }}
                     >
-                      Shipping Mode
+                      Shipping Mode <InfoTooltip id="po-shipping-mode" />
                     </label>
                     {SHIPPING_MODES.map((m) => (
                       <div

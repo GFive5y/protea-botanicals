@@ -10,6 +10,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import InfoTooltip from "../InfoTooltip";
 
 const C = {
   bg: "#f9f8f5",
@@ -599,9 +600,13 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             fontWeight: 600,
             color: C.green,
             marginBottom: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
           }}
         >
           One-Click Loyalty Schema Selection
+          <InfoTooltip id="loyalty-schema" />
         </div>
         <div
           style={{
@@ -1513,7 +1518,13 @@ function TabEconomics({ draft, setDraft, liveStats }) {
         </FieldRow>
       </SectionCard>
       <SectionCard title="Financial Model" accent={C.purple}>
-        <FieldRow label="Expected breakage rate">
+        <FieldRow
+          label={
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              Expected breakage rate <InfoTooltip id="loyalty-breakage" />
+            </span>
+          }
+        >
           <NumInput
             value={cfg.breakage_rate * 100}
             onChange={(v) => setField("breakage_rate", v / 100)}

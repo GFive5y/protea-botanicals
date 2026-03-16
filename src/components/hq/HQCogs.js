@@ -30,6 +30,7 @@
 import { useState, useEffect, useCallback } from "react";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import InfoTooltip from "../InfoTooltip";
 import { supabase } from "../../services/supabaseClient";
 
 const CANNALYTICS_TESTS = [
@@ -2480,6 +2481,7 @@ export default function HQCogs() {
                 >
                   <div>
                     {lbl("Units per batch")}
+                    <InfoTooltip id="cogs-batch-size" position="top" />
                     <input
                       type="number"
                       min="1"
@@ -2761,6 +2763,7 @@ export default function HQCogs() {
                       <div>
                         {/* Single-chamber also uses µl — label matches ChambersEditor */}
                         {lbl("Qty (µl)")}
+                        <InfoTooltip id="cogs-terpene-ul" position="top" />
                         <input
                           type="number"
                           min="1"
@@ -3425,7 +3428,8 @@ export default function HQCogs() {
                       marginBottom: 12,
                     }}
                   >
-                    🚚 Transport (ZAR per batch)
+                    🚚 Transport (ZAR per batch){" "}
+                    <InfoTooltip id="cogs-transport" position="top" />
                   </div>
                   <input
                     type="number"
