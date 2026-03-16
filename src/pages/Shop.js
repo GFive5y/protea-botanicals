@@ -910,6 +910,7 @@ function buildProductFromInventory(item) {
   const is2ml = /2\.?0?\s*ml/i.test(item.name);
   const is3ml = /3\.?0?\s*ml/i.test(item.name);
   const isPostless = /post.?less|postless/i.test(item.name);
+  const isVapePen = /\bvape\b|\bdisposable\b|\baio\b/i.test(item.name);
   const displayName = matchedStrain
     ? matchedStrain.name
     : item.name
@@ -934,6 +935,10 @@ function buildProductFromInventory(item) {
     format = "1ml Post-less Cartridge";
     formatShort = "1ml Postless";
     badge = "Post-less";
+  } else if (isVapePen) {
+    format = "1ml Disposable Vape";
+    formatShort = "1ml Vape";
+    badge = "All-in-One";
   } else {
     format = "1ml Cartridge";
     formatShort = "1ml Cart";
