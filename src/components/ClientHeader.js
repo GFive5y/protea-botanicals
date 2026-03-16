@@ -1,4 +1,5 @@
-// src/components/ClientHeader.js — Protea Botanicals WP-N v1.3
+// src/components/ClientHeader.js — Protea Botanicals WP-N v1.4
+// v1.4: Fix — fg + brandColor now go white on ANY scroll (transparent variant was staying dark on green header)
 // v1.3: Drawer nav "Inbox" renamed to "Support" — links to /account state:{tab:"support"}
 //       getInboxUnreadCount + unreadCount polling + avatar badge all retained.
 //       No other changes from v1.2.
@@ -180,15 +181,12 @@ export default function ClientHeader({ variant = "light" }) {
         ? T.borderNone
         : T.borderLight;
   const brandColor =
-    variant === "dark" || (variant === "light" && scrolled)
+    variant === "dark" || scrolled
       ? T.brandDark
       : isTransparentUnscrolled
         ? T.brandTransp
         : T.brandLight;
-  const fg =
-    variant === "dark" || (variant === "light" && scrolled)
-      ? T.fgDark
-      : T.fgLight;
+  const fg = variant === "dark" || scrolled ? T.fgDark : T.fgLight;
   const blurVal = solidified ? "blur(8px)" : "none";
   const signInBg = solidified
     ? "rgba(255,255,255,0.10)"
