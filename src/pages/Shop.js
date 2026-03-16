@@ -908,28 +908,48 @@ function buildProductFromInventory(item) {
     lowerName.startsWith(s.name.toLowerCase()),
   );
   const is2ml = /2\.?0?\s*ml/i.test(item.name);
+  const is3ml = /3\.?0?\s*ml/i.test(item.name);
+  const isPostless = /post.?less|postless/i.test(item.name);
   const displayName = matchedStrain
     ? matchedStrain.name
     : item.name
         .replace(/\d+\.?\d*\s*ml\s*/i, "")
-        .replace(/cartridge|disposable|pen|pod/i, "")
+        .replace(/cartridge|disposable|pen|pod|post.?less/i, "")
         .trim() || item.name;
   const strain = matchedStrain || {
     ...DEFAULT_STRAIN,
     id: item.id,
     name: displayName,
   };
+  let format, formatShort, badge;
+  if (is3ml) {
+    format = "3ml Disposable Pen";
+    formatShort = "3ml Pen";
+    badge = "All-in-One";
+  } else if (is2ml) {
+    format = "2ml Disposable Pen";
+    formatShort = "2ml Pen";
+    badge = "All-in-One";
+  } else if (isPostless) {
+    format = "1ml Post-less Cartridge";
+    formatShort = "1ml Postless";
+    badge = "Post-less";
+  } else {
+    format = "1ml Cartridge";
+    formatShort = "1ml Cart";
+    badge = "510 Thread";
+  }
   return {
     id: item.id,
     inventory_item_id: item.id,
     strainId: strain.id,
     name: displayName,
     strain,
-    format: is2ml ? "2ml Disposable Pen" : "1ml Cartridge",
-    formatShort: is2ml ? "2ml Pen" : "1ml Cart",
+    format,
+    formatShort,
     price: parseFloat(item.sell_price) || 0,
     thc: "93.55%",
-    badge: is2ml ? "All-in-One" : "510 Thread",
+    badge,
     quantity_on_hand: item.quantity_on_hand,
     sku: item.sku,
   };
@@ -2904,6 +2924,7 @@ export default function Shop() {
 function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
   const s = product.strain;
   const is2ml = product.format.includes("2ml");
+  const isPostless = product.badge === "Post-less";
   return (
     <div className="shop-card">
       <div
@@ -2938,9 +2959,11 @@ function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
             style={{
               background: is2ml
                 ? "rgba(181,147,90,0.08)"
-                : "rgba(27,67,50,0.06)",
-              color: is2ml ? "#b5935a" : "#1b4332",
-              border: `1px solid ${is2ml ? "rgba(181,147,90,0.2)" : "rgba(27,67,50,0.15)"}`,
+                : isPostless
+                  ? "rgba(74,110,190,0.08)"
+                  : "rgba(27,67,50,0.06)",
+              color: is2ml ? "#b5935a" : isPostless ? "#4a6ebe" : "#1b4332",
+              border: `1px solid ${is2ml ? "rgba(181,147,90,0.2)" : isPostless ? "rgba(74,110,190,0.2)" : "rgba(27,67,50,0.15)"}`,
             }}
           >
             {product.badge} · {product.formatShort}
