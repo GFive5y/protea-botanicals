@@ -134,6 +134,15 @@ const FORMAT_CATALOGUE = {
     terpene_pct: 10,
     format_short: "1ml Cart",
   },
+  vape_1ml_postless: {
+    label: "1ml Post-less Cartridge",
+    category: "vape",
+    is_vape: true,
+    distillate_ml: 1.0,
+    chambers: 1,
+    terpene_pct: 10,
+    format_short: "1ml Postless",
+  },
   vape_2ml: {
     label: "2ml Disposable Pen (AiO)",
     category: "vape",
@@ -196,7 +205,14 @@ const FORMAT_CATALOGUE = {
 const FORMAT_GROUPS = [
   {
     groupLabel: "── Vape ──",
-    keys: ["vape_05ml", "vape_1ml", "vape_2ml", "vape_3x1ml", "vape_custom"],
+    keys: [
+      "vape_05ml",
+      "vape_1ml",
+      "vape_1ml_postless",
+      "vape_2ml",
+      "vape_3x1ml",
+      "vape_custom",
+    ],
   },
   {
     groupLabel: "── Other Products ──",
@@ -374,6 +390,296 @@ function StockGauge({ label, available, needed, unit, color = C.accent }) {
             transition: "width 0.4s ease",
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOW IT WORKS BANNER — persistent onboarding for all users
+// ═══════════════════════════════════════════════════════════════════════════════
+function HowItWorksBanner() {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          ...sCard,
+          borderLeft: `4px solid ${C.blue}`,
+          padding: "12px 16px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16 }}>ℹ</span>
+            <span
+              style={{
+                fontFamily: F.body,
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.blue,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              How Production Works
+            </span>
+            <span style={{ fontFamily: F.body, fontSize: 12, color: C.muted }}>
+              — 4 steps from raw materials to live shop
+            </span>
+          </div>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            style={{
+              ...sBtn("outline"),
+              padding: "4px 12px",
+              fontSize: "9px",
+              color: C.blue,
+              borderColor: C.blue,
+            }}
+          >
+            {open ? "▲ Hide" : "▼ Show"}
+          </button>
+        </div>
+
+        {open && (
+          <div style={{ marginTop: 16 }}>
+            {/* Step flow */}
+            <div
+              style={{
+                display: "flex",
+                gap: 0,
+                flexWrap: "wrap",
+                alignItems: "stretch",
+                marginBottom: 16,
+              }}
+            >
+              {[
+                {
+                  step: "1",
+                  icon: "📥",
+                  title: "Supply Chain",
+                  color: C.blue,
+                  what: "Receive raw materials",
+                  how: "HQ → Supply Chain → Purchase Orders\nCreate a PO for distillate, terpenes, hardware.\nWhen stock arrives, click 'Receive' — quantities auto-add to inventory.",
+                  result:
+                    "Raw materials appear in inventory with correct quantities.",
+                },
+                {
+                  step: "2",
+                  icon: "⚗",
+                  title: "New Production Run",
+                  color: C.purple,
+                  what: "Manufacture finished product",
+                  how: "HQ → Production → New Production Run\nSelect strain + format (e.g. MAC 1ml Cart).\nEnter how many units you're filling.\nSystem shows exactly what raw materials will be deducted.",
+                  result:
+                    "Raw materials deducted. Finished units added to stock. Batch + run record created.",
+                },
+                {
+                  step: "3",
+                  icon: "💰",
+                  title: "Set Sell Price",
+                  color: C.gold,
+                  what: "Price the product for the shop",
+                  how: "HQ → Pricing tab\nFind the finished product.\nSet sell_price > R0.\nWithout a price, the product will NOT appear in the customer shop.",
+                  result: "Product is now ready to go live.",
+                },
+                {
+                  step: "4",
+                  icon: "🛍",
+                  title: "Live in Shop",
+                  color: C.accent,
+                  what: "Product appears automatically",
+                  how: "No action needed.\nThe shop reads inventory_items WHERE:\n  • category = 'finished_product'\n  • is_active = true\n  • quantity_on_hand > 0\n  • sell_price > R0\nAll 4 conditions must be true.",
+                  result:
+                    "Customers can find, add to cart and buy the product online.",
+                },
+              ].map((s, i, arr) => (
+                <React.Fragment key={s.step}>
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 200,
+                      background: C.white,
+                      border: `1px solid ${s.color}30`,
+                      borderTop: `3px solid ${s.color}`,
+                      borderRadius: 2,
+                      padding: "14px 16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{s.icon}</span>
+                      <div>
+                        <div
+                          style={{
+                            fontFamily: F.body,
+                            fontSize: 9,
+                            letterSpacing: "0.2em",
+                            textTransform: "uppercase",
+                            color: s.color,
+                            fontWeight: 700,
+                          }}
+                        >
+                          Step {s.step}
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: F.body,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: C.text,
+                          }}
+                        >
+                          {s.title}
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: F.body,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: C.text,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {s.what}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: F.body,
+                        fontSize: 11,
+                        color: C.muted,
+                        lineHeight: 1.7,
+                        whiteSpace: "pre-line",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {s.how}
+                    </div>
+                    <div
+                      style={{
+                        background: `${s.color}10`,
+                        border: `1px solid ${s.color}30`,
+                        borderRadius: 2,
+                        padding: "6px 10px",
+                        fontFamily: F.body,
+                        fontSize: 11,
+                        color: s.color,
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✓ {s.result}
+                    </div>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 4px",
+                        color: C.muted,
+                        fontSize: 18,
+                        flexShrink: 0,
+                      }}
+                    >
+                      →
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Glossary */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {[
+                {
+                  term: "BATCH",
+                  icon: "📦",
+                  def: "A product record — describes what the product is (strain, format, expiry, lab cert). Does NOT add stock on its own.",
+                },
+                {
+                  term: "PRODUCTION RUN",
+                  icon: "⚗",
+                  def: "A manufacturing event — logs how many units you filled today, deducts raw materials, adds finished stock.",
+                },
+                {
+                  term: "INVENTORY ITEM",
+                  icon: "📊",
+                  def: "The live stock counter — quantity_on_hand is what the shop reads. This number goes up on production, down on each sale.",
+                },
+                {
+                  term: "NOT LINKED",
+                  icon: "⚠",
+                  def: "Batch was created before v2.0 and has no inventory_item_id. Run a New Production Run to link it and enable live stock tracking.",
+                },
+                {
+                  term: "LOW STOCK",
+                  icon: "🟡",
+                  def: "quantity_on_hand ≤ low_stock_threshold (default: 10). Still live in shop but you should plan a production run soon.",
+                },
+                {
+                  term: "DEPLETED",
+                  icon: "🔴",
+                  def: "quantity_on_hand = 0. Product is automatically hidden from shop. Run production to restock and it reappears.",
+                },
+              ].map((g) => (
+                <div
+                  key={g.term}
+                  style={{
+                    background: C.warm,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 2,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: F.body,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: C.text,
+                      marginBottom: 4,
+                    }}
+                  >
+                    {g.icon} {g.term}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: F.body,
+                      fontSize: 11,
+                      color: C.muted,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {g.def}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -626,6 +932,9 @@ export default function HQProduction() {
           )}
         </div>
       )}
+
+      {/* ── How It Works — persistent onboarding strip ── */}
+      <HowItWorksBanner />
 
       <div
         style={{
@@ -3076,15 +3385,13 @@ function HistoryPanel({ runs, onRefresh }) {
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
-            await supabase
-              .from("stock_movements")
-              .insert({
-                item_id: mv.item_id,
-                quantity: rev,
-                movement_type: "adjustment",
-                reference: `VOID-${run.run_number}`,
-                notes: `Reversal: deleted run ${run.run_number}`,
-              });
+            await supabase.from("stock_movements").insert({
+              item_id: mv.item_id,
+              quantity: rev,
+              movement_type: "adjustment",
+              reference: `VOID-${run.run_number}`,
+              notes: `Reversal: deleted run ${run.run_number}`,
+            });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
@@ -3737,15 +4044,13 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
         form.channel === "wholesale" && partner ? partner.name : form.channel;
-      await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: form.item_id,
-          quantity: -qty,
-          movement_type: "sale_out",
-          reference: ref,
-          notes: form.notes || `Allocated to ${ref}`,
-        });
+      await supabase.from("stock_movements").insert({
+        item_id: form.item_id,
+        quantity: -qty,
+        movement_type: "sale_out",
+        reference: ref,
+        notes: form.notes || `Allocated to ${ref}`,
+      });
       const newQty = available - qty;
       await supabase
         .from("inventory_items")
