@@ -23,6 +23,8 @@ const SUPABASE_FUNCTIONS_URL =
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
 
 const DEFAULT_LOYALTY_CONFIG = {
+  pts_streak_bonus: 200,
+  streak_interval: 5,
   pts_qr_scan: 10,
   mult_bronze: 1.0,
   mult_silver: 1.25,
