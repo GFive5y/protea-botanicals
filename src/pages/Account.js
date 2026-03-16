@@ -1121,7 +1121,111 @@ function RewardField({ fieldKey, config, profile, onSave }) {
     </div>
   );
 }
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUPPORT COMMS PANEL — unified messages + tickets (mirrors admin comms view)
+// ═══════════════════════════════════════════════════════════════════════════════
+function SupportCommsPanel({ userId, profile, onUnreadChange, inboxUnread }) {
+  const [commsTab, setCommsTab] = useState("messages");
 
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      {/* Inner tab switcher */}
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          borderBottom: `2px solid ${C.border}`,
+          marginBottom: 20,
+        }}
+      >
+        {[
+          { id: "messages", label: "💬 Messages", badge: inboxUnread },
+          { id: "tickets", label: "🎫 Tickets", badge: 0 },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setCommsTab(t.id)}
+            style={{
+              padding: "10px 20px",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              fontFamily: F.body,
+              cursor: "pointer",
+              border: "none",
+              background: "none",
+              color: commsTab === t.id ? C.green : C.muted,
+              borderBottom:
+                commsTab === t.id
+                  ? `3px solid ${C.green}`
+                  : "3px solid transparent",
+              marginBottom: -2,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {t.label}
+            {t.badge > 0 && (
+              <span
+                style={{
+                  background: C.red,
+                  color: C.white,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "1px 6px",
+                  borderRadius: 10,
+                  fontFamily: F.body,
+                }}
+              >
+                {t.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Messages panel — CustomerInbox unchanged */}
+      {commsTab === "messages" && (
+        <div>
+          <p
+            style={{
+              fontSize: 12,
+              color: C.muted,
+              marginBottom: 16,
+              fontFamily: F.body,
+              lineHeight: 1.6,
+            }}
+          >
+            Messages from Protea Botanicals — including admin replies, tier
+            upgrades and account notices.
+          </p>
+          <CustomerInbox userId={userId} onUnreadChange={onUnreadChange} />
+        </div>
+      )}
+
+      {/* Tickets panel — CustomerSupportWidget unchanged */}
+      {commsTab === "tickets" && (
+        <div>
+          <p
+            style={{
+              fontSize: 12,
+              color: C.muted,
+              marginBottom: 16,
+              fontFamily: F.body,
+              lineHeight: 1.6,
+            }}
+          >
+            Raise a support ticket for product issues, orders or billing. Our
+            team typically replies within 24 hours.
+          </p>
+          <CustomerSupportWidget userId={userId} profile={profile} />
+        </div>
+      )}
+    </div>
+  );
+}
 // ═══════════════════════════════════════════════════════════════════════════════
 // ACCOUNT VIEW
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2647,44 +2751,14 @@ function AccountView({
             </div>
           )}
 
-          {/* SUPPORT TAB — CustomerInbox first, then CustomerSupportWidget */}
+          {/* SUPPORT TAB — unified comms panel with inner tabs */}
           {activeTab === "support" && (
-            <div style={{ animation: "fadeIn 0.3s ease" }}>
-              {/* Inbox: admin messages, tier upgrades, streak bonuses, referral notices */}
-              <CustomerInbox
-                userId={user.id}
-                onUnreadChange={(n) => setInboxUnread(n)}
-              />
-              {/* Divider */}
-              <div
-                style={{
-                  borderTop: `2px solid ${C.border}`,
-                  margin: "28px 0 24px",
-                  position: "relative",
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -10,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: C.white,
-                    padding: "0 12px",
-                    fontSize: 10,
-                    color: C.muted,
-                    fontWeight: 600,
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    fontFamily: F.body,
-                  }}
-                >
-                  Support Tickets
-                </span>
-              </div>
-              {/* Support tickets with auto-reply */}
-              <CustomerSupportWidget userId={user?.id} profile={profile} />
-            </div>
+            <SupportCommsPanel
+              userId={user.id}
+              profile={profile}
+              onUnreadChange={(n) => setInboxUnread(n)}
+              inboxUnread={inboxUnread}
+            />
           )}
         </div>
 
