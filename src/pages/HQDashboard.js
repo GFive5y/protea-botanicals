@@ -1,6 +1,7 @@
-// src/pages/HQDashboard.js v3.7
+// src/pages/HQDashboard.js v3.8
 // Protea Botanicals — HQ Command Centre
-// v3.7: Removed "Production" tab (id: production) — "HQ Production" is the canonical tab
+// v3.8: WP-X — LiveFXBar injected above tab content on every tab
+// v3.7: Removed "Production" tab — "HQ Production" is the canonical tab
 // v3.6: Tab 3 now renders HQProduction (dead Production.js placeholder removed)
 // v3.5: WP-8 Fraud tab added (17th tab)
 // v3.4: Loyalty tab added (WP-O)
@@ -41,6 +42,9 @@ import HQLoyalty from "../components/hq/HQLoyalty";
 
 // ── WP-8 ─────────────────────────────────────────────────────────────────────
 import HQFraud from "../components/hq/HQFraud";
+
+// ── WP-X: Live FX Bar ────────────────────────────────────────────────────────
+import LiveFXBar from "../components/hq/LiveFXBar";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -245,6 +249,9 @@ export default function HQDashboard() {
 
       {/* ── Tab Content ──────────────────────────────────────────────────── */}
       <div>
+        {/* v3.8: LiveFXBar renders above ALL tab content — persistent across every tab */}
+        <LiveFXBar />
+
         {activeTab === "overview" && <HQOverview onNavigate={handleNavigate} />}
         {activeTab === "supply-chain" && <SupplyChain />}
         {activeTab === "distribution" && <Distribution />}

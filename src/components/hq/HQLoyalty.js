@@ -1,19 +1,14 @@
-// HQLoyalty.js v2.0
-// WP-V: Loyalty Economics Engine — Schema Selector + Live Config
-// v2.0: NEW Tab 0 "🎛️ Schema" — 3-click Conservative/Standard/Aggressive preset system
-//       Applying a schema writes ALL loyalty_config values live in one operation.
-//       Manual per-field override remains in tabs 1–6 (unchanged from v1.2).
-//       Onboarding info panels explain every metric to non-technical HQ users.
-//       New DEFAULT_CONFIG fields: pts_streak_bonus, streak_interval, pts_birthday, active_schema.
-//       handleApplySchema: upserts full schema to loyalty_config, updates local state immediately.
-// v1.2: Tab 7 "📅 Campaigns" — double_points_campaigns CRUD
+// HQLoyalty.js v2.1
+// WP-Z: Tier System Unification — added recalculate_all_tiers() RPC call
+//       after every loyalty_config UPDATE so all existing customer tiers
+//       immediately reflect the new thresholds. No hardcoded thresholds remain.
+// v2.0: Schema Selector + Live Config (Conservative/Standard/Aggressive presets)
+// v1.2: Campaigns tab
 // v1.1: 6 sub-tabs: Earning Rules | Tiers | Economics | Referrals | QR Security | Simulator
-// Inline styles only. Fonts: Cormorant Garamond + Jost.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── COLOUR PALETTE ──────────────────────────────────────────────────────────
 const C = {
   bg: "#f9f8f5",
   card: "#ffffff",
@@ -42,7 +37,6 @@ const C = {
 const FONT_DISPLAY = "'Cormorant Garamond', Georgia, serif";
 const FONT_BODY = "'Jost', 'Helvetica Neue', Arial, sans-serif";
 
-// ─── DEFAULT CONFIG (v2.0: added streak/birthday/schema fields) ───────────────
 const DEFAULT_CONFIG = {
   pts_qr_scan: 10,
   pts_per_r100_online: 4.0,
@@ -67,14 +61,12 @@ const DEFAULT_CONFIG = {
   pts_expiry_months: 24,
   max_scans_per_qr: 1,
   qr_validity_months: 18,
-  // v2.0 new fields
   pts_streak_bonus: 200,
   streak_interval: 5,
   pts_birthday: 100,
   active_schema: "standard",
 };
 
-// ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 const SCHEMAS = [
   {
     id: "conservative",
@@ -84,8 +76,8 @@ const SCHEMAS = [
     description:
       "Minimal programme cost. Ideal for the launch phase — test engagement without committing to high reward liabilities. Points are worth less per transaction but are easy to control and predict. Best when you want to measure customer engagement before scaling up rewards.",
     costBadge: "~R0.065 per point issued",
-    costColor: C.blue,
-    costBg: C.bluePale,
+    costColor: "#1565C0",
+    costBg: "#E3F2FD",
     preview: [
       { label: "QR scan reward", value: "5 pts" },
       { label: "R400 online order", value: "~12 pts  (R1.20 value)" },
@@ -130,8 +122,8 @@ const SCHEMAS = [
     description:
       "Follows global loyalty programme benchmarks. Good balance between customer motivation and programme cost. Points feel meaningful — customers notice them on their dashboard and are motivated to earn more. Tier multipliers create genuine incentive to remain loyal.",
     costBadge: "~R0.11 per point issued",
-    costColor: C.green,
-    costBg: C.greenPale,
+    costColor: "#3d6b3d",
+    costBg: "#e8f5e9",
     preview: [
       { label: "QR scan reward", value: "10 pts" },
       { label: "R400 online order", value: "~48 pts  (R7.20 value)" },
@@ -176,8 +168,8 @@ const SCHEMAS = [
     description:
       "Maximum engagement and acquisition power. Higher programme cost but drives strong word-of-mouth, repeat purchase, and brand advocacy. Points accumulate fast — customers reach redemption thresholds quickly and feel genuinely rewarded. Best for growth phases or competitive markets.",
     costBadge: "~R0.16 per point issued",
-    costColor: C.purple,
-    costBg: C.purplePale,
+    costColor: "#6A1B9A",
+    costBg: "#F3E5F5",
     preview: [
       { label: "QR scan reward", value: "25 pts" },
       { label: "R400 online order", value: "~100 pts  (Bronze, no mult)" },
@@ -216,7 +208,6 @@ const SCHEMAS = [
   },
 ];
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 function getTierLabel(pts, cfg) {
   if (pts >= cfg.threshold_platinum) return "Platinum";
   if (pts >= cfg.threshold_gold) return "Gold";
@@ -232,15 +223,12 @@ function getTierMult(tier, cfg) {
   };
   return map[tier] || 1.0;
 }
-
 const TIER_COLOURS = {
   Bronze: { bg: "#FFF3E0", text: "#E65100", border: "#FFCC80" },
   Silver: { bg: "#F5F5F5", text: "#424242", border: "#BDBDBD" },
   Gold: { bg: "#FFFDE7", text: "#F57F17", border: "#FFD54F" },
   Platinum: { bg: "#F3E5F5", text: "#6A1B9A", border: "#CE93D8" },
 };
-
-// ─── SHARED UI ────────────────────────────────────────────────────────────────
 
 function SectionCard({ title, subtitle, children, accent }) {
   const ac = accent || C.green;
@@ -376,8 +364,8 @@ function NumInput({
 }
 
 function InfoBox({ children, colour, bgColour }) {
-  const co = colour || C.blue;
-  const bg = bgColour || C.bluePale;
+  const co = colour || C.blue,
+    bg = bgColour || C.bluePale;
   return (
     <div
       style={{
@@ -480,11 +468,9 @@ function Toast({ msg, type, onDone }) {
   );
 }
 
-// ─── TAB 0: SCHEMA SELECTOR (v2.0 NEW) ───────────────────────────────────────
 function TabSchema({ config, onApplySchema, applyingSchema }) {
   const activeSchemaId = config?.active_schema || "standard";
   const [confirmSchema, setConfirmSchema] = useState(null);
-
   const COMPARISON_ROWS = [
     { label: "QR scan", key: "pts_qr_scan", format: (v) => `${v} pts` },
     {
@@ -561,12 +547,11 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
       format: (v) => `${v} months`,
     },
   ];
-
   const ONBOARDING = [
     {
       icon: "🔄",
       title: "How live updates work",
-      body: "Every page in the platform — ScanResult, CheckoutPage, OrderSuccess, Loyalty dashboard and Redeem — reads from the loyalty_config table on each load. When you apply a schema, all values are written to the database in a single operation. The next customer to scan a QR, complete a purchase, or visit the loyalty page will see the new rates immediately. No server restart required.",
+      body: "Every page in the platform — ScanResult, CheckoutPage, OrderSuccess, Loyalty dashboard and Redeem — reads from the loyalty_config table on each load. When you apply a schema, all values are written to the database in a single operation. All existing customer tiers are immediately recalculated. No server restart required.",
     },
     {
       icon: "💰",
@@ -581,12 +566,12 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
     {
       icon: "🏆",
       title: "Tier multipliers",
-      body: "Multipliers apply to ALL earned points — scans, purchases, referrals and streak bonuses. A Platinum customer at 3× earns triple points on every interaction. This is the single most powerful retention tool: once a customer reaches Platinum tier, downgrading to a competitor means losing their multiplier advantage. Design your tiers so Platinum is achievable within 6–9 months of consistent purchasing.",
+      body: "Multipliers apply to ALL earned points — scans, purchases, referrals and streak bonuses. A Platinum customer at 3× earns triple points on every interaction. This is the single most powerful retention tool: once a customer reaches Platinum tier, downgrading to a competitor means losing their multiplier advantage.",
     },
     {
       icon: "📉",
       title: "Breakage rate",
-      body: "Breakage is the percentage of issued points that are never redeemed (expired, dormant accounts, customers who forget). Industry average is 20–35%. A higher breakage rate lowers your actual programme cost. Conservative schema assumes 35% breakage; Aggressive assumes 20% (because higher-value rewards drive more active redemption). Set this honestly — it affects your cost model in the Economics tab.",
+      body: "Breakage is the percentage of issued points that are never redeemed (expired, dormant accounts, customers who forget). Industry average is 20–35%. A higher breakage rate lowers your actual programme cost. Conservative schema assumes 35% breakage; Aggressive assumes 20% (because higher-value rewards drive more active redemption).",
     },
     {
       icon: "🔒",
@@ -594,10 +579,8 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
       body: "Applying a schema sets all values at once — useful for a clean baseline. After applying, you can fine-tune any individual value using the tabs above (Earning Rules, Tiers, Economics, etc.) without affecting other values. Manual overrides save separately via 'Save All Changes'. The active_schema label will show 'custom' once you deviate from a preset.",
     },
   ];
-
   return (
     <div>
-      {/* ── Intro ── */}
       <div
         style={{
           background: `linear-gradient(135deg, ${C.green}08, ${C.greenLight}06)`,
@@ -629,8 +612,9 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
         >
           Choose a pre-calibrated rewards level. Clicking <strong>Apply</strong>{" "}
           writes all values to the database — scans, purchases, referrals,
-          tiers, redemptions and bonuses all update simultaneously. Fine-tune
-          individual values in the other tabs at any time.
+          tiers, redemptions and bonuses all update simultaneously. All existing
+          customer tiers are immediately recalculated to match the new
+          thresholds.
         </div>
         <div
           style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}
@@ -643,6 +627,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             "✅ Tier multipliers",
             "✅ Redemption values",
             "✅ Expiry rules",
+            "✅ All tiers recalculated",
           ].map((tag) => (
             <span
               key={tag}
@@ -661,8 +646,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           ))}
         </div>
       </div>
-
-      {/* ── Schema Cards ── */}
       <div
         style={{
           display: "grid",
@@ -685,7 +668,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                 boxShadow: active ? `0 4px 20px ${schema.costColor}20` : "none",
               }}
             >
-              {/* Card header */}
               <div
                 style={{
                   background: active
@@ -747,10 +729,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                   )}
                 </div>
               </div>
-
-              {/* Card body */}
               <div style={{ padding: "16px 20px" }}>
-                {/* Cost badge */}
                 <div
                   style={{
                     display: "inline-block",
@@ -766,8 +745,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                 >
                   💰 {schema.costBadge}
                 </div>
-
-                {/* Description */}
                 <div
                   style={{
                     fontFamily: FONT_BODY,
@@ -779,8 +756,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                 >
                   {schema.description}
                 </div>
-
-                {/* Preview values */}
                 <div
                   style={{
                     background: C.bg,
@@ -825,8 +800,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     </div>
                   ))}
                 </div>
-
-                {/* Apply button */}
                 {confirmSchema === schema.id ? (
                   <div>
                     <div
@@ -841,7 +814,8 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                         border: `1px solid ${schema.costColor}30`,
                       }}
                     >
-                      This will overwrite all current loyalty settings. Confirm?
+                      This will overwrite all current loyalty settings and
+                      immediately recalculate all customer tiers. Confirm?
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
@@ -897,7 +871,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                         ? `${schema.costColor}15`
                         : schema.costColor,
                       color: active ? schema.costColor : C.white,
-                      border: `1.5px solid ${active ? schema.costColor : schema.costColor}`,
+                      border: `1.5px solid ${schema.costColor}`,
                       borderRadius: 8,
                       fontFamily: FONT_BODY,
                       fontSize: 12,
@@ -917,8 +891,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           );
         })}
       </div>
-
-      {/* ── Side-by-Side Comparison ── */}
       <SectionCard
         title="Full Schema Comparison"
         subtitle="All values across all three schemas"
@@ -998,8 +970,8 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     {row.label}
                   </td>
                   {SCHEMAS.map((s) => {
-                    const val = s.values[row.key];
-                    const isActive = activeSchemaId === s.id;
+                    const val = s.values[row.key],
+                      isActive = activeSchemaId === s.id;
                     return (
                       <td
                         key={s.id}
@@ -1024,8 +996,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           </table>
         </div>
       </SectionCard>
-
-      {/* ── Onboarding Info ── */}
       <SectionCard
         title="Understanding Each Setting"
         subtitle="What these values control across the platform"
@@ -1093,7 +1063,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
   );
 }
 
-// ─── TAB 1: EARNING RULES (unchanged from v1.1) ───────────────────────────────
 function TabEarning({ draft, setDraft }) {
   const cfg = draft;
   const costPerPt = cfg.redemption_value_zar * (1 - cfg.breakage_rate);
@@ -1274,7 +1243,6 @@ function TabEarning({ draft, setDraft }) {
   );
 }
 
-// ─── TAB 2: TIERS (unchanged from v1.1) ──────────────────────────────────────
 function TabTiers({ draft, setDraft }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1476,7 +1444,6 @@ function TabTiers({ draft, setDraft }) {
   );
 }
 
-// ─── TAB 3: ECONOMICS (unchanged from v1.1) ───────────────────────────────────
 function TabEconomics({ draft, setDraft, liveStats }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1666,7 +1633,6 @@ function TabEconomics({ draft, setDraft, liveStats }) {
   );
 }
 
-// ─── TAB 4: REFERRALS (unchanged from v1.1) ───────────────────────────────────
 function TabReferrals({ draft, setDraft, referralLeaderboard }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1801,7 +1767,6 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
   );
 }
 
-// ─── TAB 5: QR SECURITY (unchanged from v1.1) ─────────────────────────────────
 function TabQRSecurity({ draft, setDraft, qrStats }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1904,7 +1869,6 @@ function TabQRSecurity({ draft, setDraft, qrStats }) {
   );
 }
 
-// ─── TAB 6: SIMULATOR (unchanged from v1.1) ───────────────────────────────────
 function TabSimulator({ draft }) {
   const cfg = draft;
   const [onlinePct, setOnlinePct] = useState(30);
@@ -2153,7 +2117,6 @@ function TabSimulator({ draft }) {
   );
 }
 
-// ─── TAB 7: CAMPAIGNS (unchanged from v1.2) ────────────────────────────────────
 function TabCampaigns({ showToast }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2502,16 +2465,15 @@ function TabCampaigns({ showToast }) {
               padding: "30px 0",
             }}
           >
-            <div style={{ fontSize: 32, marginBottom: 10 }}>📅</div>
-            No campaigns yet. Create one to double your customers' points during
-            a promotion.
+            <div style={{ fontSize: 32, marginBottom: 10 }}>📅</div>No campaigns
+            yet. Create one to double your customers' points during a promotion.
           </div>
         ) : (
           <div>
             {campaigns.map((c) => {
-              const active = isActive(c);
-              const upcoming = c.is_active && c.start_date > today;
-              const past = c.end_date < today;
+              const active = isActive(c),
+                upcoming = c.is_active && c.start_date > today,
+                past = c.end_date < today;
               let statusColour = C.textLight,
                 statusLabel = "Inactive";
               if (active) {
@@ -2642,16 +2604,15 @@ function TabCampaigns({ showToast }) {
           and a campaign is active today, the campaign multiplier is applied{" "}
           <em>on top of</em> their tier multiplier. A Gold tier customer (2×)
           during a 2× campaign earns <strong>2 × 2 = 4×</strong> base points.
-          The campaign banner is shown on the scan result page.
         </InfoBox>
       </SectionCard>
     </div>
   );
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT: HQLoyalty v2.0
-// ═════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT v2.1 — WP-Z: added recalculate_all_tiers() RPC
+// ═══════════════════════════════════════════════════════════════════════════
 export default function HQLoyalty() {
   const [config, setConfig] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -2664,7 +2625,6 @@ export default function HQLoyalty() {
   const [qrStats, setQrStats] = useState(null);
   const [referralLB, setReferralLB] = useState([]);
 
-  // v2.0: Tab 0 = Schema, tabs 1–7 = existing tabs shifted +1
   const SUB_TABS = [
     { label: "🎛️ Schema", key: "schema" },
     { label: "📊 Earning Rules", key: "earning" },
@@ -2676,7 +2636,6 @@ export default function HQLoyalty() {
     { label: "📅 Campaigns", key: "campaigns" },
   ];
 
-  // Config tabs = 0–6 (Schema through Simulator); Campaigns = 7
   const isConfigTab = activeTab < 7;
   const isDirty =
     draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false;
@@ -2775,24 +2734,33 @@ export default function HQLoyalty() {
     }
   }
 
+  // ─── WP-Z: helper — recalculates ALL customer tiers after any config change ──
+  async function recalculateAllTiers() {
+    try {
+      const { error } = await supabase.rpc("recalculate_all_tiers");
+      if (error) console.error("Tier recalculation failed:", error.message);
+    } catch (err) {
+      console.error("Tier recalculation exception:", err);
+    }
+  }
+
   // ── Apply full schema preset ──────────────────────────────────────────────
   async function handleApplySchema(schema) {
     setApplyingSchema(true);
     try {
-      const schemaValues = {
-        ...schema.values,
-        active_schema: schema.id,
-      };
+      const schemaValues = { ...schema.values, active_schema: schema.id };
       const { error } = await supabase
         .from("loyalty_config")
         .update(schemaValues)
         .eq("id", config.id);
       if (error) throw error;
+      // WP-Z: immediately recalculate all customer tiers to match new thresholds
+      await recalculateAllTiers();
       const newConfig = { ...config, ...schemaValues };
       setConfig(newConfig);
       setDraft({ ...newConfig });
       showToast(
-        `✓ ${schema.label} schema applied — all touchpoints updated live`,
+        `✓ ${schema.label} schema applied — all customer tiers updated live`,
       );
     } catch (err) {
       console.error("HQLoyalty applySchema error:", err);
@@ -2807,7 +2775,6 @@ export default function HQLoyalty() {
     setSaving(true);
     try {
       const { id, updated_by, ...fields } = draft;
-      // If any field differs from the active schema, mark as 'custom'
       const activeSchema = SCHEMAS.find((s) => s.id === draft.active_schema);
       let schemaToSave = draft.active_schema || "standard";
       if (activeSchema) {
@@ -2818,17 +2785,14 @@ export default function HQLoyalty() {
       }
       const { error } = await supabase
         .from("loyalty_config")
-        .update({
-          ...fields,
-          active_schema: schemaToSave,
-        })
+        .update({ ...fields, active_schema: schemaToSave })
         .eq("id", config.id);
       if (error) throw error;
+      // WP-Z: recalculate all tiers whenever thresholds might have changed
+      await recalculateAllTiers();
       setConfig({ ...draft, active_schema: schemaToSave });
       setDraft((d) => ({ ...d, active_schema: schemaToSave }));
-      showToast(
-        "Loyalty config saved — changes are now live across the platform",
-      );
+      showToast("Loyalty config saved — all customer tiers updated live");
     } catch (err) {
       console.error("HQLoyalty save error:", err);
       showToast("Save failed: " + (err.message || "unknown error"), "error");
@@ -2859,8 +2823,6 @@ export default function HQLoyalty() {
   return (
     <div style={{ fontFamily: FONT_BODY, background: C.bg, minHeight: "100%" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@400;500;600;700&display=swap');`}</style>
-
-      {/* ── HEADER ── */}
       <div
         style={{
           padding: "24px 28px 0",
@@ -2899,7 +2861,6 @@ export default function HQLoyalty() {
               >
                 💎 Loyalty Economics Engine
               </h1>
-              {/* Active schema badge */}
               {config?.active_schema && (
                 <span
                   style={{
@@ -2989,8 +2950,6 @@ export default function HQLoyalty() {
             </button>
           )}
         </div>
-
-        {/* Sub-tab nav */}
         <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
           {SUB_TABS.map((tab, i) => (
             <button
@@ -3025,8 +2984,6 @@ export default function HQLoyalty() {
           ))}
         </div>
       </div>
-
-      {/* ── TAB CONTENT ── */}
       <div style={{ padding: "24px 28px", maxWidth: 960 }}>
         {activeTab === 0 && (
           <TabSchema
@@ -3057,8 +3014,6 @@ export default function HQLoyalty() {
         {activeTab === 6 && <TabSimulator draft={draft} />}
         {activeTab === 7 && <TabCampaigns showToast={showToast} />}
       </div>
-
-      {/* ── STICKY SAVE FOOTER (config tabs 1–6 only) ── */}
       {isDirty && activeTab > 0 && activeTab < 7 && (
         <div
           style={{
@@ -3122,7 +3077,6 @@ export default function HQLoyalty() {
           </div>
         </div>
       )}
-
       {toast && (
         <Toast
           msg={toast.msg}
@@ -3133,5 +3087,3 @@ export default function HQLoyalty() {
     </div>
   );
 }
-
-

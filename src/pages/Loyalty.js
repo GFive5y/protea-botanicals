@@ -1,4 +1,5 @@
-// src/pages/Loyalty.js v5.6
+// src/pages/Loyalty.js v5.7
+// v5.7: Tier benefits preview — locked/greyed before phone verified
 // Protea Botanicals — Phase 1 Communications build
 // v5.6 changes from v5.5:
 //   - Fetches user's current monthly rank via get_user_monthly_rank() RPC
@@ -787,79 +788,199 @@ export default function Loyalty() {
               </div>
             )}
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 10,
-            }}
-          >
-            {[
-              {
-                icon: "✕",
-                label: `${tier.mult}× points multiplier`,
-                desc: `Every purchase earns ${tier.mult}× base points`,
-              },
-              {
-                icon: "📦",
-                label: `${config.pts_qr_scan * tier.mult} pts per QR scan`,
-                desc: `Base ${config.pts_qr_scan} × ${tier.mult} tier bonus`,
-              },
-              {
-                icon: "🛒",
-                label: `${Math.round((400 / 100) * config.pts_per_r100_online * (1 + config.online_bonus_pct / 100) * tier.mult)} pts / R400 online`,
-                desc: `Including ${config.online_bonus_pct}% online bonus`,
-              },
-              {
-                icon: "🤝",
-                label: `${config.pts_referral_referrer} pts per referral`,
-                desc: `When your friend makes their first order`,
-              },
-            ].map((perk, i) => (
+          {!profile?.phone_verified ? (
+            /* ── LOCKED PREVIEW ── */
+            <div style={{ position: "relative", marginTop: 4 }}>
+              {/* Blurred ghost of the perks so users can see what they're unlocking */}
               <div
-                key={i}
                 style={{
-                  background: "rgba(255,255,255,0.6)",
-                  borderRadius: 2,
-                  padding: "10px 12px",
+                  opacity: 0.2,
+                  filter: "blur(3px)",
+                  pointerEvents: "none",
+                  userSelect: "none",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: tier.color,
-                    marginBottom: 3,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: 10,
                   }}
                 >
-                  {perk.icon} {perk.label}
+                  {[
+                    {
+                      icon: "✕",
+                      label: `${tier.mult}× points multiplier`,
+                      desc: "Every purchase earns tier bonus",
+                    },
+                    {
+                      icon: "📦",
+                      label: "pts per QR scan",
+                      desc: "Tier multiplier applied",
+                    },
+                    {
+                      icon: "🛒",
+                      label: "pts per R400 online",
+                      desc: "Online bonus included",
+                    },
+                    {
+                      icon: "🤝",
+                      label: "pts per referral",
+                      desc: "When friend places first order",
+                    },
+                  ].map((perk, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        background: "rgba(255,255,255,0.6)",
+                        borderRadius: 2,
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: tier.color,
+                          marginBottom: 3,
+                        }}
+                      >
+                        {perk.icon} {perk.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.muted }}>
+                        {perk.desc}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ fontSize: 11, color: C.muted }}>{perk.desc}</div>
               </div>
-            ))}
-          </div>
-          {tier.nextTier && (
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 12,
-                color: C.muted,
-                borderTop: `1px solid ${tier.color}30`,
-                paddingTop: 10,
-              }}
-            >
-              🏆 Reach{" "}
-              <strong style={{ color: tier.color }}>{tier.nextTier}</strong> at{" "}
-              {tier.nextMin} pts to unlock{" "}
-              {
-                {
-                  Silver: `${config.mult_silver}×`,
-                  Gold: `${config.mult_gold}×`,
-                  Platinum: `${config.mult_platinum}×`,
-                }[tier.nextTier]
-              }{" "}
-              multiplier — {pointsToNext} pts to go
+              {/* Lock overlay */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "8px 16px",
+                }}
+              >
+                <div style={{ fontSize: 26 }}>🔒</div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: tier.color,
+                    textAlign: "center",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Verify your phone to unlock {tier.name} tier benefits
+                </div>
+                <Link
+                  to="/account"
+                  state={{ tab: "rewards" }}
+                  style={{
+                    display: "inline-block",
+                    marginTop: 4,
+                    background: tier.color,
+                    color: "#fff",
+                    borderRadius: 2,
+                    padding: "8px 20px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    textTransform: "uppercase",
+                    textDecoration: "none",
+                    fontFamily: F.body,
+                  }}
+                >
+                  📱 Verify Phone →
+                </Link>
+              </div>
             </div>
+          ) : (
+            /* ── UNLOCKED PERKS ── */
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {[
+                  {
+                    icon: "✕",
+                    label: `${tier.mult}× points multiplier`,
+                    desc: `Every purchase earns ${tier.mult}× base points`,
+                  },
+                  {
+                    icon: "📦",
+                    label: `${config.pts_qr_scan * tier.mult} pts per QR scan`,
+                    desc: `Base ${config.pts_qr_scan} × ${tier.mult} tier bonus`,
+                  },
+                  {
+                    icon: "🛒",
+                    label: `${Math.round((400 / 100) * config.pts_per_r100_online * (1 + config.online_bonus_pct / 100) * tier.mult)} pts / R400 online`,
+                    desc: `Including ${config.online_bonus_pct}% online bonus`,
+                  },
+                  {
+                    icon: "🤝",
+                    label: `${config.pts_referral_referrer} pts per referral`,
+                    desc: `When your friend makes their first order`,
+                  },
+                ].map((perk, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      background: "rgba(255,255,255,0.6)",
+                      borderRadius: 2,
+                      padding: "10px 12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: tier.color,
+                        marginBottom: 3,
+                      }}
+                    >
+                      {perk.icon} {perk.label}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted }}>
+                      {perk.desc}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {tier.nextTier && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 12,
+                    color: C.muted,
+                    borderTop: `1px solid ${tier.color}30`,
+                    paddingTop: 10,
+                  }}
+                >
+                  🏆 Reach{" "}
+                  <strong style={{ color: tier.color }}>{tier.nextTier}</strong>{" "}
+                  at {tier.nextMin} pts to unlock{" "}
+                  {
+                    {
+                      Silver: `${config.mult_silver}×`,
+                      Gold: `${config.mult_gold}×`,
+                      Platinum: `${config.mult_platinum}×`,
+                    }[tier.nextTier]
+                  }{" "}
+                  multiplier — {pointsToNext} pts to go
+                </div>
+              )}
+            </>
           )}
         </div>
 

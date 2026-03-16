@@ -1,5 +1,10 @@
-// AdminDashboard.js v4.7
+// AdminDashboard.js v4.8
 // Protea Botanicals — March 2026
+// ★ v4.8: WP-X System Intelligence Layer
+//   - SystemStatusBar added below header (live counts + pending setup checklist)
+//   - Overview tab overhauled: 3-row tile grid (Today · Action Required · Platform Health)
+//   - WorkflowGuide added to Overview tab (contextual onboarding)
+//   - New live counts: scansToday, newCustomers, pointsToday, fraudAlerts
 // ★ v4.7: WP-U Unified Comms Centre
 //   - New "comms" tab replaces separate "messages" and "support" tabs
 //   - AdminCommsCenter.js handles customer_messages + support_tickets + wholesale_messages
@@ -11,6 +16,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "../components/WorkflowGuide";
+import SystemStatusBar from "../components/SystemStatusBar";
 import AdminAnalytics from "./AdminAnalytics";
 import StockControl from "../components/StockControl";
 import AdminBatchManager from "../components/AdminBatchManager";
@@ -58,9 +65,10 @@ const makeBtn = (bg, color = C.white) => ({
   transition: "opacity 0.2s",
 });
 
-function StatCard({ label, value, sub, color = C.green, icon }) {
+function StatCard({ label, value, sub, color = C.green, icon, onClick }) {
   return (
     <div
+      onClick={onClick}
       style={{
         background: C.white,
         border: `1px solid ${C.border}`,
@@ -68,6 +76,15 @@ function StatCard({ label, value, sub, color = C.green, icon }) {
         padding: "20px",
         flex: "1 1 200px",
         minWidth: "180px",
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        if (onClick)
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "none";
       }}
     >
       <div
@@ -180,6 +197,11 @@ export default function AdminDashboard() {
     avgTimeToClaim: null,
     userCount: 0,
   });
+  // v4.8: additional live stats for overview
+  const [scansToday, setScansToday] = useState(0);
+  const [newCustomers, setNewCustomers] = useState(0);
+  const [pointsToday, setPointsToday] = useState(0);
+  const [fraudAlerts, setFraudAlerts] = useState(0);
 
   const fetchUsers = useCallback(async () => {
     const { data } = await supabase.from("user_profiles").select("*");
@@ -274,11 +296,46 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  // v4.8: fetch today's live counts
+  const fetchTodayStats = useCallback(async () => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const iso = todayStart.toISOString();
+      const [scanRes, custRes, ptsRes, fraudRes] = await Promise.all([
+        supabase
+          .from("scan_logs")
+          .select("id", { count: "exact", head: true })
+          .gte("scanned_at", iso),
+        supabase
+          .from("user_profiles")
+          .select("id", { count: "exact", head: true })
+          .gte("created_at", iso),
+        supabase
+          .from("loyalty_transactions")
+          .select("points")
+          .gte("transaction_date", iso)
+          .not("transaction_type", "in", '("SPENT","REDEEMED")'),
+        supabase
+          .from("user_profiles")
+          .select("id", { count: "exact", head: true })
+          .or("is_suspended.eq.true,anomaly_score.gt.70"),
+      ]);
+      setScansToday(scanRes.count || 0);
+      setNewCustomers(custRes.count || 0);
+      setPointsToday(
+        (ptsRes.data || []).reduce((s, t) => s + (t.points || 0), 0),
+      );
+      setFraudAlerts(fraudRes.count || 0);
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     fetchUsers();
     computeAnalytics();
     fetchCommsBadge();
-  }, [fetchUsers, computeAnalytics, fetchCommsBadge]);
+    fetchTodayStats();
+  }, [fetchUsers, computeAnalytics, fetchCommsBadge, fetchTodayStats]);
 
   // Realtime: customer_messages → refresh comms badge
   useEffect(() => {
@@ -346,7 +403,7 @@ export default function AdminDashboard() {
           background: C.green,
           padding: "20px 32px",
           borderRadius: "2px",
-          marginBottom: "24px",
+          marginBottom: 0,
         }}
       >
         <span
@@ -371,6 +428,9 @@ export default function AdminDashboard() {
         </h1>
       </div>
 
+      {/* System Status Bar — WP-X */}
+      <SystemStatusBar />
+
       {/* Tab Bar */}
       <div
         style={{
@@ -381,6 +441,7 @@ export default function AdminDashboard() {
           overflowX: "auto",
           marginBottom: "24px",
           borderRadius: "2px",
+          marginTop: "12px",
         }}
       >
         <TabBtn
@@ -481,65 +542,223 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* OVERVIEW */}
+      {/* ═══════════════════════════════════════════════════════
+          OVERVIEW — v4.8
+      ═══════════════════════════════════════════════════════ */}
       {tab === "overview" && (
         <div>
-          <h2
-            style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: "22px",
-              marginBottom: "24px",
-            }}
-          >
-            System Overview
-          </h2>
+          {/* Workflow Guide */}
+          <WorkflowGuide
+            title="Admin Dashboard"
+            description="Day-to-day operations for your shop. Check the Comms badge first — reply to customers and close tickets. Then review batches, QR codes, and fraud alerts."
+            steps={[
+              {
+                number: 1,
+                label: "Comms",
+                desc: "Reply to customer messages and resolve open support tickets. Badge turns red when attention is needed.",
+                status: "required",
+              },
+              {
+                number: 2,
+                label: "Batches",
+                desc: "Review active batches and stock levels. Low stock means products may disappear from the shop.",
+                status: "required",
+              },
+              {
+                number: 3,
+                label: "QR Codes",
+                desc: "Generate QR codes for new stock batches. Codes are HMAC-signed — always use the QR Engine.",
+                status: "required",
+              },
+              {
+                number: 4,
+                label: "Customers",
+                desc: "Monitor loyalty scores and engagement. CRM scoring only — use Comms tab for messaging.",
+                status: "optional",
+              },
+              {
+                number: 5,
+                label: "Fraud",
+                desc: "Review flagged accounts daily. Dismiss false positives or suspend confirmed abuse.",
+                status: "required",
+              },
+              {
+                number: 6,
+                label: "Notifications",
+                desc: "Check SMS/email delivery log for failures. This is an ops log — NOT a comms channel.",
+                status: "optional",
+              },
+            ]}
+            warnings={[
+              "Comms tab (v4.7) replaced the old Messages + Support tabs. Do NOT re-add those tabs.",
+              "Notifications tab = SMS/email delivery log ONLY. It is not a comms channel.",
+              "Customers tab = CRM engagement scoring ONLY. It is not a comms channel.",
+              "customer_messages uses .body field. ticket_messages uses .content field. Never swap these.",
+              "ORDER BY production_date on batches — there is no created_at column on the batches table.",
+              "UPDATE only on user_profiles — never use upsert.",
+            ]}
+            dataFlow={[
+              {
+                direction: "in",
+                from: "HQ ships batch",
+                to: "Batches tab (stock level updates)",
+              },
+              {
+                direction: "in",
+                from: "Customer scans QR",
+                to: "Analytics tab + Customers tab (loyalty points)",
+              },
+              {
+                direction: "in",
+                from: "Customer sends message",
+                to: "Comms tab badge (realtime)",
+              },
+              {
+                direction: "out",
+                from: "Admin replies in Comms",
+                to: "Customer receives WhatsApp + inbox message",
+              },
+              {
+                direction: "out",
+                from: "Admin generates QR codes",
+                to: "QR codes assigned to batch, ready for distribution",
+              },
+            ]}
+            tips={[
+              "The Comms badge is realtime — no refresh needed. Watch it during business hours.",
+              "The QR Engine auto-selects the most recent batch. Always verify the correct batch before bulk generating.",
+              "Customers tab shows tier distribution — useful for targeting Broadcast messages in the Comms tab.",
+            ]}
+            storageKey="admin_overview"
+            defaultOpen={false}
+          />
+
+          {/* ── ROW 1: Today's Activity ── */}
           <div
             style={{
-              display: "flex",
-              gap: "16px",
-              flexWrap: "wrap",
-              marginBottom: "32px",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: C.muted,
+              marginBottom: 12,
             }}
           >
-            <StatCard
-              icon="📦"
-              label="Total QR Codes"
-              value={analytics.total}
-              color={C.green}
-            />
-            <StatCard
-              icon="✅"
-              label="Claimed"
-              value={analytics.claimed}
-              sub={`${analytics.claimRate}% claim rate`}
-              color={C.accent}
-            />
-            <StatCard
-              icon="📤"
-              label="Distributed"
-              value={analytics.distributed}
-              color={C.gold}
-            />
-            <StatCard
-              icon="🏪"
-              label="In Stock"
-              value={analytics.inStock}
-              color={C.blue}
-            />
+            Today's Activity
           </div>
           <div
             style={{
               display: "flex",
-              gap: "16px",
+              gap: 14,
               flexWrap: "wrap",
-              marginBottom: "32px",
+              marginBottom: 24,
+            }}
+          >
+            <StatCard
+              icon="📱"
+              label="Scans Today"
+              value={scansToday}
+              color={C.green}
+            />
+            <StatCard
+              icon="👥"
+              label="New Customers"
+              value={newCustomers}
+              color={C.accent}
+            />
+            <StatCard
+              icon="⭐"
+              label="Points Awarded"
+              value={pointsToday.toLocaleString()}
+              color={C.gold}
+            />
+            <StatCard
+              icon="📦"
+              label="Active QR Codes"
+              value={analytics.inStock}
+              sub="in stock, unscanned"
+              color={C.blue}
+            />
+          </div>
+
+          {/* ── ROW 2: Action Required ── */}
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: C.muted,
+              marginBottom: 12,
+            }}
+          >
+            Action Required
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 14,
+              flexWrap: "wrap",
+              marginBottom: 24,
+            }}
+          >
+            <StatCard
+              icon="💬"
+              label="Comms"
+              value={commsBadge}
+              sub={commsBadge > 0 ? "items need attention" : "all clear"}
+              color={commsBadge > 0 ? C.red : C.accent}
+              onClick={() => setTab("comms")}
+            />
+            <StatCard
+              icon="📦"
+              label="QR Claim Rate"
+              value={`${analytics.claimRate}%`}
+              sub={`${analytics.claimed} claimed of ${analytics.total}`}
+              color={parseFloat(analytics.claimRate) < 20 ? C.orange : C.accent}
+            />
+            <StatCard
+              icon="🚨"
+              label="Fraud Alerts"
+              value={fraudAlerts}
+              sub={fraudAlerts > 0 ? "accounts flagged" : "no alerts"}
+              color={fraudAlerts > 0 ? C.red : C.accent}
+              onClick={() => setTab("security")}
+            />
+            <StatCard
+              icon="👥"
+              label="Total Users"
+              value={analytics.userCount}
+              color={C.green}
+              onClick={() => setTab("users")}
+            />
+          </div>
+
+          {/* ── ROW 3: Platform Health ── */}
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: C.muted,
+              marginBottom: 12,
+            }}
+          >
+            Platform Health
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 14,
+              flexWrap: "wrap",
+              marginBottom: 28,
             }}
           >
             <StatCard
               icon="🎯"
               label="Points Distributed"
-              value={analytics.totalPointsDistributed}
+              value={analytics.totalPointsDistributed.toLocaleString()}
               color={C.gold}
             />
             <StatCard
@@ -558,56 +777,32 @@ export default function AdminDashboard() {
               color={C.blue}
             />
             <StatCard
-              icon="👥"
-              label="Total Users"
-              value={analytics.userCount}
-              color={C.green}
+              icon="📤"
+              label="Distributed"
+              value={analytics.distributed}
+              sub="with customer, unclaimed"
+              color={C.gold}
             />
           </div>
 
-          {commsBadge > 0 && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "#fffdf5",
-                border: `1px solid ${C.orange}`,
-                borderRadius: 2,
-                marginBottom: 24,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <span style={{ fontSize: 18 }}>💬</span>
-              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
-                {commsBadge} item{commsBadge !== 1 ? "s" : ""} need attention in
-                Comms
-              </span>
-              <button
-                onClick={() => setTab("comms")}
-                style={{
-                  ...makeBtn(C.orange),
-                  fontSize: 10,
-                  padding: "5px 14px",
-                  marginLeft: "auto",
-                }}
-              >
-                View Comms
-              </button>
-            </div>
-          )}
-
+          {/* ── Quick Actions ── */}
           <h3
             style={{
               fontFamily: FONTS.heading,
               color: C.green,
               fontSize: "18px",
-              marginBottom: "16px",
+              marginBottom: "14px",
             }}
           >
             Quick Actions
           </h3>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              onClick={() => setTab("comms")}
+              style={{ ...makeBtn(commsBadge > 0 ? C.red : C.mid) }}
+            >
+              💬 COMMS {commsBadge > 0 ? `(${commsBadge})` : ""}
+            </button>
             <button onClick={() => setTab("shipments")} style={makeBtn(C.blue)}>
               🚚 SHIPMENTS
             </button>
@@ -618,7 +813,7 @@ export default function AdminDashboard() {
               ⚙️ PRODUCTION RUNS
             </button>
             <button onClick={() => setTab("batches")} style={makeBtn(C.green)}>
-              🌿 MANAGE BATCHES
+              🌿 BATCHES
             </button>
             <button
               onClick={() => {
@@ -627,16 +822,19 @@ export default function AdminDashboard() {
               }}
               style={makeBtn(C.accent)}
             >
-              QR ENGINE v2
+              📷 QR ENGINE
             </button>
             <button onClick={() => setTab("stock")} style={makeBtn(C.mid)}>
-              STOCK CONTROL
+              📦 STOCK
             </button>
             <button onClick={() => setTab("customers")} style={makeBtn(C.mid)}>
               👥 CUSTOMERS
             </button>
-            <button onClick={() => setTab("comms")} style={makeBtn(C.mid)}>
-              💬 COMMS
+            <button
+              onClick={() => setTab("security")}
+              style={{ ...makeBtn(fraudAlerts > 0 ? C.red : C.mid) }}
+            >
+              🛡️ FRAUD {fraudAlerts > 0 ? `(${fraudAlerts})` : ""}
             </button>
             <button
               onClick={() => {
@@ -652,10 +850,11 @@ export default function AdminDashboard() {
                 computeAnalytics();
                 fetchUsers();
                 fetchCommsBadge();
+                fetchTodayStats();
               }}
               style={makeBtn(C.mid)}
             >
-              REFRESH DATA
+              ↻ REFRESH
             </button>
           </div>
         </div>
