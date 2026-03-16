@@ -180,9 +180,9 @@ const SCHEMAS = [
     costBg: C.purplePale,
     preview: [
       { label: "QR scan reward", value: "25 pts" },
-      { label: "R400 online order", value: "~160 pts  (R32 value)" },
-      { label: "Referral earned", value: "400 pts (referrer)" },
-      { label: "1 000 pts cash value", value: "R200" },
+      { label: "R400 online order", value: "~100 pts  (Bronze, no mult)" },
+      { label: "Silver at", value: "300 pts (~3 orders)" },
+      { label: "Platinum at", value: "1 500 pts (~10 orders)" },
       { label: "Est. cost / 100 orders", value: "~R960 / month" },
     ],
     values: {
@@ -201,9 +201,9 @@ const SCHEMAS = [
       mult_silver: 1.5,
       mult_gold: 2.5,
       mult_platinum: 4.0,
-      threshold_silver: 100,
-      threshold_gold: 250,
-      threshold_platinum: 500,
+      threshold_silver: 300,
+      threshold_gold: 750,
+      threshold_platinum: 1500,
       redemption_value_zar: 0.2,
       min_pts_to_redeem: 50,
       max_redeem_pct_per_order: 30,
@@ -2782,7 +2782,6 @@ export default function HQLoyalty() {
       const schemaValues = {
         ...schema.values,
         active_schema: schema.id,
-        updated_at: new Date().toISOString(),
       };
       const { error } = await supabase
         .from("loyalty_config")
@@ -2822,7 +2821,6 @@ export default function HQLoyalty() {
         .update({
           ...fields,
           active_schema: schemaToSave,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", config.id);
       if (error) throw error;
@@ -3135,3 +3133,5 @@ export default function HQLoyalty() {
     </div>
   );
 }
+
+
