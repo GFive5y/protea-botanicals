@@ -10,6 +10,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -2488,6 +2490,7 @@ export default function AdminQRCodes() {
   const [tab, setTab] = useState("registry");
   const [batches, setBatches] = useState([]);
   const [banners, setBanners] = useState([]);
+  const ctx = usePageContext("admin-qr", null);
 
   const fetchBatches = useCallback(async () => {
     const { data } = await supabase
@@ -2518,6 +2521,12 @@ export default function AdminQRCodes() {
 
   return (
     <div style={{ fontFamily: FONTS.body }}>
+      <WorkflowGuide
+        context={ctx}
+        tabId="admin-qr"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
       <div
         style={{
           fontFamily: FONTS.heading,

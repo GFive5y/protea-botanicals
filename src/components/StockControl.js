@@ -14,6 +14,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
 const C = {
   green: "#1b4332",
@@ -219,6 +221,7 @@ function isLiveInShop(item) {
 export default function StockControl() {
   const [subTab, setSubTab] = useState("overview");
   const [items, setItems] = useState([]);
+  const ctx = usePageContext("admin-stock", null);
   const [movements, setMovements] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -294,6 +297,12 @@ export default function StockControl() {
 
   return (
     <div>
+      <WorkflowGuide
+        context={ctx}
+        tabId="admin-stock"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
       <div
         style={{
           display: "flex",
@@ -1611,15 +1620,13 @@ function MovementsView({ movements, items, onRefresh }) {
         form.movement_type,
       );
       const finalQty = isOut ? -Math.abs(qty) : Math.abs(qty);
-      const { error: mE } = await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: form.item_id,
-          quantity: finalQty,
-          movement_type: form.movement_type,
-          reference: form.reference || null,
-          notes: form.notes || null,
-        });
+      const { error: mE } = await supabase.from("stock_movements").insert({
+        item_id: form.item_id,
+        quantity: finalQty,
+        movement_type: form.movement_type,
+        reference: form.reference || null,
+        notes: form.notes || null,
+      });
       if (mE) throw mE;
       const item = items.find((i) => i.id === form.item_id);
       if (item) {
@@ -1964,16 +1971,14 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
         .select()
         .single();
       if (pE) throw pE;
-      const { error: lE } = await supabase
-        .from("purchase_order_items")
-        .insert(
-          valid.map((l) => ({
-            po_id: po.id,
-            item_id: l.item_id,
-            quantity_ordered: parseFloat(l.quantity_ordered),
-            unit_cost: parseFloat(l.unit_cost),
-          })),
-        );
+      const { error: lE } = await supabase.from("purchase_order_items").insert(
+        valid.map((l) => ({
+          po_id: po.id,
+          item_id: l.item_id,
+          quantity_ordered: parseFloat(l.quantity_ordered),
+          unit_cost: parseFloat(l.unit_cost),
+        })),
+      );
       if (lE) throw lE;
       setShowForm(false);
       setForm({
@@ -2011,15 +2016,13 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
     if (newStatus === "received" && po.purchase_order_items) {
       for (const line of po.purchase_order_items) {
         if (!line.item_id) continue;
-        await supabase
-          .from("stock_movements")
-          .insert({
-            item_id: line.item_id,
-            quantity: line.quantity_ordered,
-            movement_type: "purchase_in",
-            reference: po.po_number,
-            notes: `Auto-recorded from PO ${po.po_number}`,
-          });
+        await supabase.from("stock_movements").insert({
+          item_id: line.item_id,
+          quantity: line.quantity_ordered,
+          movement_type: "purchase_in",
+          reference: po.po_number,
+          notes: `Auto-recorded from PO ${po.po_number}`,
+        });
         const item = items.find((i) => i.id === line.item_id);
         if (item)
           await supabase
