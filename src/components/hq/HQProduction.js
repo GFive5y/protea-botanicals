@@ -1,12 +1,22 @@
-// src/components/hq/HQProduction.js v1.6
+// src/components/hq/HQProduction.js v2.0
+// WP-W: Unified Batch→Production→Stock→Shop Pipeline
+//
+// v2.0 changes:
+//   - OverviewPanel: Stock Alert banner (DEPLETED + LOW STOCK finished products)
+//   - BatchesPanel: shows live quantity_on_hand per batch (via inventory_item_id link)
+//   - BatchesPanel: lifecycle_status badges (active|low_stock|depleted|archived)
+//   - BatchesPanel: Archive action (sets is_archived=true + lifecycle_status='archived')
+//   - BatchesPanel: "🏭 New Run" shortcut per batch row
+//   - BatchesPanel: onboarding panel explaining the full pipeline
+//   - BatchesPanel: low_stock_threshold field editable per batch
+//   - NewRunPanel.handleConfirm: writes inventory_item_id + lifecycle_status back to batches
+//   - NewRunPanel: post-completion prompt "Set sell price to go live in shop"
+//   - AllocatePanel: auto-updates batch lifecycle_status after allocation depletes stock
+//
 // v1.6 — WP-T: Audit Export sub-tab — batch→QR→scan chain, CSV export, QR recall tool
-// v1.5 — FORMAT expansion: vape (0.5/1/2/3ml + custom), edible, flower, beverage, topical, other
-//         Triple Chamber: distillate_needed = units × fill_ml × 3 chambers
-//         Non-vape formats: material BOM hidden — run tracks units only
-//         Batch Edit added to BatchesPanel (product_name, product_type, strain, status, units_produced, expiry_date, lab_certified)
-//         No updated_at in batches UPDATE (column does not exist)
+// v1.5 — FORMAT expansion: vape formats, non-vape, triple chamber, batch edit
 // v1.4 — BUG-001 FIX: direct batches query ordered by production_date
-// v1.3 — Terpene unit fix: ml, % input 3–15
+// v1.3 — Terpene unit fix
 // v1.2 — History admin controls: Edit/Cancel/Delete w/ stock reversal
 // v1.1 — Schema fix
 // v1.0 — WP-L: Production Module
@@ -47,9 +57,17 @@ const sCard = {
 const sBtn = (v = "primary") => ({
   padding: "8px 16px",
   background:
-    v === "primary" ? C.green : v === "danger" ? C.red : "transparent",
-  color: v === "primary" || v === "danger" ? C.white : C.mid,
-  border: v === "primary" || v === "danger" ? "none" : `1px solid ${C.mid}`,
+    v === "primary"
+      ? C.green
+      : v === "danger"
+        ? C.red
+        : v === "amber"
+          ? C.orange
+          : "transparent",
+  color: ["primary", "danger", "amber"].includes(v) ? C.white : C.mid,
+  border: ["primary", "danger", "amber"].includes(v)
+    ? "none"
+    : `1px solid ${C.mid}`,
   borderRadius: "2px",
   fontSize: "10px",
   letterSpacing: "0.15em",
@@ -175,7 +193,6 @@ const FORMAT_CATALOGUE = {
     format_short: "Custom",
   },
 };
-
 const FORMAT_GROUPS = [
   {
     groupLabel: "── Vape ──",
@@ -186,7 +203,6 @@ const FORMAT_GROUPS = [
     keys: ["edible", "flower", "beverage", "topical", "other"],
   },
 ];
-
 const STRAIN_OPTIONS = [
   "Pineapple Express",
   "Gelato #41",
@@ -224,10 +240,40 @@ function genRunNumber(nameStr, formatKey) {
     .slice(0, 4);
   return `PR-${y}${m}${day}-${sc}-${fc}`;
 }
-
 function calcYield(actual, planned) {
   if (!planned || planned === 0) return null;
   return +((actual / planned) * 100).toFixed(1);
+}
+
+// ─── LIFECYCLE STATUS BADGE ──────────────────────────────────────────────────
+function LifecycleBadge({ status, qty }) {
+  // Derive effective status from qty if lifecycle_status not set
+  const effective = status || "active";
+  const map = {
+    active: { bg: "#d4edda", color: C.green, label: "Active" },
+    in_production: { bg: "#e3f2fd", color: C.blue, label: "In Production" },
+    low_stock: { bg: "#fff3e8", color: C.orange, label: "Low Stock" },
+    depleted: { bg: "#ffebee", color: C.red, label: "Depleted" },
+    archived: { bg: C.warm, color: C.muted, label: "Archived" },
+  };
+  const s = map[effective] || map.active;
+  return (
+    <span
+      style={{
+        fontSize: "9px",
+        padding: "2px 8px",
+        borderRadius: "2px",
+        background: s.bg,
+        color: s.color,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        fontWeight: 600,
+        fontFamily: F.body,
+      }}
+    >
+      {s.label}
+    </span>
+  );
 }
 
 function StatusBadge({ status, yieldPct }) {
@@ -373,7 +419,7 @@ export default function HQProduction() {
         supabase
           .from("batches")
           .select(
-            "id,batch_number,product_name,product_type,strain,volume,status,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id",
+            "id,batch_number,product_name,product_type,strain,volume,status,lifecycle_status,inventory_item_id,low_stock_threshold,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id",
           )
           .eq("is_archived", false)
           .order("production_date", { ascending: false }),
@@ -411,6 +457,18 @@ export default function HQProduction() {
     { id: "audit", label: "Audit Export", icon: "🔍" },
   ];
 
+  // Compute stock alerts across all finished products
+  const finishedItems = items.filter((i) => i.category === "finished_product");
+  const depleted = finishedItems.filter(
+    (i) => parseFloat(i.quantity_on_hand || 0) <= 0,
+  );
+  const lowStock = finishedItems.filter((i) => {
+    const qty = parseFloat(i.quantity_on_hand || 0);
+    const batch = batches.find((b) => b.inventory_item_id === i.id);
+    const threshold = batch?.low_stock_threshold || 10;
+    return qty > 0 && qty <= threshold;
+  });
+
   if (error)
     return (
       <div
@@ -432,6 +490,143 @@ export default function HQProduction() {
 
   return (
     <div>
+      {/* ── Global Stock Alert Banner ── */}
+      {(depleted.length > 0 || lowStock.length > 0) && !loading && (
+        <div style={{ marginBottom: "20px" }}>
+          {depleted.length > 0 && (
+            <div
+              style={{
+                ...sCard,
+                borderLeft: `4px solid ${C.red}`,
+                background: "#fff5f5",
+                marginBottom: "10px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: C.red,
+                      fontFamily: F.body,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    🚨 {depleted.length} Product{depleted.length > 1 ? "s" : ""}{" "}
+                    Out of Stock — Shop Hidden
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {depleted.map((i) => (
+                      <span
+                        key={i.id}
+                        style={{
+                          fontSize: "11px",
+                          background: "#ffebee",
+                          color: C.red,
+                          padding: "2px 10px",
+                          borderRadius: "2px",
+                          fontFamily: F.body,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {i.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSubTab("new-run")}
+                  style={{
+                    ...sBtn("primary"),
+                    background: C.red,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  + New Production Run →
+                </button>
+              </div>
+            </div>
+          )}
+          {lowStock.length > 0 && (
+            <div
+              style={{
+                ...sCard,
+                borderLeft: `4px solid ${C.orange}`,
+                background: C.lightOrange,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: C.orange,
+                      fontFamily: F.body,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    ⚠ {lowStock.length} Product{lowStock.length > 1 ? "s" : ""}{" "}
+                    Running Low
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {lowStock.map((i) => {
+                      const batch = batches.find(
+                        (b) => b.inventory_item_id === i.id,
+                      );
+                      return (
+                        <span
+                          key={i.id}
+                          style={{
+                            fontSize: "11px",
+                            background: "#fff3e8",
+                            color: C.orange,
+                            padding: "2px 10px",
+                            borderRadius: "2px",
+                            fontFamily: F.body,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {i.name} —{" "}
+                          {Math.floor(parseFloat(i.quantity_on_hand || 0))} left
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSubTab("new-run")}
+                  style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
+                >
+                  Plan Production →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -457,6 +652,7 @@ export default function HQProduction() {
               fontFamily: F.body,
               fontWeight: subTab === t.id ? 600 : 400,
               transition: "all 0.15s",
+              position: "relative",
             }}
           >
             {t.icon} {t.label}
@@ -475,6 +671,21 @@ export default function HQProduction() {
                 {batches.length}
               </span>
             )}
+            {t.id === "batches" && depleted.length > 0 && (
+              <span
+                style={{
+                  marginLeft: "4px",
+                  background: C.red,
+                  color: C.white,
+                  borderRadius: "10px",
+                  fontSize: "9px",
+                  padding: "1px 6px",
+                  fontWeight: 700,
+                }}
+              >
+                !
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -491,11 +702,20 @@ export default function HQProduction() {
               items={items}
               runs={runs}
               batches={batches}
+              depleted={depleted}
+              lowStock={lowStock}
               onNavBatches={() => setSubTab("batches")}
+              onNavNewRun={() => setSubTab("new-run")}
             />
           )}
           {subTab === "batches" && (
-            <BatchesPanel batches={batches} runs={runs} onRefresh={fetchAll} />
+            <BatchesPanel
+              batches={batches}
+              runs={runs}
+              items={items}
+              onNavNewRun={() => setSubTab("new-run")}
+              onRefresh={fetchAll}
+            />
           )}
           {subTab === "new-run" && (
             <NewRunPanel
@@ -513,6 +733,7 @@ export default function HQProduction() {
             <AllocatePanel
               items={items}
               partners={partners}
+              batches={batches}
               onRefresh={fetchAll}
             />
           )}
@@ -526,7 +747,15 @@ export default function HQProduction() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // OVERVIEW
 // ═══════════════════════════════════════════════════════════════════════════════
-function OverviewPanel({ items, runs, batches, onNavBatches }) {
+function OverviewPanel({
+  items,
+  runs,
+  batches,
+  depleted,
+  lowStock,
+  onNavBatches,
+  onNavNewRun,
+}) {
   const distillate = items.filter(
     (i) => i.category === "raw_material" && i.unit === "ml",
   );
@@ -573,6 +802,104 @@ function OverviewPanel({ items, runs, batches, onNavBatches }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
+      {/* Pipeline onboarding */}
+      <div
+        style={{
+          ...sCard,
+          borderLeft: `4px solid ${C.accent}`,
+          background: "#f0faf5",
+        }}
+      >
+        <div style={{ ...sLabel, color: C.mid, marginBottom: 8 }}>
+          📋 Production Pipeline — How It Works
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 0,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {[
+            {
+              step: "1",
+              label: "Supply Chain",
+              desc: "Receive raw materials via PO",
+              color: C.blue,
+            },
+            { step: "→", label: "", desc: "", color: C.muted },
+            {
+              step: "2",
+              label: "New Production Run",
+              desc: "Select batch + materials → confirm",
+              color: C.purple,
+            },
+            { step: "→", label: "", desc: "", color: C.muted },
+            {
+              step: "3",
+              label: "Set Sell Price",
+              desc: "HQ → Pricing → set sell_price > R0",
+              color: C.gold,
+            },
+            { step: "→", label: "", desc: "", color: C.muted },
+            {
+              step: "4",
+              label: "Live in Shop",
+              desc: "Auto-appears when qty > 0 + price set",
+              color: C.accent,
+            },
+          ].map((s, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center" }}>
+              {s.step === "→" ? (
+                <div style={{ fontSize: 18, color: C.muted, margin: "0 8px" }}>
+                  →
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: "8px 14px",
+                    background: C.white,
+                    border: `1px solid ${s.color}30`,
+                    borderRadius: 2,
+                    borderLeft: `3px solid ${s.color}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: s.color,
+                      fontFamily: F.body,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Step {s.step}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontFamily: F.body,
+                      fontWeight: 600,
+                      color: C.text,
+                      marginTop: 2,
+                    }}
+                  >
+                    {s.label}
+                  </div>
+                  <div
+                    style={{ fontSize: 10, color: C.muted, fontFamily: F.body }}
+                  >
+                    {s.desc}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div
         style={{
           display: "grid",
@@ -610,7 +937,7 @@ function OverviewPanel({ items, runs, batches, onNavBatches }) {
             label: "Finished Stock",
             value: totalFin.toLocaleString(),
             sub: "units ready",
-            color: C.accent,
+            color: depleted.length > 0 ? C.red : C.accent,
           },
           {
             label: "1ml Capacity",
@@ -719,54 +1046,81 @@ function OverviewPanel({ items, runs, batches, onNavBatches }) {
               <tr>
                 <th style={sTh}>Batch #</th>
                 <th style={sTh}>Product</th>
-                <th style={sTh}>Type</th>
                 <th style={sTh}>Strain</th>
                 <th style={{ ...sTh, textAlign: "right" }}>Units</th>
                 <th style={sTh}>Date</th>
+                <th style={sTh}>Stock</th>
                 <th style={sTh}>Status</th>
                 <th style={sTh}>Lab</th>
               </tr>
             </thead>
             <tbody>
-              {batches.slice(0, 6).map((b) => (
-                <tr key={b.id}>
-                  <td
-                    style={{
-                      ...sTd,
-                      fontFamily: "monospace",
-                      fontSize: "11px",
-                      color: C.muted,
-                    }}
-                  >
-                    {b.batch_number}
-                  </td>
-                  <td style={{ ...sTd, fontWeight: 500 }}>
-                    {b.product_name || "—"}
-                  </td>
-                  <td style={{ ...sTd, color: C.muted }}>
-                    {b.product_type || "—"}
-                  </td>
-                  <td style={sTd}>{b.strain || "—"}</td>
-                  <td style={{ ...sTd, textAlign: "right", fontWeight: 600 }}>
-                    {b.units_produced ?? "—"}
-                  </td>
-                  <td style={{ ...sTd, color: C.muted }}>
-                    {b.production_date
-                      ? new Date(b.production_date).toLocaleDateString("en-ZA")
-                      : "—"}
-                  </td>
-                  <td style={sTd}>
-                    <StatusBadge status={b.status} yieldPct={null} />
-                  </td>
-                  <td style={sTd}>
-                    {b.lab_certified ? (
-                      <span style={{ color: C.green }}>✓</span>
-                    ) : (
-                      <span style={{ color: C.muted }}>—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {batches.slice(0, 6).map((b) => {
+                const invItem = b.inventory_item_id
+                  ? items.find((i) => i.id === b.inventory_item_id)
+                  : items.find(
+                      (i) =>
+                        i.category === "finished_product" &&
+                        i.name === b.product_name,
+                    );
+                const qty = invItem
+                  ? parseFloat(invItem.quantity_on_hand || 0)
+                  : null;
+                return (
+                  <tr key={b.id}>
+                    <td
+                      style={{
+                        ...sTd,
+                        fontFamily: "monospace",
+                        fontSize: "11px",
+                        color: C.muted,
+                      }}
+                    >
+                      {b.batch_number}
+                    </td>
+                    <td style={{ ...sTd, fontWeight: 500 }}>
+                      {b.product_name || "—"}
+                    </td>
+                    <td style={sTd}>{b.strain || "—"}</td>
+                    <td style={{ ...sTd, textAlign: "right", fontWeight: 600 }}>
+                      {b.units_produced ?? "-"}
+                    </td>
+                    <td style={{ ...sTd, color: C.muted }}>
+                      {b.production_date
+                        ? new Date(b.production_date).toLocaleDateString(
+                            "en-ZA",
+                          )
+                        : "—"}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        fontWeight: 600,
+                        color:
+                          qty === null
+                            ? C.muted
+                            : qty <= 0
+                              ? C.red
+                              : qty <= 10
+                                ? C.orange
+                                : C.green,
+                      }}
+                    >
+                      {qty === null ? "—" : `${Math.floor(qty)} pcs`}
+                    </td>
+                    <td style={sTd}>
+                      <LifecycleBadge status={b.lifecycle_status} />
+                    </td>
+                    <td style={sTd}>
+                      {b.lab_certified ? (
+                        <span style={{ color: C.green }}>✓</span>
+                      ) : (
+                        <span style={{ color: C.muted }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -864,13 +1218,15 @@ function OverviewPanel({ items, runs, batches, onNavBatches }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BATCHES PANEL — v1.5: inline edit per batch row
+// BATCHES PANEL v2.0 — lifecycle, stock levels, archive, new run shortcut
 // ═══════════════════════════════════════════════════════════════════════════════
-function BatchesPanel({ batches, runs, onRefresh }) {
+function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(null);
+  const [deleting, setDeleting] = useState(null); // batch id pending delete confirm
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
@@ -878,13 +1234,63 @@ function BatchesPanel({ batches, runs, onRefresh }) {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const handleDeleteBatch = async (b) => {
+    const linkedRun = runs.find((r) => r.batch_id === b.id);
+    if (linkedRun) {
+      showToast(
+        "Cannot delete — this batch has a linked production run. Delete the run first from the History tab, or Archive this batch instead.",
+        "error",
+      );
+      setDeleting(null);
+      return;
+    }
+    setSaving(true);
+    try {
+      // Safe to delete — no production runs linked
+      const { error } = await supabase.from("batches").delete().eq("id", b.id);
+      if (error) throw error;
+      setDeleting(null);
+      onRefresh();
+      showToast(`Batch ${b.batch_number} deleted.`);
+    } catch (err) {
+      showToast("Delete failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const runByBatch = {};
   runs.forEach((r) => {
     if (r.batch_id) runByBatch[r.batch_id] = r;
   });
 
+  // Link each batch to its inventory item
+  const getStockForBatch = (b) => {
+    if (b.inventory_item_id)
+      return items.find((i) => i.id === b.inventory_item_id);
+    return items.find(
+      (i) => i.category === "finished_product" && i.name === b.product_name,
+    );
+  };
+
+  const getEffectiveLifecycle = (b) => {
+    const invItem = getStockForBatch(b);
+    if (!invItem) return b.lifecycle_status || "active";
+    const qty = parseFloat(invItem.quantity_on_hand || 0);
+    const threshold = b.low_stock_threshold || 10;
+    if (qty <= 0) return "depleted";
+    if (qty <= threshold) return "low_stock";
+    return b.lifecycle_status || "active";
+  };
+
   const filtered =
-    filter === "all" ? batches : batches.filter((b) => b.status === filter);
+    filter === "all"
+      ? batches
+      : filter === "depleted"
+        ? batches.filter((b) => getEffectiveLifecycle(b) === "depleted")
+        : filter === "low_stock"
+          ? batches.filter((b) => getEffectiveLifecycle(b) === "low_stock")
+          : batches.filter((b) => b.status === filter);
 
   const openEdit = (b) => {
     setEditing(b.id);
@@ -896,13 +1302,14 @@ function BatchesPanel({ batches, runs, onRefresh }) {
       units_produced: b.units_produced ?? "",
       expiry_date: b.expiry_date || "",
       lab_certified: b.lab_certified || false,
+      low_stock_threshold: b.low_stock_threshold ?? 10,
     });
   };
 
   const handleSaveEdit = async (b) => {
     setSaving(true);
     try {
-      // IMPORTANT: batches table has NO updated_at column — never include it
+      // IMPORTANT: batches table has NO updated_at column
       const { error } = await supabase
         .from("batches")
         .update({
@@ -913,6 +1320,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
           units_produced: parseInt(editForm.units_produced) || null,
           expiry_date: editForm.expiry_date || null,
           lab_certified: editForm.lab_certified,
+          low_stock_threshold: parseInt(editForm.low_stock_threshold) || 10,
         })
         .eq("id", b.id);
       if (error) throw error;
@@ -926,12 +1334,53 @@ function BatchesPanel({ batches, runs, onRefresh }) {
     }
   };
 
+  const handleArchive = async (b) => {
+    if (
+      !window.confirm(
+        `Archive batch "${b.batch_number}"?\n\nThis will hide it from active views. The batch record and history are preserved.`,
+      )
+    )
+      return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("batches")
+        .update({
+          is_archived: true,
+          lifecycle_status: "archived",
+          status: "archived",
+        })
+        .eq("id", b.id);
+      if (error) throw error;
+      setArchiving(null);
+      onRefresh();
+      showToast(`Batch ${b.batch_number} archived.`);
+    } catch (err) {
+      showToast("Archive failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const depletedCount = batches.filter(
+    (b) => getEffectiveLifecycle(b) === "depleted",
+  ).length;
+  const lowCount = batches.filter(
+    (b) => getEffectiveLifecycle(b) === "low_stock",
+  ).length;
+
   const FILTER_OPTIONS = [
     { id: "all", label: `All (${batches.length})` },
     {
       id: "active",
       label: `Active (${batches.filter((b) => b.status === "active").length})`,
     },
+    {
+      id: "depleted",
+      label: `Depleted (${depletedCount})`,
+      alert: depletedCount > 0,
+    },
+    { id: "low_stock", label: `Low Stock (${lowCount})`, alert: lowCount > 0 },
     {
       id: "archived",
       label: `Archived (${batches.filter((b) => b.status === "archived").length})`,
@@ -956,6 +1405,84 @@ function BatchesPanel({ batches, runs, onRefresh }) {
         >
           {toast.type === "error" ? "⚠ " : "✓ "}
           {toast.msg}
+        </div>
+      )}
+
+      {/* Onboarding panel — shown when no batches linked to inventory */}
+      {batches.length === 0 && (
+        <div
+          style={{
+            ...sCard,
+            borderLeft: `4px solid ${C.accent}`,
+            background: "#f0faf5",
+          }}
+        >
+          <div style={{ ...sLabel, color: C.mid, marginBottom: 12 }}>
+            Getting Started — No Batches Yet
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {[
+              {
+                icon: "📥",
+                title: "1. Receive Raw Materials",
+                desc: "HQ → Supply Chain → Purchase Orders. Receive a PO to add distillate, terpenes and hardware to inventory.",
+              },
+              {
+                icon: "⊕",
+                title: "2. New Production Run",
+                desc: "Use the 'New Production Run' tab. Select a strain, format and quantity. The system deducts raw materials and adds finished stock.",
+              },
+              {
+                icon: "💰",
+                title: "3. Set Sell Price",
+                desc: "HQ → Pricing. Set sell_price > R0 for each finished product. Without a price, the shop won't display it.",
+              },
+              {
+                icon: "🛍",
+                title: "4. Live in Shop",
+                desc: "Once qty > 0 and sell_price > R0, the product appears automatically in the customer shop. No further action needed.",
+              },
+            ].map((s) => (
+              <div
+                key={s.title}
+                style={{
+                  padding: "12px 14px",
+                  background: C.white,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 2,
+                }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{s.icon}</div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    fontFamily: F.body,
+                    color: C.text,
+                    marginBottom: 4,
+                  }}
+                >
+                  {s.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: C.muted,
+                    fontFamily: F.body,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {s.desc}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -987,6 +1514,11 @@ function BatchesPanel({ batches, runs, onRefresh }) {
             label: "No Run Yet",
             value: batches.filter((b) => !runByBatch[b.id]).length,
             color: C.orange,
+          },
+          {
+            label: "Depleted",
+            value: depletedCount,
+            color: depletedCount > 0 ? C.red : C.muted,
           },
         ].map((c) => (
           <div
@@ -1023,7 +1555,14 @@ function BatchesPanel({ batches, runs, onRefresh }) {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
         {FILTER_OPTIONS.map((f) => (
           <button
             key={f.id}
@@ -1031,8 +1570,8 @@ function BatchesPanel({ batches, runs, onRefresh }) {
             style={{
               padding: "6px 14px",
               background: filter === f.id ? C.green : C.white,
-              color: filter === f.id ? C.white : C.muted,
-              border: `1px solid ${filter === f.id ? C.green : C.border}`,
+              color: filter === f.id ? C.white : f.alert ? C.orange : C.muted,
+              border: `1px solid ${filter === f.id ? C.green : f.alert ? C.orange : C.border}`,
               borderRadius: "2px",
               fontSize: "9px",
               letterSpacing: "0.12em",
@@ -1043,6 +1582,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
             }}
           >
             {f.label}
+            {f.alert ? " ⚠" : ""}
           </button>
         ))}
         <button
@@ -1072,7 +1612,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "140px 1fr 110px 100px 55px 95px 95px 45px 115px 75px 70px",
+                  "140px 1fr 110px 100px 55px 80px 95px 95px 45px 100px 75px 80px",
                 gap: 0,
                 padding: "0 0 6px 0",
                 borderBottom: `2px solid ${C.border}`,
@@ -1084,6 +1624,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                 "TYPE",
                 "STRAIN",
                 "UNITS",
+                "STOCK",
                 "PROD DATE",
                 "EXPIRY",
                 "LAB",
@@ -1102,17 +1643,30 @@ function BatchesPanel({ batches, runs, onRefresh }) {
             {filtered.map((b) => {
               const linkedRun = runByBatch[b.id];
               const isEditing = editing === b.id;
+              const invItem = getStockForBatch(b);
+              const qty = invItem
+                ? parseFloat(invItem.quantity_on_hand || 0)
+                : null;
+              const lifecycle = getEffectiveLifecycle(b);
+              const isDepleted = lifecycle === "depleted";
+              const isLow = lifecycle === "low_stock";
               return (
                 <div key={b.id}>
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns:
-                        "140px 1fr 110px 100px 55px 95px 95px 45px 115px 75px 70px",
+                        "140px 1fr 110px 100px 55px 80px 95px 95px 45px 100px 75px 80px",
                       gap: 0,
                       borderBottom: `1px solid ${C.border}`,
                       alignItems: "center",
-                      background: isEditing ? "#f0faf5" : "transparent",
+                      background: isDepleted
+                        ? "#fff8f8"
+                        : isLow
+                          ? "#fffbf5"
+                          : isEditing
+                            ? "#f0faf5"
+                            : "transparent",
                     }}
                   >
                     <div
@@ -1142,7 +1696,30 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                     <div
                       style={{ ...sTd, textAlign: "right", fontWeight: 600 }}
                     >
-                      {b.units_produced ?? "—"}
+                      {b.units_produced ?? "-"}
+                    </div>
+                    {/* v2.0: live stock column */}
+                    <div
+                      style={{
+                        ...sTd,
+                        fontWeight: 700,
+                        color:
+                          qty === null
+                            ? C.muted
+                            : isDepleted
+                              ? C.red
+                              : isLow
+                                ? C.orange
+                                : C.green,
+                      }}
+                    >
+                      {qty === null ? (
+                        <span style={{ color: C.muted, fontSize: 10 }}>
+                          not linked
+                        </span>
+                      ) : (
+                        `${Math.floor(qty)} pcs`
+                      )}
                     </div>
                     <div style={{ ...sTd, color: C.muted, fontSize: "11px" }}>
                       {b.production_date
@@ -1190,9 +1767,17 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                       )}
                     </div>
                     <div style={sTd}>
-                      <StatusBadge status={b.status} yieldPct={null} />
+                      <LifecycleBadge status={lifecycle} />
                     </div>
-                    <div style={{ ...sTd, textAlign: "center" }}>
+                    <div
+                      style={{
+                        ...sTd,
+                        textAlign: "center",
+                        display: "flex",
+                        gap: 4,
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <button
                         onClick={() =>
                           isEditing ? setEditing(null) : openEdit(b)
@@ -1205,8 +1790,81 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                           borderColor: isEditing ? C.muted : C.mid,
                         }}
                       >
-                        {isEditing ? "✕" : "✎ Edit"}
+                        {isEditing ? "✕" : "✎"}
                       </button>
+                      {/* New Run shortcut */}
+                      {!linkedRun && (
+                        <button
+                          onClick={onNavNewRun}
+                          title="New Production Run"
+                          style={{
+                            ...sBtn("outline"),
+                            padding: "3px 8px",
+                            fontSize: "9px",
+                            color: C.accent,
+                            borderColor: C.accent,
+                          }}
+                        >
+                          ⊕
+                        </button>
+                      )}
+                      {/* Archive */}
+                      {(isDepleted || b.status !== "archived") && (
+                        <button
+                          onClick={() => handleArchive(b)}
+                          title="Archive batch"
+                          style={{
+                            ...sBtn("outline"),
+                            padding: "3px 8px",
+                            fontSize: "9px",
+                            color: C.muted,
+                            borderColor: C.muted,
+                          }}
+                        >
+                          🗄
+                        </button>
+                      )}
+                      {/* Delete — only when no production run linked */}
+                      {!linkedRun && deleting !== b.id && (
+                        <button
+                          onClick={() => setDeleting(b.id)}
+                          title="Delete batch"
+                          style={{
+                            ...sBtn("outline"),
+                            padding: "3px 8px",
+                            fontSize: "9px",
+                            color: C.red,
+                            borderColor: C.red,
+                          }}
+                        >
+                          🗑
+                        </button>
+                      )}
+                      {deleting === b.id && (
+                        <>
+                          <button
+                            onClick={() => handleDeleteBatch(b)}
+                            disabled={saving}
+                            style={{
+                              ...sBtn("danger"),
+                              padding: "3px 8px",
+                              fontSize: "9px",
+                            }}
+                          >
+                            {saving ? "..." : "✓ Delete"}
+                          </button>
+                          <button
+                            onClick={() => setDeleting(null)}
+                            style={{
+                              ...sBtn("outline"),
+                              padding: "3px 8px",
+                              fontSize: "9px",
+                            }}
+                          >
+                            No
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                   {isEditing && (
@@ -1220,7 +1878,8 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                       <div
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "1fr 1fr 1fr 1fr 90px 130px",
+                          gridTemplateColumns:
+                            "1fr 1fr 1fr 1fr 80px 130px 100px",
                           gap: "12px",
                           marginBottom: "12px",
                         }}
@@ -1230,7 +1889,6 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                             lbl: "Product Name",
                             key: "product_name",
                             type: "text",
-                            placeholder: "",
                           },
                           {
                             lbl: "Product Type",
@@ -1238,12 +1896,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                             type: "text",
                             placeholder: "e.g. 1ml Cart",
                           },
-                          {
-                            lbl: "Strain",
-                            key: "strain",
-                            type: "text",
-                            placeholder: "",
-                          },
+                          { lbl: "Strain", key: "strain", type: "text" },
                         ].map(({ lbl, key, type, placeholder }) => (
                           <div key={key}>
                             <label
@@ -1349,6 +2002,31 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                             }
                           />
                         </div>
+                        <div>
+                          <label
+                            style={{
+                              fontSize: "10px",
+                              color: C.muted,
+                              display: "block",
+                              marginBottom: "3px",
+                              fontFamily: F.body,
+                            }}
+                          >
+                            Low Stock Alert
+                          </label>
+                          <input
+                            style={sInput}
+                            type="number"
+                            min="1"
+                            value={editForm.low_stock_threshold}
+                            onChange={(e) =>
+                              setEditForm((p) => ({
+                                ...p,
+                                low_stock_threshold: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
                       </div>
                       <div
                         style={{
@@ -1401,8 +2079,8 @@ function BatchesPanel({ batches, runs, onRefresh }) {
                             fontFamily: F.body,
                           }}
                         >
-                          ℹ Editing updates batch record only. Stock levels
-                          unchanged.
+                          ℹ Low Stock Alert = notify when qty drops below this
+                          number
                         </span>
                       </div>
                     </div>
@@ -1422,22 +2100,38 @@ function BatchesPanel({ batches, runs, onRefresh }) {
             background: C.lightOrange,
           }}
         >
-          <div style={{ ...sLabel, color: C.orange }}>
-            ⚠ Batches Without Production Runs
-          </div>
-          <p
+          <div
             style={{
-              fontSize: "13px",
-              color: C.text,
-              margin: "8px 0 0",
-              fontFamily: F.body,
-              lineHeight: "1.7",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}
           >
-            {batches.filter((b) => !runByBatch[b.id]).length} batch(es) have no
-            linked production run. Use New Production Run to log material
-            consumption going forward.
-          </p>
+            <div>
+              <div style={{ ...sLabel, color: C.orange }}>
+                ⚠ Batches Without Production Runs
+              </div>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: C.text,
+                  margin: "8px 0 0",
+                  fontFamily: F.body,
+                  lineHeight: "1.7",
+                }}
+              >
+                {batches.filter((b) => !runByBatch[b.id]).length} batch(es) have
+                no linked production run. Use New Production Run to log material
+                consumption going forward.
+              </p>
+            </div>
+            <button
+              onClick={onNavNewRun}
+              style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
+            >
+              + New Run →
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1445,7 +2139,7 @@ function BatchesPanel({ batches, runs, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NEW RUN — v1.5
+// NEW RUN v2.0 — writes inventory_item_id + lifecycle_status back to batch
 // ═══════════════════════════════════════════════════════════════════════════════
 function NewRunPanel({ items, onComplete }) {
   const [form, setForm] = useState({
@@ -1463,6 +2157,7 @@ function NewRunPanel({ items, onComplete }) {
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [completedRun, setCompletedRun] = useState(null); // for post-completion prompt
   const set = (k, v) => {
     setForm((p) => ({ ...p, [k]: v }));
     setConfirmed(false);
@@ -1492,15 +2187,12 @@ function NewRunPanel({ items, onComplete }) {
   );
   const terpItems = items.filter((i) => i.category === "terpene");
   const hwItems = items.filter((i) => i.category === "hardware");
-
   const selDist = distItems.find((i) => i.id === form.distillate_item_id);
   const selTerp = terpItems.find((i) => i.id === form.terpene_item_id);
   const selHw = hwItems.find((i) => i.id === form.hardware_item_id);
-
   const distAvail = parseFloat(selDist?.quantity_on_hand || 0);
   const terpAvail = parseFloat(selTerp?.quantity_on_hand || 0);
   const hwAvail = parseFloat(selHw?.quantity_on_hand || 0);
-
   const vapeMatsOk =
     !isVape ||
     (form.distillate_item_id &&
@@ -1512,7 +2204,6 @@ function NewRunPanel({ items, onComplete }) {
       distMlPerUnit > 0);
   const hasName = form.strain || form.product_name_override;
   const canRun = planned > 0 && vapeMatsOk && hasName;
-
   const distCost = selDist
     ? parseFloat(selDist.cost_price || 0) * distNeeded
     : 0;
@@ -1522,11 +2213,9 @@ function NewRunPanel({ items, onComplete }) {
   const hwCost = selHw ? parseFloat(selHw.cost_price || 0) * hwNeeded : 0;
   const totalCost = distCost + terpCost + hwCost;
   const costPerUnit = planned > 0 ? (totalCost / planned).toFixed(2) : 0;
-
   const finalActual = parseInt(form.actual_units) || planned;
   const yieldPct = calcYield(finalActual, planned);
   const yieldFlagged = yieldPct !== null && yieldPct < 95;
-
   const nameBase = form.strain
     ? `${form.strain} ${fmt.format_short}`
     : fmt.format_short;
@@ -1575,6 +2264,7 @@ function NewRunPanel({ items, onComplete }) {
           production_date: now.split("T")[0],
           units_produced: finalActual,
           status: "active",
+          lifecycle_status: "active",
           is_archived: false,
         })
         .select()
@@ -1658,6 +2348,7 @@ function NewRunPanel({ items, onComplete }) {
           .eq("id", form.hardware_item_id);
       }
 
+      // Find or create finished_product inventory item
       const existingFin = items.find(
         (i) => i.category === "finished_product" && i.name === finishedName,
       );
@@ -1683,6 +2374,7 @@ function NewRunPanel({ items, onComplete }) {
         if (niErr) throw niErr;
         finId = ni.id;
       }
+
       await supabase.from("stock_movements").insert({
         item_id: finId,
         quantity: finalActual,
@@ -1699,13 +2391,158 @@ function NewRunPanel({ items, onComplete }) {
         })
         .eq("id", finId);
 
-      onComplete();
+      // v2.0: Write inventory_item_id + lifecycle_status back to the batch
+      await supabase
+        .from("batches")
+        .update({
+          inventory_item_id: finId,
+          lifecycle_status: "active",
+        })
+        .eq("id", batch.id);
+
+      setCompletedRun({
+        runNumber,
+        finishedName,
+        finalActual,
+        finId,
+        sellPrice: existingFin?.sell_price || 0,
+      });
     } catch (err) {
       console.error("[HQProduction] Run error:", err);
     } finally {
       setSaving(false);
     }
   };
+
+  // Post-completion state
+  if (completedRun) {
+    const needsPrice = parseFloat(completedRun.sellPrice || 0) <= 0;
+    return (
+      <div style={{ maxWidth: "640px" }}>
+        <div
+          style={{
+            ...sCard,
+            borderLeft: `4px solid ${C.accent}`,
+            background: "#f0faf5",
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+          <div
+            style={{
+              fontFamily: F.heading,
+              fontSize: 22,
+              fontWeight: 600,
+              color: C.green,
+              marginBottom: 6,
+            }}
+          >
+            Production Run Complete
+          </div>
+          <div
+            style={{
+              fontFamily: F.body,
+              fontSize: 13,
+              color: C.mid,
+              marginBottom: 12,
+              lineHeight: 1.7,
+            }}
+          >
+            <strong>{completedRun.finalActual} units</strong> of{" "}
+            <strong>{completedRun.finishedName}</strong> added to finished
+            stock.
+            <br />
+            Run reference:{" "}
+            <code
+              style={{
+                fontFamily: "monospace",
+                background: C.warm,
+                padding: "2px 6px",
+              }}
+            >
+              {completedRun.runNumber}
+            </code>
+          </div>
+          {needsPrice && (
+            <div
+              style={{
+                padding: "14px 16px",
+                background: "#fffbe6",
+                border: `1px solid ${C.gold}`,
+                borderRadius: 2,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: F.body,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: C.gold,
+                  marginBottom: 6,
+                }}
+              >
+                ⚠ Sell Price Not Set — Product NOT yet visible in Shop
+              </div>
+              <div
+                style={{
+                  fontFamily: F.body,
+                  fontSize: 12,
+                  color: C.text,
+                  lineHeight: 1.6,
+                }}
+              >
+                To make <strong>{completedRun.finishedName}</strong> visible on
+                the customer shop, you need to set a sell price.
+                <br />
+                Go to <strong>HQ → Pricing</strong> and set a sell_price &gt; R0
+                for this product.
+              </div>
+            </div>
+          )}
+          {!needsPrice && (
+            <div
+              style={{
+                padding: "12px 16px",
+                background: "#d4edda",
+                borderRadius: 2,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: F.body,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: C.green,
+                }}
+              >
+                ✓ Product is now live in the shop (sell price already set: R
+                {parseFloat(completedRun.sellPrice).toFixed(0)})
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => {
+                setCompletedRun(null);
+                onComplete();
+              }}
+              style={sBtn()}
+            >
+              ✓ Done — View History
+            </button>
+            <button
+              onClick={() => setCompletedRun(null)}
+              style={sBtn("outline")}
+            >
+              + Another Run
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: "20px", maxWidth: "820px" }}>
@@ -1877,7 +2714,7 @@ function NewRunPanel({ items, onComplete }) {
                     fontFamily: F.body,
                   }}
                 >
-                  Add distillate via StockControl first
+                  Add distillate via Supply Chain first
                 </p>
               )}
             </div>
@@ -2124,6 +2961,9 @@ function NewRunPanel({ items, onComplete }) {
                   finished stock
                 </li>
                 <li>Create batch record + production run log</li>
+                <li>
+                  Link batch to inventory item (enables live stock tracking)
+                </li>
               </ul>
             </div>
           )}
@@ -2161,7 +3001,7 @@ function NewRunPanel({ items, onComplete }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HISTORY
+// HISTORY — unchanged from v1.2/v1.6
 // ═══════════════════════════════════════════════════════════════════════════════
 function HistoryPanel({ runs, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
@@ -2172,7 +3012,6 @@ function HistoryPanel({ runs, onRefresh }) {
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(null);
   const [toast, setToast] = useState(null);
-
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
@@ -2237,13 +3076,15 @@ function HistoryPanel({ runs, onRefresh }) {
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
-            await supabase.from("stock_movements").insert({
-              item_id: mv.item_id,
-              quantity: rev,
-              movement_type: "adjustment",
-              reference: `VOID-${run.run_number}`,
-              notes: `Reversal: deleted run ${run.run_number}`,
-            });
+            await supabase
+              .from("stock_movements")
+              .insert({
+                item_id: mv.item_id,
+                quantity: rev,
+                movement_type: "adjustment",
+                reference: `VOID-${run.run_number}`,
+                notes: `Reversal: deleted run ${run.run_number}`,
+              });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
@@ -2339,7 +3180,7 @@ function HistoryPanel({ runs, onRefresh }) {
               marginTop: "8px",
             }}
           >
-            Batches exist — use the Batches tab to view them.
+            Use "New Production Run" to log your first batch.
           </p>
         </div>
       ) : (
@@ -2847,9 +3688,9 @@ function HistoryPanel({ runs, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ALLOCATE
+// ALLOCATE v2.0 — updates batch lifecycle_status after depletion
 // ═══════════════════════════════════════════════════════════════════════════════
-function AllocatePanel({ items, partners, onRefresh }) {
+function AllocatePanel({ items, partners, batches, onRefresh }) {
   const finished = items.filter(
     (i) =>
       i.category === "finished_product" &&
@@ -2896,17 +3737,43 @@ function AllocatePanel({ items, partners, onRefresh }) {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
         form.channel === "wholesale" && partner ? partner.name : form.channel;
-      await supabase.from("stock_movements").insert({
-        item_id: form.item_id,
-        quantity: -qty,
-        movement_type: "sale_out",
-        reference: ref,
-        notes: form.notes || `Allocated to ${ref}`,
-      });
+      await supabase
+        .from("stock_movements")
+        .insert({
+          item_id: form.item_id,
+          quantity: -qty,
+          movement_type: "sale_out",
+          reference: ref,
+          notes: form.notes || `Allocated to ${ref}`,
+        });
+      const newQty = available - qty;
       await supabase
         .from("inventory_items")
-        .update({ quantity_on_hand: available - qty })
+        .update({ quantity_on_hand: newQty })
         .eq("id", form.item_id);
+
+      // v2.0: update batch lifecycle_status if depleted
+      const linkedBatch = batches.find(
+        (b) =>
+          b.inventory_item_id === form.item_id ||
+          (b.category === "finished_product" &&
+            b.product_name === selItem?.name),
+      );
+      if (linkedBatch && newQty <= 0) {
+        await supabase
+          .from("batches")
+          .update({ lifecycle_status: "depleted" })
+          .eq("id", linkedBatch.id);
+      } else if (
+        linkedBatch &&
+        newQty <= (linkedBatch.low_stock_threshold || 10)
+      ) {
+        await supabase
+          .from("batches")
+          .update({ lifecycle_status: "low_stock" })
+          .eq("id", linkedBatch.id);
+      }
+
       setForm({
         item_id: "",
         quantity: "",
@@ -3184,7 +4051,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
         >
           Finished products with <strong>sell_price &gt; R0</strong> and{" "}
           <strong>quantity &gt; 0</strong> are automatically live in the
-          customer shop.
+          customer shop. No manual activation needed.
         </p>
       </div>
     </div>
@@ -3192,7 +4059,7 @@ function AllocatePanel({ items, partners, onRefresh }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// AUDIT PANEL — v1.6: Regulatory batch→QR→scan traceability + CSV export
+// AUDIT PANEL — unchanged from v1.6
 // ═══════════════════════════════════════════════════════════════════════════════
 function AuditPanel({ batches }) {
   const [auditData, setAuditData] = useState([]);
@@ -3201,7 +4068,6 @@ function AuditPanel({ batches }) {
   const [recallBatchId, setRecallBatchId] = useState(null);
   const [recallLoading, setRecallLoading] = useState(false);
   const [toast, setToast] = useState(null);
-
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
@@ -3214,17 +4080,14 @@ function AuditPanel({ batches }) {
         .from("qr_codes")
         .select(
           `
-          id, qr_code, qr_type, claimed, claimed_by, claimed_at,
-          scan_count, points_value, is_active, created_at, batch_id,
-          batches ( id, batch_number, product_name, strain, product_type,
-                    production_date, expiry_date, lab_certified, lab_name,
-                    units_produced, status )
-        `,
+        id, qr_code, qr_type, claimed, claimed_by, claimed_at,
+        scan_count, points_value, is_active, created_at, batch_id,
+        batches ( id, batch_number, product_name, strain, product_type, production_date, expiry_date, lab_certified, lab_name, units_produced, status )
+      `,
         )
         .not("batch_id", "is", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
-
       const qrIds = (qrs || []).map((q) => q.id);
       let scanMap = {};
       if (qrIds.length > 0) {
@@ -3333,7 +4196,6 @@ function AuditPanel({ batches }) {
     }
   };
 
-  // Group by batch
   const byBatch = {};
   for (const row of auditData) {
     const bid = row.batches?.batch_number || row.batch_id;
@@ -3361,8 +4223,6 @@ function AuditPanel({ batches }) {
           {toast.msg}
         </div>
       )}
-
-      {/* Header card */}
       <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
         <div
           style={{
@@ -3428,7 +4288,6 @@ function AuditPanel({ batches }) {
             )}
           </div>
         </div>
-
         {loaded && (
           <div
             style={{
@@ -3496,19 +4355,16 @@ function AuditPanel({ batches }) {
           </div>
         )}
       </div>
-
-      {/* Batch breakdown */}
       {loaded &&
         Object.entries(byBatch).map(([batchNum, { batch, batch_id, qrs }]) => {
-          const totalScans = qrs.reduce((s, r) => s + (r.scan_count || 0), 0);
-          const claimed = qrs.filter((r) => r.claimed).length;
-          const inactive = qrs.filter((r) => !r.is_active).length;
+          const totalScans = qrs.reduce((s, r) => s + (r.scan_count || 0), 0),
+            claimed = qrs.filter((r) => r.claimed).length,
+            inactive = qrs.filter((r) => !r.is_active).length;
           const daysToExpiry = batch?.expiry_date
             ? Math.ceil((new Date(batch.expiry_date) - new Date()) / 86400000)
             : null;
-          const isExpired = daysToExpiry !== null && daysToExpiry < 0;
-          const isRecalling = recallBatchId === batch_id;
-
+          const isExpired = daysToExpiry !== null && daysToExpiry < 0,
+            isRecalling = recallBatchId === batch_id;
           return (
             <div
               key={batchNum}
@@ -3660,7 +4516,6 @@ function AuditPanel({ batches }) {
                   )}
                 </div>
               </div>
-
               <div
                 style={{
                   display: "flex",
@@ -3700,7 +4555,6 @@ function AuditPanel({ batches }) {
                   </div>
                 ))}
               </div>
-
               <div style={{ overflowX: "auto" }}>
                 <table
                   style={{
@@ -3822,7 +4676,6 @@ function AuditPanel({ batches }) {
             </div>
           );
         })}
-
       {!loaded && (
         <div
           style={{
