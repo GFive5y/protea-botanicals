@@ -1,11 +1,13 @@
 // src/pages/AdminAnalytics.js
-// Protea Botanicals — Scan Analytics Dashboard Component
+// v2.1 — WP-GUIDE-C+++: usePageContext 'admin-analytics' wired + WorkflowGuide added
 // v2.0 — FIXED: now queries scan_logs (not legacy scans table)
 //         scanned_at replaces scan_date, qr_type used for breakdown,
 //         realtime subscription to scan_logs, rich geo + device data
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "../components/WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
 const C = {
   green: "#1b4332",
@@ -105,6 +107,9 @@ function StatCard({ label, value, color = C.green, icon }) {
 }
 
 export default function AdminAnalytics() {
+  // WP-GUIDE-C+++: wire 'admin-analytics' context for WorkflowGuide live status
+  const ctx = usePageContext("admin-analytics", null);
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
     totalScans: 0,
@@ -154,7 +159,6 @@ export default function AdminAnalytics() {
       const all = rows || [];
       const total = tot.count || 0;
 
-      // By type
       const typeMap = {};
       all.forEach((s) => {
         const t = s.qr_type || "unknown";
@@ -172,7 +176,6 @@ export default function AdminAnalytics() {
         }))
         .sort((a, b) => b.count - a.count);
 
-      // By outcome
       const outcomeMap = {};
       all.forEach((s) => {
         const o = s.scan_outcome || "unknown";
@@ -182,7 +185,6 @@ export default function AdminAnalytics() {
         .map(([outcome, count]) => ({ outcome, count }))
         .sort((a, b) => b.count - a.count);
 
-      // By province
       const provMap = {};
       all.forEach((s) => {
         const p = s.ip_province || "Unknown";
@@ -212,7 +214,6 @@ export default function AdminAnalytics() {
 
   useEffect(() => {
     fetchAnalytics();
-    // Live update on new scans
     const sub = supabase
       .channel("admin-analytics-scan-logs")
       .on(
@@ -237,6 +238,14 @@ export default function AdminAnalytics() {
 
   return (
     <div style={{ fontFamily: FONTS.body }}>
+      {/* WP-GUIDE-C+++: WorkflowGuide with live admin analytics context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="admin-analytics"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
+
       {/* Header */}
       <div
         style={{
@@ -540,7 +549,6 @@ export default function AdminAnalytics() {
               })
             )}
           </div>
-
           <div
             style={{
               background: C.white,

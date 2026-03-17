@@ -1,5 +1,9 @@
-// AdminDashboard.js v4.8
+// AdminDashboard.js v4.9
 // Protea Botanicals — March 2026
+// ★ v4.9: WP-HR-2 — HR tab added (AdminHRPanel)
+//   - Import AdminHRPanel
+//   - Added '🧑‍💼 HR' TabBtn to tab bar
+//   - Added render case: tab === 'hr'
 // ★ v4.8: WP-X System Intelligence Layer
 //   - SystemStatusBar added below header (live counts + pending setup checklist)
 //   - Overview tab overhauled: 3-row tile grid (Today · Action Required · Platform Health)
@@ -29,6 +33,7 @@ import AdminNotifications from "../components/AdminNotifications";
 import HQDocuments from "../components/hq/HQDocuments";
 import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCommsCenter from "../components/AdminCommsCenter";
+import AdminHRPanel from "../components/AdminHRPanel";
 
 const C = {
   green: "#1b4332",
@@ -203,9 +208,28 @@ export default function AdminDashboard() {
   const [pointsToday, setPointsToday] = useState(0);
   const [fraudAlerts, setFraudAlerts] = useState(0);
 
+  // v4.9: tenantId needed for AdminHRPanel
+  const [tenantId, setTenantId] = useState(null);
+
   const fetchUsers = useCallback(async () => {
     const { data } = await supabase.from("user_profiles").select("*");
     setUsers(data || []);
+  }, []);
+
+  // v4.9: fetch current user's tenant_id for HR module
+  const fetchTenantId = useCallback(async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("user_profiles")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .single();
+      if (data?.tenant_id) setTenantId(data.tenant_id);
+    } catch (_) {}
   }, []);
 
   // v4.7: combined comms badge = unread inbound messages + open tickets
@@ -335,7 +359,14 @@ export default function AdminDashboard() {
     computeAnalytics();
     fetchCommsBadge();
     fetchTodayStats();
-  }, [fetchUsers, computeAnalytics, fetchCommsBadge, fetchTodayStats]);
+    fetchTenantId();
+  }, [
+    fetchUsers,
+    computeAnalytics,
+    fetchCommsBadge,
+    fetchTodayStats,
+    fetchTenantId,
+  ]);
 
   // Realtime: customer_messages → refresh comms badge
   useEffect(() => {
@@ -510,6 +541,12 @@ export default function AdminDashboard() {
             setDocumentsTargetId(null);
             setTab("documents");
           }}
+        />
+        {/* v4.9: HR tab */}
+        <TabBtn
+          active={tab === "hr"}
+          label="🧑‍💼 HR"
+          onClick={() => setTab("hr")}
         />
       </div>
 
@@ -845,6 +882,9 @@ export default function AdminDashboard() {
             >
               📄 DOCUMENTS
             </button>
+            <button onClick={() => setTab("hr")} style={makeBtn(C.mid)}>
+              🧑‍💼 HR
+            </button>
             <button
               onClick={() => {
                 computeAnalytics();
@@ -882,6 +922,8 @@ export default function AdminDashboard() {
       {tab === "analytics" && <AdminAnalytics />}
       {tab === "stock" && <StockControl />}
       {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
+      {/* v4.9: HR Module */}
+      {tab === "hr" && <AdminHRPanel tenantId={tenantId} />}
 
       {/* USERS */}
       {tab === "users" && (

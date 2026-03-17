@@ -1,6 +1,9 @@
 // src/hooks/usePageContext.js
 // WP-GUIDE Phase A — Living Intelligence Layer
-// Version: 1.4.0
+// Version: 1.7.0
+// WP-HR-2: Added 'hr-staff' context query — Staff Directory health (16 total queries)
+// WP-GUIDE-D: Enriched 'hq-production' query — covers all sub-tabs (Batches/COA/expiry/stock/runs)
+// WP-GUIDE-C+++: Added 'hq-analytics' and 'admin-analytics' context queries
 // WP-GUIDE-C++: Added 'batches', 'comms', and 'customers' context queries
 // WP-GUIDE-C+: Added 'fraud', 'documents', 'pricing' context queries
 // WP-GUIDE-C: Added 'overview' and 'pl' context queries
@@ -136,32 +139,99 @@ const CONTEXT_QUERIES = {
     };
   },
 
-  // ── PRODUCTION / INVENTORY ALLOCATION ─────────────────────────────────────
+  // ── PRODUCTION / BATCH HEALTH ─────────────────────────────────────────────
+  // WP-GUIDE-D: Enriched v1.6.0 — queries ALL sub-tab data:
+  //   Overview, Batches (COA/expiry/stock), History, Allocate Stock, Audit
+  // RULE: Context queries must cover every sub-tab on the page, not just overview.
   "hq-production": async (sb, tenantId) => {
-    const [batchesRes, zeroPricesRes] = await Promise.allSettled([
-      sb
-        .from("batches")
-        .select("batch_number, product_name, lifecycle_status")
-        .eq("is_archived", false)
-        .order("production_date", { ascending: false })
-        .limit(10),
-      sb
-        .from("inventory_items")
-        .select("name, sell_price")
-        .eq("category", "finished_product")
-        .eq("is_active", true)
-        .eq("sell_price", 0),
-    ]);
+    const [batchesRes, zeroPricesRes, pricedItemsRes, runsRes] =
+      await Promise.allSettled([
+        // All active batches — full field set for multi-sub-tab analysis
+        sb
+          .from("batches")
+          .select(
+            "id, batch_number, product_name, lifecycle_status, coa_url, expiry_date, production_date",
+          )
+          .eq("is_archived", false)
+          .order("production_date", { ascending: false }),
+        // Products with no sell price → invisible in storefront (Allocate Stock concern)
+        sb
+          .from("inventory_items")
+          .select("name")
+          .eq("category", "finished_product")
+          .eq("is_active", true)
+          .eq("sell_price", 0),
+        // Priced finished products → check for low stock (Batches / Overview concern)
+        sb
+          .from("inventory_items")
+          .select("name, quantity_on_hand, reorder_level")
+          .eq("category", "finished_product")
+          .eq("is_active", true)
+          .gt("sell_price", 0),
+        // Production runs → find batches with no logged run (History concern)
+        sb.from("production_runs").select("batch_id, status"),
+      ]);
 
     const batches = safeData(batchesRes);
     const zeroPrices = safeData(zeroPricesRes);
+    const pricedItems = safeData(pricedItemsRes);
+    const runs = safeData(runsRes);
 
-    const warnings = zeroPrices.map(
-      (p) =>
-        `⚠ "${p.name}" has no sell price — invisible to customers in the storefront`,
+    // ── Batch-level analysis (Batches sub-tab) ───────────────────────────────
+    const noCoa = batches.filter((b) => !b.coa_url);
+    const noExpiry = batches.filter((b) => !b.expiry_date);
+    const batchIdsWithRuns = new Set(
+      runs.map((r) => r.batch_id).filter(Boolean),
+    );
+    const noRun = batches.filter((b) => !batchIdsWithRuns.has(b.id));
+
+    // ── Inventory-level analysis (Overview / Allocate Stock sub-tab) ─────────
+    const lowStock = pricedItems.filter(
+      (i) =>
+        safeFloat(i.reorder_level) > 0 &&
+        safeFloat(i.quantity_on_hand) <= safeFloat(i.reorder_level),
     );
 
-    const batchItems = batches
+    const warnings = [
+      // Critical (revenue impact) first
+      ...zeroPrices.map(
+        (p) =>
+          `⚠ "${p.name}" has no sell price — invisible to customers in the storefront`,
+      ),
+      lowStock.length > 0
+        ? `⚠ ${pl(lowStock.length, "finished product")} at or below reorder level — plan a production run`
+        : null,
+      // Important compliance issues
+      noCoa.length > 0
+        ? `⚠ ${pl(noCoa.length, "batch", "es")} missing lab certificate (COA) — ${noCoa
+            .map((b) => b.batch_number)
+            .slice(0, 3)
+            .join(", ")}${noCoa.length > 3 ? ` +${noCoa.length - 3} more` : ""}`
+        : null,
+      noExpiry.length > 0
+        ? `⚠ ${pl(noExpiry.length, "batch", "es")} have no expiry date set — required for compliance`
+        : null,
+      // Operational gaps
+      noRun.length > 0
+        ? `${pl(noRun.length, "batch", "es")} ${noRun.length === 1 ? "has" : "have"} no linked production run — material consumption untracked`
+        : null,
+    ].filter(Boolean);
+
+    const totalIssues = warnings.length;
+    const criticalIssues = zeroPrices.length + lowStock.length;
+
+    const headline =
+      zeroPrices.length > 0
+        ? `${pl(zeroPrices.length, "product")} not visible — sell price not set`
+        : lowStock.length > 0
+          ? `${pl(lowStock.length, "product")} running low — production run needed`
+          : noCoa.length > 0
+            ? `${pl(noCoa.length, "batch", "es")} missing lab certificate`
+            : batches.length === 0
+              ? "No active batches — create your first batch to begin production"
+              : "All products priced and visible";
+
+    const batchSummary = batches
       .slice(0, 3)
       .map(
         (b) => `${b.batch_number} · ${b.product_name} · ${b.lifecycle_status}`,
@@ -171,22 +241,51 @@ const CONTEXT_QUERIES = {
       batches.length > 0
         ? `${pl(batches.length, "active batch", "es")}`
         : "No active production batches",
-      ...batchItems,
-    ];
+      ...batchSummary,
+      lowStock.length > 0
+        ? `Low stock: ${lowStock
+            .map((i) => i.name)
+            .slice(0, 2)
+            .join(
+              ", ",
+            )}${lowStock.length > 2 ? ` +${lowStock.length - 2} more` : ""}`
+        : "All priced products stocked above reorder level",
+      noCoa.length > 0
+        ? `${pl(noCoa.length, "batch", "es")} awaiting COA upload`
+        : null,
+      noExpiry.length > 0
+        ? `${pl(noExpiry.length, "batch", "es")} missing expiry date`
+        : null,
+    ].filter(Boolean);
 
     return {
-      status: zeroPrices.length > 0 ? "warn" : "ok",
-      headline:
-        zeroPrices.length > 0
-          ? `${pl(zeroPrices.length, "product")} not visible — sell price not set`
-          : "All products priced and visible",
+      status: criticalIssues > 0 ? "warn" : totalIssues > 0 ? "info" : "ok",
+      headline,
       items,
       warnings,
-      actions:
-        zeroPrices.length > 0
-          ? [{ label: "-> Set prices in Allocate Stock", tab: "allocate" }]
-          : [],
-      raw: { tabId: "hq-production", queries: { batches, zeroPrices } },
+      actions: [
+        ...(zeroPrices.length > 0
+          ? [{ label: "-> Set prices in Allocate Stock tab", tab: "allocate" }]
+          : []),
+        ...(noCoa.length > 0
+          ? [{ label: "-> Upload COA in Batches tab", tab: "batches" }]
+          : []),
+        ...(lowStock.length > 0
+          ? [{ label: "-> Plan new production run", tab: "new-run" }]
+          : []),
+      ],
+      raw: {
+        tabId: "hq-production",
+        subTabData: {
+          overview: { batchCount: batches.length, lowStock: lowStock.length },
+          batches: {
+            noCoa: noCoa.length,
+            noExpiry: noExpiry.length,
+            noRun: noRun.length,
+          },
+          allocate: { zeroPrices: zeroPrices.length },
+        },
+      },
     };
   },
 
@@ -1017,6 +1116,259 @@ const CONTEXT_QUERIES = {
       raw: {
         tabId: "customers",
         queries: { total, churnRisk, optIn, optInRate },
+      },
+    };
+  },
+
+  // ── HQ ANALYTICS ─────────────────────────────────────────────────────────────
+  // WP-GUIDE-C+++: Added for HQAnalytics.js context wiring
+  // Reads: scan_logs (today count), shipments (in transit + overdue),
+  //        production_runs (active)
+  // Note: shipments.estimated_arrival compared client-side in context
+  "hq-analytics": async (sb, tenantId) => {
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).toISOString();
+
+    const [todayScansRes, allScansRes, shipmentsRes, runsRes] =
+      await Promise.allSettled([
+        sb
+          .from("scan_logs")
+          .select("id", { count: "exact", head: true })
+          .gte("scanned_at", todayStart),
+        sb.from("scan_logs").select("id", { count: "exact", head: true }),
+        sb
+          .from("shipments")
+          .select("id, shipment_number, status, estimated_arrival")
+          .not("status", "in", '("delivered","confirmed","cancelled")'),
+        sb
+          .from("production_runs")
+          .select("id, status")
+          .eq("status", "in_progress"),
+      ]);
+
+    const todayScans =
+      todayScansRes?.status === "fulfilled"
+        ? (todayScansRes.value?.count ?? 0)
+        : 0;
+    const totalScans =
+      allScansRes?.status === "fulfilled" ? (allScansRes.value?.count ?? 0) : 0;
+    const openShipments = safeData(shipmentsRes);
+    const activeRuns = safeData(runsRes);
+
+    const inTransit = openShipments.filter((s) =>
+      ["shipped", "in_transit"].includes(s.status),
+    );
+    const overdue = openShipments.filter(
+      (s) => s.estimated_arrival && new Date(s.estimated_arrival) < now,
+    );
+
+    const warnings = [
+      overdue.length > 0
+        ? `⚠ ${pl(overdue.length, "shipment")} overdue — past estimated arrival date`
+        : null,
+      activeRuns.length > 0
+        ? `${pl(activeRuns.length, "production run")} currently in progress`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      status: overdue.length > 0 ? "warn" : "ok",
+      headline:
+        overdue.length > 0
+          ? `${pl(overdue.length, "shipment")} overdue · ${todayScans} scans today`
+          : `${todayScans} scans today · ${pl(totalScans, "total")} all time`,
+      items: [
+        `${todayScans} scans today · ${pl(totalScans, "total")} all time`,
+        inTransit.length > 0
+          ? `${pl(inTransit.length, "shipment")} in transit`
+          : "No shipments in transit",
+        activeRuns.length > 0
+          ? `${pl(activeRuns.length, "production run")} active`
+          : "No active production runs",
+      ],
+      warnings,
+      actions:
+        overdue.length > 0
+          ? [{ label: "→ View distribution status", tab: "distribution" }]
+          : [],
+      raw: {
+        tabId: "hq-analytics",
+        queries: {
+          todayScans,
+          totalScans,
+          inTransit: inTransit.length,
+          overdue: overdue.length,
+          activeRuns: activeRuns.length,
+        },
+      },
+    };
+  },
+
+  // ── ADMIN SCAN ANALYTICS ──────────────────────────────────────────────────────
+  // WP-GUIDE-C+++: Added for AdminAnalytics.js context wiring
+  // Reads: scan_logs (total, today, 7d counts — head:true)
+  "admin-analytics": async (sb, tenantId) => {
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).toISOString();
+    const weekStart = new Date(now - 7 * 86400000).toISOString();
+
+    const [totalRes, todayRes, weekRes] = await Promise.allSettled([
+      sb.from("scan_logs").select("id", { count: "exact", head: true }),
+      sb
+        .from("scan_logs")
+        .select("id", { count: "exact", head: true })
+        .gte("scanned_at", todayStart),
+      sb
+        .from("scan_logs")
+        .select("id", { count: "exact", head: true })
+        .gte("scanned_at", weekStart),
+    ]);
+
+    const total =
+      totalRes?.status === "fulfilled" ? (totalRes.value?.count ?? 0) : 0;
+    const today =
+      todayRes?.status === "fulfilled" ? (todayRes.value?.count ?? 0) : 0;
+    const week =
+      weekRes?.status === "fulfilled" ? (weekRes.value?.count ?? 0) : 0;
+
+    if (total === 0) {
+      return {
+        status: "setup",
+        headline:
+          "No scan activity yet — scans appear here after customers scan QR codes",
+        items: [
+          "Generate QR codes in Admin → QR Codes tab",
+          "Attach them to product batches",
+          "Customers scan → scan_logs records every event with geo + device data",
+        ],
+        warnings: [],
+        actions: [],
+        raw: {
+          tabId: "admin-analytics",
+          queries: { total: 0, today: 0, week: 0 },
+        },
+      };
+    }
+
+    const weekAvgPerDay = week > 0 ? (week / 7).toFixed(1) : "0";
+
+    return {
+      status: "ok",
+      headline: `${today} scan${today !== 1 ? "s" : ""} today · ${week} this week · ${pl(total, "total")}`,
+      items: [
+        `${pl(total, "scan")} recorded all time`,
+        `${today} scan${today !== 1 ? "s" : ""} today · ${week} in last 7 days`,
+        `~${weekAvgPerDay} scans/day average this week`,
+      ],
+      warnings:
+        today === 0 && total > 0
+          ? [
+              "No scans yet today — this may be normal for your traffic patterns",
+            ]
+          : [],
+      actions: [],
+      raw: { tabId: "admin-analytics", queries: { total, today, week } },
+    };
+  },
+
+  // ── HR STAFF DIRECTORY ────────────────────────────────────────────────────────
+  // WP-HR-2: Added for AdminHRPanel.js context wiring
+  // Reads: staff_profiles (total, active count, data quality checks)
+  // Surfaces: missing job titles, missing start dates, churn/termination counts
+  // Note: Uses head:true for active count to avoid fetching full rows.
+  //       Promise.allSettled — graceful on empty table for new tenants.
+  "hr-staff": async (sb, tenantId) => {
+    const [allRes, activeRes] = await Promise.allSettled([
+      sb
+        .from("staff_profiles")
+        .select("id, status, job_title, employment_start_date, department")
+        .eq("tenant_id", tenantId),
+      sb
+        .from("staff_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "active"),
+    ]);
+
+    const all = safeData(allRes);
+    const activeCount =
+      activeRes?.status === "fulfilled" ? (activeRes.value?.count ?? 0) : 0;
+    const total = all.length;
+
+    if (total === 0) {
+      return {
+        status: "setup",
+        headline: "No staff records yet — add your first team member",
+        items: [
+          "Click '+ Add Staff Member' to create the first employee record",
+          "Add personal details, employment info, banking and emergency contacts",
+          "Staff records feed leave, timesheets, contracts and payroll export",
+        ],
+        warnings: [],
+        actions: [{ label: "→ Add first staff member", tab: "staff" }],
+        raw: { tabId: "hr-staff", queries: { total: 0, active: 0 } },
+      };
+    }
+
+    const noTitle = all.filter((s) => !s.job_title).length;
+    const noStart = all.filter((s) => !s.employment_start_date).length;
+    const terminated = all.filter((s) => s.status === "terminated").length;
+    const onLeave = all.filter((s) => s.status === "on_leave").length;
+    const suspended = all.filter((s) => s.status === "suspended").length;
+
+    const warnings = [
+      noTitle > 0
+        ? `⚠ ${pl(noTitle, "staff member")} missing job title — required for payroll export`
+        : null,
+      noStart > 0
+        ? `⚠ ${pl(noStart, "staff member")} missing employment start date — required for leave accrual`
+        : null,
+    ].filter(Boolean);
+
+    const items = [
+      `${pl(activeCount, "active staff member")}`,
+      total > activeCount
+        ? `${total - activeCount} inactive (${terminated > 0 ? `${terminated} terminated` : ""}${onLeave > 0 ? `${terminated > 0 ? ", " : ""}${onLeave} on leave` : ""}${suspended > 0 ? `, ${suspended} suspended` : ""})`
+        : "All staff members active",
+      noTitle > 0
+        ? `${pl(noTitle, "staff member")} missing job title`
+        : "All records have job titles",
+      noStart > 0
+        ? `${pl(noStart, "staff member")} missing start date`
+        : "All records have start dates",
+    ].filter(Boolean);
+
+    return {
+      status: warnings.length > 0 ? "warn" : "ok",
+      headline:
+        warnings.length > 0
+          ? `${pl(warnings.length, "data quality issue")} — ${pl(activeCount, "active staff member")}`
+          : `${pl(activeCount, "active staff member")} · ${pl(total, "total record")}`,
+      items,
+      warnings,
+      actions:
+        warnings.length > 0
+          ? [{ label: "→ Complete missing staff details", tab: "staff" }]
+          : [],
+      raw: {
+        tabId: "hr-staff",
+        queries: {
+          total,
+          active: activeCount,
+          terminated,
+          onLeave,
+          suspended,
+          noTitle,
+          noStart,
+        },
       },
     };
   },

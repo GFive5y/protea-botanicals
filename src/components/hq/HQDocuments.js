@@ -1,10 +1,8 @@
 // src/components/hq/HQDocuments.js
+// v2.2 — WP-GUIDE-C+: usePageContext 'documents' wired + WorkflowGuide added
 // v2.1 — Shipping line detection: after AI extraction, client-side scan of line_items
 //         for shipping/freight/handling keywords. If found and a linked PO exists,
 //         auto-injects a proposed "update_po_shipping" update into extracted_data.
-//         handleConfirm now handles update_po_shipping: writes shipping_cost_usd,
-//         shipping_mode, and recalculates landed_cost_zar on the purchase_order.
-//         ActionBadge + label updated for new action type (orange ship icon).
 // v2.0 — Fix: create_supplier_product action now also creates inventory_item + stock_movement
 // v1.9 — Inline supplier creation
 // v1.8 — Fix: update_batch_coa resolves batch UUID by batch_number when record_id null
@@ -13,6 +11,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
+import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
 const C = {
   green: "#1b4332",
@@ -41,7 +41,6 @@ const F = {
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ── Shipping keyword detection ────────────────────────────────────────────────
 const SHIPPING_KEYWORDS = [
   "shipping",
   "freight",
@@ -283,7 +282,6 @@ function SupplierCreateForm({
   const [error, setError] = useState("");
   const set = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
-
   const inputStyle = {
     width: "100%",
     boxSizing: "border-box",
@@ -305,7 +303,6 @@ function SupplierCreateForm({
     display: "block",
     marginBottom: 3,
   };
-
   const handleSave = async () => {
     if (!form.name.trim()) {
       setError("Supplier name is required");
@@ -320,7 +317,6 @@ function SupplierCreateForm({
       setSaving(false);
     }
   };
-
   return (
     <div
       style={{
@@ -336,9 +332,6 @@ function SupplierCreateForm({
           color: C.purple,
           fontFamily: F.body,
           marginBottom: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
         }}
       >
         ➕ Create New Supplier
@@ -654,8 +647,6 @@ function ReviewPanel({
   const proposedUpdates = extraction.proposed_updates || [];
   const unknownItems = extraction.unknown_items || [];
   const warnings = extraction.warnings || [];
-  const supplierUnmatched =
-    extraction.supplier?.name && !extraction.supplier?.matched_id;
 
   useEffect(() => {
     const autoChecked = new Set(proposedUpdates.map((_, i) => i));
@@ -666,15 +657,13 @@ function ReviewPanel({
     setSupplierCreated(false);
   }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleUpdate = (idx) => {
+  const toggleUpdate = (idx) =>
     setCheckedUpdates((prev) => {
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx);
       else next.add(idx);
       return next;
     });
-  };
-
   const isReadOnly = doc.status !== "pending_review";
 
   const panelStyle = {
@@ -707,7 +696,6 @@ function ReviewPanel({
     fontFamily: F.body,
   };
 
-  // v2.1: added update_po_shipping styling
   const actionBadgeStyle = (action) => ({
     fontSize: 9,
     padding: "1px 6px",
@@ -731,7 +719,6 @@ function ReviewPanel({
     fontFamily: F.body,
     letterSpacing: "0.05em",
   });
-
   const actionBadgeLabel = (action, table) => {
     if (action === "receive_delivery_item") return "📦 " + table;
     if (action === "update_batch_coa") return "🔬 " + table;
@@ -746,10 +733,11 @@ function ReviewPanel({
     setShowSupplierForm(false);
     setSupplierCreated(true);
   };
+  const supplierUnmatched =
+    extraction.supplier?.name && !extraction.supplier?.matched_id;
 
   return (
     <div style={panelStyle}>
-      {/* Header */}
       <div
         style={{
           padding: "14px",
@@ -803,7 +791,6 @@ function ReviewPanel({
         )}
       </div>
 
-      {/* Extracted Fields */}
       <div style={sectionHead}>Extracted Fields</div>
       {extraction.reference?.number && (
         <div style={fieldRow}>
@@ -834,7 +821,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Supplier row */}
       {extraction.supplier?.matched_id ? (
         <div style={fieldRow}>
           <span style={{ color: C.muted }}>Supplier</span>
@@ -865,9 +851,6 @@ function ReviewPanel({
                 </span>
               ) : (
                 <>
-                  <span style={{ color: C.amber, fontSize: 11 }}>
-                    ⚠ No match
-                  </span>
                   {!showSupplierForm && (
                     <button
                       onClick={() => setShowSupplierForm(true)}
@@ -903,7 +886,6 @@ function ReviewPanel({
         </>
       ) : null}
 
-      {/* Line Items */}
       {lineItems.length > 0 && (
         <>
           <div style={sectionHead}>Line Items ({lineItems.length})</div>
@@ -968,7 +950,6 @@ function ReviewPanel({
         </>
       )}
 
-      {/* Proposed Updates */}
       {proposedUpdates.length > 0 && (
         <>
           <div style={sectionHead}>
@@ -1118,7 +1099,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Confirmed banner */}
       {doc.status === "confirmed" && doc.applied_updates && (
         <div
           style={{
@@ -1153,7 +1133,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Rejected banner */}
       {doc.status === "rejected" && (
         <div
           style={{
@@ -1187,7 +1166,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Re-open */}
       {(doc.status === "confirmed" ||
         doc.status === "partially_applied" ||
         doc.status === "rejected") && (
@@ -1219,7 +1197,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Reject textarea */}
       {rejecting && (
         <div
           style={{
@@ -1296,7 +1273,6 @@ function ReviewPanel({
         </div>
       )}
 
-      {/* Confirm / Reject buttons */}
       {!isReadOnly && !rejecting && !showSupplierForm && (
         <div
           style={{
@@ -1658,6 +1634,9 @@ export default function HQDocuments({ initialDocId = null }) {
   const [confirmed, setConfirmed] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
+  // WP-GUIDE-C+: wire 'documents' context for WorkflowGuide live status
+  const ctx = usePageContext("documents", null);
+
   const selectedDoc = documents.find((d) => d.id === selectedDocId) || null;
 
   const fetchDocuments = useCallback(async () => {
@@ -1753,30 +1732,25 @@ export default function HQDocuments({ initialDocId = null }) {
       setUploadMsg("Unsupported file type. Use PDF, JPG, PNG, or WEBP.");
       return;
     }
-
     setUploadState("uploading");
     setUploadProgress(10);
     setUploadMsg("Uploading to secure storage…");
     setConfirmError("");
     const detectedHint = typeHint || detectTypeFromName(file.name);
-
     try {
       const storagePath = `${detectedHint || "documents"}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("supplier-documents")
         .upload(storagePath, file, { contentType: file.type, upsert: false });
       if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
-
       setUploadProgress(30);
       setUploadMsg("Loading catalogue, inventory & open POs for matching…");
       const freshContext = await fetchFreshContext();
-
       setUploadProgress(50);
       setUploadMsg("Extracting data with Claude Vision…");
       setUploadState("processing");
       const base64 = await fileToBase64(file);
       setUploadProgress(55);
-
       const { data: fnData, error: fnErr } = await supabase.functions.invoke(
         "process-document",
         {
@@ -1791,15 +1765,11 @@ export default function HQDocuments({ initialDocId = null }) {
           },
         },
       );
-
       if (fnErr) throw new Error(`Edge function error: ${fnErr.message}`);
       if (!fnData?.success)
         throw new Error(fnData?.error || "Extraction failed");
 
-      // ── v2.1: Client-side shipping line detection ──────────────────────
-      // The AI extracts line items but doesn't always propose a shipping update.
-      // Scan line_items for shipping keywords. If found and a linked PO exists,
-      // inject a proposed update_po_shipping action into extracted_data.
+      // v2.1: Client-side shipping line detection
       if (fnData.document_log_id) {
         try {
           const { data: freshDoc } = await supabase
@@ -1807,38 +1777,27 @@ export default function HQDocuments({ initialDocId = null }) {
             .select("extracted_data")
             .eq("id", fnData.document_log_id)
             .single();
-
           if (freshDoc?.extracted_data) {
             const exData = freshDoc.extracted_data;
             const lines = exData.line_items || [];
             const proposals = exData.proposed_updates || [];
-
-            // Find shipping line item
             const shippingLine = lines.find(
               (li) =>
                 isShippingLine(li.description) &&
                 Number(li.unit_price ?? 0) > 0,
             );
-
-            // Check if a shipping proposal already exists
             const alreadyHasShippingProposal = proposals.some(
               (p) => p.action === "update_po_shipping",
             );
-
             if (shippingLine && !alreadyHasShippingProposal) {
-              // Find PO record_id from update_po_status proposal
               const poProposal = proposals.find(
                 (p) =>
                   (p.action === "update_po_status" ||
                     p.action === "create_purchase_order") &&
                   p.record_id,
               );
-
-              // Also check if PO matched via supplier + reference
               let poRecordId = poProposal?.record_id || null;
-
               if (!poRecordId && exData.supplier?.matched_id) {
-                // Try to find PO by supplier + invoice reference
                 const ref = exData.reference?.number;
                 if (ref) {
                   const { data: matchedPO } = await supabase
@@ -1850,7 +1809,6 @@ export default function HQDocuments({ initialDocId = null }) {
                   if (matchedPO) poRecordId = matchedPO.id;
                 }
               }
-
               if (poRecordId) {
                 const shippingAmt = Number(shippingLine.unit_price);
                 const shippingProposal = {
@@ -1876,14 +1834,12 @@ export default function HQDocuments({ initialDocId = null }) {
             }
           }
         } catch (patchErr) {
-          // Non-fatal — log but don't fail the whole upload
           console.warn(
             "[HQDocuments] shipping patch failed:",
             patchErr.message,
           );
         }
       }
-      // ── end shipping detection ──────────────────────────────────────────
 
       setUploadProgress(90);
       setUploadMsg("Extraction complete — review below");
@@ -1905,7 +1861,6 @@ export default function HQDocuments({ initialDocId = null }) {
     }
   };
 
-  // ── Schema whitelists ──────────────────────────────────────────────────────
   const PO_HEADER_COLS = new Set([
     "po_number",
     "supplier_id",
@@ -2004,7 +1959,6 @@ export default function HQDocuments({ initialDocId = null }) {
     if (!selectedDoc || checkedIndices.length === 0) return;
     setConfirming(true);
     setConfirmError("");
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -2016,7 +1970,6 @@ export default function HQDocuments({ initialDocId = null }) {
       .filter(Boolean);
     const appliedUpdates = [];
     const failedUpdates = [];
-
     const fxRate = extraction.usd_zar_rate || extraction.fx_rate || 18.5;
     const docSupplierId =
       extraction.supplier?.matched_id || selectedDoc.supplier_id || null;
@@ -2025,7 +1978,6 @@ export default function HQDocuments({ initialDocId = null }) {
       try {
         const { action, table, record_id, data } = update;
         if (!table || !data) throw new Error("Missing table or data");
-
         if (action === "create_purchase_order") {
           const { items, ...rawHeader } = data;
           const poHeader = Object.fromEntries(
@@ -2053,7 +2005,6 @@ export default function HQDocuments({ initialDocId = null }) {
             throw new Error(
               "supplier_id could not be resolved — cannot insert PO without a supplier",
             );
-
           let newPO = null;
           const { data: insertedPO, error: poErr } = await supabase
             .from(table)
@@ -2075,7 +2026,6 @@ export default function HQDocuments({ initialDocId = null }) {
           } else {
             newPO = insertedPO;
           }
-
           if (items?.length && newPO?.id) {
             const poItems = items
               .map((item) => ({ ...normalisePOItem(item), po_id: newPO.id }))
@@ -2181,7 +2131,6 @@ export default function HQDocuments({ initialDocId = null }) {
             .select("id, name, sku, category, unit_price_usd, supplier_id")
             .single();
           if (spErr) throw spErr;
-
           const productNameLower = (
             newProduct.name ||
             data.name ||
@@ -2200,7 +2149,6 @@ export default function HQDocuments({ initialDocId = null }) {
           const qty = matchingLine
             ? Number(matchingLine.quantity ?? 1)
             : Number(data.quantity ?? data.quantity_ordered ?? 1);
-
           const rawSku = newProduct.sku || data.sku || "";
           const invSku = rawSku
             ? `IMP-${rawSku}`
@@ -2208,7 +2156,6 @@ export default function HQDocuments({ initialDocId = null }) {
                 .toUpperCase()
                 .replace(/[^A-Z0-9]/g, "-")
                 .slice(0, 20)}`;
-
           const unitPriceUsd = Number(
             newProduct.unit_price_usd ?? data.unit_price_usd ?? 0,
           );
@@ -2219,7 +2166,6 @@ export default function HQDocuments({ initialDocId = null }) {
           const invUnit = defaultUnitForCat(invCat);
           const supplierId =
             newProduct.supplier_id || data.supplier_id || docSupplierId;
-
           const { data: newInvItem, error: invErr } = await supabase
             .from("inventory_items")
             .insert({
@@ -2237,10 +2183,9 @@ export default function HQDocuments({ initialDocId = null }) {
             })
             .select("id")
             .single();
-
           if (invErr) {
             console.warn(
-              "[HQDocuments] inventory_item insert skipped (likely duplicate SKU):",
+              "[HQDocuments] inventory_item insert skipped:",
               invErr.message,
             );
           } else if (newInvItem?.id && qty > 0) {
@@ -2260,12 +2205,9 @@ export default function HQDocuments({ initialDocId = null }) {
                 movErr.message,
               );
           }
-
-          // ── v2.1: update_po_shipping ─────────────────────────────────────
         } else if (action === "update_po_shipping") {
           if (!record_id)
             throw new Error("record_id required for update_po_shipping");
-
           const shippingUpdate = {};
           if (data.shipping_cost_usd != null)
             shippingUpdate.shipping_cost_usd = parseFloat(
@@ -2277,8 +2219,6 @@ export default function HQDocuments({ initialDocId = null }) {
             );
           if (data.shipping_mode != null)
             shippingUpdate.shipping_mode = data.shipping_mode;
-
-          // Fetch current PO to recalculate landed_cost_zar
           const { data: poRow, error: poFetchErr } = await supabase
             .from("purchase_orders")
             .select(
@@ -2286,7 +2226,6 @@ export default function HQDocuments({ initialDocId = null }) {
             )
             .eq("id", record_id)
             .single();
-
           if (!poFetchErr && poRow) {
             const fxR = parseFloat(poRow.usd_zar_rate) || fxRate;
             const subtotal = parseFloat(poRow.subtotal) || 0;
@@ -2302,7 +2241,6 @@ export default function HQDocuments({ initialDocId = null }) {
               Math.round((subtotal + newShipping + clearance) * fxR * 100) /
               100;
           }
-
           const { error: poUpdErr } = await supabase
             .from("purchase_orders")
             .update(shippingUpdate)
@@ -2320,7 +2258,6 @@ export default function HQDocuments({ initialDocId = null }) {
         } else {
           throw new Error(`No record_id for update action on ${table}`);
         }
-
         appliedUpdates.push(update);
       } catch (err) {
         console.error("[handleConfirm] failed update:", err.message, update);
@@ -2333,7 +2270,6 @@ export default function HQDocuments({ initialDocId = null }) {
       newStatus = "partially_applied";
     else if (failedUpdates.length > 0 && appliedUpdates.length === 0)
       newStatus = "rejected";
-
     await supabase
       .from("document_log")
       .update({
@@ -2343,7 +2279,6 @@ export default function HQDocuments({ initialDocId = null }) {
         confirmed_at: new Date().toISOString(),
       })
       .eq("id", selectedDoc.id);
-
     setConfirming(false);
     if (failedUpdates.length > 0) {
       setConfirmError(
@@ -2386,6 +2321,14 @@ export default function HQDocuments({ initialDocId = null }) {
 
   return (
     <div style={{ fontFamily: F.body, position: "relative" }}>
+      {/* WP-GUIDE-C+: WorkflowGuide with live documents context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="documents"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
+
       <div
         style={{
           display: "flex",

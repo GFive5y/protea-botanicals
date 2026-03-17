@@ -1,21 +1,14 @@
-// src/components/hq/HQPricing.js v3.4 — WP-D: Pricing & Margin Intelligence
-// Protea Botanicals · Phase 2 · March 2026
+// src/components/hq/HQPricing.js v3.5 — WP-GUIDE-C+: usePageContext 'pricing' wired + WorkflowGuide added
 // v3.4 — Batch P&L boxes always show per-unit price alongside total
-// v3.3 — Per-unit COGS always shown prominently, batch P&L secondary, channel cards show per-unit + batch
+// v3.3 — Per-unit COGS always shown prominently, batch P&L secondary
 // v3.2 — Edit scrolls to detail panel, quantity P&L strip, hardware_qty warning
-// v3.1 — calcCogsTotal now mirrors HQCogs v3.1 exactly:
-//         chambers (multi-chamber), packaging_manual_zar, labour_manual_zar,
-//         shipping_alloc_zar, µl terpene, lab, transport, misc
-//
-// Margin formula:  margin% = (sell_price - cogs) / sell_price × 100
-// Recommended price from target margin: price = cogs / (1 - target/100)
-// Channels: wholesale / retail / website
-// Colour thresholds: red <20% · orange 20–35% · green >35%
+// v3.1 — calcCogsTotal mirrors HQCogs v3.1 exactly
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
+import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
-// ─── Cannalytics test list (mirrors HQCogs v2.0) ──────────────────────────────
 const CANNALYTICS_TESTS = [
   { id: "potency", price: 350 },
   { id: "solvents", price: 200 },
@@ -27,7 +20,6 @@ const CANNALYTICS_TESTS = [
   { id: "foreign_matter", price: 100 },
 ];
 
-// ─── FX Hook ──────────────────────────────────────────────────────────────────
 function useFxRate() {
   const [fxRate, setFxRate] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
@@ -53,35 +45,24 @@ function useFxRate() {
   return { fxRate, fxLoading };
 }
 
-// ─── COGS Calculation v3.1 — exact mirror of HQCogs v3.1 ────────────────────
-// Single source of truth: any change to HQCogs.js calcCogs() must be reflected here.
-// Supports: chambers (multi-chamber JSONB), packaging_manual_zar, labour_manual_zar,
-//           shipping_alloc_zar, terpene_qty_ul (µl), lab tests, transport, misc.
 function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
   if (!recipe || !usdZar) return 0;
-
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
   const pk = localInputs.find((i) => i.id === recipe.packaging_input_id);
   const lb = localInputs.find((i) => i.id === recipe.labour_input_id);
-
-  // Hardware (always flat field regardless of chamber count)
   const hwCost = hw
     ? parseFloat(recipe.hardware_qty || 1) *
         parseFloat(hw.unit_price_usd) *
         usdZar +
       parseFloat(recipe.shipping_alloc_zar || 0)
     : 0;
-
-  // v3.0: multi-chamber JSONB takes priority; null = single-chamber flat fields
-  let tpCost = 0;
-  let diCost = 0;
+  let tpCost = 0,
+    diCost = 0;
   const chamberData =
     Array.isArray(recipe.chambers) && recipe.chambers.length > 1
       ? recipe.chambers
       : null;
-
   if (chamberData) {
-    // Sum across all chambers
     chamberData.forEach((ch) => {
       const chTp = supplierProducts.find((p) => p.id === ch.terpene_item_id);
       const chDi = localInputs.find((i) => i.id === ch.distillate_input_id);
@@ -94,7 +75,6 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
           : 0;
     });
   } else {
-    // Single-chamber: flat fields (backward compatible)
     const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
     const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
     const terpUl = parseFloat(recipe.terpene_qty_ul || 0);
@@ -105,8 +85,6 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
         ? parseFloat(recipe.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
         : 0;
   }
-
-  // v2.2: packaging — manual ZAR override takes priority over dropdown
   const pkRate =
     recipe.packaging_manual_zar != null && recipe.packaging_manual_zar !== ""
       ? parseFloat(recipe.packaging_manual_zar)
@@ -115,8 +93,6 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
         : 0;
   const pkCost =
     pkRate > 0 ? parseFloat(recipe.packaging_qty || 1) * pkRate : 0;
-
-  // v2.2: labour — same override pattern
   const lbRate =
     recipe.labour_manual_zar != null && recipe.labour_manual_zar !== ""
       ? parseFloat(recipe.labour_manual_zar)
@@ -124,8 +100,6 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
         ? parseFloat(lb.cost_zar)
         : 0;
   const lbCost = lbRate > 0 ? parseFloat(recipe.labour_qty || 1) * lbRate : 0;
-
-  // Batch-amortised: lab, transport, misc
   const batchSize = Math.max(1, parseInt(recipe.batch_size || 1));
   const labTests = Array.isArray(recipe.lab_tests) ? recipe.lab_tests : [];
   const labTotal = labTests.reduce((s, id) => {
@@ -135,7 +109,6 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
   const labPerUnit = labTotal / batchSize;
   const transPerU = parseFloat(recipe.transport_cost_zar || 0) / batchSize;
   const miscPerU = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
-
   return (
     hwCost +
     tpCost +
@@ -148,7 +121,6 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtZar = (n) =>
   `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
@@ -172,19 +144,16 @@ function marginColour(pct) {
   if (pct < 35) return { color: "#E65100", bg: "#FFF3E0", label: "OK" };
   return { color: "#2E7D32", bg: "#E8F5E9", label: "Good" };
 }
-
 function calcMargin(sellPrice, cogs) {
   if (!sellPrice || sellPrice <= 0) return null;
   return ((sellPrice - cogs) / sellPrice) * 100;
 }
-
 function recommendedPrice(cogs, targetMarginPct) {
   if (!targetMarginPct || targetMarginPct >= 100 || targetMarginPct <= 0)
     return null;
   return cogs / (1 - targetMarginPct / 100);
 }
 
-// ─── Margin Badge ─────────────────────────────────────────────────────────────
 function MarginBadge({ pct, large = false }) {
   const c = marginColour(pct);
   return (
@@ -199,13 +168,12 @@ function MarginBadge({ pct, large = false }) {
         background: c.bg,
       }}
     >
-      {pct !== null && !isNaN(pct) ? `${fmt(pct)}%` : "—"}{" "}
-      {c.label !== "—" ? `· ${c.label}` : ""}
+      {pct !== null && !isNaN(pct) ? `${fmt(pct)}%` : "—"}
+      {c.label !== "—" ? ` · ${c.label}` : ""}
     </span>
   );
 }
 
-// ─── FX Sensitivity ───────────────────────────────────────────────────────────
 function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
   const scenarios = [-2, -1, 0, +1, +2].map((delta) => {
     const rate = baseRate + delta;
@@ -213,7 +181,6 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
     const margin = sellPrice > 0 ? calcMargin(sellPrice, scenarioCogs) : null;
     return { rate, scenarioCogs, margin, delta };
   });
-
   return (
     <div style={{ overflowX: "auto" }}>
       <table
@@ -277,9 +244,6 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// CHANNEL PRICING CARD (unchanged from v1.0 except style cleanup)
-// ══════════════════════════════════════════════════════════════════════════════
 function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
   const existing = pricing.find((p) => p.channel === channel.id);
   const [sellPrice, setSellPrice] = useState(
@@ -291,7 +255,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
   const [notes, setNotes] = useState(existing?.notes || "");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-
   const sell = parseFloat(sellPrice) || 0;
   const margin = sell > 0 ? calcMargin(sell, cogs) : null;
   const mc = marginColour(margin);
@@ -309,7 +272,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
     setSaving(false);
     setDirty(false);
   };
-
   const applyRec = () => {
     if (recPrice) {
       setSellPrice(fmt(recPrice));
@@ -352,7 +314,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
         transition: "border-color 0.2s",
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -372,8 +333,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
         </div>
         {margin !== null && <MarginBadge pct={margin} large />}
       </div>
-
-      {/* Sell price */}
       <div style={{ marginBottom: 14 }}>
         {lbl("Sell Price (ZAR) — per unit")}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -401,8 +360,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           />
         </div>
       </div>
-
-      {/* Slider */}
       {sell > 0 && (
         <div style={{ marginBottom: 14 }}>
           {lbl("Adjust Price (what-if)")}
@@ -435,8 +392,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           </div>
         </div>
       )}
-
-      {/* Margin breakdown — per unit */}
       {sell > 0 && (
         <>
           <div
@@ -523,8 +478,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           )}
         </>
       )}
-
-      {/* Target margin */}
       <div style={{ marginBottom: 14 }}>
         {lbl("Target Margin % → Recommended Price")}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -572,8 +525,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           )}
         </div>
       </div>
-
-      {/* Notes */}
       <div style={{ marginBottom: 16 }}>
         <input
           type="text"
@@ -594,8 +545,6 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           }}
         />
       </div>
-
-      {/* Save */}
       <button
         onClick={handleSave}
         disabled={saving || !dirty}
@@ -626,6 +575,9 @@ export default function HQPricing() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
 
+  // WP-GUIDE-C+: wire 'pricing' context for WorkflowGuide live status
+  const ctx = usePageContext("pricing", null);
+
   const [recipes, setRecipes] = useState([]);
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [localInputs, setLocalInputs] = useState([]);
@@ -636,9 +588,8 @@ export default function HQPricing() {
   const [toast, setToast] = useState("");
   const [showFxPanel, setShowFxPanel] = useState(false);
   const [pricingVersion, setPricingVersion] = useState(0);
-  const [qtyUnits, setQtyUnits] = useState(1); // batch quantity for P&L view
+  const [qtyUnits, setQtyUnits] = useState(1);
 
-  // ── Fetch ─────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const [r1, r2, r3, r4] = await Promise.all([
@@ -656,7 +607,7 @@ export default function HQPricing() {
     setLocalInputs(r3.data || []);
     setPricing(r4.data || []);
     setLoading(false);
-    if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id); // no scroll on initial load
+    if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id);
   }, [selectedId]);
 
   useEffect(() => {
@@ -665,7 +616,6 @@ export default function HQPricing() {
 
   const selectAndScroll = (id) => {
     setSelectedId(id);
-    // Scroll to detail panel on next paint
     setTimeout(() => {
       if (detailRef.current) {
         detailRef.current.scrollIntoView({
@@ -675,13 +625,11 @@ export default function HQPricing() {
       }
     }, 50);
   };
-
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 4000);
   };
 
-  // ── Save channel price ─────────────────────────────────────────────────
   const handleSaveChannel = async (cogsId, channelId, values) => {
     const { data: existing } = await supabase
       .from("product_pricing")
@@ -689,7 +637,6 @@ export default function HQPricing() {
       .eq("product_cogs_id", cogsId)
       .eq("channel", channelId)
       .maybeSingle();
-
     let error;
     if (existing?.id) {
       ({ error } = await supabase
@@ -701,7 +648,6 @@ export default function HQPricing() {
         .from("product_pricing")
         .insert({ product_cogs_id: cogsId, channel: channelId, ...values }));
     }
-
     if (error) {
       console.error("Pricing save error:", error);
       showToast("❌ Save failed — check console");
@@ -713,7 +659,6 @@ export default function HQPricing() {
     setPricingVersion((v) => v + 1);
   };
 
-  // ── Derived ────────────────────────────────────────────────────────────
   const selected = recipes.find((r) => r.id === selectedId);
   const selectedCogs = selected
     ? calcCogsTotal(selected, supplierProducts, localInputs, usdZar)
@@ -741,9 +686,6 @@ export default function HQPricing() {
     marginBottom: 20,
   };
 
-  // ══════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════════════════
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
       {/* Toast */}
@@ -766,6 +708,14 @@ export default function HQPricing() {
           {toast}
         </div>
       )}
+
+      {/* WP-GUIDE-C+: WorkflowGuide with live pricing context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="pricing"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
 
       {/* Header */}
       <div
@@ -850,7 +800,7 @@ export default function HQPricing() {
         </div>
       ) : (
         <>
-          {/* ── All-SKUs Summary ──────────────────────────────────── */}
+          {/* All-SKUs Summary */}
           <div style={card}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, color: "#2d4a2d" }}>
               All SKUs — Margin Overview
@@ -975,11 +925,10 @@ export default function HQPricing() {
             </div>
           </div>
 
-          {/* ── Selected SKU Detail ───────────────────────────────── */}
+          {/* Selected SKU Detail */}
           <div ref={detailRef} />
           {selected && (
             <div>
-              {/* SKU header */}
               <div style={{ ...card, padding: "20px 24px", marginBottom: 20 }}>
                 <div
                   style={{
@@ -1006,7 +955,6 @@ export default function HQPricing() {
                         {selected.sku}
                       </div>
                     )}
-                    {/* v2.0: show batch size + amortised costs hint */}
                     {(selected.lab_tests?.length > 0 ||
                       selected.transport_cost_zar > 0 ||
                       selected.misc_cost_zar > 0) && (
@@ -1093,7 +1041,6 @@ export default function HQPricing() {
                 </div>
               </div>
 
-              {/* FX Sensitivity */}
               {showFxPanel && selectedCogs > 0 && (
                 <div
                   style={{ ...card, background: "#f8f9fa", marginBottom: 20 }}
@@ -1139,7 +1086,7 @@ export default function HQPricing() {
                 </div>
               )}
 
-              {/* ── Quantity scenario strip */}
+              {/* Quantity scenario strip */}
               <div
                 style={{
                   background: "#f8faf8",
@@ -1149,7 +1096,6 @@ export default function HQPricing() {
                   marginBottom: 20,
                 }}
               >
-                {/* Row 1: per-unit COGS — always visible */}
                 <div
                   style={{
                     display: "flex",
@@ -1199,8 +1145,6 @@ export default function HQPricing() {
                     </span>
                   </div>
                 </div>
-
-                {/* Row 2: batch scenario */}
                 <div style={{ borderTop: "1px solid #e8f0e8", paddingTop: 12 }}>
                   <div
                     style={{
@@ -1262,8 +1206,6 @@ export default function HQPricing() {
                       </button>
                     ))}
                   </div>
-
-                  {/* Batch totals — always shown */}
                   {(() => {
                     const totalCogs = selectedCogs * qtyUnits;
                     const bestSell = Math.max(
@@ -1290,7 +1232,6 @@ export default function HQPricing() {
                     const totalProfit = totalRev - totalCogs;
                     const margin =
                       totalRev > 0 ? (totalProfit / totalRev) * 100 : null;
-
                     return (
                       <div
                         style={{
@@ -1341,7 +1282,6 @@ export default function HQPricing() {
                             )}
                           </div>
                         </div>
-
                         {bestSell > 0 ? (
                           <>
                             <div style={{ fontSize: 20, color: "#ddd" }}>→</div>

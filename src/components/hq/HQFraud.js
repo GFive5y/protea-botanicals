@@ -1,10 +1,13 @@
-// src/components/hq/HQFraud.js — v1.0
-// WP-8: Fraud Detection, Security & POPIA Compliance Dashboard
+// src/components/hq/HQFraud.js — v1.1
+// WP-GUIDE-C+: usePageContext 'fraud' wired + WorkflowGuide added
+// v1.0 — WP-8: Fraud Detection, Security & POPIA Compliance Dashboard
 // 5 sub-tabs: Flagged Accounts | Scan Velocity | Suspended | Deletion Requests | Audit Log
 // Inline styles only. Fonts: Cormorant Garamond + Jost.
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
 // ─── COLOURS ────────────────────────────────────────────────────────────────
 const C = {
@@ -27,11 +30,8 @@ const C = {
   textLight: "#888888",
   white: "#ffffff",
 };
-
 const FD = "'Cormorant Garamond', Georgia, serif";
 const FB = "'Jost', 'Helvetica Neue', Arial, sans-serif";
-
-// ─── SHARED UI ───────────────────────────────────────────────────────────────
 
 function SectionCard({ title, subtitle, children, accent, action }) {
   const ac = accent || C.green;
@@ -196,19 +196,20 @@ function fmtAgo(d) {
   return `${dy}d ago`;
 }
 
-// ─── WRITE AUDIT LOG HELPER ──────────────────────────────────────────────────
 async function writeAuditLog(action, targetType, targetId, details) {
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    await supabase.from("audit_log").insert({
-      admin_id: user?.id || null,
-      action,
-      target_type: targetType,
-      target_id: targetId || null,
-      details: details || null,
-    });
+    await supabase
+      .from("audit_log")
+      .insert({
+        admin_id: user?.id || null,
+        action,
+        target_type: targetType,
+        target_id: targetId || null,
+        details: details || null,
+      });
   } catch (err) {
     console.error("Audit log write error:", err);
   }
@@ -385,7 +386,6 @@ function TabFlagged({ showToast }) {
                 border: `1px solid ${acc.is_suspended ? C.red + "40" : C.border}`,
               }}
             >
-              {/* Score badge */}
               <div
                 style={{
                   width: 52,
@@ -409,8 +409,6 @@ function TabFlagged({ showToast }) {
                   {acc.anomaly_score || 0}
                 </span>
               </div>
-
-              {/* User info */}
               <div style={{ flex: 1, minWidth: 160 }}>
                 <div
                   style={{
@@ -454,7 +452,6 @@ function TabFlagged({ showToast }) {
                   {acc.total_scans || 0} scans · {acc.loyalty_points || 0} pts ·
                   last active {fmtAgo(acc.last_active_at)}
                 </div>
-                {/* Flag reasons */}
                 {acc.flag_reasons && acc.flag_reasons.length > 0 && (
                   <div
                     style={{
@@ -470,8 +467,6 @@ function TabFlagged({ showToast }) {
                   </div>
                 )}
               </div>
-
-              {/* Actions */}
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 {acc.is_suspended ? (
                   <ActionBtn
@@ -751,7 +746,7 @@ function TabSuspended({ showToast }) {
             message="No suspended accounts. All users are in good standing."
           />
         ) : (
-          accounts.map((acc, i) => (
+          accounts.map((acc) => (
             <div
               key={acc.id}
               style={{
@@ -1018,7 +1013,6 @@ function TabDeletion({ showToast }) {
             );
           })
         )}
-
         <div
           style={{
             marginTop: 16,
@@ -1057,7 +1051,6 @@ function TabAuditLog({ showToast }) {
     { value: "APPROVE_DELETION", label: "Deletion Approvals" },
     { value: "REJECT_DELETION", label: "Deletion Rejections" },
   ];
-
   const ACTION_COLOURS = {
     SUSPEND_ACCOUNT: C.red,
     REINSTATE_ACCOUNT: C.green,
@@ -1206,7 +1199,7 @@ function TabAuditLog({ showToast }) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT: HQFraud v1.0
+// MAIN COMPONENT: HQFraud v1.1
 // ═════════════════════════════════════════════════════════════════════════════
 export default function HQFraud() {
   const [activeTab, setActiveTab] = useState(0);
@@ -1217,11 +1210,13 @@ export default function HQFraud() {
     deletions: 0,
   });
 
+  // WP-GUIDE-C+: wire 'fraud' context for WorkflowGuide live status
+  const ctx = usePageContext("fraud", null);
+
   function showToast(msg, type = "success") {
     setToast({ msg, type });
   }
 
-  // Load badge counts for tab headers
   useEffect(() => {
     const loadCounts = async () => {
       try {
@@ -1247,7 +1242,7 @@ export default function HQFraud() {
       } catch (_) {}
     };
     loadCounts();
-  }, [activeTab]); // refresh counts when switching tabs
+  }, [activeTab]);
 
   const TABS = [
     { label: "🚨 Flagged", badge: counts.flagged },
@@ -1260,6 +1255,14 @@ export default function HQFraud() {
   return (
     <div style={{ fontFamily: FB, background: C.bg, minHeight: "100%" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@400;500;600;700&display=swap');`}</style>
+
+      {/* WP-GUIDE-C+: WorkflowGuide with live fraud context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="fraud"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
 
       {/* Header */}
       <div
@@ -1293,8 +1296,6 @@ export default function HQFraud() {
             admin audit trail.
           </p>
         </div>
-
-        {/* Summary strip */}
         <div
           style={{
             display: "flex",
@@ -1355,8 +1356,6 @@ export default function HQFraud() {
             </div>
           ))}
         </div>
-
-        {/* Tab nav */}
         <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
           {TABS.map((tab, i) => (
             <button
@@ -1403,7 +1402,6 @@ export default function HQFraud() {
         </div>
       </div>
 
-      {/* Tab content */}
       <div style={{ padding: "24px 28px", maxWidth: 900 }}>
         {activeTab === 0 && <TabFlagged showToast={showToast} />}
         {activeTab === 1 && <TabVelocity showToast={showToast} />}
