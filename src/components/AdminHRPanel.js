@@ -1,8 +1,9 @@
-// AdminHRPanel.js v1.1
+// AdminHRPanel.js v1.2
 // Protea Botanicals · HR Module · Admin HR Panel Container
-// WP-HR-3 · March 2026
+// WP-HR-4 · March 2026
 // src/components/AdminHRPanel.js
 //
+// v1.2 — WP-HR-4: Timesheets tab unlocked — HRTimesheets.js wired
 // v1.1 — WP-HR-3: Leave tab unlocked — HRLeave.js wired
 // v1.0 — WP-HR-2: Initial build — Staff tab live
 
@@ -11,12 +12,13 @@ import { usePageContext } from "../hooks/usePageContext";
 import WorkflowGuide from "./WorkflowGuide";
 import HRStaffDirectory from "./hq/HRStaffDirectory";
 import HRLeave from "./hq/HRLeave";
+import HRTimesheets from "./hq/HRTimesheets";
 
 // ─── Sub-tab config ────────────────────────────────────────────────────────────
 const SUB_TABS = [
   { id: "staff", label: "👥 Staff", live: true, wp: null },
   { id: "leave", label: "🗓 Leave", live: true, wp: null },
-  { id: "timesheets", label: "⏱ Timesheets", live: false, wp: "WP-HR-4" },
+  { id: "timesheets", label: "⏱ Timesheets", live: true, wp: null },
   { id: "contracts", label: "📋 Contracts", live: false, wp: "WP-HR-5" },
   { id: "disciplinary", label: "⚠ Disciplinary", live: false, wp: "WP-HR-6" },
 ];
@@ -130,6 +132,7 @@ export default function AdminHRPanel({ tenantId, user }) {
         <HRStaffDirectory tenantId={tenantId} user={user} />
       )}
       {activeTab === "leave" && <HRLeave tenantId={tenantId} />}
+      {activeTab === "timesheets" && <HRTimesheets tenantId={tenantId} />}
 
       {activeTabDef && !activeTabDef.live && (
         <div style={s.placeholder}>
@@ -141,7 +144,8 @@ export default function AdminHRPanel({ tenantId, user }) {
           </h3>
           <span style={s.placeholderWp}>{activeTabDef.wp}</span>
           <p style={s.placeholderText}>
-            Coming in the next HR work package. Staff and Leave are live now.
+            Coming in the next HR work package. Staff, Leave and Timesheets are
+            live now.
           </p>
         </div>
       )}
