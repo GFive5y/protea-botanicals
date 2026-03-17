@@ -1,16 +1,21 @@
-// src/App.js — Protea Botanicals v4.0
+// src/App.js — Protea Botanicals v5.0
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v5.0 CHANGELOG (WP-HR-12):
+//   1. ADD: import StaffPortal from "./pages/StaffPortal"
+//   2. ADD: RequireStaff auth guard (any logged-in user — profile check inside)
+//   3. ADD: /staff/* route guarded by RequireStaff
+//   4. ADD: My Portal nav link (visible to all logged-in users)
+//   All v4.0 nav, auth, cart, route logic — untouched.
+//
 // ★ v4.0 CHANGELOG (WP-HR-5):
 //   1. ADD: import HRDashboard from "./pages/HRDashboard"
 //   2. ADD: RequireHR auth guard (role='hr' OR isHQ)
 //   3. ADD: /hr/* route guarded by RequireHR
 //   4. ADD: HR nav link (visible to role='hr' or isHQ users)
-//   All v3.9 nav, auth, cart, route logic — untouched.
 //
 // ★ v3.9 CHANGELOG:
 //   1. ADD: import Leaderboard from "./pages/Leaderboard"
 //   2. ADD: public /leaderboard route (no RequireAuth — visible to all)
-//   All v3.8 nav, auth, cart, route logic — untouched.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useState, useEffect, useContext } from "react";
@@ -49,6 +54,7 @@ import AdminQrGenerator from "./pages/AdminQrGenerator";
 import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
 import HRDashboard from "./pages/HRDashboard"; // ★ v4.0
+import StaffPortal from "./pages/StaffPortal"; // ★ v5.0
 import ShopDashboard from "./pages/ShopDashboard";
 import TerpenePage from "./pages/TerpenePage";
 
@@ -64,7 +70,7 @@ const LS = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INLINE NAV BAR — v3.8: Scroll-aware cream/green, auto-hide, no gold
+// INLINE NAV BAR
 // ─────────────────────────────────────────────────────────────────────────────
 function NavBar() {
   const { role, setRole, isDevMode, setIsDevMode, userEmail, loading } =
@@ -244,6 +250,12 @@ function NavBar() {
           {(role === "hr" || isHQ) && (
             <NavLink to="/hr" scrolled={scrolled}>
               HR
+            </NavLink>
+          )}
+          {/* ★ v5.0: My Portal nav link — visible to all logged-in users */}
+          {isLoggedIn && (
+            <NavLink to="/staff" scrolled={scrolled}>
+              My Portal
             </NavLink>
           )}
         </nav>
@@ -652,6 +664,61 @@ function RequireHR({ children }) {
   return children;
 }
 
+// ★ v5.0: RequireStaff — any logged-in user (profile check happens inside StaffPortal)
+function RequireStaff({ children }) {
+  const { role, loading } = useContext(RoleContext);
+  const location = useLocation();
+  const storedRole = localStorage.getItem("protea_role");
+
+  if (role || storedRole) return children;
+
+  if (loading)
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+          fontFamily: "Jost, sans-serif",
+          color: "#1b4332",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            width: "32px",
+            height: "32px",
+            border: "3px solid #e0dbd2",
+            borderTopColor: "#1b4332",
+            borderRadius: "50%",
+            animation: "protea-spin 0.8s linear infinite",
+          }}
+        />
+        <style>{`@keyframes protea-spin { to { transform: rotate(360deg); } }`}</style>
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: "600",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            color: "#888",
+          }}
+        >
+          Loading…
+        </span>
+      </div>
+    );
+
+  return (
+    <Navigate
+      to={`/account?return=${encodeURIComponent(location.pathname)}`}
+      replace
+    />
+  );
+}
+
 function AdminDashboardRouter() {
   const { isHQ, tenantType, loading: tenantLoading } = useTenant();
 
@@ -991,6 +1058,23 @@ export default function App() {
                             <HRDashboard />
                           </RequireHR>
                         </RequireAuth>
+                      </PageShell>
+                    </div>
+                  </>
+                }
+              />
+
+              {/* ★ v5.0: Staff Portal — any logged-in user, profile check inside */}
+              <Route
+                path="/staff/*"
+                element={
+                  <>
+                    <NavBar />
+                    <div style={{ paddingTop: "56px" }}>
+                      <PageShell maxWidth={1200}>
+                        <RequireStaff>
+                          <StaffPortal />
+                        </RequireStaff>
                       </PageShell>
                     </div>
                   </>
