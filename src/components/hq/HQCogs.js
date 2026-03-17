@@ -1,4 +1,6 @@
-// src/components/hq/HQCogs.js v3.7
+// src/components/hq/HQCogs.js v3.9
+// v3.9 — WP-GUIDE-B: InfoTooltip injected (batch size, transport, terpene µl)
+// v3.8 — WP-GUIDE-A: usePageContext() + WorkflowGuide v2.0 wired
 // v3.7 — Hardware row shows landed cost split: unit cost + shipping alloc separately
 // v3.6 — Hardware MOQ displayed on cards and in builder
 //         MOQ indicator shows min order qty from supplier_products.moq
@@ -610,8 +612,6 @@ const CHAMBER_COLORS = [
 ];
 
 // ── ChambersEditor ────────────────────────────────────────────────────────────
-// v3.5 FIX: Terpene qty column label changed from "Qty (ml)" → "Qty (µl)"
-//           Added conversion hint below field: "= Xml" so it's unambiguous
 function ChambersEditor({
   chambers,
   onChange,
@@ -634,7 +634,6 @@ function ChambersEditor({
 
   return (
     <div>
-      {/* Summary header */}
       <div
         style={{
           display: "flex",
@@ -694,7 +693,6 @@ function ChambersEditor({
         })}
       </div>
 
-      {/* Per-chamber cards */}
       {chambers.map((ch, idx) => {
         const col = CHAMBER_COLORS[idx % CHAMBER_COLORS.length];
         const terpPct =
@@ -749,7 +747,6 @@ function ChambersEditor({
               overflow: "hidden",
             }}
           >
-            {/* Chamber header */}
             <div
               style={{
                 background: col.bg,
@@ -798,9 +795,7 @@ function ChambersEditor({
               </div>
             </div>
 
-            {/* Chamber body */}
             <div style={{ padding: "14px 16px", background: "#fff" }}>
-              {/* Distillate row */}
               <div
                 style={{
                   display: "grid",
@@ -912,7 +907,6 @@ function ChambersEditor({
                   </select>
                 </div>
                 <div>
-                  {/* ── v3.5 FIX: was "Qty (ml)" — corrected to "Qty (µl)" ── */}
                   <div
                     style={{
                       fontSize: 11,
@@ -921,9 +915,12 @@ function ChambersEditor({
                       textTransform: "uppercase",
                       letterSpacing: "0.4px",
                       marginBottom: 5,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
                     }}
                   >
-                    Qty (µl)
+                    Qty (µl) <InfoTooltip id="cogs-terpene-ul" position="top" />
                   </div>
                   <input
                     type="number"
@@ -940,7 +937,6 @@ function ChambersEditor({
                       borderColor: col.border,
                     }}
                   />
-                  {/* Conversion hint — shows ml equivalent so there's no ambiguity */}
                   {parseFloat(ch.terpene_qty_ul) > 0 && (
                     <div
                       style={{
@@ -956,7 +952,6 @@ function ChambersEditor({
                 </div>
               </div>
 
-              {/* Terpene presets + info */}
               <div
                 style={{
                   marginTop: 8,
@@ -1811,7 +1806,6 @@ export default function HQCogs() {
                             )}
                           </div>
 
-                          {/* MOQ warning — show if batch qty < hardware MOQ */}
                           {bd?.hwMoq &&
                             getCardQty(recipe.id) < parseInt(bd.hwMoq) && (
                               <div
@@ -1843,7 +1837,6 @@ export default function HQCogs() {
                                 </div>
                               </div>
                             )}
-                          {/* Batch qty selector */}
                           <div
                             style={{
                               background: "#fafafa",
@@ -1949,7 +1942,6 @@ export default function HQCogs() {
                       );
                     })()}
 
-                    {/* Breakdown rows — v3.5: shows ×qty = batch_total when qty > 1 */}
                     {bd && (
                       <div style={{ fontSize: 13 }}>
                         {[
@@ -2007,7 +1999,7 @@ export default function HQCogs() {
                               CATEGORY_COLOURS.other;
                             const pct =
                               bd.total > 0 ? (bd[row.key] / bd.total) * 100 : 0;
-                            const qty = getCardQty(recipe.id); // v3.5: batch scale
+                            const qty = getCardQty(recipe.id);
                             return (
                               <div
                                 key={row.key}
@@ -2069,7 +2061,6 @@ export default function HQCogs() {
                                     )}
                                   </div>
                                 </div>
-                                {/* v3.5/v3.7: per-unit + optional landed split + batch total */}
                                 <div style={{ textAlign: "right" }}>
                                   {bd[row.key] > 0 ? (
                                     <>
@@ -2087,7 +2078,6 @@ export default function HQCogs() {
                                           {fmt(pct)}%
                                         </span>
                                       </div>
-                                      {/* v3.7: hardware landed cost split */}
                                       {row.key === "hardware" &&
                                         row.hwShippingZar > 0 && (
                                           <div
@@ -2449,7 +2439,7 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* Batch size */}
+              {/* Batch size — v3.9: InfoTooltip added */}
               <div
                 style={{
                   background: "#F9FBE7",
@@ -2480,8 +2470,22 @@ export default function HQCogs() {
                   }}
                 >
                   <div>
-                    {lbl("Units per batch")}
-                    <InfoTooltip id="cogs-batch-size" position="top" />
+                    <label
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#888",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.4px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        marginBottom: 6,
+                      }}
+                    >
+                      Units per batch{" "}
+                      <InfoTooltip id="cogs-batch-size" position="top" />
+                    </label>
                     <input
                       type="number"
                       min="1"
@@ -2761,9 +2765,23 @@ export default function HQCogs() {
                         </select>
                       </div>
                       <div>
-                        {/* Single-chamber also uses µl — label matches ChambersEditor */}
-                        {lbl("Qty (µl)")}
-                        <InfoTooltip id="cogs-terpene-ul" position="top" />
+                        {/* v3.9: InfoTooltip on single-chamber terpene µl label */}
+                        <label
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#888",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.4px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            marginBottom: 6,
+                          }}
+                        >
+                          Qty (µl){" "}
+                          <InfoTooltip id="cogs-terpene-ul" position="top" />
+                        </label>
                         <input
                           type="number"
                           min="1"
@@ -3402,7 +3420,7 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* Transport + Misc */}
+              {/* Transport + Misc — v3.9: InfoTooltip on Transport header */}
               <div
                 style={{
                   display: "grid",
@@ -3426,6 +3444,9 @@ export default function HQCogs() {
                       textTransform: "uppercase",
                       letterSpacing: "0.4px",
                       marginBottom: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
                     🚚 Transport (ZAR per batch){" "}
