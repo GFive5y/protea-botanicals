@@ -1,9 +1,9 @@
-// HRStaffProfile.js v1.0
+// HRStaffProfile.js v1.1
 // Protea Botanicals · HR Module · Staff Profile CRUD Modal
-// WP-HR-2 · March 2026
-// NEW FILE — src/components/hr/HRStaffProfile.js
+// WP-HR-3 · March 2026 — +Leave History tab
+// src/components/hq/HRStaffProfile.js
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
 const EMPLOYMENT_TYPES = ["full_time", "part_time", "contractor", "casual"];
@@ -36,7 +36,15 @@ const SECTION_TABS = [
   { id: "employment", label: "Employment", icon: "💼" },
   { id: "emergency", label: "Emergency", icon: "🚨" },
   { id: "banking", label: "Banking", icon: "🏦" },
+  { id: "leave", label: "Leave History", icon: "🗓" },
 ];
+
+const STATUS_CFG = {
+  pending: { label: "Pending", bg: "#fff8e1", color: "#f57f17" },
+  admin_approved: { label: "Approved", bg: "#e8f5e9", color: "#2e7d32" },
+  approved: { label: "Approved", bg: "#e8f5e9", color: "#2e7d32" },
+  rejected: { label: "Rejected", bg: "#fdecea", color: "#c62828" },
+};
 
 const st = {
   overlay: {
@@ -332,6 +340,10 @@ export default function HRStaffProfile({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState(null);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [leaveBalances, setLeaveBalances] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [leaveLoading, setLeaveLoading] = useState(false);
 
   useEffect(() => {
     if (toast) {
@@ -339,6 +351,47 @@ export default function HRStaffProfile({
       return () => clearTimeout(t);
     }
   }, [toast]);
+
+  const loadLeaveHistory = useCallback(async () => {
+    if (!staff?.id || section !== "leave") return;
+    setLeaveLoading(true);
+    try {
+      const [reqRes, balRes, typRes] = await Promise.allSettled([
+        supabase
+          .from("leave_requests")
+          .select(
+            "id, leave_type_id, start_date, end_date, days_requested, status, notes, created_at",
+          )
+          .eq("staff_profile_id", staff.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("leave_balances")
+          .select(
+            "id, leave_type_id, available, used, pending, cycle_start, cycle_end",
+          )
+          .eq("staff_profile_id", staff.id),
+        supabase
+          .from("leave_types")
+          .select("id, name, color")
+          .eq("tenant_id", tenantId),
+      ]);
+      setLeaveRequests(
+        reqRes.status === "fulfilled" ? reqRes.value.data || [] : [],
+      );
+      setLeaveBalances(
+        balRes.status === "fulfilled" ? balRes.value.data || [] : [],
+      );
+      setLeaveTypes(
+        typRes.status === "fulfilled" ? typRes.value.data || [] : [],
+      );
+    } finally {
+      setLeaveLoading(false);
+    }
+  }, [staff?.id, section, tenantId]);
+
+  useEffect(() => {
+    loadLeaveHistory();
+  }, [loadLeaveHistory]);
 
   const f = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -783,6 +836,209 @@ export default function HRStaffProfile({
           )}
 
           {/* ── BANKING ── */}
+          {section === "leave" && (
+            <>
+              <p style={st.sectionTitle}>Leave Balances</p>
+              {leaveLoading ? (
+                <div style={{ color: "#aaa", fontSize: 13, padding: "12px 0" }}>
+                  Loading…
+                </div>
+              ) : leaveBalances.length === 0 ? (
+                <div style={{ color: "#bbb", fontSize: 13, marginBottom: 20 }}>
+                  No leave balances on record for this staff member.
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    marginBottom: 24,
+                  }}
+                >
+                  {leaveBalances.map((bal) => {
+                    const lt = leaveTypes.find(
+                      (t) => t.id === bal.leave_type_id,
+                    );
+                    return (
+                      <div
+                        key={bal.id}
+                        style={{
+                          flex: "1 1 140px",
+                          minWidth: 130,
+                          background: "#faf8f5",
+                          border: "1px solid #ece8e2",
+                          borderLeft: `3px solid ${lt?.color || "#3d6b35"}`,
+                          borderRadius: 6,
+                          padding: "10px 12px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#aaa",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            marginBottom: 4,
+                          }}
+                        >
+                          {lt?.name || "—"}
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: "'Cormorant Garamond', serif",
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color:
+                              (bal.available || 0) <= 2 ? "#c62828" : "#3d6b35",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {bal.available ?? "—"}{" "}
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 400,
+                              color: "#aaa",
+                            }}
+                          >
+                            avail
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "#aaa",
+                            marginTop: 3,
+                            display: "flex",
+                            gap: 8,
+                          }}
+                        >
+                          {bal.used > 0 && <span>✓ {bal.used} used</span>}
+                          {bal.pending > 0 && (
+                            <span style={{ color: "#f57f17" }}>
+                              ⏳ {bal.pending} pending
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={st.divider} />
+              <p style={{ ...st.sectionTitle, marginTop: 0 }}>
+                Leave Request History
+              </p>
+              {leaveLoading ? (
+                <div style={{ color: "#aaa", fontSize: 13 }}>Loading…</div>
+              ) : leaveRequests.length === 0 ? (
+                <div style={{ color: "#bbb", fontSize: 13 }}>
+                  No leave requests on record.
+                </div>
+              ) : (
+                <div>
+                  {leaveRequests.map((req) => {
+                    const lt = leaveTypes.find(
+                      (t) => t.id === req.leave_type_id,
+                    );
+                    const cfg = STATUS_CFG[req.status] || {
+                      label: req.status,
+                      bg: "#f5f5f5",
+                      color: "#666",
+                    };
+                    return (
+                      <div
+                        key={req.id}
+                        style={{
+                          padding: "10px 0",
+                          borderBottom: "1px solid #f5f2ee",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          fontSize: 13,
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color: "#2d2d2d",
+                              fontSize: 13,
+                            }}
+                          >
+                            {lt?.name || "—"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#aaa",
+                              marginTop: 2,
+                            }}
+                          >
+                            {req.start_date
+                              ? new Date(req.start_date).toLocaleDateString(
+                                  "en-ZA",
+                                  {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  },
+                                )
+                              : "—"}
+                            {" → "}
+                            {req.end_date
+                              ? new Date(req.end_date).toLocaleDateString(
+                                  "en-ZA",
+                                  {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  },
+                                )
+                              : "—"}
+                            {req.days_requested
+                              ? ` · ${req.days_requested} day${req.days_requested !== 1 ? "s" : ""}`
+                              : ""}
+                          </div>
+                          {req.notes && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "#888",
+                                marginTop: 2,
+                                fontStyle: "italic",
+                              }}
+                            >
+                              {req.notes}
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          style={{
+                            background: cfg.bg,
+                            color: cfg.color,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 20,
+                            letterSpacing: "0.04em",
+                            textTransform: "uppercase",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {cfg.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
           {section === "banking" && (
             <>
               <p style={st.sectionTitle}>Banking Details</p>
