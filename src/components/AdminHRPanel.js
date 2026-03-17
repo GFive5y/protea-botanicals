@@ -1,8 +1,9 @@
-// AdminHRPanel.js v1.2
+// AdminHRPanel.js v1.3
 // Protea Botanicals · HR Module · Admin HR Panel Container
-// WP-HR-4 · March 2026
+// WP-HR-5 · March 2026
 // src/components/AdminHRPanel.js
 //
+// v1.3 — WP-HR-5: Contracts tab unlocked — HRContracts.js wired
 // v1.2 — WP-HR-4: Timesheets tab unlocked — HRTimesheets.js wired
 // v1.1 — WP-HR-3: Leave tab unlocked — HRLeave.js wired
 // v1.0 — WP-HR-2: Initial build — Staff tab live
@@ -13,13 +14,14 @@ import WorkflowGuide from "./WorkflowGuide";
 import HRStaffDirectory from "./hq/HRStaffDirectory";
 import HRLeave from "./hq/HRLeave";
 import HRTimesheets from "./hq/HRTimesheets";
+import HRContracts from "./hq/HRContracts";
 
 // ─── Sub-tab config ────────────────────────────────────────────────────────────
 const SUB_TABS = [
   { id: "staff", label: "👥 Staff", live: true, wp: null },
   { id: "leave", label: "🗓 Leave", live: true, wp: null },
   { id: "timesheets", label: "⏱ Timesheets", live: true, wp: null },
-  { id: "contracts", label: "📋 Contracts", live: false, wp: "WP-HR-5" },
+  { id: "contracts", label: "📋 Contracts", live: true, wp: null },
   { id: "disciplinary", label: "⚠ Disciplinary", live: false, wp: "WP-HR-6" },
 ];
 
@@ -133,6 +135,7 @@ export default function AdminHRPanel({ tenantId, user }) {
       )}
       {activeTab === "leave" && <HRLeave tenantId={tenantId} />}
       {activeTab === "timesheets" && <HRTimesheets tenantId={tenantId} />}
+      {activeTab === "contracts" && <HRContracts tenantId={tenantId} />}
 
       {activeTabDef && !activeTabDef.live && (
         <div style={s.placeholder}>
@@ -144,8 +147,8 @@ export default function AdminHRPanel({ tenantId, user }) {
           </h3>
           <span style={s.placeholderWp}>{activeTabDef.wp}</span>
           <p style={s.placeholderText}>
-            Coming in the next HR work package. Staff, Leave and Timesheets are
-            live now.
+            Coming in the next HR work package. Staff, Leave, Timesheets and
+            Contracts are live now.
           </p>
         </div>
       )}

@@ -1,19 +1,16 @@
-// src/App.js — Protea Botanicals v3.9
+// src/App.js — Protea Botanicals v4.0
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v4.0 CHANGELOG (WP-HR-5):
+//   1. ADD: import HRDashboard from "./pages/HRDashboard"
+//   2. ADD: RequireHR auth guard (role='hr' OR isHQ)
+//   3. ADD: /hr/* route guarded by RequireHR
+//   4. ADD: HR nav link (visible to role='hr' or isHQ users)
+//   All v3.9 nav, auth, cart, route logic — untouched.
+//
 // ★ v3.9 CHANGELOG:
 //   1. ADD: import Leaderboard from "./pages/Leaderboard"
 //   2. ADD: public /leaderboard route (no RequireAuth — visible to all)
 //   All v3.8 nav, auth, cart, route logic — untouched.
-//
-// ★ v3.8 CHANGELOG (NavBar redesign):
-//   1. MODIFY: NavBar background — scroll-aware cream/green
-//   2. ADD: scroll state + auto-hide in NavBar
-//   3–8. Various nav style changes (see v3.8 notes)
-//
-// ★ v3.7 CHANGELOG (Phase 2F — Shop Admin Scoping):
-//   1. ADD: import ShopDashboard
-//   2. ADD: AdminDashboardRouter component
-//   3. MODIFY: /admin route uses AdminDashboardRouter
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createContext, useState, useEffect, useContext } from "react";
@@ -33,7 +30,7 @@ import Landing from "./pages/Landing";
 import ScanPage from "./pages/ScanPage";
 import ScanResult from "./pages/ScanResult";
 import Loyalty from "./pages/Loyalty";
-import Leaderboard from "./pages/Leaderboard"; // ★ v3.9
+import Leaderboard from "./pages/Leaderboard";
 import Account from "./pages/Account";
 import AdminDashboard from "./pages/AdminDashboard";
 import WholesalePortal from "./pages/WholesalePortal";
@@ -51,6 +48,7 @@ import OrderSuccess from "./pages/OrderSuccess";
 import AdminQrGenerator from "./pages/AdminQrGenerator";
 import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
+import HRDashboard from "./pages/HRDashboard"; // ★ v4.0
 import ShopDashboard from "./pages/ShopDashboard";
 import TerpenePage from "./pages/TerpenePage";
 
@@ -240,6 +238,12 @@ function NavBar() {
           {isHQ && (
             <NavLink to="/hq" scrolled={scrolled}>
               HQ
+            </NavLink>
+          )}
+          {/* ★ v4.0: HR nav link — visible to hr role or HQ users */}
+          {(role === "hr" || isHQ) && (
+            <NavLink to="/hr" scrolled={scrolled}>
+              HR
             </NavLink>
           )}
         </nav>
@@ -596,6 +600,58 @@ function RequireHQ({ children }) {
   return children;
 }
 
+// ★ v4.0: RequireHR — allows role='hr' OR isHQ access
+function RequireHR({ children }) {
+  const { isHQ, loading: tenantLoading } = useTenant();
+  const { role } = useContext(RoleContext);
+
+  if (tenantLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+          fontFamily: "Jost, sans-serif",
+          color: "#1b4332",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            width: "32px",
+            height: "32px",
+            border: "3px solid #e0dbd2",
+            borderTopColor: "#1b4332",
+            borderRadius: "50%",
+            animation: "protea-spin 0.8s linear infinite",
+          }}
+        />
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: "600",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            color: "#888",
+          }}
+        >
+          Loading HR…
+        </span>
+      </div>
+    );
+  }
+
+  if (role !== "hr" && !isHQ) {
+    const fallback = role === "admin" ? "/admin" : "/loyalty";
+    return <Navigate to={fallback} replace />;
+  }
+
+  return children;
+}
+
 function AdminDashboardRouter() {
   const { isHQ, tenantType, loading: tenantLoading } = useTenant();
 
@@ -800,7 +856,7 @@ export default function App() {
                 }
               />
 
-              {/* ★ v3.9: Leaderboard — public, no auth required */}
+              {/* v3.9: Leaderboard — public, no auth required */}
               <Route
                 path="/leaderboard"
                 element={
@@ -915,6 +971,25 @@ export default function App() {
                               <HQDashboard />
                             </RequireHQ>
                           </RequireRole>
+                        </RequireAuth>
+                      </PageShell>
+                    </div>
+                  </>
+                }
+              />
+
+              {/* ★ v4.0: HR Dashboard — role='hr' or isHQ */}
+              <Route
+                path="/hr/*"
+                element={
+                  <>
+                    <NavBar />
+                    <div style={{ paddingTop: "56px" }}>
+                      <PageShell maxWidth={1200}>
+                        <RequireAuth>
+                          <RequireHR>
+                            <HRDashboard />
+                          </RequireHR>
                         </RequireAuth>
                       </PageShell>
                     </div>
