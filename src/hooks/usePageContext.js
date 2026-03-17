@@ -1,6 +1,7 @@
 // src/hooks/usePageContext.js
 // WP-GUIDE Phase A — Living Intelligence Layer
-// Version: 1.0.0
+// Version: 1.1.0
+// WP-GUIDE-C: Added 'overview' and 'pl' context queries
 //
 // ─── DESIGN PHILOSOPHY ────────────────────────────────────────────────────────
 // This hook is PLATFORM-AGNOSTIC by design. The engine (query runner, context
@@ -15,11 +16,11 @@
 //   { loading, status, headline, items[], warnings[], actions[], raw, refresh, lastFetched }
 //
 // Status values (worst-first hierarchy):
-//   'setup'    → purple  — no data yet, guide user through first-time config
-//   'ok'       → green   — all checks passed
-//   'info'     → blue    — items to note, no action required
-//   'warn'     → amber   — something broken or missing, action recommended
-//   'critical' → red     — revenue/operation impacting, fix immediately
+//   'setup'    -> purple  -- no data yet, guide user through first-time config
+//   'ok'       -> green   -- all checks passed
+//   'info'     -> blue    -- items to note, no action required
+//   'warn'     -> amber   -- something broken or missing, action recommended
+//   'critical' -> red     -- revenue/operation impacting, fix immediately
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -70,8 +71,6 @@ const pl = (n, word, suffix = "s") => `${n} ${word}${n === 1 ? "" : suffix}`;
 
 const CONTEXT_QUERIES = {
   // ── COSTING / COGS ENGINE ─────────────────────────────────────────────────
-  // Reads: local_inputs (unit costs) + product_cogs (recipes)
-  // Critical: any input with cost_zar = 0 makes recipes using it incorrect.
   costing: async (sb, tenantId) => {
     const [inputsRes, recipesRes] = await Promise.allSettled([
       sb
@@ -84,7 +83,6 @@ const CONTEXT_QUERIES = {
     const inputs = safeData(inputsRes);
     const recipes = safeData(recipesRes);
 
-    // First-time setup: nothing configured yet
     if (inputs.length === 0 && recipes.length === 0) {
       return {
         status: "setup",
@@ -95,14 +93,12 @@ const CONTEXT_QUERIES = {
           "Step 3: Set transport and batch overheads per production run",
         ],
         warnings: [],
-        actions: [{ label: "→ Open Local Inputs", tab: "local-inputs" }],
+        actions: [{ label: "-> Open Local Inputs", tab: "local-inputs" }],
         raw: { tabId: "costing", queries: { inputs, recipes } },
       };
     }
 
-    // Detect inputs with no cost set
     const zeroCosts = inputs.filter((i) => safeFloat(i.cost_zar) === 0);
-
     const warnings = zeroCosts.map(
       (i) =>
         `⚠ ${i.name}${i.category ? ` (${i.category})` : ""} has no cost set — any recipe using this input shows incorrect totals`,
@@ -117,10 +113,8 @@ const CONTEXT_QUERIES = {
         : "No input costs found",
     ];
 
-    const status = zeroCosts.length > 0 ? "warn" : "ok";
-
     return {
-      status,
+      status: zeroCosts.length > 0 ? "warn" : "ok",
       headline:
         zeroCosts.length > 0
           ? `${pl(zeroCosts.length, "input cost")} missing — cost calculations incorrect`
@@ -131,7 +125,7 @@ const CONTEXT_QUERIES = {
         zeroCosts.length > 0
           ? [
               {
-                label: "→ Fix missing costs in Local Inputs",
+                label: "-> Fix missing costs in Local Inputs",
                 tab: "local-inputs",
               },
             ]
@@ -141,8 +135,6 @@ const CONTEXT_QUERIES = {
   },
 
   // ── PRODUCTION / INVENTORY ALLOCATION ─────────────────────────────────────
-  // Reads: batches (active runs) + inventory_items (finished goods)
-  // Critical: items with sell_price = 0 are invisible to customers.
   "hq-production": async (sb, tenantId) => {
     const [batchesRes, zeroPricesRes] = await Promise.allSettled([
       sb
@@ -180,10 +172,8 @@ const CONTEXT_QUERIES = {
       ...batchItems,
     ];
 
-    const status = zeroPrices.length > 0 ? "warn" : "ok";
-
     return {
-      status,
+      status: zeroPrices.length > 0 ? "warn" : "ok",
       headline:
         zeroPrices.length > 0
           ? `${pl(zeroPrices.length, "product")} not visible — sell price not set`
@@ -192,15 +182,13 @@ const CONTEXT_QUERIES = {
       warnings,
       actions:
         zeroPrices.length > 0
-          ? [{ label: "→ Set prices in Allocate Stock", tab: "allocate" }]
+          ? [{ label: "-> Set prices in Allocate Stock", tab: "allocate" }]
           : [],
       raw: { tabId: "hq-production", queries: { batches, zeroPrices } },
     };
   },
 
   // ── LOYALTY / REWARDS ENGINE ───────────────────────────────────────────────
-  // Reads: loyalty_config (settings) + user_profiles (tier distribution)
-  // Informational: shows active schema + live tier counts.
   loyalty: async (sb, tenantId) => {
     const [configRes, usersRes] = await Promise.allSettled([
       sb
@@ -231,7 +219,6 @@ const CONTEXT_QUERIES = {
       };
     }
 
-    // Build tier distribution from live data
     const tierCounts = users.reduce((acc, u) => {
       const tier = u.loyalty_tier || "bronze";
       acc[tier] = (acc[tier] || 0) + 1;
@@ -262,8 +249,6 @@ const CONTEXT_QUERIES = {
   },
 
   // ── PROCUREMENT / PURCHASE ORDERS ─────────────────────────────────────────
-  // Reads: purchase_orders (non-complete) joined to suppliers
-  // Info: open POs need attention (receiving, payment, etc.)
   procurement: async (sb, tenantId) => {
     const [posRes] = await Promise.allSettled([
       sb
@@ -297,15 +282,13 @@ const CONTEXT_QUERIES = {
       items,
       warnings: [],
       actions: [
-        { label: `→ Review ${pl(pos.length, "open PO")}`, tab: "procurement" },
+        { label: `-> Review ${pl(pos.length, "open PO")}`, tab: "procurement" },
       ],
       raw: { tabId: "procurement", queries: { pos } },
     };
   },
 
   // ── STOCK / INVENTORY HEALTH ───────────────────────────────────────────────
-  // Reads: inventory_items (active) — compares qty vs reorder_level client-side
-  // Avoids RPC — simpler to filter after fetch for small datasets.
   "admin-stock": async (sb, tenantId) => {
     const [itemsRes] = await Promise.allSettled([
       sb
@@ -341,14 +324,13 @@ const CONTEXT_QUERIES = {
       warnings,
       actions:
         below.length > 0
-          ? [{ label: "→ View reorder recommendations", tab: "reorder" }]
+          ? [{ label: "-> View reorder recommendations", tab: "reorder" }]
           : [],
       raw: { tabId: "admin-stock", queries: { allItems, below } },
     };
   },
 
   // ── QR CODES / SCAN ENGINE ────────────────────────────────────────────────
-  // Reads: qr_codes (active) — claim rate, scan counts
   "admin-qr": async (sb, tenantId) => {
     const [qrRes] = await Promise.allSettled([
       sb
@@ -372,7 +354,7 @@ const CONTEXT_QUERIES = {
           "Generate codes in the Generate tab to get started",
         ],
         warnings: [],
-        actions: [{ label: "→ Generate QR codes", tab: "generate" }],
+        actions: [{ label: "-> Generate QR codes", tab: "generate" }],
         raw: { tabId: "admin-qr", queries: { codes } },
       };
     }
@@ -393,12 +375,162 @@ const CONTEXT_QUERIES = {
       raw: { tabId: "admin-qr", queries: { codes, claimRate } },
     };
   },
+
+  // ── HQ OVERVIEW DASHBOARD ─────────────────────────────────────────────────
+  // WP-GUIDE-C: Added for HQOverview.js context wiring + GAP-01 tile fix
+  // Reads: scan_logs (today count, scanned_at) + inventory_items (depleted)
+  //        + support_tickets (open count)
+  // Note: Uses count queries (head:true) for scan_logs and support_tickets
+  //       to avoid fetching full rows. Promise.allSettled safe on empty tables.
+  overview: async (sb, tenantId) => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayIso = todayStart.toISOString();
+
+    const [scansRes, depletedRes, ticketsRes] = await Promise.allSettled([
+      sb
+        .from("scan_logs")
+        .select("id", { count: "exact", head: true })
+        .gte("scanned_at", todayIso),
+      sb
+        .from("inventory_items")
+        .select("name, quantity_on_hand")
+        .eq("is_active", true)
+        .lte("quantity_on_hand", 0),
+      sb
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open"),
+    ]);
+
+    const scansToday =
+      scansRes?.status === "fulfilled" ? (scansRes.value?.count ?? 0) : 0;
+    const depleted = safeData(depletedRes);
+    const openTickets =
+      ticketsRes?.status === "fulfilled" ? (ticketsRes.value?.count ?? 0) : 0;
+
+    const warnings = [
+      ...depleted.map(
+        (i) => `⚠ ${i.name} — out of stock (quantity: ${i.quantity_on_hand})`,
+      ),
+      openTickets > 0
+        ? `⚠ ${pl(openTickets, "support ticket")} awaiting response`
+        : null,
+    ].filter(Boolean);
+
+    const items = [
+      `${pl(scansToday, "QR scan")} today`,
+      depleted.length > 0
+        ? `${pl(depleted.length, "item")} out of stock`
+        : "All stocked items available",
+      openTickets > 0
+        ? `${pl(openTickets, "open support ticket")}`
+        : "No open support tickets",
+    ];
+
+    const status = worstStatus([
+      depleted.length > 0 ? "warn" : "ok",
+      openTickets > 0 ? "info" : "ok",
+    ]);
+
+    return {
+      status,
+      headline:
+        depleted.length > 0
+          ? `${pl(depleted.length, "item")} out of stock — attention needed`
+          : openTickets > 0
+            ? `${pl(openTickets, "open ticket")} — ${pl(scansToday, "scan")} today`
+            : `${pl(scansToday, "scan")} today — operations normal`,
+      items,
+      warnings,
+      actions: [
+        ...(depleted.length > 0
+          ? [{ label: "-> Restock items", tab: "items" }]
+          : []),
+        ...(openTickets > 0
+          ? [{ label: "-> View support tickets", tab: "support" }]
+          : []),
+      ],
+      raw: {
+        tabId: "overview",
+        queries: { scansToday, depleted, openTickets },
+      },
+    };
+  },
+
+  // ── PROFIT & LOSS SUMMARY ─────────────────────────────────────────────────
+  // WP-GUIDE-C: Added for HQProfitLoss.js context wiring
+  // Reads: orders (revenue — `total` column, NOT total_amount)
+  //        + loyalty_transactions (redemptions — `transaction_date`, NOT created_at)
+  // Note: Promise.allSettled — empty tables on new tenants return [] not error.
+  pl: async (sb, tenantId) => {
+    const thisMonthStart = new Date();
+    thisMonthStart.setDate(1);
+    thisMonthStart.setHours(0, 0, 0, 0);
+    const thisMonthIso = thisMonthStart.toISOString();
+
+    const [ordersRes, redemptionsRes] = await Promise.allSettled([
+      sb
+        .from("orders")
+        .select("total, created_at")
+        .gte("created_at", thisMonthIso),
+      sb
+        .from("loyalty_transactions")
+        .select("points_change, transaction_date")
+        .eq("transaction_type", "redemption")
+        .gte("transaction_date", thisMonthIso),
+    ]);
+
+    const orders = safeData(ordersRes);
+    const redemptions = safeData(redemptionsRes);
+
+    const revenue = orders.reduce((sum, o) => sum + safeFloat(o.total), 0);
+    const orderCount = orders.length;
+    const avgOrder = orderCount > 0 ? revenue / orderCount : 0;
+    const redemptionCount = redemptions.length;
+    const pointsRedeemed = redemptions.reduce(
+      (sum, r) => sum + Math.abs(safeFloat(r.points_change)),
+      0,
+    );
+
+    const items = [
+      orderCount > 0
+        ? `${pl(orderCount, "order")} this month — R${revenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })} revenue`
+        : "No orders recorded this month",
+      orderCount > 0
+        ? `Average order value: R${avgOrder.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`
+        : null,
+      redemptionCount > 0
+        ? `${pl(redemptionCount, "loyalty redemption")} — ${pointsRedeemed.toLocaleString()} pts redeemed`
+        : "No loyalty redemptions this month",
+    ].filter(Boolean);
+
+    return {
+      status: orderCount === 0 ? "info" : "ok",
+      headline:
+        orderCount > 0
+          ? `R${revenue.toLocaleString("en-ZA", { minimumFractionDigits: 2 })} revenue · ${pl(orderCount, "order")} this month`
+          : "No orders this month — P&L awaiting data",
+      items,
+      warnings: [],
+      actions: [],
+      raw: {
+        tabId: "pl",
+        queries: {
+          orders,
+          redemptions,
+          revenue,
+          orderCount,
+          redemptionCount,
+          pointsRedeemed,
+        },
+      },
+    };
+  },
 };
 
 // ─── RUNTIME REGISTRATION ─────────────────────────────────────────────────────
 // External code can register tab context handlers without modifying this file.
-// Use case: plugin tabs, custom business modules, SaaS tenant overrides.
-//
 // Usage:
 //   import { registerTabContext } from '../hooks/usePageContext';
 //   registerTabContext('my-custom-tab', async (supabase, tenantId) => ({
@@ -445,18 +577,18 @@ const ERROR_CONTEXT = {
 /**
  * usePageContext(tabId, tenantId, customQueries?)
  *
- * @param {string}   tabId         — matches a key in CONTEXT_QUERIES (or runtime registry)
- * @param {string}   tenantId      — passed to query functions for RLS / tenant filtering
- * @param {object}   customQueries — optional: override or extend CONTEXT_QUERIES at call site
+ * @param {string}   tabId         -- matches a key in CONTEXT_QUERIES (or runtime registry)
+ * @param {string}   tenantId      -- passed to query functions for RLS / tenant filtering
+ * @param {object}   customQueries -- optional: override or extend CONTEXT_QUERIES at call site
  *
- * @returns {object} context — { loading, status, headline, items, warnings, actions, raw, refresh, lastFetched }
+ * @returns {object} context -- { loading, status, headline, items, warnings, actions, raw, refresh, lastFetched }
  */
 export function usePageContext(tabId, tenantId, customQueries = {}) {
   const [ctx, setCtx] = useState({ ...EMPTY_CONTEXT, loading: true });
   const lastFetchedRef = useRef(null);
   const abortRef = useRef(false);
 
-  // Merge: call-site overrides → runtime registry → built-in defaults
+  // Merge: call-site overrides -> runtime registry -> built-in defaults
   const resolvedQueries = {
     ...CONTEXT_QUERIES,
     ..._runtimeRegistry,
@@ -472,15 +604,13 @@ export function usePageContext(tabId, tenantId, customQueries = {}) {
     const queryFn = resolvedQueries[tabId];
 
     if (!queryFn) {
-      // Tab has no registered context — render nothing, silently
       setCtx({ ...EMPTY_CONTEXT });
       return;
     }
 
-    // Respect cache window — don't re-query within TTL unless refresh() was called
     const now = Date.now();
     if (lastFetchedRef.current && now - lastFetchedRef.current < CACHE_TTL_MS) {
-      return; // Still fresh — skip
+      return;
     }
 
     setCtx((prev) => ({ ...prev, loading: true }));
@@ -489,12 +619,11 @@ export function usePageContext(tabId, tenantId, customQueries = {}) {
     try {
       const result = await queryFn(supabase, tenantId);
 
-      if (abortRef.current) return; // Component unmounted or tabId changed
+      if (abortRef.current) return;
 
       const fetchedAt = new Date().toISOString();
       lastFetchedRef.current = Date.now();
 
-      // Attach metadata to raw payload for AI Phase C consumption
       const enrichedRaw = {
         ...(result.raw || {}),
         tabId,
@@ -518,28 +647,25 @@ export function usePageContext(tabId, tenantId, customQueries = {}) {
     } catch (err) {
       if (abortRef.current) return;
       console.error(`[usePageContext] Error on tab "${tabId}":`, err);
-      lastFetchedRef.current = null; // Allow immediate retry
+      lastFetchedRef.current = null;
       setCtx({ ...ERROR_CONTEXT, lastFetched: new Date() });
     }
   }, [tabId, tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Explicit refresh — bypasses cache, re-queries immediately
   const refresh = useCallback(() => {
     lastFetchedRef.current = null;
     run();
   }, [run]);
 
-  // Run on mount and whenever tabId or tenantId changes
   useEffect(() => {
     abortRef.current = false;
-    lastFetchedRef.current = null; // New tab = fresh query
+    lastFetchedRef.current = null;
     run();
     return () => {
       abortRef.current = true;
     };
   }, [tabId, tenantId, run]);
 
-  // Auto-refresh after TTL expires (poll — not realtime, light-touch)
   useEffect(() => {
     const timer = setInterval(run, CACHE_TTL_MS + 1000);
     return () => clearInterval(timer);

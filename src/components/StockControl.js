@@ -1,6 +1,7 @@
-// src/components/StockControl.js v1.4
+// src/components/StockControl.js v1.5
+// WP-GUIDE-C: InfoTooltip injected — shop-visibility on Sell Price column
 // v1.4 — Admin PO Detail Modal (OrdersView):
-//         - PO cards are now clickable → opens full detail slide-in panel
+//         - PO cards are now clickable -> opens full detail slide-in panel
 //         - Admin has full status control over ALL POs including cancelled
 //           (can un-cancel back to any status)
 //         - Edit notes, expected_date, supplier_invoice_ref, usd_zar_rate inline
@@ -16,6 +17,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import InfoTooltip from "./InfoTooltip";
 
 const C = {
   green: "#1b4332",
@@ -773,7 +775,19 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
               <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
               <th style={{ ...sTh, textAlign: "right" }}>Reorder</th>
               <th style={{ ...sTh, textAlign: "right" }}>Cost</th>
-              <th style={{ ...sTh, textAlign: "right" }}>Sell</th>
+              <th style={{ ...sTh, textAlign: "right" }}>
+                {/* WP-GUIDE-C: shop-visibility tooltip */}
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: 4,
+                  }}
+                >
+                  Sell <InfoTooltip id="shop-visibility" />
+                </span>
+              </th>
               <th style={{ ...sTh, textAlign: "right" }}>Margin</th>
               <th style={sTh}>Supplier</th>
               <th style={sTh}>Source</th>
@@ -1620,13 +1634,15 @@ function MovementsView({ movements, items, onRefresh }) {
         form.movement_type,
       );
       const finalQty = isOut ? -Math.abs(qty) : Math.abs(qty);
-      const { error: mE } = await supabase.from("stock_movements").insert({
-        item_id: form.item_id,
-        quantity: finalQty,
-        movement_type: form.movement_type,
-        reference: form.reference || null,
-        notes: form.notes || null,
-      });
+      const { error: mE } = await supabase
+        .from("stock_movements")
+        .insert({
+          item_id: form.item_id,
+          quantity: finalQty,
+          movement_type: form.movement_type,
+          reference: form.reference || null,
+          notes: form.notes || null,
+        });
       if (mE) throw mE;
       const item = items.find((i) => i.id === form.item_id);
       if (item) {
@@ -1971,14 +1987,16 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
         .select()
         .single();
       if (pE) throw pE;
-      const { error: lE } = await supabase.from("purchase_order_items").insert(
-        valid.map((l) => ({
-          po_id: po.id,
-          item_id: l.item_id,
-          quantity_ordered: parseFloat(l.quantity_ordered),
-          unit_cost: parseFloat(l.unit_cost),
-        })),
-      );
+      const { error: lE } = await supabase
+        .from("purchase_order_items")
+        .insert(
+          valid.map((l) => ({
+            po_id: po.id,
+            item_id: l.item_id,
+            quantity_ordered: parseFloat(l.quantity_ordered),
+            unit_cost: parseFloat(l.unit_cost),
+          })),
+        );
       if (lE) throw lE;
       setShowForm(false);
       setForm({
@@ -1996,7 +2014,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
     }
   };
 
-  // Admin status change — ALL statuses, no restrictions
   const handleStatusChange = async (po, newStatus) => {
     const updates = {
       status: newStatus,
@@ -2016,13 +2033,15 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
     if (newStatus === "received" && po.purchase_order_items) {
       for (const line of po.purchase_order_items) {
         if (!line.item_id) continue;
-        await supabase.from("stock_movements").insert({
-          item_id: line.item_id,
-          quantity: line.quantity_ordered,
-          movement_type: "purchase_in",
-          reference: po.po_number,
-          notes: `Auto-recorded from PO ${po.po_number}`,
-        });
+        await supabase
+          .from("stock_movements")
+          .insert({
+            item_id: line.item_id,
+            quantity: line.quantity_ordered,
+            movement_type: "purchase_in",
+            reference: po.po_number,
+            notes: `Auto-recorded from PO ${po.po_number}`,
+          });
         const item = items.find((i) => i.id === line.item_id);
         if (item)
           await supabase
@@ -2059,7 +2078,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           {showForm ? "Cancel" : "+ Create PO"}
         </button>
       </div>
-
       {showForm && (
         <div
           style={{
@@ -2240,7 +2258,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           </div>
         </div>
       )}
-
       <div style={{ display: "grid", gap: "12px" }}>
         {orders.length === 0 ? (
           <div
@@ -2328,7 +2345,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                     >
                       {status}
                     </span>
-                    {/* Admin status dropdown — ALL statuses, including un-cancel */}
                     <select
                       value=""
                       onClick={(e) => e.stopPropagation()}
@@ -2417,7 +2433,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           })
         )}
       </div>
-
       {selectedPo && (
         <PODetailModal
           po={selectedPo}
@@ -2558,7 +2573,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
           overflow: "hidden",
         }}
       >
-        {/* Header */}
         <div
           style={{
             padding: "20px 24px",
@@ -2625,8 +2639,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
               </button>
             </div>
           </div>
-
-          {/* Admin status buttons */}
           <div style={{ marginTop: "16px" }}>
             <div
               style={{
@@ -2672,8 +2684,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             </div>
           </div>
         </div>
-
-        {/* Body */}
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
           <div style={{ ...sCard, marginBottom: "20px", padding: "0 16px" }}>
             {row("Supplier Invoice Ref", localPo.supplier_invoice_ref)}
@@ -2733,8 +2743,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             {localPo.total_weight_kg &&
               row("Total Weight", `${localPo.total_weight_kg} kg`)}
           </div>
-
-          {/* Edit panel */}
           {editing ? (
             <div
               style={{
@@ -2895,8 +2903,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
               </button>
             </div>
           )}
-
-          {/* Line items */}
           {lines.length > 0 && (
             <div>
               <div style={{ ...sLabel, marginBottom: "10px" }}>
@@ -3035,7 +3041,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
               </div>
             </div>
           )}
-
           <div
             style={{
               marginTop: "20px",
@@ -3053,7 +3058,6 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             there to set weight, freight mode, and update per-item costs.
           </div>
         </div>
-
         <div
           style={{
             padding: "14px 24px",

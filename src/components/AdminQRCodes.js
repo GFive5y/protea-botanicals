@@ -1,7 +1,7 @@
-// src/components/AdminQRCodes.js v2.0
-// Protea Botanicals — WP-M QR Engine v2.0
-// March 2026
-// ★ v2.0: Full QR engine — 6 types, scan action stack, banner library, 3-step wizard
+// src/components/AdminQRCodes.js v2.2
+// WP-GUIDE-C: InfoTooltip injected — qr-claim-rate, qr-scan-actions, qr-hmac
+// v2.1: admin-qr context wired (WP-GUIDE-A)
+// v2.0: Full QR engine — 6 types, scan action stack, banner library, 3-step wizard
 // Replaces: AdminQrList.js (retired) + extracts generator from AdminQrGenerator.js
 //
 // Tabs: QR REGISTRY | GENERATE | BANNERS
@@ -12,6 +12,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import InfoTooltip from "./InfoTooltip";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -728,6 +729,32 @@ function RegistryTab({ batches }) {
     ).length,
   };
 
+  // Stats strip data — tooltip ids/props attached where needed
+  const statItems = [
+    { k: "Total", v: stats.total, col: C.green },
+    {
+      k: "🔒 Signed",
+      v: stats.signed,
+      col: C.mid,
+      tooltipId: "qr-hmac",
+    },
+    { k: "Unsigned", v: stats.unsigned, col: C.muted },
+    {
+      k: "Claimed",
+      v: stats.claimed,
+      col: C.blue,
+      tooltipId: "qr-claim-rate",
+      tooltipTitle: "What is claim rate?",
+      tooltipBody:
+        "Claim rate is the percentage of active QR codes that have been scanned at least once by a customer. A high claim rate means your loyalty programme is being actively discovered — customers are finding and scanning their product QR codes. A low rate may mean QR codes aren't visible, customers don't know to scan them, or distribution hasn't reached end consumers yet.",
+    },
+    { k: "Available", v: stats.available, col: C.success },
+    { k: "Total Scans", v: stats.scans, col: C.gold },
+    { k: "Active", v: stats.active, col: C.accent },
+    { k: "Paused", v: stats.paused, col: C.warning },
+    { k: "Expired", v: stats.expired, col: C.error },
+  ];
+
   // Filter
   const filtered = codes.filter((c) => {
     if (search) {
@@ -803,51 +830,55 @@ function RegistryTab({ batches }) {
       <div
         style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}
       >
-        {[
-          ["Total", stats.total, C.green],
-          ["🔒 Signed", stats.signed, C.mid],
-          ["Unsigned", stats.unsigned, C.muted],
-          ["Claimed", stats.claimed, C.blue],
-          ["Available", stats.available, C.success],
-          ["Total Scans", stats.scans, C.gold],
-          ["Active", stats.active, C.accent],
-          ["Paused", stats.paused, C.warning],
-          ["Expired", stats.expired, C.error],
-        ].map(([k, v, col]) => (
-          <div
-            key={k}
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: "10px 14px",
-              minWidth: 80,
-              textAlign: "center",
-            }}
-          >
+        {statItems.map(
+          ({ k, v, col, tooltipId, tooltipTitle, tooltipBody }) => (
             <div
+              key={k}
               style={{
-                fontSize: 20,
-                fontWeight: 700,
-                color: col,
-                fontFamily: FONTS.heading,
+                background: C.white,
+                border: `1px solid ${C.border}`,
+                borderRadius: 2,
+                padding: "10px 14px",
+                minWidth: 80,
+                textAlign: "center",
               }}
             >
-              {v}
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: col,
+                  fontFamily: FONTS.heading,
+                }}
+              >
+                {v}
+              </div>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: C.muted,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  fontFamily: FONTS.body,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                }}
+              >
+                {k}
+                {tooltipId && (
+                  <InfoTooltip
+                    id={tooltipId}
+                    title={tooltipTitle}
+                    body={tooltipBody}
+                    position="top"
+                  />
+                )}
+              </div>
             </div>
-            <div
-              style={{
-                fontSize: 9,
-                color: C.muted,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                fontFamily: FONTS.body,
-              }}
-            >
-              {k}
-            </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       {/* Filters */}
@@ -1588,6 +1619,25 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
       {/* STEP 2 — Scan Actions */}
       {step === 2 && (
         <div>
+          {/* Section header with scan-actions tooltip */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 16,
+              fontFamily: FONTS.body,
+              fontSize: 12,
+              fontWeight: 700,
+              color: C.green,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+            }}
+          >
+            Configure Scan Actions
+            <InfoTooltip id="qr-scan-actions" position="top" />
+          </div>
+
           <ActionToggle
             label="🎯 Award Points"
             checked={doPoints}
@@ -1821,9 +1871,12 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
             </div>
             {selectedType === "product_insert" && (
               <div style={{ flex: 1 }}>
-                <span style={label()}>
-                  {isBulk ? "Start Code" : "Product Code"} (4-digit)
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={label()}>
+                    {isBulk ? "Start Code" : "Product Code"} (4-digit)
+                  </span>
+                  <InfoTooltip id="qr-hmac" position="top" />
+                </div>
                 <input
                   style={inputStyle}
                   value={productCode}
@@ -1835,7 +1888,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                   }
                 />
                 <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
-                  → PB-001-2026-{productCode.padStart(4, "0")}
+                  → PB-001-2026-{productCode.padStart(4, "0")} · HMAC signed
                 </div>
               </div>
             )}
@@ -2484,7 +2537,7 @@ function BannerPreview({ banner, compact = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
+// MAIN COMPONENT v2.2 — WP-GUIDE-C: InfoTooltip injected
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminQRCodes() {
   const [tab, setTab] = useState("registry");

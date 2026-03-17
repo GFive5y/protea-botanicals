@@ -1,7 +1,9 @@
-// HQLoyalty.js v2.1
-// WP-Z: Tier System Unification — added recalculate_all_tiers() RPC call
-//       after every loyalty_config UPDATE so all existing customer tiers
-//       immediately reflect the new thresholds. No hardcoded thresholds remain.
+// HQLoyalty.js v2.4
+// WP-GUIDE-C: InfoTooltip injected — loyalty-threshold, loyalty-multiplier,
+//             loyalty-redemption-value
+// v2.3 (WP-GUIDE-B): loyalty-schema, loyalty-breakage tooltips
+// v2.2 (WP-GUIDE-A): usePageContext loyalty context wired
+// v2.1 (WP-Z): Tier System Unification — recalculate_all_tiers() RPC after every config UPDATE
 // v2.0: Schema Selector + Live Config (Conservative/Standard/Aggressive presets)
 // v1.2: Campaigns tab
 // v1.1: 6 sub-tabs: Earning Rules | Tiers | Economics | Referrals | QR Security | Simulator
@@ -1337,6 +1339,9 @@ function TabTiers({ draft, setDraft }) {
                 <div style={{ marginBottom: 12 }}>
                   <div
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
                       fontFamily: FONT_BODY,
                       fontSize: 11,
                       color: C.textLight,
@@ -1346,6 +1351,11 @@ function TabTiers({ draft, setDraft }) {
                     }}
                   >
                     Reaches at
+                    <InfoTooltip
+                      id="loyalty-threshold"
+                      title="What is a tier threshold?"
+                      body="The total points a customer needs to reach this tier. Once they cross this threshold their tier upgrades instantly — along with their earn multiplier. Thresholds apply to all-time accumulated points, not just recent activity."
+                    />
                   </div>
                   <NumInput
                     value={cfg[tier.thKey]}
@@ -1372,6 +1382,9 @@ function TabTiers({ draft, setDraft }) {
               <div>
                 <div
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
                     fontFamily: FONT_BODY,
                     fontSize: 11,
                     color: C.textLight,
@@ -1381,6 +1394,7 @@ function TabTiers({ draft, setDraft }) {
                   }}
                 >
                   Earn multiplier
+                  <InfoTooltip id="loyalty-multiplier" />
                 </div>
                 <NumInput
                   value={cfg[tier.multKey]}
@@ -1474,7 +1488,18 @@ function TabEconomics({ draft, setDraft, liveStats }) {
   return (
     <div>
       <SectionCard title="Redemption Settings">
-        <FieldRow label="1 point = R___ value to customer">
+        <FieldRow
+          label={
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              1 point = R___ value to customer
+              <InfoTooltip
+                id="loyalty-redemption-value"
+                title="What does point value mean?"
+                body="This is how much each point is worth in Rand when a customer redeems them at checkout. At R0.15 per point, a customer with 1 000 points can discount their order by R150. Higher values feel more rewarding but increase your programme cost — lower values are cheaper but may not motivate customers enough to earn."
+              />
+            </span>
+          }
+        >
           <NumInput
             value={cfg.redemption_value_zar}
             onChange={(v) => setField("redemption_value_zar", v)}
@@ -2624,7 +2649,8 @@ function TabCampaigns({ showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT v2.1 — WP-Z: added recalculate_all_tiers() RPC
+// MAIN COMPONENT v2.4 — WP-GUIDE-C: loyalty-threshold, loyalty-multiplier,
+//                        loyalty-redemption-value tooltips injected
 // ═══════════════════════════════════════════════════════════════════════════
 export default function HQLoyalty() {
   const ctx = usePageContext("loyalty", null);
@@ -2748,7 +2774,6 @@ export default function HQLoyalty() {
     }
   }
 
-  // ─── WP-Z: helper — recalculates ALL customer tiers after any config change ──
   async function recalculateAllTiers() {
     try {
       const { error } = await supabase.rpc("recalculate_all_tiers");
@@ -2758,7 +2783,6 @@ export default function HQLoyalty() {
     }
   }
 
-  // ── Apply full schema preset ──────────────────────────────────────────────
   async function handleApplySchema(schema) {
     setApplyingSchema(true);
     try {
@@ -2768,7 +2792,6 @@ export default function HQLoyalty() {
         .update(schemaValues)
         .eq("id", config.id);
       if (error) throw error;
-      // WP-Z: immediately recalculate all customer tiers to match new thresholds
       await recalculateAllTiers();
       const newConfig = { ...config, ...schemaValues };
       setConfig(newConfig);
@@ -2785,7 +2808,6 @@ export default function HQLoyalty() {
     }
   }
 
-  // ── Save manual overrides ─────────────────────────────────────────────────
   async function handleSave() {
     setSaving(true);
     try {
@@ -2803,7 +2825,6 @@ export default function HQLoyalty() {
         .update({ ...fields, active_schema: schemaToSave })
         .eq("id", config.id);
       if (error) throw error;
-      // WP-Z: recalculate all tiers whenever thresholds might have changed
       await recalculateAllTiers();
       setConfig({ ...draft, active_schema: schemaToSave });
       setDraft((d) => ({ ...d, active_schema: schemaToSave }));

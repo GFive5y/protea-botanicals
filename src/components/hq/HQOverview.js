@@ -1,11 +1,12 @@
-// src/components/hq/HQOverview.js — Protea Botanicals v2.0
+// src/components/hq/HQOverview.js — Protea Botanicals v2.1
 // WP-X: System Intelligence Layer — HQ Overview overhaul
+// WP-GUIDE-C: usePageContext('overview') wired to WorkflowGuide + GAP-01 tile onClick confirmed
+//
+// v2.1 — WP-GUIDE-C: wire overview context to WorkflowGuide
 // v2.0: New 3-row tile grid (Operations · Customer Intelligence · Import ERP)
 //       + WorkflowGuide contextual onboarding
 //       + SystemStatusBar (injected at HQDashboard level — not here)
-//       + Fraud tile (flagged accounts)
-//       + Production tile (active batches, low finished goods)
-//       + P&L snapshot tile (revenue MTD)
+//       + Fraud tile, Production tile, P&L snapshot tile
 //       All v1.9 functionality retained: FX rate, birthday stats,
 //       recent scans, low stock, reorder alerts, avg margin, import POs.
 // v1.9: Comms tile expanded — open tickets + unread customer + unread wholesale
@@ -15,6 +16,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
 // ─── Colour tokens ───────────────────────────────────────────────────────────
 const C = {
@@ -133,6 +135,9 @@ const GUIDE_TIPS = [
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function HQOverview({ onNavigate }) {
+  // WP-GUIDE-C: wire 'overview' context for WorkflowGuide live status
+  const ctx = usePageContext("overview", null);
+
   const [stats, setStats] = useState(null);
   const [recentScans, setRecentScans] = useState([]);
   const [lowStock, setLowStock] = useState([]);
@@ -150,7 +155,6 @@ export default function HQOverview({ onNavigate }) {
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
 
-  // ── FX rate ────────────────────────────────────────────────────────────────
   const fetchFx = useCallback(async (silent = false) => {
     if (!silent) setFxRefreshing(true);
     try {
@@ -202,7 +206,6 @@ export default function HQOverview({ onNavigate }) {
     };
   }, [fetchFx]);
 
-  // ── Birthday stats ─────────────────────────────────────────────────────────
   const fetchBirthdayStats = useCallback(async () => {
     try {
       const now = new Date();
@@ -232,7 +235,6 @@ export default function HQOverview({ onNavigate }) {
     } catch (_) {}
   }, []);
 
-  // ── Main data fetch ────────────────────────────────────────────────────────
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -313,7 +315,6 @@ export default function HQOverview({ onNavigate }) {
         if (!r.error) lowStockData = r.data || [];
       } catch (_) {}
 
-      // Comms counts
       let openTickets = 0,
         unreadMsgs = 0,
         unreadWholesale = 0;
@@ -355,7 +356,6 @@ export default function HQOverview({ onNavigate }) {
       setRecentScans(scansData);
       setLowStock(lowStockData);
 
-      // ── NEW: Production stats ────────────────────────────────────────────
       try {
         const [batchRes, lowFinishedRes] = await Promise.all([
           supabase
@@ -379,7 +379,6 @@ export default function HQOverview({ onNavigate }) {
         setProductionStats({ activeBatches: 0, lowFinished: [] });
       }
 
-      // ── NEW: Fraud stats ─────────────────────────────────────────────────
       try {
         const [suspendedRes, flaggedRes] = await Promise.all([
           supabase
@@ -399,7 +398,6 @@ export default function HQOverview({ onNavigate }) {
         setFraudStats({ suspended: 0, flagged: 0 });
       }
 
-      // ── NEW: P&L snapshot (revenue MTD) ─────────────────────────────────
       try {
         const monthStart = new Date();
         monthStart.setDate(1);
@@ -417,7 +415,6 @@ export default function HQOverview({ onNavigate }) {
         setPlStats({ revenueMTD: 0 });
       }
 
-      // ── Import ERP stats (existing) ──────────────────────────────────────
       let reorderCount = 0,
         avgMarginPct = null,
         activeImportPOs = 0;
@@ -508,7 +505,6 @@ export default function HQOverview({ onNavigate }) {
     fetchStats();
   }, [fetchStats]);
 
-  // ── Loading / error states ─────────────────────────────────────────────────
   if (loading)
     return (
       <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
@@ -571,7 +567,6 @@ export default function HQOverview({ onNavigate }) {
       </div>
     );
 
-  // ── Derived values ─────────────────────────────────────────────────────────
   const nav = (tab) => onNavigate && onNavigate(tab);
   const marginColour =
     erpStats?.avgMarginPct >= 35
@@ -588,8 +583,9 @@ export default function HQOverview({ onNavigate }) {
 
   return (
     <div>
-      {/* ── Workflow Guide ── */}
+      {/* WP-GUIDE-C: WorkflowGuide with live overview context wired */}
       <WorkflowGuide
+        context={ctx}
         title="HQ Command Centre"
         description="The master control room for Protea Botanicals. Every number here is live — no refresh needed. Follow the workflow below to get products into the shop and keep operations running smoothly."
         steps={GUIDE_STEPS}
@@ -600,9 +596,7 @@ export default function HQOverview({ onNavigate }) {
         defaultOpen={false}
       />
 
-      {/* ══════════════════════════════════════════════
-          ROW 1 — OPERATIONS HEALTH
-      ══════════════════════════════════════════════ */}
+      {/* ROW 1 — OPERATIONS HEALTH */}
       <SectionLabel label="Operations Health" />
       <div
         style={{
@@ -612,7 +606,6 @@ export default function HQOverview({ onNavigate }) {
           marginBottom: 28,
         }}
       >
-        {/* Production tile */}
         <TileCard
           icon="🏭"
           label="Production"
@@ -628,8 +621,6 @@ export default function HQOverview({ onNavigate }) {
           hint="→ HQ Production"
           subLabel="active batches"
         />
-
-        {/* Supply Chain / POs */}
         <TileCard
           icon="📦"
           label="Import POs"
@@ -640,8 +631,6 @@ export default function HQOverview({ onNavigate }) {
           hint="→ Procurement"
           subLabel="open orders"
         />
-
-        {/* P&L snapshot */}
         <TileCard
           icon="📊"
           label="Revenue MTD"
@@ -660,8 +649,6 @@ export default function HQOverview({ onNavigate }) {
           hint="→ P&L"
           subLabel="this month"
         />
-
-        {/* Reorder alerts */}
         <TileCard
           icon="🔔"
           label="Reorder Alerts"
@@ -677,9 +664,7 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ══════════════════════════════════════════════
-          ROW 2 — CUSTOMER INTELLIGENCE
-      ══════════════════════════════════════════════ */}
+      {/* ROW 2 — CUSTOMER INTELLIGENCE */}
       <SectionLabel label="Customer Intelligence" />
       <div
         style={{
@@ -689,7 +674,6 @@ export default function HQOverview({ onNavigate }) {
           marginBottom: 28,
         }}
       >
-        {/* QR Scans */}
         <TileCard
           icon="📱"
           label="QR Scans"
@@ -700,8 +684,6 @@ export default function HQOverview({ onNavigate }) {
           hint="→ Analytics"
           subLabel="total lifetime"
         />
-
-        {/* Loyalty */}
         <TileCard
           icon="🏆"
           label="Loyalty Points"
@@ -712,8 +694,6 @@ export default function HQOverview({ onNavigate }) {
           hint="→ Loyalty"
           subLabel="total issued"
         />
-
-        {/* Comms */}
         <TileCard
           icon="💬"
           label="Comms"
@@ -739,8 +719,6 @@ export default function HQOverview({ onNavigate }) {
           hint="→ Admin Comms"
           subLabel="items needing attention"
         />
-
-        {/* Fraud & Security */}
         <TileCard
           icon="🛡️"
           label="Fraud Alerts"
@@ -763,9 +741,7 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ══════════════════════════════════════════════
-          ROW 3 — BIRTHDAYS
-      ══════════════════════════════════════════════ */}
+      {/* ROW 3 — BIRTHDAYS */}
       <SectionLabel label="Birthdays" />
       <div
         style={{
@@ -797,9 +773,7 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ══════════════════════════════════════════════
-          ROW 4 — IMPORT ERP (existing)
-      ══════════════════════════════════════════════ */}
+      {/* ROW 4 — IMPORT ERP */}
       {erpStats && (
         <>
           <SectionLabel label="Import ERP" />
@@ -811,7 +785,6 @@ export default function HQOverview({ onNavigate }) {
               marginBottom: 28,
             }}
           >
-            {/* Avg Margin */}
             <ERPCard
               icon="📊"
               label="Avg Gross Margin"
@@ -920,9 +893,7 @@ export default function HQOverview({ onNavigate }) {
         </>
       )}
 
-      {/* ══════════════════════════════════════════════
-          PANELS — Recent Scans + Low Stock (existing)
-      ══════════════════════════════════════════════ */}
+      {/* PANELS — Recent Scans + Low Stock */}
       <div
         style={{
           display: "grid",
@@ -931,7 +902,6 @@ export default function HQOverview({ onNavigate }) {
           marginBottom: 24,
         }}
       >
-        {/* Recent Scans */}
         <div
           style={{
             background: C.white,
@@ -1038,7 +1008,6 @@ export default function HQOverview({ onNavigate }) {
           </div>
         </div>
 
-        {/* Low Stock */}
         <div
           style={{
             background: C.white,
@@ -1179,9 +1148,7 @@ export default function HQOverview({ onNavigate }) {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════
-          QUICK ACTIONS (existing + new)
-      ══════════════════════════════════════════════ */}
+      {/* QUICK ACTIONS */}
       <div
         style={{
           background: C.white,

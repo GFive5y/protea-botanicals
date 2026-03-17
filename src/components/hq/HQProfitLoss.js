@@ -1,27 +1,21 @@
-// src/components/hq/HQProfitLoss.js v2.3 — WP-R Phase 6: Realtime subscriptions
+// src/components/hq/HQProfitLoss.js v2.4 — WP-GUIDE-C: usePageContext 'pl' wired + WorkflowGuide added
 // Protea Botanicals · Phase 2 · March 2026
 //
+// v2.4 — WP-GUIDE-C: wire usePageContext('pl') context + WorkflowGuide at top of render
 // v2.3 — WP-R Phase 6: realtime subscription for revenue tiles (orders table).
 //         Any INSERT/UPDATE/DELETE on orders triggers fetchAll automatically.
 // v2.2 — COGS methodology fix: Cost of Goods SOLD not Cost of Goods PURCHASED.
-//         Uses recipe engine (calcCogsTotal) × units sold — the correct source
-//         since recipes already know full per-cart cost (hardware, terpenes,
-//         distillate, packaging, labour). PO totals shown as balance-sheet ref only.
 // v2.1 — CRITICAL FIX: Use landed_cost_zar directly instead of subtotal × rate.
-//         Recalculating with null usd_zar_rate fell back to live FX → phantom R67k COGS.
-//         Incomplete POs (landed_cost_zar = R0) now flagged, not counted.
 // v2.0 — WP-Q Live Data Integration fixes:
-//   ★ CRITICAL FIX: orders.total_amount → orders.total (misnamed in v1.0 → silent R0 revenue bug)
-//   ★ orders status filter now excludes BOTH 'cancelled' AND 'failed'
-//   ★ Units estimate uses orders.items_count (replaces broken length × 2 hack)
-//   ★ Loyalty programme cost added as P&L line (loyalty_transactions EARNED pts × est. cost/pt)
-//   ★ Loyalty config fetched for real redemption_value_zar + breakage_rate
-//   ★ Per-source error indicators — no more silent R0 data gaps
+//   ★ CRITICAL FIX: orders.total_amount → orders.total
+//   ★ orders status filter excludes both 'cancelled' AND 'failed'
+//   ★ Loyalty programme cost added as P&L line
 //   ★ Last-updated timestamp + manual refresh button
-//   ★ Data source status strip (shows which queries returned data vs 0 rows)
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { usePageContext } from "../../hooks/usePageContext";
+import WorkflowGuide from "../WorkflowGuide";
 
 // ─── FX Hook ──────────────────────────────────────────────────────────────────
 function useFxRate() {
@@ -50,8 +44,6 @@ function useFxRate() {
 }
 
 // ─── COGS calculation — mirrors HQCogs v3.7 exactly ─────────────────────────
-// Supports chambers (multi-chamber JSONB), packaging_manual_zar, labour_manual_zar,
-// shipping_alloc_zar, terpene_qty_ul (µl), lab tests, transport, misc.
 const CANNALYTICS_TESTS = [
   { id: "potency", price: 350 },
   { id: "solvents", price: 200 },
@@ -149,10 +141,7 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtZar = (n, abs = false) => {
   const val = abs ? Math.abs(parseFloat(n) || 0) : parseFloat(n) || 0;
-  return `R${val.toLocaleString("en-ZA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return `R${val.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 const pctColour = (pct) =>
@@ -173,7 +162,7 @@ function periodStart(period) {
   if (period === "mtd")
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   if (period === "ytd") return new Date(now.getFullYear(), 0, 1).toISOString();
-  return null; // all time — no filter
+  return null;
 }
 
 function periodFilter(dateStr, period) {
@@ -266,7 +255,6 @@ function SectionHeader({ label, icon }) {
   );
 }
 
-// ─── Data Source Status Badge ─────────────────────────────────────────────────
 function DataBadge({ label, ok, count }) {
   return (
     <div
@@ -308,6 +296,9 @@ export default function HQProfitLoss() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
 
+  // WP-GUIDE-C: wire 'pl' context for WorkflowGuide
+  const ctx = usePageContext("pl", null);
+
   // Raw data
   const [orders, setOrders] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -321,27 +312,18 @@ export default function HQProfitLoss() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [dataErrors, setDataErrors] = useState({});
 
-  // Period
   const [period, setPeriod] = useState("30d");
-
-  // Manual OpEx
   const [opexItems, setOpexItems] = useState([
     { id: 1, label: "Shipping out to stores", amount: "" },
     { id: 2, label: "Other overheads", amount: "" },
   ]);
   const [newOpexLabel, setNewOpexLabel] = useState("");
   const [newOpexAmount, setNewOpexAmount] = useState("");
-
-  // FX sensitivity
   const [fxScenario, setFxScenario] = useState("");
 
-  // ── Fetch ─────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const errors = {};
-
-    // ── FIXED v2.0: column is `total` not `total_amount` ──────────────
-    // Also added items_count, and excluded both 'cancelled' AND 'failed'
     const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
       supabase
         .from("orders")
@@ -357,22 +339,18 @@ export default function HQProfitLoss() {
       supabase.from("supplier_products").select("*").eq("is_active", true),
       supabase.from("local_inputs").select("*").eq("is_active", true),
       supabase.from("product_pricing").select("*"),
-      // v2.0: loyalty transactions for programme cost
       supabase
         .from("loyalty_transactions")
         .select("points, transaction_type, created_at"),
-      // v2.0: loyalty config for real redemption value + breakage rate
       supabase
         .from("loyalty_config")
         .select("redemption_value_zar, breakage_rate")
         .maybeSingle(),
     ]);
-
     if (r1.error) errors.orders = r1.error.message;
     if (r2.error) errors.pos = r2.error.message;
     if (r3.error) errors.cogs = r3.error.message;
     if (r7.error) errors.loyalty = r7.error.message;
-
     setOrders(r1.data || []);
     setPurchaseOrders(r2.data || []);
     setRecipes(r3.data || []);
@@ -390,7 +368,7 @@ export default function HQProfitLoss() {
     fetchAll();
   }, [fetchAll]);
 
-  // v2.3: WP-R Phase 6 — realtime revenue tiles (any orders change → refetch)
+  // v2.3: WP-R Phase 6 — realtime revenue tiles
   useEffect(() => {
     const sub = supabase
       .channel("hq-pl-orders")
@@ -403,7 +381,6 @@ export default function HQProfitLoss() {
     return () => supabase.removeChannel(sub);
   }, [fetchAll]);
 
-  // ── OpEx helpers ──────────────────────────────────────────────────────
   const addOpex = () => {
     if (!newOpexLabel.trim()) return;
     setOpexItems((prev) => [
@@ -421,22 +398,18 @@ export default function HQProfitLoss() {
   );
 
   // ── P&L Calculations ──────────────────────────────────────────────────
-
-  // Revenue: website orders — FIXED v2.0: field is `total` not `total_amount`
   const filteredOrders = orders.filter((o) =>
     periodFilter(o.created_at, period),
   );
   const websiteRevenue = filteredOrders.reduce(
-    (s, o) => s + (parseFloat(o.total) || 0), // ← FIXED: was total_amount
+    (s, o) => s + (parseFloat(o.total) || 0),
     0,
   );
-  // Units sold: use items_count (FIXED v2.0: replaces broken length × 2 hack)
   const totalUnitsSold = filteredOrders.reduce(
     (s, o) => s + (parseInt(o.items_count) || 1),
     0,
   );
 
-  // PO data for inventory investment reference (balance sheet display only)
   const filteredPOs = purchaseOrders.filter((po) =>
     periodFilter(po.order_date, period),
   );
@@ -451,25 +424,17 @@ export default function HQProfitLoss() {
     0,
   );
 
-  // ── v2.2 COGS: Recipe-engine × units sold ──────────────────────────────
-  // The recipe engine (calcCogsTotal) already knows the full cost to produce
-  // one finished cart — hardware (import), terpenes (import), distillate,
-  // packaging, labour, lab tests, etc. This is the correct per-unit COGS.
-  // Total COGS = avg recipe COGS/unit × actual units sold this period.
-  // PO totals are shown as "Inventory investment" reference (balance sheet).
   const recipesWithCogs = recipes.map((r) => ({
     ...r,
     cogsPerUnit: calcCogsTotal(r, supplierProducts, localInputs, usdZar),
   }));
 
-  // Avg full COGS/unit across all active recipes
   const avgFullCogsPerUnit =
     recipesWithCogs.length > 0
       ? recipesWithCogs.reduce((s, r) => s + r.cogsPerUnit, 0) /
         recipesWithCogs.length
       : 0;
 
-  // Split import vs local for waterfall display
   const avgImportCogsPerUnit =
     recipesWithCogs.length > 0
       ? recipesWithCogs.reduce((s, r) => {
@@ -491,19 +456,14 @@ export default function HQProfitLoss() {
       : 0;
 
   const avgLocalCogsPerUnit = avgFullCogsPerUnit - avgImportCogsPerUnit;
-
   const importCogsSold = avgImportCogsPerUnit * totalUnitsSold;
   const localCogsTotal = avgLocalCogsPerUnit * totalUnitsSold;
   const importCogsHardware = importCogsSold;
-  const importCogsShipping = 0; // baked into shipping_alloc_zar in recipe
-
   const totalCogs = avgFullCogsPerUnit * totalUnitsSold;
   const grossProfit = websiteRevenue - totalCogs;
   const grossMarginPct =
     websiteRevenue > 0 ? (grossProfit / websiteRevenue) * 100 : 0;
 
-  // NEW v2.0: Loyalty programme cost
-  // Earned points × estimated cost per point (redemption_value × (1 - breakage))
   const redemptionValue = loyaltyConfig?.redemption_value_zar ?? 0.1;
   const breakageRate = loyaltyConfig?.breakage_rate ?? 0.3;
   const costPerPointIssued = redemptionValue * (1 - breakageRate);
@@ -525,14 +485,11 @@ export default function HQProfitLoss() {
     0,
   );
   const loyaltyCost = earnedPoints * costPerPointIssued;
-
   const totalOpexIncLoyalty = totalOpex + loyaltyCost;
-
   const netProfit = grossProfit - totalOpexIncLoyalty;
   const netMarginPct =
     websiteRevenue > 0 ? (netProfit / websiteRevenue) * 100 : 0;
 
-  // Best margin SKU
   const bestSkuMargin = (() => {
     let best = null;
     pricing.forEach((p) => {
@@ -554,7 +511,6 @@ export default function HQProfitLoss() {
     return best;
   })();
 
-  // Break-even
   const avgCogsPerUnit =
     recipesWithCogs.length > 0
       ? recipesWithCogs.reduce((s, r) => s + r.cogsPerUnit, 0) /
@@ -574,17 +530,14 @@ export default function HQProfitLoss() {
       ? Math.ceil(totalOpexIncLoyalty / (avgSellPrice - avgCogsPerUnit))
       : null;
 
-  // FX sensitivity — scales import portion of recipe COGS
   const scenarioRate = parseFloat(fxScenario) || usdZar;
   const scenarioImportCogs =
     usdZar > 0 ? importCogsSold * (scenarioRate / usdZar) : importCogsSold;
   const scenarioGross = websiteRevenue - scenarioImportCogs - localCogsTotal;
   const scenarioGrossMargin =
     websiteRevenue > 0 ? (scenarioGross / websiteRevenue) * 100 : 0;
-
   const hasDataErrors = Object.keys(dataErrors).length > 0;
 
-  // ── Styles ────────────────────────────────────────────────────────────
   const card = {
     background: "#fff",
     borderRadius: 12,
@@ -603,6 +556,14 @@ export default function HQProfitLoss() {
 
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
+      {/* WP-GUIDE-C: WorkflowGuide with live pl context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="pl"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
+
       {/* Header */}
       <div
         style={{
@@ -701,7 +662,7 @@ export default function HQProfitLoss() {
         </div>
       </div>
 
-      {/* ── Data source status strip ─────────────────────────────────────── */}
+      {/* Data source status strip */}
       <div
         style={{
           display: "flex",
@@ -789,10 +750,9 @@ export default function HQProfitLoss() {
             alignItems: "start",
           }}
         >
-          {/* ── LEFT: WATERFALL ──────────────────────────────────────── */}
+          {/* LEFT: WATERFALL */}
           <div>
             <div style={card}>
-              {/* REVENUE */}
               <SectionHeader icon="💰" label="Revenue" />
               <WRow
                 label="Website / direct sales"
@@ -815,13 +775,12 @@ export default function HQProfitLoss() {
                 highlight={websiteRevenue > 0 ? "green" : undefined}
               />
 
-              {/* COGS */}
               <SectionHeader icon="📦" label="Cost of Goods Sold" />
               <WRow
                 label="Imported hardware & terpenes (recipe cost)"
                 sub={
                   avgImportCogsPerUnit > 0
-                    ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded from investment ref` : ""}`
+                    ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
                     : "⚠ Set hardware & terpene prices in HQ → Suppliers"
                 }
                 value={importCogsHardware}
@@ -848,7 +807,6 @@ export default function HQProfitLoss() {
                 negative
                 highlight={totalCogs > 0 ? "red" : undefined}
               />
-              {/* Inventory investment reference — NOT part of COGS */}
               {totalInventoryInvestment > 0 && (
                 <div
                   style={{
@@ -883,7 +841,6 @@ export default function HQProfitLoss() {
                 </div>
               )}
 
-              {/* GROSS PROFIT */}
               <SectionHeader icon="📊" label="Gross Profit" />
               <WRow
                 label="Gross Profit"
@@ -900,10 +857,7 @@ export default function HQProfitLoss() {
                 }
               />
 
-              {/* OPERATING COSTS */}
               <SectionHeader icon="⚙️" label="Operating Costs" />
-
-              {/* NEW v2.0: Loyalty programme cost as a real P&L line */}
               <div
                 style={{
                   display: "flex",
@@ -937,7 +891,6 @@ export default function HQProfitLoss() {
                 <div style={{ width: 24 }} />
               </div>
 
-              {/* Manual OpEx items */}
               {opexItems.map((item) => (
                 <div
                   key={item.id}
@@ -998,7 +951,6 @@ export default function HQProfitLoss() {
                 </div>
               ))}
 
-              {/* Add OpEx row */}
               <div
                 style={{
                   display: "flex",
@@ -1049,7 +1001,6 @@ export default function HQProfitLoss() {
                 highlight={totalOpexIncLoyalty > 0 ? "red" : undefined}
               />
 
-              {/* NET PROFIT */}
               <SectionHeader icon="🏁" label="Net Profit / Loss" />
               <div
                 style={{
@@ -1156,7 +1107,7 @@ export default function HQProfitLoss() {
             </div>
           </div>
 
-          {/* ── RIGHT: INTEL PANELS ──────────────────────────────────── */}
+          {/* RIGHT: INTEL PANELS */}
           <div>
             {/* FX Impact */}
             <div style={{ ...card, padding: 0 }}>
@@ -1260,7 +1211,7 @@ export default function HQProfitLoss() {
               </div>
             </div>
 
-            {/* Loyalty Programme Summary — NEW v2.0 */}
+            {/* Loyalty Programme Summary */}
             <div style={{ ...card, padding: 0 }}>
               <SectionHeader icon="⭐" label="Loyalty Programme Cost" />
               <div style={{ padding: "16px 20px" }}>
