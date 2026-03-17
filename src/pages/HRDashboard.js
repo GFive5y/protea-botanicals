@@ -21,6 +21,8 @@ import HRComms from "../components/hq/HRComms";
 import HRSettings from "../components/hq/HRSettings";
 import HRCalendar from "../components/hq/HRCalendar";
 import HRLoans from "../components/hq/HRLoans";
+import HRPerformance from "../components/hq/HRPerformance";
+import HRPayroll from "../components/hq/HRPayroll";
 
 const C = {
   green: "#1b4332",
@@ -48,6 +50,8 @@ const TABS = [
   { id: "disciplinary", label: "Disciplinary" },
   { id: "calendar", label: "Calendar" },
   { id: "loans", label: "Loans" },
+  { id: "performance", label: "Performance" },
+  { id: "payroll", label: "Payroll" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -494,6 +498,8 @@ export default function HRDashboard() {
         {tab === "disciplinary" && <HRDisciplinary tenantId={tenantId} />}
         {tab === "calendar" && <HRCalendar tenantId={tenantId} />}
         {tab === "loans" && <HRLoans tenantId={tenantId} />}
+        {tab === "performance" && <HRPerformance tenantId={tenantId} />}
+        {tab === "payroll" && <HRPayroll tenantId={tenantId} />}
         {tab === "settings" && <HRSettings tenantId={tenantId} />}
       </div>
     </div>
