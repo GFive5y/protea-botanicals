@@ -1,13 +1,21 @@
-// src/components/CoPilot.js v2.5
-// Protea Botanicals — AI Assistant Sidebar Panel
-// v2.5: Revert LottieCharacter size 120 → 80 (was bumped 50% too large)
-// v2.4: Hide/show toggle — "hide" button above bot collapses to slim tab,
-//       tab click restores bot. Bot hidden by default until summoned.
-// v2.3: WP-003 — Frosted glass panel, gradient fade borders, Lottie bot
-//       in header when open, aggressive fade-in transition, no hard edges.
-// v2.2: WP-002 — Replace static floating button with AnimatedAICharacter
-// v2.1: Page-specific suggestion prompts — getSuggestions(role, pathname)
-// v2.0: Slide-in sidebar, conversation history, role-aware, branded design
+// src/components/CoPilot.js v3.0
+// WP-Y: AI CoPilot — Dual Mode: Script (free) + AI (Claude)
+//
+// v3.0 CHANGES:
+//   1. Two modes: Script (🔇 zero tokens) + AI (🤖 Claude)
+//   2. usePageContext integration — live business data from current route
+//   3. Proactive Insights panel — surfaces warnings on open, no typing needed
+//   4. Dynamic suggestions from live context data
+//   5. Script mode local response engine (zero API calls)
+//   6. Mode persisted to localStorage
+//   7. Compressed pageContext injected into AI mode system prompt
+//
+// v2.5: Revert LottieCharacter size 120 → 80
+// v2.4: Hide/show toggle — bot hidden by default
+// v2.3: Frosted glass panel, gradient fade borders, Lottie bot
+// v2.2: AnimatedAICharacter
+// v2.1: Page-specific suggestion prompts
+// v2.0: Slide-in sidebar, conversation history, role-aware
 
 import React, {
   useState,
@@ -18,10 +26,37 @@ import React, {
 } from "react";
 import { useLocation } from "react-router-dom";
 import { RoleContext } from "../App";
-import { sendMessage, buildUserContext } from "../services/copilotService";
+import { useTenant } from "../services/tenantService";
+import { usePageContext } from "../hooks/usePageContext";
+import {
+  sendMessage,
+  buildUserContext,
+  generateScriptResponse,
+  getContextSuggestions,
+} from "../services/copilotService";
 import LottieCharacter from "./LottieCharacter";
 import Lottie from "lottie-react";
 import chatbotIdle from "../assets/lottie/chatbot-idle.json";
+
+// ─── ROUTE → CONTEXT ID MAP ───────────────────────────────────────────────────
+// Maps the current route to the appropriate usePageContext query key.
+// Extends automatically as new context queries are registered.
+
+const ROUTE_CONTEXT_MAP = {
+  "/hq": "overview",
+  "/admin": "overview",
+  "/hr": "hr-staff",
+  "/staff": "hr-staff",
+  "/loyalty": "loyalty",
+};
+
+function getContextId(pathname) {
+  if (!pathname || pathname === "/") return null;
+  const segment = "/" + (pathname.split("/")[1] || "");
+  return ROUTE_CONTEXT_MAP[segment] || null;
+}
+
+// ─── THEME ───────────────────────────────────────────────────────────────────
 
 const C = {
   green: "#1b4332",
@@ -34,18 +69,59 @@ const C = {
   muted: "#888",
   text: "#1a1a1a",
   error: "#c0392b",
-  lightGreen: "#d4edda",
+  amber: "#f59e0b",
 };
+
 const FONTS = {
   heading: "'Cormorant Garamond', Georgia, serif",
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
+
 const PANEL_WIDTH = 370;
+
+// ─── STATUS COLOURS ───────────────────────────────────────────────────────────
+
+const STATUS_CONFIG = {
+  ok: {
+    bg: "rgba(82,183,136,0.12)",
+    border: "rgba(82,183,136,0.35)",
+    color: "#52b788",
+    icon: "✅",
+  },
+  info: {
+    bg: "rgba(59,130,246,0.12)",
+    border: "rgba(59,130,246,0.35)",
+    color: "#60a5fa",
+    icon: "ℹ️",
+  },
+  warn: {
+    bg: "rgba(245,158,11,0.12)",
+    border: "rgba(245,158,11,0.35)",
+    color: "#f59e0b",
+    icon: "⚠️",
+  },
+  critical: {
+    bg: "rgba(239,68,68,0.12)",
+    border: "rgba(239,68,68,0.35)",
+    color: "#ef4444",
+    icon: "🔴",
+  },
+  setup: {
+    bg: "rgba(139,92,246,0.12)",
+    border: "rgba(139,92,246,0.35)",
+    color: "#a78bfa",
+    icon: "🔧",
+  },
+};
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function getWelcome(role) {
   switch (role) {
     case "admin":
-      return "Hey! I can help with system health, user stats, scan analytics, or database queries. What do you need?";
+      return "Hey! I can help with system health, staff, stock, scan analytics, or anything on your dashboard. What do you need?";
+    case "hr":
+      return "Hello! I can help with staff records, leave management, payroll, disciplinary matters, or HR performance. What's on your mind?";
     case "retailer":
       return "Welcome! I can help with your orders, stock availability, or product information for your customers.";
     case "customer":
@@ -55,110 +131,27 @@ function getWelcome(role) {
   }
 }
 
-const PAGE_SUGGESTIONS = {
-  "/": [
-    "What products do you offer?",
-    "How does the loyalty programme work?",
-    "Tell me about your strains",
-    "What makes Protea different?",
-  ],
-  "/shop": [
-    "How do I place an order?",
-    "Do you offer delivery?",
-    "Cart or Pen — what's the difference?",
-    "What payment methods do you accept?",
-  ],
-  "/loyalty": [
-    "Check my loyalty points",
-    "How do I earn more points?",
-    "What rewards can I redeem?",
-    "What tier am I on?",
-  ],
-  "/verify": [
-    "Tell me about this strain",
-    "What are the terpenes in this?",
-    "Is this good for sleep or focus?",
-    "How was this product tested?",
-  ],
-  "/scan": [
-    "How do I scan a QR code?",
-    "What happens after I scan?",
-    "Why should I scan my product?",
-    "How many points per scan?",
-  ],
-  "/redeem": [
-    "How do I redeem my points?",
-    "What rewards are available?",
-    "Where can I use my voucher?",
-    "How long until my voucher expires?",
-  ],
-  "/wholesale": [
-    "What's your wholesale pricing?",
-    "Minimum order quantity?",
-    "How do I become a stockist?",
-    "What strains are available wholesale?",
-  ],
-  "/admin": [
-    "System health check",
-    "Scan analytics this week",
-    "Show all users",
-    "How are promo QR codes performing?",
-  ],
-};
-
-const ROLE_SUGGESTIONS = {
-  admin: [
-    "System health check",
-    "Scan analytics this week",
-    "Show all users",
-    "How are promo QR codes performing?",
-  ],
-  retailer: [
-    "Check my orders",
-    "What strains are available?",
-    "Best sellers for my shop?",
-    "Wholesale pricing",
-  ],
-  customer: [
-    "What strain helps with sleep?",
-    "Check my loyalty points",
-    "Difference between Cart and Pen?",
-    "How does QR scanning work?",
-  ],
-};
-
-const DEFAULT_SUGGESTIONS = [
-  "What strains do you have?",
-  "How does the loyalty programme work?",
-  "Tell me about your products",
-  "What makes Protea different?",
-];
-
-function getSuggestions(role, pathname) {
-  if (role === "admin") return ROLE_SUGGESTIONS.admin;
-  if (PAGE_SUGGESTIONS[pathname]) return PAGE_SUGGESTIONS[pathname];
-  const prefix = "/" + (pathname.split("/")[1] || "");
-  if (prefix !== pathname && PAGE_SUGGESTIONS[prefix])
-    return PAGE_SUGGESTIONS[prefix];
-  return ROLE_SUGGESTIONS[role] || DEFAULT_SUGGESTIONS;
-}
-
 function renderMessageContent(text) {
   if (!text) return null;
   const parts = text.split("\n").map((line, i) => {
-    let processed = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    if (/^\s*[-•]\s/.test(processed)) {
-      processed = processed.replace(/^\s*[-•]\s/, "");
+    let processed = line
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>");
+    if (/^\s*[-•→]\s/.test(processed)) {
+      const bullet = processed.match(/^\s*([-•→])\s/)?.[1] || "•";
+      processed = processed.replace(/^\s*[-•→]\s/, "");
       return (
         <div
           key={i}
           style={{
-            paddingLeft: "16px",
+            paddingLeft: "14px",
             textIndent: "-10px",
-            marginBottom: "2px",
+            marginBottom: "3px",
           }}
         >
-          <span style={{ color: C.accent }}>•</span>{" "}
+          <span style={{ color: bullet === "→" ? C.gold : C.accent }}>
+            {bullet === "→" ? "→" : "•"}
+          </span>{" "}
           <span dangerouslySetInnerHTML={{ __html: processed }} />
         </div>
       );
@@ -173,12 +166,159 @@ function renderMessageContent(text) {
   return <>{parts}</>;
 }
 
+// ─── PROACTIVE INSIGHT CARD ───────────────────────────────────────────────────
+
+function InsightCard({ warning, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: "rgba(245,158,11,0.08)",
+        border: "1px solid rgba(245,158,11,0.25)",
+        borderLeft: "3px solid rgba(245,158,11,0.7)",
+        borderRadius: "8px",
+        padding: "9px 12px",
+        fontSize: "12px",
+        color: "#555",
+        cursor: "pointer",
+        lineHeight: 1.5,
+        marginBottom: "6px",
+        transition: "background 0.15s",
+      }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.background = "rgba(245,158,11,0.14)")
+      }
+      onMouseLeave={(e) =>
+        (e.currentTarget.style.background = "rgba(245,158,11,0.08)")
+      }
+    >
+      <span
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          color: C.amber,
+          letterSpacing: "0.05em",
+        }}
+      >
+        LIVE INSIGHT{" "}
+      </span>
+      {warning.replace(/^⚠\s*/, "")}
+    </div>
+  );
+}
+
+// ─── STATUS PILL ─────────────────────────────────────────────────────────────
+
+function StatusPill({ status, headline }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.ok;
+  return (
+    <div
+      style={{
+        background: cfg.bg,
+        border: `1px solid ${cfg.border}`,
+        borderRadius: "8px",
+        padding: "7px 12px",
+        fontSize: "12px",
+        color: cfg.color,
+        fontWeight: 600,
+        marginBottom: "10px",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        lineHeight: 1.4,
+      }}
+    >
+      <span>{cfg.icon}</span>
+      <span
+        style={{ color: "#444", fontWeight: 400, flex: 1, fontSize: "11.5px" }}
+      >
+        {headline}
+      </span>
+    </div>
+  );
+}
+
+// ─── MODE TOGGLE ─────────────────────────────────────────────────────────────
+
+function ModeToggle({ mode, onToggle }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        background: "rgba(0,0,0,0.15)",
+        borderRadius: "20px",
+        padding: "2px",
+        gap: "1px",
+      }}
+    >
+      <button
+        onClick={() => mode !== "script" && onToggle()}
+        title="Script mode — free, reads live data"
+        style={{
+          padding: "4px 10px",
+          borderRadius: "18px",
+          border: "none",
+          cursor: mode === "script" ? "default" : "pointer",
+          background:
+            mode === "script" ? "rgba(255,255,255,0.2)" : "transparent",
+          color: mode === "script" ? C.white : "rgba(255,255,255,0.45)",
+          fontSize: "10px",
+          fontWeight: 700,
+          fontFamily: FONTS.body,
+          letterSpacing: "0.06em",
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+        }}
+      >
+        🔇 Script
+      </button>
+      <button
+        onClick={() => mode !== "ai" && onToggle()}
+        title="AI mode — full Claude intelligence"
+        style={{
+          padding: "4px 10px",
+          borderRadius: "18px",
+          border: "none",
+          cursor: mode === "ai" ? "default" : "pointer",
+          background: mode === "ai" ? "rgba(255,255,255,0.2)" : "transparent",
+          color: mode === "ai" ? C.white : "rgba(255,255,255,0.45)",
+          fontSize: "10px",
+          fontWeight: 700,
+          fontFamily: FONTS.body,
+          letterSpacing: "0.06em",
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+        }}
+      >
+        🤖 AI
+      </button>
+    </div>
+  );
+}
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+
 export default function CoPilot() {
   const { role, userEmail } = useContext(RoleContext);
+  const { tenantId } = useTenant();
   const location = useLocation();
 
+  // ── Mode ─────────────────────────────────────────────────────────────────
+  const [mode, setMode] = useState(
+    () => localStorage.getItem("copilot_mode") || "script",
+  );
+
+  const toggleMode = useCallback(() => {
+    setMode((prev) => {
+      const next = prev === "script" ? "ai" : "script";
+      localStorage.setItem("copilot_mode", next);
+      return next;
+    });
+  }, []);
+
+  // ── Panel state ───────────────────────────────────────────────────────────
   const [isOpen, setIsOpen] = useState(false);
-  const [botVisible, setBotVisible] = useState(false); // v2.4: hidden by default
+  const [botVisible, setBotVisible] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -188,16 +328,23 @@ export default function CoPilot() {
   const inputRef = useRef(null);
   const headerLottieRef = useRef(null);
 
+  // ── Live context from current route ──────────────────────────────────────
+  const contextId = getContextId(location.pathname);
+  const pageCtx = usePageContext(contextId, tenantId);
+
+  // ── Scroll to bottom ──────────────────────────────────────────────────────
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // ── Focus input on open ───────────────────────────────────────────────────
   useEffect(() => {
     if (isOpen && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [isOpen]);
 
+  // ── Welcome message ───────────────────────────────────────────────────────
   useEffect(() => {
     if (isOpen && messages.length === 0 && !hasInteracted) {
       setMessages([
@@ -206,11 +353,13 @@ export default function CoPilot() {
     }
   }, [isOpen, role, messages.length, hasInteracted]);
 
+  // ── Clear on role change ──────────────────────────────────────────────────
   useEffect(() => {
     if (hasInteracted) return;
     setMessages([]);
   }, [role, hasInteracted]);
 
+  // ── SEND HANDLER ──────────────────────────────────────────────────────────
   const handleSend = useCallback(
     async (text) => {
       const msg = (text || input).trim();
@@ -223,6 +372,43 @@ export default function CoPilot() {
       setMessages((prev) => [...prev, userMessage]);
       setLoading(true);
 
+      // ── SCRIPT MODE: local response engine ───────────────────────────────
+      if (mode === "script") {
+        const scriptReply = generateScriptResponse(msg, pageCtx);
+
+        if (scriptReply) {
+          // Small delay for UX realism
+          await new Promise((r) => setTimeout(r, 320));
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: scriptReply,
+              timestamp: new Date(),
+              isScript: true,
+            },
+          ]);
+          setLoading(false);
+          return;
+        }
+
+        // Script mode can't handle this query → suggest AI mode
+        await new Promise((r) => setTimeout(r, 200));
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "💡 This question needs deeper analysis.\n\nSwitch to **AI mode** (toggle above) to ask Claude directly — it has full access to your live business data and can answer complex questions.",
+            timestamp: new Date(),
+            isUpgrade: true,
+          },
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      // ── AI MODE: full Claude via Edge Function ────────────────────────────
       try {
         const apiMessages = [...messages, userMessage].map((m) => ({
           role: m.role,
@@ -231,6 +417,7 @@ export default function CoPilot() {
         const userContext = await buildUserContext(
           { role, userEmail },
           location.pathname,
+          pageCtx,
         );
         const result = await sendMessage(apiMessages, userContext);
 
@@ -266,7 +453,16 @@ export default function CoPilot() {
         setLoading(false);
       }
     },
-    [input, loading, messages, role, userEmail, location.pathname],
+    [
+      input,
+      loading,
+      messages,
+      role,
+      userEmail,
+      location.pathname,
+      mode,
+      pageCtx,
+    ],
   );
 
   const handleKeyDown = (e) => {
@@ -283,18 +479,33 @@ export default function CoPilot() {
     setHasInteracted(false);
   };
 
+  // ── Suggestions ───────────────────────────────────────────────────────────
+  const suggestions = getContextSuggestions(
+    pageCtx && !pageCtx.loading ? pageCtx : null,
+    role,
+    location.pathname,
+  );
+
+  // ── Hide on scan result pages ─────────────────────────────────────────────
   const hiddenPaths = ["/scan/"];
   const shouldHide = hiddenPaths.some(
     (p) => location.pathname.startsWith(p) && location.pathname !== "/scan",
   );
 
+  // ── Proactive insights available? ─────────────────────────────────────────
+  const hasInsights =
+    !hasInteracted &&
+    pageCtx &&
+    !pageCtx.loading &&
+    pageCtx.warnings?.length > 0 &&
+    role !== "customer";
+
   return (
     <>
-      {/* ── v2.4: Bot visible/hidden toggle ── */}
+      {/* ── Bot toggle ── */}
       {!shouldHide && (
         <>
           {botVisible ? (
-            /* Bot is visible — show character with "hide" button above */
             <div
               style={{
                 position: "fixed",
@@ -307,6 +518,28 @@ export default function CoPilot() {
                 gap: 4,
               }}
             >
+              {/* Insight pulse badge */}
+              {hasInsights && !isOpen && (
+                <div
+                  style={{
+                    background: "rgba(245,158,11,0.9)",
+                    color: "#fff",
+                    borderRadius: "20px",
+                    padding: "3px 10px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    fontFamily: FONTS.body,
+                    letterSpacing: "0.06em",
+                    animation: "copilot-pulse 2s ease-in-out infinite",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                  onClick={() => setIsOpen(true)}
+                >
+                  ⚠ {pageCtx.warnings.length} live insight
+                  {pageCtx.warnings.length > 1 ? "s" : ""}
+                </div>
+              )}
               <button
                 onClick={() => setBotVisible(false)}
                 title="Hide assistant"
@@ -331,7 +564,6 @@ export default function CoPilot() {
               >
                 hide ✕
               </button>
-              {/* v2.5: size reverted 120 → 80 (was 50% too large) */}
               <LottieCharacter
                 isOpen={isOpen}
                 isThinking={loading}
@@ -340,7 +572,6 @@ export default function CoPilot() {
               />
             </div>
           ) : (
-            /* Bot is hidden — slim tab tucked against right edge */
             <button
               onClick={() => setBotVisible(true)}
               title="Show AI assistant"
@@ -372,6 +603,18 @@ export default function CoPilot() {
               }
             >
               <span style={{ fontSize: "16px" }}>🤖</span>
+              {hasInsights && (
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: C.amber,
+                    flexShrink: 0,
+                    animation: "copilot-pulse 2s ease-in-out infinite",
+                  }}
+                />
+              )}
               <span
                 style={{
                   fontSize: "9px",
@@ -390,7 +633,7 @@ export default function CoPilot() {
         </>
       )}
 
-      {/* ── Backdrop overlay ── */}
+      {/* ── Backdrop ── */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
@@ -399,15 +642,12 @@ export default function CoPilot() {
             inset: 0,
             zIndex: 9999,
             background: "rgba(0,0,0,0.05)",
-            backdropFilter: "none",
-            WebkitBackdropFilter: "none",
-            transition: "opacity 0.15s ease",
             animation: "copilot-backdrop-in 0.15s ease-out",
           }}
         />
       )}
 
-      {/* ── Main panel — frosted glass ── */}
+      {/* ── Main panel ── */}
       <div
         style={{
           position: "fixed",
@@ -420,7 +660,6 @@ export default function CoPilot() {
           background: "rgba(250, 249, 246, 0.55)",
           backdropFilter: "blur(12px) saturate(1.2)",
           WebkitBackdropFilter: "blur(12px) saturate(1.2)",
-          borderLeft: "none",
           display: "flex",
           flexDirection: "column",
           fontFamily: FONTS.body,
@@ -433,7 +672,7 @@ export default function CoPilot() {
             : "none",
         }}
       >
-        {/* ── Left edge gradient fade ── */}
+        {/* Left edge fade */}
         <div
           style={{
             position: "absolute",
@@ -453,7 +692,7 @@ export default function CoPilot() {
             background: "rgba(27, 67, 50, 0.88)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
-            padding: "12px 20px 12px 12px",
+            padding: "12px 14px 10px 12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -461,6 +700,7 @@ export default function CoPilot() {
             boxShadow: "0 4px 20px rgba(27, 67, 50, 0.15)",
           }}
         >
+          {/* Left: Lottie + title */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div
               style={{
@@ -506,52 +746,64 @@ export default function CoPilot() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            <button
-              onClick={handleClearChat}
-              title="Clear conversation"
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                border: "none",
-                color: "rgba(255,255,255,0.5)",
-                cursor: "pointer",
-                padding: "6px 8px",
-                borderRadius: "6px",
-                fontSize: "12px",
-                fontFamily: FONTS.body,
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.target.style.background = "rgba(255,255,255,0.15)")
-              }
-              onMouseLeave={(e) =>
-                (e.target.style.background = "rgba(255,255,255,0.08)")
-              }
-            >
-              🗑
-            </button>
-            <button
-              onClick={() => setIsOpen(false)}
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                border: "none",
-                color: "rgba(255,255,255,0.6)",
-                cursor: "pointer",
-                padding: "6px 10px",
-                borderRadius: "6px",
-                fontSize: "16px",
-                lineHeight: 1,
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.target.style.background = "rgba(255,255,255,0.15)")
-              }
-              onMouseLeave={(e) =>
-                (e.target.style.background = "rgba(255,255,255,0.08)")
-              }
-            >
-              ✕
-            </button>
+
+          {/* Right: mode toggle + actions */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: "6px",
+            }}
+          >
+            <ModeToggle mode={mode} onToggle={toggleMode} />
+            <div style={{ display: "flex", gap: "4px" }}>
+              <button
+                onClick={handleClearChat}
+                title="Clear conversation"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "none",
+                  color: "rgba(255,255,255,0.5)",
+                  cursor: "pointer",
+                  padding: "5px 8px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontFamily: FONTS.body,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.target.style.background = "rgba(255,255,255,0.15)")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.background = "rgba(255,255,255,0.08)")
+                }
+              >
+                🗑
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "none",
+                  color: "rgba(255,255,255,0.6)",
+                  cursor: "pointer",
+                  padding: "5px 10px",
+                  borderRadius: "6px",
+                  fontSize: "16px",
+                  lineHeight: 1,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.target.style.background = "rgba(255,255,255,0.15)")
+                }
+                onMouseLeave={(e) =>
+                  (e.target.style.background = "rgba(255,255,255,0.08)")
+                }
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
 
@@ -560,14 +812,47 @@ export default function CoPilot() {
           style={{
             flex: 1,
             overflowY: "auto",
-            padding: "16px",
+            padding: "14px 16px",
             display: "flex",
             flexDirection: "column",
-            gap: "12px",
+            gap: "10px",
             background:
               "linear-gradient(to bottom, rgba(27,67,50,0.04) 0%, transparent 40px)",
           }}
         >
+          {/* ── Proactive Insights (script mode + live warnings) ── */}
+          {!hasInteracted &&
+            messages.length <= 1 &&
+            pageCtx &&
+            !pageCtx.loading &&
+            role !== "customer" && (
+              <div style={{ marginBottom: "4px" }}>
+                {/* Status headline pill */}
+                {pageCtx.status && pageCtx.headline && (
+                  <StatusPill
+                    status={pageCtx.status}
+                    headline={pageCtx.headline}
+                  />
+                )}
+
+                {/* Warning insight cards */}
+                {pageCtx.warnings?.length > 0 && (
+                  <div style={{ marginBottom: "8px" }}>
+                    {pageCtx.warnings.slice(0, 3).map((warning, i) => (
+                      <InsightCard
+                        key={i}
+                        warning={warning}
+                        onClick={() =>
+                          handleSend("What issues need my attention?")
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+          {/* ── Message bubbles ── */}
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -578,8 +863,8 @@ export default function CoPilot() {
             >
               <div
                 style={{
-                  maxWidth: "85%",
-                  padding: "12px 16px",
+                  maxWidth: "88%",
+                  padding: "11px 15px",
                   borderRadius:
                     msg.role === "user"
                       ? "16px 16px 4px 16px"
@@ -589,7 +874,11 @@ export default function CoPilot() {
                       ? "rgba(27, 67, 50, 0.85)"
                       : msg.isError
                         ? "rgba(255, 240, 238, 0.85)"
-                        : "rgba(255, 255, 255, 0.65)",
+                        : msg.isUpgrade
+                          ? "rgba(245,158,11,0.08)"
+                          : msg.isScript
+                            ? "rgba(255, 255, 255, 0.72)"
+                            : "rgba(255, 255, 255, 0.65)",
                   backdropFilter: msg.role === "user" ? "none" : "blur(10px)",
                   WebkitBackdropFilter:
                     msg.role === "user" ? "none" : "blur(10px)",
@@ -597,19 +886,37 @@ export default function CoPilot() {
                     msg.role === "user"
                       ? C.white
                       : msg.isError
-                        ? C.error
-                        : C.text,
+                        ? "#c0392b"
+                        : msg.isUpgrade
+                          ? "#92400e"
+                          : C.text,
                   fontSize: "13px",
                   lineHeight: "1.6",
                   border:
                     msg.role === "user"
                       ? "none"
-                      : msg.isError
-                        ? "1px solid rgba(240, 192, 176, 0.4)"
+                      : msg.isUpgrade
+                        ? "1px solid rgba(245,158,11,0.3)"
                         : "1px solid rgba(224, 219, 210, 0.4)",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                  position: "relative",
                 }}
               >
+                {/* Script mode indicator */}
+                {msg.isScript && (
+                  <div
+                    style={{
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                      color: "rgba(82,183,136,0.6)",
+                      textTransform: "uppercase",
+                      marginBottom: "5px",
+                    }}
+                  >
+                    🔇 Live Data
+                  </div>
+                )}
                 {msg.role === "user"
                   ? msg.content
                   : renderMessageContent(msg.content)}
@@ -617,6 +924,7 @@ export default function CoPilot() {
             </div>
           ))}
 
+          {/* ── Loading dots ── */}
           {loading && (
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
               <div
@@ -648,16 +956,17 @@ export default function CoPilot() {
             </div>
           )}
 
+          {/* ── Suggestion chips ── */}
           {!hasInteracted && messages.length <= 1 && (
             <div
               style={{
                 display: "flex",
                 flexWrap: "wrap",
-                gap: "8px",
-                marginTop: "8px",
+                gap: "7px",
+                marginTop: "4px",
               }}
             >
-              {getSuggestions(role, location.pathname).map((s, i) => (
+              {suggestions.map((s, i) => (
                 <button
                   key={i}
                   onClick={() => handleSend(s)}
@@ -667,7 +976,7 @@ export default function CoPilot() {
                     WebkitBackdropFilter: "blur(8px)",
                     border: "1px solid rgba(224, 219, 210, 0.4)",
                     borderRadius: "20px",
-                    padding: "8px 14px",
+                    padding: "7px 13px",
                     fontSize: "12px",
                     color: C.mid,
                     cursor: "pointer",
@@ -691,6 +1000,26 @@ export default function CoPilot() {
               ))}
             </div>
           )}
+
+          {/* ── Mode hint (first open, AI mode) ── */}
+          {!hasInteracted &&
+            messages.length <= 1 &&
+            mode === "ai" &&
+            contextId && (
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "rgba(82,183,136,0.7)",
+                  textAlign: "center",
+                  marginTop: "4px",
+                  fontStyle: "italic",
+                }}
+              >
+                🤖 AI mode active — Claude has access to your live{" "}
+                {contextId.replace(/-/g, " ")} data
+              </div>
+            )}
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -712,7 +1041,11 @@ export default function CoPilot() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me anything..."
+              placeholder={
+                mode === "script"
+                  ? "Ask about status, issues, actions…"
+                  : "Ask me anything…"
+              }
               disabled={loading}
               rows={1}
               style={{
@@ -770,11 +1103,13 @@ export default function CoPilot() {
               fontSize: "10px",
               color: "rgba(136, 136, 136, 0.6)",
               textAlign: "center",
-              marginTop: "8px",
+              marginTop: "7px",
               letterSpacing: "0.05em",
             }}
           >
-            Powered by Claude AI · Protea Botanicals
+            {mode === "script"
+              ? "🔇 Script mode · free · reads live data"
+              : "🤖 AI mode · powered by Claude · uses tokens"}
           </div>
         </div>
       </div>
@@ -787,6 +1122,10 @@ export default function CoPilot() {
         @keyframes copilot-backdrop-in {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes copilot-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.05); }
         }
       `}</style>
     </>
