@@ -1,6 +1,8 @@
 // src/hooks/usePageContext.js
 // WP-GUIDE Phase A — Living Intelligence Layer
-// Version: 1.1.0
+// Version: 1.4.0
+// WP-GUIDE-C++: Added 'batches', 'comms', and 'customers' context queries
+// WP-GUIDE-C+: Added 'fraud', 'documents', 'pricing' context queries
 // WP-GUIDE-C: Added 'overview' and 'pl' context queries
 //
 // ─── DESIGN PHILOSOPHY ────────────────────────────────────────────────────────
@@ -524,6 +526,497 @@ const CONTEXT_QUERIES = {
           redemptionCount,
           pointsRedeemed,
         },
+      },
+    };
+  },
+
+  // ── FRAUD & SECURITY ──────────────────────────────────────────────────────
+  // WP-GUIDE-C+: Added for HQFraud.js context wiring
+  // Reads: user_profiles (flagged + suspended counts)
+  //        + deletion_requests (pending POPIA count)
+  // Note: head:true count queries — no row data fetched.
+  fraud: async (sb, tenantId) => {
+    const [flaggedRes, suspendedRes, deletionsRes] = await Promise.allSettled([
+      sb
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .gte("anomaly_score", 50),
+      sb
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("is_suspended", true),
+      sb
+        .from("deletion_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
+    ]);
+
+    const flagged =
+      flaggedRes?.status === "fulfilled" ? (flaggedRes.value?.count ?? 0) : 0;
+    const suspended =
+      suspendedRes?.status === "fulfilled"
+        ? (suspendedRes.value?.count ?? 0)
+        : 0;
+    const deletions =
+      deletionsRes?.status === "fulfilled"
+        ? (deletionsRes.value?.count ?? 0)
+        : 0;
+
+    const warnings = [
+      flagged > 0
+        ? `⚠ ${pl(flagged, "account")} flagged — anomaly score ≥ 50, review required`
+        : null,
+      deletions > 0
+        ? `⚠ ${pl(deletions, "POPIA deletion request")} pending — must be processed within 30 days`
+        : null,
+    ].filter(Boolean);
+
+    const status = worstStatus([
+      flagged > 0 ? "warn" : "ok",
+      deletions > 0 ? "warn" : "ok",
+    ]);
+
+    return {
+      status,
+      headline:
+        flagged > 0 || suspended > 0 || deletions > 0
+          ? `${flagged} flagged · ${suspended} suspended · ${deletions} deletion${deletions !== 1 ? "s" : ""} pending`
+          : "No active fraud alerts — all accounts in good standing",
+      items: [
+        `${pl(flagged, "account")} with anomaly score ≥ 50`,
+        `${pl(suspended, "account")} currently suspended`,
+        deletions > 0
+          ? `${pl(deletions, "POPIA deletion request")} pending — 30-day deadline applies`
+          : "No pending deletion requests",
+      ],
+      warnings,
+      actions: [
+        ...(flagged > 0
+          ? [{ label: "→ Review flagged accounts", tab: "flagged" }]
+          : []),
+        ...(deletions > 0
+          ? [{ label: "→ Process deletion requests", tab: "deletions" }]
+          : []),
+      ],
+      raw: { tabId: "fraud", queries: { flagged, suspended, deletions } },
+    };
+  },
+
+  // ── DOCUMENT INGESTION ────────────────────────────────────────────────────
+  // WP-GUIDE-C+: Added for HQDocuments.js context wiring
+  // Reads: document_log (counts by status — pending_review, confirmed, rejected)
+  // Note: head:true count queries throughout.
+  documents: async (sb, tenantId) => {
+    const [pendingRes, confirmedRes, rejectedRes] = await Promise.allSettled([
+      sb
+        .from("document_log")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending_review"),
+      sb
+        .from("document_log")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "confirmed"),
+      sb
+        .from("document_log")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "rejected"),
+    ]);
+
+    const pending =
+      pendingRes?.status === "fulfilled" ? (pendingRes.value?.count ?? 0) : 0;
+    const confirmed =
+      confirmedRes?.status === "fulfilled"
+        ? (confirmedRes.value?.count ?? 0)
+        : 0;
+    const rejected =
+      rejectedRes?.status === "fulfilled" ? (rejectedRes.value?.count ?? 0) : 0;
+    const total = pending + confirmed + rejected;
+
+    if (total === 0) {
+      return {
+        status: "setup",
+        headline: "No documents ingested yet — upload your first document",
+        items: [
+          "Drop a PDF, JPG, or PNG above to start",
+          "AI extracts supplier, products, quantities and prices automatically",
+          "Review extracted data and confirm — changes apply to your DB instantly",
+        ],
+        warnings: [],
+        actions: [],
+        raw: { tabId: "documents", queries: { pending, confirmed, rejected } },
+      };
+    }
+
+    return {
+      status: pending > 0 ? "warn" : "ok",
+      headline:
+        pending > 0
+          ? `${pl(pending, "document")} awaiting review — extracted data not yet applied`
+          : `${pl(total, "document")} in vault — all reviewed`,
+      items: [
+        `${pl(total, "document")} in the vault`,
+        pending > 0
+          ? `${pl(pending, "document")} pending review`
+          : "No documents pending review",
+        `${pl(confirmed, "document")} confirmed · ${pl(rejected, "document")} rejected`,
+      ],
+      warnings:
+        pending > 0
+          ? [
+              `⚠ ${pl(pending, "document")} awaiting review — extracted data not yet applied to inventory or POs`,
+            ]
+          : [],
+      actions:
+        pending > 0
+          ? [{ label: "→ Review pending documents", tab: "review" }]
+          : [],
+      raw: {
+        tabId: "documents",
+        queries: { pending, confirmed, rejected, total },
+      },
+    };
+  },
+
+  // ── PRICING & MARGIN ──────────────────────────────────────────────────────
+  // WP-GUIDE-C+: Added for HQPricing.js context wiring
+  // Reads: product_cogs (active count) + product_pricing (retail prices set)
+  // Warn if any active SKU has no retail price — product invisible in shop.
+  pricing: async (sb, tenantId) => {
+    const [recipesRes, pricingRes] = await Promise.allSettled([
+      sb.from("product_cogs").select("id").eq("is_active", true),
+      sb
+        .from("product_pricing")
+        .select("product_cogs_id, channel, sell_price_zar")
+        .eq("channel", "retail"),
+    ]);
+
+    const recipes = safeData(recipesRes);
+    const retailPrices = safeData(pricingRes);
+
+    if (recipes.length === 0) {
+      return {
+        status: "setup",
+        headline:
+          "No SKU recipes yet — build COGS recipes in HQ → Costing first",
+        items: [
+          "Go to HQ → Costing to create your first SKU recipe",
+          "Once recipes exist, return here to set sell prices per channel",
+        ],
+        warnings: [],
+        actions: [{ label: "→ Go to Costing", tab: "costing" }],
+        raw: {
+          tabId: "pricing",
+          queries: { recipesCount: 0, unpricedCount: 0 },
+        },
+      };
+    }
+
+    const pricedIds = new Set(retailPrices.map((p) => p.product_cogs_id));
+    const unpricedCount = recipes.filter((r) => !pricedIds.has(r.id)).length;
+    const zeroPricedCount = retailPrices.filter(
+      (p) => !safeFloat(p.sell_price_zar),
+    ).length;
+
+    const warnings = [
+      unpricedCount > 0
+        ? `⚠ ${pl(unpricedCount, "SKU")} with no retail price — invisible to customers in shop`
+        : null,
+      zeroPricedCount > 0
+        ? `⚠ ${pl(zeroPricedCount, "SKU")} has retail price of R0 — will not appear in shop`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      status: unpricedCount > 0 || zeroPricedCount > 0 ? "warn" : "ok",
+      headline:
+        unpricedCount > 0
+          ? `${pl(unpricedCount, "SKU")} missing retail price — not visible in shop`
+          : `${pl(recipes.length, "SKU")} priced across all channels`,
+      items: [
+        `${pl(recipes.length, "active SKU recipe")}`,
+        unpricedCount > 0
+          ? `${pl(unpricedCount, "SKU")} with no retail price — invisible to customers`
+          : "All SKUs have retail prices set",
+        `${pl(retailPrices.length, "retail price")} configured`,
+      ],
+      warnings,
+      actions:
+        unpricedCount > 0
+          ? [{ label: "→ Set missing prices", tab: "pricing" }]
+          : [],
+      raw: {
+        tabId: "pricing",
+        queries: {
+          recipesCount: recipes.length,
+          unpricedCount,
+          zeroPricedCount,
+        },
+      },
+    };
+  },
+
+  // ── BATCH MANAGER ────────────────────────────────────────────────────────────
+  // WP-GUIDE-C++: Added for AdminBatchManager.js context wiring
+  // Reads: batches (active, expiring, no COA)
+  // CRITICAL: batches has NO created_at / NO updated_at → ORDER BY production_date only
+  //           production_batches = UNUSED — NEVER query this table
+  batches: async (sb, tenantId) => {
+    const [batchRes] = await Promise.allSettled([
+      sb
+        .from("batches")
+        .select("id, batch_number, product_name, expiry_date, coa_url")
+        .eq("is_archived", false),
+    ]);
+
+    const allBatches = safeData(batchRes);
+    const now = Date.now();
+
+    const expiring = allBatches.filter((b) => {
+      const days = b.expiry_date
+        ? Math.ceil((new Date(b.expiry_date) - now) / 86400000)
+        : null;
+      return days !== null && days <= 30 && days >= 0;
+    });
+    const expired = allBatches.filter((b) => {
+      const days = b.expiry_date
+        ? Math.ceil((new Date(b.expiry_date) - now) / 86400000)
+        : null;
+      return days !== null && days < 0;
+    });
+    const noCoa = allBatches.filter((b) => !b.coa_url);
+
+    if (allBatches.length === 0) {
+      return {
+        status: "setup",
+        headline:
+          "No batches yet — create your first production batch to get started",
+        items: [
+          "Click '+ New Batch' to register a production run",
+          "Add batch number, THC/CBD content, and production date",
+          "Upload the COA PDF for lab certification",
+          "Then generate QR codes linked to this batch",
+        ],
+        warnings: [],
+        actions: [{ label: "→ Create first batch", tab: "batches" }],
+        raw: { tabId: "batches", queries: { total: 0, expiring: 0, noCoa: 0 } },
+      };
+    }
+
+    const warnings = [
+      expiring.length > 0
+        ? `⚠ ${pl(expiring.length, "batch")} expiring within 30 days — review distribution plan`
+        : null,
+      expired.length > 0
+        ? `⚠ ${pl(expired.length, "batch")} already expired — archive or investigate`
+        : null,
+      noCoa.length > 0
+        ? `⚠ ${pl(noCoa.length, "batch")} without a COA uploaded — required for QR trust`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      status: worstStatus([
+        expired.length > 0 ? "error" : "ok",
+        expiring.length > 0 ? "warn" : "ok",
+        noCoa.length > 0 ? "warn" : "ok",
+      ]),
+      headline:
+        expired.length > 0
+          ? `${pl(expired.length, "batch")} expired — action required`
+          : expiring.length > 0
+            ? `${pl(expiring.length, "batch")} expiring soon · ${pl(allBatches.length, "active batch")} total`
+            : `${pl(allBatches.length, "active batch")} · all in date`,
+      items: [
+        `${pl(allBatches.length, "active batch")} in production`,
+        expiring.length > 0
+          ? `${pl(expiring.length, "batch")} expiring within 30 days`
+          : "No batches expiring soon",
+        noCoa.length > 0
+          ? `${pl(noCoa.length, "batch")} missing COA — customers cannot verify lab results`
+          : "All batches have COA uploaded",
+      ],
+      warnings,
+      actions: [
+        ...(expiring.length > 0
+          ? [{ label: "→ View expiring batches", tab: "batches" }]
+          : []),
+        ...(noCoa.length > 0
+          ? [{ label: "→ Upload missing COAs", tab: "batches" }]
+          : []),
+      ],
+      raw: {
+        tabId: "batches",
+        queries: {
+          total: allBatches.length,
+          expiring: expiring.length,
+          expired: expired.length,
+          noCoa: noCoa.length,
+        },
+      },
+    };
+  },
+
+  // ── CUSTOMER COMMS ────────────────────────────────────────────────────────────
+  // WP-GUIDE-C++: Added for AdminCommsCenter.js context wiring
+  // CRITICAL: customer_messages uses .body (NOT .content) and .read_at (NOT .read)
+  //           ticket_messages uses .content (NOT .body)
+  //           support_tickets open = NOT IN ('closed','resolved')
+  comms: async (sb, tenantId) => {
+    const [unreadRes, ticketsRes] = await Promise.allSettled([
+      sb
+        .from("customer_messages")
+        .select("id", { count: "exact", head: true })
+        .is("read_at", null),
+      sb
+        .from("support_tickets")
+        .select("id, status")
+        .not("status", "in", '("closed","resolved")'),
+    ]);
+
+    const unread =
+      unreadRes?.status === "fulfilled" ? (unreadRes.value?.count ?? 0) : 0;
+    const ticketRows = safeData(ticketsRes);
+    const openTickets = ticketRows.length;
+
+    if (unread === 0 && openTickets === 0) {
+      return {
+        status: "ok",
+        headline: "All caught up — no unread messages or open tickets",
+        items: [
+          "No unread customer messages",
+          "No open support tickets",
+          "Use Broadcast to send tier-targeted messages to Bronze/Silver/Gold/Platinum customers",
+        ],
+        warnings: [],
+        actions: [],
+        raw: { tabId: "comms", queries: { unread: 0, openTickets: 0 } },
+      };
+    }
+
+    const warnings = [
+      unread > 0
+        ? `⚠ ${pl(unread, "unread message")} awaiting reply — customers are waiting`
+        : null,
+      openTickets > 0
+        ? `⚠ ${pl(openTickets, "open ticket")} — respond to maintain customer satisfaction`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      status: worstStatus([
+        unread > 10 ? "error" : unread > 0 ? "warn" : "ok",
+        openTickets > 0 ? "warn" : "ok",
+      ]),
+      headline:
+        unread > 0 && openTickets > 0
+          ? `${pl(unread, "unread message")} + ${pl(openTickets, "open ticket")}`
+          : unread > 0
+            ? `${pl(unread, "unread message")} awaiting reply`
+            : `${pl(openTickets, "open ticket")} to resolve`,
+      items: [
+        unread > 0
+          ? `${pl(unread, "customer message")} unread — reply promptly`
+          : "No unread messages",
+        openTickets > 0
+          ? `${pl(openTickets, "support ticket")} open`
+          : "No open support tickets",
+        "Use Broadcast to reach customers by tier — Bronze, Silver, Gold, Platinum",
+      ],
+      warnings,
+      actions: [
+        ...(unread > 0
+          ? [{ label: "→ View unread messages", tab: "customers" }]
+          : []),
+        ...(openTickets > 0
+          ? [{ label: "→ View open tickets", tab: "customers" }]
+          : []),
+      ],
+      raw: { tabId: "comms", queries: { unread, openTickets } },
+    };
+  },
+
+  // ── CUSTOMER ENGAGEMENT ───────────────────────────────────────────────────────
+  // WP-GUIDE-C++: Added for AdminCustomerEngagement.js context wiring
+  // Reads: user_profiles (role='customer' — total, at-risk, opt-in)
+  // Churn risk: inactive 45+ days OR (total_scans=0 AND loyalty_points<50)
+  customers: async (sb, tenantId) => {
+    const [allRes, churnRes, optinRes] = await Promise.allSettled([
+      sb
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "customer"),
+      sb
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "customer")
+        .lt(
+          "last_active_at",
+          new Date(Date.now() - 45 * 86400000).toISOString(),
+        ),
+      sb
+        .from("user_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "customer")
+        .eq("marketing_opt_in", true),
+    ]);
+
+    const total =
+      allRes?.status === "fulfilled" ? (allRes.value?.count ?? 0) : 0;
+    const churnRisk =
+      churnRes?.status === "fulfilled" ? (churnRes.value?.count ?? 0) : 0;
+    const optIn =
+      optinRes?.status === "fulfilled" ? (optinRes.value?.count ?? 0) : 0;
+    const optInRate = total > 0 ? Math.round((optIn / total) * 100) : 0;
+
+    if (total === 0) {
+      return {
+        status: "setup",
+        headline:
+          "No customers yet — they appear here once they sign up and scan a QR code",
+        items: [
+          "Customers register via the shop website or in-store registration",
+          "Use 'Register In-Store' button to manually onboard walk-in customers",
+          "Engagement scores are calculated automatically from scan + loyalty data",
+        ],
+        warnings: [],
+        actions: [],
+        raw: {
+          tabId: "customers",
+          queries: { total: 0, churnRisk: 0, optIn: 0 },
+        },
+      };
+    }
+
+    const warnings = [
+      churnRisk > 0
+        ? `⚠ ${pl(churnRisk, "customer")} inactive for 45+ days — at churn risk`
+        : null,
+      optInRate < 30
+        ? `⚠ Only ${optInRate}% opted into marketing — consider a re-consent campaign`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      status: churnRisk > total * 0.3 ? "warn" : "ok",
+      headline:
+        churnRisk > 0
+          ? `${pl(churnRisk, "customer")} at churn risk out of ${pl(total, "total")}`
+          : `${pl(total, "customer")} · all engaged`,
+      items: [
+        `${pl(total, "customer")} registered`,
+        churnRisk > 0
+          ? `${pl(churnRisk, "customer")} inactive 45+ days — churn risk`
+          : "No customers at churn risk",
+        `${pl(optIn, "customer")} opted into marketing (${optInRate}%)`,
+      ],
+      warnings,
+      actions:
+        churnRisk > 0
+          ? [{ label: "→ View at-risk customers", tab: "customers" }]
+          : [],
+      raw: {
+        tabId: "customers",
+        queries: { total, churnRisk, optIn, optInRate },
       },
     };
   },

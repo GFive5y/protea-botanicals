@@ -1,22 +1,14 @@
 // src/components/AdminBatchManager.js
+// v1.2 — WP-GUIDE-C++: usePageContext 'batches' wired + WorkflowGuide added
 // v1.1 — WP-I: COA source document link on batch card when coa_document_id is set
 // v1.0 — March 2026
 // WP1 — Batch Manager
-// Features:
-//   - Card grid of all batches with live QR + claim stats
-//   - Create batch form (slide-in panel)
-//   - Auto-suggested next batch number
-//   - COA PDF upload to Supabase Storage
-//   - Expiry alerts (orange <30d, red = expired)
-//   - Edit batch
-//   - Archive batch (never delete)
-//   - "Generate QR Codes" button → navigates to QR tab
-//   - COA source document badge linking to document_log record (WP-I)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -42,7 +34,6 @@ const FONTS = {
   body: "'Jost', 'Helvetica Neue', sans-serif",
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const label = (text) => ({
   fontSize: 11,
   fontWeight: 600,
@@ -112,7 +103,6 @@ function pct(a, b) {
   return ((a / b) * 100).toFixed(1);
 }
 
-// ─── Expiry Badge ─────────────────────────────────────────────────────────────
 function ExpiryBadge({ expiryDate }) {
   const days = daysUntil(expiryDate);
   if (days === null) return null;
@@ -168,7 +158,6 @@ function ExpiryBadge({ expiryDate }) {
   );
 }
 
-// ─── Stat pill ────────────────────────────────────────────────────────────────
 function StatPill({ label: l, value, color = C.green }) {
   return (
     <div style={{ textAlign: "center", flex: 1 }}>
@@ -197,7 +186,6 @@ function StatPill({ label: l, value, color = C.green }) {
   );
 }
 
-// ─── Mini progress bar ────────────────────────────────────────────────────────
 function ProgressBar({ value, max, color = C.accent }) {
   const pctVal = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
@@ -223,8 +211,6 @@ function ProgressBar({ value, max, color = C.accent }) {
   );
 }
 
-// ─── COA Document Source Badge (WP-I) ─────────────────────────────────────────
-// Shows when a batch's COA was ingested via the Document Ingestion Engine
 function COADocumentBadge({ coaDocumentId, onViewInDocuments }) {
   if (!coaDocumentId) return null;
   return (
@@ -255,7 +241,6 @@ function COADocumentBadge({ coaDocumentId, onViewInDocuments }) {
   );
 }
 
-// ─── Batch Card ───────────────────────────────────────────────────────────────
 function BatchCard({
   batch,
   stats,
@@ -293,7 +278,6 @@ function BatchCard({
       }
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
-      {/* Header row */}
       <div
         style={{
           display: "flex",
@@ -328,8 +312,6 @@ function BatchCard({
         </div>
         <ExpiryBadge expiryDate={batch.expiry_date} />
       </div>
-
-      {/* Strain / type row */}
       <div
         style={{
           display: "flex",
@@ -345,8 +327,6 @@ function BatchCard({
         {batch.volume && <span>💧 {batch.volume}</span>}
         {batch.thc_content && <span>⚗️ THC {batch.thc_content}%</span>}
       </div>
-
-      {/* Stats strip */}
       <div
         style={{
           display: "flex",
@@ -372,8 +352,6 @@ function BatchCard({
           color={parseFloat(activation) >= 50 ? C.accent : C.orange}
         />
       </div>
-
-      {/* Activation bar */}
       <div>
         <div
           style={{
@@ -393,8 +371,6 @@ function BatchCard({
           color={parseFloat(activation) >= 50 ? C.accent : C.orange}
         />
       </div>
-
-      {/* Dates row */}
       <div
         style={{
           display: "flex",
@@ -407,8 +383,6 @@ function BatchCard({
         <span>Produced: {fmtDate(batch.production_date)}</span>
         <span>Expires: {fmtDate(batch.expiry_date)}</span>
       </div>
-
-      {/* Lab / COA row */}
       <div
         style={{
           display: "flex",
@@ -471,15 +445,11 @@ function BatchCard({
         ) : (
           <span style={{ fontSize: 10, color: C.muted }}>No COA uploaded</span>
         )}
-
-        {/* WP-I: AI Ingested COA badge */}
         <COADocumentBadge
           coaDocumentId={batch.coa_document_id}
           onViewInDocuments={onViewDocumentSource}
         />
       </div>
-
-      {/* Actions */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
         <button
           onClick={() => onGoToQR(batch.id)}
@@ -519,7 +489,6 @@ function BatchCard({
   );
 }
 
-// ─── Row / Field layout helpers (must be outside BatchForm to avoid remount) ──
 function Row({ children }) {
   return (
     <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>{children}</div>
@@ -534,7 +503,6 @@ function Field({ label: l, children, flex = 1 }) {
   );
 }
 
-// ─── Create / Edit Form ───────────────────────────────────────────────────────
 function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
@@ -560,7 +528,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleCOAUpload = async (e) => {
@@ -660,7 +627,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         fontFamily: FONTS.body,
       }}
     >
-      {/* Header */}
       <div
         style={{
           background: C.green,
@@ -697,7 +663,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           ×
         </button>
       </div>
-
       <div style={{ padding: 24 }}>
         {error && (
           <div
@@ -714,8 +679,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             ⚠ {error}
           </div>
         )}
-
-        {/* Section: Identity */}
         <div
           style={{
             fontSize: 11,
@@ -730,7 +693,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         >
           Batch Identity
         </div>
-
         <Row>
           <Field label="Batch Number *" flex={1}>
             <input
@@ -744,7 +706,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             </div>
           </Field>
         </Row>
-
         <Row>
           <Field label="Product Name *" flex={2}>
             <input
@@ -769,7 +730,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             </select>
           </Field>
         </Row>
-
         <Row>
           <Field label="Strain" flex={2}>
             <input
@@ -789,7 +749,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             />
           </Field>
         </Row>
-
         <Row>
           <Field label="Units Produced">
             <input
@@ -822,8 +781,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             />
           </Field>
         </Row>
-
-        {/* Section: Dates */}
         <div
           style={{
             fontSize: 11,
@@ -839,7 +796,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         >
           Dates
         </div>
-
         <Row>
           <Field label="Production Date">
             <input
@@ -870,8 +826,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             )}
           </Field>
         </Row>
-
-        {/* Section: Lab */}
         <div
           style={{
             fontSize: 11,
@@ -887,7 +841,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         >
           Lab &amp; Certification
         </div>
-
         <Row>
           <Field label="Lab Name" flex={2}>
             <input
@@ -906,7 +859,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             />
           </Field>
         </Row>
-
         <Row>
           <Field label="">
             <label
@@ -949,8 +901,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             </label>
           </Field>
         </Row>
-
-        {/* Section: COA Upload */}
         <div
           style={{
             fontSize: 11,
@@ -966,7 +916,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         >
           Certificate of Analysis (COA)
         </div>
-
         {form.coa_url ? (
           <div
             style={{
@@ -1053,8 +1002,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             {uploadMsg}
           </div>
         )}
-
-        {/* OR paste URL */}
         <div style={{ marginBottom: 20 }}>
           <span style={label("Or Paste Existing COA URL")}>
             Or Paste Existing COA URL
@@ -1066,8 +1013,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             placeholder="https://..."
           />
         </div>
-
-        {/* Actions */}
         <div
           style={{
             display: "flex",
@@ -1105,12 +1050,15 @@ export default function AdminBatchManager({
   onNavigateToQR,
   onNavigateToDocuments,
 }) {
+  // WP-GUIDE-C++: wire 'batches' context for WorkflowGuide live status
+  const ctx = usePageContext("batches", null);
+
   const [batches, setBatches] = useState([]);
   const [statsMap, setStatsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editBatch, setEditBatch] = useState(null);
-  const [filter, setFilter] = useState("active"); // active | expiring | archived | all
+  const [filter, setFilter] = useState("active");
   const [search, setSearch] = useState("");
   const [suggestedNum, setSuggestedNum] = useState("");
   const [archiveTarget, setArchiveTarget] = useState(null);
@@ -1121,7 +1069,6 @@ export default function AdminBatchManager({
     setTimeout(() => setToast(""), 3000);
   };
 
-  // ── Fetch batches ────────────────────────────────────────────────────────
   const fetchBatches = useCallback(async () => {
     setLoading(true);
     try {
@@ -1130,13 +1077,10 @@ export default function AdminBatchManager({
         .select("*")
         .order("batch_number", { ascending: false });
       if (bErr) throw bErr;
-
-      // Get QR + claim stats for all batches in one query
       const { data: productData } = await supabase
         .from("qr_codes")
         .select("batch_id, claimed")
         .not("batch_id", "is", null);
-
       const map = {};
       for (const p of productData || []) {
         if (!map[p.batch_id])
@@ -1146,8 +1090,6 @@ export default function AdminBatchManager({
       }
       setStatsMap(map);
       setBatches(batchData || []);
-
-      // Suggest next batch number
       await suggestNext(batchData || []);
     } catch (err) {
       console.error("fetchBatches error:", err);
@@ -1161,7 +1103,6 @@ export default function AdminBatchManager({
       setSuggestedNum("PB-001-2026");
       return;
     }
-    // Find highest numeric suffix
     let max = 0;
     for (const b of batchList) {
       const parts = (b.batch_number || "").split("-");
@@ -1176,7 +1117,6 @@ export default function AdminBatchManager({
     fetchBatches();
   }, [fetchBatches]);
 
-  // ── Archive ──────────────────────────────────────────────────────────────
   const handleArchive = async (batch) => {
     const { error } = await supabase
       .from("batches")
@@ -1189,7 +1129,6 @@ export default function AdminBatchManager({
     }
   };
 
-  // ── Save (create or edit) ────────────────────────────────────────────────
   const handleSave = (saved) => {
     setShowForm(false);
     setEditBatch(null);
@@ -1197,17 +1136,13 @@ export default function AdminBatchManager({
     fetchBatches();
   };
 
-  // ── Go to QR generator ───────────────────────────────────────────────────
   const handleGoToQR = (batchId) => {
     if (onNavigateToQR) onNavigateToQR(batchId);
   };
-
-  // ── Go to Document source (WP-I) ─────────────────────────────────────────
   const handleViewDocumentSource = (documentId) => {
     if (onNavigateToDocuments) onNavigateToDocuments(documentId);
   };
 
-  // ── Filtered list ────────────────────────────────────────────────────────
   const filtered = batches.filter((b) => {
     const q = search.toLowerCase();
     const matchSearch =
@@ -1221,10 +1156,9 @@ export default function AdminBatchManager({
     if (filter === "archived") return archived;
     if (filter === "active") return !archived && (days === null || days > 30);
     if (filter === "expiring") return !archived && days !== null && days <= 30;
-    return true; // all
+    return true;
   });
 
-  // ── Summary stats ─────────────────────────────────────────────────────────
   const activeBatches = batches.filter((b) => !b.is_archived).length;
   const expiringBatches = batches.filter((b) => {
     const d = daysUntil(b.expiry_date);
@@ -1237,6 +1171,14 @@ export default function AdminBatchManager({
 
   return (
     <div style={{ fontFamily: FONTS.body, position: "relative" }}>
+      {/* WP-GUIDE-C++: WorkflowGuide with live batch context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="batches"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
+
       {/* Toast */}
       {toast && (
         <div
@@ -1349,7 +1291,6 @@ export default function AdminBatchManager({
         ))}
       </div>
 
-      {/* Expiry alert banner */}
       {expiringBatches > 0 && (
         <div
           style={{
@@ -1383,7 +1324,7 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Search + filter bar */}
+      {/* Search + filter */}
       <div
         style={{
           display: "flex",
@@ -1525,7 +1466,6 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Archive confirm modal */}
       {archiveTarget && (
         <div
           style={{
@@ -1594,7 +1534,6 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Create / Edit slide-in form */}
       {showForm && (
         <>
           <div

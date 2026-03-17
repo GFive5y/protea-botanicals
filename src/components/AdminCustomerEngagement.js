@@ -1,30 +1,12 @@
-// src/components/AdminCustomerEngagement.js v2.1
-// Protea Botanicals — March 2026
-// ============================================================================
-// v2.1 — Inbox / Messaging layer built on top of v2.0
-//   PRESERVED from v2.0 (ALL):
-//   - calcEngagement() scoring algorithm (recency/scans/points/profile/optins)
-//   - isChurnRisk() logic
-//   - TierBadge, EngBar, ScoreBadge, Pill, makeBtn, inputStyle, TIERS config
-//   - handleBulkSave() + Save All Scores + toast system
-//   - All stat cards, filter/sort logic
-//   - fmtDate, fmtDateTime, daysSince, timeAgo helpers
-//   - Customer 360 drawer: Profile / Loyalty / Scans / POPIA tabs
-//   - Register In-Store modal
-//   - Data deletion POPIA flow
-//   ADDED in v2.1:
-//   - 💬 Messages tab in 360 drawer (5th tab)
-//   - Compose form: type, subject, body, bonus points
-//   - Message thread view: shows full inbound + outbound history per customer
-//   - Auto-triggers: tier-up message, birthday message (if date_of_birth today)
-//     — detected on drawer open, offered as pre-filled compose
-//   - Broadcast tool: send to all customers matching active filter
-//   - Admin CRUD: mark message read, delete message (soft via read_at + notes)
-//   - Unread count badge on Messages tab
-// ============================================================================
+// src/components/AdminCustomerEngagement.js v2.2
+// WP-GUIDE-C++: usePageContext 'customers' wired + WorkflowGuide added
+// v2.1 — Inbox / Messaging layer + broadcast, compose, auto-triggers
+// v2.0 — calcEngagement scoring, churn risk, 360 drawer
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -55,16 +37,21 @@ const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Tier config — PRESERVED from v2.0 ─────────────────────────────────────────
 const TIERS = {
   platinum: {
     label: "Platinum",
     min: 1000,
-    color: C.platinum,
-    bg: C.lightPlatinum,
+    color: "#7b68ee",
+    bg: "#f0eeff",
     icon: "💎",
   },
-  gold: { label: "Gold", min: 500, color: C.gold, bg: "#fef9e7", icon: "🥇" },
+  gold: {
+    label: "Gold",
+    min: 500,
+    color: "#b5935a",
+    bg: "#fef9e7",
+    icon: "🥇",
+  },
   silver: {
     label: "Silver",
     min: 200,
@@ -90,7 +77,6 @@ function getTierCfg(points) {
   return TIERS[getTier(points)];
 }
 
-// ── Helpers — PRESERVED from v2.0 ─────────────────────────────────────────────
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -100,7 +86,6 @@ function fmtDate(d) {
   });
 }
 function fmtDateTime(d) {
-  // eslint-disable-line no-unused-vars
   if (!d) return "—";
   return new Date(d).toLocaleString("en-ZA", {
     day: "numeric",
@@ -108,7 +93,7 @@ function fmtDateTime(d) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
+} // eslint-disable-line no-unused-vars
 function daysSince(d) {
   if (!d) return null;
   return Math.floor((new Date() - new Date(d)) / 86400000);
@@ -133,7 +118,6 @@ function profileScore(p) {
   return s;
 }
 
-// ── Style helpers — PRESERVED from v2.0 ───────────────────────────────────────
 const inputStyle = {
   padding: "9px 12px",
   border: `1px solid ${C.border}`,
@@ -160,7 +144,6 @@ const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
   opacity: disabled ? 0.6 : 1,
 });
 
-// ── Engagement score calculator — PRESERVED from v2.0 ────────────────────────
 function calcEngagement(profile) {
   const days = profile.last_active_at ? daysSince(profile.last_active_at) : 999;
   let recency = 0;
@@ -169,7 +152,6 @@ function calcEngagement(profile) {
   else if (days <= 30) recency = 16;
   else if (days <= 60) recency = 8;
   else if (days <= 90) recency = 3;
-
   const scanScore = Math.min(
     25,
     Math.round(((profile.total_scans || 0) / 20) * 25),
@@ -178,7 +160,6 @@ function calcEngagement(profile) {
     20,
     Math.round(((profile.loyalty_points || 0) / 500) * 20),
   );
-
   let profScore = 0;
   if (profile.full_name) profScore += 3;
   if (profile.phone) profScore += 3;
@@ -187,13 +168,11 @@ function calcEngagement(profile) {
   if (profile.gender) profScore += 2;
   if (profile.profile_complete) profScore += 3;
   profScore = Math.min(15, profScore);
-
   let optScore = 0;
   if (profile.popia_consented) optScore += 4;
   if (profile.marketing_opt_in) optScore += 3;
   if (profile.analytics_opt_in) optScore += 3;
   optScore = Math.min(10, optScore);
-
   const total = Math.min(
     100,
     Math.max(0, recency + scanScore + pointScore + profScore + optScore),
@@ -216,7 +195,6 @@ function isChurnRisk(profile) {
   return (days !== null && days > 45) || (lowPoints && inactiveScans);
 }
 
-// ── Sub-components — PRESERVED from v2.0 ─────────────────────────────────────
 function TierBadge({ points }) {
   const t = getTierCfg(points || 0);
   return (
@@ -313,13 +291,12 @@ function Pill({ label, color, bg }) {
   );
 }
 
-// ── NEW v2.1: Message type meta ───────────────────────────────────────────────
 const MSG_META = {
   query: { label: "Query", icon: "💬", color: C.blue },
   fault: { label: "Fault", icon: "⚠", color: C.red },
   admin_notice: { label: "Notice", icon: "📢", color: C.mid },
   birthday: { label: "Birthday", icon: "🎂", color: C.gold },
-  tier_up: { label: "Tier Upgrade", icon: "🏆", color: C.platinum },
+  tier_up: { label: "Tier Upgrade", icon: "🏆", color: "#7b68ee" },
   event: { label: "Event", icon: "🎪", color: "#9b6b9e" },
   response: { label: "Response", icon: "↩️", color: C.mid },
   broadcast: { label: "Broadcast", icon: "📣", color: C.accent },
@@ -333,7 +310,9 @@ function getMsgMeta(type) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminCustomerEngagement() {
-  // ── State — PRESERVED from v2.0 ──────────────────────────────────────────────
+  // WP-GUIDE-C++: wire 'customers' context for WorkflowGuide live status
+  const ctx = usePageContext("customers", null);
+
   const [customers, setCustomers] = useState([]);
   const [engScores, setEngScores] = useState({});
   const [transactions, setTransactions] = useState([]);
@@ -344,7 +323,6 @@ export default function AdminCustomerEngagement() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [sortBy, setSortBy] = useState("engagement");
-
   const [selected, setSelected] = useState(null);
   const [drawerTab, setDrawerTab] = useState("profile");
   const [drawerData, setDrawerData] = useState({ txns: [], scans: [] });
@@ -359,9 +337,7 @@ export default function AdminCustomerEngagement() {
   const [regLoading, setRegLoading] = useState(false);
   const [regMsg, setRegMsg] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-
-  // ── State — NEW v2.1 ──────────────────────────────────────────────────────────
-  const [messages, setMessages] = useState([]); // messages for selected customer
+  const [messages, setMessages] = useState([]);
   const [msgsLoading, setMsgsLoading] = useState(false);
   const [composing, setComposing] = useState(false);
   const [composeForm, setComposeForm] = useState({
@@ -372,9 +348,9 @@ export default function AdminCustomerEngagement() {
   });
   const [sendingMsg, setSendingMsg] = useState(false);
   const [sendMsgResult, setSendMsgResult] = useState(null);
-  const [adminUser, setAdminUser] = useState(null); // current admin session
+  const [adminUser, setAdminUser] = useState(null);
   const [birthdayAlert, setBirthdayAlert] = useState(false);
-  const [tierUpAlert, setTierUpAlert] = useState(null); // {old, new} if tier changed
+  const [tierUpAlert, setTierUpAlert] = useState(null);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastForm, setBroadcastForm] = useState({
     subject: "",
@@ -389,12 +365,10 @@ export default function AdminCustomerEngagement() {
     setTimeout(() => setToast(""), 3200);
   };
 
-  // ── Get current admin user ─────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setAdminUser(user));
   }, []);
 
-  // ── Fetch all — PRESERVED from v2.0 ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -411,8 +385,8 @@ export default function AdminCustomerEngagement() {
           )
           .order("transaction_date", { ascending: false }),
       ]);
-      const custs = custRes.data || [];
-      const txns = txnRes.data || [];
+      const custs = custRes.data || [],
+        txns = txnRes.data || [];
       setCustomers(custs);
       setTransactions(txns);
       const scores = {};
@@ -431,7 +405,6 @@ export default function AdminCustomerEngagement() {
     fetchAll();
   }, [fetchAll]);
 
-  // ── Load drawer data — PRESERVED from v2.0 ───────────────────────────────────
   useEffect(() => {
     if (!selected) return;
     setDrawerLoading(true);
@@ -457,24 +430,16 @@ export default function AdminCustomerEngagement() {
       setDrawerData({ txns: txnRes.data || [], scans: scanRes.data || [] });
       setDrawerLoading(false);
     });
-
-    // ── NEW v2.1: detect birthday + tier-up triggers on drawer open ──────────
     const today = new Date();
     if (selected.date_of_birth) {
       const dob = new Date(selected.date_of_birth);
-      if (
+      setBirthdayAlert(
         dob.getMonth() === today.getMonth() &&
-        dob.getDate() === today.getDate()
-      ) {
-        setBirthdayAlert(true);
-      } else {
-        setBirthdayAlert(false);
-      }
+          dob.getDate() === today.getDate(),
+      );
     } else {
       setBirthdayAlert(false);
     }
-
-    // tier-up: compare stored tier vs computed tier
     const computedTier = getTier(selected.loyalty_points || 0);
     const storedTier = selected.loyalty_tier || "bronze";
     if (computedTier !== storedTier && computedTier !== "bronze") {
@@ -484,7 +449,6 @@ export default function AdminCustomerEngagement() {
     }
   }, [selected]);
 
-  // ── Load messages for selected customer — NEW v2.1 ───────────────────────────
   const loadMessages = useCallback(async () => {
     if (!selected) return;
     setMsgsLoading(true);
@@ -501,21 +465,18 @@ export default function AdminCustomerEngagement() {
     if (drawerTab === "messages") loadMessages();
   }, [drawerTab, loadMessages]);
 
-  // ── Bulk save — PRESERVED from v2.0 ──────────────────────────────────────────
   const handleBulkSave = async () => {
     setSaving(true);
     let saved = 0;
     for (const c of customers) {
       const eng = engScores[c.id];
       if (!eng) continue;
-      const churn = isChurnRisk(c);
-      const tier = getTier(c.loyalty_points || 0);
       const { error } = await supabase
         .from("user_profiles")
         .update({
           engagement_score: eng.total,
-          churn_risk: churn,
-          loyalty_tier: tier,
+          churn_risk: isChurnRisk(c),
+          loyalty_tier: getTier(c.loyalty_points || 0),
         })
         .eq("id", c.id);
       if (!error) saved++;
@@ -525,7 +486,6 @@ export default function AdminCustomerEngagement() {
     fetchAll();
   };
 
-  // ── Register In-Store — PRESERVED from v2.0 ───────────────────────────────────
   async function handleRegister() {
     setRegLoading(true);
     setRegMsg(null);
@@ -585,7 +545,6 @@ export default function AdminCustomerEngagement() {
     }, 3000);
   }
 
-  // ── Data deletion — PRESERVED from v2.0 ───────────────────────────────────────
   async function handleDeleteRequest(customer) {
     try {
       await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
@@ -602,7 +561,6 @@ export default function AdminCustomerEngagement() {
     }
   }
 
-  // ── NEW v2.1: Send message to customer ────────────────────────────────────────
   const handleSendMessage = async () => {
     if (!composeForm.body.trim()) {
       setSendMsgResult({ error: "Message body is required." });
@@ -613,19 +571,20 @@ export default function AdminCustomerEngagement() {
     const metadata = {};
     if (composeForm.bonus_points > 0)
       metadata.points_awarded = Number(composeForm.bonus_points);
-
-    const { error } = await supabase.from("customer_messages").insert({
-      user_id: selected.id,
-      direction: "outbound",
-      message_type: composeForm.message_type,
-      subject: composeForm.subject.trim() || null,
-      body: composeForm.body.trim(),
-      sent_by: adminUser?.id || null,
-      sent_by_name: adminUser?.email ? adminUser.email.split("@")[0] : "Admin",
-      metadata,
-    });
-
-    // Award bonus points if set
+    const { error } = await supabase
+      .from("customer_messages")
+      .insert({
+        user_id: selected.id,
+        direction: "outbound",
+        message_type: composeForm.message_type,
+        subject: composeForm.subject.trim() || null,
+        body: composeForm.body.trim(),
+        sent_by: adminUser?.id || null,
+        sent_by_name: adminUser?.email
+          ? adminUser.email.split("@")[0]
+          : "Admin",
+        metadata,
+      });
     if (!error && composeForm.bonus_points > 0) {
       const pts = Number(composeForm.bonus_points);
       await supabase
@@ -642,7 +601,6 @@ export default function AdminCustomerEngagement() {
           transaction_date: new Date().toISOString(),
         });
     }
-
     if (error) {
       setSendMsgResult({
         error: "Failed to send. Check customer_messages table exists.",
@@ -664,7 +622,6 @@ export default function AdminCustomerEngagement() {
     setSendingMsg(false);
   };
 
-  // Auto-fill birthday compose
   const prefillBirthday = () => {
     setComposing(true);
     setComposeForm({
@@ -674,8 +631,6 @@ export default function AdminCustomerEngagement() {
       bonus_points: 50,
     });
   };
-
-  // Auto-fill tier-up compose
   const prefillTierUp = () => {
     setComposing(true);
     setComposeForm({
@@ -686,7 +641,6 @@ export default function AdminCustomerEngagement() {
     });
   };
 
-  // ── NEW v2.1: Broadcast ────────────────────────────────────────────────────────
   const handleBroadcast = async () => {
     if (!broadcastForm.body.trim()) {
       setBroadcastResult({ error: "Body required." });
@@ -699,16 +653,18 @@ export default function AdminCustomerEngagement() {
     );
     let sent = 0;
     for (const c of targets) {
-      const { error } = await supabase.from("customer_messages").insert({
-        user_id: c.id,
-        direction: "outbound",
-        message_type: broadcastForm.message_type,
-        subject: broadcastForm.subject.trim() || null,
-        body: broadcastForm.body.trim(),
-        sent_by: adminUser?.id || null,
-        sent_by_name: "Protea Botanicals",
-        metadata: {},
-      });
+      const { error } = await supabase
+        .from("customer_messages")
+        .insert({
+          user_id: c.id,
+          direction: "outbound",
+          message_type: broadcastForm.message_type,
+          subject: broadcastForm.subject.trim() || null,
+          body: broadcastForm.body.trim(),
+          sent_by: adminUser?.id || null,
+          sent_by_name: "Protea Botanicals",
+          metadata: {},
+        });
       if (!error) sent++;
     }
     setBroadcastResult({
@@ -722,13 +678,12 @@ export default function AdminCustomerEngagement() {
     }, 3000);
   };
 
-  // ── Delete message — NEW v2.1 ─────────────────────────────────────────────────
   const handleDeleteMessage = async (msgId) => {
     await supabase.from("customer_messages").delete().eq("id", msgId);
     loadMessages();
   };
 
-  // ── Computed stats — PRESERVED from v2.0 ─────────────────────────────────────
+  // ── Computed stats ──
   const avgEng =
     customers.length > 0
       ? Math.round(
@@ -758,7 +713,7 @@ export default function AdminCustomerEngagement() {
     tierCounts[getTier(c.loyalty_points || 0)]++;
   });
 
-  // ── Filter + sort — PRESERVED from v2.0 ──────────────────────────────────────
+  // ── Filter + sort ──
   let displayed = [...customers];
   if (filter === "at_risk") displayed = displayed.filter((c) => isChurnRisk(c));
   if (filter === "active")
@@ -808,16 +763,20 @@ export default function AdminCustomerEngagement() {
     );
   if (sortBy === "profile")
     displayed.sort((a, b) => profileScore(b) - profileScore(a));
-
-  // ── Unread count for badge ────────────────────────────────────────────────────
   const msgUnreadCount = messages.filter(
     (m) => m.direction === "inbound" && !m.read_at,
   ).length;
 
-  // ══════════════════════════════════════════════════════════════════════════════
   return (
     <div style={{ fontFamily: FONTS.body, position: "relative" }}>
-      {/* Toast */}
+      {/* WP-GUIDE-C++: WorkflowGuide with live customers context */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="customers"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
+
       {toast && (
         <div
           style={{
@@ -839,7 +798,7 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -904,7 +863,7 @@ export default function AdminCustomerEngagement() {
         </div>
       </div>
 
-      {/* ── Stats strip ── */}
+      {/* Stats strip */}
       <div
         style={{
           display: "grid",
@@ -979,7 +938,6 @@ export default function AdminCustomerEngagement() {
         ))}
       </div>
 
-      {/* Churn alert */}
       {churnCount > 0 && (
         <div
           style={{
@@ -998,7 +956,7 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* Filters + search + sort */}
+      {/* Filters */}
       <div
         style={{
           display: "flex",
@@ -1079,7 +1037,7 @@ export default function AdminCustomerEngagement() {
         </div>
       </div>
 
-      {/* ── Customer Table (PRESERVED from v2.0) ── */}
+      {/* Table */}
       {loading ? (
         <div style={{ padding: 60, textAlign: "center", color: C.muted }}>
           Loading customers…
@@ -1287,9 +1245,7 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          CUSTOMER 360 DRAWER — v2.1: 5 tabs (added Messages)
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* ── CUSTOMER 360 DRAWER ── */}
       {selected && (
         <>
           <div
@@ -1317,7 +1273,6 @@ export default function AdminCustomerEngagement() {
               flexDirection: "column",
             }}
           >
-            {/* Drawer Header */}
             <div
               style={{
                 background: C.green,
@@ -1363,7 +1318,6 @@ export default function AdminCustomerEngagement() {
                     fontSize: 20,
                     borderRadius: 2,
                     padding: "4px 10px",
-                    fontFamily: FONTS.body,
                   }}
                   onClick={() => setSelected(null)}
                 >
@@ -1372,7 +1326,6 @@ export default function AdminCustomerEngagement() {
               </div>
             </div>
 
-            {/* Trigger alerts (birthday / tier-up) */}
             {(birthdayAlert || tierUpAlert) && (
               <div
                 style={{
@@ -1436,7 +1389,6 @@ export default function AdminCustomerEngagement() {
               </div>
             )}
 
-            {/* Drawer Tabs — v2.1: added Messages tab */}
             <div
               style={{
                 display: "flex",
@@ -1483,9 +1435,8 @@ export default function AdminCustomerEngagement() {
               ))}
             </div>
 
-            {/* Drawer Body */}
             <div style={{ padding: 24, flex: 1 }}>
-              {/* ── PROFILE TAB (PRESERVED from v2.0) ── */}
+              {/* PROFILE TAB */}
               {drawerTab === "profile" &&
                 (() => {
                   const eng =
@@ -1691,58 +1642,6 @@ export default function AdminCustomerEngagement() {
                             fontFamily: FONTS.body,
                           }}
                         >
-                          Profile Completeness
-                        </div>
-                        <div
-                          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
-                        >
-                          {[
-                            { label: "Name", done: !!selected.full_name },
-                            { label: "Phone", done: !!selected.phone },
-                            { label: "DOB", done: !!selected.date_of_birth },
-                            { label: "Province", done: !!selected.province },
-                            {
-                              label: "POPIA",
-                              done: !!selected.popia_consented,
-                            },
-                          ].map(({ label, done }) => (
-                            <span
-                              key={label}
-                              style={{
-                                fontSize: 11,
-                                fontFamily: FONTS.body,
-                                padding: "4px 12px",
-                                borderRadius: 10,
-                                background: done ? C.lightGreen : "#eee",
-                                color: done ? C.mid : C.muted,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {done ? "✓" : "○"} {label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          background: C.white,
-                          border: `1px solid ${C.border}`,
-                          borderRadius: 2,
-                          padding: 20,
-                          marginBottom: 16,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            letterSpacing: "0.15em",
-                            textTransform: "uppercase",
-                            color: C.muted,
-                            marginBottom: 14,
-                            fontFamily: FONTS.body,
-                          }}
-                        >
                           Identity
                         </div>
                         <div
@@ -1762,14 +1661,6 @@ export default function AdminCustomerEngagement() {
                             { label: "Gender", val: selected.gender },
                             { label: "Province", val: selected.province },
                             { label: "City", val: selected.city },
-                            {
-                              label: "Preferred Type",
-                              val: selected.preferred_type,
-                            },
-                            {
-                              label: "How Found Us",
-                              val: selected.acquisition_channel,
-                            },
                             {
                               label: "Total Scans",
                               val: selected.total_scans || 0,
@@ -1821,7 +1712,7 @@ export default function AdminCustomerEngagement() {
                   );
                 })()}
 
-              {/* ── LOYALTY TAB (PRESERVED from v2.0) ── */}
+              {/* LOYALTY TAB */}
               {drawerTab === "loyalty" && (
                 <>
                   <div
@@ -1966,7 +1857,7 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* ── SCANS TAB (PRESERVED from v2.0) ── */}
+              {/* SCANS TAB */}
               {drawerTab === "scans" && (
                 <>
                   <div
@@ -2175,10 +2066,9 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* ── MESSAGES TAB — NEW v2.1 ── */}
+              {/* MESSAGES TAB */}
               {drawerTab === "messages" && (
                 <>
-                  {/* Compose toggle */}
                   <div
                     style={{
                       display: "flex",
@@ -2212,8 +2102,6 @@ export default function AdminCustomerEngagement() {
                       {composing ? "✕ Cancel" : "+ Compose"}
                     </button>
                   </div>
-
-                  {/* Compose form */}
                   {composing && (
                     <div
                       style={{
@@ -2395,8 +2283,6 @@ export default function AdminCustomerEngagement() {
                       )}
                     </div>
                   )}
-
-                  {/* Message thread */}
                   {msgsLoading ? (
                     <div
                       style={{
@@ -2426,8 +2312,8 @@ export default function AdminCustomerEngagement() {
                     <div style={{ display: "grid", gap: 1 }}>
                       {messages.map((msg) => {
                         const m = getMsgMeta(msg.message_type);
-                        const isInbound = msg.direction === "inbound";
-                        const isUnread = isInbound && !msg.read_at;
+                        const isInbound = msg.direction === "inbound",
+                          isUnread = isInbound && !msg.read_at;
                         return (
                           <div
                             key={msg.id}
@@ -2556,7 +2442,7 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* ── POPIA TAB (PRESERVED from v2.0) ── */}
+              {/* POPIA TAB */}
               {drawerTab === "popia" && (
                 <>
                   <div
@@ -2725,9 +2611,7 @@ export default function AdminCustomerEngagement() {
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          BROADCAST MODAL — NEW v2.1
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* BROADCAST MODAL */}
       {showBroadcast && (
         <div
           style={{
@@ -2777,59 +2661,63 @@ export default function AdminCustomerEngagement() {
               opted-in customers matching your current filter (
               {displayed.length} visible).
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: C.muted,
-                  marginBottom: 5,
-                }}
-              >
-                Type
-              </label>
-              <select
-                value={broadcastForm.message_type}
-                onChange={(e) =>
-                  setBroadcastForm((f) => ({
-                    ...f,
-                    message_type: e.target.value,
-                  }))
-                }
-                style={{ ...inputStyle, width: "100%" }}
-              >
-                <option value="broadcast">📣 Broadcast</option>
-                <option value="event">🎪 Event</option>
-                <option value="admin_notice">📢 Notice</option>
-              </select>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: C.muted,
-                  marginBottom: 5,
-                }}
-              >
-                Subject
-              </label>
-              <input
-                type="text"
-                value={broadcastForm.subject}
-                onChange={(e) =>
-                  setBroadcastForm((f) => ({ ...f, subject: e.target.value }))
-                }
-                style={{ ...inputStyle, width: "100%" }}
-                placeholder="Optional subject"
-              />
-            </div>
+            {[
+              {
+                field: "type",
+                label: "Type",
+                el: (
+                  <select
+                    value={broadcastForm.message_type}
+                    onChange={(e) =>
+                      setBroadcastForm((f) => ({
+                        ...f,
+                        message_type: e.target.value,
+                      }))
+                    }
+                    style={{ ...inputStyle, width: "100%" }}
+                  >
+                    <option value="broadcast">📣 Broadcast</option>
+                    <option value="event">🎪 Event</option>
+                    <option value="admin_notice">📢 Notice</option>
+                  </select>
+                ),
+              },
+              {
+                field: "subject",
+                label: "Subject",
+                el: (
+                  <input
+                    type="text"
+                    value={broadcastForm.subject}
+                    onChange={(e) =>
+                      setBroadcastForm((f) => ({
+                        ...f,
+                        subject: e.target.value,
+                      }))
+                    }
+                    style={{ ...inputStyle, width: "100%" }}
+                    placeholder="Optional subject"
+                  />
+                ),
+              },
+            ].map(({ field, label, el }) => (
+              <div key={field} style={{ marginBottom: 12 }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: C.muted,
+                    marginBottom: 5,
+                  }}
+                >
+                  {label}
+                </label>
+                {el}
+              </div>
+            ))}
             <div style={{ marginBottom: 16 }}>
               <label
                 style={{
@@ -2897,9 +2785,7 @@ export default function AdminCustomerEngagement() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          REGISTER IN-STORE MODAL — PRESERVED from v2.0
-      ══════════════════════════════════════════════════════════════════════ */}
+      {/* REGISTER IN-STORE MODAL */}
       {showRegister && (
         <div
           style={{
