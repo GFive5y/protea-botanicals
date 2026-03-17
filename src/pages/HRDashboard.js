@@ -16,6 +16,7 @@ import HRStaffDirectory from "../components/hq/HRStaffDirectory";
 import HRLeave from "../components/hq/HRLeave";
 import HRTimesheets from "../components/hq/HRTimesheets";
 import HRContracts from "../components/hq/HRContracts";
+import HRDisciplinary from "../components/hq/HRDisciplinary";
 import HRSettings from "../components/hq/HRSettings";
 
 const C = {
@@ -40,6 +41,7 @@ const TABS = [
   { id: "leave", label: "Leave" },
   { id: "timesheets", label: "Timesheets" },
   { id: "contracts", label: "Contracts" },
+  { id: "disciplinary", label: "Disciplinary" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -482,6 +484,7 @@ export default function HRDashboard() {
         {tab === "leave" && <HRLeave tenantId={tenantId} />}
         {tab === "timesheets" && <HRTimesheets tenantId={tenantId} />}
         {tab === "contracts" && <HRContracts tenantId={tenantId} />}
+        {tab === "disciplinary" && <HRDisciplinary tenantId={tenantId} />}
         {tab === "settings" && <HRSettings tenantId={tenantId} />}
       </div>
     </div>

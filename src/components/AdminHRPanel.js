@@ -1,8 +1,9 @@
-// AdminHRPanel.js v1.3
+// AdminHRPanel.js v1.4
 // Protea Botanicals · HR Module · Admin HR Panel Container
-// WP-HR-5 · March 2026
+// WP-HR-6 · March 2026
 // src/components/AdminHRPanel.js
 //
+// v1.4 — WP-HR-6: Disciplinary tab unlocked — HRDisciplinary.js wired
 // v1.3 — WP-HR-5: Contracts tab unlocked — HRContracts.js wired
 // v1.2 — WP-HR-4: Timesheets tab unlocked — HRTimesheets.js wired
 // v1.1 — WP-HR-3: Leave tab unlocked — HRLeave.js wired
@@ -15,6 +16,7 @@ import HRStaffDirectory from "./hq/HRStaffDirectory";
 import HRLeave from "./hq/HRLeave";
 import HRTimesheets from "./hq/HRTimesheets";
 import HRContracts from "./hq/HRContracts";
+import HRDisciplinary from "./hq/HRDisciplinary";
 
 // ─── Sub-tab config ────────────────────────────────────────────────────────────
 const SUB_TABS = [
@@ -22,7 +24,7 @@ const SUB_TABS = [
   { id: "leave", label: "🗓 Leave", live: true, wp: null },
   { id: "timesheets", label: "⏱ Timesheets", live: true, wp: null },
   { id: "contracts", label: "📋 Contracts", live: true, wp: null },
-  { id: "disciplinary", label: "⚠ Disciplinary", live: false, wp: "WP-HR-6" },
+  { id: "disciplinary", label: "⚠ Disciplinary", live: true, wp: null },
 ];
 
 const s = {
@@ -136,6 +138,7 @@ export default function AdminHRPanel({ tenantId, user }) {
       {activeTab === "leave" && <HRLeave tenantId={tenantId} />}
       {activeTab === "timesheets" && <HRTimesheets tenantId={tenantId} />}
       {activeTab === "contracts" && <HRContracts tenantId={tenantId} />}
+      {activeTab === "disciplinary" && <HRDisciplinary tenantId={tenantId} />}
 
       {activeTabDef && !activeTabDef.live && (
         <div style={s.placeholder}>
@@ -146,10 +149,7 @@ export default function AdminHRPanel({ tenantId, user }) {
             {activeTabDef.label.replace(/^[^\s]+\s/, "")} Module
           </h3>
           <span style={s.placeholderWp}>{activeTabDef.wp}</span>
-          <p style={s.placeholderText}>
-            Coming in the next HR work package. Staff, Leave, Timesheets and
-            Contracts are live now.
-          </p>
+          <p style={s.placeholderText}>All tabs are now live.</p>
         </div>
       )}
     </div>
