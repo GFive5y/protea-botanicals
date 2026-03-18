@@ -1,81 +1,83 @@
-// src/components/hq/HQOverview.js — Protea Botanicals v2.1
-// WP-X: System Intelligence Layer — HQ Overview overhaul
-// WP-GUIDE-C: usePageContext('overview') wired to WorkflowGuide + GAP-01 tile onClick confirmed
-//
+// src/components/hq/HQOverview.js — v3.1 — WP-THEME-2: Inter font
+// v3.0 — WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all metric values
+//   - Emoji icons removed — SVG / text indicators only
+//   - Coloured top borders removed — semantic state on value colour only
+//   - Alert bars use standard 4-variant template
+//   - Buttons use standard 4-variant system
 // v2.1 — WP-GUIDE-C: wire overview context to WorkflowGuide
-// v2.0: New 3-row tile grid (Operations · Customer Intelligence · Import ERP)
-//       + WorkflowGuide contextual onboarding
-//       + SystemStatusBar (injected at HQDashboard level — not here)
-//       + Fraud tile, Production tile, P&L snapshot tile
-//       All v1.9 functionality retained: FX rate, birthday stats,
-//       recent scans, low stock, reorder alerts, avg margin, import POs.
-// v1.9: Comms tile expanded — open tickets + unread customer + unread wholesale
-// v1.8: Products KPI from product_cogs
-// v1.6: Open tickets KPI + live USD/ZAR
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 
-// ─── Colour tokens ───────────────────────────────────────────────────────────
-const C = {
-  bg: "#faf9f6",
-  warmBg: "#f4f0e8",
-  primaryDark: "#1b4332",
-  primaryMid: "#2d6a4f",
-  accentGreen: "#52b788",
-  gold: "#b5935a",
-  text: "#1a1a1a",
-  muted: "#888888",
-  border: "#e8e0d4",
-  white: "#ffffff",
-  red: "#c0392b",
-  orange: "#E65100",
-  purple: "#6A1B9A",
-  blue: "#2c4a6e",
-};
-
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ─── WorkflowGuide content ───────────────────────────────────────────────────
+// ─── Design tokens (mirrors src/theme.js) ───────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadowCard: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+// ─── WorkflowGuide content (unchanged) ──────────────────────────────────────
 const GUIDE_STEPS = [
   {
     number: 1,
     label: "Supply Chain",
-    desc: "Add suppliers → Create POs → Receive stock. Raw materials enter inventory here.",
+    desc: "Add suppliers, create POs, receive stock. Raw materials enter inventory here.",
     status: "required",
-    link: null,
   },
   {
     number: 2,
     label: "Production",
-    desc: "Create batches → Run production. Finished products deduct raw materials and add to finished goods inventory.",
+    desc: "Create batches, run production. Finished products deduct raw materials and add to finished goods.",
     status: "required",
-    link: null,
   },
   {
     number: 3,
     label: "Pricing",
-    desc: "Set sell_price per product in the Pricing tab. Without a sell_price > R0 the product will NOT appear in the customer shop.",
+    desc: "Set sell_price per product. Without sell_price > R0 the product will NOT appear in the shop.",
     status: "required",
-    link: null,
   },
   {
     number: 4,
     label: "Distribution",
     desc: "Ship finished goods to wholesale partners via the Distribution tab.",
     status: "optional",
-    link: null,
   },
   {
     number: 5,
     label: "Monitor Daily",
-    desc: "Check Comms for customer messages, Fraud for flagged accounts, and Reorder alerts for low stock.",
+    desc: "Check Comms for messages, Fraud for flagged accounts, and Reorder alerts for low stock.",
     status: "required",
-    link: null,
   },
 ];
 const GUIDE_DATAFLOW = [
@@ -83,7 +85,7 @@ const GUIDE_DATAFLOW = [
     direction: "in",
     from: "Purchase Orders received",
     to: "inventory_items (raw materials +)",
-    note: "Triggered by 'Receive' action on a PO",
+    note: "Triggered by Receive action on a PO",
   },
   {
     direction: "in",
@@ -106,14 +108,14 @@ const GUIDE_DATAFLOW = [
   {
     direction: "out",
     from: "Admin reply in Comms",
-    to: "customer_messages (outbound) + WhatsApp notification",
+    to: "customer_messages (outbound) + WhatsApp",
     note: "Realtime: inbox-{userId} channel fires immediately",
   },
   {
     direction: "out",
     from: "Loyalty Schema applied",
     to: "All pts_ and mult_ fields updated live",
-    note: "Next scan/purchase reads new config instantly — no restart needed",
+    note: "Next scan/purchase reads new config instantly",
   },
 ];
 const GUIDE_WARNINGS = [
@@ -126,16 +128,15 @@ const GUIDE_WARNINGS = [
   "Notifications tab = SMS delivery log only. It is NOT a comms channel.",
 ];
 const GUIDE_TIPS = [
-  "Apply a loyalty schema first (Conservative / Standard / Aggressive) to get a clean baseline, then fine-tune individual values in the other tabs.",
-  "Check the Fraud tab daily. anomaly_score > 70 requires review. Dismiss false positives promptly so real threats stay visible.",
-  "The FX rate widget updates every 60 seconds from the live API. All COGS calculations use this rate automatically.",
-  "The Comms tile turns red when there are open tickets or unread messages. Click it to go directly to Admin Comms.",
-  "Production tile shows finished goods with quantity < 5. These products are at risk of going out of stock in the shop.",
+  "Apply a loyalty schema first (Conservative / Standard / Aggressive) to get a clean baseline.",
+  "Check the Fraud tab daily. anomaly_score > 70 requires review.",
+  "The FX rate updates every 60 seconds. All COGS calculations use this rate automatically.",
+  "The Comms tile turns red when there are open tickets or unread messages.",
+  "Production tile shows finished goods with quantity < 5 — at risk of going out of stock.",
 ];
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function HQOverview({ onNavigate }) {
-  // WP-GUIDE-C: wire 'overview' context for WorkflowGuide live status
   const ctx = usePageContext("overview", null);
 
   const [stats, setStats] = useState(null);
@@ -177,7 +178,7 @@ export default function HQOverview({ onNavigate }) {
     try {
       const r = await supabase
         .from("fx_rates")
-        .select("rate, fetched_at")
+        .select("rate,fetched_at")
         .eq("currency_pair", "USD/ZAR")
         .order("fetched_at", { ascending: false })
         .limit(1);
@@ -406,11 +407,12 @@ export default function HQOverview({ onNavigate }) {
           .from("orders")
           .select("total")
           .gte("created_at", monthStart.toISOString());
-        const revenueMTD = (ordersData || []).reduce(
-          (s, o) => s + (parseFloat(o.total) || 0),
-          0,
-        );
-        setPlStats({ revenueMTD });
+        setPlStats({
+          revenueMTD: (ordersData || []).reduce(
+            (s, o) => s + (parseFloat(o.total) || 0),
+            0,
+          ),
+        });
       } catch (_) {
         setPlStats({ revenueMTD: 0 });
       }
@@ -505,16 +507,24 @@ export default function HQOverview({ onNavigate }) {
     fetchStats();
   }, [fetchStats]);
 
+  // ── Loading ──
   if (loading)
     return (
-      <div style={{ textAlign: "center", padding: "60px 0", color: C.muted }}>
+      <div
+        style={{
+          textAlign: "center",
+          padding: "60px 0",
+          color: T.ink500,
+          fontFamily: T.fontUi,
+        }}
+      >
         <style>{`@keyframes protea-spin{to{transform:rotate(360deg)}}`}</style>
         <div
           style={{
-            width: 32,
-            height: 32,
-            border: `3px solid ${C.border}`,
-            borderTopColor: C.primaryDark,
+            width: 28,
+            height: 28,
+            border: `2px solid ${T.ink150}`,
+            borderTopColor: T.accent,
             borderRadius: "50%",
             animation: "protea-spin 0.8s linear infinite",
             margin: "0 auto 16px",
@@ -524,7 +534,7 @@ export default function HQOverview({ onNavigate }) {
           style={{
             fontSize: 11,
             fontWeight: 600,
-            letterSpacing: "0.15em",
+            letterSpacing: "0.12em",
             textTransform: "uppercase",
           }}
         >
@@ -533,47 +543,39 @@ export default function HQOverview({ onNavigate }) {
       </div>
     );
 
+  // ── Error ──
   if (error)
     return (
       <div
         style={{
-          background: "#fdf2f2",
-          border: "1px solid #fecaca",
-          borderRadius: 2,
-          padding: "16px 20px",
-          color: C.red,
+          background: T.dangerBg,
+          border: `1px solid ${T.dangerBd}`,
+          borderRadius: 6,
+          padding: "14px 18px",
+          color: T.danger,
+          fontFamily: T.fontUi,
           fontSize: 13,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
         }}
       >
-        {error}
-        <button
-          onClick={fetchStats}
-          style={{
-            marginLeft: 12,
-            background: C.primaryDark,
-            color: C.white,
-            border: "none",
-            borderRadius: 2,
-            padding: "6px 14px",
-            cursor: "pointer",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-          }}
-        >
+        <span style={{ flex: 1 }}>{error}</span>
+        <button onClick={fetchStats} style={{ ...btn("primary", "sm") }}>
           Retry
         </button>
       </div>
     );
 
   const nav = (tab) => onNavigate && onNavigate(tab);
+
   const marginColour =
     erpStats?.avgMarginPct >= 35
-      ? "#2E7D32"
+      ? T.success
       : erpStats?.avgMarginPct >= 20
-        ? C.orange
-        : C.red;
+        ? T.warning
+        : T.danger;
+
   const commsTotal =
     (stats.openTickets || 0) +
     (stats.unreadMsgs || 0) +
@@ -582,12 +584,11 @@ export default function HQOverview({ onNavigate }) {
   const lowFinishedCount = productionStats?.lowFinished?.length || 0;
 
   return (
-    <div>
-      {/* WP-GUIDE-C: WorkflowGuide with live overview context wired */}
+    <div style={{ fontFamily: T.fontUi }}>
       <WorkflowGuide
         context={ctx}
         title="HQ Command Centre"
-        description="The master control room for Protea Botanicals. Every number here is live — no refresh needed. Follow the workflow below to get products into the shop and keep operations running smoothly."
+        description="Master control for Protea Botanicals. Every number is live. Follow the workflow below to get products into the shop and keep operations running."
         steps={GUIDE_STEPS}
         warnings={GUIDE_WARNINGS}
         dataFlow={GUIDE_DATAFLOW}
@@ -596,108 +597,92 @@ export default function HQOverview({ onNavigate }) {
         defaultOpen={false}
       />
 
-      {/* ROW 1 — OPERATIONS HEALTH */}
+      {/* ── ROW 1: OPERATIONS HEALTH ── */}
       <SectionLabel label="Operations Health" />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 14,
-          marginBottom: 28,
-        }}
-      >
-        <TileCard
-          icon="🏭"
+      <div style={tileGrid}>
+        <MetricTile
           label="Production"
           value={productionStats?.activeBatches ?? "—"}
+          subLabel="active batches"
           sub={
             lowFinishedCount > 0
-              ? `⚠ ${lowFinishedCount} finished good${lowFinishedCount !== 1 ? "s" : ""} low`
+              ? `${lowFinishedCount} finished goods low`
               : "all batches healthy"
           }
-          color={lowFinishedCount > 0 ? C.orange : C.primaryMid}
-          alert={lowFinishedCount > 0}
+          semantic={lowFinishedCount > 0 ? "warning" : "success"}
           onClick={() => nav("hq-production")}
-          hint="→ HQ Production"
-          subLabel="active batches"
+          hint="HQ Production"
         />
-        <TileCard
-          icon="📦"
+        <MetricTile
           label="Import POs"
           value={erpStats?.activeImportPOs ?? "—"}
-          sub="in transit / pending"
-          color={C.blue}
-          onClick={() => nav("procurement")}
-          hint="→ Procurement"
           subLabel="open orders"
+          sub="in transit / pending"
+          semantic="info"
+          onClick={() => nav("procurement")}
+          hint="Procurement"
         />
-        <TileCard
-          icon="📊"
+        <MetricTile
           label="Revenue MTD"
           value={
             plStats
               ? `R${plStats.revenueMTD.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
               : "—"
           }
+          subLabel="this month"
           sub={
             erpStats?.avgMarginPct != null
               ? `${erpStats.avgMarginPct.toFixed(1)}% avg margin`
               : "margin loading…"
           }
-          color={marginColour}
+          semantic={
+            erpStats?.avgMarginPct >= 35
+              ? "success"
+              : erpStats?.avgMarginPct >= 20
+                ? "warning"
+                : "danger"
+          }
           onClick={() => nav("pl")}
-          hint="→ P&L"
-          subLabel="this month"
+          hint="P&L"
         />
-        <TileCard
-          icon="🔔"
+        <MetricTile
           label="Reorder Alerts"
           value={erpStats?.reorderCount ?? "—"}
+          subLabel="below threshold"
           sub={
             erpStats?.reorderCount > 0 ? "items need reorder" : "all stocked"
           }
-          color={erpStats?.reorderCount > 0 ? C.red : C.accentGreen}
-          alert={erpStats?.reorderCount > 0}
+          semantic={erpStats?.reorderCount > 0 ? "danger" : "success"}
           onClick={() => nav("reorder")}
-          hint="→ Reorder"
-          subLabel="below threshold"
+          hint="Reorder"
         />
       </div>
 
-      {/* ROW 2 — CUSTOMER INTELLIGENCE */}
+      {/* ── ROW 2: CUSTOMER INTELLIGENCE ── */}
       <SectionLabel label="Customer Intelligence" />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 14,
-          marginBottom: 28,
-        }}
-      >
-        <TileCard
-          icon="📱"
+      <div style={tileGrid}>
+        <MetricTile
           label="QR Scans"
           value={stats.scans}
-          sub={`${stats.recentScanCount} in last 7 days`}
-          color={C.accentGreen}
-          onClick={() => nav("analytics")}
-          hint="→ Analytics"
           subLabel="total lifetime"
+          sub={`${stats.recentScanCount} in last 7 days`}
+          semantic="success"
+          onClick={() => nav("analytics")}
+          hint="Analytics"
         />
-        <TileCard
-          icon="🏆"
+        <MetricTile
           label="Loyalty Points"
           value={stats.loyaltyPoints.toLocaleString()}
-          sub={`${stats.users} registered members`}
-          color={C.gold}
-          onClick={() => nav("loyalty")}
-          hint="→ Loyalty"
           subLabel="total issued"
+          sub={`${stats.users} registered members`}
+          semantic="info"
+          onClick={() => nav("loyalty")}
+          hint="Loyalty"
         />
-        <TileCard
-          icon="💬"
+        <MetricTile
           label="Comms"
           value={commsTotal}
+          subLabel="items needing attention"
           sub={
             [
               stats.openTickets > 0
@@ -713,16 +698,14 @@ export default function HQOverview({ onNavigate }) {
               .filter(Boolean)
               .join(" · ") || "all clear"
           }
-          color={commsTotal > 0 ? C.red : C.accentGreen}
-          alert={commsTotal > 0}
+          semantic={commsTotal > 0 ? "danger" : "success"}
           onClick={() => (window.location.href = "/admin")}
-          hint="→ Admin Comms"
-          subLabel="items needing attention"
+          hint="Admin Comms"
         />
-        <TileCard
-          icon="🛡️"
+        <MetricTile
           label="Fraud Alerts"
           value={fraudStats ? fraudTotal : "—"}
+          subLabel="accounts flagged"
           sub={
             [
               fraudStats?.flagged > 0 ? `${fraudStats.flagged} flagged` : null,
@@ -733,47 +716,43 @@ export default function HQOverview({ onNavigate }) {
               .filter(Boolean)
               .join(" · ") || "no alerts"
           }
-          color={fraudTotal > 0 ? C.red : C.accentGreen}
-          alert={fraudTotal > 0}
+          semantic={fraudTotal > 0 ? "danger" : "success"}
           onClick={() => nav("fraud")}
-          hint="→ Fraud & Security"
-          subLabel="accounts flagged"
+          hint="Fraud & Security"
         />
       </div>
 
-      {/* ROW 3 — BIRTHDAYS */}
+      {/* ── ROW 3: BIRTHDAYS ── */}
       <SectionLabel label="Birthdays" />
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 14,
+          gap: 12,
           marginBottom: 28,
         }}
       >
-        <TileCard
-          icon="🎂"
+        <MetricTile
           label="Birthdays Today"
           value={birthdayStats.today}
+          subLabel="customers"
           sub={
             birthdayStats.today > 0
               ? "bonus points sent at 06:00"
               : "none today"
           }
-          color={birthdayStats.today > 0 ? C.purple : C.muted}
-          subLabel="customers"
+          semantic={birthdayStats.today > 0 ? "info" : null}
         />
-        <TileCard
-          icon="🎉"
+        <MetricTile
           label="Birthdays This Week"
           value={birthdayStats.thisWeek}
-          sub="next 7 days"
-          color={birthdayStats.thisWeek > 0 ? C.gold : C.muted}
           subLabel="upcoming"
+          sub="next 7 days"
+          semantic={birthdayStats.thisWeek > 0 ? "info" : null}
         />
       </div>
 
-      {/* ROW 4 — IMPORT ERP */}
+      {/* ── ROW 4: IMPORT ERP ── */}
       {erpStats && (
         <>
           <SectionLabel label="Import ERP" />
@@ -781,31 +760,39 @@ export default function HQOverview({ onNavigate }) {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-              gap: 14,
+              gap: 12,
               marginBottom: 28,
             }}
           >
-            <ERPCard
-              icon="📊"
+            <MetricTile
               label="Avg Gross Margin"
               value={
                 erpStats.avgMarginPct !== null
                   ? `${erpStats.avgMarginPct.toFixed(1)}%`
                   : "—"
               }
-              color={erpStats.avgMarginPct !== null ? marginColour : C.muted}
-              sub="retail channel avg"
+              subLabel="retail channel"
+              sub="average across SKUs"
+              semantic={
+                erpStats.avgMarginPct !== null
+                  ? erpStats.avgMarginPct >= 35
+                    ? "success"
+                    : erpStats.avgMarginPct >= 20
+                      ? "warning"
+                      : "danger"
+                  : null
+              }
               onClick={() => nav("pricing")}
+              hint="Pricing"
             />
-            {/* FX Rate widget */}
+            {/* FX Rate card */}
             <div
               style={{
-                background: "#E8F5E9",
-                border: "1px solid #c8e6c9",
-                borderTop: "3px solid #2E7D32",
-                borderRadius: 2,
+                background: "white",
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 6,
                 padding: "18px 20px",
-                position: "relative",
+                boxShadow: T.shadowCard,
               }}
             >
               <div
@@ -813,134 +800,132 @@ export default function HQOverview({ onNavigate }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  marginBottom: 10,
+                  marginBottom: 8,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 14 }}>💱</span>
-                  <span
-                    style={{
-                      color: C.muted,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      letterSpacing: "0.15em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    USD / ZAR
-                  </span>
-                </div>
-                <button
-                  onClick={() => fetchFx(false)}
-                  disabled={fxRefreshing}
-                  title="Refresh rate now"
+                <span
                   style={{
-                    background: "none",
-                    border: "none",
-                    cursor: fxRefreshing ? "default" : "pointer",
-                    fontSize: 14,
-                    opacity: fxRefreshing ? 0.4 : 1,
-                    padding: 0,
-                    lineHeight: 1,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: T.ink500,
                   }}
                 >
-                  {fxRefreshing ? "⏳" : "↻"}
-                </button>
+                  USD / ZAR
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span
+                    style={{
+                      fontFamily: T.fontData,
+                      fontSize: 10,
+                      color: T.ink400,
+                      background: T.ink075,
+                      padding: "1px 6px",
+                      borderRadius: 3,
+                    }}
+                  >
+                    {fxCountdown}s
+                  </span>
+                  <button
+                    onClick={() => fetchFx(false)}
+                    disabled={fxRefreshing}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: fxRefreshing ? "default" : "pointer",
+                      color: T.ink500,
+                      fontSize: 14,
+                      padding: 0,
+                      opacity: fxRefreshing ? 0.4 : 1,
+                    }}
+                    title="Refresh rate"
+                  >
+                    ↻
+                  </button>
+                </div>
               </div>
               <div
                 style={{
-                  fontFamily: "'Cormorant Garamond',serif",
+                  fontFamily: T.fontData,
                   fontSize: 28,
-                  fontWeight: 300,
-                  color: "#2E7D32",
+                  fontWeight: 400,
+                  color: T.success,
                   lineHeight: 1,
+                  letterSpacing: "-0.02em",
                 }}
               >
                 {fxRate
                   ? `R${fxRate.toFixed(4)}`
                   : erpStats.fxRate
                     ? `R${erpStats.fxRate.toFixed(4)}`
-                    : "Loading…"}
+                    : "—"}
               </div>
-              <div
-                style={{
-                  color: C.muted,
-                  fontSize: 10,
-                  marginTop: 6,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span>
-                  {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
-                </span>
-                <span
-                  style={{
-                    background: "rgba(46,125,50,0.12)",
-                    color: "#2E7D32",
-                    padding: "1px 6px",
-                    borderRadius: 2,
-                    fontWeight: 700,
-                    fontSize: 9,
-                  }}
-                >
-                  ↻ {fxCountdown}s
-                </span>
+              <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
+                {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
               </div>
             </div>
           </div>
         </>
       )}
 
-      {/* PANELS — Recent Scans + Low Stock */}
+      {/* ── PANELS: Recent Scans + Low Stock ── */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: 24,
+          gap: 20,
           marginBottom: 24,
         }}
       >
+        {/* Recent Scans */}
         <div
           style={{
-            background: C.white,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            background: "white",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
             overflow: "hidden",
+            boxShadow: T.shadowCard,
           }}
         >
           <div
             onClick={() => nav("analytics")}
             style={{
               padding: "14px 20px",
-              borderBottom: `1px solid ${C.border}`,
+              borderBottom: `1px solid ${T.ink150}`,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               cursor: "pointer",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = C.warmBg)}
+            onMouseEnter={(e) => (e.currentTarget.style.background = T.ink075)}
             onMouseLeave={(e) =>
               (e.currentTarget.style.background = "transparent")
             }
           >
-            <h3
-              style={{ ...sH, display: "flex", alignItems: "center", gap: 8 }}
-            >
-              Recent Scans{" "}
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}>
+              Recent Scans
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span
+                style={{ fontSize: 11, color: T.accentMid, fontWeight: 500 }}
+              >
+                Analytics
+              </span>
               <span
                 style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: C.accentGreen,
-                  fontFamily: "Jost,sans-serif",
+                  background: T.accentLit,
+                  color: T.accent,
+                  padding: "1px 7px",
+                  borderRadius: 2,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
                 }}
               >
-                → Analytics
+                {recentScans.length}
               </span>
-            </h3>
-            <span style={badge}>{recentScans.length}</span>
+            </div>
           </div>
           <div style={{ maxHeight: 280, overflowY: "auto" }}>
             {recentScans.length === 0 ? (
@@ -948,7 +933,7 @@ export default function HQOverview({ onNavigate }) {
                 style={{
                   padding: 24,
                   textAlign: "center",
-                  color: C.muted,
+                  color: T.ink500,
                   fontSize: 13,
                 }}
               >
@@ -962,7 +947,7 @@ export default function HQOverview({ onNavigate }) {
                     padding: "10px 20px",
                     borderBottom:
                       i < recentScans.length - 1
-                        ? `1px solid ${C.border}`
+                        ? `1px solid ${T.ink075}`
                         : "none",
                     display: "flex",
                     justifyContent: "space-between",
@@ -971,19 +956,26 @@ export default function HQOverview({ onNavigate }) {
                   }}
                 >
                   <div>
-                    <span style={{ color: C.text, fontWeight: 500 }}>
+                    <span
+                      style={{
+                        color: T.ink900,
+                        fontFamily: T.fontData,
+                        fontSize: 11,
+                        fontWeight: 500,
+                      }}
+                    >
                       {scan.qr_code ? scan.qr_code.slice(0, 20) + "…" : "—"}
                     </span>
                     {scan.qr_type && (
                       <span
                         style={{
                           marginLeft: 8,
-                          background: "rgba(82,183,136,0.1)",
-                          color: C.accentGreen,
+                          background: T.infoBg,
+                          color: T.info,
                           padding: "1px 6px",
                           borderRadius: 2,
                           fontSize: 9,
-                          fontWeight: 600,
+                          fontWeight: 700,
                           letterSpacing: "0.1em",
                           textTransform: "uppercase",
                         }}
@@ -993,13 +985,13 @@ export default function HQOverview({ onNavigate }) {
                     )}
                     {scan.ip_city && (
                       <span
-                        style={{ marginLeft: 6, fontSize: 10, color: C.muted }}
+                        style={{ marginLeft: 6, fontSize: 10, color: T.ink400 }}
                       >
-                        📍{scan.ip_city}
+                        {scan.ip_city}
                       </span>
                     )}
                   </div>
-                  <span style={{ color: C.muted, fontSize: 11 }}>
+                  <span style={{ color: T.ink400, fontSize: 11 }}>
                     {fmtAgo(scan.scanned_at)}
                   </span>
                 </div>
@@ -1008,55 +1000,60 @@ export default function HQOverview({ onNavigate }) {
           </div>
         </div>
 
+        {/* Low Stock */}
         <div
           style={{
-            background: C.white,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            background: "white",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
             overflow: "hidden",
+            boxShadow: T.shadowCard,
           }}
         >
           <div
             onClick={() => nav("supply-chain")}
             style={{
               padding: "14px 20px",
-              borderBottom: `1px solid ${C.border}`,
+              borderBottom: `1px solid ${T.ink150}`,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               cursor: "pointer",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = C.warmBg)}
+            onMouseEnter={(e) => (e.currentTarget.style.background = T.ink075)}
             onMouseLeave={(e) =>
               (e.currentTarget.style.background = "transparent")
             }
           >
-            <h3
-              style={{ ...sH, display: "flex", alignItems: "center", gap: 8 }}
-            >
-              Low Stock Alerts{" "}
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}>
+              Low Stock Alerts
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span
                 style={{
                   fontSize: 11,
+                  color: lowStock.length > 0 ? T.danger : T.accentMid,
                   fontWeight: 500,
-                  color: lowStock.length > 0 ? C.red : C.accentGreen,
-                  fontFamily: "Jost,sans-serif",
                 }}
               >
-                → Supply Chain
+                Supply Chain
               </span>
-            </h3>
-            {lowStock.length > 0 && (
-              <span
-                style={{
-                  ...badge,
-                  background: "rgba(192,57,43,0.1)",
-                  color: C.red,
-                }}
-              >
-                {lowStock.length}
-              </span>
-            )}
+              {lowStock.length > 0 && (
+                <span
+                  style={{
+                    background: T.dangerBg,
+                    color: T.danger,
+                    padding: "1px 7px",
+                    borderRadius: 2,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {lowStock.length}
+                </span>
+              )}
+            </div>
           </div>
           <div>
             {lowStock.length === 0 ? (
@@ -1064,20 +1061,32 @@ export default function HQOverview({ onNavigate }) {
                 style={{
                   padding: 24,
                   textAlign: "center",
-                  color: C.muted,
+                  color: T.ink500,
                   fontSize: 13,
                 }}
               >
-                <span
+                <div
                   style={{
-                    fontSize: 24,
-                    display: "block",
-                    marginBottom: 8,
-                    opacity: 0.4,
+                    width: 32,
+                    height: 32,
+                    background: T.successBg,
+                    borderRadius: "50%",
+                    margin: "0 auto 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  ✅
-                </span>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M3 8l3.5 3.5 6.5-7"
+                      stroke={T.success}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
                 All stock levels healthy
               </div>
             ) : (
@@ -1089,7 +1098,7 @@ export default function HQOverview({ onNavigate }) {
                     padding: "10px 20px",
                     borderBottom:
                       i < lowStock.length - 1
-                        ? `1px solid ${C.border}`
+                        ? `1px solid ${T.ink075}`
                         : "none",
                     display: "flex",
                     justifyContent: "space-between",
@@ -1098,14 +1107,14 @@ export default function HQOverview({ onNavigate }) {
                     cursor: "pointer",
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "#fff8f8")
+                    (e.currentTarget.style.background = T.dangerBg)
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.background = "transparent")
                   }
                 >
                   <div>
-                    <span style={{ color: C.text, fontWeight: 500 }}>
+                    <span style={{ color: T.ink900, fontWeight: 500 }}>
                       {item.name || item.sku || "Unnamed"}
                     </span>
                     {item.sku && (
@@ -1113,8 +1122,8 @@ export default function HQOverview({ onNavigate }) {
                         style={{
                           marginLeft: 8,
                           fontSize: 10,
-                          color: C.muted,
-                          fontFamily: "monospace",
+                          color: T.ink400,
+                          fontFamily: T.fontData,
                         }}
                       >
                         {item.sku}
@@ -1125,17 +1134,19 @@ export default function HQOverview({ onNavigate }) {
                     <span
                       style={{
                         color:
-                          (item.quantity_on_hand || 0) === 0 ? C.red : C.gold,
+                          (item.quantity_on_hand || 0) === 0
+                            ? T.danger
+                            : T.warning,
                         fontWeight: 600,
-                        fontSize: 13,
-                        fontFamily: "'Cormorant Garamond',serif",
+                        fontSize: 14,
+                        fontFamily: T.fontData,
                       }}
                     >
                       {item.quantity_on_hand ?? 0}
                     </span>
                     {item.unit && (
                       <span
-                        style={{ marginLeft: 4, fontSize: 10, color: C.muted }}
+                        style={{ marginLeft: 4, fontSize: 10, color: T.ink400 }}
                       >
                         {item.unit}
                       </span>
@@ -1148,85 +1159,173 @@ export default function HQOverview({ onNavigate }) {
         </div>
       </div>
 
-      {/* QUICK ACTIONS */}
+      {/* ── QUICK ACTIONS ── */}
       <div
         style={{
-          background: C.white,
-          border: `1px solid ${C.border}`,
-          borderRadius: 2,
+          background: "white",
+          border: `1px solid ${T.ink150}`,
+          borderRadius: 6,
           padding: "20px 24px",
+          boxShadow: T.shadowCard,
         }}
       >
-        <h3 style={{ ...sH, marginBottom: 8 }}>Quick Actions</h3>
-        <SectionLabel label="Platform" small />
         <div
           style={{
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
+            fontSize: 13,
+            fontWeight: 600,
+            color: T.ink900,
             marginBottom: 16,
           }}
         >
-          <QA label="Admin Dashboard" href="/admin" icon="⚙️" />
-          <QA label="View Shop" href="/shop" icon="🛒" />
-          <QA label="Loyalty Page" href="/loyalty" icon="⭐" />
-          <QA label="Leaderboard" href="/leaderboard" icon="🏆" />
+          Quick Actions
         </div>
+
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: T.ink400,
+            marginBottom: 10,
+          }}
+        >
+          Platform
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            marginBottom: 20,
+          }}
+        >
+          {[
+            { label: "Admin Dashboard", href: "/admin" },
+            { label: "View Shop", href: "/shop" },
+            { label: "Loyalty Page", href: "/loyalty" },
+            { label: "Leaderboard", href: "/leaderboard" },
+          ].map(({ label, href }) => (
+            <a
+              key={label}
+              href={href}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: T.ink075,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 3,
+                padding: "8px 14px",
+                fontFamily: T.fontUi,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                color: T.ink700,
+                textDecoration: "none",
+              }}
+            >
+              {label}
+            </a>
+          ))}
+        </div>
+
         {onNavigate && (
           <>
-            <SectionLabel label="Import ERP" small />
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <QABtn
-                label="Production"
-                icon="🏭"
-                onClick={() => nav("hq-production")}
-                highlight={lowFinishedCount > 0}
-              />
-              <QABtn
-                label="Procurement"
-                icon="🛒"
-                onClick={() => nav("procurement")}
-              />
-              <QABtn label="Costing" icon="🧮" onClick={() => nav("costing")} />
-              <QABtn label="Pricing" icon="💰" onClick={() => nav("pricing")} />
-              <QABtn label="P&L" icon="📉" onClick={() => nav("pl")} />
-              <QABtn
-                label="Loyalty Engine"
-                icon="💎"
-                onClick={() => nav("loyalty")}
-              />
-              <QABtn
-                label="Reorder"
-                icon="🔔"
-                onClick={() => nav("reorder")}
-                highlight={erpStats?.reorderCount > 0}
-              />
-              <QABtn
-                label="Fraud & Security"
-                icon="🛡️"
-                onClick={() => nav("fraud")}
-                highlight={fraudTotal > 0}
-              />
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                marginBottom: 10,
+              }}
+            >
+              Import ERP
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[
+                {
+                  label: "Production",
+                  tab: "hq-production",
+                  alert: lowFinishedCount > 0,
+                },
+                { label: "Procurement", tab: "procurement", alert: false },
+                { label: "Costing", tab: "costing", alert: false },
+                { label: "Pricing", tab: "pricing", alert: false },
+                { label: "P&L", tab: "pl", alert: false },
+                { label: "Loyalty Engine", tab: "loyalty", alert: false },
+                {
+                  label: "Reorder",
+                  tab: "reorder",
+                  alert: erpStats?.reorderCount > 0,
+                },
+                {
+                  label: "Fraud & Security",
+                  tab: "fraud",
+                  alert: fraudTotal > 0,
+                },
+              ].map(({ label, tab, alert }) => (
+                <button
+                  key={tab}
+                  onClick={() => nav(tab)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: alert ? T.dangerBg : T.ink075,
+                    border: `1px solid ${alert ? T.dangerBd : T.ink150}`,
+                    borderRadius: 3,
+                    padding: "8px 14px",
+                    fontFamily: T.fontUi,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    color: alert ? T.danger : T.ink700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {label}
+                  {alert && (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M6 1L11 10H1L6 1z"
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M6 5v2M6 8.5v.5"
+                        stroke="currentColor"
+                        strokeWidth="1"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                </button>
+              ))}
             </div>
           </>
         )}
       </div>
 
-      <div style={{ marginTop: 24, textAlign: "right" }}>
+      <div style={{ marginTop: 20, textAlign: "right" }}>
         <button
           onClick={fetchStats}
           style={{
             background: "transparent",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            padding: "8px 16px",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 3,
+            padding: "7px 14px",
             cursor: "pointer",
-            fontFamily: "Jost,sans-serif",
+            fontFamily: T.fontUi,
             fontSize: 10,
             fontWeight: 600,
-            letterSpacing: "0.15em",
+            letterSpacing: "0.1em",
             textTransform: "uppercase",
-            color: C.muted,
+            color: T.ink500,
           }}
         >
           ↻ Refresh All Data
@@ -1237,16 +1336,18 @@ export default function HQOverview({ onNavigate }) {
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
-function SectionLabel({ label, small }) {
+
+function SectionLabel({ label }) {
   return (
     <div
       style={{
-        fontSize: small ? 9 : 10,
+        fontSize: 10,
         fontWeight: 700,
-        letterSpacing: "0.2em",
+        letterSpacing: "0.12em",
         textTransform: "uppercase",
-        color: C.muted,
-        marginBottom: small ? 10 : 12,
+        color: "#B0B0B0",
+        marginBottom: 12,
+        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
       }}
     >
       {label}
@@ -1254,77 +1355,72 @@ function SectionLabel({ label, small }) {
   );
 }
 
-function TileCard({
-  icon,
-  label,
-  value,
-  sub,
-  subLabel,
-  color,
-  alert,
-  onClick,
-  hint,
-}) {
+const SEMANTIC = {
+  success: { text: "#166534", bg: "#F0FDF4", bd: "#BBF7D0" },
+  warning: { text: "#92400E", bg: "#FFFBEB", bd: "#FDE68A" },
+  danger: { text: "#991B1B", bg: "#FEF2F2", bd: "#FECACA" },
+  info: { text: "#1E3A5F", bg: "#EFF6FF", bd: "#BFDBFE" },
+};
+
+function MetricTile({ label, value, subLabel, sub, semantic, onClick, hint }) {
+  const s = semantic ? SEMANTIC[semantic] : null;
   const clickable = !!onClick;
   return (
     <div
       onClick={onClick}
-      title={hint}
       style={{
-        background: C.white,
-        border: `1px solid ${alert ? "#ffcdd2" : C.border}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: 2,
+        background: "white",
+        border: `1px solid #E2E2E2`,
+        borderRadius: 6,
         padding: "18px 20px",
         cursor: clickable ? "pointer" : "default",
-        transition: "box-shadow 0.15s, transform 0.1s",
+        transition: "box-shadow 0.15s",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
       }}
       onMouseEnter={(e) => {
-        if (clickable) {
-          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)";
-          e.currentTarget.style.transform = "translateY(-1px)";
-        }
+        if (clickable)
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.07)";
       }}
     >
       <div
         style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "#B0B0B0",
+          marginBottom: 8,
           display: "flex",
-          alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 10,
+          alignItems: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontSize: 14 }}>{icon}</span>
+        {label}
+        {clickable && hint && (
           <span
             style={{
-              color: C.muted,
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
+              fontSize: 9,
+              color: "#B0B0B0",
+              fontWeight: 500,
+              textTransform: "none",
+              letterSpacing: 0,
             }}
           >
-            {label}
-          </span>
-        </div>
-        {clickable && (
-          <span style={{ fontSize: 9, color, fontWeight: 600, opacity: 0.7 }}>
-            ↗
+            {hint} ↗
           </span>
         )}
       </div>
       <div
         style={{
-          fontFamily: "'Cormorant Garamond',serif",
-          fontSize: 32,
-          fontWeight: 300,
-          color,
+          fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+          fontSize: 28,
+          fontWeight: 400,
+          color: s ? s.text : "#0D0D0D",
           lineHeight: 1,
+          letterSpacing: "-0.02em",
         }}
       >
         {value}
@@ -1333,7 +1429,7 @@ function TileCard({
         <div
           style={{
             fontSize: 9,
-            color: C.muted,
+            color: "#B0B0B0",
             marginTop: 2,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
@@ -1346,139 +1442,20 @@ function TileCard({
         <div
           style={{
             fontSize: 11,
-            color: alert ? color : C.muted,
-            marginTop: 4,
-            fontWeight: alert ? 600 : 400,
+            color: s ? s.text : "#5A5A5A",
+            marginTop: 6,
+            fontWeight: s ? 600 : 400,
+            background: s ? s.bg : "transparent",
+            border: s ? `1px solid ${s.bd}` : "none",
+            borderRadius: s ? 3 : 0,
+            padding: s ? "2px 6px" : 0,
+            display: "inline-block",
           }}
         >
           {sub}
         </div>
       )}
-      {hint && (
-        <div
-          style={{
-            fontSize: 9,
-            color,
-            opacity: 0.55,
-            marginTop: 6,
-            fontWeight: 500,
-            fontFamily: "Jost,sans-serif",
-          }}
-        >
-          {hint}
-        </div>
-      )}
     </div>
-  );
-}
-
-function ERPCard({ icon, label, value, color, sub, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        background: C.white,
-        border: `1px solid ${C.border}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: 2,
-        padding: "18px 20px",
-        cursor: onClick ? "pointer" : "default",
-        transition: "box-shadow 0.15s, transform 0.1s",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)";
-        e.currentTarget.style.transform = "translateY(-1px)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.transform = "translateY(0)";
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 10,
-        }}
-      >
-        <span style={{ fontSize: 14 }}>{icon}</span>
-        <span
-          style={{
-            color: C.muted,
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-          }}
-        >
-          {label}
-        </span>
-      </div>
-      <div
-        style={{
-          fontFamily: "'Cormorant Garamond',serif",
-          fontSize: 32,
-          fontWeight: 300,
-          color,
-          lineHeight: 1,
-        }}
-      >
-        {value}
-      </div>
-      <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>{sub}</div>
-    </div>
-  );
-}
-
-function QA({ label, href, icon }) {
-  return (
-    <a
-      href={href}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: "#f4f0e8",
-        border: `1px solid ${C.border}`,
-        borderRadius: 2,
-        padding: "8px 16px",
-        fontFamily: "Jost,sans-serif",
-        fontSize: 11,
-        fontWeight: 500,
-        color: C.primaryDark,
-        textDecoration: "none",
-      }}
-    >
-      <span>{icon}</span>
-      {label}
-    </a>
-  );
-}
-
-function QABtn({ label, icon, onClick, highlight }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: highlight ? "#FFEBEE" : "#f4f0e8",
-        border: `1px solid ${highlight ? "#ffcdd2" : C.border}`,
-        borderRadius: 2,
-        padding: "8px 16px",
-        fontFamily: "Jost,sans-serif",
-        fontSize: 11,
-        fontWeight: 500,
-        color: highlight ? C.red : C.primaryDark,
-        cursor: "pointer",
-      }}
-    >
-      <span>{icon}</span>
-      {label}
-      {highlight ? " ⚠" : ""}
-    </button>
   );
 }
 
@@ -1495,19 +1472,35 @@ function fmtAgo(d) {
   return new Date(d).toLocaleDateString();
 }
 
-const sH = {
-  fontFamily: "'Cormorant Garamond',serif",
-  fontSize: 16,
-  fontWeight: 300,
-  color: "#1b4332",
-  margin: 0,
-};
-const badge = {
-  background: "rgba(82,183,136,0.1)",
-  color: "#52b788",
-  padding: "2px 8px",
-  borderRadius: 2,
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: "0.1em",
+function btn(variant, size) {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 3,
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+    border: "none",
+    fontSize: size === "sm" ? "10px" : "11px",
+    padding: size === "sm" ? "6px 12px" : "9px 16px",
+  };
+  const variants = {
+    primary: { background: "#1A3D2B", color: "white" },
+    ghost: {
+      background: "transparent",
+      color: "#2C2C2C",
+      border: "1px solid #E2E2E2",
+    },
+  };
+  return { ...base, ...(variants[variant] || variants.primary) };
+}
+
+const tileGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+  gap: 12,
+  marginBottom: 28,
 };
