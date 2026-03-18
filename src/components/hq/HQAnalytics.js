@@ -1,80 +1,106 @@
-// src/components/hq/HQAnalytics.js
-// v3.2 — March 2026
-//
-// CHANGES v3.2:
-//   - FIX: Potential Margin now filters to finished_product category only.
-//          Raw materials have cost_price but sell_price=0 → skewed negative margin.
-//   - FIX: Active POs pipeline card uses p.po_status (workflow field) not p.status.
-//          p.status is a secondary field; po_status is the source of truth.
-//          Also excludes 'complete' (was missing from exclusion list).
-//   - FIX: PO Pipeline in Supply Chain uses p.po_status throughout + shows 'complete' status.
-//
-// CHANGES v3.1:
-//   - CRITICAL FIX: scans table → scan_logs (ScanResult v4.1 writes here)
-//   - CRITICAL FIX: scan_date → scanned_at throughout
-//   - CRITICAL FIX: Realtime subscription now on scan_logs table
-//   - CRITICAL FIX: product_id → qr_code_id, source → qr_type
-//   - Scans & Loyalty sub-tab: shows QR type, outcome, points, province
-//   - Province breakdown + outcome breakdown added to Scans tab
-//
-// Sub-tabs: Overview · Supply Chain · Production · Distribution · Scans & Loyalty
+// src/components/hq/HQAnalytics.js v4.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all metric values in KPI + tables
+//   - KPI: coloured top borders removed — semantic colour on value only
+//   - PipelineCard: coloured top borders removed
+//   - Sub-tabs: standard underline style, emoji removed from labels
+//   - sLabel: ink400 replaces accent green
+//   - Live feed: standard info template
+//   - Alert pills: semantic token colours
+//   - Overdue shipment: standard danger template
+//   - Category cards: left border only (no coloured top border)
+// v3.2: Margin fix + po_status fix | v3.1: scan_logs schema
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
+// ── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+// Legacy aliases
 const C = {
-  bg: "#faf9f6",
-  primaryDark: "#1b4332",
-  primaryMid: "#2d6a4f",
+  bg: T.ink050,
+  primaryDark: T.accent,
+  primaryMid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  text: "#1a1a1a",
-  muted: "#888888",
-  border: "#e8e0d4",
-  white: "#ffffff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef9f0",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  lightGreen: "#eafaf1",
+  text: T.ink900,
+  muted: T.ink500,
+  border: T.ink150,
+  white: "#fff",
+  red: T.danger,
+  lightRed: T.dangerBg,
+  orange: T.warning,
+  lightOrange: T.warningBg,
+  blue: T.info,
+  lightBlue: T.infoBg,
+  lightGreen: T.accentLit,
 };
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const F = { heading: T.fontUi, body: T.fontUi };
+
 const sCard = {
-  background: C.white,
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  background: "#fff",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: "6px",
   padding: "20px",
+  boxShadow: T.shadow,
 };
 const sLabel = {
-  fontSize: "9px",
-  letterSpacing: "0.3em",
+  fontSize: "10px",
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: "4px",
-  fontFamily: F.body,
+  color: T.ink400,
+  marginBottom: "6px",
+  fontFamily: T.fontUi,
+  fontWeight: 700,
 };
 const sTh = {
   textAlign: "left",
   padding: "10px 12px",
   fontSize: "9px",
-  letterSpacing: "0.2em",
+  letterSpacing: "0.15em",
   textTransform: "uppercase",
-  color: C.muted,
-  borderBottom: `2px solid ${C.border}`,
-  fontWeight: 500,
+  color: T.ink400,
+  borderBottom: `2px solid ${T.ink150}`,
+  fontWeight: 700,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${C.border}`,
-  color: C.text,
+  borderBottom: `1px solid ${T.ink075}`,
+  color: T.ink700,
   verticalAlign: "middle",
   fontSize: "12px",
 };
+
 const CATEGORY_LABELS = {
   finished_product: "Finished Product",
   raw_material: "Raw Material",
@@ -83,11 +109,11 @@ const CATEGORY_LABELS = {
   uncategorised: "Uncategorised",
 };
 const CATEGORY_COLORS = {
-  finished_product: C.accent,
-  raw_material: C.blue,
-  terpene: "#9b6b9e",
-  hardware: C.gold,
-  uncategorised: C.muted,
+  finished_product: T.success,
+  raw_material: T.info,
+  terpene: T.accentMid,
+  hardware: "#92400E",
+  uncategorised: T.ink500,
 };
 
 export default function HQAnalytics() {
@@ -104,113 +130,96 @@ export default function HQAnalytics() {
     setError(null);
     try {
       const result = {};
-      try {
-        const r = await supabase
-          .from("inventory_items")
-          .select(
-            "id,name,sku,category,unit,quantity_on_hand,reorder_level,cost_price,sell_price,is_active,supplier_id",
-          );
-        result.inventory = (r.data || []).filter((i) => i.is_active);
-      } catch {
-        result.inventory = [];
-      }
-      try {
-        const r = await supabase
-          .from("suppliers")
-          .select("id,name,country,is_active");
-        result.suppliers = (r.data || []).filter((s) => s.is_active);
-      } catch {
-        result.suppliers = [];
-      }
-      try {
+      const safe = async (fn, fallback = []) => {
+        try {
+          return await fn();
+        } catch {
+          return fallback;
+        }
+      };
+      result.inventory = (
+        await safe(async () => {
+          const r = await supabase
+            .from("inventory_items")
+            .select(
+              "id,name,sku,category,unit,quantity_on_hand,reorder_level,cost_price,sell_price,is_active,supplier_id",
+            );
+          return r.data || [];
+        })
+      ).filter((i) => i.is_active);
+      result.suppliers = (
+        await safe(async () => {
+          const r = await supabase
+            .from("suppliers")
+            .select("id,name,country,is_active");
+          return r.data || [];
+        })
+      ).filter((s) => s.is_active);
+      result.purchaseOrders = await safe(async () => {
         const r = await supabase
           .from("purchase_orders")
           .select(
             "id,po_number,supplier_id,po_status,status,subtotal,currency,order_date,received_date,created_at,purchase_order_items(*)",
           );
-        result.purchaseOrders = r.data || [];
-      } catch {
-        result.purchaseOrders = [];
-      }
-      try {
+        return r.data || [];
+      });
+      result.productionRuns = await safe(async () => {
         const r = await supabase
           .from("production_runs")
           .select(
             "id,run_number,batch_id,status,planned_units,actual_units,started_at,completed_at,notes,created_at,production_run_inputs(*)",
           );
-        result.productionRuns = r.data || [];
-      } catch (e) {
-        console.warn("[HQAnalytics] production_runs:", e.message);
-        result.productionRuns = [];
-      }
-      try {
+        return r.data || [];
+      });
+      result.batches = await safe(async () => {
         const r = await supabase
           .from("batches")
           .select("id,batch_number,product_name,product_type,status");
-        result.batches = r.data || [];
-      } catch {
-        result.batches = [];
-      }
-      try {
+        return r.data || [];
+      });
+      result.shipments = await safe(async () => {
         const r = await supabase
           .from("shipments")
           .select(
             "id,shipment_number,destination_name,status,courier,shipped_date,delivered_date,confirmed_date,estimated_arrival,created_at,shipment_items(*)",
           );
-        result.shipments = r.data || [];
-      } catch {
-        result.shipments = [];
-      }
-
-      // FIXED v3.1: scan_logs with scanned_at
-      try {
+        return r.data || [];
+      });
+      result.scans = await safe(async () => {
         const r = await supabase
           .from("scan_logs")
           .select(
             "id,qr_code_id,qr_code,user_id,scanned_at,points_awarded,scan_outcome,qr_type,campaign_name,ip_province,ip_city,device_type",
           )
           .order("scanned_at", { ascending: false });
-        result.scans = r.data || [];
-      } catch (e) {
-        console.warn("[HQAnalytics] scan_logs:", e.message);
-        result.scans = [];
-      }
-
-      try {
+        return r.data || [];
+      });
+      result.users = await safe(async () => {
         const r = await supabase
           .from("user_profiles")
           .select("id,role,created_at");
-        result.users = r.data || [];
-      } catch {
-        result.users = [];
-      }
-      try {
+        return r.data || [];
+      });
+      result.loyalty = await safe(async () => {
         const r = await supabase
           .from("loyalty_transactions")
           .select("points,transaction_type");
-        result.loyalty = r.error ? [] : r.data || [];
-      } catch {
-        result.loyalty = [];
-      }
-      try {
+        return r.error ? [] : r.data || [];
+      });
+      result.tenants = await safe(async () => {
         const r = await supabase
           .from("tenants")
           .select("id,name,type,is_active");
-        result.tenants = r.data || [];
-      } catch {
-        result.tenants = [];
-      }
-      try {
+        return r.data || [];
+      });
+      result.movements = await safe(async () => {
         const r = await supabase
           .from("stock_movements")
           .select("id,item_id,quantity,movement_type,reference,created_at")
           .order("created_at", { ascending: false })
           .limit(50);
-        result.movements = r.data || [];
-      } catch {
-        result.movements = [];
-      }
-
+        return r.data || [];
+      });
       setData(result);
       setLastUpdated(new Date());
     } catch (err) {
@@ -223,8 +232,6 @@ export default function HQAnalytics() {
 
   useEffect(() => {
     fetchAll();
-
-    // FIXED v3.1: subscribe to scan_logs
     const scanSub = supabase
       .channel("hq-scan-logs")
       .on(
@@ -236,7 +243,6 @@ export default function HQAnalytics() {
             [
               {
                 type: "scan",
-                icon: "📱",
                 msg: `New scan · ${n.qr_type || "QR"} · ${n.ip_city || "—"}`,
                 time: new Date(),
                 id: n.id,
@@ -251,7 +257,6 @@ export default function HQAnalytics() {
         },
       )
       .subscribe();
-
     const shipSub = supabase
       .channel("hq-shipments")
       .on(
@@ -263,7 +268,6 @@ export default function HQAnalytics() {
             [
               {
                 type: "shipment",
-                icon: "🚚",
                 msg: `${n.shipment_number} → ${n.status}`,
                 time: new Date(),
                 id: n.id,
@@ -271,20 +275,20 @@ export default function HQAnalytics() {
               ...prev,
             ].slice(0, 10),
           );
-          setData((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              shipments: prev.shipments.map((s) =>
-                s.id === n.id ? { ...s, ...n } : s,
-              ),
-            };
-          });
+          setData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  shipments: prev.shipments.map((s) =>
+                    s.id === n.id ? { ...s, ...n } : s,
+                  ),
+                }
+              : prev,
+          );
           setLastUpdated(new Date());
         },
       )
       .subscribe();
-
     const runSub = supabase
       .channel("hq-runs")
       .on(
@@ -296,7 +300,6 @@ export default function HQAnalytics() {
             [
               {
                 type: "production",
-                icon: "🔧",
                 msg: `Run ${n.run_number || ""} → ${n.status || "updated"}`,
                 time: new Date(),
                 id: n.id,
@@ -319,7 +322,6 @@ export default function HQAnalytics() {
         },
       )
       .subscribe();
-
     subscriptions.current = [scanSub, shipSub, runSub];
     return () => {
       subscriptions.current.forEach((sub) => supabase.removeChannel(sub));
@@ -327,18 +329,24 @@ export default function HQAnalytics() {
   }, [fetchAll]);
 
   const SUB_TABS = [
-    { id: "overview", label: "Overview", icon: "📊" },
-    { id: "supply", label: "Supply Chain", icon: "📦" },
-    { id: "production", label: "Production", icon: "🔧" },
-    { id: "distribution", label: "Distribution", icon: "🚚" },
-    { id: "scans", label: "Scans & Loyalty", icon: "📱" },
+    { id: "overview", label: "Overview" },
+    { id: "supply", label: "Supply Chain" },
+    { id: "production", label: "Production" },
+    { id: "distribution", label: "Distribution" },
+    { id: "scans", label: "Scans & Loyalty" },
   ];
 
   if (error)
     return (
-      <div style={{ ...sCard, borderLeft: `3px solid ${C.red}` }}>
+      <div
+        style={{
+          ...sCard,
+          border: `1px solid ${T.dangerBd}`,
+          borderLeft: `3px solid ${T.danger}`,
+        }}
+      >
         <div style={sLabel}>Error</div>
-        <p style={{ fontSize: "13px", color: C.red, margin: "8px 0 0" }}>
+        <p style={{ fontSize: "13px", color: T.danger, margin: "8px 0 0" }}>
           {error}
         </p>
         <button
@@ -346,15 +354,16 @@ export default function HQAnalytics() {
           style={{
             marginTop: "12px",
             padding: "8px 16px",
-            background: C.primaryDark,
-            color: C.white,
+            background: T.accent,
+            color: "#fff",
             border: "none",
-            borderRadius: "2px",
+            borderRadius: "4px",
             fontSize: "10px",
-            letterSpacing: "0.15em",
+            letterSpacing: "0.1em",
             textTransform: "uppercase",
             fontWeight: 600,
             cursor: "pointer",
+            fontFamily: T.fontUi,
           }}
         >
           Retry
@@ -363,7 +372,8 @@ export default function HQAnalytics() {
     );
 
   return (
-    <div style={{ fontFamily: F.body }}>
+    <div style={{ fontFamily: T.fontUi }}>
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -377,10 +387,10 @@ export default function HQAnalytics() {
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <h2
             style={{
-              fontFamily: F.heading,
+              fontFamily: T.fontUi,
               fontSize: "22px",
               fontWeight: 300,
-              color: C.primaryDark,
+              color: T.ink900,
               margin: 0,
             }}
           >
@@ -392,14 +402,14 @@ export default function HQAnalytics() {
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                backgroundColor: C.accent,
+                backgroundColor: T.success,
                 animation: "pulse 2s infinite",
               }}
             />
             <span
               style={{
                 fontSize: 10,
-                color: C.muted,
+                color: T.ink500,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
               }}
@@ -410,7 +420,7 @@ export default function HQAnalytics() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {lastUpdated && (
-            <span style={{ fontSize: 11, color: C.muted }}>
+            <span style={{ fontSize: 11, color: T.ink500 }}>
               Updated{" "}
               {lastUpdated.toLocaleTimeString("en-ZA", {
                 hour: "2-digit",
@@ -423,60 +433,61 @@ export default function HQAnalytics() {
             onClick={fetchAll}
             style={{
               background: "transparent",
-              border: `1px solid ${C.border}`,
-              borderRadius: "2px",
+              border: `1px solid ${T.ink150}`,
+              borderRadius: "4px",
               padding: "7px 14px",
               cursor: "pointer",
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
               fontSize: "10px",
               fontWeight: 600,
-              letterSpacing: "0.15em",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: C.muted,
+              color: T.ink500,
             }}
           >
-            ↻ Refresh
+            Refresh
           </button>
         </div>
       </div>
 
+      {/* Live feed — standard info template */}
       {liveEvents.length > 0 && (
         <div
           style={{
             marginBottom: 16,
             padding: "12px 16px",
-            background: C.lightGreen,
-            border: `1px solid ${C.accent}`,
-            borderRadius: 2,
+            background: T.infoBg,
+            border: `1px solid ${T.infoBd}`,
+            borderRadius: 6,
           }}
         >
           <div
             style={{
               fontSize: 10,
               fontWeight: 700,
-              letterSpacing: "0.15em",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: C.primaryDark,
+              color: T.info,
               marginBottom: 8,
             }}
           >
-            🔴 Live Feed
+            Live Feed
           </div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {liveEvents.slice(0, 5).map((ev, i) => (
               <div
                 key={i}
                 style={{
                   fontSize: 12,
-                  color: C.primaryDark,
-                  background: C.white,
+                  color: T.info,
+                  background: "#fff",
                   padding: "4px 10px",
-                  borderRadius: 2,
-                  border: `1px solid ${C.border}`,
+                  borderRadius: 3,
+                  border: `1px solid ${T.infoBd}`,
                 }}
               >
-                {ev.icon} {ev.msg} ·{" "}
-                <span style={{ color: C.muted }}>
+                {ev.msg} ·{" "}
+                <span style={{ color: T.ink400 }}>
                   {ev.time.toLocaleTimeString("en-ZA", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -485,7 +496,7 @@ export default function HQAnalytics() {
               </div>
             ))}
             {liveEvents.length > 5 && (
-              <div style={{ fontSize: 12, color: C.muted, padding: "4px 0" }}>
+              <div style={{ fontSize: 12, color: T.ink400, padding: "4px 0" }}>
                 +{liveEvents.length - 5} more
               </div>
             )}
@@ -493,11 +504,12 @@ export default function HQAnalytics() {
         </div>
       )}
 
+      {/* Sub-tabs — standard underline style */}
       <div
         style={{
           display: "flex",
-          gap: "6px",
-          flexWrap: "wrap",
+          gap: 0,
+          borderBottom: `1px solid ${T.ink150}`,
           marginBottom: "24px",
         }}
       >
@@ -506,28 +518,42 @@ export default function HQAnalytics() {
             key={t.id}
             onClick={() => setSubTab(t.id)}
             style={{
-              padding: "8px 16px",
-              background: subTab === t.id ? C.primaryDark : C.white,
-              color: subTab === t.id ? C.white : C.muted,
-              border: `1px solid ${subTab === t.id ? C.primaryDark : C.border}`,
-              borderRadius: "2px",
-              fontSize: "10px",
-              letterSpacing: "0.12em",
+              padding: "10px 16px",
+              background: "none",
+              border: "none",
+              borderBottom:
+                subTab === t.id
+                  ? `2px solid ${T.accent}`
+                  : "2px solid transparent",
+              fontFamily: T.fontUi,
+              fontSize: "11px",
+              fontWeight: subTab === t.id ? 700 : 400,
+              letterSpacing: "0.06em",
               textTransform: "uppercase",
+              color: subTab === t.id ? T.accent : T.ink500,
               cursor: "pointer",
-              fontFamily: F.body,
-              fontWeight: subTab === t.id ? 600 : 400,
-              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+              marginBottom: "-1px",
             }}
           >
-            {t.icon} {t.label}
+            {t.label}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
-          <div style={{ fontSize: "24px", marginBottom: "12px" }}>📈</div>
+        <div style={{ textAlign: "center", padding: "60px", color: T.ink500 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              border: `2px solid ${T.ink150}`,
+              borderTopColor: T.accent,
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+              margin: "0 auto 12px",
+            }}
+          />
           Loading analytics…
         </div>
       ) : data ? (
@@ -540,21 +566,19 @@ export default function HQAnalytics() {
         </>
       ) : null}
 
-      <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }`}</style>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+        @keyframes spin  { to{transform:rotate(360deg)} }
+      `}</style>
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────
-// OVERVIEW
-// ───────────────────────────────────────────────────────
+// ─── Overview ─────────────────────────────────────────────────────────────────
 function OverviewAnalytics({ data }) {
   const inv = data.inventory;
   const runs = data.productionRuns;
   const shipments = data.shipments;
-
-  // v3.2 FIX: Only finished_product items have a meaningful sell_price.
-  // Raw materials / hardware have cost_price but sell_price=0 → -777% if included.
   const finishedInv = inv.filter((i) => i.category === "finished_product");
   const stockValue = finishedInv.reduce(
     (s, i) => s + (i.quantity_on_hand || 0) * (i.sell_price || 0),
@@ -568,13 +592,10 @@ function OverviewAnalytics({ data }) {
     stockValue > 0
       ? (((stockValue - stockCost) / stockValue) * 100).toFixed(1)
       : 0;
-
-  // Full inv still used for low-stock counts etc.
   const lowStock = inv.filter(
     (i) => i.reorder_level > 0 && i.quantity_on_hand <= i.reorder_level,
   );
   const outOfStock = inv.filter((i) => i.quantity_on_hand <= 0);
-
   const completedRuns = runs.filter((r) => r.status === "completed");
   const activeRuns = runs.filter((r) => r.status === "in_progress");
   const totalUnits = completedRuns.reduce(
@@ -594,7 +615,6 @@ function OverviewAnalytics({ data }) {
           ) / completedRuns.length
         ).toFixed(1)
       : "—";
-
   const delivered = shipments.filter((s) =>
     ["delivered", "confirmed"].includes(s.status),
   );
@@ -607,9 +627,7 @@ function OverviewAnalytics({ data }) {
       (sh.shipment_items || []).reduce((is, i) => is + (i.quantity || 0), 0),
     0,
   );
-
   const now = new Date();
-  // FIXED v3.1: scanned_at
   const scans7d = data.scans.filter(
     (s) => new Date(s.scanned_at) >= new Date(now - 7 * 86400000),
   ).length;
@@ -624,191 +642,211 @@ function OverviewAnalytics({ data }) {
     )
     .reduce((s, t) => s + (t.points || 0), 0);
   const customers = data.users.filter((u) => u.role === "customer").length;
-
-  const alerts = [];
-  if (outOfStock.length > 0)
-    alerts.push({
-      level: "critical",
-      icon: "🔴",
-      msg: `${outOfStock.length} item${outOfStock.length > 1 ? "s" : ""} out of stock`,
-    });
-  if (lowStock.length > 0)
-    alerts.push({
-      level: "warning",
-      icon: "🟡",
-      msg: `${lowStock.length} item${lowStock.length > 1 ? "s" : ""} below reorder level`,
-    });
-  if (inTransit.length > 0)
-    alerts.push({
-      level: "info",
-      icon: "🚚",
-      msg: `${inTransit.length} shipment${inTransit.length > 1 ? "s" : ""} in transit`,
-    });
-  if (activeRuns.length > 0)
-    alerts.push({
-      level: "info",
-      icon: "🔧",
-      msg: `${activeRuns.length} run${activeRuns.length > 1 ? "s" : ""} in progress`,
-    });
   const overdue = shipments.filter(
     (s) =>
       s.estimated_arrival &&
       !["delivered", "confirmed", "cancelled"].includes(s.status) &&
       new Date(s.estimated_arrival) < now,
   );
+
+  const alerts = [];
+  if (outOfStock.length > 0)
+    alerts.push({
+      sem: "danger",
+      msg: `${outOfStock.length} item${outOfStock.length > 1 ? "s" : ""} out of stock`,
+    });
+  if (lowStock.length > 0)
+    alerts.push({
+      sem: "warning",
+      msg: `${lowStock.length} item${lowStock.length > 1 ? "s" : ""} below reorder level`,
+    });
+  if (inTransit.length > 0)
+    alerts.push({
+      sem: "info",
+      msg: `${inTransit.length} shipment${inTransit.length > 1 ? "s" : ""} in transit`,
+    });
+  if (activeRuns.length > 0)
+    alerts.push({
+      sem: "info",
+      msg: `${activeRuns.length} run${activeRuns.length > 1 ? "s" : ""} in progress`,
+    });
   if (overdue.length > 0)
     alerts.push({
-      level: "critical",
-      icon: "⚠",
+      sem: "danger",
       msg: `${overdue.length} shipment${overdue.length > 1 ? "s" : ""} overdue`,
     });
 
-  const alertColors = { critical: C.red, warning: C.gold, info: C.blue };
-  const alertBgs = {
-    critical: C.lightRed,
-    warning: "#fef9e7",
-    info: C.lightBlue,
+  const semC = {
+    danger: T.danger,
+    warning: T.warning,
+    info: T.info,
+    success: T.success,
+  };
+  const semBg = {
+    danger: T.dangerBg,
+    warning: T.warningBg,
+    info: T.infoBg,
+    success: T.successBg,
+  };
+  const semBd = {
+    danger: T.dangerBd,
+    warning: T.warningBd,
+    info: T.infoBd,
+    success: T.successBd,
   };
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       {alerts.length > 0 && (
-        <div style={{ ...sCard, borderLeft: `4px solid ${C.red}` }}>
-          <div style={{ ...sLabel, color: C.red }}>
-            ⚡ Command Centre — Live Alerts
-          </div>
+        <div style={{ ...sCard }}>
+          <div style={sLabel}>Command Centre — Live Alerts</div>
           <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 10,
-              marginTop: 10,
-            }}
+            style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}
           >
             {alerts.map((a, i) => (
               <div
                 key={i}
                 style={{
                   padding: "8px 14px",
-                  borderRadius: 2,
-                  background: alertBgs[a.level],
-                  color: alertColors[a.level],
-                  border: `1px solid ${alertColors[a.level]}40`,
+                  borderRadius: 4,
+                  background: semBg[a.sem],
+                  color: semC[a.sem],
+                  border: `1px solid ${semBd[a.sem]}`,
                   fontSize: 12,
                   fontWeight: 600,
+                  fontFamily: T.fontUi,
                 }}
               >
-                {a.icon} {a.msg}
+                {a.msg}
               </div>
             ))}
           </div>
         </div>
       )}
+
+      {/* Row 1 */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: "12px",
+          gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
         <KPI
           label="Finished Stock Value"
           value={`R${stockValue.toLocaleString()}`}
-          color={C.primaryDark}
+          semantic="success"
         />
         <KPI
           label="Finished Stock Cost"
           value={`R${stockCost.toLocaleString()}`}
-          color={C.blue}
+          semantic="info"
         />
         <KPI
           label="Potential Margin"
           value={`${potentialMargin}%`}
-          color={C.accent}
+          semantic="success"
           sub="finished goods only"
         />
-        <KPI label="Active SKUs" value={inv.length} color={C.primaryMid} />
+        <KPI label="Active SKUs" value={inv.length} semantic={null} />
         <KPI
           label="Low Stock"
           value={lowStock.length}
-          color={lowStock.length > 0 ? C.gold : C.accent}
+          semantic={lowStock.length > 0 ? "warning" : "success"}
         />
         <KPI
           label="Out of Stock"
           value={outOfStock.length}
-          color={outOfStock.length > 0 ? C.red : C.accent}
+          semantic={outOfStock.length > 0 ? "danger" : "success"}
         />
       </div>
+
+      {/* Row 2 */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: "12px",
+          gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
         <KPI
           label="Runs Completed"
           value={completedRuns.length}
-          color={C.accent}
+          semantic="success"
         />
         <KPI
           label="Runs Active"
           value={activeRuns.length}
-          color={activeRuns.length > 0 ? C.gold : C.muted}
+          semantic={activeRuns.length > 0 ? "warning" : null}
         />
         <KPI
           label="Units Produced"
           value={totalUnits.toLocaleString()}
-          color={C.primaryDark}
+          semantic={null}
         />
         <KPI
           label="Avg Yield"
           value={avgYield !== "—" ? `${avgYield}%` : "—"}
-          color={C.accent}
+          semantic="success"
         />
         <KPI
           label="Shipments Delivered"
           value={delivered.length}
-          color={C.accent}
+          semantic="success"
         />
         <KPI
           label="Units Shipped"
           value={unitsShipped.toLocaleString()}
-          color={C.primaryDark}
+          semantic={null}
         />
       </div>
+
+      {/* Row 3 */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: "12px",
+          gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
-        <KPI label="Total Scans" value={data.scans.length} color={C.blue} />
+        <KPI label="Total Scans" value={data.scans.length} semantic="info" />
         <KPI
           label="Scans (7d)"
           value={scans7d}
-          color={C.accent}
+          semantic="info"
           sub="last 7 days"
         />
         <KPI
           label="Scans (30d)"
           value={scans30d}
-          color={C.blue}
+          semantic="info"
           sub="last 30 days"
         />
-        <KPI label="Customers" value={customers} color={C.primaryMid} />
+        <KPI label="Customers" value={customers} semantic={null} />
         <KPI
           label="Points Issued"
           value={totalPoints.toLocaleString()}
-          color={C.gold}
+          semantic={null}
         />
-        <KPI
-          label="Suppliers"
-          value={data.suppliers.length}
-          color={C.primaryDark}
-        />
+        <KPI label="Suppliers" value={data.suppliers.length} semantic={null} />
       </div>
+
+      {/* Pipeline strip */}
       <div style={sCard}>
         <div style={sLabel}>Supply Chain Pipeline — Live Status</div>
         <div
@@ -821,12 +859,10 @@ function OverviewAnalytics({ data }) {
         >
           <PipelineCard
             stage="Procure"
-            icon="📋"
-            color={C.blue}
+            color={T.info}
             items={[
               {
                 label: "Active POs",
-                // v3.2 FIX: use po_status (workflow field), exclude complete + received + cancelled + draft
                 value: data.purchaseOrders.filter(
                   (p) =>
                     !["received", "complete", "cancelled", "draft"].includes(
@@ -839,8 +875,7 @@ function OverviewAnalytics({ data }) {
           />
           <PipelineCard
             stage="Store"
-            icon="📦"
-            color={C.primaryMid}
+            color={T.accentMid}
             items={[
               { label: "SKUs", value: inv.length },
               { label: "Value", value: `R${stockValue.toLocaleString()}` },
@@ -848,8 +883,7 @@ function OverviewAnalytics({ data }) {
           />
           <PipelineCard
             stage="Produce"
-            icon="🔧"
-            color={C.gold}
+            color="#b5935a"
             items={[
               { label: "Active", value: activeRuns.length },
               { label: "Done", value: completedRuns.length },
@@ -857,8 +891,7 @@ function OverviewAnalytics({ data }) {
           />
           <PipelineCard
             stage="Distribute"
-            icon="🚚"
-            color={C.accent}
+            color={T.success}
             items={[
               { label: "In Transit", value: inTransit.length },
               { label: "Delivered", value: delivered.length },
@@ -866,8 +899,7 @@ function OverviewAnalytics({ data }) {
           />
           <PipelineCard
             stage="Scans"
-            icon="📱"
-            color={C.primaryDark}
+            color={T.accent}
             items={[
               { label: "Total", value: data.scans.length },
               { label: "7-day", value: scans7d },
@@ -875,6 +907,8 @@ function OverviewAnalytics({ data }) {
           />
         </div>
       </div>
+
+      {/* Recent movements */}
       {data.movements?.length > 0 && (
         <div style={sCard}>
           <div style={sLabel}>Recent Stock Movements</div>
@@ -884,6 +918,7 @@ function OverviewAnalytics({ data }) {
               borderCollapse: "collapse",
               marginTop: 12,
               fontSize: 12,
+              fontFamily: T.fontUi,
             }}
           >
             <thead>
@@ -909,20 +944,20 @@ function OverviewAnalytics({ data }) {
                       style={{
                         fontSize: 10,
                         padding: "2px 8px",
-                        borderRadius: 2,
+                        borderRadius: 3,
                         background:
                           m.movement_type?.includes("out") ||
                           m.movement_type?.includes("Out")
-                            ? "#fdf0ef"
-                            : "#eafaf1",
+                            ? T.dangerBg
+                            : T.successBg,
                         color:
                           m.movement_type?.includes("out") ||
                           m.movement_type?.includes("Out")
-                            ? C.red
-                            : C.accent,
+                            ? T.danger
+                            : T.success,
                         textTransform: "uppercase",
                         letterSpacing: "0.1em",
-                        fontWeight: 600,
+                        fontWeight: 700,
                       }}
                     >
                       {m.movement_type}
@@ -931,8 +966,9 @@ function OverviewAnalytics({ data }) {
                   <td
                     style={{
                       ...sTd,
+                      fontFamily: T.fontData,
                       fontWeight: 600,
-                      color: m.quantity < 0 ? C.red : C.accent,
+                      color: m.quantity < 0 ? T.danger : T.success,
                     }}
                   >
                     {m.quantity > 0 ? "+" : ""}
@@ -941,9 +977,9 @@ function OverviewAnalytics({ data }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: "monospace",
+                      fontFamily: T.fontData,
                       fontSize: 11,
-                      color: C.muted,
+                      color: T.ink500,
                     }}
                   >
                     {m.reference || "—"}
@@ -958,9 +994,7 @@ function OverviewAnalytics({ data }) {
   );
 }
 
-// ───────────────────────────────────────────────────────
-// SUPPLY CHAIN
-// ───────────────────────────────────────────────────────
+// ─── Supply Chain ─────────────────────────────────────────────────────────────
 function SupplyChainAnalytics({ data }) {
   const inv = data.inventory;
   const pos = data.purchaseOrders;
@@ -972,14 +1006,11 @@ function SupplyChainAnalytics({ data }) {
     categories[cat].value += (i.quantity_on_hand || 0) * (i.sell_price || 0);
     categories[cat].cost += (i.quantity_on_hand || 0) * (i.cost_price || 0);
   });
-
-  // v3.2 FIX: use po_status (the actual workflow field) not status (secondary field).
   const poStatuses = {};
   pos.forEach((p) => {
     const s = p.po_status || p.status || "unknown";
     poStatuses[s] = (poStatuses[s] || 0) + 1;
   });
-
   const supplierSpend = {};
   pos
     .filter((p) => ["received", "complete"].includes(p.po_status))
@@ -1001,9 +1032,20 @@ function SupplyChainAnalytics({ data }) {
     }))
     .sort((a, b) => b.totalValue - a.totalValue)
     .slice(0, 8);
+  const poStatusColors = {
+    draft: T.ink500,
+    ordered: T.info,
+    submitted: T.info,
+    confirmed: T.success,
+    in_transit: "#b5935a",
+    received: T.accentMid,
+    complete: T.accent,
+    cancelled: T.danger,
+  };
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
+      {/* Category breakdown */}
       <div style={sCard}>
         <div style={sLabel}>Inventory by Category</div>
         <div
@@ -1024,33 +1066,43 @@ function SupplyChainAnalytics({ data }) {
                 key={cat}
                 style={{
                   padding: 14,
-                  background: C.bg,
-                  borderRadius: 2,
-                  borderLeft: `3px solid ${CATEGORY_COLORS[cat] || C.muted}`,
+                  background: T.ink075,
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 6,
+                  borderLeft: `3px solid ${CATEGORY_COLORS[cat] || T.ink500}`,
                 }}
               >
                 <div
                   style={{
                     fontSize: 10,
-                    letterSpacing: "0.15em",
+                    letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: CATEGORY_COLORS[cat] || C.muted,
+                    color: CATEGORY_COLORS[cat] || T.ink500,
                     marginBottom: 4,
+                    fontFamily: T.fontUi,
+                    fontWeight: 700,
                   }}
                 >
                   {CATEGORY_LABELS[cat] || cat}
                 </div>
                 <div
                   style={{
-                    fontFamily: F.heading,
+                    fontFamily: T.fontData,
                     fontSize: 20,
-                    fontWeight: 600,
-                    color: C.text,
+                    fontWeight: 400,
+                    color: T.ink900,
                   }}
                 >
                   {d.count} items
                 </div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.ink500,
+                    marginTop: 4,
+                    fontFamily: T.fontUi,
+                  }}
+                >
                   Value: R{d.value.toLocaleString()} · Margin: {margin}%
                 </div>
               </div>
@@ -1058,11 +1110,12 @@ function SupplyChainAnalytics({ data }) {
           })}
         </div>
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* PO Pipeline */}
         <div style={sCard}>
           <div style={sLabel}>Purchase Order Pipeline</div>
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-            {/* v3.2 FIX: includes 'complete' status, uses po_status field */}
             {[
               "draft",
               "ordered",
@@ -1079,16 +1132,6 @@ function SupplyChainAnalytics({ data }) {
                 !["received", "complete", "cancelled"].includes(status)
               )
                 return null;
-              const colors = {
-                draft: C.muted,
-                ordered: C.blue,
-                submitted: C.blue,
-                confirmed: C.accent,
-                in_transit: C.gold,
-                received: C.primaryMid,
-                complete: C.primaryDark,
-                cancelled: C.red,
-              };
               return (
                 <div
                   key={status}
@@ -1097,7 +1140,7 @@ function SupplyChainAnalytics({ data }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "6px 0",
-                    borderBottom: `1px solid ${C.border}`,
+                    borderBottom: `1px solid ${T.ink075}`,
                   }}
                 >
                   <span
@@ -1105,18 +1148,19 @@ function SupplyChainAnalytics({ data }) {
                       fontSize: 11,
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
-                      color: colors[status] || C.muted,
-                      fontWeight: 600,
+                      color: poStatusColors[status] || T.ink500,
+                      fontWeight: 700,
+                      fontFamily: T.fontUi,
                     }}
                   >
                     {status}
                   </span>
                   <span
                     style={{
-                      fontFamily: F.heading,
+                      fontFamily: T.fontData,
                       fontSize: 18,
-                      fontWeight: 600,
-                      color: colors[status] || C.muted,
+                      fontWeight: 400,
+                      color: poStatusColors[status] || T.ink500,
                     }}
                   >
                     {count}
@@ -1126,10 +1170,19 @@ function SupplyChainAnalytics({ data }) {
             })}
           </div>
         </div>
+
+        {/* Supplier spend */}
         <div style={sCard}>
           <div style={sLabel}>Supplier Spend (Received/Complete POs)</div>
           {supplierSpendList.length === 0 ? (
-            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: T.ink500,
+                marginTop: 12,
+                fontFamily: T.fontUi,
+              }}
+            >
               No received POs yet
             </p>
           ) : (
@@ -1142,28 +1195,34 @@ function SupplyChainAnalytics({ data }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "6px 0",
-                    borderBottom: `1px solid ${C.border}`,
+                    borderBottom: `1px solid ${T.ink075}`,
                   }}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 500 }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      fontFamily: T.fontUi,
+                    }}
+                  >
                     {s.name}
                   </span>
                   <span
                     style={{
-                      fontFamily: F.heading,
+                      fontFamily: T.fontData,
                       fontSize: 16,
-                      fontWeight: 600,
-                      color: C.primaryDark,
+                      fontWeight: 400,
+                      color: T.accent,
                     }}
-                  >
-                    R{s.total.toLocaleString()}
-                  </span>
+                  >{`R${s.total.toLocaleString()}`}</span>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Top items table */}
       <div style={sCard}>
         <div style={sLabel}>Top Items by Stock Value</div>
         <table
@@ -1172,6 +1231,7 @@ function SupplyChainAnalytics({ data }) {
             borderCollapse: "collapse",
             marginTop: 12,
             fontSize: 12,
+            fontFamily: T.fontUi,
           }}
         >
           <thead>
@@ -1204,9 +1264,9 @@ function SupplyChainAnalytics({ data }) {
                 <td
                   style={{
                     ...sTd,
-                    fontFamily: "monospace",
+                    fontFamily: T.fontData,
                     fontSize: 11,
-                    color: C.muted,
+                    color: T.ink500,
                   }}
                 >
                   {i.sku}
@@ -1216,28 +1276,34 @@ function SupplyChainAnalytics({ data }) {
                     style={{
                       fontSize: 9,
                       padding: "2px 6px",
-                      borderRadius: 2,
-                      background: `${CATEGORY_COLORS[i.category] || C.muted}15`,
-                      color: CATEGORY_COLORS[i.category] || C.muted,
+                      borderRadius: 3,
+                      background: T.ink075,
+                      color: CATEGORY_COLORS[i.category] || T.ink500,
                       textTransform: "uppercase",
                       letterSpacing: "0.1em",
+                      fontWeight: 700,
                     }}
                   >
                     {CATEGORY_LABELS[i.category] || i.category}
                   </span>
                 </td>
-                <td style={{ ...sTd, textAlign: "right" }}>
+                <td
+                  style={{ ...sTd, textAlign: "right", fontFamily: T.fontData }}
+                >
                   {i.quantity_on_hand} {i.unit}
                 </td>
-                <td style={{ ...sTd, textAlign: "right" }}>
+                <td
+                  style={{ ...sTd, textAlign: "right", fontFamily: T.fontData }}
+                >
                   R{(i.sell_price || 0).toFixed(2)}
                 </td>
                 <td
                   style={{
                     ...sTd,
                     textAlign: "right",
+                    fontFamily: T.fontData,
                     fontWeight: 600,
-                    color: C.primaryDark,
+                    color: T.accent,
                   }}
                 >
                   R{i.totalValue.toLocaleString()}
@@ -1251,9 +1317,7 @@ function SupplyChainAnalytics({ data }) {
   );
 }
 
-// ───────────────────────────────────────────────────────
-// PRODUCTION
-// ───────────────────────────────────────────────────────
+// ─── Production ───────────────────────────────────────────────────────────────
 function ProductionAnalytics({ data }) {
   const runs = data.productionRuns;
   const batches = data.batches;
@@ -1280,44 +1344,55 @@ function ProductionAnalytics({ data }) {
     batchName: batches.find((b) => b.id === r.batch_id)?.batch_number || "—",
     productName: batches.find((b) => b.id === r.batch_id)?.product_name || "—",
   }));
+  const statusC = {
+    completed: T.success,
+    in_progress: T.warning,
+    planned: T.info,
+    cancelled: T.danger,
+  };
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
-        <KPI label="Total Runs" value={runs.length} color={C.primaryDark} />
-        <KPI label="Completed" value={completed.length} color={C.accent} />
+        <KPI label="Total Runs" value={runs.length} semantic={null} />
+        <KPI label="Completed" value={completed.length} semantic="success" />
         <KPI
           label="In Progress"
           value={inProgress.length}
-          color={inProgress.length > 0 ? C.gold : C.muted}
+          semantic={inProgress.length > 0 ? "warning" : null}
         />
-        <KPI label="Planned" value={planned.length} color={C.blue} />
+        <KPI label="Planned" value={planned.length} semantic="info" />
         <KPI
           label="Cancelled"
           value={cancelled.length}
-          color={cancelled.length > 0 ? C.red : C.muted}
+          semantic={cancelled.length > 0 ? "danger" : null}
         />
         <KPI
           label="Yield Rate"
           value={yieldRate !== "—" ? `${yieldRate}%` : "—"}
-          color={C.accent}
+          semantic="success"
           sub="actual vs planned"
         />
         <KPI
           label="Units Produced"
           value={totalActual.toLocaleString()}
-          color={C.primaryDark}
+          semantic={null}
         />
         <KPI
           label="Avg Completion"
           value={avgHours !== "—" ? `${avgHours}h` : "—"}
-          color={C.gold}
+          semantic={null}
           sub="hours"
         />
       </div>
@@ -1330,6 +1405,7 @@ function ProductionAnalytics({ data }) {
               borderCollapse: "collapse",
               marginTop: 12,
               fontSize: 12,
+              fontFamily: T.fontUi,
             }}
           >
             <thead>
@@ -1359,25 +1435,19 @@ function ProductionAnalytics({ data }) {
               </tr>
             </thead>
             <tbody>
-              {enriched
+              {[...enriched]
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
                 .map((r) => {
                   const yld =
                     r.planned_units > 0 && r.actual_units != null
                       ? ((r.actual_units / r.planned_units) * 100).toFixed(1)
                       : "—";
-                  const sc = {
-                    completed: C.accent,
-                    in_progress: C.gold,
-                    planned: C.blue,
-                    cancelled: C.red,
-                  };
                   return (
                     <tr key={r.id}>
                       <td
                         style={{
                           ...sTd,
-                          fontFamily: "monospace",
+                          fontFamily: T.fontData,
                           fontWeight: 600,
                           fontSize: 11,
                         }}
@@ -1388,8 +1458,8 @@ function ProductionAnalytics({ data }) {
                         style={{
                           ...sTd,
                           fontSize: 11,
-                          color: C.muted,
-                          fontFamily: "monospace",
+                          color: T.ink500,
+                          fontFamily: T.fontData,
                         }}
                       >
                         {r.batchName}
@@ -1402,9 +1472,9 @@ function ProductionAnalytics({ data }) {
                           style={{
                             fontSize: 10,
                             padding: "2px 8px",
-                            borderRadius: 2,
-                            background: `${sc[r.status] || C.muted}20`,
-                            color: sc[r.status] || C.muted,
+                            borderRadius: 3,
+                            background: `${statusC[r.status] || T.ink500}18`,
+                            color: statusC[r.status] || T.ink500,
                             textTransform: "uppercase",
                             letterSpacing: "0.1em",
                             fontWeight: 700,
@@ -1413,23 +1483,36 @@ function ProductionAnalytics({ data }) {
                           {r.status}
                         </span>
                       </td>
-                      <td style={{ ...sTd, textAlign: "right" }}>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                        }}
+                      >
                         {r.planned_units ?? "—"}
                       </td>
                       <td
                         style={{
                           ...sTd,
                           textAlign: "right",
+                          fontFamily: T.fontData,
                           fontWeight: 600,
-                          color: C.accent,
+                          color: T.success,
                         }}
                       >
                         {r.actual_units ?? "—"}
                       </td>
-                      <td style={{ ...sTd, textAlign: "right" }}>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                        }}
+                      >
                         {yld !== "—" ? `${yld}%` : "—"}
                       </td>
-                      <td style={{ ...sTd, fontSize: 11, color: C.muted }}>
+                      <td style={{ ...sTd, fontSize: 11, color: T.ink500 }}>
                         {r.started_at
                           ? new Date(r.started_at).toLocaleDateString("en-ZA", {
                               day: "numeric",
@@ -1437,7 +1520,7 @@ function ProductionAnalytics({ data }) {
                             })
                           : "—"}
                       </td>
-                      <td style={{ ...sTd, fontSize: 11, color: C.muted }}>
+                      <td style={{ ...sTd, fontSize: 11, color: T.ink500 }}>
                         {r.completed_at
                           ? new Date(r.completed_at).toLocaleDateString(
                               "en-ZA",
@@ -1454,19 +1537,21 @@ function ProductionAnalytics({ data }) {
       )}
       {runs.length === 0 && (
         <div
-          style={{ ...sCard, textAlign: "center", padding: 40, color: C.muted }}
+          style={{
+            ...sCard,
+            textAlign: "center",
+            padding: 40,
+            color: T.ink500,
+          }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🔧</div>No production
-          runs yet.
+          No production runs yet.
         </div>
       )}
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────
-// DISTRIBUTION
-// ───────────────────────────────────────────────────────
+// ─── Distribution ─────────────────────────────────────────────────────────────
 function DistributionAnalytics({ data }) {
   const shipments = data.shipments;
   const statusCounts = {};
@@ -1517,55 +1602,57 @@ function DistributionAnalytics({ data }) {
         <div
           style={{
             padding: "12px 16px",
-            background: C.lightRed,
-            border: `1px solid ${C.red}`,
-            borderRadius: 2,
+            background: T.dangerBg,
+            border: `1px solid ${T.dangerBd}`,
+            borderRadius: 6,
             fontSize: 13,
-            color: C.red,
+            color: T.danger,
             fontWeight: 600,
+            fontFamily: T.fontUi,
           }}
         >
-          ⚠ {overdue.length} shipment{overdue.length > 1 ? "s" : ""} overdue:{" "}
+          {overdue.length} shipment{overdue.length > 1 ? "s" : ""} overdue:{" "}
           {overdue.map((s) => s.shipment_number).join(", ")}
         </div>
       )}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
-        <KPI
-          label="Total Shipments"
-          value={shipments.length}
-          color={C.primaryDark}
-        />
+        <KPI label="Total Shipments" value={shipments.length} semantic={null} />
         <KPI
           label="Preparing"
           value={statusCounts.preparing || 0}
-          color={C.muted}
+          semantic={null}
         />
         <KPI
           label="In Transit"
           value={(statusCounts.shipped || 0) + (statusCounts.in_transit || 0)}
-          color={C.gold}
+          semantic="warning"
         />
         <KPI
           label="Delivered"
           value={(statusCounts.delivered || 0) + (statusCounts.confirmed || 0)}
-          color={C.accent}
+          semantic="success"
         />
         <KPI
           label="Avg Delivery Time"
           value={avgDelivery !== "—" ? `${avgDelivery}d` : "—"}
-          color={C.gold}
+          semantic={null}
           sub="days"
         />
         <KPI
           label="Total Value Shipped"
           value={`R${totalShippedValue.toLocaleString()}`}
-          color={C.primaryDark}
+          semantic={null}
         />
       </div>
       {destList.length > 0 && (
@@ -1577,6 +1664,7 @@ function DistributionAnalytics({ data }) {
               borderCollapse: "collapse",
               marginTop: 12,
               fontSize: 12,
+              fontFamily: T.fontUi,
             }}
           >
             <thead>
@@ -1599,15 +1687,31 @@ function DistributionAnalytics({ data }) {
               {destList.map((d) => (
                 <tr key={d.name}>
                   <td style={{ ...sTd, fontWeight: 500 }}>{d.name}</td>
-                  <td style={{ ...sTd, textAlign: "right" }}>{d.count}</td>
-                  <td style={{ ...sTd, textAlign: "right", fontWeight: 600 }}>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                    }}
+                  >
+                    {d.count}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                      fontWeight: 600,
+                    }}
+                  >
                     {d.items.toLocaleString()}
                   </td>
                   <td
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      color: C.primaryDark,
+                      fontFamily: T.fontData,
+                      color: T.accent,
                       fontWeight: 600,
                     }}
                   >
@@ -1623,11 +1727,9 @@ function DistributionAnalytics({ data }) {
   );
 }
 
-// ───────────────────────────────────────────────────────
-// SCANS & LOYALTY — FIXED v3.1: scan_logs schema
-// ───────────────────────────────────────────────────────
+// ─── Scans & Loyalty ─────────────────────────────────────────────────────────
 function ScansAnalytics({ data }) {
-  const scans = data.scans; // from scan_logs
+  const scans = data.scans;
   const now = new Date();
   const periods = [
     {
@@ -1639,7 +1741,6 @@ function ScansAnalytics({ data }) {
     { label: "90 days", from: new Date(now - 90 * 86400000) },
     { label: "All time", from: new Date(0) },
   ];
-
   const typeMap = {};
   scans.forEach((s) => {
     const t = s.qr_type || "unknown";
@@ -1648,7 +1749,6 @@ function ScansAnalytics({ data }) {
   const typeList = Object.entries(typeMap)
     .map(([qrType, count]) => ({ qrType, count }))
     .sort((a, b) => b.count - a.count);
-
   const codeMap = {};
   scans.forEach((s) => {
     const id = s.qr_code_id || "unknown";
@@ -1658,26 +1758,23 @@ function ScansAnalytics({ data }) {
     .map(([id, count]) => ({ id, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
-
   const provMap = {};
   scans.forEach((s) => {
     if (s.ip_province)
       provMap[s.ip_province] = (provMap[s.ip_province] || 0) + 1;
   });
   const topProvinces = Object.entries(provMap)
-    .map(([p, c]) => ({ province: p, count: c }))
+    .map(([province, count]) => ({ province, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
-
   const outcomeMap = {};
   scans.forEach((s) => {
     const o = s.scan_outcome || "unknown";
     outcomeMap[o] = (outcomeMap[o] || 0) + 1;
   });
   const outcomeList = Object.entries(outcomeMap)
-    .map(([o, c]) => ({ outcome: o, count: c }))
+    .map(([outcome, count]) => ({ outcome, count }))
     .sort((a, b) => b.count - a.count);
-
   const earned = data.loyalty.filter((t) =>
     ["EARNED", "earned", "EARNED_POINTS", "SCAN"].includes(t.transaction_type),
   );
@@ -1690,15 +1787,26 @@ function ScansAnalytics({ data }) {
     0,
   );
   const customers = data.users.filter((u) => u.role === "customer").length;
+  const outcomeColor = (o) =>
+    o === "points_awarded"
+      ? T.success
+      : o === "already_claimed"
+        ? T.ink400
+        : T.warning;
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* Period KPIs — FIXED v3.1: scanned_at */}
+      {/* Period KPIs */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(5,1fr)",
-          gap: 12,
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
         {periods.map((p) => (
@@ -1706,16 +1814,24 @@ function ScansAnalytics({ data }) {
             key={p.label}
             label={`Scans (${p.label})`}
             value={scans.filter((s) => new Date(s.scanned_at) >= p.from).length}
-            color={C.accent}
+            semantic="info"
           />
         ))}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* QR Type */}
         <div style={sCard}>
           <div style={sLabel}>Scans by QR Type</div>
           {typeList.length === 0 ? (
-            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: T.ink500,
+                marginTop: 12,
+                fontFamily: T.fontUi,
+              }}
+            >
               No scan data yet
             </p>
           ) : (
@@ -1737,21 +1853,28 @@ function ScansAnalytics({ data }) {
                       <span
                         style={{
                           fontSize: 11,
-                          fontWeight: 600,
+                          fontWeight: 700,
                           textTransform: "uppercase",
                           letterSpacing: "0.1em",
+                          fontFamily: T.fontUi,
                         }}
                       >
                         {s.qrType}
                       </span>
-                      <span style={{ fontSize: 11, color: C.muted }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: T.fontData,
+                        }}
+                      >
                         {s.count} ({pct}%)
                       </span>
                     </div>
                     <div
                       style={{
                         height: 4,
-                        background: C.border,
+                        background: T.ink150,
                         borderRadius: 2,
                       }}
                     >
@@ -1759,7 +1882,7 @@ function ScansAnalytics({ data }) {
                         style={{
                           height: "100%",
                           width: `${pct}%`,
-                          background: C.accent,
+                          background: T.accent,
                           borderRadius: 2,
                         }}
                       />
@@ -1771,10 +1894,18 @@ function ScansAnalytics({ data }) {
           )}
         </div>
 
+        {/* Top codes */}
         <div style={sCard}>
           <div style={sLabel}>Top Scanned Codes</div>
           {topCodes.length === 0 ? (
-            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: T.ink500,
+                marginTop: 12,
+                fontFamily: T.fontUi,
+              }}
+            >
               No scan data yet
             </p>
           ) : (
@@ -1787,7 +1918,7 @@ function ScansAnalytics({ data }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     padding: "6px 0",
-                    borderBottom: `1px solid ${C.border}`,
+                    borderBottom: `1px solid ${T.ink075}`,
                   }}
                 >
                   <div
@@ -1796,9 +1927,10 @@ function ScansAnalytics({ data }) {
                     <span
                       style={{
                         fontSize: 10,
-                        color: C.muted,
-                        fontWeight: 600,
+                        color: T.ink400,
+                        fontWeight: 700,
                         minWidth: 20,
+                        fontFamily: T.fontData,
                       }}
                     >
                       #{i + 1}
@@ -1806,8 +1938,8 @@ function ScansAnalytics({ data }) {
                     <span
                       style={{
                         fontSize: 11,
-                        fontFamily: "monospace",
-                        color: C.muted,
+                        fontFamily: T.fontData,
+                        color: T.ink500,
                       }}
                     >
                       {p.id.slice(0, 12)}…
@@ -1815,10 +1947,10 @@ function ScansAnalytics({ data }) {
                   </div>
                   <span
                     style={{
-                      fontFamily: F.heading,
+                      fontFamily: T.fontData,
                       fontSize: 16,
-                      fontWeight: 600,
-                      color: C.primaryDark,
+                      fontWeight: 400,
+                      color: T.ink900,
                     }}
                   >
                     {p.count}
@@ -1831,10 +1963,18 @@ function ScansAnalytics({ data }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Province */}
         <div style={sCard}>
           <div style={sLabel}>Scans by Province (IP)</div>
           {topProvinces.length === 0 ? (
-            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: T.ink500,
+                marginTop: 12,
+                fontFamily: T.fontUi,
+              }}
+            >
               No geo data yet
             </p>
           ) : (
@@ -1856,20 +1996,27 @@ function ScansAnalytics({ data }) {
                       <span
                         style={{
                           fontSize: 12,
-                          color: C.primaryDark,
+                          color: T.ink900,
                           fontWeight: 500,
+                          fontFamily: T.fontUi,
                         }}
                       >
                         {row.province}
                       </span>
-                      <span style={{ fontSize: 11, color: C.muted }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: T.fontData,
+                        }}
+                      >
                         {row.count} · {pct}%
                       </span>
                     </div>
                     <div
                       style={{
                         height: 4,
-                        background: C.border,
+                        background: T.ink150,
                         borderRadius: 2,
                       }}
                     >
@@ -1877,7 +2024,7 @@ function ScansAnalytics({ data }) {
                         style={{
                           height: "100%",
                           width: `${pct}%`,
-                          background: C.primaryMid,
+                          background: T.accentMid,
                           borderRadius: 2,
                         }}
                       />
@@ -1889,10 +2036,18 @@ function ScansAnalytics({ data }) {
           )}
         </div>
 
+        {/* Outcomes */}
         <div style={sCard}>
           <div style={sLabel}>Scan Outcomes</div>
           {outcomeList.length === 0 ? (
-            <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: T.ink500,
+                marginTop: 12,
+                fontFamily: T.fontUi,
+              }}
+            >
               No data yet
             </p>
           ) : (
@@ -1902,12 +2057,7 @@ function ScansAnalytics({ data }) {
                   scans.length > 0
                     ? ((row.count / scans.length) * 100).toFixed(1)
                     : 0;
-                const color =
-                  row.outcome === "points_awarded"
-                    ? C.accent
-                    : row.outcome === "already_claimed"
-                      ? C.muted
-                      : C.orange;
+                const color = outcomeColor(row.outcome);
                 return (
                   <div key={row.outcome}>
                     <div
@@ -1920,22 +2070,29 @@ function ScansAnalytics({ data }) {
                       <span
                         style={{
                           fontSize: 11,
-                          fontWeight: 600,
+                          fontWeight: 700,
                           textTransform: "uppercase",
                           letterSpacing: "0.1em",
                           color,
+                          fontFamily: T.fontUi,
                         }}
                       >
                         {row.outcome.replace(/_/g, " ")}
                       </span>
-                      <span style={{ fontSize: 11, color: C.muted }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: T.fontData,
+                        }}
+                      >
                         {row.count} · {pct}%
                       </span>
                     </div>
                     <div
                       style={{
                         height: 4,
-                        background: C.border,
+                        background: T.ink150,
                         borderRadius: 2,
                       }}
                     >
@@ -1956,23 +2113,29 @@ function ScansAnalytics({ data }) {
         </div>
       </div>
 
+      {/* Loyalty KPIs */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
-        <KPI label="Customers" value={customers} color={C.primaryMid} />
+        <KPI label="Customers" value={customers} semantic={null} />
         <KPI
           label="Points Earned"
           value={totalEarned.toLocaleString()}
-          color={C.gold}
+          semantic={null}
         />
         <KPI
           label="Points Redeemed"
           value={totalRedeemed.toLocaleString()}
-          color={C.accent}
+          semantic={null}
         />
         <KPI
           label="Redemption Rate"
@@ -1981,97 +2144,114 @@ function ScansAnalytics({ data }) {
               ? `${((totalRedeemed / totalEarned) * 100).toFixed(1)}%`
               : "—"
           }
-          color={C.blue}
+          semantic="info"
         />
-        <KPI
-          label="Loyalty Tx"
-          value={data.loyalty.length}
-          color={C.primaryDark}
-        />
+        <KPI label="Loyalty Tx" value={data.loyalty.length} semantic={null} />
         <KPI
           label="Avg Pts/Customer"
           value={customers > 0 ? Math.round(totalEarned / customers) : "—"}
-          color={C.gold}
+          semantic={null}
         />
       </div>
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────
-// SHARED COMPONENTS
-// ───────────────────────────────────────────────────────
-function KPI({ label, value, color, sub }) {
+// ─── Shared components ────────────────────────────────────────────────────────
+// KPI — no coloured top border, DM Mono value, semantic colour on value only
+function KPI({ label, value, semantic, sub }) {
+  const semC = {
+    success: T.success,
+    warning: T.warning,
+    danger: T.danger,
+    info: T.info,
+  };
+  const color = semantic ? semC[semantic] : T.ink900;
   return (
-    <div
-      style={{
-        background: C.white,
-        border: `1px solid ${C.border}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: 2,
-        padding: "14px 16px",
-        textAlign: "center",
-      }}
-    >
+    <div style={{ background: "#fff", padding: "16px 18px" }}>
       <div
         style={{
-          fontSize: 9,
-          fontWeight: 600,
-          letterSpacing: "0.15em",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: C.muted,
-          marginBottom: 4,
+          color: T.ink400,
+          marginBottom: 6,
+          fontFamily: T.fontUi,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontFamily: F.heading,
-          fontSize: 26,
-          fontWeight: 300,
+          fontFamily: T.fontData,
+          fontSize: "24px",
+          fontWeight: 400,
           color,
           lineHeight: 1,
+          letterSpacing: "-0.02em",
         }}
       >
         {value}
       </div>
       {sub && (
-        <div style={{ color: C.muted, fontSize: 10, marginTop: 2 }}>{sub}</div>
+        <div
+          style={{
+            color: T.ink500,
+            fontSize: 10,
+            marginTop: 2,
+            fontFamily: T.fontUi,
+          }}
+        >
+          {sub}
+        </div>
       )}
     </div>
   );
 }
 
-function PipelineCard({ stage, icon, items, color }) {
+// PipelineCard — no coloured top border
+function PipelineCard({ stage, items, color }) {
   return (
     <div
       style={{
-        background: C.bg,
-        border: `1px solid ${C.border}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: 2,
+        background: T.ink075,
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 6,
         padding: 14,
         textAlign: "center",
+        borderTop: `3px solid ${color}`,
       }}
     >
-      <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
       <div
         style={{
           fontSize: 10,
           fontWeight: 700,
-          letterSpacing: "0.15em",
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
           color,
           marginBottom: 8,
+          fontFamily: T.fontUi,
         }}
       >
         {stage}
       </div>
       {items.map((item, i) => (
-        <div key={i} style={{ fontSize: 11, color: C.muted, marginBottom: 2 }}>
+        <div
+          key={i}
+          style={{
+            fontSize: 11,
+            color: T.ink500,
+            marginBottom: 4,
+            fontFamily: T.fontUi,
+          }}
+        >
           {item.label}:{" "}
-          <span style={{ fontWeight: 600, color: C.text }}>{item.value}</span>
+          <span
+            style={{ fontFamily: T.fontData, fontWeight: 600, color: T.ink900 }}
+          >
+            {item.value}
+          </span>
         </div>
       ))}
     </div>
