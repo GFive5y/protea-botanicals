@@ -2038,11 +2038,16 @@ function FlowStep({ label, done, active }) {
     return (
       <span
         style={{
-          background: C.accentGreen,
-          color: C.white,
+          background: T.accentLit,
+          color: T.accent,
           padding: "4px 12px",
-          borderRadius: "2px",
+          borderRadius: "3px",
           fontWeight: 700,
+          border: `1px solid ${T.accentBd}`,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          fontSize: "11px",
+          fontFamily: T.font,
         }}
       >
         {label}
@@ -2052,11 +2057,16 @@ function FlowStep({ label, done, active }) {
     return (
       <span
         style={{
-          background: "rgba(82,183,136,0.15)",
-          color: C.accentGreen,
+          background: T.ink075,
+          color: T.ink400,
           padding: "4px 12px",
-          borderRadius: "2px",
-          fontWeight: 600,
+          borderRadius: "3px",
+          fontWeight: 400,
+          border: `1px solid ${T.ink150}`,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          fontSize: "11px",
+          fontFamily: T.font,
         }}
       >
         ✓ {label}
@@ -2079,19 +2089,7 @@ function FlowStep({ label, done, active }) {
 
 function MiniStat({ label, value, color }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: "1px",
-        background: T.ink150,
-        borderRadius: "6px",
-        overflow: "hidden",
-        border: `1px solid ${T.ink150}`,
-        boxShadow: T.shadow,
-        marginBottom: "24px",
-      }}
-    >
+    <div style={{ background: "#fff", padding: "16px 18px" }}>
       <div
         style={{
           fontSize: "10px",
