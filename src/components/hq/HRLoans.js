@@ -46,23 +46,46 @@ const TRAVEL_STATUSES = ["pending", "approved", "rejected"];
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink500,
   white: "#fff",
-  red: "#c0392b",
-  bg: "#f7f6f2",
+  red: T.danger,
+  bg: T.ink075,
 };
-
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
 // ─── STATUS BADGE ─────────────────────────────────────────────────────────────
 
@@ -1211,51 +1234,58 @@ function LoansTab({ tenantId, staff }) {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))",
-          gap: 12,
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
           marginBottom: 24,
         }}
       >
         {[
-          { label: "Total Loaned", value: zar(totalLoaned), color: "#1565c0" },
+          { label: "Total Loaned", value: zar(totalLoaned), color: T.info },
           {
             label: "Outstanding",
             value: zar(totalOutstanding),
-            color: totalOutstanding > 0 ? C.red : "#2e7d32",
+            color: totalOutstanding > 0 ? T.danger : T.success,
           },
-          { label: "Total Stipends", value: zar(totalStipends), color: C.gold },
+          {
+            label: "Total Stipends",
+            value: zar(totalStipends),
+            color: "#b5935a",
+          },
           {
             label: "Active Records",
             value: records.filter((r) => r.status === "active").length,
-            color: "#2e7d32",
+            color: T.success,
           },
         ].map((tile) => (
           <div
             key={tile.label}
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderTop: `3px solid ${tile.color}`,
-              borderRadius: 2,
-              padding: "14px 16px",
-            }}
+            style={{ background: "#fff", padding: "16px 18px" }}
           >
             <div
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.12em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {tile.label}
             </div>
             <div
               style={{
-                fontFamily: FONTS.heading,
+                fontFamily: T.font,
                 fontSize: 22,
+                fontWeight: 400,
                 color: tile.color,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
               }}
             >
               {tile.value}
@@ -1589,7 +1619,12 @@ function TravelTab({ tenantId, staff }) {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))",
-          gap: 12,
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
           marginBottom: 24,
         }}
       >
@@ -1612,31 +1647,29 @@ function TravelTab({ tenantId, staff }) {
         ].map((tile) => (
           <div
             key={tile.label}
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderTop: `3px solid ${tile.color}`,
-              borderRadius: 2,
-              padding: "14px 16px",
-            }}
+            style={{ background: "#fff", padding: "16px 18px" }}
           >
             <div
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.12em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {tile.label}
             </div>
             <div
               style={{
-                fontFamily: FONTS.heading,
+                fontFamily: T.font,
                 fontSize: 22,
+                fontWeight: 400,
                 color: tile.color,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
               }}
             >
               {tile.value}
