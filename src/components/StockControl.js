@@ -10,10 +10,21 @@
 // v1.5: InfoTooltip shop-visibility | v1.4: PO Detail Modal | v1.3: Item History
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
+import { ChartCard, ChartTooltip, InlineProgressBar } from "./viz";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -42,6 +53,8 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  ink400: "#888888",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -599,6 +612,162 @@ function OverviewView({ items, movements, orders }) {
           );
         })}
       </div>
+
+      {/* ── CHARTS: Stock by category + Stock health bar ── */}
+      {active.length > 0 &&
+        (() => {
+          const catBarData = Object.entries(catBreak).map(([cat, d]) => ({
+            name: (CATEGORY_LABELS[cat] || cat).split(" ")[0],
+            items: d.count,
+            value: Math.round(d.value),
+            color: CATEGORY_COLORS[cat] || T.ink400,
+          }));
+
+          const healthBarData = [
+            {
+              name: "Healthy",
+              value: active.length - lowStock.length - outOfStock.length,
+              color: T.success,
+            },
+            { name: "Low", value: lowStock.length, color: T.warning },
+            { name: "Out", value: outOfStock.length, color: T.danger },
+          ].filter((d) => d.value > 0);
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.4fr 1fr",
+                gap: 16,
+                marginBottom: 0,
+              }}
+            >
+              <ChartCard title="Stock Items by Category" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={catBarData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          formatter={(v, n) =>
+                            n === "items"
+                              ? `${v} SKUs`
+                              : `R${v.toLocaleString("en-ZA")}`
+                          }
+                        />
+                      }
+                    />
+                    <Bar
+                      dataKey="items"
+                      name="items"
+                      isAnimationActive={false}
+                      maxBarSize={40}
+                      radius={[3, 3, 0, 0]}
+                    >
+                      {catBarData.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Stock Health" height={200}>
+                <div
+                  style={{
+                    padding: "16px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                    height: "100%",
+                    justifyContent: "center",
+                  }}
+                >
+                  {healthBarData.map((d) => (
+                    <div key={d.name}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: 5,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: d.color,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {d.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontFamily: T.fontData,
+                            color: T.ink400,
+                          }}
+                        >
+                          {d.value} SKU{d.value !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <InlineProgressBar
+                        value={
+                          active.length > 0
+                            ? (d.value / active.length) * 100
+                            : 0
+                        }
+                        max={100}
+                      />
+                    </div>
+                  ))}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: T.ink400,
+                      fontFamily: T.fontUi,
+                      textAlign: "center",
+                      marginTop: 4,
+                    }}
+                  >
+                    {active.length} total active SKUs
+                  </div>
+                </div>
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* Low stock alert */}
       {lowStock.length > 0 && (
