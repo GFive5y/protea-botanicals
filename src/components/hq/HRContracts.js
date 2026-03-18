@@ -18,21 +18,50 @@ const CONTRACT_TYPES = [
 ];
 const SALARY_FREQUENCIES = ["monthly", "weekly", "fortnightly", "hourly"];
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — preserve all internal logic referencing C
 const C = {
-  green: "#3d6b35",
-  greenLight: "#e8f5e9",
-  greenMid: "#2e7d32",
-  amber: "#f57f17",
-  amberLight: "#fff8e1",
-  red: "#c62828",
-  redLight: "#fdecea",
-  blue: "#1565c0",
-  blueLight: "#e3f2fd",
-  border: "#ece8e2",
-  bg: "#faf8f5",
+  green: T.accent,
+  greenLight: T.accentLit,
+  greenMid: T.accentMid,
+  amber: T.warning,
+  amberLight: T.warningBg,
+  red: T.danger,
+  redLight: T.dangerBg,
+  blue: T.info,
+  blueLight: T.infoBg,
+  border: T.ink150,
+  bg: T.ink075,
   white: "#fff",
-  text: "#2d2d2d",
-  muted: "#aaa",
+  text: T.ink700,
+  muted: T.ink400,
 };
 
 function fmtDate(d) {
@@ -79,16 +108,18 @@ const s = {
     verticalAlign: "middle",
     fontSize: 13,
   },
-  btn: (bg, color = C.white) => ({
+  btn: (bg, color = "#fff") => ({
     padding: "6px 14px",
     background: bg,
     color,
     border: `1px solid ${bg}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   outBtn: (color) => ({
     padding: "6px 14px",
@@ -96,29 +127,31 @@ const s = {
     color,
     border: `1px solid ${color}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     cursor: "pointer",
     outline: "none",
     width: "100%",
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
     width: "100%",
@@ -127,7 +160,8 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: "#888",
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
@@ -184,13 +218,15 @@ const s = {
   },
   field: { marginBottom: 16 },
   section: {
-    fontFamily: "'Cormorant Garamond', serif",
-    fontSize: 16,
-    fontWeight: 600,
-    color: C.text,
+    fontFamily: T.font,
+    fontSize: 11,
+    fontWeight: 700,
+    color: T.ink400,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
     margin: "20px 0 12px 0",
     paddingBottom: 8,
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
   },
   error: {
     padding: "12px 16px",
@@ -459,9 +495,10 @@ function ContractDrawer({
             </div>
             <div
               style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 20,
+                fontFamily: T.font,
+                fontSize: 17,
                 fontWeight: 600,
+                color: T.ink700,
               }}
             >
               {staffName}
@@ -745,7 +782,7 @@ export default function HRContracts({ tenantId }) {
   }).length;
 
   return (
-    <div style={{ fontFamily: "'Jost', sans-serif", color: C.text }}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       {/* Alerts */}
       {expiringCount > 0 && (
         <div
@@ -849,8 +886,9 @@ export default function HRContracts({ tenantId }) {
           <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
           <div
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 17,
+              fontFamily: T.font,
+              fontSize: 15,
+              color: T.ink400,
               marginBottom: 6,
             }}
           >
@@ -952,18 +990,19 @@ export default function HRContracts({ tenantId }) {
                       {c.gross_salary_zar ? (
                         <span
                           style={{
-                            fontFamily: "'Cormorant Garamond', serif",
-                            fontSize: 15,
-                            fontWeight: 600,
-                            color: C.green,
+                            fontFamily: T.font,
+                            fontSize: 13,
+                            fontWeight: 400,
+                            fontVariantNumeric: "tabular-nums",
+                            color: T.accent,
                           }}
                         >
                           {fmtCurrency(c.gross_salary_zar)}
                           <span
                             style={{
                               fontSize: 10,
-                              color: C.muted,
-                              fontFamily: "'Jost', sans-serif",
+                              color: T.ink400,
+                              fontFamily: T.font,
                               marginLeft: 3,
                             }}
                           >
