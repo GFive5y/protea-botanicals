@@ -1,4 +1,4 @@
-// HRCalendar.js v1.1 — SCHEMA VERIFIED
+// HRCalendar.js v1.2 — SCHEMA VERIFIED · WP-VISUAL updated
 // WP-HR-8: HR Calendar — leave, public holidays, hearings, timesheets, shifts
 // Location: src/components/hq/HRCalendar.js
 // Views: Month | Week | Team
@@ -17,8 +17,37 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS ───────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_KEYS = [
   "sunday",
@@ -50,23 +79,19 @@ function toDateStr(d) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
 function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
-
 function startOfWeek(date) {
   const d = new Date(date);
   d.setDate(d.getDate() - d.getDay());
   return d;
 }
-
 function addDays(date, n) {
   const d = new Date(date);
   d.setDate(d.getDate() + n);
   return d;
 }
-
 function formatDisplay(dateStr) {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
@@ -76,49 +101,44 @@ function formatDisplay(dateStr) {
     year: "numeric",
   });
 }
-
 function formatTime(timeStr) {
   if (!timeStr) return "";
   return timeStr.slice(0, 5);
 }
-
-// Determine if a shift_schedule covers a given date string (YYYY-MM-DD)
 function shiftCoversDate(shift, dateStr) {
   if (!shift.is_active) return false;
   if (dateStr < shift.effective_from) return false;
   if (shift.effective_to && dateStr > shift.effective_to) return false;
-  const dow = new Date(dateStr + "T00:00:00").getDay(); // 0=Sun
+  const dow = new Date(dateStr + "T00:00:00").getDay();
   const key = `works_${DAY_KEYS[dow]}`;
   return !!shift[key];
 }
 
-// ─── COLOURS ─────────────────────────────────────────────────────────────────
-
-const C = {
-  leave: { bg: "#14532d", text: "#bbf7d0", border: "#22c55e" },
-  holiday: { bg: "#78350f", text: "#fde68a", border: "#f59e0b" },
-  hearing: { bg: "#7f1d1d", text: "#fecaca", border: "#ef4444" },
-  timesheet: { bg: "#1e3a5f", text: "#bfdbfe", border: "#3b82f6" },
-  shift: { bg: "#1e1b4b", text: "#e0e7ff", border: "#818cf8" },
+// ─── EVENT COLOURS (light-theme semantic palette) ────────────────────────────
+const EV = {
+  leave: { bg: T.accentLit, border: T.accentBd, text: T.accent },
+  holiday: { bg: T.warningBg, border: T.warningBd, text: T.warning },
+  hearing: { bg: T.dangerBg, border: T.dangerBd, text: T.danger },
+  timesheet: { bg: T.infoBg, border: T.infoBd, text: T.info },
+  shift: { bg: "#EDE9FE", border: "#A78BFA", text: "#5B21B6" },
 };
 
 const STATUS_COLOR = {
-  pending: "#f59e0b",
-  admin_approved: "#22c55e",
-  hr_approved: "#10b981",
-  rejected: "#ef4444",
-  draft: "#64748b",
-  staff_submitted: "#f59e0b",
-  locked: "#94a3b8",
+  pending: T.warning,
+  admin_approved: T.success,
+  hr_approved: T.accentMid,
+  rejected: T.danger,
+  draft: T.ink400,
+  staff_submitted: T.warning,
+  locked: T.ink300,
 };
 
 // ─── EVENT CHIP ───────────────────────────────────────────────────────────────
-
 function EventChip({ event, onClick, compact = false }) {
-  const c = C[event.type];
-  const bg = event.leaveColor ? event.leaveColor + "44" : c.bg;
-  const border = event.leaveColor ? event.leaveColor + "99" : c.border;
-  const color = event.leaveColor ? "#f1f5f9" : c.text;
+  const c = EV[event.type];
+  const bg = event.leaveColor ? event.leaveColor + "30" : c.bg;
+  const border = event.leaveColor ? event.leaveColor + "88" : c.border;
+  const color = event.leaveColor ? event.leaveColor : c.text;
 
   return (
     <div
@@ -135,6 +155,7 @@ function EventChip({ event, onClick, compact = false }) {
         padding: compact ? "1px 4px" : "2px 6px",
         fontSize: compact ? 10 : 11,
         fontWeight: 600,
+        fontFamily: T.font,
         cursor: "pointer",
         whiteSpace: "nowrap",
         overflow: "hidden",
@@ -143,7 +164,7 @@ function EventChip({ event, onClick, compact = false }) {
         lineHeight: 1.4,
         transition: "opacity 0.15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.7")}
       onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
     >
       {event.title}
@@ -152,10 +173,9 @@ function EventChip({ event, onClick, compact = false }) {
 }
 
 // ─── DETAIL MODAL ─────────────────────────────────────────────────────────────
-
 function DetailModal({ event, onClose }) {
   if (!event) return null;
-  const c = C[event.type];
+  const c = EV[event.type];
   const typeLabel =
     {
       leave: "Leave Request",
@@ -171,7 +191,7 @@ function DetailModal({ event, onClose }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.72)",
+        background: "rgba(0,0,0,0.4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -181,13 +201,14 @@ function DetailModal({ event, onClose }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#1a1a2e",
+          background: "#fff",
           border: `1px solid ${c.border}`,
-          borderRadius: 12,
+          borderRadius: 10,
           padding: 28,
           minWidth: 340,
           maxWidth: 500,
-          boxShadow: `0 0 40px ${c.border}33`,
+          boxShadow: T.shadow,
+          fontFamily: T.font,
         }}
       >
         <div
@@ -203,31 +224,33 @@ function DetailModal({ event, onClose }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: 1.5,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: c.border,
+                color: c.text,
+                fontFamily: T.font,
               }}
             >
               {typeLabel}
             </div>
-            <h3
+            <div
               style={{
-                color: "#f1f5f9",
-                fontSize: 17,
+                color: T.ink700,
+                fontSize: 16,
                 fontWeight: 700,
                 margin: "4px 0 0",
+                fontFamily: T.font,
               }}
             >
               {event.title}
-            </h3>
+            </div>
           </div>
           <button
             onClick={onClose}
             style={{
               background: "none",
               border: "none",
-              color: "#64748b",
-              fontSize: 22,
+              color: T.ink400,
+              fontSize: 20,
               cursor: "pointer",
               lineHeight: 1,
             }}
@@ -235,7 +258,6 @@ function DetailModal({ event, onClose }) {
             ×
           </button>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {event.staffName && <DRow label="Staff" value={event.staffName} />}
           {event.startDate && (
@@ -270,16 +292,19 @@ function DetailModal({ event, onClose }) {
             <DRow label="Status">
               <span
                 style={{
-                  background: (STATUS_COLOR[event.status] || "#64748b") + "22",
-                  color: STATUS_COLOR[event.status] || "#94a3b8",
-                  border: `1px solid ${STATUS_COLOR[event.status] || "#64748b"}44`,
+                  background: (STATUS_COLOR[event.status] || T.ink400) + "20",
+                  color: STATUS_COLOR[event.status] || T.ink400,
+                  border: `1px solid ${STATUS_COLOR[event.status] || T.ink400}44`,
                   padding: "2px 10px",
                   borderRadius: 20,
-                  fontSize: 12,
-                  fontWeight: 600,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: T.font,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
                 }}
               >
-                {event.status.replace(/_/g, " ").toUpperCase()}
+                {event.status.replace(/_/g, " ")}
               </span>
             </DRow>
           )}
@@ -294,9 +319,10 @@ function DRow({ label, value, children }) {
     <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
       <span
         style={{
-          color: "#475569",
-          fontSize: 12,
+          color: T.ink400,
+          fontSize: 11,
           fontWeight: 600,
+          fontFamily: T.font,
           minWidth: 90,
           flexShrink: 0,
         }}
@@ -304,14 +330,15 @@ function DRow({ label, value, children }) {
         {label}
       </span>
       {children || (
-        <span style={{ color: "#cbd5e1", fontSize: 13 }}>{value}</span>
+        <span style={{ color: T.ink700, fontSize: 13, fontFamily: T.font }}>
+          {value}
+        </span>
       )}
     </div>
   );
 }
 
 // ─── LEGEND ──────────────────────────────────────────────────────────────────
-
 const LAYER_META = [
   { key: "leave", label: "Leave" },
   { key: "holiday", label: "Holidays" },
@@ -324,7 +351,7 @@ function Legend({ layers, onToggle }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
       {LAYER_META.map(({ key, label }) => {
-        const c = C[key];
+        const c = EV[key];
         const on = layers[key];
         return (
           <button
@@ -337,11 +364,12 @@ function Legend({ layers, onToggle }) {
               padding: "4px 11px",
               borderRadius: 20,
               cursor: "pointer",
-              border: `1px solid ${on ? c.border : "#334155"}`,
+              border: `1px solid ${on ? c.border : T.ink150}`,
               background: on ? c.bg : "transparent",
-              color: on ? c.border : "#475569",
+              color: on ? c.text : T.ink400,
               fontSize: 11,
               fontWeight: 700,
+              fontFamily: T.font,
               transition: "all 0.15s",
             }}
           >
@@ -350,7 +378,7 @@ function Legend({ layers, onToggle }) {
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: on ? c.border : "#334155",
+                background: on ? c.text : T.ink300,
               }}
             />
             {label}
@@ -362,7 +390,6 @@ function Legend({ layers, onToggle }) {
 }
 
 // ─── MONTH VIEW ──────────────────────────────────────────────────────────────
-
 function MonthView({ year, month, events, layers, onEventClick }) {
   const firstDow = new Date(year, month, 1).getDay();
   const totalDays = daysInMonth(year, month);
@@ -387,6 +414,7 @@ function MonthView({ year, month, events, layers, onEventClick }) {
 
   return (
     <div style={{ flex: 1, overflow: "auto" }}>
+      {/* Day headers */}
       <div
         style={{
           display: "grid",
@@ -401,10 +429,11 @@ function MonthView({ year, month, events, layers, onEventClick }) {
             style={{
               textAlign: "center",
               padding: "8px 0",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 700,
-              letterSpacing: 1,
-              color: "#475569",
+              letterSpacing: "0.08em",
+              fontFamily: T.font,
+              color: T.ink400,
               textTransform: "uppercase",
             }}
           >
@@ -412,6 +441,7 @@ function MonthView({ year, month, events, layers, onEventClick }) {
           </div>
         ))}
       </div>
+      {/* Day cells */}
       <div
         style={{
           display: "grid",
@@ -433,17 +463,17 @@ function MonthView({ year, month, events, layers, onEventClick }) {
             <div
               key={i}
               style={{
-                minHeight: 92,
-                borderRadius: 5,
+                minHeight: 90,
+                borderRadius: 4,
                 padding: "5px 4px",
                 background: day
                   ? isToday
-                    ? "#1e293b"
+                    ? T.accentLit
                     : isWeekend
-                      ? "#0c111d"
-                      : "#0f172a"
-                  : "#07090f",
-                border: `1px solid ${isToday ? "#22c55e44" : "#1a2235"}`,
+                      ? T.ink075
+                      : "#fff"
+                  : T.ink050,
+                border: `1px solid ${isToday ? T.accentBd : T.ink150}`,
               }}
             >
               {day && (
@@ -458,13 +488,14 @@ function MonthView({ year, month, events, layers, onEventClick }) {
                     <span
                       style={{
                         fontSize: 11,
-                        fontWeight: isToday ? 800 : 500,
+                        fontWeight: isToday ? 700 : 400,
+                        fontFamily: T.font,
                         color: isToday
-                          ? "#22c55e"
+                          ? T.accent
                           : isWeekend
-                            ? "#374151"
-                            : "#64748b",
-                        background: isToday ? "#22c55e1a" : "transparent",
+                            ? T.ink300
+                            : T.ink500,
+                        background: isToday ? T.accentBd : "transparent",
                         width: 20,
                         height: 20,
                         borderRadius: "50%",
@@ -486,7 +517,12 @@ function MonthView({ year, month, events, layers, onEventClick }) {
                   ))}
                   {overflow > 0 && (
                     <div
-                      style={{ fontSize: 10, color: "#475569", paddingLeft: 3 }}
+                      style={{
+                        fontSize: 10,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                        paddingLeft: 3,
+                      }}
                     >
                       +{overflow} more
                     </div>
@@ -502,7 +538,6 @@ function MonthView({ year, month, events, layers, onEventClick }) {
 }
 
 // ─── WEEK VIEW ────────────────────────────────────────────────────────────────
-
 function WeekView({ weekStart, events, layers, onEventClick }) {
   const todayStr = toDateStr(new Date());
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -523,7 +558,7 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7,1fr)",
-          gap: 4,
+          gap: 6,
         }}
       >
         {days.map((day, i) => {
@@ -538,11 +573,11 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
               key={i}
               style={{
                 background: isToday
-                  ? "#1e293b"
+                  ? T.accentLit
                   : isWeekend
-                    ? "#0c111d"
-                    : "#0f172a",
-                border: `1px solid ${isToday ? "#22c55e44" : "#1a2235"}`,
+                    ? T.ink075
+                    : "#fff",
+                border: `1px solid ${isToday ? T.accentBd : T.ink150}`,
                 borderRadius: 8,
                 padding: "10px 7px",
                 minHeight: 220,
@@ -554,8 +589,9 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
                     fontSize: 10,
                     fontWeight: 700,
                     textTransform: "uppercase",
-                    letterSpacing: 1,
-                    color: isWeekend ? "#374151" : "#475569",
+                    letterSpacing: "0.08em",
+                    fontFamily: T.font,
+                    color: isWeekend ? T.ink300 : T.ink400,
                   }}
                 >
                   {DAYS_SHORT[dow]}
@@ -563,18 +599,18 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
                 <div
                   style={{
                     fontSize: 22,
-                    fontWeight: 800,
-                    color: isToday
-                      ? "#22c55e"
-                      : isWeekend
-                        ? "#374151"
-                        : "#e2e8f0",
+                    fontWeight: 700,
+                    fontFamily: T.font,
+                    color: isToday ? T.accent : isWeekend ? T.ink300 : T.ink700,
                     lineHeight: 1.2,
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {day.getDate()}
                 </div>
-                <div style={{ fontSize: 10, color: "#334155" }}>
+                <div
+                  style={{ fontSize: 10, fontFamily: T.font, color: T.ink300 }}
+                >
                   {MONTHS_FULL[day.getMonth()].slice(0, 3)}
                 </div>
               </div>
@@ -582,7 +618,8 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#1e293b",
+                    fontFamily: T.font,
+                    color: T.ink150,
                     textAlign: "center",
                     marginTop: 16,
                   }}
@@ -603,7 +640,6 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
 }
 
 // ─── TEAM VIEW ────────────────────────────────────────────────────────────────
-
 function TeamView({ year, month, staff, events, layers, onEventClick }) {
   const totalDays = daysInMonth(year, month);
   const todayStr = toDateStr(new Date());
@@ -656,12 +692,9 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
                   textAlign: "center",
                   fontSize: 9,
                   lineHeight: 1.4,
-                  color: isToday
-                    ? "#22c55e"
-                    : isWeekend
-                      ? "#2d3748"
-                      : "#475569",
-                  fontWeight: isToday ? 800 : 500,
+                  fontFamily: T.font,
+                  color: isToday ? T.accent : isWeekend ? T.ink300 : T.ink400,
+                  fontWeight: isToday ? 700 : 500,
                 }}
               >
                 <div>{DAYS_SHORT[dow][0]}</div>
@@ -674,10 +707,11 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
         {staff.length === 0 && (
           <div
             style={{
-              color: "#334155",
+              color: T.ink400,
               textAlign: "center",
               padding: 48,
               fontSize: 13,
+              fontFamily: T.font,
             }}
           >
             No active staff found.
@@ -695,7 +729,8 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
                 minWidth: 160,
                 fontSize: 12,
                 fontWeight: 600,
-                color: "#94a3b8",
+                fontFamily: T.font,
+                color: T.ink500,
                 padding: "3px 8px 3px 0",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -713,42 +748,38 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
               const dow = new Date(ds + "T00:00:00").getDay();
               const isWeekend = dow === 0 || dow === 6;
 
-              let bg = isWeekend ? "#090d17" : "#0f172a";
-              let border = isToday ? "#22c55e22" : "#1a2235";
+              let bg = isWeekend ? T.ink075 : "#fff";
+              let border = isToday ? T.accentBd : T.ink150;
               let symbol = null;
               let clickEv = null;
 
               if (holiday) {
-                bg = C.holiday.bg + "55";
-                border = C.holiday.border + "44";
+                bg = T.warningBg;
+                border = T.warningBd;
                 symbol = (
-                  <span style={{ color: C.holiday.border, fontSize: 9 }}>
-                    ★
-                  </span>
+                  <span style={{ color: T.warning, fontSize: 9 }}>★</span>
                 );
               }
               if (shift) {
-                bg = C.shift.bg + "66";
-                border = C.shift.border + "55";
+                bg = "#EDE9FE";
+                border = "#A78BFA";
                 symbol = (
-                  <span style={{ color: C.shift.border, fontSize: 9 }}>S</span>
+                  <span style={{ color: "#5B21B6", fontSize: 9 }}>S</span>
                 );
                 clickEv = shift;
               }
               if (leave.length) {
-                const lc = leave[0].leaveColor || C.leave.border;
-                bg = lc + "44";
-                border = lc + "88";
+                const lc = leave[0].leaveColor || T.accent;
+                bg = lc + "25";
+                border = lc + "66";
                 symbol = <span style={{ color: lc, fontSize: 9 }}>✓</span>;
                 clickEv = leave[0];
               }
               if (hearing) {
-                bg = C.hearing.bg + "77";
-                border = C.hearing.border + "88";
+                bg = T.dangerBg;
+                border = T.dangerBd;
                 symbol = (
-                  <span style={{ color: C.hearing.border, fontSize: 9 }}>
-                    ⚠
-                  </span>
+                  <span style={{ color: T.danger, fontSize: 9 }}>⚠</span>
                 );
                 clickEv = hearing;
               }
@@ -791,11 +822,16 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
         style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 16 }}
       >
         {[
-          { sym: "✓", color: C.leave.border, label: "On Leave" },
-          { sym: "★", color: C.holiday.border, label: "Public Holiday" },
-          { sym: "⚠", color: C.hearing.border, label: "Hearing" },
-          { sym: "S", color: C.shift.border, label: "Shift" },
-        ].map(({ sym, color, label }) => (
+          { sym: "✓", color: T.accent, bg: T.accentLit, label: "On Leave" },
+          {
+            sym: "★",
+            color: T.warning,
+            bg: T.warningBg,
+            label: "Public Holiday",
+          },
+          { sym: "⚠", color: T.danger, bg: T.dangerBg, label: "Hearing" },
+          { sym: "S", color: "#5B21B6", bg: "#EDE9FE", label: "Shift" },
+        ].map(({ sym, color, bg, label }) => (
           <div
             key={label}
             style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -805,7 +841,7 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
                 width: 18,
                 height: 18,
                 borderRadius: 3,
-                background: color + "22",
+                background: bg,
                 border: `1px solid ${color}55`,
                 display: "flex",
                 alignItems: "center",
@@ -816,7 +852,9 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
             >
               {sym}
             </div>
-            <span style={{ fontSize: 12, color: "#475569" }}>{label}</span>
+            <span style={{ fontSize: 12, fontFamily: T.font, color: T.ink500 }}>
+              {label}
+            </span>
           </div>
         ))}
       </div>
@@ -825,7 +863,6 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-
 export default function HRCalendar({ tenantId }) {
   const today = new Date();
   const [view, setView] = useState("month");
@@ -855,7 +892,7 @@ export default function HRCalendar({ tenantId }) {
     setLoading(true);
     setError(null);
     try {
-      // 1. Active staff ───────────────────────────────────────────────────────
+      // 1. Active staff
       const { data: staffData, error: sErr } = await supabase
         .from("staff_profiles")
         .select("id, full_name, preferred_name, user_id")
@@ -869,7 +906,7 @@ export default function HRCalendar({ tenantId }) {
         staffMap[s.id] = s.full_name || s.preferred_name || "—";
       });
 
-      // 2. Leave requests ─────────────────────────────────────────────────────
+      // 2. Leave requests
       const { data: leaveData, error: lErr } = await supabase
         .from("leave_requests")
         .select(
@@ -892,12 +929,11 @@ export default function HRCalendar({ tenantId }) {
         leaveType: lr.leave_types?.name || "—",
         leaveColor: lr.leave_types?.color || null,
         days: lr.days_requested,
-        reason: lr.reason, // confirmed column name
+        reason: lr.reason,
         status: lr.status,
       }));
 
-      // 3. Public holidays ────────────────────────────────────────────────────
-      // CONFIRMED: column is holiday_date (not date)
+      // 3. Public holidays (CONFIRMED: holiday_date column)
       const { data: phData, error: phErr } = await supabase
         .from("public_holidays")
         .select("id, holiday_date, name, holiday_type")
@@ -912,15 +948,13 @@ export default function HRCalendar({ tenantId }) {
         id: ph.id,
         type: "holiday",
         title: ph.name,
-        date: ph.holiday_date, // confirmed: holiday_date
+        date: ph.holiday_date,
         startDate: ph.holiday_date,
         endDate: ph.holiday_date,
         holidayType: ph.holiday_type,
       }));
 
-      // 4. Disciplinary hearings ──────────────────────────────────────────────
-      // CONFIRMED: hearing_date is TIMESTAMPTZ — extract date portion client-side
-      // Range filter: gte rangeStart, lt day-after-rangeEnd (covers full last day)
+      // 4. Disciplinary hearings (CONFIRMED: hearing_date is TIMESTAMPTZ)
       const dayAfterEnd = toDateStr(
         addDays(new Date(rangeEnd + "T00:00:00"), 1),
       );
@@ -952,7 +986,7 @@ export default function HRCalendar({ tenantId }) {
         };
       });
 
-      // 5. Timesheets ─────────────────────────────────────────────────────────
+      // 5. Timesheets
       const { data: tsData, error: tsErr } = await supabase
         .from("timesheets")
         .select(
@@ -981,9 +1015,7 @@ export default function HRCalendar({ tenantId }) {
         absentCount: ts.absent_count,
       }));
 
-      // 6. Shift schedules ────────────────────────────────────────────────────
-      // CONFIRMED: effective_from/to date range + works_[day] booleans
-      // Fetch schedules overlapping this month, then expand per-day client-side
+      // 6. Shift schedules (CONFIRMED: works_[day] booleans, effective_from/to)
       const { data: shiftData, error: shErr } = await supabase
         .from("shift_schedules")
         .select(
@@ -1011,7 +1043,6 @@ export default function HRCalendar({ tenantId }) {
         .or(`effective_to.is.null,effective_to.gte.${rangeStart}`);
       if (shErr) throw shErr;
 
-      // Expand each schedule into individual confirmed day events
       const shiftEvents = [];
       (shiftData || []).forEach((sh) => {
         const shiftTime =
@@ -1056,7 +1087,6 @@ export default function HRCalendar({ tenantId }) {
     fetchData();
   }, [fetchData]);
 
-  // Sync week nav → month/year
   useEffect(() => {
     if (view === "week") {
       setYear(weekStart.getFullYear());
@@ -1064,7 +1094,6 @@ export default function HRCalendar({ tenantId }) {
     }
   }, [weekStart, view]);
 
-  // Navigation
   function prevMonth() {
     if (month === 0) {
       setYear((y) => y - 1);
@@ -1090,7 +1119,6 @@ export default function HRCalendar({ tenantId }) {
     setWeekStart(startOfWeek(t));
   }
 
-  // Summary counts (deduplicated — shifts expand to many events per schedule)
   const counts = { leave: 0, holiday: 0, hearing: 0, timesheet: 0, shift: 0 };
   const seen = new Set();
   events.forEach((e) => {
@@ -1101,17 +1129,32 @@ export default function HRCalendar({ tenantId }) {
     }
   });
 
+  const navBtnStyle = {
+    background: "none",
+    border: `1px solid ${T.ink150}`,
+    color: T.ink400,
+    borderRadius: 6,
+    padding: "5px 11px",
+    cursor: "pointer",
+    fontSize: 17,
+    lineHeight: 1,
+    fontFamily: T.font,
+    transition: "all 0.15s",
+  };
+
   return (
     <div
       style={{
-        background: "#0b0f1a",
-        borderRadius: 12,
+        background: "#fff",
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 10,
         padding: 24,
         minHeight: "70vh",
         display: "flex",
         flexDirection: "column",
         gap: 18,
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: T.font,
+        boxShadow: T.shadow,
       }}
     >
       {/* Header */}
@@ -1125,39 +1168,45 @@ export default function HRCalendar({ tenantId }) {
         }}
       >
         <div>
-          <h2
+          <div
             style={{
-              color: "#f1f5f9",
-              fontSize: 21,
-              fontWeight: 800,
+              color: T.ink700,
+              fontSize: 17,
+              fontWeight: 700,
+              fontFamily: T.font,
               margin: 0,
             }}
           >
             HR Calendar
-          </h2>
+          </div>
           <div
             style={{ display: "flex", gap: 14, marginTop: 5, flexWrap: "wrap" }}
           >
             {[
-              { key: "leave", label: "Leave", color: C.leave.border },
-              { key: "holiday", label: "Holidays", color: C.holiday.border },
-              { key: "hearing", label: "Hearings", color: C.hearing.border },
-              { key: "shift", label: "Shifts", color: C.shift.border },
+              { key: "leave", label: "Leave", color: T.accent },
+              { key: "holiday", label: "Holidays", color: T.warning },
+              { key: "hearing", label: "Hearings", color: T.danger },
+              { key: "shift", label: "Shifts", color: "#5B21B6" },
             ].map(({ key, label, color }) => (
-              <span key={key} style={{ fontSize: 12, color: "#475569" }}>
+              <span
+                key={key}
+                style={{ fontSize: 12, fontFamily: T.font, color: T.ink400 }}
+              >
                 <span style={{ color, fontWeight: 700 }}>{counts[key]}</span>{" "}
                 {label}
               </span>
             ))}
           </div>
         </div>
+
+        {/* View switcher */}
         <div
           style={{
             display: "flex",
-            gap: 3,
-            background: "#1e293b",
+            gap: 2,
+            background: T.ink075,
             borderRadius: 8,
-            padding: 4,
+            padding: 3,
           }}
         >
           {["month", "week", "team"].map((v) => (
@@ -1169,11 +1218,13 @@ export default function HRCalendar({ tenantId }) {
                 borderRadius: 6,
                 border: "none",
                 cursor: "pointer",
-                background: view === v ? "#22c55e" : "transparent",
-                color: view === v ? "#000" : "#475569",
+                background: view === v ? T.accent : "transparent",
+                color: view === v ? "#fff" : T.ink400,
                 fontWeight: 700,
-                fontSize: 12,
-                textTransform: "capitalize",
+                fontSize: 11,
+                fontFamily: T.font,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
                 transition: "all 0.15s",
               }}
             >
@@ -1193,18 +1244,19 @@ export default function HRCalendar({ tenantId }) {
           gap: 10,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             onClick={view === "week" ? prevWeek : prevMonth}
-            style={NAV_BTN}
+            style={navBtnStyle}
           >
             ‹
           </button>
           <span
             style={{
-              color: "#e2e8f0",
-              fontSize: 16,
-              fontWeight: 700,
+              color: T.ink700,
+              fontSize: 15,
+              fontWeight: 600,
+              fontFamily: T.font,
               minWidth: 210,
               textAlign: "center",
             }}
@@ -1215,18 +1267,21 @@ export default function HRCalendar({ tenantId }) {
           </span>
           <button
             onClick={view === "week" ? nextWeek : nextMonth}
-            style={NAV_BTN}
+            style={navBtnStyle}
           >
             ›
           </button>
           <button
             onClick={goToday}
             style={{
-              ...NAV_BTN,
-              color: "#22c55e",
-              borderColor: "#22c55e33",
-              fontSize: 12,
+              ...navBtnStyle,
+              color: T.accent,
+              borderColor: T.accentBd,
+              fontSize: 11,
               padding: "6px 12px",
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
             }}
           >
             Today
@@ -1239,12 +1294,13 @@ export default function HRCalendar({ tenantId }) {
       {error && (
         <div
           style={{
-            background: "#7f1d1d22",
-            border: "1px solid #ef444433",
+            background: T.dangerBg,
+            border: `1px solid ${T.dangerBd}`,
             borderRadius: 8,
             padding: "10px 14px",
-            color: "#fca5a5",
+            color: T.danger,
             fontSize: 13,
+            fontFamily: T.font,
           }}
         >
           ⚠ {error} —{" "}
@@ -1253,10 +1309,11 @@ export default function HRCalendar({ tenantId }) {
             style={{
               background: "none",
               border: "none",
-              color: "#f87171",
+              color: T.danger,
               cursor: "pointer",
               textDecoration: "underline",
               fontSize: 13,
+              fontFamily: T.font,
             }}
           >
             Retry
@@ -1274,11 +1331,13 @@ export default function HRCalendar({ tenantId }) {
             justifyContent: "center",
             flexDirection: "column",
             gap: 12,
-            color: "#334155",
+            color: T.ink300,
           }}
         >
           <div style={{ fontSize: 36 }}>📅</div>
-          <div style={{ fontSize: 13 }}>Loading calendar…</div>
+          <div style={{ fontSize: 13, fontFamily: T.font }}>
+            Loading calendar…
+          </div>
         </div>
       ) : (
         <>
@@ -1318,15 +1377,3 @@ export default function HRCalendar({ tenantId }) {
     </div>
   );
 }
-
-const NAV_BTN = {
-  background: "none",
-  border: "1px solid #1e293b",
-  color: "#64748b",
-  borderRadius: 6,
-  padding: "5px 11px",
-  cursor: "pointer",
-  fontSize: 17,
-  lineHeight: 1,
-  transition: "all 0.15s",
-};
