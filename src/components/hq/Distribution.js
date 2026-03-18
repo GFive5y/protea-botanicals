@@ -1,4 +1,5 @@
-// src/components/hq/Distribution.js — Protea Botanicals v1.2
+// src/components/hq/Distribution.js — Protea Botanicals v1.3 — WP-THEME-2: Inter font + WorkflowGuide
+// v1.2: Import PO Cost Integration
 // ─────────────────────────────────────────────────────────────────────────────
 // DISTRIBUTION TAB — Phase 2D
 //
@@ -24,6 +25,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import WorkflowGuide from "../WorkflowGuide";
+import { usePageContext } from "../../hooks/usePageContext";
 
 const C = {
   bg: "#faf9f6",
@@ -41,8 +44,8 @@ const C = {
   orange: "#e67e22",
 };
 const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
+  heading: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+  body: "'Inter', 'Helvetica Neue', Arial, sans-serif",
 };
 
 const sLabel = {
@@ -131,6 +134,7 @@ export default function Distribution() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const ctx = usePageContext("hq-distribution", null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [expandedShipment, setExpandedShipment] = useState(null);
 
@@ -257,6 +261,12 @@ export default function Distribution() {
 
   return (
     <div>
+      <WorkflowGuide
+        context={ctx}
+        tabId="hq-distribution"
+        onAction={() => {}}
+        defaultOpen={false}
+      />
       {/* Header */}
       <div style={{ marginBottom: "24px" }}>
         <div
@@ -1141,17 +1151,15 @@ function ShipmentCard({
                     quantity_on_hand: (hqItem.quantity_on_hand || 0) - qty,
                   })
                   .eq("id", si.inventory_item_id);
-                await supabase
-                  .from("stock_movements")
-                  .insert({
-                    id: crypto.randomUUID(),
-                    item_id: si.inventory_item_id,
-                    quantity: -qty,
-                    movement_type: "shipment_out",
-                    reference: shipment.shipment_number,
-                    notes: `Shipped to ${shipment.destination_name} (${shipment.shipment_number})`,
-                    tenant_id: HQ_TENANT_ID,
-                  });
+                await supabase.from("stock_movements").insert({
+                  id: crypto.randomUUID(),
+                  item_id: si.inventory_item_id,
+                  quantity: -qty,
+                  movement_type: "shipment_out",
+                  reference: shipment.shipment_number,
+                  notes: `Shipped to ${shipment.destination_name} (${shipment.shipment_number})`,
+                  tenant_id: HQ_TENANT_ID,
+                });
               }
             }
 
@@ -1174,32 +1182,28 @@ function ShipmentCard({
                   .eq("id", shopItemId);
               } else {
                 shopItemId = crypto.randomUUID();
-                await supabase
-                  .from("inventory_items")
-                  .insert({
-                    id: shopItemId,
-                    tenant_id: destTenantId,
-                    name: si.item_name,
-                    sku: si.sku || null,
-                    category: "finished_product",
-                    quantity_on_hand: qty,
-                    unit: si.unit || "pcs",
-                    cost_price: si.unit_cost || null,
-                    is_active: true,
-                  });
+                await supabase.from("inventory_items").insert({
+                  id: shopItemId,
+                  tenant_id: destTenantId,
+                  name: si.item_name,
+                  sku: si.sku || null,
+                  category: "finished_product",
+                  quantity_on_hand: qty,
+                  unit: si.unit || "pcs",
+                  cost_price: si.unit_cost || null,
+                  is_active: true,
+                });
               }
               if (shopItemId) {
-                await supabase
-                  .from("stock_movements")
-                  .insert({
-                    id: crypto.randomUUID(),
-                    item_id: shopItemId,
-                    quantity: qty,
-                    movement_type: "shipment_in",
-                    reference: shipment.shipment_number,
-                    notes: `Received from HQ (${shipment.shipment_number})`,
-                    tenant_id: destTenantId,
-                  });
+                await supabase.from("stock_movements").insert({
+                  id: crypto.randomUUID(),
+                  item_id: shopItemId,
+                  quantity: qty,
+                  movement_type: "shipment_in",
+                  reference: shipment.shipment_number,
+                  notes: `Received from HQ (${shipment.shipment_number})`,
+                  tenant_id: destTenantId,
+                });
               }
             }
           } catch (itemErr) {
