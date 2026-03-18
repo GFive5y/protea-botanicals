@@ -19,6 +19,36 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtZar = (n) =>
   `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -54,19 +84,20 @@ function calcReliabilityScore(
 
 function scoreColour(score) {
   if (score === null || score === undefined)
-    return { color: "#bbb", bg: "#f5f5f5", label: "No data" };
+    return { color: T.ink400, bg: T.ink075, label: "No data" };
   if (score >= 75)
-    return { color: "#2E7D32", bg: "#E8F5E9", label: "Reliable" };
-  if (score >= 50) return { color: "#E65100", bg: "#FFF3E0", label: "Average" };
-  return { color: "#c62828", bg: "#FFEBEE", label: "At risk" };
+    return { color: T.success, bg: T.successBg, label: "Reliable" };
+  if (score >= 50)
+    return { color: T.warning, bg: T.warningBg, label: "Average" };
+  return { color: T.danger, bg: T.dangerBg, label: "At risk" };
 }
 
 function stockColour(qty, reorder) {
-  if (reorder <= 0) return { color: "#888", bg: "#f5f5f5" };
-  if (qty <= 0) return { color: "#c62828", bg: "#FFEBEE" };
-  if (qty <= reorder) return { color: "#c62828", bg: "#FFEBEE" };
-  if (qty <= reorder * 1.5) return { color: "#E65100", bg: "#FFF3E0" };
-  return { color: "#2E7D32", bg: "#E8F5E9" };
+  if (reorder <= 0) return { color: T.ink400, bg: T.ink075 };
+  if (qty <= 0) return { color: T.danger, bg: T.dangerBg };
+  if (qty <= reorder) return { color: T.danger, bg: T.dangerBg };
+  if (qty <= reorder * 1.5) return { color: T.warning, bg: T.warningBg };
+  return { color: T.success, bg: T.successBg };
 }
 
 // ─── Score Badge ─────────────────────────────────────────────────────────────
@@ -267,36 +298,40 @@ export default function HQReorderScoring({ onNavigate }) {
   // ── Styles ────────────────────────────────────────────────────────────
   const card = {
     background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #f0ede8",
+    borderRadius: 6,
+    border: `1px solid ${T.ink150}`,
     overflow: "hidden",
     marginBottom: 16,
+    boxShadow: T.shadow,
   };
   const btn = (variant = "primary", extra = {}) => ({
-    padding: "10px 20px",
-    borderRadius: 8,
+    padding: "8px 16px",
+    borderRadius: 4,
     border: "none",
     cursor: "pointer",
-    fontFamily: "Jost, sans-serif",
+    fontFamily: T.font,
     fontWeight: 600,
-    fontSize: 14,
-    ...(variant === "primary" ? { background: "#2d4a2d", color: "#fff" } : {}),
+    fontSize: 11,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    ...(variant === "primary" ? { background: T.accent, color: "#fff" } : {}),
     ...(variant === "ghost"
       ? {
           background: "transparent",
-          color: "#2d4a2d",
-          border: "1px solid #2d4a2d",
+          color: T.accentMid,
+          border: `1px solid ${T.accentBd}`,
         }
       : {}),
     ...(variant === "small"
       ? {
-          background: "#f5f5f5",
-          color: "#555",
-          padding: "6px 14px",
-          fontSize: 13,
+          background: T.ink075,
+          color: T.ink500,
+          padding: "6px 12px",
+          fontSize: 10,
+          border: `1px solid ${T.ink150}`,
         }
       : {}),
-    ...(variant === "alert" ? { background: "#c62828", color: "#fff" } : {}),
+    ...(variant === "alert" ? { background: T.danger, color: "#fff" } : {}),
     ...extra,
   });
 
@@ -309,7 +344,7 @@ export default function HQReorderScoring({ onNavigate }) {
   // RENDER
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
+    <div style={{ fontFamily: T.font, color: T.ink900 }}>
       {/* Toast */}
       {toast && (
         <div
@@ -344,10 +379,10 @@ export default function HQReorderScoring({ onNavigate }) {
           <h2
             style={{
               margin: 0,
-              fontSize: 26,
-              fontFamily: "Cormorant Garamond, serif",
+              fontSize: 22,
+              fontFamily: T.font,
               fontWeight: 600,
-              color: "#2d4a2d",
+              color: T.accent,
             }}
           >
             Reorder & Supplier Intelligence
@@ -384,14 +419,16 @@ export default function HQReorderScoring({ onNavigate }) {
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              padding: "10px 20px",
-              fontFamily: "Jost, sans-serif",
-              fontSize: 13,
+              padding: "10px 16px",
+              fontFamily: T.font,
+              fontSize: 11,
               fontWeight: activeTab === t.id ? 700 : 400,
-              color: activeTab === t.id ? "#2d4a2d" : "#999",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: activeTab === t.id ? T.accent : T.ink400,
               borderBottom:
                 activeTab === t.id
-                  ? "2px solid #2d4a2d"
+                  ? `2px solid ${T.accent}`
                   : "2px solid transparent",
             }}
           >
@@ -416,7 +453,12 @@ export default function HQReorderScoring({ onNavigate }) {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 16,
+                  gap: "1px",
+                  background: T.ink150,
+                  borderRadius: 6,
+                  overflow: "hidden",
+                  border: `1px solid ${T.ink150}`,
+                  boxShadow: T.shadow,
                   marginBottom: 24,
                 }}
               >
@@ -447,28 +489,32 @@ export default function HQReorderScoring({ onNavigate }) {
                 ].map((s) => (
                   <div
                     key={s.label}
-                    style={{
-                      background: s.bg,
-                      borderRadius: 12,
-                      padding: "20px 24px",
-                      border: `1px solid ${s.bg}`,
-                    }}
+                    style={{ background: "#fff", padding: "16px 18px" }}
                   >
-                    <div style={{ fontSize: 28, marginBottom: 6 }}>
-                      {s.icon}
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: T.ink400,
+                        marginBottom: 6,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      {s.label}
                     </div>
                     <div
                       style={{
-                        fontSize: 36,
-                        fontWeight: 800,
+                        fontFamily: T.fontData,
+                        fontSize: 26,
+                        fontWeight: 400,
                         color: s.colour,
                         lineHeight: 1,
+                        letterSpacing: "-0.02em",
                       }}
                     >
                       {s.value}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
-                      {s.label}
                     </div>
                   </div>
                 ))}
