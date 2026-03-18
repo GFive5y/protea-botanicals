@@ -1,118 +1,141 @@
-// src/components/hq/HQProduction.js v2.0
-// WP-W: Unified Batch→Production→Stock→Shop Pipeline
-//
-// v2.0 changes:
-//   - OverviewPanel: Stock Alert banner (DEPLETED + LOW STOCK finished products)
-//   - BatchesPanel: shows live quantity_on_hand per batch (via inventory_item_id link)
-//   - BatchesPanel: lifecycle_status badges (active|low_stock|depleted|archived)
-//   - BatchesPanel: Archive action (sets is_archived=true + lifecycle_status='archived')
-//   - BatchesPanel: "🏭 New Run" shortcut per batch row
-//   - BatchesPanel: onboarding panel explaining the full pipeline
-//   - BatchesPanel: low_stock_threshold field editable per batch
-//   - NewRunPanel.handleConfirm: writes inventory_item_id + lifecycle_status back to batches
-//   - NewRunPanel: post-completion prompt "Set sell price to go live in shop"
-//   - AllocatePanel: auto-updates batch lifecycle_status after allocation depletes stock
-//
-// v1.6 — WP-T: Audit Export sub-tab — batch→QR→scan chain, CSV export, QR recall tool
-// v1.5 — FORMAT expansion: vape formats, non-vape, triple chamber, batch edit
-// v1.4 — BUG-001 FIX: direct batches query ordered by production_date
-// v1.3 — Terpene unit fix
-// v1.2 — History admin controls: Edit/Cancel/Delete w/ stock reversal
-// v1.1 — Schema fix
-// v1.0 — WP-L: Production Module
+// src/components/hq/HQProduction.js v3.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all metric/numeric values
+//   - Stat cards: coloured top borders removed — semantic colour on value only
+//   - Orange "PLAN PRODUCTION" banner → standard warning template
+//   - Red "Out of Stock" banner → standard danger template
+//   - Sub-tabs: standard underline style (no filled buttons)
+//   - sLabel: ink400 replaces accent green
+//   - HowItWorksBanner: step cards use left border only (no coloured top border)
+//   - Purple retired from pipeline steps → info-blue
+// v2.0: WP-W unified pipeline, lifecycle badges, archive, audit export
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 
+// ── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+// Legacy aliases — keeps all internal logic unchanged
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  warm: "#f4f0e8",
+  cream: T.ink050,
+  warm: T.ink075,
   white: "#fff",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
-  error: "#c0392b",
-  red: "#e74c3c",
-  blue: "#2c4a6e",
-  purple: "#6c3483",
-  lightPurple: "#f5eef8",
-  orange: "#d4680a",
-  lightOrange: "#fff3e8",
+  border: T.ink150,
+  muted: T.ink500,
+  text: T.ink900,
+  error: T.danger,
+  red: T.danger,
+  blue: T.info,
+  purple: T.info, // ★ purple → info-blue
+  orange: T.warning,
+  lightOrange: T.warningBg,
 };
 const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
+  heading: T.fontUi, // ★ Outfit replaces Cormorant everywhere
+  body: T.fontUi,
 };
+
 const sCard = {
-  background: C.white,
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  background: "#fff",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: "6px",
   padding: "20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+  boxShadow: T.shadow,
 };
 const sBtn = (v = "primary") => ({
   padding: "8px 16px",
   background:
     v === "primary"
-      ? C.green
+      ? T.accent
       : v === "danger"
-        ? C.red
+        ? T.danger
         : v === "amber"
-          ? C.orange
+          ? T.warning
           : "transparent",
-  color: ["primary", "danger", "amber"].includes(v) ? C.white : C.mid,
+  color: ["primary", "danger", "amber"].includes(v) ? "#fff" : T.accentMid,
   border: ["primary", "danger", "amber"].includes(v)
     ? "none"
-    : `1px solid ${C.mid}`,
-  borderRadius: "2px",
+    : `1px solid ${T.accentBd}`,
+  borderRadius: "4px",
   fontSize: "10px",
-  letterSpacing: "0.15em",
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
   fontWeight: 600,
   cursor: "pointer",
-  fontFamily: F.body,
+  fontFamily: T.fontUi,
   transition: "all 0.15s",
 });
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: "4px",
   fontSize: "13px",
-  fontFamily: F.body,
-  background: C.white,
+  fontFamily: T.fontUi,
+  background: "#fff",
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
 };
 const sSelect = { ...sInput, cursor: "pointer" };
 const sLabel = {
-  fontSize: "9px",
-  letterSpacing: "0.3em",
+  fontSize: "10px",
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: "4px",
-  fontFamily: F.body,
+  color: T.ink400,
+  marginBottom: "6px",
+  fontFamily: T.fontUi,
+  fontWeight: 700,
 };
 const sTh = {
   textAlign: "left",
   padding: "10px 12px",
   fontSize: "9px",
-  letterSpacing: "0.2em",
+  letterSpacing: "0.15em",
   textTransform: "uppercase",
-  color: C.muted,
-  borderBottom: `2px solid ${C.border}`,
-  fontWeight: 500,
+  color: T.ink400,
+  borderBottom: `2px solid ${T.ink150}`,
+  fontWeight: 700,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${C.border}`,
-  color: C.text,
+  borderBottom: `1px solid ${T.ink075}`,
+  color: T.ink700,
   verticalAlign: "middle",
 };
 
@@ -263,30 +286,28 @@ function calcYield(actual, planned) {
   return +((actual / planned) * 100).toFixed(1);
 }
 
-// ─── LIFECYCLE STATUS BADGE ──────────────────────────────────────────────────
-function LifecycleBadge({ status, qty }) {
-  // Derive effective status from qty if lifecycle_status not set
-  const effective = status || "active";
+// ─── Lifecycle badge ─────────────────────────────────────────────────────────
+function LifecycleBadge({ status }) {
   const map = {
-    active: { bg: "#d4edda", color: C.green, label: "Active" },
-    in_production: { bg: "#e3f2fd", color: C.blue, label: "In Production" },
-    low_stock: { bg: "#fff3e8", color: C.orange, label: "Low Stock" },
-    depleted: { bg: "#ffebee", color: C.red, label: "Depleted" },
-    archived: { bg: C.warm, color: C.muted, label: "Archived" },
+    active: { bg: T.successBg, color: T.success, label: "Active" },
+    in_production: { bg: T.infoBg, color: T.info, label: "In Production" },
+    low_stock: { bg: T.warningBg, color: T.warning, label: "Low Stock" },
+    depleted: { bg: T.dangerBg, color: T.danger, label: "Depleted" },
+    archived: { bg: T.ink075, color: T.ink500, label: "Archived" },
   };
-  const s = map[effective] || map.active;
+  const s = map[status || "active"] || map.active;
   return (
     <span
       style={{
         fontSize: "9px",
         padding: "2px 8px",
-        borderRadius: "2px",
+        borderRadius: "3px",
         background: s.bg,
         color: s.color,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
-        fontWeight: 600,
-        fontFamily: F.body,
+        fontWeight: 700,
+        fontFamily: T.fontUi,
       }}
     >
       {s.label}
@@ -297,28 +318,28 @@ function LifecycleBadge({ status, qty }) {
 function StatusBadge({ status, yieldPct }) {
   let bg, color, label;
   if (status === "completed" && yieldPct !== null && yieldPct < 95) {
-    bg = "#fff3e8";
-    color = C.orange;
+    bg = T.warningBg;
+    color = T.warning;
     label = "Yield Flagged";
   } else if (status === "completed") {
-    bg = "#d4edda";
-    color = C.green;
+    bg = T.successBg;
+    color = T.success;
     label = "Completed";
   } else if (status === "in_progress") {
-    bg = "#fff3e8";
-    color = C.orange;
+    bg = T.warningBg;
+    color = T.warning;
     label = "In Progress";
   } else if (status === "active") {
-    bg = "#d4edda";
-    color = C.green;
+    bg = T.successBg;
+    color = T.success;
     label = "Active";
   } else if (status === "archived") {
-    bg = C.warm;
-    color = C.muted;
+    bg = T.ink075;
+    color = T.ink500;
     label = "Archived";
   } else {
-    bg = C.warm;
-    color = C.muted;
+    bg = T.ink075;
+    color = T.ink500;
     label = status || "Draft";
   }
   return (
@@ -326,13 +347,13 @@ function StatusBadge({ status, yieldPct }) {
       style={{
         fontSize: "9px",
         padding: "2px 8px",
-        borderRadius: "2px",
+        borderRadius: "3px",
         background: bg,
         color,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
-        fontWeight: 600,
-        fontFamily: F.body,
+        fontWeight: 700,
+        fontFamily: T.fontUi,
       }}
     >
       {label}
@@ -340,7 +361,7 @@ function StatusBadge({ status, yieldPct }) {
   );
 }
 
-function StockGauge({ label, available, needed, unit, color = C.accent }) {
+function StockGauge({ label, available, needed, unit, color = T.accentMid }) {
   const pct = needed > 0 ? Math.min((available / needed) * 100, 100) : 100;
   const ok = available >= needed;
   return (
@@ -352,22 +373,24 @@ function StockGauge({ label, available, needed, unit, color = C.accent }) {
           marginBottom: "4px",
         }}
       >
-        <span style={{ fontSize: "12px", fontFamily: F.body, color: C.text }}>
+        <span
+          style={{ fontSize: "12px", fontFamily: T.fontUi, color: T.ink700 }}
+        >
           {label}
         </span>
         <span
           style={{
             fontSize: "12px",
-            fontFamily: F.body,
+            fontFamily: T.fontData,
             fontWeight: 600,
-            color: ok ? C.green : C.red,
+            color: ok ? T.success : T.danger,
           }}
         >
           {ok ? "✓" : "✕"}{" "}
           {typeof available === "number" ? available.toFixed(2) : available}
           {unit} available
           {needed > 0 && (
-            <span style={{ color: C.muted, fontWeight: 400 }}>
+            <span style={{ color: T.ink400, fontWeight: 400 }}>
               {" "}
               / {needed}
               {unit} needed
@@ -378,7 +401,7 @@ function StockGauge({ label, available, needed, unit, color = C.accent }) {
       <div
         style={{
           height: "6px",
-          background: C.border,
+          background: T.ink150,
           borderRadius: "3px",
           overflow: "hidden",
         }}
@@ -387,7 +410,7 @@ function StockGauge({ label, available, needed, unit, color = C.accent }) {
           style={{
             width: `${pct}%`,
             height: "100%",
-            background: ok ? color : C.red,
+            background: ok ? color : T.danger,
             borderRadius: "3px",
             transition: "width 0.4s ease",
           }}
@@ -397,17 +420,76 @@ function StockGauge({ label, available, needed, unit, color = C.accent }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HOW IT WORKS BANNER — persistent onboarding for all users
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── How It Works banner ─────────────────────────────────────────────────────
 function HowItWorksBanner() {
   const [open, setOpen] = React.useState(false);
+  const steps = [
+    {
+      step: "1",
+      title: "Supply Chain",
+      color: T.info,
+      what: "Receive raw materials",
+      how: "HQ → Supply Chain → Purchase Orders\nCreate a PO for distillate, terpenes, hardware.\nWhen stock arrives, click 'Receive' — quantities auto-add to inventory.",
+      result: "Raw materials appear in inventory with correct quantities.",
+    },
+    {
+      step: "2",
+      title: "New Production Run",
+      color: T.accentMid,
+      what: "Manufacture finished product",
+      how: "HQ → Production → New Production Run\nSelect strain + format (e.g. MAC 1ml Cart).\nEnter how many units you're filling.\nSystem shows exactly what raw materials will be deducted.",
+      result: "Raw materials deducted. Finished units added to stock.",
+    },
+    {
+      step: "3",
+      title: "Set Sell Price",
+      color: "#b5935a",
+      what: "Price the product for the shop",
+      how: "HQ → Pricing tab\nFind the finished product.\nSet sell_price > R0.\nWithout a price, the product will NOT appear in the customer shop.",
+      result: "Product is now ready to go live.",
+    },
+    {
+      step: "4",
+      title: "Live in Shop",
+      color: T.success,
+      what: "Product appears automatically",
+      how: "No action needed.\nThe shop reads inventory_items WHERE:\n  • category = 'finished_product'\n  • is_active = true\n  • quantity_on_hand > 0\n  • sell_price > R0\nAll 4 conditions must be true.",
+      result: "Customers can find, add to cart and buy the product.",
+    },
+  ];
+  const glossary = [
+    {
+      term: "BATCH",
+      def: "A product record — describes what the product is (strain, format, expiry, lab cert). Does NOT add stock on its own.",
+    },
+    {
+      term: "PRODUCTION RUN",
+      def: "A manufacturing event — logs how many units you filled today, deducts raw materials, adds finished stock.",
+    },
+    {
+      term: "INVENTORY ITEM",
+      def: "The live stock counter — quantity_on_hand is what the shop reads. Goes up on production, down on each sale.",
+    },
+    {
+      term: "NOT LINKED",
+      def: "Batch was created before v2.0 and has no inventory_item_id. Run a New Production Run to link it.",
+    },
+    {
+      term: "LOW STOCK",
+      def: "quantity_on_hand ≤ low_stock_threshold (default: 10). Still live in shop but plan a production run soon.",
+    },
+    {
+      term: "DEPLETED",
+      def: "quantity_on_hand = 0. Product is automatically hidden from shop. Run production to restock.",
+    },
+  ];
   return (
     <div style={{ marginBottom: 16 }}>
       <div
         style={{
           ...sCard,
-          borderLeft: `4px solid ${C.blue}`,
+          border: `1px solid ${T.infoBd}`,
+          borderLeft: `3px solid ${T.info}`,
           padding: "12px 16px",
         }}
       >
@@ -418,23 +500,15 @@ function HowItWorksBanner() {
             alignItems: "center",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 16 }}>ℹ</span>
-            <span
-              style={{
-                fontFamily: F.body,
-                fontSize: 12,
-                fontWeight: 600,
-                color: C.blue,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              How Production Works
-            </span>
-            <span style={{ fontFamily: F.body, fontSize: 12, color: C.muted }}>
-              — 4 steps from raw materials to live shop
-            </span>
+          <div
+            style={{
+              fontFamily: T.fontUi,
+              fontSize: 13,
+              fontWeight: 600,
+              color: T.info,
+            }}
+          >
+            How Production Works — 4 steps from raw materials to live shop
           </div>
           <button
             onClick={() => setOpen((o) => !o)}
@@ -442,17 +516,15 @@ function HowItWorksBanner() {
               ...sBtn("outline"),
               padding: "4px 12px",
               fontSize: "9px",
-              color: C.blue,
-              borderColor: C.blue,
+              color: T.info,
+              borderColor: T.infoBd,
             }}
           >
             {open ? "▲ Hide" : "▼ Show"}
           </button>
         </div>
-
         {open && (
           <div style={{ marginTop: 16 }}>
-            {/* Step flow */}
             <div
               style={{
                 display: "flex",
@@ -462,99 +534,49 @@ function HowItWorksBanner() {
                 marginBottom: 16,
               }}
             >
-              {[
-                {
-                  step: "1",
-                  icon: "📥",
-                  title: "Supply Chain",
-                  color: C.blue,
-                  what: "Receive raw materials",
-                  how: "HQ → Supply Chain → Purchase Orders\nCreate a PO for distillate, terpenes, hardware.\nWhen stock arrives, click 'Receive' — quantities auto-add to inventory.",
-                  result:
-                    "Raw materials appear in inventory with correct quantities.",
-                },
-                {
-                  step: "2",
-                  icon: "⚗",
-                  title: "New Production Run",
-                  color: C.purple,
-                  what: "Manufacture finished product",
-                  how: "HQ → Production → New Production Run\nSelect strain + format (e.g. MAC 1ml Cart).\nEnter how many units you're filling.\nSystem shows exactly what raw materials will be deducted.",
-                  result:
-                    "Raw materials deducted. Finished units added to stock. Batch + run record created.",
-                },
-                {
-                  step: "3",
-                  icon: "💰",
-                  title: "Set Sell Price",
-                  color: C.gold,
-                  what: "Price the product for the shop",
-                  how: "HQ → Pricing tab\nFind the finished product.\nSet sell_price > R0.\nWithout a price, the product will NOT appear in the customer shop.",
-                  result: "Product is now ready to go live.",
-                },
-                {
-                  step: "4",
-                  icon: "🛍",
-                  title: "Live in Shop",
-                  color: C.accent,
-                  what: "Product appears automatically",
-                  how: "No action needed.\nThe shop reads inventory_items WHERE:\n  • category = 'finished_product'\n  • is_active = true\n  • quantity_on_hand > 0\n  • sell_price > R0\nAll 4 conditions must be true.",
-                  result:
-                    "Customers can find, add to cart and buy the product online.",
-                },
-              ].map((s, i, arr) => (
+              {steps.map((s, i, arr) => (
                 <React.Fragment key={s.step}>
                   <div
                     style={{
                       flex: 1,
                       minWidth: 200,
-                      background: C.white,
-                      border: `1px solid ${s.color}30`,
-                      borderTop: `3px solid ${s.color}`,
-                      borderRadius: 2,
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderLeft: `3px solid ${s.color}`,
+                      borderRadius: 6,
                       padding: "14px 16px",
                     }}
                   >
                     <div
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 8,
+                        fontSize: 9,
+                        letterSpacing: "0.2em",
+                        textTransform: "uppercase",
+                        color: s.color,
+                        fontFamily: T.fontUi,
+                        fontWeight: 700,
+                        marginBottom: 4,
                       }}
                     >
-                      <span style={{ fontSize: 20 }}>{s.icon}</span>
-                      <div>
-                        <div
-                          style={{
-                            fontFamily: F.body,
-                            fontSize: 9,
-                            letterSpacing: "0.2em",
-                            textTransform: "uppercase",
-                            color: s.color,
-                            fontWeight: 700,
-                          }}
-                        >
-                          Step {s.step}
-                        </div>
-                        <div
-                          style={{
-                            fontFamily: F.body,
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: C.text,
-                          }}
-                        >
-                          {s.title}
-                        </div>
-                      </div>
+                      Step {s.step}
                     </div>
                     <div
                       style={{
-                        fontFamily: F.body,
+                        fontFamily: T.fontUi,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: T.ink900,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {s.title}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: T.fontUi,
                         fontSize: 11,
                         fontWeight: 600,
-                        color: C.text,
+                        color: T.ink700,
                         marginBottom: 4,
                       }}
                     >
@@ -562,9 +584,9 @@ function HowItWorksBanner() {
                     </div>
                     <div
                       style={{
-                        fontFamily: F.body,
+                        fontFamily: T.fontUi,
                         fontSize: 11,
-                        color: C.muted,
+                        color: T.ink500,
                         lineHeight: 1.7,
                         whiteSpace: "pre-line",
                         marginBottom: 8,
@@ -576,9 +598,9 @@ function HowItWorksBanner() {
                       style={{
                         background: `${s.color}10`,
                         border: `1px solid ${s.color}30`,
-                        borderRadius: 2,
+                        borderRadius: 4,
                         padding: "6px 10px",
-                        fontFamily: F.body,
+                        fontFamily: T.fontUi,
                         fontSize: 11,
                         color: s.color,
                         fontWeight: 600,
@@ -593,7 +615,7 @@ function HowItWorksBanner() {
                         display: "flex",
                         alignItems: "center",
                         padding: "0 4px",
-                        color: C.muted,
+                        color: T.ink300,
                         fontSize: 18,
                         flexShrink: 0,
                       }}
@@ -604,74 +626,41 @@ function HowItWorksBanner() {
                 </React.Fragment>
               ))}
             </div>
-
-            {/* Glossary */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
                 gap: 10,
               }}
             >
-              {[
-                {
-                  term: "BATCH",
-                  icon: "📦",
-                  def: "A product record — describes what the product is (strain, format, expiry, lab cert). Does NOT add stock on its own.",
-                },
-                {
-                  term: "PRODUCTION RUN",
-                  icon: "⚗",
-                  def: "A manufacturing event — logs how many units you filled today, deducts raw materials, adds finished stock.",
-                },
-                {
-                  term: "INVENTORY ITEM",
-                  icon: "📊",
-                  def: "The live stock counter — quantity_on_hand is what the shop reads. This number goes up on production, down on each sale.",
-                },
-                {
-                  term: "NOT LINKED",
-                  icon: "⚠",
-                  def: "Batch was created before v2.0 and has no inventory_item_id. Run a New Production Run to link it and enable live stock tracking.",
-                },
-                {
-                  term: "LOW STOCK",
-                  icon: "🟡",
-                  def: "quantity_on_hand ≤ low_stock_threshold (default: 10). Still live in shop but you should plan a production run soon.",
-                },
-                {
-                  term: "DEPLETED",
-                  icon: "🔴",
-                  def: "quantity_on_hand = 0. Product is automatically hidden from shop. Run production to restock and it reappears.",
-                },
-              ].map((g) => (
+              {glossary.map((g) => (
                 <div
                   key={g.term}
                   style={{
-                    background: C.warm,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 2,
+                    background: T.ink075,
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 6,
                     padding: "10px 12px",
                   }}
                 >
                   <div
                     style={{
-                      fontFamily: F.body,
+                      fontFamily: T.fontUi,
                       fontSize: 10,
                       fontWeight: 700,
-                      letterSpacing: "0.15em",
+                      letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      color: C.text,
+                      color: T.ink900,
                       marginBottom: 4,
                     }}
                   >
-                    {g.icon} {g.term}
+                    {g.term}
                   </div>
                   <div
                     style={{
-                      fontFamily: F.body,
+                      fontFamily: T.fontUi,
                       fontSize: 11,
-                      color: C.muted,
+                      color: T.ink500,
                       lineHeight: 1.6,
                     }}
                   >
@@ -687,15 +676,12 @@ function HowItWorksBanner() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SET PRICE PANEL v2.4
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Set Price Panel ─────────────────────────────────────────────────────────
 function SetPricePanel({ items, onRefresh }) {
   const finished = items.filter((i) => i.category === "finished_product");
   const [prices, setPrices] = useState({});
   const [saving, setSaving] = useState(null);
   const [toast, setToast] = useState(null);
-
   useEffect(() => {
     const init = {};
     finished.forEach((i) => {
@@ -703,7 +689,6 @@ function SetPricePanel({ items, onRefresh }) {
     });
     setPrices(init);
   }, [items]); // eslint-disable-line
-
   const handleSave = async (item) => {
     setSaving(item.id);
     try {
@@ -713,7 +698,7 @@ function SetPricePanel({ items, onRefresh }) {
         .eq("id", item.id);
       if (error) throw error;
       setToast({
-        msg: `✓ ${item.name} updated to R${prices[item.id]}`,
+        msg: `${item.name} updated to R${prices[item.id]}`,
         type: "success",
       });
       setTimeout(() => setToast(null), 3000);
@@ -724,22 +709,21 @@ function SetPricePanel({ items, onRefresh }) {
       setSaving(null);
     }
   };
-
   return (
     <div
       style={{
         ...sCard,
-        borderLeft: `3px solid ${C.accent}`,
-        background: "#f0faf5",
+        border: `1px solid ${T.accentBd}`,
+        background: T.accentLit,
       }}
     >
-      <div style={sLabel}>💰 Set Sell Prices — Website Shop</div>
+      <div style={sLabel}>Set Sell Prices — Website Shop</div>
       <p
         style={{
           fontSize: "12px",
-          color: C.mid,
+          color: T.accentMid,
           margin: "6px 0 12px",
-          fontFamily: F.body,
+          fontFamily: T.fontUi,
           lineHeight: "1.7",
         }}
       >
@@ -751,19 +735,20 @@ function SetPricePanel({ items, onRefresh }) {
           style={{
             padding: "8px 12px",
             marginBottom: 10,
-            borderRadius: 2,
+            borderRadius: 4,
             fontSize: 12,
-            fontFamily: F.body,
-            background: toast.type === "success" ? "#f0faf5" : "#fff0f0",
-            color: toast.type === "success" ? C.green : C.red,
-            border: `1px solid ${toast.type === "success" ? C.accent : C.red}`,
+            fontFamily: T.fontUi,
+            background: toast.type === "success" ? T.successBg : T.dangerBg,
+            color: toast.type === "success" ? T.success : T.danger,
+            border: `1px solid ${toast.type === "success" ? T.successBd : T.dangerBd}`,
           }}
         >
+          {toast.type === "success" ? "✓ " : "✗ "}
           {toast.msg}
         </div>
       )}
       {finished.length === 0 ? (
-        <p style={{ fontSize: "12px", color: C.muted, fontFamily: F.body }}>
+        <p style={{ fontSize: "12px", color: T.ink500, fontFamily: T.fontUi }}>
           No finished products in inventory yet.
         </p>
       ) : (
@@ -772,7 +757,7 @@ function SetPricePanel({ items, onRefresh }) {
             width: "100%",
             borderCollapse: "collapse",
             fontSize: "12px",
-            fontFamily: F.body,
+            fontFamily: T.fontUi,
           }}
         >
           <thead>
@@ -790,15 +775,26 @@ function SetPricePanel({ items, onRefresh }) {
               const qty = parseFloat(i.quantity_on_hand || 0);
               const price = parseFloat(prices[i.id] || 0);
               const isLive = qty > 0 && price > 0;
+              const sem = isLive ? "success" : qty <= 0 ? "danger" : "warning";
+              const semC = {
+                success: T.success,
+                danger: T.danger,
+                warning: T.warning,
+              };
+              const semBg = {
+                success: T.successBg,
+                danger: T.dangerBg,
+                warning: T.warningBg,
+              };
               return (
                 <tr key={i.id}>
                   <td style={{ ...sTd, fontWeight: 500 }}>{i.name}</td>
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: "monospace",
+                      fontFamily: T.fontData,
                       fontSize: "11px",
-                      color: C.muted,
+                      color: T.ink500,
                     }}
                   >
                     {i.sku}
@@ -807,7 +803,8 @@ function SetPricePanel({ items, onRefresh }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      color: qty <= 0 ? C.red : C.green,
+                      fontFamily: T.fontData,
+                      color: qty <= 0 ? T.danger : T.success,
                       fontWeight: 600,
                     }}
                   >
@@ -836,23 +833,15 @@ function SetPricePanel({ items, onRefresh }) {
                       style={{
                         fontSize: "9px",
                         padding: "2px 8px",
-                        borderRadius: 2,
+                        borderRadius: 3,
                         fontWeight: 700,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        background: isLive
-                          ? "#d4edda"
-                          : qty <= 0
-                            ? "#ffebee"
-                            : "#fff3e8",
-                        color: isLive ? C.green : qty <= 0 ? C.red : C.orange,
+                        background: semBg[sem],
+                        color: semC[sem],
                       }}
                     >
-                      {isLive
-                        ? "🟢 Live"
-                        : qty <= 0
-                          ? "🔴 No Stock"
-                          : "🟡 Price Needed"}
+                      {isLive ? "Live" : qty <= 0 ? "No Stock" : "Price Needed"}
                     </span>
                   </td>
                   <td style={{ ...sTd, textAlign: "center" }}>
@@ -877,6 +866,8 @@ function SetPricePanel({ items, onRefresh }) {
     </div>
   );
 }
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const ctx = usePageContext("hq-production", null);
@@ -900,15 +891,7 @@ export default function HQProduction() {
         supabase
           .from("production_runs")
           .select(
-            `
-          id, batch_id, run_number, status, planned_units, actual_units,
-          started_at, completed_at, notes, created_at,
-          batches ( batch_number, product_name, strain, product_type, volume ),
-          production_run_inputs (
-            id, run_id, item_id, quantity_planned, quantity_actual, notes,
-            inventory_items ( name, sku, unit, category )
-          )
-        `,
+            `id,batch_id,run_number,status,planned_units,actual_units,started_at,completed_at,notes,created_at,batches(batch_number,product_name,strain,product_type,volume),production_run_inputs(id,run_id,item_id,quantity_planned,quantity_actual,notes,inventory_items(name,sku,unit,category))`,
           )
           .order("created_at", { ascending: false })
           .limit(100),
@@ -945,15 +928,14 @@ export default function HQProduction() {
   }, [fetchAll]);
 
   const SUB_TABS = [
-    { id: "overview", label: "Overview", icon: "◎" },
-    { id: "batches", label: "Batches", icon: "📦" },
-    { id: "new-run", label: "New Production Run", icon: "⊕" },
-    { id: "history", label: "History", icon: "📋" },
-    { id: "allocate", label: "Allocate Stock", icon: "→" },
-    { id: "audit", label: "Audit Export", icon: "🔍" },
+    { id: "overview", label: "Overview" },
+    { id: "batches", label: "Batches" },
+    { id: "new-run", label: "New Production Run" },
+    { id: "history", label: "History" },
+    { id: "allocate", label: "Allocate Stock" },
+    { id: "audit", label: "Audit Export" },
   ];
 
-  // Compute stock alerts across all finished products
   const finishedItems = items.filter((i) => i.category === "finished_product");
   const depleted = finishedItems.filter(
     (i) => parseFloat(i.quantity_on_hand || 0) <= 0,
@@ -970,12 +952,13 @@ export default function HQProduction() {
       <div
         style={{
           ...sCard,
-          borderLeft: `3px solid ${C.error}`,
+          border: `1px solid ${T.dangerBd}`,
+          borderLeft: `3px solid ${T.danger}`,
           margin: "20px 0",
         }}
       >
         <div style={sLabel}>Error</div>
-        <p style={{ fontSize: "13px", color: C.error, margin: "8px 0 0" }}>
+        <p style={{ fontSize: "13px", color: T.danger, margin: "8px 0 0" }}>
           {error}
         </p>
         <button onClick={fetchAll} style={{ ...sBtn(), marginTop: "12px" }}>
@@ -985,139 +968,122 @@ export default function HQProduction() {
     );
 
   return (
-    <div>
-      {/* ── Global Stock Alert Banner ── */}
+    <div style={{ fontFamily: T.fontUi }}>
+      {/* ── Stock alerts — standard semantic templates ── */}
       {(depleted.length > 0 || lowStock.length > 0) && !loading && (
         <div style={{ marginBottom: "20px" }}>
           {depleted.length > 0 && (
             <div
               style={{
-                ...sCard,
-                borderLeft: `4px solid ${C.red}`,
-                background: "#fff5f5",
+                background: T.dangerBg,
+                border: `1px solid ${T.dangerBd}`,
+                borderRadius: "6px",
+                padding: "14px 18px",
                 marginBottom: "10px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: C.red,
-                      fontFamily: F.body,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      marginBottom: 4,
-                    }}
-                  >
-                    🚨 {depleted.length} Product{depleted.length > 1 ? "s" : ""}{" "}
-                    Out of Stock — Shop Hidden
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {depleted.map((i) => (
-                      <span
-                        key={i.id}
-                        style={{
-                          fontSize: "11px",
-                          background: "#ffebee",
-                          color: C.red,
-                          padding: "2px 10px",
-                          borderRadius: "2px",
-                          fontFamily: F.body,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {i.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSubTab("new-run")}
+              <div>
+                <div
                   style={{
-                    ...sBtn("primary"),
-                    background: C.red,
-                    whiteSpace: "nowrap",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: T.danger,
+                    fontFamily: T.fontUi,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    marginBottom: 6,
                   }}
                 >
-                  + New Production Run →
-                </button>
+                  {depleted.length} product{depleted.length > 1 ? "s" : ""} out
+                  of stock — shop hidden
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {depleted.map((i) => (
+                    <span
+                      key={i.id}
+                      style={{
+                        fontSize: "11px",
+                        background: "rgba(153,27,27,0.08)",
+                        color: T.danger,
+                        padding: "2px 10px",
+                        borderRadius: "3px",
+                        fontFamily: T.fontUi,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {i.name}
+                    </span>
+                  ))}
+                </div>
               </div>
+              <button
+                onClick={() => setSubTab("new-run")}
+                style={{ ...sBtn("danger"), whiteSpace: "nowrap" }}
+              >
+                New Production Run
+              </button>
             </div>
           )}
           {lowStock.length > 0 && (
             <div
               style={{
-                ...sCard,
-                borderLeft: `4px solid ${C.orange}`,
-                background: C.lightOrange,
+                background: T.warningBg,
+                border: `1px solid ${T.warningBd}`,
+                borderRadius: "6px",
+                padding: "14px 18px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: C.orange,
-                      fontFamily: F.body,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      marginBottom: 4,
-                    }}
-                  >
-                    ⚠ {lowStock.length} Product{lowStock.length > 1 ? "s" : ""}{" "}
-                    Running Low
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {lowStock.map((i) => {
-                      const batch = batches.find(
-                        (b) => b.inventory_item_id === i.id,
-                      );
-                      return (
-                        <span
-                          key={i.id}
-                          style={{
-                            fontSize: "11px",
-                            background: "#fff3e8",
-                            color: C.orange,
-                            padding: "2px 10px",
-                            borderRadius: "2px",
-                            fontFamily: F.body,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {i.name} —{" "}
-                          {Math.floor(parseFloat(i.quantity_on_hand || 0))} left
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSubTab("new-run")}
-                  style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
+              <div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: T.warning,
+                    fontFamily: T.fontUi,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                  }}
                 >
-                  Plan Production →
-                </button>
+                  {lowStock.length} product{lowStock.length > 1 ? "s" : ""}{" "}
+                  running low
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {lowStock.map((i) => (
+                    <span
+                      key={i.id}
+                      style={{
+                        fontSize: "11px",
+                        background: "rgba(146,64,14,0.08)",
+                        color: T.warning,
+                        padding: "2px 10px",
+                        borderRadius: "3px",
+                        fontFamily: T.fontUi,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {i.name} —{" "}
+                      {Math.floor(parseFloat(i.quantity_on_hand || 0))} left
+                    </span>
+                  ))}
+                </div>
               </div>
+              <button
+                onClick={() => setSubTab("new-run")}
+                style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
+              >
+                Plan Production
+              </button>
             </div>
           )}
         </div>
@@ -1129,15 +1095,16 @@ export default function HQProduction() {
         onAction={(action) => action.tab && setSubTab(action.tab)}
         defaultOpen={true}
       />
-      {/* ── How It Works — persistent onboarding strip ── */}
       <HowItWorksBanner />
 
+      {/* Sub-tabs — standard underline style */}
       <div
         style={{
           display: "flex",
-          gap: "6px",
-          flexWrap: "wrap",
+          gap: 0,
+          borderBottom: `1px solid ${T.ink150}`,
           marginBottom: "24px",
+          overflowX: "auto",
         }}
       >
         {SUB_TABS.map((t) => (
@@ -1145,28 +1112,32 @@ export default function HQProduction() {
             key={t.id}
             onClick={() => setSubTab(t.id)}
             style={{
-              padding: "8px 16px",
-              background: subTab === t.id ? C.green : C.white,
-              color: subTab === t.id ? C.white : C.muted,
-              border: `1px solid ${subTab === t.id ? C.green : C.border}`,
-              borderRadius: "2px",
-              fontSize: "10px",
-              letterSpacing: "0.12em",
+              padding: "10px 16px",
+              background: "none",
+              border: "none",
+              borderBottom:
+                subTab === t.id
+                  ? `2px solid ${T.accent}`
+                  : "2px solid transparent",
+              fontFamily: T.fontUi,
+              fontSize: "11px",
+              fontWeight: subTab === t.id ? 700 : 400,
+              letterSpacing: "0.06em",
               textTransform: "uppercase",
+              color: subTab === t.id ? T.accent : T.ink500,
               cursor: "pointer",
-              fontFamily: F.body,
-              fontWeight: subTab === t.id ? 600 : 400,
-              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+              marginBottom: "-1px",
               position: "relative",
             }}
           >
-            {t.icon} {t.label}
+            {t.label}
             {t.id === "batches" && batches.length > 0 && (
               <span
                 style={{
                   marginLeft: "6px",
-                  background: C.accent,
-                  color: C.white,
+                  background: T.accent,
+                  color: "#fff",
                   borderRadius: "10px",
                   fontSize: "9px",
                   padding: "1px 6px",
@@ -1180,8 +1151,8 @@ export default function HQProduction() {
               <span
                 style={{
                   marginLeft: "4px",
-                  background: C.red,
-                  color: C.white,
+                  background: T.danger,
+                  color: "#fff",
                   borderRadius: "10px",
                   fontSize: "9px",
                   padding: "1px 6px",
@@ -1196,8 +1167,19 @@ export default function HQProduction() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
-          <div style={{ fontSize: "24px", marginBottom: "12px" }}>◎</div>
+        <div style={{ textAlign: "center", padding: "60px", color: T.ink500 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              border: `2px solid ${T.ink150}`,
+              borderTopColor: T.accent,
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+              margin: "0 auto 12px",
+            }}
+          />
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
           Loading production data...
         </div>
       ) : (
@@ -1249,9 +1231,7 @@ export default function HQProduction() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// OVERVIEW
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Overview ─────────────────────────────────────────────────────────────────
 function OverviewPanel({
   items,
   runs,
@@ -1305,19 +1285,75 @@ function OverviewPanel({
       ? (yieldsArr.reduce((s, y) => s + y, 0) / yieldsArr.length).toFixed(1)
       : null;
 
+  const metrics = [
+    {
+      label: "Active Batches",
+      value: activeBatches.length,
+      sub: `${batches.length} total`,
+      semantic: "success",
+      click: onNavBatches,
+    },
+    {
+      label: "Distillate",
+      value: `${totalDist.toFixed(1)}ml`,
+      sub: `${distillate.length} SKU`,
+      semantic: "info",
+    },
+    {
+      label: "Terpenes",
+      value: `${totalTerp.toFixed(2)}ml`,
+      sub: `${terpenes.length} strains`,
+      semantic: "info",
+    },
+    {
+      label: "Hardware",
+      value: totalHw.toLocaleString(),
+      sub: `${hardware.length} types`,
+      semantic: null,
+    },
+    {
+      label: "Finished Stock",
+      value: totalFin.toLocaleString(),
+      sub: "units ready",
+      semantic: depleted.length > 0 ? "danger" : "success",
+    },
+    {
+      label: "1ml Capacity",
+      value: cap1ml.toLocaleString(),
+      sub: "carts possible",
+      semantic: "success",
+    },
+    {
+      label: "Runs (Month)",
+      value: monthRuns.length,
+      sub: `${monthUnits} units`,
+      semantic: "info",
+    },
+    {
+      label: "Avg Yield",
+      value: avgYield ? `${avgYield}%` : "—",
+      sub: "all runs",
+      semantic: avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
+    },
+  ];
+  const semC = {
+    success: T.success,
+    warning: T.warning,
+    danger: T.danger,
+    info: T.info,
+  };
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* Pipeline onboarding */}
+      {/* Pipeline strip */}
       <div
         style={{
           ...sCard,
-          borderLeft: `4px solid ${C.accent}`,
-          background: "#f0faf5",
+          border: `1px solid ${T.accentBd}`,
+          background: T.accentLit,
         }}
       >
-        <div style={{ ...sLabel, color: C.mid, marginBottom: 8 }}>
-          📋 Production Pipeline — How It Works
-        </div>
+        <div style={{ ...sLabel, marginBottom: 10 }}>Production Pipeline</div>
         <div
           style={{
             display: "flex",
@@ -1331,42 +1367,42 @@ function OverviewPanel({
               step: "1",
               label: "Supply Chain",
               desc: "Receive raw materials via PO",
-              color: C.blue,
+              color: T.info,
             },
-            { step: "→", label: "", desc: "", color: C.muted },
+            { step: "→", label: "", desc: "", color: T.ink300 },
             {
               step: "2",
               label: "New Production Run",
               desc: "Select batch + materials → confirm",
-              color: C.purple,
+              color: T.accentMid,
             },
-            { step: "→", label: "", desc: "", color: C.muted },
+            { step: "→", label: "", desc: "", color: T.ink300 },
             {
               step: "3",
               label: "Set Sell Price",
               desc: "HQ → Pricing → set sell_price > R0",
-              color: C.gold,
+              color: "#b5935a",
             },
-            { step: "→", label: "", desc: "", color: C.muted },
+            { step: "→", label: "", desc: "", color: T.ink300 },
             {
               step: "4",
               label: "Live in Shop",
               desc: "Auto-appears when qty > 0 + price set",
-              color: C.accent,
+              color: T.success,
             },
           ].map((s, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center" }}>
               {s.step === "→" ? (
-                <div style={{ fontSize: 18, color: C.muted, margin: "0 8px" }}>
+                <div style={{ fontSize: 18, color: T.ink300, margin: "0 8px" }}>
                   →
                 </div>
               ) : (
                 <div
                   style={{
                     padding: "8px 14px",
-                    background: C.white,
+                    background: "#fff",
                     border: `1px solid ${s.color}30`,
-                    borderRadius: 2,
+                    borderRadius: 6,
                     borderLeft: `3px solid ${s.color}`,
                   }}
                 >
@@ -1376,7 +1412,7 @@ function OverviewPanel({
                       letterSpacing: "0.15em",
                       textTransform: "uppercase",
                       color: s.color,
-                      fontFamily: F.body,
+                      fontFamily: T.fontUi,
                       fontWeight: 700,
                     }}
                   >
@@ -1385,16 +1421,20 @@ function OverviewPanel({
                   <div
                     style={{
                       fontSize: 12,
-                      fontFamily: F.body,
+                      fontFamily: T.fontUi,
                       fontWeight: 600,
-                      color: C.text,
+                      color: T.ink900,
                       marginTop: 2,
                     }}
                   >
                     {s.label}
                   </div>
                   <div
-                    style={{ fontSize: 10, color: C.muted, fontFamily: F.body }}
+                    style={{
+                      fontSize: 10,
+                      color: T.ink500,
+                      fontFamily: T.fontUi,
+                    }}
                   >
                     {s.desc}
                   </div>
@@ -1405,100 +1445,58 @@ function OverviewPanel({
         </div>
       </div>
 
+      {/* Metric grid */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))",
-          gap: "14px",
+          gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: "6px",
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
-        {[
-          {
-            label: "Active Batches",
-            value: activeBatches.length,
-            sub: `${batches.length} total`,
-            color: C.green,
-            click: onNavBatches,
-          },
-          {
-            label: "Distillate",
-            value: `${totalDist.toFixed(1)}ml`,
-            sub: `${distillate.length} SKU`,
-            color: C.blue,
-          },
-          {
-            label: "Terpenes",
-            value: `${totalTerp.toFixed(2)}ml`,
-            sub: `${terpenes.length} strains`,
-            color: C.purple,
-          },
-          {
-            label: "Hardware",
-            value: totalHw.toLocaleString(),
-            sub: `${hardware.length} types`,
-            color: C.gold,
-          },
-          {
-            label: "Finished Stock",
-            value: totalFin.toLocaleString(),
-            sub: "units ready",
-            color: depleted.length > 0 ? C.red : C.accent,
-          },
-          {
-            label: "1ml Capacity",
-            value: cap1ml.toLocaleString(),
-            sub: "carts possible",
-            color: C.green,
-          },
-          {
-            label: "Runs (Month)",
-            value: monthRuns.length,
-            sub: `${monthUnits} units`,
-            color: C.blue,
-          },
-          {
-            label: "Avg Yield",
-            value: avgYield ? `${avgYield}%` : "—",
-            sub: "all runs",
-            color: avgYield && parseFloat(avgYield) >= 95 ? C.accent : C.gold,
-          },
-        ].map((c) => (
+        {metrics.map((c) => (
           <div
             key={c.label}
             onClick={c.click || undefined}
             style={{
-              ...sCard,
-              borderTop: `3px solid ${c.color}`,
-              textAlign: "center",
+              background: "#fff",
+              padding: "16px 18px",
               cursor: c.click ? "pointer" : "default",
             }}
             onMouseEnter={(e) => {
               if (c.click)
-                e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
+                e.currentTarget.style.boxShadow =
+                  "inset 0 0 0 1px " + T.accentBd;
             }}
             onMouseLeave={(e) => {
-              if (c.click)
-                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.03)";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
             <div
               style={{
-                fontSize: "9px",
-                letterSpacing: "0.2em",
+                fontSize: "10px",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: "6px",
-                fontFamily: F.body,
+                fontFamily: T.fontUi,
+                fontWeight: 700,
               }}
             >
               {c.label}
             </div>
             <div
               style={{
+                fontFamily: T.fontData,
                 fontSize: "24px",
-                fontWeight: 600,
-                color: c.color,
-                fontFamily: F.heading,
+                fontWeight: 400,
+                color: c.semantic ? semC[c.semantic] : T.ink900,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
               }}
             >
               {c.value}
@@ -1506,9 +1504,9 @@ function OverviewPanel({
             <div
               style={{
                 fontSize: "11px",
-                color: C.muted,
+                color: T.ink500,
                 marginTop: "2px",
-                fontFamily: F.body,
+                fontFamily: T.fontUi,
               }}
             >
               {c.sub}
@@ -1517,6 +1515,7 @@ function OverviewPanel({
         ))}
       </div>
 
+      {/* Recent batches */}
       {batches.length > 0 && (
         <div style={sCard}>
           <div
@@ -1544,7 +1543,7 @@ function OverviewPanel({
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "12px",
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
             }}
           >
             <thead>
@@ -1576,9 +1575,9 @@ function OverviewPanel({
                     <td
                       style={{
                         ...sTd,
-                        fontFamily: "monospace",
+                        fontFamily: T.fontData,
                         fontSize: "11px",
-                        color: C.muted,
+                        color: T.ink500,
                       }}
                     >
                       {b.batch_number}
@@ -1587,10 +1586,17 @@ function OverviewPanel({
                       {b.product_name || "—"}
                     </td>
                     <td style={sTd}>{b.strain || "—"}</td>
-                    <td style={{ ...sTd, textAlign: "right", fontWeight: 600 }}>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 600,
+                      }}
+                    >
                       {b.units_produced ?? "-"}
                     </td>
-                    <td style={{ ...sTd, color: C.muted }}>
+                    <td style={{ ...sTd, color: T.ink500 }}>
                       {b.production_date
                         ? new Date(b.production_date).toLocaleDateString(
                             "en-ZA",
@@ -1600,15 +1606,16 @@ function OverviewPanel({
                     <td
                       style={{
                         ...sTd,
+                        fontFamily: T.fontData,
                         fontWeight: 600,
                         color:
                           qty === null
-                            ? C.muted
+                            ? T.ink400
                             : qty <= 0
-                              ? C.red
+                              ? T.danger
                               : qty <= 10
-                                ? C.orange
-                                : C.green,
+                                ? T.warning
+                                : T.success,
                       }}
                     >
                       {qty === null ? "—" : `${Math.floor(qty)} pcs`}
@@ -1618,9 +1625,9 @@ function OverviewPanel({
                     </td>
                     <td style={sTd}>
                       {b.lab_certified ? (
-                        <span style={{ color: C.green }}>✓</span>
+                        <span style={{ color: T.success }}>✓</span>
                       ) : (
-                        <span style={{ color: C.muted }}>—</span>
+                        <span style={{ color: T.ink400 }}>—</span>
                       )}
                     </td>
                   </tr>
@@ -1631,14 +1638,15 @@ function OverviewPanel({
         </div>
       )}
 
+      {/* Material breakdown grid */}
       <div
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
       >
         {[
-          { label: "🧪 Distillate", data: distillate, unit: "ml", decimals: 1 },
-          { label: "🌿 Terpenes", data: terpenes, unit: "ml", decimals: 2 },
-          { label: "⚙ Hardware", data: hardware, unit: "pcs", decimals: 0 },
-          { label: "📦 Finished", data: finished, unit: "pcs", decimals: 0 },
+          { label: "Distillate", data: distillate, unit: "ml", decimals: 1 },
+          { label: "Terpenes", data: terpenes, unit: "ml", decimals: 2 },
+          { label: "Hardware", data: hardware, unit: "pcs", decimals: 0 },
+          { label: "Finished", data: finished, unit: "pcs", decimals: 0 },
         ].map(({ label, data, unit, decimals }) => (
           <div key={label} style={sCard}>
             <div style={sLabel}>{label}</div>
@@ -1646,9 +1654,9 @@ function OverviewPanel({
               <p
                 style={{
                   fontSize: "12px",
-                  color: C.muted,
+                  color: T.ink500,
                   marginTop: "8px",
-                  fontFamily: F.body,
+                  fontFamily: T.fontUi,
                 }}
               >
                 None in inventory
@@ -1659,7 +1667,7 @@ function OverviewPanel({
                   width: "100%",
                   borderCollapse: "collapse",
                   fontSize: "12px",
-                  fontFamily: F.body,
+                  fontFamily: T.fontUi,
                   marginTop: "10px",
                 }}
               >
@@ -1667,7 +1675,7 @@ function OverviewPanel({
                   <tr>
                     <th style={sTh}>Name</th>
                     <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
-                    {label === "📦 Finished" && (
+                    {label === "Finished" && (
                       <th style={{ ...sTh, textAlign: "right" }}>Sell</th>
                     )}
                   </tr>
@@ -1680,11 +1688,12 @@ function OverviewPanel({
                         style={{
                           ...sTd,
                           textAlign: "right",
+                          fontFamily: T.fontData,
                           fontWeight: 600,
                           color:
                             parseFloat(i.quantity_on_hand || 0) <= 0
-                              ? C.red
-                              : C.text,
+                              ? T.danger
+                              : T.ink900,
                         }}
                       >
                         {decimals === 0
@@ -1694,20 +1703,21 @@ function OverviewPanel({
                             )}
                         {unit === "pcs" ? "" : unit}
                       </td>
-                      {label === "📦 Finished" && (
+                      {label === "Finished" && (
                         <td
                           style={{
                             ...sTd,
                             textAlign: "right",
+                            fontFamily: T.fontData,
                             color:
                               parseFloat(i.sell_price || 0) > 0
-                                ? C.text
-                                : C.red,
+                                ? T.ink900
+                                : T.danger,
                           }}
                         >
                           {parseFloat(i.sell_price || 0) > 0
                             ? `R${parseFloat(i.sell_price).toFixed(0)}`
-                            : "R0 ⚠"}
+                            : "R0"}
                         </td>
                       )}
                     </tr>
@@ -1722,46 +1732,17 @@ function OverviewPanel({
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// BATCHES PANEL v2.0 — lifecycle, stock levels, archive, new run shortcut
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Batches Panel ────────────────────────────────────────────────────────────
 function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
-  const [archiving, setArchiving] = useState(null);
-  const [deleting, setDeleting] = useState(null); // batch id pending delete confirm
+  const [deleting, setDeleting] = useState(null);
   const [toast, setToast] = useState(null);
-
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
-  };
-
-  const handleDeleteBatch = async (b) => {
-    const linkedRun = runs.find((r) => r.batch_id === b.id);
-    if (linkedRun) {
-      showToast(
-        "Cannot delete — this batch has a linked production run. Delete the run first from the History tab, or Archive this batch instead.",
-        "error",
-      );
-      setDeleting(null);
-      return;
-    }
-    setSaving(true);
-    try {
-      // Safe to delete — no production runs linked
-      const { error } = await supabase.from("batches").delete().eq("id", b.id);
-      if (error) throw error;
-      setDeleting(null);
-      onRefresh();
-      showToast(`Batch ${b.batch_number} deleted.`);
-    } catch (err) {
-      showToast("Delete failed: " + err.message, "error");
-    } finally {
-      setSaving(false);
-    }
   };
 
   const runByBatch = {};
@@ -1769,7 +1750,6 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
     if (r.batch_id) runByBatch[r.batch_id] = r;
   });
 
-  // Link each batch to its inventory item
   const getStockForBatch = (b) => {
     if (b.inventory_item_id)
       return items.find((i) => i.id === b.inventory_item_id);
@@ -1777,7 +1757,6 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
       (i) => i.category === "finished_product" && i.name === b.product_name,
     );
   };
-
   const getEffectiveLifecycle = (b) => {
     const invItem = getStockForBatch(b);
     if (!invItem) return b.lifecycle_status || "active";
@@ -1787,6 +1766,13 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
     if (qty <= threshold) return "low_stock";
     return b.lifecycle_status || "active";
   };
+
+  const depletedCount = batches.filter(
+    (b) => getEffectiveLifecycle(b) === "depleted",
+  ).length;
+  const lowCount = batches.filter(
+    (b) => getEffectiveLifecycle(b) === "low_stock",
+  ).length;
 
   const filtered =
     filter === "all"
@@ -1814,7 +1800,6 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
   const handleSaveEdit = async (b) => {
     setSaving(true);
     try {
-      // IMPORTANT: batches table has NO updated_at column
       const { error } = await supabase
         .from("batches")
         .update({
@@ -1857,7 +1842,6 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
         })
         .eq("id", b.id);
       if (error) throw error;
-      setArchiving(null);
       onRefresh();
       showToast(`Batch ${b.batch_number} archived.`);
     } catch (err) {
@@ -1867,12 +1851,29 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
     }
   };
 
-  const depletedCount = batches.filter(
-    (b) => getEffectiveLifecycle(b) === "depleted",
-  ).length;
-  const lowCount = batches.filter(
-    (b) => getEffectiveLifecycle(b) === "low_stock",
-  ).length;
+  const handleDeleteBatch = async (b) => {
+    const linkedRun = runs.find((r) => r.batch_id === b.id);
+    if (linkedRun) {
+      showToast(
+        "Cannot delete — this batch has a linked production run. Delete the run first from the History tab, or Archive this batch instead.",
+        "error",
+      );
+      setDeleting(null);
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("batches").delete().eq("id", b.id);
+      if (error) throw error;
+      setDeleting(null);
+      onRefresh();
+      showToast(`Batch ${b.batch_number} deleted.`);
+    } catch (err) {
+      showToast("Delete failed: " + err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const FILTER_OPTIONS = [
     { id: "all", label: `All (${batches.length})` },
@@ -1899,167 +1900,105 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
         <div
           style={{
             padding: "10px 16px",
-            borderRadius: "2px",
+            borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: F.body,
+            fontFamily: T.fontUi,
             fontWeight: 500,
-            background: toast.type === "error" ? "#fff0f0" : "#f0faf5",
-            color: toast.type === "error" ? C.red : C.green,
-            border: `1px solid ${toast.type === "error" ? C.red : C.accent}`,
+            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            color: toast.type === "error" ? T.danger : T.success,
+            border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
         >
-          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.type === "error" ? "✗ " : "✓ "}
           {toast.msg}
         </div>
       )}
 
-      {/* Onboarding panel — shown when no batches linked to inventory */}
-      {batches.length === 0 && (
-        <div
-          style={{
-            ...sCard,
-            borderLeft: `4px solid ${C.accent}`,
-            background: "#f0faf5",
-          }}
-        >
-          <div style={{ ...sLabel, color: C.mid, marginBottom: 12 }}>
-            Getting Started — No Batches Yet
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {[
-              {
-                icon: "📥",
-                title: "1. Receive Raw Materials",
-                desc: "HQ → Supply Chain → Purchase Orders. Receive a PO to add distillate, terpenes and hardware to inventory.",
-              },
-              {
-                icon: "⊕",
-                title: "2. New Production Run",
-                desc: "Use the 'New Production Run' tab. Select a strain, format and quantity. The system deducts raw materials and adds finished stock.",
-              },
-              {
-                icon: "💰",
-                title: "3. Set Sell Price",
-                desc: "HQ → Pricing. Set sell_price > R0 for each finished product. Without a price, the shop won't display it.",
-              },
-              {
-                icon: "🛍",
-                title: "4. Live in Shop",
-                desc: "Once qty > 0 and sell_price > R0, the product appears automatically in the customer shop. No further action needed.",
-              },
-            ].map((s) => (
-              <div
-                key={s.title}
-                style={{
-                  padding: "12px 14px",
-                  background: C.white,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 2,
-                }}
-              >
-                <div style={{ fontSize: 22, marginBottom: 6 }}>{s.icon}</div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    fontFamily: F.body,
-                    color: C.text,
-                    marginBottom: 4,
-                  }}
-                >
-                  {s.title}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: C.muted,
-                    fontFamily: F.body,
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {s.desc}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* Batch stats — flush grid, no coloured borders */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "12px",
+          gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: "6px",
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
         }}
       >
         {[
-          { label: "Total Batches", value: batches.length, color: C.green },
+          {
+            label: "Total Batches",
+            value: batches.length,
+            semantic: "success",
+          },
           {
             label: "Active",
             value: batches.filter((b) => b.status === "active").length,
-            color: C.accent,
+            semantic: "success",
           },
           {
             label: "Lab Certified",
             value: batches.filter((b) => b.lab_certified).length,
-            color: C.blue,
+            semantic: "info",
           },
           {
             label: "With Production Run",
             value: Object.keys(runByBatch).length,
-            color: C.gold,
+            semantic: null,
           },
           {
             label: "No Run Yet",
             value: batches.filter((b) => !runByBatch[b.id]).length,
-            color: C.orange,
+            semantic: "warning",
           },
           {
             label: "Depleted",
             value: depletedCount,
-            color: depletedCount > 0 ? C.red : C.muted,
+            semantic: depletedCount > 0 ? "danger" : null,
           },
-        ].map((c) => (
-          <div
-            key={c.label}
-            style={{
-              ...sCard,
-              borderTop: `3px solid ${c.color}`,
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "9px",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: C.muted,
-                marginBottom: "6px",
-                fontFamily: F.body,
-              }}
-            >
-              {c.label}
+        ].map((c, i) => {
+          const col = c.semantic
+            ? {
+                success: T.success,
+                warning: T.warning,
+                danger: T.danger,
+                info: T.info,
+              }[c.semantic]
+            : T.ink900;
+          return (
+            <div key={i} style={{ background: "#fff", padding: "16px 18px" }}>
+              <div
+                style={{
+                  fontSize: "10px",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: "6px",
+                  fontFamily: T.fontUi,
+                  fontWeight: 700,
+                }}
+              >
+                {c.label}
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontData,
+                  fontSize: "24px",
+                  fontWeight: 400,
+                  color: col,
+                  lineHeight: 1,
+                }}
+              >
+                {c.value}
+              </div>
             </div>
-            <div
-              style={{
-                fontSize: "24px",
-                fontWeight: 600,
-                color: c.color,
-                fontFamily: F.heading,
-              }}
-            >
-              {c.value}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
+      {/* Filter bar */}
       <div
         style={{
           display: "flex",
@@ -2074,20 +2013,19 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
             onClick={() => setFilter(f.id)}
             style={{
               padding: "6px 14px",
-              background: filter === f.id ? C.green : C.white,
-              color: filter === f.id ? C.white : f.alert ? C.orange : C.muted,
-              border: `1px solid ${filter === f.id ? C.green : f.alert ? C.orange : C.border}`,
-              borderRadius: "2px",
+              background: filter === f.id ? T.accent : "#fff",
+              color: filter === f.id ? "#fff" : f.alert ? T.warning : T.ink500,
+              border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.warningBd : T.ink150}`,
+              borderRadius: "4px",
               fontSize: "9px",
-              letterSpacing: "0.12em",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
               cursor: "pointer",
-              fontFamily: F.body,
-              fontWeight: filter === f.id ? 600 : 400,
+              fontFamily: T.fontUi,
+              fontWeight: filter === f.id ? 700 : 400,
             }}
           >
             {f.label}
-            {f.alert ? " ⚠" : ""}
           </button>
         ))}
         <button
@@ -2099,15 +2037,18 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
             marginLeft: "auto",
           }}
         >
-          ↻ Refresh
+          Refresh
         </button>
       </div>
 
+      {/* Batch table */}
       <div style={sCard}>
         {filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
+          <div
+            style={{ textAlign: "center", padding: "60px", color: T.ink500 }}
+          >
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>📦</div>
-            <p style={{ fontFamily: F.body, fontSize: "14px" }}>
+            <p style={{ fontFamily: T.fontUi, fontSize: "14px" }}>
               No batches found.
             </p>
           </div>
@@ -2120,7 +2061,7 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                   "140px 1fr 110px 100px 55px 80px 95px 95px 45px 100px 75px 80px",
                 gap: 0,
                 padding: "0 0 6px 0",
-                borderBottom: `2px solid ${C.border}`,
+                borderBottom: `2px solid ${T.ink150}`,
               }}
             >
               {[
@@ -2163,23 +2104,23 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                       gridTemplateColumns:
                         "140px 1fr 110px 100px 55px 80px 95px 95px 45px 100px 75px 80px",
                       gap: 0,
-                      borderBottom: `1px solid ${C.border}`,
+                      borderBottom: `1px solid ${T.ink075}`,
                       alignItems: "center",
                       background: isDepleted
-                        ? "#fff8f8"
+                        ? T.dangerBg
                         : isLow
-                          ? "#fffbf5"
+                          ? T.warningBg
                           : isEditing
-                            ? "#f0faf5"
+                            ? T.accentLit
                             : "transparent",
                     }}
                   >
                     <div
                       style={{
                         ...sTd,
-                        fontFamily: "monospace",
+                        fontFamily: T.fontData,
                         fontSize: "10px",
-                        color: C.muted,
+                        color: T.ink500,
                         paddingLeft: "8px",
                       }}
                     >
@@ -2191,66 +2132,71 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                     <div
                       style={{
                         ...sTd,
-                        color: !b.product_type ? C.orange : C.muted,
+                        color: !b.product_type ? T.warning : T.ink500,
                         fontSize: "11px",
                       }}
                     >
-                      {b.product_type || <span>⚠ empty</span>}
+                      {b.product_type || <span>empty</span>}
                     </div>
                     <div style={sTd}>{b.strain || "—"}</div>
                     <div
-                      style={{ ...sTd, textAlign: "right", fontWeight: 600 }}
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 600,
+                      }}
                     >
                       {b.units_produced ?? "-"}
                     </div>
-                    {/* v2.0: live stock column */}
                     <div
                       style={{
                         ...sTd,
+                        fontFamily: T.fontData,
                         fontWeight: 700,
                         color:
                           qty === null
-                            ? C.muted
+                            ? T.ink400
                             : isDepleted
-                              ? C.red
+                              ? T.danger
                               : isLow
-                                ? C.orange
-                                : C.green,
+                                ? T.warning
+                                : T.success,
                       }}
                     >
                       {qty === null ? (
-                        <span style={{ color: C.muted, fontSize: 10 }}>
+                        <span style={{ color: T.ink400, fontSize: 10 }}>
                           not linked
                         </span>
                       ) : (
                         `${Math.floor(qty)} pcs`
                       )}
                     </div>
-                    <div style={{ ...sTd, color: C.muted, fontSize: "11px" }}>
+                    <div style={{ ...sTd, color: T.ink500, fontSize: "11px" }}>
                       {b.production_date
                         ? new Date(b.production_date).toLocaleDateString(
                             "en-ZA",
                           )
                         : "—"}
                     </div>
-                    <div style={{ ...sTd, color: C.muted, fontSize: "11px" }}>
+                    <div style={{ ...sTd, color: T.ink500, fontSize: "11px" }}>
                       {b.expiry_date
                         ? new Date(b.expiry_date).toLocaleDateString("en-ZA")
                         : "—"}
                     </div>
                     <div style={sTd}>
                       {b.lab_certified ? (
-                        <span style={{ color: C.green, fontWeight: 600 }}>
+                        <span style={{ color: T.success, fontWeight: 600 }}>
                           ✓
                         </span>
                       ) : (
-                        <span style={{ color: C.muted }}>—</span>
+                        <span style={{ color: T.ink400 }}>—</span>
                       )}
                     </div>
                     <div style={{ ...sTd, fontSize: "10px" }}>
                       {linkedRun ? (
                         <span
-                          style={{ color: C.green, fontFamily: "monospace" }}
+                          style={{ color: T.success, fontFamily: T.fontData }}
                         >
                           {linkedRun.run_number || "✓"}
                         </span>
@@ -2259,9 +2205,9 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           style={{
                             fontSize: "9px",
                             padding: "2px 6px",
-                            borderRadius: "2px",
-                            background: C.lightOrange,
-                            color: C.orange,
+                            borderRadius: "3px",
+                            background: T.warningBg,
+                            color: T.warning,
                             fontWeight: 600,
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
@@ -2291,13 +2237,12 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           ...sBtn("outline"),
                           padding: "3px 8px",
                           fontSize: "9px",
-                          color: isEditing ? C.muted : C.mid,
-                          borderColor: isEditing ? C.muted : C.mid,
+                          color: isEditing ? T.ink400 : T.accentMid,
+                          borderColor: isEditing ? T.ink150 : T.accentBd,
                         }}
                       >
                         {isEditing ? "✕" : "✎"}
                       </button>
-                      {/* New Run shortcut */}
                       {!linkedRun && (
                         <button
                           onClick={onNavNewRun}
@@ -2306,14 +2251,13 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                             ...sBtn("outline"),
                             padding: "3px 8px",
                             fontSize: "9px",
-                            color: C.accent,
-                            borderColor: C.accent,
+                            color: T.success,
+                            borderColor: T.successBd,
                           }}
                         >
                           ⊕
                         </button>
                       )}
-                      {/* Archive */}
                       {(isDepleted || b.status !== "archived") && (
                         <button
                           onClick={() => handleArchive(b)}
@@ -2322,14 +2266,13 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                             ...sBtn("outline"),
                             padding: "3px 8px",
                             fontSize: "9px",
-                            color: C.muted,
-                            borderColor: C.muted,
+                            color: T.ink400,
+                            borderColor: T.ink150,
                           }}
                         >
-                          🗄
+                          ▣
                         </button>
                       )}
-                      {/* Delete — only when no production run linked */}
                       {!linkedRun && deleting !== b.id && (
                         <button
                           onClick={() => setDeleting(b.id)}
@@ -2338,11 +2281,11 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                             ...sBtn("outline"),
                             padding: "3px 8px",
                             fontSize: "9px",
-                            color: C.red,
-                            borderColor: C.red,
+                            color: T.danger,
+                            borderColor: T.dangerBd,
                           }}
                         >
-                          🗑
+                          ✕
                         </button>
                       )}
                       {deleting === b.id && (
@@ -2356,7 +2299,7 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                               fontSize: "9px",
                             }}
                           >
-                            {saving ? "..." : "✓ Delete"}
+                            {saving ? "..." : "Delete"}
                           </button>
                           <button
                             onClick={() => setDeleting(null)}
@@ -2376,8 +2319,8 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                     <div
                       style={{
                         padding: "16px 12px",
-                        background: "#f0faf5",
-                        borderBottom: `1px solid ${C.accent}`,
+                        background: T.accentLit,
+                        borderBottom: `1px solid ${T.accentBd}`,
                       }}
                     >
                       <div
@@ -2407,10 +2350,10 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                             <label
                               style={{
                                 fontSize: "10px",
-                                color: C.muted,
+                                color: T.ink500,
                                 display: "block",
                                 marginBottom: "3px",
-                                fontFamily: F.body,
+                                fontFamily: T.fontUi,
                               }}
                             >
                               {lbl}
@@ -2433,10 +2376,10 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           <label
                             style={{
                               fontSize: "10px",
-                              color: C.muted,
+                              color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: F.body,
+                              fontFamily: T.fontUi,
                             }}
                           >
                             Status
@@ -2462,10 +2405,10 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           <label
                             style={{
                               fontSize: "10px",
-                              color: C.muted,
+                              color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: F.body,
+                              fontFamily: T.fontUi,
                             }}
                           >
                             Units
@@ -2487,10 +2430,10 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           <label
                             style={{
                               fontSize: "10px",
-                              color: C.muted,
+                              color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: F.body,
+                              fontFamily: T.fontUi,
                             }}
                           >
                             Expiry Date
@@ -2511,10 +2454,10 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           <label
                             style={{
                               fontSize: "10px",
-                              color: C.muted,
+                              color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: F.body,
+                              fontFamily: T.fontUi,
                             }}
                           >
                             Low Stock Alert
@@ -2547,8 +2490,8 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                             gap: "6px",
                             cursor: "pointer",
                             fontSize: "12px",
-                            fontFamily: F.body,
-                            color: C.text,
+                            fontFamily: T.fontUi,
+                            color: T.ink900,
                           }}
                         >
                           <input
@@ -2569,7 +2512,7 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           disabled={saving}
                           style={sBtn()}
                         >
-                          {saving ? "Saving..." : "✓ Save"}
+                          {saving ? "Saving..." : "Save"}
                         </button>
                         <button
                           onClick={() => setEditing(null)}
@@ -2577,16 +2520,6 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                         >
                           Cancel
                         </button>
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            color: C.muted,
-                            fontFamily: F.body,
-                          }}
-                        >
-                          ℹ Low Stock Alert = notify when qty drops below this
-                          number
-                        </span>
                       </div>
                     </div>
                   )}
@@ -2600,52 +2533,55 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
       {batches.filter((b) => !runByBatch[b.id]).length > 0 && (
         <div
           style={{
-            ...sCard,
-            borderLeft: `4px solid ${C.orange}`,
-            background: C.lightOrange,
+            background: T.warningBg,
+            border: `1px solid ${T.warningBd}`,
+            borderRadius: "6px",
+            padding: "16px 18px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <div style={{ ...sLabel, color: C.orange }}>
-                ⚠ Batches Without Production Runs
-              </div>
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: C.text,
-                  margin: "8px 0 0",
-                  fontFamily: F.body,
-                  lineHeight: "1.7",
-                }}
-              >
-                {batches.filter((b) => !runByBatch[b.id]).length} batch(es) have
-                no linked production run. Use New Production Run to log material
-                consumption going forward.
-              </p>
-            </div>
-            <button
-              onClick={onNavNewRun}
-              style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
+          <div>
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: T.warning,
+                fontFamily: T.fontUi,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
             >
-              + New Run →
-            </button>
+              Batches Without Production Runs
+            </div>
+            <p
+              style={{
+                fontSize: "13px",
+                color: T.ink700,
+                margin: "0",
+                fontFamily: T.fontUi,
+                lineHeight: "1.7",
+              }}
+            >
+              {batches.filter((b) => !runByBatch[b.id]).length} batch(es) have
+              no linked production run.
+            </p>
           </div>
+          <button
+            onClick={onNavNewRun}
+            style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
+          >
+            New Run
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEW RUN v2.0 — writes inventory_item_id + lifecycle_status back to batch
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── New Run Panel ────────────────────────────────────────────────────────────
 function NewRunPanel({ items, onComplete }) {
   const [form, setForm] = useState({
     strain: "",
@@ -2662,7 +2598,7 @@ function NewRunPanel({ items, onComplete }) {
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [completedRun, setCompletedRun] = useState(null); // for post-completion prompt
+  const [completedRun, setCompletedRun] = useState(null);
   const set = (k, v) => {
     setForm((p) => ({ ...p, [k]: v }));
     setConfirmed(false);
@@ -2686,7 +2622,6 @@ function NewRunPanel({ items, onComplete }) {
     ? +(planned * distMlPerUnit * terpRatio).toFixed(3)
     : 0;
   const hwNeeded = isVape ? planned : 0;
-
   const distItems = items.filter(
     (i) => i.category === "raw_material" && i.unit === "ml",
   );
@@ -2733,20 +2668,21 @@ function NewRunPanel({ items, onComplete }) {
   const runNumber = hasName
     ? genRunNumber(form.strain || form.product_name_override, form.format_key)
     : "";
-
   const fLabel = (text, hint) => (
     <label
       style={{
         fontSize: "11px",
-        color: C.muted,
+        color: T.ink500,
         display: "block",
         marginBottom: "4px",
-        fontFamily: F.body,
+        fontFamily: T.fontUi,
       }}
     >
       {text}
       {hint && (
-        <span style={{ color: C.accent, marginLeft: "6px", fontSize: "9px" }}>
+        <span
+          style={{ color: T.accentMid, marginLeft: "6px", fontSize: "9px" }}
+        >
           {hint}
         </span>
       )}
@@ -2775,7 +2711,6 @@ function NewRunPanel({ items, onComplete }) {
         .select()
         .single();
       if (batchErr) throw batchErr;
-
       const { data: run, error: runErr } = await supabase
         .from("production_runs")
         .insert({
@@ -2791,7 +2726,6 @@ function NewRunPanel({ items, onComplete }) {
         .select()
         .single();
       if (runErr) throw runErr;
-
       if (isVape) {
         await supabase.from("production_run_inputs").insert([
           {
@@ -2852,8 +2786,6 @@ function NewRunPanel({ items, onComplete }) {
           .update({ quantity_on_hand: hwAvail - hwNeeded })
           .eq("id", form.hardware_item_id);
       }
-
-      // Find or create finished_product inventory item
       const existingFin = items.find(
         (i) => i.category === "finished_product" && i.name === finishedName,
       );
@@ -2879,14 +2811,15 @@ function NewRunPanel({ items, onComplete }) {
         if (niErr) throw niErr;
         finId = ni.id;
       }
-
-      await supabase.from("stock_movements").insert({
-        item_id: finId,
-        quantity: finalActual,
-        movement_type: "production_in",
-        reference: runNumber,
-        notes: `Batch ${runNumber}: ${finishedName}`,
-      });
+      await supabase
+        .from("stock_movements")
+        .insert({
+          item_id: finId,
+          quantity: finalActual,
+          movement_type: "production_in",
+          reference: runNumber,
+          notes: `Batch ${runNumber}: ${finishedName}`,
+        });
       const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
       await supabase
         .from("inventory_items")
@@ -2895,16 +2828,10 @@ function NewRunPanel({ items, onComplete }) {
           ...(isVape ? { cost_price: parseFloat(costPerUnit) || 0 } : {}),
         })
         .eq("id", finId);
-
-      // v2.0: Write inventory_item_id + lifecycle_status back to the batch
       await supabase
         .from("batches")
-        .update({
-          inventory_item_id: finId,
-          lifecycle_status: "active",
-        })
+        .update({ inventory_item_id: finId, lifecycle_status: "active" })
         .eq("id", batch.id);
-
       setCompletedRun({
         runNumber,
         finishedName,
@@ -2919,7 +2846,6 @@ function NewRunPanel({ items, onComplete }) {
     }
   };
 
-  // Post-completion state
   if (completedRun) {
     const needsPrice = parseFloat(completedRun.sellPrice || 0) <= 0;
     return (
@@ -2927,18 +2853,17 @@ function NewRunPanel({ items, onComplete }) {
         <div
           style={{
             ...sCard,
-            borderLeft: `4px solid ${C.accent}`,
-            background: "#f0faf5",
+            border: `1px solid ${T.successBd}`,
+            background: T.successBg,
             marginBottom: 20,
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
           <div
             style={{
-              fontFamily: F.heading,
+              fontFamily: T.fontUi,
               fontSize: 22,
               fontWeight: 600,
-              color: C.green,
+              color: T.success,
               marginBottom: 6,
             }}
           >
@@ -2946,9 +2871,9 @@ function NewRunPanel({ items, onComplete }) {
           </div>
           <div
             style={{
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
               fontSize: 13,
-              color: C.mid,
+              color: T.accentMid,
               marginBottom: 12,
               lineHeight: 1.7,
             }}
@@ -2960,9 +2885,10 @@ function NewRunPanel({ items, onComplete }) {
             Run reference:{" "}
             <code
               style={{
-                fontFamily: "monospace",
-                background: C.warm,
+                fontFamily: T.fontData,
+                background: T.ink075,
                 padding: "2px 6px",
+                borderRadius: 3,
               }}
             >
               {completedRun.runNumber}
@@ -2972,36 +2898,33 @@ function NewRunPanel({ items, onComplete }) {
             <div
               style={{
                 padding: "14px 16px",
-                background: "#fffbe6",
-                border: `1px solid ${C.gold}`,
-                borderRadius: 2,
+                background: T.warningBg,
+                border: `1px solid ${T.warningBd}`,
+                borderRadius: 6,
                 marginBottom: 16,
               }}
             >
               <div
                 style={{
-                  fontFamily: F.body,
+                  fontFamily: T.fontUi,
                   fontSize: 12,
                   fontWeight: 700,
-                  color: C.gold,
+                  color: T.warning,
                   marginBottom: 6,
                 }}
               >
-                ⚠ Sell Price Not Set — Product NOT yet visible in Shop
+                Sell price not set — product not yet visible in shop
               </div>
               <div
                 style={{
-                  fontFamily: F.body,
+                  fontFamily: T.fontUi,
                   fontSize: 12,
-                  color: C.text,
+                  color: T.ink700,
                   lineHeight: 1.6,
                 }}
               >
-                To make <strong>{completedRun.finishedName}</strong> visible on
-                the customer shop, you need to set a sell price.
-                <br />
                 Go to <strong>HQ → Pricing</strong> and set a sell_price &gt; R0
-                for this product.
+                for {completedRun.finishedName}.
               </div>
             </div>
           )}
@@ -3009,20 +2932,21 @@ function NewRunPanel({ items, onComplete }) {
             <div
               style={{
                 padding: "12px 16px",
-                background: "#d4edda",
-                borderRadius: 2,
+                background: T.successBg,
+                border: `1px solid ${T.successBd}`,
+                borderRadius: 6,
                 marginBottom: 16,
               }}
             >
               <div
                 style={{
-                  fontFamily: F.body,
+                  fontFamily: T.fontUi,
                   fontSize: 12,
                   fontWeight: 700,
-                  color: C.green,
+                  color: T.success,
                 }}
               >
-                ✓ Product is now live in the shop (sell price already set: R
+                Product is now live in the shop (sell price already set: R
                 {parseFloat(completedRun.sellPrice).toFixed(0)})
               </div>
             </div>
@@ -3035,13 +2959,13 @@ function NewRunPanel({ items, onComplete }) {
               }}
               style={sBtn()}
             >
-              ✓ Done — View History
+              Done — View History
             </button>
             <button
               onClick={() => setCompletedRun(null)}
               style={sBtn("outline")}
             >
-              + Another Run
+              Another Run
             </button>
           </div>
         </div>
@@ -3051,7 +2975,7 @@ function NewRunPanel({ items, onComplete }) {
 
   return (
     <div style={{ display: "grid", gap: "20px", maxWidth: "820px" }}>
-      <div style={{ ...sCard, borderLeft: `4px solid ${C.accent}` }}>
+      <div style={{ ...sCard, borderLeft: `3px solid ${T.accent}` }}>
         <div style={{ ...sLabel, marginBottom: "16px" }}>
           Step 1 — Define Run
         </div>
@@ -3098,16 +3022,16 @@ function NewRunPanel({ items, onComplete }) {
             <div
               style={{
                 padding: "10px 14px",
-                background: C.warm,
-                borderRadius: "2px",
+                background: T.ink075,
+                borderRadius: "4px",
                 fontSize: "12px",
-                fontFamily: F.body,
-                color: C.text,
+                fontFamily: T.fontUi,
+                color: T.ink700,
                 display: "flex",
                 alignItems: "center",
               }}
             >
-              ℹ Triple Chamber:{" "}
+              Triple Chamber:{" "}
               <strong style={{ margin: "0 4px" }}>
                 {distMlPerUnit.toFixed(2)}ml distillate/unit
               </strong>{" "}
@@ -3169,9 +3093,9 @@ function NewRunPanel({ items, onComplete }) {
                 <p
                   style={{
                     fontSize: "10px",
-                    color: C.accent,
+                    color: T.accentMid,
                     margin: "4px 0 0",
-                    fontFamily: F.body,
+                    fontFamily: T.fontUi,
                   }}
                 >
                   = {terpNeeded.toFixed(3)}ml terpene for {planned} unit
@@ -3184,7 +3108,7 @@ function NewRunPanel({ items, onComplete }) {
       </div>
 
       {isVape && (
-        <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
+        <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             Step 2 — Select Materials
           </div>
@@ -3214,9 +3138,9 @@ function NewRunPanel({ items, onComplete }) {
                 <p
                   style={{
                     fontSize: "11px",
-                    color: C.red,
+                    color: T.danger,
                     margin: "4px 0 0",
-                    fontFamily: F.body,
+                    fontFamily: T.fontUi,
                   }}
                 >
                   Add distillate via Supply Chain first
@@ -3263,19 +3187,19 @@ function NewRunPanel({ items, onComplete }) {
         <div
           style={{
             ...sCard,
-            borderLeft: `4px solid ${C.gold}`,
-            background: "#fffdf5",
+            border: `1px solid ${T.warningBd}`,
+            background: T.warningBg,
           }}
         >
-          <div style={{ ...sLabel, color: C.gold, marginBottom: "8px" }}>
+          <div style={{ ...sLabel, color: T.warning, marginBottom: "8px" }}>
             Non-Vape Run — Units Only
           </div>
           <p
             style={{
               fontSize: "12px",
-              color: C.text,
+              color: T.ink700,
               margin: 0,
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
               lineHeight: "1.7",
             }}
           >
@@ -3295,46 +3219,46 @@ function NewRunPanel({ items, onComplete }) {
           <div
             style={{
               ...sCard,
-              borderLeft: `4px solid ${canRun ? C.accent : C.red}`,
-              background: canRun ? "#f0faf5" : "#fff5f5",
+              borderLeft: `3px solid ${canRun ? T.success : T.danger}`,
+              background: canRun ? T.successBg : T.dangerBg,
             }}
           >
             <div
               style={{
                 ...sLabel,
-                color: canRun ? C.green : C.red,
+                color: canRun ? T.success : T.danger,
                 marginBottom: "16px",
               }}
             >
               Step 3 — Bill of Materials{" "}
               {canRun
-                ? "✓ All materials available"
-                : "✕ Insufficient materials"}
+                ? "— All materials available"
+                : "— Insufficient materials"}
             </div>
             <StockGauge
               label="Distillate"
               available={distAvail}
               needed={distNeeded}
               unit="ml"
-              color={C.blue}
+              color={T.info}
             />
             <StockGauge
               label={`Terpene (${selTerp?.name || "—"})`}
               available={terpAvail}
               needed={terpNeeded}
               unit="ml"
-              color={C.purple}
+              color={T.accentMid}
             />
             <StockGauge
               label={`Hardware (${selHw?.name || "—"})`}
               available={hwAvail}
               needed={hwNeeded}
               unit=" pcs"
-              color={C.gold}
+              color="#b5935a"
             />
             <div
               style={{
-                borderTop: `1px solid ${C.border}`,
+                borderTop: `1px solid ${T.ink150}`,
                 paddingTop: "14px",
                 marginTop: "8px",
                 display: "flex",
@@ -3343,11 +3267,11 @@ function NewRunPanel({ items, onComplete }) {
               }}
             >
               {[
-                ["Output", `${planned} × ${finishedName || "—"}`, C.green],
-                ["Dist / Unit", `${distMlPerUnit.toFixed(2)}ml`, C.blue],
-                ["Cost / Unit", `R${costPerUnit}`, C.gold],
-                ["Total Material Cost", `R${totalCost.toFixed(2)}`, C.blue],
-                ["Run Number", runNumber, C.muted],
+                ["Output", `${planned} × ${finishedName || "—"}`, T.success],
+                ["Dist / Unit", `${distMlPerUnit.toFixed(2)}ml`, T.info],
+                ["Cost / Unit", `R${costPerUnit}`, "#b5935a"],
+                ["Total Material Cost", `R${totalCost.toFixed(2)}`, T.info],
+                ["Run Number", runNumber, T.ink500],
               ].map(([lbl, val, color]) => (
                 <div key={lbl}>
                   <div
@@ -3355,9 +3279,9 @@ function NewRunPanel({ items, onComplete }) {
                       fontSize: "9px",
                       letterSpacing: "0.2em",
                       textTransform: "uppercase",
-                      color: C.muted,
+                      color: T.ink400,
                       marginBottom: "4px",
-                      fontFamily: F.body,
+                      fontFamily: T.fontUi,
                     }}
                   >
                     {lbl}
@@ -3367,7 +3291,7 @@ function NewRunPanel({ items, onComplete }) {
                       fontSize: lbl === "Run Number" ? "13px" : "18px",
                       fontWeight: 600,
                       fontFamily:
-                        lbl === "Run Number" ? "monospace" : F.heading,
+                        lbl === "Run Number" ? T.fontData : T.fontData,
                       color,
                     }}
                   >
@@ -3380,7 +3304,7 @@ function NewRunPanel({ items, onComplete }) {
         )}
 
       {canRun && (
-        <div style={{ ...sCard, borderLeft: `4px solid ${C.gold}` }}>
+        <div style={{ ...sCard, borderLeft: `3px solid #b5935a` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             Step {isVape ? "4" : "3"} — Confirm & Log
           </div>
@@ -3407,12 +3331,12 @@ function NewRunPanel({ items, onComplete }) {
                 <p
                   style={{
                     fontSize: "11px",
-                    color: C.orange,
+                    color: T.warning,
                     margin: "4px 0 0",
-                    fontFamily: F.body,
+                    fontFamily: T.fontUi,
                   }}
                 >
-                  ⚠ Yield {yieldPct}% — below 95% threshold
+                  Yield {yieldPct}% — below 95% threshold
                 </p>
               )}
             </div>
@@ -3430,12 +3354,12 @@ function NewRunPanel({ items, onComplete }) {
             <div
               style={{
                 padding: "14px 16px",
-                background: C.warm,
-                borderRadius: "2px",
+                background: T.ink075,
+                borderRadius: "4px",
                 marginBottom: "14px",
                 fontSize: "13px",
-                fontFamily: F.body,
-                color: C.text,
+                fontFamily: T.fontUi,
+                color: T.ink700,
               }}
             >
               <strong>This will:</strong>
@@ -3490,11 +3414,11 @@ function NewRunPanel({ items, onComplete }) {
                   disabled={saving}
                   style={{
                     ...sBtn(),
-                    background: saving ? C.muted : C.green,
+                    background: saving ? T.ink400 : T.accent,
                     minWidth: "180px",
                   }}
                 >
-                  {saving ? "Processing..." : "✓ Confirm Production Run"}
+                  {saving ? "Processing..." : "Confirm Production Run"}
                 </button>
               </>
             )}
@@ -3505,9 +3429,7 @@ function NewRunPanel({ items, onComplete }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HISTORY — unchanged from v1.2/v1.6
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── History Panel ────────────────────────────────────────────────────────────
 function HistoryPanel({ runs, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -3552,7 +3474,6 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
-
   const handleCancel = async (run) => {
     setSaving(true);
     try {
@@ -3569,7 +3490,6 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
-
   const handleDelete = async (run) => {
     setSaving(true);
     try {
@@ -3581,13 +3501,15 @@ function HistoryPanel({ runs, onRefresh }) {
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
-            await supabase.from("stock_movements").insert({
-              item_id: mv.item_id,
-              quantity: rev,
-              movement_type: "adjustment",
-              reference: `VOID-${run.run_number}`,
-              notes: `Reversal: deleted run ${run.run_number}`,
-            });
+            await supabase
+              .from("stock_movements")
+              .insert({
+                item_id: mv.item_id,
+                quantity: rev,
+                movement_type: "adjustment",
+                reference: `VOID-${run.run_number}`,
+                notes: `Reversal: deleted run ${run.run_number}`,
+              });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
@@ -3621,7 +3543,6 @@ function HistoryPanel({ runs, onRefresh }) {
       setSaving(false);
     }
   };
-
   const ALL_STATUSES = ["planned", "in_progress", "completed", "cancelled"];
 
   return (
@@ -3631,16 +3552,16 @@ function HistoryPanel({ runs, onRefresh }) {
           style={{
             padding: "10px 16px",
             marginBottom: "12px",
-            borderRadius: "2px",
+            borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: F.body,
+            fontFamily: T.fontUi,
             fontWeight: 500,
-            background: toast.type === "error" ? "#fff0f0" : "#f0faf5",
-            color: toast.type === "error" ? C.red : C.green,
-            border: `1px solid ${toast.type === "error" ? C.red : C.accent}`,
+            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            color: toast.type === "error" ? T.danger : T.success,
+            border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
         >
-          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.type === "error" ? "✗ " : "✓ "}
           {toast.msg}
         </div>
       )}
@@ -3652,14 +3573,16 @@ function HistoryPanel({ runs, onRefresh }) {
           marginBottom: "16px",
         }}
       >
-        <div style={{ fontSize: "11px", color: C.muted, fontFamily: F.body }}>
+        <div
+          style={{ fontSize: "11px", color: T.ink500, fontFamily: T.fontUi }}
+        >
           {runs.length} production runs
         </div>
         <button
           onClick={onRefresh}
           style={{ ...sBtn("outline"), fontSize: "9px", padding: "6px 12px" }}
         >
-          ↻ Refresh
+          Refresh
         </button>
       </div>
       {runs.length === 0 ? (
@@ -3668,22 +3591,12 @@ function HistoryPanel({ runs, onRefresh }) {
             ...sCard,
             textAlign: "center",
             padding: "60px",
-            color: C.muted,
+            color: T.ink500,
           }}
         >
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>⚗</div>
-          <p style={{ fontFamily: F.body, fontSize: "14px" }}>
-            No production runs yet.
-          </p>
-          <p
-            style={{
-              fontFamily: F.body,
-              fontSize: "12px",
-              color: C.muted,
-              marginTop: "8px",
-            }}
-          >
-            Use "New Production Run" to log your first batch.
+          <p style={{ fontFamily: T.fontUi, fontSize: "14px" }}>
+            No production runs yet. Use "New Production Run" to log your first
+            batch.
           </p>
         </div>
       ) : (
@@ -3707,7 +3620,7 @@ function HistoryPanel({ runs, onRefresh }) {
                 key={run.id}
                 style={{
                   ...sCard,
-                  borderLeft: `3px solid ${isCancelled ? C.muted : yp && yp < 95 ? C.orange : C.accent}`,
+                  borderLeft: `3px solid ${isCancelled ? T.ink300 : yp && yp < 95 ? T.warning : T.success}`,
                   opacity: isCancelled ? 0.75 : 1,
                 }}
               >
@@ -3725,8 +3638,8 @@ function HistoryPanel({ runs, onRefresh }) {
                       style={{
                         fontSize: "16px",
                         fontWeight: 600,
-                        fontFamily: F.heading,
-                        color: C.text,
+                        fontFamily: T.fontUi,
+                        color: T.ink900,
                       }}
                     >
                       {productLabel}
@@ -3734,8 +3647,8 @@ function HistoryPanel({ runs, onRefresh }) {
                     <div
                       style={{
                         fontSize: "11px",
-                        color: C.muted,
-                        fontFamily: "monospace",
+                        color: T.ink500,
+                        fontFamily: T.fontData,
                         marginTop: "2px",
                       }}
                     >
@@ -3754,8 +3667,8 @@ function HistoryPanel({ runs, onRefresh }) {
                     <span
                       style={{
                         fontSize: "11px",
-                        color: C.muted,
-                        fontFamily: F.body,
+                        color: T.ink500,
+                        fontFamily: T.fontUi,
                       }}
                     >
                       {new Date(run.created_at).toLocaleDateString("en-ZA")}
@@ -3768,7 +3681,7 @@ function HistoryPanel({ runs, onRefresh }) {
                         fontSize: "9px",
                       }}
                     >
-                      ✎ Edit
+                      Edit
                     </button>
                     {!isCancelled && cancelling !== run.id && (
                       <button
@@ -3777,11 +3690,11 @@ function HistoryPanel({ runs, onRefresh }) {
                           ...sBtn("outline"),
                           padding: "4px 10px",
                           fontSize: "9px",
-                          color: C.orange,
-                          borderColor: C.orange,
+                          color: T.warning,
+                          borderColor: T.warningBd,
                         }}
                       >
-                        ✕ Cancel
+                        Cancel
                       </button>
                     )}
                     {cancelling === run.id && (
@@ -3789,8 +3702,8 @@ function HistoryPanel({ runs, onRefresh }) {
                         <span
                           style={{
                             fontSize: "11px",
-                            color: C.orange,
-                            fontFamily: F.body,
+                            color: T.warning,
+                            fontFamily: T.fontUi,
                           }}
                         >
                           Cancel?
@@ -3802,11 +3715,11 @@ function HistoryPanel({ runs, onRefresh }) {
                             ...sBtn("outline"),
                             padding: "4px 10px",
                             fontSize: "9px",
-                            color: C.red,
-                            borderColor: C.red,
+                            color: T.danger,
+                            borderColor: T.dangerBd,
                           }}
                         >
-                          {saving ? "..." : "✓ Yes"}
+                          {saving ? "..." : "Yes"}
                         </button>
                         <button
                           onClick={() => setCancelling(null)}
@@ -3830,11 +3743,11 @@ function HistoryPanel({ runs, onRefresh }) {
                         ...sBtn("outline"),
                         padding: "4px 10px",
                         fontSize: "9px",
-                        color: C.red,
-                        borderColor: C.red,
+                        color: T.danger,
+                        borderColor: T.dangerBd,
                       }}
                     >
-                      🗑 Delete
+                      Delete
                     </button>
                     <button
                       onClick={() => setExpanded(isOpen ? null : run.id)}
@@ -3867,28 +3780,29 @@ function HistoryPanel({ runs, onRefresh }) {
                           fontSize: "9px",
                           letterSpacing: "0.2em",
                           textTransform: "uppercase",
-                          color: C.muted,
-                          fontFamily: F.body,
+                          color: T.ink400,
+                          fontFamily: T.fontUi,
                         }}
                       >
                         {lbl}
                       </div>
                       <div
                         style={{
+                          fontFamily: T.fontData,
                           fontSize: "20px",
-                          fontWeight: 600,
-                          fontFamily: F.heading,
+                          fontWeight: 400,
                           color:
                             lbl === "Yield" && yp && yp < 95
-                              ? C.orange
-                              : C.text,
+                              ? T.warning
+                              : T.ink900,
+                          lineHeight: 1,
                         }}
                       >
                         {val}
                         <span
                           style={{
                             fontSize: "12px",
-                            color: C.muted,
+                            color: T.ink400,
                             marginLeft: "2px",
                           }}
                         >
@@ -3903,21 +3817,22 @@ function HistoryPanel({ runs, onRefresh }) {
                     style={{
                       marginTop: "10px",
                       padding: "8px 12px",
-                      background: C.lightOrange,
-                      borderRadius: "2px",
+                      background: T.warningBg,
+                      border: `1px solid ${T.warningBd}`,
+                      borderRadius: "4px",
                       fontSize: "12px",
-                      color: C.orange,
-                      fontFamily: F.body,
+                      color: T.warning,
+                      fontFamily: T.fontUi,
                     }}
                   >
-                    ⚠ Yield {yp}% — below 95% threshold.
+                    Yield {yp}% — below 95% threshold.
                   </div>
                 )}
                 {isOpen && (
                   <div
                     style={{
                       marginTop: "14px",
-                      borderTop: `1px solid ${C.border}`,
+                      borderTop: `1px solid ${T.ink150}`,
                       paddingTop: "14px",
                     }}
                   >
@@ -3925,9 +3840,9 @@ function HistoryPanel({ runs, onRefresh }) {
                       <div
                         style={{
                           padding: "16px",
-                          background: "#fff5f5",
-                          border: `1px solid ${C.red}`,
-                          borderRadius: "2px",
+                          background: T.dangerBg,
+                          border: `1px solid ${T.dangerBd}`,
+                          borderRadius: "4px",
                           marginBottom: "14px",
                         }}
                       >
@@ -3935,12 +3850,12 @@ function HistoryPanel({ runs, onRefresh }) {
                           style={{
                             fontSize: "12px",
                             fontWeight: 600,
-                            color: C.red,
-                            fontFamily: F.body,
+                            color: T.danger,
+                            fontFamily: T.fontUi,
                             marginBottom: "10px",
                           }}
                         >
-                          ⚠ Delete Run {run.run_number}?
+                          Delete Run {run.run_number}?
                         </div>
                         <label
                           style={{
@@ -3950,8 +3865,8 @@ function HistoryPanel({ runs, onRefresh }) {
                             cursor: "pointer",
                             marginBottom: "14px",
                             fontSize: "12px",
-                            fontFamily: F.body,
-                            color: C.text,
+                            fontFamily: T.fontUi,
+                            color: T.ink900,
                           }}
                         >
                           <input
@@ -3971,13 +3886,13 @@ function HistoryPanel({ runs, onRefresh }) {
                             disabled={saving}
                             style={{ ...sBtn("danger"), minWidth: "140px" }}
                           >
-                            {saving ? "Deleting..." : "✓ Confirm Delete"}
+                            {saving ? "Deleting..." : "Confirm Delete"}
                           </button>
                           <button
                             onClick={() => setDeleting(null)}
                             style={sBtn("outline")}
                           >
-                            ← Cancel
+                            Cancel
                           </button>
                         </div>
                       </div>
@@ -3986,22 +3901,13 @@ function HistoryPanel({ runs, onRefresh }) {
                       <div
                         style={{
                           padding: "16px",
-                          background: "#f0faf5",
-                          border: `1px solid ${C.accent}`,
-                          borderRadius: "2px",
+                          background: T.accentLit,
+                          border: `1px solid ${T.accentBd}`,
+                          borderRadius: "4px",
                           marginBottom: "14px",
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: "9px",
-                            letterSpacing: "0.2em",
-                            textTransform: "uppercase",
-                            color: C.accent,
-                            fontFamily: F.body,
-                            marginBottom: "14px",
-                          }}
-                        >
+                        <div style={{ ...sLabel, marginBottom: "14px" }}>
                           Edit Run
                         </div>
                         <div
@@ -4016,10 +3922,10 @@ function HistoryPanel({ runs, onRefresh }) {
                             <label
                               style={{
                                 fontSize: "11px",
-                                color: C.muted,
+                                color: T.ink500,
                                 display: "block",
                                 marginBottom: "4px",
-                                fontFamily: F.body,
+                                fontFamily: T.fontUi,
                               }}
                             >
                               Actual Units
@@ -4041,10 +3947,10 @@ function HistoryPanel({ runs, onRefresh }) {
                             <label
                               style={{
                                 fontSize: "11px",
-                                color: C.muted,
+                                color: T.ink500,
                                 display: "block",
                                 marginBottom: "4px",
-                                fontFamily: F.body,
+                                fontFamily: T.fontUi,
                               }}
                             >
                               Status
@@ -4071,10 +3977,10 @@ function HistoryPanel({ runs, onRefresh }) {
                             <label
                               style={{
                                 fontSize: "11px",
-                                color: C.muted,
+                                color: T.ink500,
                                 display: "block",
                                 marginBottom: "4px",
-                                fontFamily: F.body,
+                                fontFamily: T.fontUi,
                               }}
                             >
                               Notes
@@ -4098,13 +4004,13 @@ function HistoryPanel({ runs, onRefresh }) {
                             disabled={saving}
                             style={sBtn()}
                           >
-                            {saving ? "Saving..." : "✓ Save Changes"}
+                            {saving ? "Saving..." : "Save Changes"}
                           </button>
                           <button
                             onClick={() => setEditing(null)}
                             style={sBtn("outline")}
                           >
-                            ← Cancel
+                            Cancel
                           </button>
                         </div>
                       </div>
@@ -4114,7 +4020,7 @@ function HistoryPanel({ runs, onRefresh }) {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "repeat(auto-fill, minmax(180px, 1fr))",
+                            "repeat(auto-fill,minmax(180px,1fr))",
                           gap: "10px",
                         }}
                       >
@@ -4123,27 +4029,29 @@ function HistoryPanel({ runs, onRefresh }) {
                             key={inp.id}
                             style={{
                               padding: "10px 14px",
-                              background: C.warm,
-                              borderRadius: "2px",
+                              background: T.ink075,
+                              border: `1px solid ${T.ink150}`,
+                              borderRadius: "4px",
                             }}
                           >
                             <div
                               style={{
                                 fontSize: "9px",
-                                letterSpacing: "0.2em",
+                                letterSpacing: "0.15em",
                                 textTransform: "uppercase",
-                                color: C.muted,
-                                fontFamily: F.body,
+                                color: T.ink400,
+                                fontFamily: T.fontUi,
+                                fontWeight: 700,
                               }}
                             >
                               {inp.inventory_items?.name || "Material"}
                             </div>
                             <div
                               style={{
+                                fontFamily: T.fontData,
                                 fontSize: "16px",
-                                fontWeight: 600,
-                                fontFamily: F.heading,
-                                color: C.text,
+                                fontWeight: 400,
+                                color: T.ink900,
                                 marginTop: "4px",
                               }}
                             >
@@ -4155,7 +4063,7 @@ function HistoryPanel({ runs, onRefresh }) {
                               <span
                                 style={{
                                   fontSize: "11px",
-                                  color: C.muted,
+                                  color: T.ink400,
                                   marginLeft: "3px",
                                 }}
                               >
@@ -4170,10 +4078,10 @@ function HistoryPanel({ runs, onRefresh }) {
                       <p
                         style={{
                           fontSize: "12px",
-                          color: C.muted,
+                          color: T.ink500,
                           fontStyle: "italic",
                           margin: "10px 0 0",
-                          fontFamily: F.body,
+                          fontFamily: T.fontUi,
                         }}
                       >
                         {run.notes}
@@ -4190,9 +4098,7 @@ function HistoryPanel({ runs, onRefresh }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ALLOCATE v2.0 — updates batch lifecycle_status after depletion
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Allocate Panel ───────────────────────────────────────────────────────────
 function AllocatePanel({ items, partners, batches, onRefresh }) {
   const finished = items.filter(
     (i) =>
@@ -4216,21 +4122,10 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
     {
       id: "wholesale",
       label: "Wholesale",
-      icon: "🏪",
       desc: "Allocate to a retail partner",
     },
-    {
-      id: "samples",
-      label: "Samples",
-      icon: "🎁",
-      desc: "Internal / giveaway units",
-    },
-    {
-      id: "write_off",
-      label: "Write Off",
-      icon: "✕",
-      desc: "Damaged or destroyed units",
-    },
+    { id: "samples", label: "Samples", desc: "Internal / giveaway units" },
+    { id: "write_off", label: "Write Off", desc: "Damaged or destroyed units" },
   ];
 
   const handleAllocate = async () => {
@@ -4240,20 +4135,20 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
         form.channel === "wholesale" && partner ? partner.name : form.channel;
-      await supabase.from("stock_movements").insert({
-        item_id: form.item_id,
-        quantity: -qty,
-        movement_type: "sale_out",
-        reference: ref,
-        notes: form.notes || `Allocated to ${ref}`,
-      });
+      await supabase
+        .from("stock_movements")
+        .insert({
+          item_id: form.item_id,
+          quantity: -qty,
+          movement_type: "sale_out",
+          reference: ref,
+          notes: form.notes || `Allocated to ${ref}`,
+        });
       const newQty = available - qty;
       await supabase
         .from("inventory_items")
         .update({ quantity_on_hand: newQty })
         .eq("id", form.item_id);
-
-      // v2.0: update batch lifecycle_status if depleted
       const linkedBatch = batches.find(
         (b) =>
           b.inventory_item_id === form.item_id ||
@@ -4274,7 +4169,6 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
           .update({ lifecycle_status: "low_stock" })
           .eq("id", linkedBatch.id);
       }
-
       setForm({
         item_id: "",
         quantity: "",
@@ -4295,7 +4189,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
           gap: "12px",
         }}
       >
@@ -4306,20 +4200,17 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             style={{
               ...sCard,
               cursor: "pointer",
-              borderLeft: `4px solid ${form.channel === ch.id ? C.green : C.border}`,
-              background: form.channel === ch.id ? "#f0faf5" : C.white,
+              borderLeft: `3px solid ${form.channel === ch.id ? T.accent : T.ink150}`,
+              background: form.channel === ch.id ? T.accentLit : "#fff",
               transition: "all 0.15s",
             }}
           >
-            <div style={{ fontSize: "22px", marginBottom: "6px" }}>
-              {ch.icon}
-            </div>
             <div
               style={{
                 fontSize: "13px",
                 fontWeight: 600,
-                fontFamily: F.body,
-                color: C.text,
+                fontFamily: T.fontUi,
+                color: T.ink900,
               }}
             >
               {ch.label}
@@ -4327,8 +4218,8 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             <div
               style={{
                 fontSize: "11px",
-                color: C.muted,
-                fontFamily: F.body,
+                color: T.ink500,
+                fontFamily: T.fontUi,
                 marginTop: "3px",
               }}
             >
@@ -4338,14 +4229,14 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
         ))}
       </div>
       <div style={sCard}>
-        <div style={sLabel}>📦 Available Finished Stock</div>
+        <div style={sLabel}>Available Finished Stock</div>
         {finished.length === 0 ? (
           <p
             style={{
               fontSize: "13px",
-              color: C.muted,
+              color: T.ink500,
               marginTop: "10px",
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
             }}
           >
             No finished products in stock.
@@ -4356,7 +4247,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "12px",
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
               marginTop: "10px",
             }}
           >
@@ -4376,12 +4267,12 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                   style={{
                     cursor: "pointer",
                     background:
-                      form.item_id === i.id ? "#f0faf5" : "transparent",
+                      form.item_id === i.id ? T.accentLit : "transparent",
                   }}
                 >
                   <td style={{ ...sTd, fontWeight: 500 }}>
                     {form.item_id === i.id && (
-                      <span style={{ color: C.accent, marginRight: "6px" }}>
+                      <span style={{ color: T.accent, marginRight: "6px" }}>
                         ►
                       </span>
                     )}
@@ -4390,9 +4281,9 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: "monospace",
+                      fontFamily: T.fontData,
                       fontSize: "11px",
-                      color: C.muted,
+                      color: T.ink500,
                     }}
                   >
                     {i.sku}
@@ -4401,13 +4292,20 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
+                      fontFamily: T.fontData,
                       fontWeight: 600,
-                      color: C.green,
+                      color: T.success,
                     }}
                   >
                     {Math.floor(parseFloat(i.quantity_on_hand || 0))} pcs
                   </td>
-                  <td style={{ ...sTd, textAlign: "right" }}>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                    }}
+                  >
                     R{parseFloat(i.sell_price || 0).toFixed(0)}
                   </td>
                 </tr>
@@ -4417,7 +4315,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
         )}
       </div>
       {form.item_id && (
-        <div style={{ ...sCard, borderLeft: `4px solid ${C.gold}` }}>
+        <div style={{ ...sCard, borderLeft: `3px solid #b5935a` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             Allocate: {selItem?.name} — {Math.floor(available)} units available
           </div>
@@ -4433,10 +4331,10 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               <label
                 style={{
                   fontSize: "11px",
-                  color: C.muted,
+                  color: T.ink500,
                   display: "block",
                   marginBottom: "4px",
-                  fontFamily: F.body,
+                  fontFamily: T.fontUi,
                 }}
               >
                 Quantity *
@@ -4457,10 +4355,10 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                 <label
                   style={{
                     fontSize: "11px",
-                    color: C.muted,
+                    color: T.ink500,
                     display: "block",
                     marginBottom: "4px",
-                    fontFamily: F.body,
+                    fontFamily: T.fontUi,
                   }}
                 >
                   Wholesale Partner
@@ -4484,10 +4382,10 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             <label
               style={{
                 fontSize: "11px",
-                color: C.muted,
+                color: T.ink500,
                 display: "block",
                 marginBottom: "4px",
-                fontFamily: F.body,
+                fontFamily: T.fontUi,
               }}
             >
               Notes
@@ -4503,12 +4401,12 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             <div
               style={{
                 padding: "12px 14px",
-                background: C.warm,
-                borderRadius: "2px",
+                background: T.ink075,
+                borderRadius: "4px",
                 marginBottom: "12px",
                 fontSize: "12px",
-                fontFamily: F.body,
-                color: C.text,
+                fontFamily: T.fontUi,
+                color: T.ink700,
               }}
             >
               <strong>
@@ -4517,9 +4415,13 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               → {CHANNELS.find((c) => c.id === form.channel)?.label}
               {qty > available && (
                 <span
-                  style={{ color: C.red, marginLeft: "8px", fontWeight: 600 }}
+                  style={{
+                    color: T.danger,
+                    marginLeft: "8px",
+                    fontWeight: 600,
+                  }}
                 >
-                  ⚠ Exceeds stock
+                  Exceeds stock
                 </span>
               )}
             </div>
@@ -4529,7 +4431,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             disabled={saving || !valid}
             style={{ ...sBtn(), opacity: valid ? 1 : 0.5 }}
           >
-            {saving ? "Recording..." : `✓ Allocate ${qty || "?"} Units`}
+            {saving ? "Recording..." : `Allocate ${qty || "?"} Units`}
           </button>
         </div>
       )}
@@ -4538,9 +4440,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// AUDIT PANEL — unchanged from v1.6
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Audit Panel ──────────────────────────────────────────────────────────────
 function AuditPanel({ batches }) {
   const [auditData, setAuditData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -4559,11 +4459,7 @@ function AuditPanel({ batches }) {
       const { data: qrs, error } = await supabase
         .from("qr_codes")
         .select(
-          `
-        id, qr_code, qr_type, claimed, claimed_by, claimed_at,
-        scan_count, points_value, is_active, created_at, batch_id,
-        batches ( id, batch_number, product_name, strain, product_type, production_date, expiry_date, lab_certified, lab_name, units_produced, status )
-      `,
+          `id,qr_code,qr_type,claimed,claimed_by,claimed_at,scan_count,points_value,is_active,created_at,batch_id,batches(id,batch_number,product_name,strain,product_type,production_date,expiry_date,lab_certified,lab_name,units_produced,status)`,
         )
         .not("batch_id", "is", null)
         .order("created_at", { ascending: false });
@@ -4574,7 +4470,7 @@ function AuditPanel({ batches }) {
         const { data: scans } = await supabase
           .from("scan_logs")
           .select(
-            "qr_code_id, scan_outcome, scanned_at, user_id, ip_city, ip_province",
+            "qr_code_id,scan_outcome,scanned_at,user_id,ip_city,ip_province",
           )
           .in("qr_code_id", qrIds)
           .order("scanned_at", { ascending: false });
@@ -4652,7 +4548,7 @@ function AuditPanel({ batches }) {
   const handleRecall = async (batchId, batchNumber) => {
     if (
       !window.confirm(
-        `Flag ALL QR codes from batch ${batchNumber} as INACTIVE?\n\nThis is a quality recall action. It can be reversed by re-activating codes individually.`,
+        `Flag ALL QR codes from batch ${batchNumber} as INACTIVE?\n\nThis is a quality recall action.`,
       )
     )
       return;
@@ -4665,7 +4561,7 @@ function AuditPanel({ batches }) {
         .select("id");
       if (error) throw error;
       showToast(
-        `✓ ${data?.length || 0} QR codes from ${batchNumber} flagged inactive`,
+        `${data?.length || 0} QR codes from ${batchNumber} flagged inactive`,
       );
       await loadAudit();
     } catch (err) {
@@ -4690,20 +4586,26 @@ function AuditPanel({ batches }) {
         <div
           style={{
             padding: "10px 16px",
-            borderRadius: "2px",
+            borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: F.body,
+            fontFamily: T.fontUi,
             fontWeight: 500,
-            background: toast.type === "error" ? "#fff0f0" : "#f0faf5",
-            color: toast.type === "error" ? C.red : C.green,
-            border: `1px solid ${toast.type === "error" ? C.red : C.accent}`,
+            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            color: toast.type === "error" ? T.danger : T.success,
+            border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
         >
-          {toast.type === "error" ? "⚠ " : "✓ "}
+          {toast.type === "error" ? "✗ " : "✓ "}
           {toast.msg}
         </div>
       )}
-      <div style={{ ...sCard, borderLeft: `4px solid ${C.blue}` }}>
+      <div
+        style={{
+          ...sCard,
+          border: `1px solid ${T.infoBd}`,
+          borderLeft: `3px solid ${T.info}`,
+        }}
+      >
         <div
           style={{
             display: "flex",
@@ -4714,22 +4616,20 @@ function AuditPanel({ batches }) {
           }}
         >
           <div>
-            <div style={{ ...sLabel, color: C.blue }}>
-              🔍 Regulatory Audit Export
+            <div style={{ ...sLabel, color: T.info }}>
+              Regulatory Audit Export
             </div>
             <p
               style={{
                 fontSize: "13px",
-                color: C.muted,
+                color: T.ink500,
                 margin: "6px 0 0",
-                fontFamily: F.body,
+                fontFamily: T.fontUi,
                 lineHeight: "1.6",
               }}
             >
               Full traceability chain: Batch → QR codes → Scans → Customers.
-              <br />
-              Export CSV for regulatory compliance. Use QR Recall to flag a
-              batch inactive on quality issues.
+              Export CSV for regulatory compliance.
             </p>
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -4739,11 +4639,11 @@ function AuditPanel({ batches }) {
                 disabled={loading}
                 style={{
                   ...sBtn(),
-                  background: loading ? C.muted : C.blue,
+                  background: loading ? T.ink400 : T.info,
                   minWidth: "140px",
                 }}
               >
-                {loading ? "Loading..." : "🔍 Load Audit Data"}
+                {loading ? "Loading..." : "Load Audit Data"}
               </button>
             ) : (
               <>
@@ -4756,13 +4656,10 @@ function AuditPanel({ batches }) {
                     padding: "6px 12px",
                   }}
                 >
-                  ↻ Refresh
+                  Refresh
                 </button>
-                <button
-                  onClick={exportCSV}
-                  style={{ ...sBtn(), background: C.green }}
-                >
-                  ⬇ Export CSV
+                <button onClick={exportCSV} style={sBtn()}>
+                  Export CSV
                 </button>
               </>
             )}
@@ -4772,8 +4669,12 @@ function AuditPanel({ batches }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-              gap: "10px",
+              gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))",
+              gap: "1px",
+              background: T.ink150,
+              borderRadius: 4,
+              overflow: "hidden",
+              border: `1px solid ${T.ink150}`,
               marginTop: "16px",
             }}
           >
@@ -4781,57 +4682,63 @@ function AuditPanel({ batches }) {
               {
                 label: "Batches",
                 value: Object.keys(byBatch).length,
-                color: C.green,
+                sem: "success",
               },
-              { label: "QR Codes", value: auditData.length, color: C.blue },
+              { label: "QR Codes", value: auditData.length, sem: "info" },
               {
                 label: "Claimed",
                 value: auditData.filter((r) => r.claimed).length,
-                color: C.accent,
+                sem: "success",
               },
               {
                 label: "Total Scans",
                 value: auditData.reduce((s, r) => s + (r.scan_count || 0), 0),
-                color: C.gold,
+                sem: null,
               },
               {
                 label: "Inactive",
                 value: auditData.filter((r) => !r.is_active).length,
-                color: C.muted,
+                sem: null,
               },
-            ].map((s) => (
-              <div
-                key={s.label}
-                style={{
-                  background: C.cream,
-                  borderRadius: "2px",
-                  padding: "10px 12px",
-                  textAlign: "center",
-                }}
-              >
+            ].map((s, i) => {
+              const col = s.sem
+                ? { success: T.success, info: T.info }[s.sem]
+                : T.ink700;
+              return (
                 <div
+                  key={i}
                   style={{
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    color: s.color,
-                    fontFamily: F.heading,
+                    background: "#fff",
+                    padding: "12px 14px",
+                    textAlign: "center",
                   }}
                 >
-                  {s.value}
+                  <div
+                    style={{
+                      fontFamily: T.fontData,
+                      fontSize: "20px",
+                      fontWeight: 400,
+                      color: col,
+                    }}
+                  >
+                    {s.value}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "9px",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: T.ink400,
+                      fontFamily: T.fontUi,
+                      marginTop: 2,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {s.label}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: "9px",
-                    letterSpacing: "0.15em",
-                    textTransform: "uppercase",
-                    color: C.muted,
-                    fontFamily: F.body,
-                  }}
-                >
-                  {s.label}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -4843,14 +4750,14 @@ function AuditPanel({ batches }) {
           const daysToExpiry = batch?.expiry_date
             ? Math.ceil((new Date(batch.expiry_date) - new Date()) / 86400000)
             : null;
-          const isExpired = daysToExpiry !== null && daysToExpiry < 0,
-            isRecalling = recallBatchId === batch_id;
+          const isExpired = daysToExpiry !== null && daysToExpiry < 0;
+          const isRecalling = recallBatchId === batch_id;
           return (
             <div
               key={batchNum}
               style={{
                 ...sCard,
-                borderLeft: `3px solid ${isExpired ? C.red : inactive > 0 ? C.orange : C.accent}`,
+                borderLeft: `3px solid ${isExpired ? T.danger : inactive > 0 ? T.warning : T.success}`,
               }}
             >
               <div
@@ -4868,8 +4775,8 @@ function AuditPanel({ batches }) {
                     style={{
                       fontSize: "16px",
                       fontWeight: 600,
-                      fontFamily: F.heading,
-                      color: C.green,
+                      fontFamily: T.fontUi,
+                      color: T.accent,
                     }}
                   >
                     {batch?.product_name || batchNum}
@@ -4877,8 +4784,8 @@ function AuditPanel({ batches }) {
                   <div
                     style={{
                       fontSize: "11px",
-                      color: C.muted,
-                      fontFamily: "monospace",
+                      color: T.ink500,
+                      fontFamily: T.fontData,
                       marginTop: "2px",
                     }}
                   >
@@ -4897,40 +4804,40 @@ function AuditPanel({ batches }) {
                         style={{
                           fontSize: "9px",
                           padding: "2px 8px",
-                          borderRadius: "2px",
-                          background: "#eafaf1",
-                          color: C.green,
+                          borderRadius: "3px",
+                          background: T.successBg,
+                          color: T.success,
                           fontWeight: 700,
                           letterSpacing: "0.1em",
                           textTransform: "uppercase",
-                          fontFamily: F.body,
+                          fontFamily: T.fontUi,
                         }}
                       >
-                        🔬 Lab Certified
+                        Lab Certified
                       </span>
                     )}
                     {batch?.strain && (
                       <span
                         style={{
                           fontSize: "10px",
-                          color: C.muted,
-                          fontFamily: F.body,
+                          color: T.ink500,
+                          fontFamily: T.fontUi,
                         }}
                       >
-                        🌿 {batch.strain}
+                        {batch.strain}
                       </span>
                     )}
                     {batch?.expiry_date && (
                       <span
                         style={{
                           fontSize: "10px",
-                          color: isExpired ? C.red : C.muted,
-                          fontFamily: F.body,
+                          color: isExpired ? T.danger : T.ink500,
+                          fontFamily: T.fontUi,
                           fontWeight: isExpired ? 600 : 400,
                         }}
                       >
                         {isExpired
-                          ? "⚠ EXPIRED"
+                          ? "EXPIRED"
                           : `Expires ${new Date(batch.expiry_date).toLocaleDateString("en-ZA")}`}
                       </span>
                     )}
@@ -4946,11 +4853,11 @@ function AuditPanel({ batches }) {
                         ...sBtn("outline"),
                         fontSize: "9px",
                         padding: "5px 12px",
-                        color: C.orange,
-                        borderColor: C.orange,
+                        color: T.warning,
+                        borderColor: T.warningBd,
                       }}
                     >
-                      ⚠ QR Recall
+                      QR Recall
                     </button>
                   ) : (
                     <div
@@ -4963,8 +4870,8 @@ function AuditPanel({ batches }) {
                       <span
                         style={{
                           fontSize: "11px",
-                          color: C.orange,
-                          fontFamily: F.body,
+                          color: T.warning,
+                          fontFamily: T.fontUi,
                         }}
                       >
                         Flag all QRs inactive?
@@ -4976,11 +4883,11 @@ function AuditPanel({ batches }) {
                           ...sBtn("outline"),
                           fontSize: "9px",
                           padding: "4px 10px",
-                          color: C.red,
-                          borderColor: C.red,
+                          color: T.danger,
+                          borderColor: T.dangerBd,
                         }}
                       >
-                        {recallLoading ? "..." : "✓ Confirm"}
+                        {recallLoading ? "..." : "Confirm"}
                       </button>
                       <button
                         onClick={() => setRecallBatchId(null)}
@@ -5005,10 +4912,10 @@ function AuditPanel({ batches }) {
                 }}
               >
                 {[
-                  ["QR Codes", qrs.length, C.blue],
-                  ["Claimed", claimed, C.accent],
-                  ["Total Scans", totalScans, C.gold],
-                  ["Inactive", inactive, inactive > 0 ? C.orange : C.muted],
+                  ["QR Codes", qrs.length, T.info],
+                  ["Claimed", claimed, T.success],
+                  ["Total Scans", totalScans, "#b5935a"],
+                  ["Inactive", inactive, inactive > 0 ? T.warning : T.ink400],
                 ].map(([lbl, val, color]) => (
                   <div key={lbl}>
                     <div
@@ -5016,17 +4923,17 @@ function AuditPanel({ batches }) {
                         fontSize: "9px",
                         letterSpacing: "0.2em",
                         textTransform: "uppercase",
-                        color: C.muted,
-                        fontFamily: F.body,
+                        color: T.ink400,
+                        fontFamily: T.fontUi,
                       }}
                     >
                       {lbl}
                     </div>
                     <div
                       style={{
+                        fontFamily: T.fontData,
                         fontSize: "20px",
-                        fontWeight: 600,
-                        fontFamily: F.heading,
+                        fontWeight: 400,
                         color,
                       }}
                     >
@@ -5041,7 +4948,7 @@ function AuditPanel({ batches }) {
                     width: "100%",
                     borderCollapse: "collapse",
                     fontSize: "11px",
-                    fontFamily: F.body,
+                    fontFamily: T.fontUi,
                   }}
                 >
                   <thead>
@@ -5073,16 +4980,16 @@ function AuditPanel({ batches }) {
                       <tr
                         key={r.id}
                         style={{
-                          background: !r.is_active ? "#fafafa" : "transparent",
+                          background: !r.is_active ? T.ink050 : "transparent",
                           opacity: r.is_active ? 1 : 0.6,
                         }}
                       >
                         <td
                           style={{
                             ...sTd,
-                            fontFamily: "monospace",
+                            fontFamily: T.fontData,
                             fontSize: "10px",
-                            color: C.muted,
+                            color: T.ink500,
                             padding: "6px 8px",
                           }}
                         >
@@ -5090,7 +4997,11 @@ function AuditPanel({ batches }) {
                           {r.qr_code?.length > 32 ? "…" : ""}
                         </td>
                         <td
-                          style={{ ...sTd, padding: "6px 8px", color: C.muted }}
+                          style={{
+                            ...sTd,
+                            padding: "6px 8px",
+                            color: T.ink500,
+                          }}
                         >
                           {r.qr_type}
                         </td>
@@ -5099,10 +5010,10 @@ function AuditPanel({ batches }) {
                             style={{
                               fontSize: "9px",
                               padding: "1px 6px",
-                              borderRadius: "2px",
-                              background: r.is_active ? "#d4edda" : "#f5f5f5",
-                              color: r.is_active ? C.green : C.muted,
-                              fontWeight: 600,
+                              borderRadius: "3px",
+                              background: r.is_active ? T.successBg : T.ink075,
+                              color: r.is_active ? T.success : T.ink400,
+                              fontWeight: 700,
                             }}
                           >
                             {r.is_active ? "YES" : "NO"}
@@ -5113,10 +5024,10 @@ function AuditPanel({ batches }) {
                             style={{
                               fontSize: "9px",
                               padding: "1px 6px",
-                              borderRadius: "2px",
-                              background: r.claimed ? "#eafaf1" : C.cream,
-                              color: r.claimed ? C.green : C.muted,
-                              fontWeight: 600,
+                              borderRadius: "3px",
+                              background: r.claimed ? T.successBg : T.ink075,
+                              color: r.claimed ? T.success : T.ink400,
+                              fontWeight: 700,
                             }}
                           >
                             {r.claimed ? "YES" : "NO"}
@@ -5127,13 +5038,18 @@ function AuditPanel({ batches }) {
                             ...sTd,
                             padding: "6px 8px",
                             textAlign: "right",
+                            fontFamily: T.fontData,
                             fontWeight: 600,
                           }}
                         >
                           {r.scan_count || 0}
                         </td>
                         <td
-                          style={{ ...sTd, padding: "6px 8px", color: C.muted }}
+                          style={{
+                            ...sTd,
+                            padding: "6px 8px",
+                            color: T.ink500,
+                          }}
                         >
                           {r.scans?.[0]?.scanned_at
                             ? new Date(
@@ -5142,7 +5058,11 @@ function AuditPanel({ batches }) {
                             : "—"}
                         </td>
                         <td
-                          style={{ ...sTd, padding: "6px 8px", color: C.muted }}
+                          style={{
+                            ...sTd,
+                            padding: "6px 8px",
+                            color: T.ink500,
+                          }}
                         >
                           {r.claimed_at
                             ? new Date(r.claimed_at).toLocaleDateString("en-ZA")
@@ -5162,13 +5082,12 @@ function AuditPanel({ batches }) {
             ...sCard,
             textAlign: "center",
             padding: "60px",
-            color: C.muted,
+            color: T.ink500,
           }}
         >
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔍</div>
           <p
             style={{
-              fontFamily: F.body,
+              fontFamily: T.fontUi,
               fontSize: "14px",
               marginBottom: "16px",
             }}
@@ -5176,7 +5095,9 @@ function AuditPanel({ batches }) {
             Click "Load Audit Data" to fetch the full batch → QR → scan
             traceability chain.
           </p>
-          <p style={{ fontFamily: F.body, fontSize: "12px", color: C.muted }}>
+          <p
+            style={{ fontFamily: T.fontUi, fontSize: "12px", color: T.ink500 }}
+          >
             Data loads on demand to keep the page fast. Export as CSV for
             regulatory submissions.
           </p>
