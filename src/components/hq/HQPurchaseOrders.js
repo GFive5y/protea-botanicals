@@ -13,8 +13,22 @@
 // v1.0: WP-B Purchase Order Flow
 
 import { useState, useEffect, useCallback } from "react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
+import { ChartCard, ChartTooltip } from "../viz";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 
@@ -46,7 +60,34 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+  label: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+  },
+  kpi: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 24,
+    fontWeight: 400,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
+  },
+  body: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 13,
+    fontWeight: 400,
+  },
+  data: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 12,
+    fontWeight: 400,
+    fontVariantNumeric: "tabular-nums",
+  },
 };
 
 // ── FX Rate Hook ─────────────────────────────────────────────────────────────
@@ -773,6 +814,163 @@ export default function HQPurchaseOrders() {
           );
         })}
       </div>
+
+      {/* ── CHARTS: PO Pipeline + Supplier Spend ── */}
+      {pos.length > 0 &&
+        (() => {
+          const statusBarData = STATUSES.map((s) => ({
+            status: STATUS_META[s].label,
+            count: statusCounts[s] || 0,
+            color: STATUS_META[s].color,
+          })).filter((d) => d.count > 0);
+
+          const supplierMap = {};
+          pos.forEach((po) => {
+            const name = po.suppliers?.name || "Unknown";
+            supplierMap[name] =
+              (supplierMap[name] || 0) + (parseFloat(po.landed_cost_zar) || 0);
+          });
+          const spendData = Object.entries(supplierMap)
+            .map(([name, value]) => ({ name, value: Math.round(value) }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+          const PIE_COLOURS = [
+            T.accent,
+            T.accentMid,
+            "#52B788",
+            T.info,
+            "#b5935a",
+          ];
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 20,
+                marginBottom: 20,
+              }}
+            >
+              <ChartCard title="PO Pipeline — Status Breakdown" height={220}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={statusBarData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="status"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          formatter={(v) => `${v} PO${v !== 1 ? "s" : ""}`}
+                        />
+                      }
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="POs"
+                      isAnimationActive={false}
+                      maxBarSize={36}
+                      radius={[3, 3, 0, 0]}
+                    >
+                      {statusBarData.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Landed Cost by Supplier (ZAR)" height={220}>
+                {spendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={spendData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={52}
+                        outerRadius={78}
+                        dataKey="value"
+                        paddingAngle={3}
+                        isAnimationActive={false}
+                      >
+                        {spendData.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={PIE_COLOURS[i % PIE_COLOURS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={
+                          <ChartTooltip
+                            formatter={(v) => `R${v.toLocaleString("en-ZA")}`}
+                          />
+                        }
+                      />
+                      <Legend
+                        iconSize={8}
+                        iconType="square"
+                        formatter={(v) => (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: T.ink500,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            {v}
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div
+                    style={{
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      color: T.ink400,
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    No completed PO spend yet
+                  </div>
+                )}
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* Overdue alert — standard warning template */}
       {overdueCount > 0 && (
