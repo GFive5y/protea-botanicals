@@ -1,5 +1,5 @@
-// src/components/hq/HQAnalytics.js v4.0
-// WP-THEME: Unified design system applied
+// src/components/hq/HQAnalytics.js v4.1 — WP-THEME-2: Inter font + WorkflowGuide + usePageContext + InfoTooltip + Toast
+// v4.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all metric values in KPI + tables
 //   - KPI: coloured top borders removed — semantic colour on value only
@@ -14,6 +14,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { usePageContext } from "../../hooks/usePageContext";
+import WorkflowGuide from "../WorkflowGuide";
+import InfoTooltip from "../InfoTooltip";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -41,8 +44,8 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
-  fontData: "'DM Mono','Courier New',monospace",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -117,6 +120,8 @@ const CATEGORY_COLORS = {
 };
 
 export default function HQAnalytics() {
+  const ctx = usePageContext("hq-analytics", null);
+
   const [subTab, setSubTab] = useState("overview");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +129,12 @@ export default function HQAnalytics() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [liveEvents, setLiveEvents] = useState([]);
   const subscriptions = useRef([]);
+
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -373,6 +384,14 @@ export default function HQAnalytics() {
 
   return (
     <div style={{ fontFamily: T.fontUi }}>
+      {/* WorkflowGuide — always first */}
+      <WorkflowGuide
+        context={ctx}
+        tabId="hq-analytics"
+        onAction={() => {}}
+        defaultOpen={false}
+      />
+
       {/* Header */}
       <div
         style={{
@@ -385,17 +404,20 @@ export default function HQAnalytics() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <h2
-            style={{
-              fontFamily: T.fontUi,
-              fontSize: "22px",
-              fontWeight: 300,
-              color: T.ink900,
-              margin: 0,
-            }}
-          >
-            HQ Analytics
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <h2
+              style={{
+                fontFamily: T.fontUi,
+                fontSize: "22px",
+                fontWeight: 300,
+                color: T.ink900,
+                margin: 0,
+              }}
+            >
+              HQ Analytics
+            </h2>
+            <InfoTooltip id="hq-analytics-title" />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div
               style={{
@@ -570,6 +592,27 @@ export default function HQAnalytics() {
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
         @keyframes spin  { to{transform:rotate(360deg)} }
       `}</style>
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: 24,
+            right: 24,
+            zIndex: 9999,
+            background: toast.type === "error" ? T.danger : T.accent,
+            color: "#fff",
+            padding: "12px 18px",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: T.fontUi,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }
