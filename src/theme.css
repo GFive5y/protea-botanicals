@@ -4,7 +4,7 @@
      import './theme.css';
    --------------------------------------------------- */
 
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600&display=swap");
 
 :root {
   /* -- Neutral scale --------------------------------- */
@@ -44,8 +44,8 @@
   --accent-bd: #a7d9b8;
 
   /* -- Typography ------------------------------------ */
-  --font-ui: "Outfit", "Helvetica Neue", Arial, sans-serif;
-  --font-data: "DM Mono", "Courier New", monospace;
+  --font-ui: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "Inter", "Helvetica Neue", Arial, sans-serif;
 
   /* -- Spacing (4px base) ---------------------------- */
   --sp-1: 4px;
