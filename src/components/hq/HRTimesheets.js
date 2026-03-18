@@ -10,36 +10,65 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — preserve all internal logic referencing C
 const C = {
-  green: "#3d6b35",
-  greenLight: "#e8f5e9",
-  greenMid: "#2e7d32",
-  amber: "#f57f17",
-  amberLight: "#fff8e1",
-  red: "#c62828",
-  redLight: "#fdecea",
-  blue: "#1565c0",
-  blueLight: "#e3f2fd",
-  orange: "#e65100",
-  orangeLight: "#fff3e0",
-  purple: "#6a1b9a",
-  purpleLight: "#f3e5f5",
-  grey: "#616161",
-  greyLight: "#f5f5f5",
-  border: "#ece8e2",
-  bg: "#faf8f5",
+  green: T.accent,
+  greenLight: T.accentLit,
+  greenMid: T.accentMid,
+  amber: T.warning,
+  amberLight: T.warningBg,
+  red: T.danger,
+  redLight: T.dangerBg,
+  blue: T.info,
+  blueLight: T.infoBg,
+  orange: T.warning,
+  orangeLight: T.warningBg,
+  purple: T.info,
+  purpleLight: T.infoBg,
+  grey: T.ink500,
+  greyLight: T.ink075,
+  border: T.ink150,
+  bg: T.ink075,
   white: "#fff",
-  text: "#2d2d2d",
-  muted: "#aaa",
+  text: T.ink700,
+  muted: T.ink400,
 };
 
 const STATUS_CFG = {
-  draft: { label: "Draft", bg: C.greyLight, color: C.grey },
-  staff_submitted: { label: "Submitted", bg: C.amberLight, color: C.amber },
-  admin_approved: { label: "Admin Approved", bg: C.blueLight, color: C.blue },
-  hr_approved: { label: "HR Approved", bg: C.greenLight, color: C.greenMid },
-  locked: { label: "Locked", bg: "#f5f5f5", color: "#444" },
+  draft: { label: "Draft", bg: T.ink075, color: T.ink500 },
+  staff_submitted: { label: "Submitted", bg: T.warningBg, color: T.warning },
+  admin_approved: { label: "Admin Approved", bg: T.infoBg, color: T.info },
+  hr_approved: { label: "HR Approved", bg: T.successBg, color: T.success },
+  locked: { label: "Locked", bg: T.ink075, color: T.ink700 },
 };
 
 const ENTRY_TYPES = [
@@ -50,11 +79,11 @@ const ENTRY_TYPES = [
   "sick",
 ];
 const ENTRY_TYPE_CFG = {
-  normal: { label: "Normal", color: C.green },
-  overtime: { label: "Overtime", color: C.blue },
-  public_holiday: { label: "Public Holiday", color: C.red },
-  on_leave: { label: "On Leave", color: C.purple },
-  sick: { label: "Sick", color: C.orange },
+  normal: { label: "Normal", color: T.accent },
+  overtime: { label: "Overtime", color: T.info },
+  public_holiday: { label: "Public Holiday", color: T.danger },
+  on_leave: { label: "On Leave", color: T.accentMid },
+  sick: { label: "Sick", color: T.warning },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -124,22 +153,24 @@ function StatusBadge({ status }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = {
-  wrapper: { fontFamily: "'Jost', sans-serif", color: C.text },
+  wrapper: { fontFamily: T.font, color: T.ink700 },
   subTabs: {
     display: "flex",
-    borderBottom: `2px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
     marginBottom: 24,
   },
   subTab: (a) => ({
-    padding: "9px 18px",
+    padding: "10px 16px",
     cursor: "pointer",
     border: "none",
-    background: "none",
-    fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    color: a ? C.green : "#555",
-    borderBottom: a ? `2px solid ${C.green}` : "2px solid transparent",
+    background: "transparent",
+    fontSize: 11,
+    fontFamily: T.font,
+    color: a ? T.accent : T.ink400,
+    borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
     marginBottom: -2,
   }),
   table: {
@@ -175,16 +206,18 @@ const s = {
     padding: "16px 20px",
     marginBottom: 12,
   },
-  btn: (bg, color = C.white) => ({
+  btn: (bg, color = "#fff") => ({
     padding: "6px 14px",
     background: bg,
     color,
     border: `1px solid ${bg}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   outlineBtn: (color) => ({
     padding: "6px 14px",
@@ -192,28 +225,30 @@ const s = {
     color,
     border: `1px solid ${color}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     cursor: "pointer",
     outline: "none",
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
   },
@@ -221,39 +256,39 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: "#888",
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
   },
   sectionTitle: {
-    fontFamily: "'Cormorant Garamond', serif",
-    fontSize: 17,
+    fontFamily: T.font,
+    fontSize: 15,
     fontWeight: 600,
-    color: C.text,
+    color: T.ink700,
     margin: "0 0 16px 0",
   },
   statCard: {
-    padding: "10px 16px",
-    background: C.white,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    flex: "1 1 120px",
+    background: "#fff",
+    padding: "16px 18px",
   },
   statNum: {
-    fontFamily: "'Cormorant Garamond', serif",
+    fontFamily: T.font,
     fontSize: 22,
-    fontWeight: 700,
+    fontWeight: 400,
     lineHeight: 1,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
   },
   statLabel: {
-    fontSize: 11,
-    color: C.muted,
+    fontSize: 10,
+    fontWeight: 700,
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.1em",
+    marginTop: 6,
   },
   emptyState: {
     padding: "48px 24px",
@@ -290,11 +325,11 @@ const s = {
     width: "100%",
     maxWidth: 680,
     height: "100vh",
-    background: C.white,
+    background: "#fff",
     display: "flex",
     flexDirection: "column",
     boxShadow: "-4px 0 32px rgba(0,0,0,0.12)",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
     overflowY: "hidden",
   },
   drawerHead: {
@@ -492,9 +527,10 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
             </div>
             <div
               style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 20,
+                fontFamily: T.font,
+                fontSize: 18,
                 fontWeight: 600,
+                color: T.ink700,
               }}
             >
               {staffName}
@@ -534,26 +570,28 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
             {
               label: "Total Hours",
               value: totalHours.toFixed(1),
-              color: C.text,
+              color: T.ink700,
             },
             {
               label: "Late Days",
               value: lateCount,
-              color: lateCount > 0 ? C.amber : C.greenMid,
+              color: lateCount > 0 ? T.warning : T.accentMid,
             },
             {
               label: "Absent Days",
               value: absentCount,
-              color: absentCount > 0 ? C.red : C.greenMid,
+              color: absentCount > 0 ? T.danger : T.accentMid,
             },
-            { label: "Days Entered", value: entries.length, color: C.text },
+            { label: "Days Entered", value: entries.length, color: T.ink700 },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ flex: 1, textAlign: "center" }}>
               <div
                 style={{
-                  fontFamily: "'Cormorant Garamond', serif",
+                  fontFamily: T.font,
                   fontSize: 20,
-                  fontWeight: 700,
+                  fontWeight: 400,
+                  letterSpacing: "-0.02em",
+                  fontVariantNumeric: "tabular-nums",
                   color,
                   lineHeight: 1,
                 }}
@@ -563,10 +601,12 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
               <div
                 style={{
                   fontSize: 10,
-                  color: C.muted,
+                  fontFamily: T.font,
+                  fontWeight: 700,
+                  color: T.ink400,
                   textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  marginTop: 2,
+                  letterSpacing: "0.08em",
+                  marginTop: 4,
                 }}
               >
                 {label}
@@ -839,8 +879,9 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
                         <td
                           style={{
                             ...s.td,
-                            fontFamily: "monospace",
+                            fontFamily: T.font,
                             fontSize: 12,
+                            fontVariantNumeric: "tabular-nums",
                           }}
                         >
                           {fmtTime(entry.clock_in)}
@@ -848,8 +889,9 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
                         <td
                           style={{
                             ...s.td,
-                            fontFamily: "monospace",
+                            fontFamily: T.font,
                             fontSize: 12,
+                            fontVariantNumeric: "tabular-nums",
                           }}
                         >
                           {fmtTime(entry.clock_out)}
@@ -1312,31 +1354,41 @@ function TimesheetsList({ tenantId, staffList }) {
     <div>
       {/* Stats */}
       <div
-        style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 20,
+        }}
       >
         {[
           {
             label: "Submitted",
             num: timesheets.filter((t) => t.status === "staff_submitted")
               .length,
-            color: C.amber,
+            color: T.warning,
           },
           {
             label: "Draft",
             num: timesheets.filter((t) => t.status === "draft").length,
-            color: C.grey,
+            color: T.ink500,
           },
           {
             label: "Admin Approved",
             num: timesheets.filter((t) => t.status === "admin_approved").length,
-            color: C.blue,
+            color: T.info,
           },
           {
             label: "Locked",
             num: timesheets.filter((t) =>
               ["hr_approved", "locked"].includes(t.status),
             ).length,
-            color: C.greenMid,
+            color: T.success,
           },
         ].map(({ label, num, color }) => (
           <div key={label} style={s.statCard}>
@@ -1419,9 +1471,10 @@ function TimesheetsList({ tenantId, staffList }) {
             <div style={s.drawerHead}>
               <div
                 style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 20,
+                  fontFamily: T.font,
+                  fontSize: 16,
                   fontWeight: 600,
+                  color: T.ink700,
                 }}
               >
                 New Timesheet
@@ -1507,9 +1560,10 @@ function TimesheetsList({ tenantId, staffList }) {
             <div style={s.drawerHead}>
               <div
                 style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 20,
+                  fontFamily: T.font,
+                  fontSize: 16,
                   fontWeight: 600,
+                  color: T.ink700,
                 }}
               >
                 Approve Timesheet
@@ -1577,9 +1631,9 @@ function TimesheetsList({ tenantId, staffList }) {
           <div style={{ fontSize: 36, marginBottom: 8 }}>⏱</div>
           <div
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 17,
-              color: C.muted,
+              fontFamily: T.font,
+              fontSize: 15,
+              color: T.ink400,
               marginBottom: 6,
             }}
           >
@@ -1623,10 +1677,12 @@ function TimesheetsList({ tenantId, staffList }) {
                     <td
                       style={{
                         ...s.td,
-                        fontFamily: "'Cormorant Garamond', serif",
-                        fontSize: 18,
-                        fontWeight: 600,
-                        color: C.green,
+                        fontFamily: T.font,
+                        fontSize: 16,
+                        fontWeight: 400,
+                        letterSpacing: "-0.01em",
+                        fontVariantNumeric: "tabular-nums",
+                        color: T.accent,
                       }}
                     >
                       {ts.total_hours
@@ -1847,10 +1903,12 @@ function TimesheetSummary({ tenantId, staffList }) {
                     <td
                       style={{
                         ...s.td,
-                        fontFamily: "'Cormorant Garamond', serif",
-                        fontSize: 20,
-                        fontWeight: 600,
-                        color: C.green,
+                        fontFamily: T.font,
+                        fontSize: 16,
+                        fontWeight: 400,
+                        letterSpacing: "-0.01em",
+                        fontVariantNumeric: "tabular-nums",
+                        color: T.accent,
                       }}
                     >
                       {row.total.toFixed(1)}
