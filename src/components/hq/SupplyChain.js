@@ -9,10 +9,24 @@
 // v2.0: SystemHealthContext — shared live data layer
 
 import React from "react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { useSystemHealth } from "../../services/systemHealthContext";
 import StockControl from "../StockControl";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "../viz";
 
 const T = {
   ink900: "#0D0D0D",
@@ -39,6 +53,8 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  ink400: "#888888",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -133,6 +149,156 @@ export default function SupplyChain() {
           }
         />
       </div>
+
+      {/* ── CHARTS: Inventory health + PO pipeline ── */}
+      {!statsLoading &&
+        (() => {
+          const inv = inventory;
+          const normal = Math.max(
+            0,
+            inv.totalActive - inv.lowStock - inv.outOfStock,
+          );
+          const healthData = [
+            { name: "Healthy", value: normal },
+            { name: "Low Stock", value: inv.lowStock },
+            { name: "Out of Stock", value: inv.outOfStock },
+          ].filter((d) => d.value > 0);
+          const HEALTH_COLOURS = [T.success, T.warning, T.danger];
+
+          const po = stats.purchaseOrders;
+          const poData = [
+            { name: "Open", value: po.open - po.inTransit },
+            { name: "In Transit", value: po.inTransit },
+            { name: "Completed", value: po.completed || 0 },
+          ].filter((d) => d.value > 0);
+          const PO_COLOURS = [T.info, T.warning, T.accentMid];
+
+          if (inv.totalActive === 0 && po.open === 0) return null;
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <ChartCard title="Inventory Health" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={healthData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={76}
+                      dataKey="value"
+                      paddingAngle={4}
+                      isAnimationActive={false}
+                    >
+                      {healthData.map((_, i) => (
+                        <Cell key={i} fill={HEALTH_COLOURS[i]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={<ChartTooltip formatter={(v) => `${v} SKUs`} />}
+                    />
+                    <Legend
+                      iconSize={8}
+                      iconType="square"
+                      formatter={(v) => (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: T.ink500,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {v}
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Purchase Order Pipeline" height={200}>
+                {poData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={poData}
+                      margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                    >
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={6}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={24}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        content={
+                          <ChartTooltip
+                            formatter={(v) => `${v} PO${v !== 1 ? "s" : ""}`}
+                          />
+                        }
+                      />
+                      <Bar
+                        dataKey="value"
+                        name="POs"
+                        isAnimationActive={false}
+                        maxBarSize={40}
+                        radius={[3, 3, 0, 0]}
+                      >
+                        {poData.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={PO_COLOURS[i % PO_COLOURS.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div
+                    style={{
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      color: T.ink400,
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    No purchase orders yet
+                  </div>
+                )}
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* ── Out of stock alert ── */}
       {!statsLoading && inventory.outOfStock > 0 && (
