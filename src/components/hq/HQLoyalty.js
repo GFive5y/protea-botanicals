@@ -1,12 +1,15 @@
-// HQLoyalty.js v2.4
-// WP-GUIDE-C: InfoTooltip injected — loyalty-threshold, loyalty-multiplier,
-//             loyalty-redemption-value
-// v2.3 (WP-GUIDE-B): loyalty-schema, loyalty-breakage tooltips
-// v2.2 (WP-GUIDE-A): usePageContext loyalty context wired
-// v2.1 (WP-Z): Tier System Unification — recalculate_all_tiers() RPC after every config UPDATE
-// v2.0: Schema Selector + Live Config (Conservative/Standard/Aggressive presets)
-// v1.2: Campaigns tab
-// v1.1: 6 sub-tabs: Earning Rules | Tiers | Economics | Referrals | QR Security | Simulator
+// HQLoyalty.js v3.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost
+//   - DM Mono for all metric/numeric values
+//   - Purple removed — Aggressive schema uses info-blue
+//   - Emoji removed from h1 title and sub-tab labels
+//   - SectionCard: gradient header removed, clean border-left accent
+//   - Schema cards: no coloured top borders, semantic badge colours
+//   - Google Fonts <style> tag removed (loaded globally via index.html)
+// v2.4: InfoTooltip — loyalty-threshold, loyalty-multiplier, loyalty-redemption-value
+// v2.3: WP-GUIDE-B tooltips | v2.2: WP-GUIDE-A context | v2.1: WP-Z tier recalc
+// v2.0: Schema Selector + Live Config
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -14,33 +17,61 @@ import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 
+// ─── Design tokens ───────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+// Legacy aliases used internally
 const C = {
-  bg: "#f9f8f5",
+  bg: T.ink050,
   card: "#ffffff",
-  border: "#e8e4dc",
-  borderDark: "#c8c0b0",
-  green: "#2d4a2d",
-  greenMid: "#3d6b3d",
+  border: T.ink150,
+  borderDark: "#C8C0B0",
+  green: T.accent,
+  greenMid: T.accentMid,
   greenLight: "#52b788",
-  greenPale: "#e8f5e9",
-  blue: "#1565C0",
-  bluePale: "#E3F2FD",
-  amber: "#F57F17",
-  amberPale: "#FFF8E1",
-  red: "#c62828",
-  redPale: "#FFEBEE",
-  purple: "#6A1B9A",
-  purpleMid: "#9C27B0",
-  purplePale: "#F3E5F5",
-  text: "#1a1a1a",
-  textMid: "#4a4a4a",
-  textLight: "#888888",
+  greenPale: T.accentLit,
+  blue: T.info,
+  bluePale: T.infoBg,
+  amber: T.warning,
+  amberPale: T.warningBg,
+  red: T.danger,
+  redPale: T.dangerBg,
+  text: T.ink900,
+  textMid: T.ink700,
+  textLight: T.ink500,
   white: "#ffffff",
   gold: "#b5935a",
   goldPale: "#FFF8E7",
 };
-const FONT_DISPLAY = "'Cormorant Garamond', Georgia, serif";
-const FONT_BODY = "'Jost', 'Helvetica Neue', Arial, sans-serif";
+const FONT_DISPLAY = T.fontUi; // Outfit replaces Cormorant everywhere
+const FONT_BODY = T.fontUi;
 
 const DEFAULT_CONFIG = {
   pts_qr_scan: 10,
@@ -76,13 +107,12 @@ const SCHEMAS = [
   {
     id: "conservative",
     label: "Conservative",
-    icon: "🛡️",
     tagline: "Low cost · entry level",
     description:
-      "Minimal programme cost. Ideal for the launch phase — test engagement without committing to high reward liabilities. Points are worth less per transaction but are easy to control and predict. Best when you want to measure customer engagement before scaling up rewards.",
+      "Minimal programme cost. Ideal for launch — test engagement without committing to high reward liabilities. Best when you want to measure customer engagement before scaling up rewards.",
     costBadge: "~R0.065 per point issued",
-    costColor: "#1565C0",
-    costBg: "#E3F2FD",
+    costColor: T.info,
+    costBg: T.infoBg,
     preview: [
       { label: "QR scan reward", value: "5 pts" },
       { label: "R400 online order", value: "~12 pts  (R1.20 value)" },
@@ -122,13 +152,12 @@ const SCHEMAS = [
   {
     id: "standard",
     label: "Standard",
-    icon: "⚖️",
     tagline: "Balanced · international best practice",
     description:
-      "Follows global loyalty programme benchmarks. Good balance between customer motivation and programme cost. Points feel meaningful — customers notice them on their dashboard and are motivated to earn more. Tier multipliers create genuine incentive to remain loyal.",
+      "Follows global loyalty programme benchmarks. Good balance between customer motivation and programme cost. Tier multipliers create genuine incentive to remain loyal.",
     costBadge: "~R0.11 per point issued",
-    costColor: "#3d6b3d",
-    costBg: "#e8f5e9",
+    costColor: T.accent,
+    costBg: T.accentLit,
     preview: [
       { label: "QR scan reward", value: "10 pts" },
       { label: "R400 online order", value: "~48 pts  (R7.20 value)" },
@@ -168,13 +197,12 @@ const SCHEMAS = [
   {
     id: "aggressive",
     label: "Aggressive",
-    icon: "🚀",
     tagline: "High reward · acquisition focused",
     description:
-      "Maximum engagement and acquisition power. Higher programme cost but drives strong word-of-mouth, repeat purchase, and brand advocacy. Points accumulate fast — customers reach redemption thresholds quickly and feel genuinely rewarded. Best for growth phases or competitive markets.",
+      "Maximum engagement and acquisition power. Higher programme cost but drives strong word-of-mouth, repeat purchase, and brand advocacy. Best for growth phases or competitive markets.",
     costBadge: "~R0.16 per point issued",
-    costColor: "#6A1B9A",
-    costBg: "#F3E5F5",
+    costColor: T.ink700,
+    costBg: T.ink075, // ★ WP-THEME: purple retired → neutral dark
     preview: [
       { label: "QR scan reward", value: "25 pts" },
       { label: "R400 online order", value: "~100 pts  (Bronze, no mult)" },
@@ -228,40 +256,42 @@ function getTierMult(tier, cfg) {
   };
   return map[tier] || 1.0;
 }
+
 const TIER_COLOURS = {
-  Bronze: { bg: "#FFF3E0", text: "#E65100", border: "#FFCC80" },
+  Bronze: { bg: "#FFF3E0", text: "#92400E", border: "#FDE68A" },
   Silver: { bg: "#F5F5F5", text: "#424242", border: "#BDBDBD" },
-  Gold: { bg: "#FFFDE7", text: "#F57F17", border: "#FFD54F" },
-  Platinum: { bg: "#F3E5F5", text: "#6A1B9A", border: "#CE93D8" },
+  Gold: { bg: "#FFFDE7", text: "#92400E", border: "#FFD54F" },
+  Platinum: { bg: T.infoBg, text: T.info, border: T.infoBd }, // info-blue replaces purple
 };
 
+// ─── Reusable sub-components ─────────────────────────────────────────────────
+
 function SectionCard({ title, subtitle, children, accent }) {
-  const ac = accent || C.green;
+  const ac = accent || T.accent;
   return (
     <div
       style={{
-        background: C.card,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
+        background: "#fff",
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 8,
         marginBottom: 20,
         overflow: "hidden",
+        boxShadow: T.shadow,
       }}
     >
       <div
         style={{
-          background: `linear-gradient(135deg, ${ac}10, ${ac}04)`,
-          borderBottom: `1px solid ${C.border}`,
+          borderBottom: `1px solid ${T.ink150}`,
           padding: "14px 20px",
-          borderLeft: `4px solid ${ac}`,
+          borderLeft: `3px solid ${ac}`,
         }}
       >
         <div
           style={{
-            fontFamily: FONT_DISPLAY,
-            fontSize: 17,
+            fontFamily: T.fontUi,
+            fontSize: 14,
             fontWeight: 600,
-            color: C.green,
-            letterSpacing: "0.02em",
+            color: T.ink900,
           }}
         >
           {title}
@@ -269,9 +299,9 @@ function SectionCard({ title, subtitle, children, accent }) {
         {subtitle && (
           <div
             style={{
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 12,
-              color: C.textLight,
+              color: T.ink500,
               marginTop: 2,
             }}
           >
@@ -297,10 +327,10 @@ function FieldRow({ label, explanation, children }) {
       >
         <div
           style={{
-            fontFamily: FONT_BODY,
+            fontFamily: T.fontUi,
             fontSize: 13,
             fontWeight: 600,
-            color: C.text,
+            color: T.ink900,
             minWidth: 200,
           }}
         >
@@ -311,12 +341,12 @@ function FieldRow({ label, explanation, children }) {
       {explanation && (
         <div
           style={{
-            fontFamily: FONT_BODY,
+            fontFamily: T.fontUi,
             fontSize: 12,
-            color: C.textLight,
+            color: T.ink500,
             marginTop: 6,
             lineHeight: 1.55,
-            borderLeft: `2px solid ${C.border}`,
+            borderLeft: `2px solid ${T.ink150}`,
             paddingLeft: 10,
           }}
         >
@@ -348,19 +378,19 @@ function NumInput({
         style={{
           width,
           padding: "7px 10px",
-          border: `1.5px solid ${C.borderDark}`,
-          borderRadius: 6,
-          fontFamily: FONT_BODY,
+          border: `1.5px solid ${T.ink150}`,
+          borderRadius: 4,
+          fontFamily: T.fontData,
           fontSize: 14,
           fontWeight: 600,
-          color: C.green,
-          background: C.white,
+          color: T.accent,
+          background: "#fff",
           outline: "none",
           textAlign: "center",
         }}
       />
       {suffix && (
-        <span style={{ fontFamily: FONT_BODY, fontSize: 13, color: C.textMid }}>
+        <span style={{ fontFamily: T.fontUi, fontSize: 13, color: T.ink700 }}>
           {suffix}
         </span>
       )}
@@ -369,18 +399,18 @@ function NumInput({
 }
 
 function InfoBox({ children, colour, bgColour }) {
-  const co = colour || C.blue,
-    bg = bgColour || C.bluePale;
+  const co = colour || T.info,
+    bg = bgColour || T.infoBg;
   return (
     <div
       style={{
         background: bg,
         border: `1px solid ${co}30`,
-        borderRadius: 8,
+        borderRadius: 6,
         padding: "12px 16px",
-        fontFamily: FONT_BODY,
+        fontFamily: T.fontUi,
         fontSize: 12.5,
-        color: C.textMid,
+        color: T.ink700,
         lineHeight: 1.6,
         marginTop: 12,
       }}
@@ -394,19 +424,19 @@ function PreviewBox({ children, title }) {
   return (
     <div
       style={{
-        background: `linear-gradient(135deg, ${C.greenPale}, #f0faf0)`,
-        border: `1px solid ${C.greenLight}50`,
-        borderRadius: 8,
+        background: T.accentLit,
+        border: `1px solid ${T.accentBd}`,
+        borderRadius: 6,
         padding: "14px 16px",
         marginTop: 14,
       }}
     >
       <div
         style={{
-          fontFamily: FONT_BODY,
-          fontSize: 11,
+          fontFamily: T.fontUi,
+          fontSize: 10,
           fontWeight: 700,
-          color: C.greenMid,
+          color: T.accentMid,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
           marginBottom: 8,
@@ -428,15 +458,15 @@ function PreviewLine({ label, value, highlight }) {
         marginBottom: 4,
       }}
     >
-      <span style={{ fontFamily: FONT_BODY, fontSize: 12.5, color: C.textMid }}>
+      <span style={{ fontFamily: T.fontUi, fontSize: 12.5, color: T.ink500 }}>
         {label}
       </span>
       <span
         style={{
-          fontFamily: FONT_BODY,
+          fontFamily: T.fontData,
           fontSize: 13,
           fontWeight: highlight ? 700 : 500,
-          color: highlight ? C.green : C.textMid,
+          color: highlight ? T.accent : T.ink700,
         }}
       >
         {value}
@@ -457,14 +487,14 @@ function Toast({ msg, type, onDone }) {
         bottom: 30,
         right: 30,
         zIndex: 9999,
-        background: type === "error" ? C.red : C.green,
-        color: C.white,
+        background: type === "error" ? T.danger : T.accent,
+        color: "#fff",
         padding: "14px 22px",
-        borderRadius: 10,
-        fontFamily: FONT_BODY,
+        borderRadius: 8,
+        fontFamily: T.fontUi,
         fontSize: 14,
         fontWeight: 500,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.20)",
       }}
     >
       {type === "error" ? "✗ " : "✓ "}
@@ -473,9 +503,11 @@ function Toast({ msg, type, onDone }) {
   );
 }
 
+// ─── Tab: Schema ─────────────────────────────────────────────────────────────
 function TabSchema({ config, onApplySchema, applyingSchema }) {
   const activeSchemaId = config?.active_schema || "standard";
   const [confirmSchema, setConfirmSchema] = useState(null);
+
   const COMPARISON_ROWS = [
     { label: "QR scan", key: "pts_qr_scan", format: (v) => `${v} pts` },
     {
@@ -552,55 +584,52 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
       format: (v) => `${v} months`,
     },
   ];
+
   const ONBOARDING = [
     {
-      icon: "🔄",
       title: "How live updates work",
-      body: "Every page in the platform — ScanResult, CheckoutPage, OrderSuccess, Loyalty dashboard and Redeem — reads from the loyalty_config table on each load. When you apply a schema, all values are written to the database in a single operation. All existing customer tiers are immediately recalculated. No server restart required.",
+      body: "Every page — ScanResult, CheckoutPage, Loyalty and Redeem — reads from loyalty_config on each load. When you apply a schema, all values are written in a single operation. All existing customer tiers are immediately recalculated.",
     },
     {
-      icon: "💰",
       title: "Understanding cost per point",
-      body: "The 'cost per point' figure shown on each schema card is the expected actual cash cost to Protea Botanicals per point issued, after accounting for breakage (points that expire or are never redeemed). Formula: redemption_value_zar × (1 − breakage_rate). Conservative: R0.10 × 0.65 = R0.065. Standard: R0.15 × 0.75 = R0.11. Aggressive: R0.20 × 0.80 = R0.16.",
+      body: "Cost per point = redemption_value_zar × (1 − breakage_rate). Conservative: R0.10 × 0.65 = R0.065. Standard: R0.15 × 0.75 = R0.11. Aggressive: R0.20 × 0.80 = R0.16.",
     },
     {
-      icon: "📊",
       title: "Online bonus vs retail",
-      body: "The online_bonus_pct gives direct website purchasers more points than retail customers who scan a QR in a dispensary. This incentivises buying directly from you (higher margin) vs. through a retail partner. Standard schema gives 100% extra online — meaning a direct customer earns double what a retail customer earns on the same spend.",
+      body: "The online_bonus_pct gives direct website purchasers more points than retail customers who scan a QR. Standard gives 100% extra online — a direct customer earns double what a retail customer earns on the same spend.",
     },
     {
-      icon: "🏆",
       title: "Tier multipliers",
-      body: "Multipliers apply to ALL earned points — scans, purchases, referrals and streak bonuses. A Platinum customer at 3× earns triple points on every interaction. This is the single most powerful retention tool: once a customer reaches Platinum tier, downgrading to a competitor means losing their multiplier advantage.",
+      body: "Multipliers apply to ALL earned points — scans, purchases, referrals and streak bonuses. A Platinum customer at 3× earns triple points on every interaction. Once a customer reaches Platinum tier, downgrading to a competitor means losing their multiplier advantage.",
     },
     {
-      icon: "📉",
       title: "Breakage rate",
-      body: "Breakage is the percentage of issued points that are never redeemed (expired, dormant accounts, customers who forget). Industry average is 20–35%. A higher breakage rate lowers your actual programme cost. Conservative schema assumes 35% breakage; Aggressive assumes 20% (because higher-value rewards drive more active redemption).",
+      body: "Breakage is the percentage of issued points never redeemed. Industry average is 20–35%. A higher breakage rate lowers your actual programme cost. Conservative assumes 35% breakage; Aggressive assumes 20%.",
     },
     {
-      icon: "🔒",
       title: "Schema + manual override",
-      body: "Applying a schema sets all values at once — useful for a clean baseline. After applying, you can fine-tune any individual value using the tabs above (Earning Rules, Tiers, Economics, etc.) without affecting other values. Manual overrides save separately via 'Save All Changes'. The active_schema label will show 'custom' once you deviate from a preset.",
+      body: "Applying a schema sets all values at once — useful for a clean baseline. After applying, fine-tune individual values using the tabs above. Manual overrides save separately via Save All Changes.",
     },
   ];
+
   return (
     <div>
+      {/* Intro banner */}
       <div
         style={{
-          background: `linear-gradient(135deg, ${C.green}08, ${C.greenLight}06)`,
-          border: `1px solid ${C.greenLight}40`,
-          borderRadius: 12,
+          background: T.accentLit,
+          border: `1px solid ${T.accentBd}`,
+          borderRadius: 8,
           padding: "18px 22px",
           marginBottom: 24,
         }}
       >
         <div
           style={{
-            fontFamily: FONT_DISPLAY,
-            fontSize: 20,
+            fontFamily: T.fontUi,
+            fontSize: 16,
             fontWeight: 600,
-            color: C.green,
+            color: T.accent,
             marginBottom: 6,
             display: "flex",
             alignItems: "center",
@@ -612,42 +641,41 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
         </div>
         <div
           style={{
-            fontFamily: FONT_BODY,
+            fontFamily: T.fontUi,
             fontSize: 13,
-            color: C.textMid,
+            color: T.ink700,
             lineHeight: 1.7,
             maxWidth: 700,
           }}
         >
           Choose a pre-calibrated rewards level. Clicking <strong>Apply</strong>{" "}
-          writes all values to the database — scans, purchases, referrals,
-          tiers, redemptions and bonuses all update simultaneously. All existing
-          customer tiers are immediately recalculated to match the new
-          thresholds.
+          writes all values to the database — all existing customer tiers are
+          immediately recalculated.
         </div>
         <div
           style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}
         >
           {[
-            "✅ QR scans",
-            "✅ Online purchases",
-            "✅ Referral rewards",
-            "✅ Streak bonuses",
-            "✅ Tier multipliers",
-            "✅ Redemption values",
-            "✅ Expiry rules",
-            "✅ All tiers recalculated",
+            "QR scans",
+            "Online purchases",
+            "Referral rewards",
+            "Streak bonuses",
+            "Tier multipliers",
+            "Redemption values",
+            "Expiry rules",
+            "All tiers recalculated",
           ].map((tag) => (
             <span
               key={tag}
               style={{
-                background: C.greenPale,
-                color: C.greenMid,
-                border: `1px solid ${C.greenLight}40`,
-                borderRadius: 20,
-                padding: "3px 10px",
+                background: "white",
+                color: T.accentMid,
+                border: `1px solid ${T.accentBd}`,
+                borderRadius: 3,
+                padding: "2px 10px",
                 fontSize: 11,
                 fontWeight: 600,
+                letterSpacing: "0.04em",
               }}
             >
               {tag}
@@ -655,10 +683,12 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           ))}
         </div>
       </div>
+
+      {/* Schema cards */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))",
           gap: 20,
           marginBottom: 32,
         }}
@@ -669,106 +699,98 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             <div
               key={schema.id}
               style={{
-                background: active ? `${schema.costColor}06` : C.card,
-                border: `2px solid ${active ? schema.costColor : C.border}`,
-                borderRadius: 14,
+                background: "#fff",
+                border: `1.5px solid ${active ? schema.costColor : T.ink150}`,
+                borderRadius: 10,
                 overflow: "hidden",
-                transition: "all 0.2s",
-                boxShadow: active ? `0 4px 20px ${schema.costColor}20` : "none",
+                boxShadow: active
+                  ? `0 4px 16px ${schema.costColor}18`
+                  : T.shadow,
               }}
             >
+              {/* Card header */}
               <div
                 style={{
-                  background: active
-                    ? schema.costColor
-                    : `${schema.costColor}12`,
+                  background: active ? schema.costColor : T.ink075,
                   padding: "16px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                  }}
-                >
+                <div>
                   <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: active ? "#fff" : T.ink900,
+                      marginBottom: 2,
+                    }}
                   >
-                    <span style={{ fontSize: 26 }}>{schema.icon}</span>
-                    <div>
-                      <div
-                        style={{
-                          fontFamily: FONT_DISPLAY,
-                          fontSize: 22,
-                          fontWeight: 700,
-                          color: active ? C.white : C.text,
-                        }}
-                      >
-                        {schema.label}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: FONT_BODY,
-                          fontSize: 11,
-                          color: active ? "rgba(255,255,255,0.8)" : C.textLight,
-                          marginTop: 1,
-                        }}
-                      >
-                        {schema.tagline}
-                      </div>
-                    </div>
+                    {schema.label}
                   </div>
-                  {active && (
-                    <span
-                      style={{
-                        background: "rgba(255,255,255,0.2)",
-                        color: C.white,
-                        borderRadius: 20,
-                        padding: "3px 12px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.08em",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      ✓ ACTIVE
-                    </span>
-                  )}
+                  <div
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 11,
+                      color: active ? "rgba(255,255,255,0.8)" : T.ink500,
+                    }}
+                  >
+                    {schema.tagline}
+                  </div>
                 </div>
+                {active && (
+                  <span
+                    style={{
+                      background: "rgba(255,255,255,0.2)",
+                      color: "#fff",
+                      borderRadius: 3,
+                      padding: "2px 10px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    ACTIVE
+                  </span>
+                )}
               </div>
+              {/* Card body */}
               <div style={{ padding: "16px 20px" }}>
-                <div
+                {/* Cost badge */}
+                <span
                   style={{
                     display: "inline-block",
                     background: schema.costBg,
                     color: schema.costColor,
                     border: `1px solid ${schema.costColor}30`,
-                    borderRadius: 20,
-                    padding: "4px 14px",
+                    borderRadius: 3,
+                    padding: "3px 10px",
                     fontSize: 11,
                     fontWeight: 700,
                     marginBottom: 12,
+                    letterSpacing: "0.04em",
                   }}
                 >
-                  💰 {schema.costBadge}
-                </div>
+                  {schema.costBadge}
+                </span>
                 <div
                   style={{
-                    fontFamily: FONT_BODY,
+                    fontFamily: T.fontUi,
                     fontSize: 12.5,
-                    color: C.textMid,
+                    color: T.ink700,
                     lineHeight: 1.65,
                     marginBottom: 14,
                   }}
                 >
                   {schema.description}
                 </div>
+                {/* Preview rows */}
                 <div
                   style={{
-                    background: C.bg,
-                    borderRadius: 8,
+                    background: T.ink075,
+                    borderRadius: 6,
                     padding: "10px 14px",
                     marginBottom: 16,
                   }}
@@ -783,22 +805,22 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                         paddingBottom: i < schema.preview.length - 1 ? 7 : 0,
                         borderBottom:
                           i < schema.preview.length - 1
-                            ? `1px solid ${C.border}`
+                            ? `1px solid ${T.ink150}`
                             : "none",
                       }}
                     >
                       <span
                         style={{
-                          fontFamily: FONT_BODY,
+                          fontFamily: T.fontUi,
                           fontSize: 12,
-                          color: C.textMid,
+                          color: T.ink500,
                         }}
                       >
                         {item.label}
                       </span>
                       <span
                         style={{
-                          fontFamily: FONT_BODY,
+                          fontFamily: T.fontData,
                           fontSize: 12,
                           fontWeight: 700,
                           color: schema.costColor,
@@ -809,22 +831,23 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     </div>
                   ))}
                 </div>
+                {/* Apply button */}
                 {confirmSchema === schema.id ? (
                   <div>
                     <div
                       style={{
-                        fontFamily: FONT_BODY,
+                        fontFamily: T.fontUi,
                         fontSize: 12,
-                        color: C.textMid,
+                        color: T.ink700,
                         marginBottom: 10,
-                        background: `${schema.costColor}10`,
+                        background: T.warningBg,
                         padding: "8px 12px",
-                        borderRadius: 6,
-                        border: `1px solid ${schema.costColor}30`,
+                        borderRadius: 4,
+                        border: `1px solid ${T.warningBd}`,
                       }}
                     >
                       This will overwrite all current loyalty settings and
-                      immediately recalculate all customer tiers. Confirm?
+                      recalculate all customer tiers. Confirm?
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
@@ -837,17 +860,16 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                           flex: 2,
                           padding: "9px",
                           background: schema.costColor,
-                          color: C.white,
+                          color: "#fff",
                           border: "none",
-                          borderRadius: 7,
-                          fontFamily: FONT_BODY,
+                          borderRadius: 5,
+                          fontFamily: T.fontUi,
                           fontSize: 12,
                           fontWeight: 700,
                           cursor: "pointer",
-                          letterSpacing: "0.04em",
                         }}
                       >
-                        {applyingSchema ? "Applying…" : "✓ Confirm Apply"}
+                        {applyingSchema ? "Applying…" : "Confirm Apply"}
                       </button>
                       <button
                         onClick={() => setConfirmSchema(null)}
@@ -855,11 +877,11 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                           flex: 1,
                           padding: "9px",
                           background: "none",
-                          border: `1px solid ${C.border}`,
-                          borderRadius: 7,
-                          fontFamily: FONT_BODY,
+                          border: `1px solid ${T.ink150}`,
+                          borderRadius: 5,
+                          fontFamily: T.fontUi,
                           fontSize: 12,
-                          color: C.textMid,
+                          color: T.ink500,
                           cursor: "pointer",
                         }}
                       >
@@ -877,12 +899,12 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                       width: "100%",
                       padding: "10px",
                       background: active
-                        ? `${schema.costColor}15`
+                        ? `${schema.costColor}12`
                         : schema.costColor,
-                      color: active ? schema.costColor : C.white,
+                      color: active ? schema.costColor : "#fff",
                       border: `1.5px solid ${schema.costColor}`,
-                      borderRadius: 8,
-                      fontFamily: FONT_BODY,
+                      borderRadius: 6,
+                      fontFamily: T.fontUi,
                       fontSize: 12,
                       fontWeight: 700,
                       cursor: active ? "default" : "pointer",
@@ -891,7 +913,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     }}
                   >
                     {active
-                      ? "✓ Currently Active"
+                      ? "Currently Active"
                       : `Apply ${schema.label} Schema`}
                   </button>
                 )}
@@ -900,17 +922,19 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           );
         })}
       </div>
+
+      {/* Full comparison table */}
       <SectionCard
         title="Full Schema Comparison"
         subtitle="All values across all three schemas"
-        accent={C.purple}
+        accent={T.info}
       >
         <div style={{ overflowX: "auto" }}>
           <table
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 12.5,
             }}
           >
@@ -921,12 +945,12 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     padding: "10px 14px",
                     textAlign: "left",
                     fontWeight: 700,
-                    color: C.textLight,
+                    color: T.ink400,
                     textTransform: "uppercase",
-                    fontSize: 11,
+                    fontSize: 10,
                     letterSpacing: "0.06em",
-                    borderBottom: `2px solid ${C.border}`,
-                    background: C.bg,
+                    borderBottom: `2px solid ${T.ink150}`,
+                    background: T.ink075,
                   }}
                 >
                   Setting
@@ -941,11 +965,11 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                       color: s.costColor,
                       fontSize: 13,
                       borderBottom: `2px solid ${s.costColor}40`,
-                      background: `${s.costColor}05`,
+                      background: `${s.costColor}06`,
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {s.icon} {s.label}
+                    {s.label}
                     {activeSchemaId === s.id && (
                       <span
                         style={{
@@ -966,14 +990,14 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
               {COMPARISON_ROWS.map((row, i) => (
                 <tr
                   key={row.key}
-                  style={{ background: i % 2 === 0 ? C.bg : C.white }}
+                  style={{ background: i % 2 === 0 ? T.ink075 : "#fff" }}
                 >
                   <td
                     style={{
                       padding: "9px 14px",
-                      color: C.textMid,
+                      color: T.ink700,
                       fontWeight: 500,
-                      borderBottom: `1px solid ${C.border}`,
+                      borderBottom: `1px solid ${T.ink150}`,
                     }}
                   >
                     {row.label}
@@ -987,11 +1011,12 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                         style={{
                           padding: "9px 14px",
                           textAlign: "center",
+                          fontFamily: T.fontData,
                           fontWeight: isActive ? 700 : 500,
-                          color: isActive ? s.costColor : C.textMid,
-                          borderBottom: `1px solid ${C.border}`,
+                          color: isActive ? s.costColor : T.ink700,
+                          borderBottom: `1px solid ${T.ink150}`,
                           background: isActive
-                            ? `${s.costColor}05`
+                            ? `${s.costColor}06`
                             : "transparent",
                         }}
                       >
@@ -1005,53 +1030,46 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           </table>
         </div>
       </SectionCard>
+
+      {/* Understanding each setting */}
       <SectionCard
         title="Understanding Each Setting"
         subtitle="What these values control across the platform"
-        accent={C.gold}
+        accent={T.warning}
       >
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: 16,
+            gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
+            gap: 14,
           }}
         >
           {ONBOARDING.map((item, i) => (
             <div
               key={i}
               style={{
-                background: C.bg,
-                border: `1px solid ${C.border}`,
-                borderRadius: 10,
+                background: T.ink075,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 6,
                 padding: "14px 16px",
               }}
             >
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginBottom: 8,
+                  fontFamily: T.fontUi,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: T.ink900,
+                  marginBottom: 6,
                 }}
               >
-                <span style={{ fontSize: 20 }}>{item.icon}</span>
-                <div
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: C.text,
-                  }}
-                >
-                  {item.title}
-                </div>
+                {item.title}
               </div>
               <div
                 style={{
-                  fontFamily: FONT_BODY,
+                  fontFamily: T.fontUi,
                   fontSize: 12,
-                  color: C.textMid,
+                  color: T.ink700,
                   lineHeight: 1.65,
                 }}
               >
@@ -1060,18 +1078,17 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             </div>
           ))}
         </div>
-        <InfoBox colour={C.gold} bgColour={C.goldPale}>
+        <InfoBox colour={T.warning} bgColour={T.warningBg}>
           <strong>Pro tip:</strong> Apply a schema first to get a clean
-          baseline, then use the <strong>Earning Rules</strong>,{" "}
-          <strong>Tiers</strong>, and <strong>Economics</strong> tabs to tweak
-          individual values. Each tab shows live previews of what a customer
-          would experience at the current settings.
+          baseline, then use the Earning Rules, Tiers, and Economics tabs to
+          tweak individual values.
         </InfoBox>
       </SectionCard>
     </div>
   );
 }
 
+// ─── Tab: Earning Rules ───────────────────────────────────────────────────────
 function TabEarning({ draft, setDraft }) {
   const cfg = draft;
   const costPerPt = cfg.redemption_value_zar * (1 - cfg.breakage_rate);
@@ -1090,7 +1107,7 @@ function TabEarning({ draft, setDraft }) {
       >
         <FieldRow
           label="Points per scan"
-          explanation={`Each physical product QR earns points once only. At current settings, one scan earns ${cfg.pts_qr_scan} pts = R${(cfg.pts_qr_scan * costPerPt).toFixed(2)} actual cost to Protea (after ${Math.round(cfg.breakage_rate * 100)}% breakage).`}
+          explanation={`One scan earns ${cfg.pts_qr_scan} pts = R${(cfg.pts_qr_scan * costPerPt).toFixed(2)} actual cost (after ${Math.round(cfg.breakage_rate * 100)}% breakage).`}
         >
           <NumInput
             value={cfg.pts_qr_scan}
@@ -1104,7 +1121,7 @@ function TabEarning({ draft, setDraft }) {
       <SectionCard
         title="Online Purchase — Direct from Website"
         subtitle="Your highest-margin channel."
-        accent={C.greenMid}
+        accent={T.accentMid}
       >
         <FieldRow
           label="Points per R100 spent"
@@ -1146,7 +1163,7 @@ function TabEarning({ draft, setDraft }) {
             value={`× ${cfg.mult_gold} = ${withTier.toFixed(1)} pts`}
           />
           <div
-            style={{ borderTop: `1px solid ${C.border}`, margin: "8px 0" }}
+            style={{ borderTop: `1px solid ${T.ink150}`, margin: "8px 0" }}
           />
           <PreviewLine
             label="Points earned"
@@ -1166,7 +1183,7 @@ function TabEarning({ draft, setDraft }) {
       <SectionCard
         title="Retail Scan"
         subtitle="Keep lower than online to incentivise direct purchasing"
-        accent={C.amber}
+        accent={T.warning}
       >
         <FieldRow label="Points per R100 equivalent">
           <NumInput
@@ -1182,11 +1199,11 @@ function TabEarning({ draft, setDraft }) {
       <SectionCard
         title="Streak & Birthday Bonuses"
         subtitle="Bonus points for consistent scanning behaviour and birthdays"
-        accent={C.purple}
+        accent={T.info}
       >
         <FieldRow
           label="Streak bonus points"
-          explanation={`Customer earns this bonus after scanning ${cfg.streak_interval} times in a row. Currently wired in ScanResult.js.`}
+          explanation={`Customer earns this bonus after scanning ${cfg.streak_interval} times in a row.`}
         >
           <NumInput
             value={cfg.pts_streak_bonus || 200}
@@ -1212,7 +1229,7 @@ function TabEarning({ draft, setDraft }) {
         </FieldRow>
         <FieldRow
           label="Birthday bonus"
-          explanation="Points auto-awarded on customer's birthday (requires pg_cron — pending Supabase Pro upgrade)."
+          explanation="Points auto-awarded on customer's birthday."
         >
           <NumInput
             value={cfg.pts_birthday || 100}
@@ -1227,7 +1244,7 @@ function TabEarning({ draft, setDraft }) {
       <SectionCard
         title="Profile Completion Rewards"
         subtitle="Already live in Account.js"
-        accent={C.blue}
+        accent={T.info}
       >
         <FieldRow label="Profile completion bonus">
           <NumInput
@@ -1252,6 +1269,7 @@ function TabEarning({ draft, setDraft }) {
   );
 }
 
+// ─── Tab: Tiers ───────────────────────────────────────────────────────────────
 function TabTiers({ draft, setDraft }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1285,13 +1303,13 @@ function TabTiers({ draft, setDraft }) {
       colour: TIER_COLOURS.Platinum,
     },
   ];
-  function weeksToTier(targetPts) {
-    return Math.ceil(targetPts / cfg.pts_qr_scan);
+  function weeksToTier(p) {
+    return Math.ceil(p / cfg.pts_qr_scan);
   }
-  function monthsToTierBuying(targetPts) {
-    const ptsPerMonth =
+  function monthsToTierBuying(p) {
+    const ppm =
       (400 / 100) * cfg.pts_per_r100_online * (1 + cfg.online_bonus_pct / 100);
-    return Math.ceil(targetPts / ptsPerMonth);
+    return Math.ceil(p / ppm);
   }
   const platBuying =
     (400 / 100) *
@@ -1309,7 +1327,7 @@ function TabTiers({ draft, setDraft }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
             gap: 16,
             marginBottom: 20,
           }}
@@ -1320,14 +1338,14 @@ function TabTiers({ draft, setDraft }) {
               style={{
                 background: tier.colour.bg,
                 border: `1.5px solid ${tier.colour.border}`,
-                borderRadius: 12,
+                borderRadius: 8,
                 padding: "16px 18px",
               }}
             >
               <div
                 style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontSize: 20,
+                  fontFamily: T.fontUi,
+                  fontSize: 16,
                   fontWeight: 700,
                   color: tier.colour.text,
                   marginBottom: 12,
@@ -1342,19 +1360,19 @@ function TabTiers({ draft, setDraft }) {
                       display: "flex",
                       alignItems: "center",
                       gap: 4,
-                      fontFamily: FONT_BODY,
-                      fontSize: 11,
-                      color: C.textLight,
+                      fontFamily: T.fontUi,
+                      fontSize: 10,
+                      color: T.ink500,
                       marginBottom: 4,
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
                     }}
                   >
-                    Reaches at
+                    Reaches at{" "}
                     <InfoTooltip
                       id="loyalty-threshold"
                       title="What is a tier threshold?"
-                      body="The total points a customer needs to reach this tier. Once they cross this threshold their tier upgrades instantly — along with their earn multiplier. Thresholds apply to all-time accumulated points, not just recent activity."
+                      body="Total points a customer needs to reach this tier. Once they cross this threshold their tier upgrades instantly. Thresholds apply to all-time accumulated points."
                     />
                   </div>
                   <NumInput
@@ -1370,9 +1388,9 @@ function TabTiers({ draft, setDraft }) {
               ) : (
                 <div
                   style={{
-                    fontFamily: FONT_BODY,
+                    fontFamily: T.fontUi,
                     fontSize: 12,
-                    color: C.textLight,
+                    color: T.ink500,
                     marginBottom: 12,
                   }}
                 >
@@ -1385,16 +1403,15 @@ function TabTiers({ draft, setDraft }) {
                     display: "flex",
                     alignItems: "center",
                     gap: 4,
-                    fontFamily: FONT_BODY,
-                    fontSize: 11,
-                    color: C.textLight,
+                    fontFamily: T.fontUi,
+                    fontSize: 10,
+                    color: T.ink500,
                     marginBottom: 4,
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
                   }}
                 >
-                  Earn multiplier
-                  <InfoTooltip id="loyalty-multiplier" />
+                  Earn multiplier <InfoTooltip id="loyalty-multiplier" />
                 </div>
                 <NumInput
                   value={cfg[tier.multKey]}
@@ -1409,7 +1426,7 @@ function TabTiers({ draft, setDraft }) {
             </div>
           ))}
         </div>
-        <PreviewBox title="Tier Journey Visualiser">
+        <PreviewBox title="Tier Journey">
           {[
             { label: "Bronze → Silver", pts: cfg.threshold_silver },
             { label: "Silver → Gold", pts: cfg.threshold_gold },
@@ -1420,51 +1437,50 @@ function TabTiers({ draft, setDraft }) {
               style={{
                 marginBottom: 10,
                 paddingBottom: 10,
-                borderBottom: i < 2 ? `1px solid ${C.border}` : "none",
+                borderBottom: i < 2 ? `1px solid ${T.ink150}` : "none",
               }}
             >
               <div
                 style={{
-                  fontFamily: FONT_BODY,
+                  fontFamily: T.fontUi,
                   fontSize: 13,
                   fontWeight: 600,
-                  color: C.textMid,
+                  color: T.ink700,
                   marginBottom: 3,
                 }}
               >
                 {step.label} — {step.pts} pts
               </div>
               <div
-                style={{
-                  fontFamily: FONT_BODY,
-                  fontSize: 12,
-                  color: C.textLight,
-                }}
+                style={{ fontFamily: T.fontUi, fontSize: 12, color: T.ink500 }}
               >
-                Scanning once/week: ~{weeksToTier(step.pts)} weeks &nbsp;·&nbsp;
-                Buying R400/month online: ~{monthsToTierBuying(step.pts)} months
+                Scanning once/week: ~{weeksToTier(step.pts)} weeks · Buying
+                R400/month online: ~{monthsToTierBuying(step.pts)} months
               </div>
             </div>
           ))}
         </PreviewBox>
       </SectionCard>
-      <SectionCard title="Multiplier Impact" accent={C.purple}>
-        <InfoBox colour={C.purple} bgColour={C.purplePale}>
+      <SectionCard title="Multiplier Impact" accent={T.info}>
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
           <strong>Platinum vs Bronze on R400/month online:</strong>
-          <br />• Bronze (1×): {Math.round(bronzeBuying)} pts/month = R
+          <br />
+          Bronze (1×): {Math.round(bronzeBuying)} pts/month = R
           {(Math.round(bronzeBuying) * cfg.redemption_value_zar).toFixed(2)}
           /month value
-          <br />• Platinum ({cfg.mult_platinum}×): {Math.round(platBuying)}{" "}
-          pts/month = R
-          {(Math.round(platBuying) * cfg.redemption_value_zar).toFixed(2)}/month
-          value
-          <br />• Difference: +{Math.round(platBuying - bronzeBuying)} pts/month
+          <br />
+          Platinum ({cfg.mult_platinum}×): {Math.round(platBuying)} pts/month =
+          R{(Math.round(platBuying) * cfg.redemption_value_zar).toFixed(2)}
+          /month value
+          <br />
+          Difference: +{Math.round(platBuying - bronzeBuying)} pts/month
         </InfoBox>
       </SectionCard>
     </div>
   );
 }
 
+// ─── Tab: Economics ───────────────────────────────────────────────────────────
 function TabEconomics({ draft, setDraft, liveStats }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1495,7 +1511,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
               <InfoTooltip
                 id="loyalty-redemption-value"
                 title="What does point value mean?"
-                body="This is how much each point is worth in Rand when a customer redeems them at checkout. At R0.15 per point, a customer with 1 000 points can discount their order by R150. Higher values feel more rewarding but increase your programme cost — lower values are cheaper but may not motivate customers enough to earn."
+                body="This is how much each point is worth in Rand when a customer redeems. At R0.15 per point, 1 000 points = R150 off their order."
               />
             </span>
           }
@@ -1542,7 +1558,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
           />
         </FieldRow>
       </SectionCard>
-      <SectionCard title="Financial Model" accent={C.purple}>
+      <SectionCard title="Financial Model" accent={T.info}>
         <FieldRow
           label={
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1569,7 +1585,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
             value={`× ${(1 - cfg.breakage_rate).toFixed(2)}`}
           />
           <div
-            style={{ borderTop: `1px solid ${C.border}`, margin: "8px 0" }}
+            style={{ borderTop: `1px solid ${T.ink150}`, margin: "8px 0" }}
           />
           <PreviewLine
             label="Actual cost per point issued"
@@ -1578,12 +1594,12 @@ function TabEconomics({ draft, setDraft, liveStats }) {
           />
         </PreviewBox>
       </SectionCard>
-      <SectionCard title="Programme Cost Dashboard" accent={C.greenMid}>
+      <SectionCard title="Programme Cost Dashboard" accent={T.accentMid}>
         {liveStats ? (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))",
               gap: 12,
             }}
           >
@@ -1591,74 +1607,85 @@ function TabEconomics({ draft, setDraft, liveStats }) {
               {
                 label: "Points Issued (30d)",
                 value: liveStats.totalPtsIssued30d?.toLocaleString() || "0",
-                colour: C.green,
+                semantic: "success",
               },
               {
                 label: "Points Redeemed (30d)",
                 value: liveStats.totalPtsRedeemed30d?.toLocaleString() || "0",
-                colour: C.purple,
+                semantic: "info",
               },
               {
                 label: "Redemption Rate",
                 value: `${actualRedemptionRate}%`,
-                colour: C.amber,
+                semantic: "warning",
               },
               {
                 label: "Outstanding Liability",
                 value: `R${outstandingLiability.toFixed(0)}`,
-                colour: C.red,
+                semantic: "danger",
               },
               {
                 label: "Programme Cost",
                 value: `R${programmeCost.toFixed(0)}`,
-                colour: C.textMid,
+                semantic: null,
               },
               {
                 label: "Cost as % Revenue",
                 value: `${costAsPctRev}%`,
-                colour: C.greenMid,
+                semantic: "success",
               },
-            ].map((s, i) => (
-              <div
-                key={i}
-                style={{
-                  background: C.white,
-                  border: `1px solid ${s.colour}25`,
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  textAlign: "center",
-                }}
-              >
+            ].map((s, i) => {
+              const semColors = {
+                success: { c: T.success, bg: T.successBg },
+                warning: { c: T.warning, bg: T.warningBg },
+                danger: { c: T.danger, bg: T.dangerBg },
+                info: { c: T.info, bg: T.infoBg },
+              };
+              const sem = s.semantic
+                ? semColors[s.semantic]
+                : { c: T.ink700, bg: "#fff" };
+              return (
                 <div
+                  key={i}
                   style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: s.colour,
+                    background: "#fff",
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 8,
+                    padding: "12px 14px",
+                    textAlign: "center",
                   }}
                 >
-                  {s.value}
+                  <div
+                    style={{
+                      fontFamily: T.fontData,
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: sem.c,
+                    }}
+                  >
+                    {s.value}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 11,
+                      color: T.ink500,
+                      marginTop: 2,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {s.label}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontSize: 11,
-                    color: C.textLight,
-                    marginTop: 2,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {s.label}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div
             style={{
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 13,
-              color: C.textLight,
+              color: T.ink500,
               textAlign: "center",
               padding: 30,
             }}
@@ -1671,6 +1698,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
   );
 }
 
+// ─── Tab: Referrals ───────────────────────────────────────────────────────────
 function TabReferrals({ draft, setDraft, referralLeaderboard }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1708,7 +1736,7 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
           />
         </FieldRow>
       </SectionCard>
-      <SectionCard title="Top Referrers" accent={C.purple}>
+      <SectionCard title="Top Referrers" accent={T.info}>
         {referralLeaderboard && referralLeaderboard.length > 0 ? (
           referralLeaderboard.map((entry, i) => (
             <div
@@ -1718,10 +1746,10 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "10px 14px",
-                background: i === 0 ? C.purplePale : C.bg,
-                borderRadius: 8,
+                background: i === 0 ? T.infoBg : T.ink075,
+                borderRadius: 6,
                 marginBottom: 6,
-                border: `1px solid ${i === 0 ? C.purple + "30" : C.border}`,
+                border: `1px solid ${i === 0 ? T.infoBd : T.ink150}`,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1730,12 +1758,12 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
                     width: 28,
                     height: 28,
                     borderRadius: "50%",
-                    background: i === 0 ? C.purple : C.textLight,
-                    color: C.white,
+                    background: i === 0 ? T.info : T.ink300,
+                    color: "#fff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontFamily: FONT_BODY,
+                    fontFamily: T.fontUi,
                     fontSize: 12,
                     fontWeight: 700,
                   }}
@@ -1745,19 +1773,19 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
                 <div>
                   <div
                     style={{
-                      fontFamily: FONT_BODY,
+                      fontFamily: T.fontUi,
                       fontSize: 13,
                       fontWeight: 600,
-                      color: C.text,
+                      color: T.ink900,
                     }}
                   >
                     {entry.name || entry.code}
                   </div>
                   <div
                     style={{
-                      fontFamily: FONT_BODY,
+                      fontFamily: T.fontData,
                       fontSize: 11,
-                      color: C.textLight,
+                      color: T.ink500,
                     }}
                   >
                     Code: {entry.code}
@@ -1767,19 +1795,19 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
               <div style={{ textAlign: "right" }}>
                 <div
                   style={{
-                    fontFamily: FONT_DISPLAY,
+                    fontFamily: T.fontData,
                     fontSize: 18,
                     fontWeight: 700,
-                    color: C.purple,
+                    color: T.info,
                   }}
                 >
                   {entry.uses_count} referrals
                 </div>
                 <div
                   style={{
-                    fontFamily: FONT_BODY,
+                    fontFamily: T.fontUi,
                     fontSize: 11,
-                    color: C.textLight,
+                    color: T.ink500,
                   }}
                 >
                   +{entry.uses_count * cfg.pts_referral_referrer} pts earned
@@ -1790,9 +1818,9 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
         ) : (
           <div
             style={{
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 13,
-              color: C.textLight,
+              color: T.ink500,
               textAlign: "center",
               padding: "24px 0",
             }}
@@ -1805,6 +1833,7 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
   );
 }
 
+// ─── Tab: QR Security ─────────────────────────────────────────────────────────
 function TabQRSecurity({ draft, setDraft, qrStats }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
@@ -1832,74 +1861,83 @@ function TabQRSecurity({ draft, setDraft, qrStats }) {
         </FieldRow>
       </SectionCard>
       {qrStats && (
-        <SectionCard title="Live QR Stats" accent={C.blue}>
+        <SectionCard title="Live QR Stats" accent={T.info}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
               gap: 12,
             }}
           >
             {[
               {
-                label: "Total Active QR Codes",
+                label: "Active QR Codes",
                 value: qrStats.total?.toLocaleString() || "0",
-                colour: C.green,
+                semantic: "success",
               },
               {
-                label: "Claimed (Scanned Once)",
+                label: "Claimed",
                 value: qrStats.claimed?.toLocaleString() || "0",
-                colour: C.purple,
+                semantic: "info",
               },
               {
                 label: "Claim Rate",
                 value: `${qrStats.total > 0 ? ((qrStats.claimed / qrStats.total) * 100).toFixed(1) : 0}%`,
-                colour: C.amber,
+                semantic: "warning",
               },
               {
                 label: "Expired",
                 value: qrStats.expired?.toLocaleString() || "0",
-                colour: C.textLight,
+                semantic: null,
               },
               {
-                label: "Invalid Attempts Today",
+                label: "Invalid Attempts",
                 value: qrStats.invalidToday?.toLocaleString() || "0",
-                colour: C.red,
+                semantic: "danger",
               },
-            ].map((s, i) => (
-              <div
-                key={i}
-                style={{
-                  background: C.white,
-                  border: `1px solid ${s.colour}25`,
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  textAlign: "center",
-                }}
-              >
+            ].map((s, i) => {
+              const semColors = {
+                success: { c: T.success },
+                warning: { c: T.warning },
+                danger: { c: T.danger },
+                info: { c: T.info },
+              };
+              const c = s.semantic ? semColors[s.semantic].c : T.ink500;
+              return (
                 <div
+                  key={i}
                   style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: s.colour,
+                    background: "#fff",
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    textAlign: "center",
                   }}
                 >
-                  {s.value}
+                  <div
+                    style={{
+                      fontFamily: T.fontData,
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: c,
+                    }}
+                  >
+                    {s.value}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 11,
+                      color: T.ink500,
+                      marginTop: 2,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {s.label}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontSize: 11,
-                    color: C.textLight,
-                    marginTop: 2,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {s.label}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </SectionCard>
       )}
@@ -1907,6 +1945,7 @@ function TabQRSecurity({ draft, setDraft, qrStats }) {
   );
 }
 
+// ─── Tab: Simulator ───────────────────────────────────────────────────────────
 function TabSimulator({ draft }) {
   const cfg = draft;
   const [onlinePct, setOnlinePct] = useState(30);
@@ -1960,7 +1999,7 @@ function TabSimulator({ draft }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
             gap: 16,
             marginBottom: 24,
           }}
@@ -1988,62 +2027,53 @@ function TabSimulator({ draft }) {
             />
           </FieldRow>
         </div>
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 13,
-              color: C.textMid,
-              marginBottom: 6,
-            }}
-          >
-            <strong>Current:</strong> {onlinePct}% online
+        {[
+          {
+            label: `Current: ${onlinePct}% online`,
+            val: onlinePct,
+            set: setOnlinePct,
+            color: T.warning,
+          },
+          {
+            label: `Target: ${targetPct}% online`,
+            val: targetPct,
+            set: setTargetPct,
+            color: T.accentMid,
+          },
+        ].map((s, i) => (
+          <div key={i} style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                fontFamily: T.fontUi,
+                fontSize: 13,
+                color: T.ink700,
+                marginBottom: 6,
+              }}
+            >
+              <strong>{s.label}</strong>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={s.val}
+              onChange={(e) => s.set(parseInt(e.target.value))}
+              style={{ width: "100%", accentColor: s.color, cursor: "pointer" }}
+            />
           </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={onlinePct}
-            onChange={(e) => setOnlinePct(parseInt(e.target.value))}
-            style={{
-              width: "100%",
-              accentColor: C.greenMid,
-              cursor: "pointer",
-            }}
-          />
-        </div>
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontFamily: FONT_BODY,
-              fontSize: 13,
-              color: C.textMid,
-              marginBottom: 6,
-            }}
-          >
-            <strong>Target:</strong> {targetPct}% online
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={targetPct}
-            onChange={(e) => setTargetPct(parseInt(e.target.value))}
-            style={{ width: "100%", accentColor: C.purple, cursor: "pointer" }}
-          />
-        </div>
+        ))}
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           {[
             {
               title: `Current — ${onlinePct}% Online`,
               data: current,
-              colour: C.amber,
+              color: T.warning,
               showGain: false,
             },
             {
               title: `Target — ${targetPct}% Online`,
               data: target,
-              colour: C.greenMid,
+              color: T.accentMid,
               showGain: true,
             },
           ].map((s, idx) => (
@@ -2052,19 +2082,19 @@ function TabSimulator({ draft }) {
               style={{
                 flex: 1,
                 minWidth: 260,
-                background: C.white,
-                border: `2px solid ${s.colour}40`,
-                borderRadius: 12,
+                background: "#fff",
+                border: `1.5px solid ${s.color}40`,
+                borderRadius: 8,
                 overflow: "hidden",
               }}
             >
-              <div style={{ background: s.colour, padding: "10px 16px" }}>
+              <div style={{ background: s.color, padding: "10px 16px" }}>
                 <div
                   style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontSize: 16,
+                    fontFamily: T.fontUi,
+                    fontSize: 14,
                     fontWeight: 600,
-                    color: C.white,
+                    color: "#fff",
                   }}
                 >
                   {s.title}
@@ -2097,24 +2127,24 @@ function TabSimulator({ draft }) {
                       justifyContent: "space-between",
                       marginBottom: 6,
                       paddingBottom: 5,
-                      borderBottom: i < 3 ? `1px solid ${C.border}` : "none",
+                      borderBottom: i < 3 ? `1px solid ${T.ink150}` : "none",
                     }}
                   >
                     <span
                       style={{
-                        fontFamily: FONT_BODY,
+                        fontFamily: T.fontUi,
                         fontSize: 12,
-                        color: C.textMid,
+                        color: T.ink500,
                       }}
                     >
                       {row.label}
                     </span>
                     <span
                       style={{
-                        fontFamily: FONT_BODY,
+                        fontFamily: T.fontData,
                         fontSize: 13,
                         fontWeight: row.bold ? 700 : 500,
-                        color: C.text,
+                        color: T.ink900,
                       }}
                     >
                       {row.value}
@@ -2126,16 +2156,16 @@ function TabSimulator({ draft }) {
                     style={{
                       marginTop: 10,
                       padding: "10px 12px",
-                      borderRadius: 8,
-                      background: gain > 0 ? C.greenPale : C.redPale,
+                      borderRadius: 6,
+                      background: gain > 0 ? T.successBg : T.dangerBg,
                     }}
                   >
                     <div
                       style={{
-                        fontFamily: FONT_BODY,
+                        fontFamily: T.fontUi,
                         fontSize: 13,
                         fontWeight: 700,
-                        color: gain > 0 ? C.green : C.red,
+                        color: gain > 0 ? T.success : T.danger,
                       }}
                     >
                       {gain > 0 ? "▲" : "▼"} {gain > 0 ? "+" : ""}R
@@ -2155,6 +2185,7 @@ function TabSimulator({ draft }) {
   );
 }
 
+// ─── Tab: Campaigns ───────────────────────────────────────────────────────────
 function TabCampaigns({ showToast }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2170,6 +2201,7 @@ function TabCampaigns({ showToast }) {
   };
   const [form, setForm] = useState(EMPTY_FORM);
   const today = new Date().toISOString().split("T")[0];
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -2185,6 +2217,7 @@ function TabCampaigns({ showToast }) {
       setLoading(false);
     }
   }, [showToast]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -2207,6 +2240,7 @@ function TabCampaigns({ showToast }) {
     setEditId(c.id);
     setShowForm(true);
   }
+
   async function handleSave() {
     if (!form.name.trim() || !form.start_date || !form.end_date) {
       showToast("Name, start date and end date are required", "error");
@@ -2279,37 +2313,39 @@ function TabCampaigns({ showToast }) {
       showToast("Delete failed: " + err.message, "error");
     }
   }
+
   const inputStyle = {
     width: "100%",
     padding: "9px 12px",
-    border: `1.5px solid ${C.borderDark}`,
-    borderRadius: 7,
-    fontFamily: FONT_BODY,
+    border: `1.5px solid ${T.ink150}`,
+    borderRadius: 5,
+    fontFamily: T.fontUi,
     fontSize: 14,
-    color: C.text,
-    background: C.white,
+    color: T.ink900,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
   };
+
   return (
     <div>
       <SectionCard
         title="Double Points Campaigns"
         subtitle="Create time-limited multiplier events — active campaigns apply automatically at scan time"
-        accent={C.gold}
+        accent={T.warning}
       >
         <div style={{ marginBottom: 20 }}>
           <button
             onClick={openNew}
             style={{
-              padding: "10px 22px",
-              background: C.green,
+              padding: "9px 20px",
+              background: T.accent,
               border: "none",
-              borderRadius: 8,
-              fontFamily: FONT_BODY,
+              borderRadius: 6,
+              fontFamily: T.fontUi,
               fontSize: 13,
               fontWeight: 600,
-              color: C.white,
+              color: "#fff",
               cursor: "pointer",
             }}
           >
@@ -2319,19 +2355,19 @@ function TabCampaigns({ showToast }) {
         {showForm && (
           <div
             style={{
-              background: C.goldPale,
-              border: `2px solid ${C.gold}40`,
-              borderRadius: 12,
+              background: T.warningBg,
+              border: `1.5px solid ${T.warningBd}`,
+              borderRadius: 8,
               padding: "20px 24px",
               marginBottom: 24,
             }}
           >
             <div
               style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 18,
+                fontFamily: T.fontUi,
+                fontSize: 16,
                 fontWeight: 600,
-                color: C.green,
+                color: T.ink900,
                 marginBottom: 16,
               }}
             >
@@ -2340,7 +2376,7 @@ function TabCampaigns({ showToast }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
                 gap: 14,
                 marginBottom: 14,
               }}
@@ -2363,10 +2399,10 @@ function TabCampaigns({ showToast }) {
                 <div key={f.key}>
                   <label
                     style={{
-                      fontFamily: FONT_BODY,
+                      fontFamily: T.fontUi,
                       fontSize: 12,
                       fontWeight: 600,
-                      color: C.textMid,
+                      color: T.ink700,
                       display: "block",
                       marginBottom: 5,
                     }}
@@ -2388,10 +2424,10 @@ function TabCampaigns({ showToast }) {
               <div>
                 <label
                   style={{
-                    fontFamily: FONT_BODY,
+                    fontFamily: T.fontUi,
                     fontSize: 12,
                     fontWeight: 600,
-                    color: C.textMid,
+                    color: T.ink700,
                     display: "block",
                     marginBottom: 5,
                   }}
@@ -2431,9 +2467,9 @@ function TabCampaigns({ showToast }) {
               <label
                 htmlFor="camp-active"
                 style={{
-                  fontFamily: FONT_BODY,
+                  fontFamily: T.fontUi,
                   fontSize: 13,
-                  color: C.textMid,
+                  color: T.ink700,
                   cursor: "pointer",
                 }}
               >
@@ -2446,13 +2482,13 @@ function TabCampaigns({ showToast }) {
                 disabled={saving}
                 style={{
                   padding: "9px 22px",
-                  background: C.green,
+                  background: T.accent,
                   border: "none",
-                  borderRadius: 7,
-                  fontFamily: FONT_BODY,
+                  borderRadius: 5,
+                  fontFamily: T.fontUi,
                   fontSize: 13,
                   fontWeight: 600,
-                  color: C.white,
+                  color: "#fff",
                   cursor: saving ? "not-allowed" : "pointer",
                   opacity: saving ? 0.6 : 1,
                 }}
@@ -2468,11 +2504,11 @@ function TabCampaigns({ showToast }) {
                 style={{
                   padding: "9px 18px",
                   background: "none",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 7,
-                  fontFamily: FONT_BODY,
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 5,
+                  fontFamily: T.fontUi,
                   fontSize: 13,
-                  color: C.textMid,
+                  color: T.ink500,
                   cursor: "pointer",
                 }}
               >
@@ -2484,9 +2520,9 @@ function TabCampaigns({ showToast }) {
         {loading ? (
           <div
             style={{
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 13,
-              color: C.textLight,
+              color: T.ink500,
               textAlign: "center",
               padding: 30,
             }}
@@ -2496,14 +2532,14 @@ function TabCampaigns({ showToast }) {
         ) : campaigns.length === 0 ? (
           <div
             style={{
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 13,
-              color: C.textLight,
+              color: T.ink500,
               textAlign: "center",
               padding: "30px 0",
             }}
           >
-            <div style={{ fontSize: 32, marginBottom: 10 }}>📅</div>No campaigns
+            <div style={{ fontSize: 32, marginBottom: 10 }}>—</div>No campaigns
             yet. Create one to double your customers' points during a promotion.
           </div>
         ) : (
@@ -2512,16 +2548,16 @@ function TabCampaigns({ showToast }) {
               const active = isActive(c),
                 upcoming = c.is_active && c.start_date > today,
                 past = c.end_date < today;
-              let statusColour = C.textLight,
+              let statusColor = T.ink400,
                 statusLabel = "Inactive";
               if (active) {
-                statusColour = C.green;
-                statusLabel = "🟢 LIVE NOW";
+                statusColor = T.success;
+                statusLabel = "Live now";
               } else if (upcoming) {
-                statusColour = C.blue;
-                statusLabel = `🔵 Starts ${c.start_date}`;
+                statusColor = T.info;
+                statusLabel = `Starts ${c.start_date}`;
               } else if (past) {
-                statusLabel = `⚫ Ended ${c.end_date}`;
+                statusLabel = `Ended ${c.end_date}`;
               }
               return (
                 <div
@@ -2534,9 +2570,9 @@ function TabCampaigns({ showToast }) {
                     gap: 12,
                     padding: "14px 18px",
                     marginBottom: 10,
-                    borderRadius: 10,
-                    background: active ? C.greenPale : C.bg,
-                    border: `1.5px solid ${active ? C.greenLight + "60" : C.border}`,
+                    borderRadius: 8,
+                    background: active ? T.successBg : T.ink075,
+                    border: `1.5px solid ${active ? T.successBd : T.ink150}`,
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 200 }}>
@@ -2550,20 +2586,20 @@ function TabCampaigns({ showToast }) {
                     >
                       <span
                         style={{
-                          fontFamily: FONT_DISPLAY,
-                          fontSize: 16,
+                          fontFamily: T.fontUi,
+                          fontSize: 14,
                           fontWeight: 600,
-                          color: C.green,
+                          color: T.ink900,
                         }}
                       >
                         {c.name}
                       </span>
                       <span
                         style={{
-                          fontFamily: FONT_BODY,
+                          fontFamily: T.fontUi,
                           fontSize: 11,
                           fontWeight: 700,
-                          color: statusColour,
+                          color: statusColor,
                         }}
                       >
                         {statusLabel}
@@ -2571,13 +2607,13 @@ function TabCampaigns({ showToast }) {
                     </div>
                     <div
                       style={{
-                        fontFamily: FONT_BODY,
+                        fontFamily: T.fontUi,
                         fontSize: 12,
-                        color: C.textLight,
+                        color: T.ink500,
                       }}
                     >
-                      {c.start_date} → {c.end_date} &nbsp;·&nbsp;{" "}
-                      <span style={{ fontWeight: 700, color: C.gold }}>
+                      {c.start_date} → {c.end_date} ·{" "}
+                      <span style={{ fontWeight: 700, color: T.warning }}>
                         {c.multiplier}× points
                       </span>
                     </div>
@@ -2586,14 +2622,14 @@ function TabCampaigns({ showToast }) {
                     <button
                       onClick={() => toggleActive(c)}
                       style={{
-                        padding: "6px 14px",
-                        background: c.is_active ? C.amberPale : C.greenPale,
-                        border: `1px solid ${c.is_active ? C.amber + "50" : C.greenLight + "50"}`,
-                        borderRadius: 6,
-                        fontFamily: FONT_BODY,
+                        padding: "6px 12px",
+                        background: c.is_active ? T.warningBg : T.successBg,
+                        border: `1px solid ${c.is_active ? T.warningBd : T.successBd}`,
+                        borderRadius: 4,
+                        fontFamily: T.fontUi,
                         fontSize: 11,
                         fontWeight: 600,
-                        color: c.is_active ? C.amber : C.green,
+                        color: c.is_active ? T.warning : T.success,
                         cursor: "pointer",
                       }}
                     >
@@ -2602,14 +2638,14 @@ function TabCampaigns({ showToast }) {
                     <button
                       onClick={() => openEdit(c)}
                       style={{
-                        padding: "6px 14px",
-                        background: C.bluePale,
-                        border: `1px solid ${C.blue}30`,
-                        borderRadius: 6,
-                        fontFamily: FONT_BODY,
+                        padding: "6px 12px",
+                        background: T.infoBg,
+                        border: `1px solid ${T.infoBd}`,
+                        borderRadius: 4,
+                        fontFamily: T.fontUi,
                         fontSize: 11,
                         fontWeight: 600,
-                        color: C.blue,
+                        color: T.info,
                         cursor: "pointer",
                       }}
                     >
@@ -2618,14 +2654,14 @@ function TabCampaigns({ showToast }) {
                     <button
                       onClick={() => handleDelete(c.id)}
                       style={{
-                        padding: "6px 14px",
-                        background: C.redPale,
-                        border: `1px solid ${C.red}30`,
-                        borderRadius: 6,
-                        fontFamily: FONT_BODY,
+                        padding: "6px 12px",
+                        background: T.dangerBg,
+                        border: `1px solid ${T.dangerBd}`,
+                        borderRadius: 4,
+                        fontFamily: T.fontUi,
                         fontSize: 11,
                         fontWeight: 600,
-                        color: C.red,
+                        color: T.danger,
                         cursor: "pointer",
                       }}
                     >
@@ -2637,7 +2673,7 @@ function TabCampaigns({ showToast }) {
             })}
           </div>
         )}
-        <InfoBox colour={C.gold} bgColour={C.goldPale}>
+        <InfoBox colour={T.warning} bgColour={T.warningBg}>
           <strong>How campaigns work:</strong> When a customer scans a QR code
           and a campaign is active today, the campaign multiplier is applied{" "}
           <em>on top of</em> their tier multiplier. A Gold tier customer (2×)
@@ -2649,8 +2685,7 @@ function TabCampaigns({ showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT v2.4 — WP-GUIDE-C: loyalty-threshold, loyalty-multiplier,
-//                        loyalty-redemption-value tooltips injected
+// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 export default function HQLoyalty() {
   const ctx = usePageContext("loyalty", null);
@@ -2665,21 +2700,21 @@ export default function HQLoyalty() {
   const [qrStats, setQrStats] = useState(null);
   const [referralLB, setReferralLB] = useState([]);
 
+  // ★ WP-THEME: emoji removed from tab labels
   const SUB_TABS = [
-    { label: "🎛️ Schema", key: "schema" },
-    { label: "📊 Earning Rules", key: "earning" },
-    { label: "🏆 Tiers", key: "tiers" },
-    { label: "💰 Economics", key: "economics" },
-    { label: "🎁 Referrals", key: "referrals" },
-    { label: "⚠ QR Security", key: "qrsecurity" },
-    { label: "📈 Simulator", key: "simulator" },
-    { label: "📅 Campaigns", key: "campaigns" },
+    { label: "Schema", key: "schema" },
+    { label: "Earning Rules", key: "earning" },
+    { label: "Tiers", key: "tiers" },
+    { label: "Economics", key: "economics" },
+    { label: "Referrals", key: "referrals" },
+    { label: "QR Security", key: "qrsecurity" },
+    { label: "Simulator", key: "simulator" },
+    { label: "Campaigns", key: "campaigns" },
   ];
 
   const isConfigTab = activeTab < 7;
   const isDirty =
     draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false;
-
   function showToast(msg, type = "success") {
     setToast({ msg, type });
   }
@@ -2699,10 +2734,9 @@ export default function HQLoyalty() {
       const cfg = { ...DEFAULT_CONFIG, ...(cfgData || {}) };
       setConfig(cfg);
       setDraft({ ...cfg });
-
       const { data: txData } = await supabase
         .from("loyalty_transactions")
-        .select("points, transaction_type, created_at");
+        .select("points,transaction_type,created_at");
       if (txData) {
         const now = new Date(),
           cutoff30 = new Date(now - 30 * 24 * 3600 * 1000);
@@ -2729,10 +2763,9 @@ export default function HQLoyalty() {
           totalRevenue: 0,
         });
       }
-
       const { data: qrData } = await supabase
         .from("qr_codes")
-        .select("is_active, claimed, expires_at");
+        .select("is_active,claimed,expires_at");
       if (qrData) {
         const now = new Date();
         setQrStats({
@@ -2744,10 +2777,9 @@ export default function HQLoyalty() {
           invalidToday: 0,
         });
       }
-
       const { data: refData } = await supabase
         .from("referral_codes")
-        .select("code, uses_count, owner_id")
+        .select("code,uses_count,owner_id")
         .eq("is_active", true)
         .order("uses_count", { ascending: false })
         .limit(10);
@@ -2755,7 +2787,7 @@ export default function HQLoyalty() {
         const ownerIds = refData.map((r) => r.owner_id).filter(Boolean);
         const { data: profiles } = await supabase
           .from("user_profiles")
-          .select("id, full_name")
+          .select("id,full_name")
           .in("id", ownerIds);
         const profileMap = {};
         (profiles || []).forEach((p) => {
@@ -2798,7 +2830,7 @@ export default function HQLoyalty() {
       setDraft({ ...newConfig });
       if (ctx?.refresh) ctx.refresh();
       showToast(
-        `✓ ${schema.label} schema applied — all customer tiers updated live`,
+        `${schema.label} schema applied — all customer tiers updated live`,
       );
     } catch (err) {
       console.error("HQLoyalty applySchema error:", err);
@@ -2848,29 +2880,40 @@ export default function HQLoyalty() {
           height: 300,
         }}
       >
-        <div
-          style={{ fontFamily: FONT_BODY, fontSize: 14, color: C.textLight }}
-        >
+        <div style={{ fontFamily: T.fontUi, fontSize: 14, color: T.ink500 }}>
           Loading loyalty configuration...
         </div>
       </div>
     );
   }
 
+  // Schema badge colour (no purple)
+  const schemaBadge = {
+    conservative: { bg: T.infoBg, color: T.info, label: "Conservative" },
+    standard: { bg: T.accentLit, color: T.accent, label: "Standard" },
+    aggressive: { bg: T.ink075, color: T.ink700, label: "Aggressive" },
+    custom: { bg: T.warningBg, color: T.warning, label: "Custom" },
+  };
+  const activeBadge =
+    schemaBadge[config?.active_schema] || schemaBadge.standard;
+
   return (
-    <div style={{ fontFamily: FONT_BODY, background: C.bg, minHeight: "100%" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@400;500;600;700&display=swap');`}</style>
+    <div
+      style={{ fontFamily: T.fontUi, background: T.ink050, minHeight: "100%" }}
+    >
       <WorkflowGuide
         context={ctx}
         tabId="loyalty"
         onAction={(action) => action.tab && setActiveTab(action.tab)}
         defaultOpen={true}
       />
+
+      {/* ── Page header ── */}
       <div
         style={{
           padding: "24px 28px 0",
-          borderBottom: `1px solid ${C.border}`,
-          background: C.white,
+          borderBottom: `1px solid ${T.ink150}`,
+          background: "#fff",
         }}
       >
         <div
@@ -2892,78 +2935,58 @@ export default function HQLoyalty() {
                 flexWrap: "wrap",
               }}
             >
+              {/* ★ WP-THEME: emoji removed from h1 */}
               <h1
                 style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontSize: 28,
-                  fontWeight: 700,
-                  color: C.green,
+                  fontFamily: T.fontUi,
+                  fontSize: 24,
+                  fontWeight: 600,
+                  color: T.ink900,
                   margin: 0,
-                  letterSpacing: "0.01em",
                 }}
               >
-                💎 Loyalty Economics Engine
+                Loyalty Economics Engine
               </h1>
               {config?.active_schema && (
                 <span
                   style={{
-                    background:
-                      config.active_schema === "conservative"
-                        ? C.bluePale
-                        : config.active_schema === "aggressive"
-                          ? C.purplePale
-                          : config.active_schema === "custom"
-                            ? C.amberPale
-                            : C.greenPale,
-                    color:
-                      config.active_schema === "conservative"
-                        ? C.blue
-                        : config.active_schema === "aggressive"
-                          ? C.purple
-                          : config.active_schema === "custom"
-                            ? C.amber
-                            : C.green,
-                    border: `1px solid ${config.active_schema === "conservative" ? C.blue : config.active_schema === "aggressive" ? C.purple : config.active_schema === "custom" ? C.amber : C.green}40`,
-                    borderRadius: 20,
-                    padding: "2px 12px",
-                    fontFamily: FONT_BODY,
+                    background: activeBadge.bg,
+                    color: activeBadge.color,
+                    border: `1px solid ${activeBadge.color}40`,
+                    borderRadius: 3,
+                    padding: "2px 10px",
+                    fontFamily: T.fontUi,
                     fontSize: 11,
                     fontWeight: 700,
                     textTransform: "uppercase",
+                    letterSpacing: "0.06em",
                   }}
                 >
-                  {config.active_schema === "conservative"
-                    ? "🛡️"
-                    : config.active_schema === "aggressive"
-                      ? "🚀"
-                      : config.active_schema === "custom"
-                        ? "✏️"
-                        : "⚖️"}{" "}
-                  {config.active_schema}
+                  {activeBadge.label}
                 </span>
               )}
               {isDirty && (
                 <span
                   style={{
-                    background: C.amberPale,
-                    color: C.amber,
-                    border: `1px solid ${C.amber}40`,
-                    borderRadius: 20,
-                    padding: "2px 12px",
-                    fontFamily: FONT_BODY,
+                    background: T.warningBg,
+                    color: T.warning,
+                    border: `1px solid ${T.warningBd}`,
+                    borderRadius: 3,
+                    padding: "2px 10px",
+                    fontFamily: T.fontUi,
                     fontSize: 11,
                     fontWeight: 700,
                   }}
                 >
-                  UNSAVED CHANGES
+                  Unsaved changes
                 </span>
               )}
             </div>
             <p
               style={{
-                fontFamily: FONT_BODY,
+                fontFamily: T.fontUi,
                 fontSize: 13,
-                color: C.textLight,
+                color: T.ink500,
                 margin: "4px 0 0",
               }}
             >
@@ -2976,50 +2999,46 @@ export default function HQLoyalty() {
               onClick={handleSave}
               disabled={!isDirty || saving}
               style={{
-                padding: "10px 24px",
-                background: isDirty ? C.green : C.border,
-                color: isDirty ? C.white : C.textLight,
+                padding: "9px 22px",
+                background: isDirty ? T.accent : T.ink150,
+                color: isDirty ? "#fff" : T.ink500,
                 border: "none",
-                borderRadius: 8,
-                fontFamily: FONT_BODY,
+                borderRadius: 6,
+                fontFamily: T.fontUi,
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: isDirty ? "pointer" : "not-allowed",
-                transition: "all 0.2s",
                 whiteSpace: "nowrap",
               }}
             >
-              {saving ? "Saving..." : "💾 Save All Changes"}
+              {saving ? "Saving..." : "Save All Changes"}
             </button>
           )}
         </div>
+
+        {/* Sub-tabs — standard underline style */}
         <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
           {SUB_TABS.map((tab, i) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(i)}
               style={{
-                padding: "10px 18px",
+                padding: "10px 16px",
                 background: "none",
                 border: "none",
                 borderBottom:
                   activeTab === i
-                    ? `3px solid ${i === 0 ? C.greenMid : i === 7 ? C.gold : C.green}`
-                    : "3px solid transparent",
-                fontFamily: FONT_BODY,
-                fontSize: 13,
-                fontWeight: activeTab === i ? 600 : 400,
-                color:
-                  activeTab === i
-                    ? i === 0
-                      ? C.greenMid
-                      : i === 7
-                        ? C.gold
-                        : C.green
-                    : C.textMid,
+                    ? `2px solid ${T.accent}`
+                    : "2px solid transparent",
+                fontFamily: T.fontUi,
+                fontSize: 11,
+                fontWeight: activeTab === i ? 700 : 400,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: activeTab === i ? T.accent : T.ink500,
                 cursor: "pointer",
                 whiteSpace: "nowrap",
-                transition: "all 0.15s",
+                marginBottom: -1,
               }}
             >
               {tab.label}
@@ -3027,6 +3046,8 @@ export default function HQLoyalty() {
           ))}
         </div>
       </div>
+
+      {/* Tab content */}
       <div style={{ padding: "24px 28px", maxWidth: 960 }}>
         {activeTab === 0 && (
           <TabSchema
@@ -3057,6 +3078,8 @@ export default function HQLoyalty() {
         {activeTab === 6 && <TabSimulator draft={draft} />}
         {activeTab === 7 && <TabCampaigns showToast={showToast} />}
       </div>
+
+      {/* Sticky save bar */}
       {isDirty && activeTab > 0 && activeTab < 7 && (
         <div
           style={{
@@ -3064,37 +3087,37 @@ export default function HQLoyalty() {
             bottom: 0,
             left: 0,
             right: 0,
-            background: C.white,
-            borderTop: `1px solid ${C.border}`,
+            background: "#fff",
+            borderTop: `1px solid ${T.ink150}`,
             padding: "14px 28px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
+            boxShadow: "0 -4px 16px rgba(0,0,0,0.07)",
             zIndex: 100,
           }}
         >
           <span
             style={{
-              fontFamily: FONT_BODY,
+              fontFamily: T.fontUi,
               fontSize: 13,
-              color: C.amber,
+              color: T.warning,
               fontWeight: 600,
             }}
           >
-            ⚠ Unsaved changes — not yet live on the platform
+            Unsaved changes — not yet live on the platform
           </span>
           <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={() => setDraft({ ...config })}
               style={{
-                padding: "8px 18px",
+                padding: "8px 16px",
                 background: "none",
-                border: `1px solid ${C.border}`,
-                borderRadius: 7,
-                fontFamily: FONT_BODY,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 5,
+                fontFamily: T.fontUi,
                 fontSize: 13,
-                color: C.textMid,
+                color: T.ink500,
                 cursor: "pointer",
               }}
             >
@@ -3104,22 +3127,23 @@ export default function HQLoyalty() {
               onClick={handleSave}
               disabled={saving}
               style={{
-                padding: "8px 22px",
-                background: C.green,
+                padding: "8px 20px",
+                background: T.accent,
                 border: "none",
-                borderRadius: 7,
-                fontFamily: FONT_BODY,
+                borderRadius: 5,
+                fontFamily: T.fontUi,
                 fontSize: 13,
                 fontWeight: 600,
-                color: C.white,
+                color: "#fff",
                 cursor: "pointer",
               }}
             >
-              {saving ? "Saving..." : "💾 Save All Changes"}
+              {saving ? "Saving..." : "Save All Changes"}
             </button>
           </div>
         </div>
       )}
+
       {toast && (
         <Toast
           msg={toast.msg}
