@@ -9,9 +9,24 @@
 // v2.1 — WP-GUIDE-C: wire overview context to WorkflowGuide
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -42,10 +57,70 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
+  ink400: "#888888",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
   shadowCard: "0 1px 3px rgba(0,0,0,0.07)",
+  display: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 36,
+    fontWeight: 300,
+    letterSpacing: "-0.03em",
+    fontVariantNumeric: "tabular-nums",
+  },
+  title: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 22,
+    fontWeight: 400,
+    letterSpacing: "-0.01em",
+  },
+  heading: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 16,
+    fontWeight: 600,
+  },
+  kpi: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 24,
+    fontWeight: 400,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
+  },
+  kpiSm: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 18,
+    fontWeight: 400,
+    fontVariantNumeric: "tabular-nums",
+  },
+  body: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 13,
+    fontWeight: 400,
+  },
+  label: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+  },
+  caption: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 11,
+    fontWeight: 400,
+  },
+  data: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 12,
+    fontWeight: 400,
+    fontVariantNumeric: "tabular-nums",
+  },
 };
+
+const DONUT_COLOURS = [T.accent, T.accentMid, "#52B788", T.accentBd, T.ink300];
 
 // ─── WorkflowGuide content (unchanged) ──────────────────────────────────────
 const GUIDE_STEPS = [
@@ -139,6 +214,9 @@ const GUIDE_TIPS = [
 export default function HQOverview({ onNavigate }) {
   const ctx = usePageContext("overview", null);
 
+  const [scanTrend, setScanTrend] = useState([]);
+  const [qrTypeDist, setQrTypeDist] = useState([]);
+  const [weeklySpark, setWeeklySpark] = useState([]);
   const [stats, setStats] = useState(null);
   const [recentScans, setRecentScans] = useState([]);
   const [lowStock, setLowStock] = useState([]);
@@ -494,6 +572,61 @@ export default function HQOverview({ onNavigate }) {
         fxRate: currentFx,
       });
 
+      // ── Scan trend (Area hero + sparkline) ──────────────────────────
+      try {
+        const d30 = new Date();
+        d30.setDate(d30.getDate() - 30);
+        const { data: trendRaw } = await supabase
+          .from("scan_logs")
+          .select("scanned_at")
+          .gte("scanned_at", d30.toISOString())
+          .order("scanned_at", { ascending: true })
+          .limit(500);
+        const dayMap = {};
+        (trendRaw || []).forEach((s) => {
+          const day = new Date(s.scanned_at).toLocaleDateString("en-ZA", {
+            month: "short",
+            day: "numeric",
+          });
+          dayMap[day] = (dayMap[day] || 0) + 1;
+        });
+        setScanTrend(
+          Object.entries(dayMap).map(([date, count]) => ({ date, count })),
+        );
+        const wkMap = {};
+        (trendRaw || []).forEach((s) => {
+          const wk = Math.floor(
+            (Date.now() - new Date(s.scanned_at).getTime()) / (7 * 86400000),
+          );
+          wkMap[wk] = (wkMap[wk] || 0) + 1;
+        });
+        setWeeklySpark(
+          Object.entries(wkMap)
+            .sort((a, b) => b[0] - a[0])
+            .slice(0, 6)
+            .reverse()
+            .map(([, v]) => ({ v })),
+        );
+      } catch (_) {}
+      // ── QR type distribution (Donut + HBar) ─────────────────────────
+      try {
+        const { data: typeRaw } = await supabase
+          .from("scan_logs")
+          .select("qr_type")
+          .not("qr_type", "is", null)
+          .limit(500);
+        const typeMap = {};
+        (typeRaw || []).forEach((s) => {
+          typeMap[s.qr_type] = (typeMap[s.qr_type] || 0) + 1;
+        });
+        setQrTypeDist(
+          Object.entries(typeMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([name, value]) => ({ name: name.replace(/_/g, " "), value })),
+        );
+      } catch (_) {}
+
       await fetchBirthdayStats();
     } catch (err) {
       console.error("[HQOverview] Fatal:", err);
@@ -658,6 +791,70 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
+      {/* ── CHART: Scan Activity — Area Hero ── */}
+      {scanTrend.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <ChartCard title="Scan Activity — Last 30 Days" height={320}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={scanTrend}
+                margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+              >
+                <defs>
+                  <linearGradient id="ov-scan-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor={T.accentMid}
+                      stopOpacity={0.18}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={T.accentMid}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  horizontal={true}
+                  vertical={false}
+                  stroke={T.ink150}
+                  strokeWidth={0.5}
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  dy={6}
+                  interval="preserveStartEnd"
+                  maxRotation={0}
+                />
+                <YAxis
+                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={28}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  content={<ChartTooltip formatter={(v) => `${v} scans`} />}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  name="Scans"
+                  stroke={T.accentMid}
+                  strokeWidth={2}
+                  fill="url(#ov-scan-grad)"
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+      )}
+
       {/* ── ROW 2: CUSTOMER INTELLIGENCE ── */}
       <SectionLabel label="Customer Intelligence" />
       <div style={tileGrid}>
@@ -669,6 +866,7 @@ export default function HQOverview({ onNavigate }) {
           semantic="success"
           onClick={() => nav("analytics")}
           hint="Analytics"
+          sparkData={weeklySpark}
         />
         <MetricTile
           label="Loyalty Points"
@@ -721,6 +919,86 @@ export default function HQOverview({ onNavigate }) {
           hint="Fraud & Security"
         />
       </div>
+
+      {/* ── CHARTS: QR Type Distribution ── */}
+      {qrTypeDist.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 20,
+            marginBottom: 28,
+          }}
+        >
+          <ChartCard title="Scan Distribution by Type" height={240}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={qrTypeDist}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={58}
+                  outerRadius={88}
+                  dataKey="value"
+                  nameKey="name"
+                  paddingAngle={3}
+                  isAnimationActive={false}
+                >
+                  {qrTypeDist.map((_, i) => (
+                    <Cell
+                      key={i}
+                      fill={DONUT_COLOURS[i % DONUT_COLOURS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<ChartTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+          <ChartCard title="Scans by QR Type" height={240}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={qrTypeDist}
+                layout="vertical"
+                margin={{ top: 4, right: 16, bottom: 4, left: 80 }}
+              >
+                <CartesianGrid
+                  horizontal={false}
+                  vertical={true}
+                  stroke={T.ink150}
+                  strokeWidth={0.5}
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fill: T.ink500, fontSize: 11, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={76}
+                />
+                <Tooltip
+                  content={<ChartTooltip formatter={(v) => `${v} scans`} />}
+                />
+                <Bar
+                  dataKey="value"
+                  name="Scans"
+                  fill={T.accent}
+                  radius={[0, 3, 3, 0]}
+                  isAnimationActive={false}
+                  maxBarSize={18}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+      )}
 
       {/* ── ROW 3: BIRTHDAYS ── */}
       <SectionLabel label="Birthdays" />
@@ -866,6 +1144,18 @@ export default function HQOverview({ onNavigate }) {
               </div>
             </div>
           </div>
+          {/* Gross margin radial gauge */}
+          {erpStats.avgMarginPct !== null &&
+            erpStats.avgMarginPct !== undefined && (
+              <div style={{ marginTop: 20 }}>
+                <ChartCard title="Gross Margin — Retail Channel" height={220}>
+                  <MarginGauge
+                    value={erpStats.avgMarginPct}
+                    color={marginColour}
+                  />
+                </ChartCard>
+              </div>
+            )}
         </>
       )}
 
@@ -1339,19 +1629,7 @@ export default function HQOverview({ onNavigate }) {
 
 function SectionLabel({ label }) {
   return (
-    <div
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.12em",
-        textTransform: "uppercase",
-        color: "#B0B0B0",
-        marginBottom: 12,
-        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-      }}
-    >
-      {label}
-    </div>
+    <div style={{ ...T.label, color: T.ink300, marginBottom: 12 }}>{label}</div>
   );
 }
 
@@ -1362,7 +1640,144 @@ const SEMANTIC = {
   info: { text: "#1E3A5F", bg: "#EFF6FF", bd: "#BFDBFE" },
 };
 
-function MetricTile({ label, value, subLabel, sub, semantic, onClick, hint }) {
+function EmptyChart({ label = "No data yet" }) {
+  return (
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "50%",
+          background: T.ink075,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M2 12L6 8L9 11L13 6"
+            stroke={T.ink300}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+      <span style={{ ...T.caption, color: T.ink400 }}>{label}</span>
+    </div>
+  );
+}
+
+function MarginGauge({ value, color }) {
+  const pct = Math.min(Math.max((value || 0) / 100, 0), 1);
+  const r = 68,
+    cx = 100,
+    cy = 108,
+    startAngle = -210,
+    totalDeg = 240;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const arcPath = (start, end) => {
+    const x1 = cx + r * Math.cos(toRad(start));
+    const y1 = cy + r * Math.sin(toRad(start));
+    const x2 = cx + r * Math.cos(toRad(end));
+    const y2 = cy + r * Math.sin(toRad(end));
+    const large = end - start > 180 ? 1 : 0;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  };
+  const endAngle = startAngle + totalDeg * pct;
+  return (
+    <svg
+      viewBox="0 0 200 200"
+      width="100%"
+      height="100%"
+      style={{ display: "block" }}
+    >
+      <path
+        d={arcPath(startAngle, startAngle + totalDeg)}
+        fill="none"
+        stroke={T.ink150}
+        strokeWidth={16}
+        strokeLinecap="round"
+      />
+      {pct > 0.01 && (
+        <path
+          d={arcPath(startAngle, endAngle)}
+          fill="none"
+          stroke={color}
+          strokeWidth={16}
+          strokeLinecap="round"
+        />
+      )}
+      <text
+        x={cx}
+        y={cy - 8}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fill={color}
+        fontSize="28"
+        fontWeight="400"
+        fontFamily={T.fontUi}
+        style={{ fontVariantNumeric: "tabular-nums" }}
+      >
+        {value !== null && value !== undefined ? `${value.toFixed(1)}%` : "—"}
+      </text>
+      <text
+        x={cx}
+        y={cy + 20}
+        textAnchor="middle"
+        fill={T.ink400}
+        fontSize="10"
+        fontWeight="600"
+        fontFamily={T.fontUi}
+        letterSpacing="0.08em"
+      >
+        GROSS MARGIN
+      </text>
+      <text
+        x={cx - r - 4}
+        y={cy + 44}
+        textAnchor="middle"
+        fill={T.ink300}
+        fontSize="9"
+        fontFamily={T.fontUi}
+      >
+        0%
+      </text>
+      <text
+        x={cx + r + 4}
+        y={cy + 44}
+        textAnchor="middle"
+        fill={T.ink300}
+        fontSize="9"
+        fontFamily={T.fontUi}
+      >
+        100%
+      </text>
+    </svg>
+  );
+}
+
+function MetricTile({
+  label,
+  value,
+  subLabel,
+  sub,
+  semantic,
+  onClick,
+  hint,
+  sparkData,
+  delta,
+}) {
   const s = semantic ? SEMANTIC[semantic] : null;
   const clickable = !!onClick;
   return (
@@ -1415,16 +1830,29 @@ function MetricTile({ label, value, subLabel, sub, semantic, onClick, hint }) {
       </div>
       <div
         style={{
-          fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-          fontSize: 28,
-          fontWeight: 400,
-          color: s ? s.text : "#0D0D0D",
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 8,
         }}
       >
-        {value}
+        <div style={{ ...T.kpi, fontSize: 28, color: s ? s.text : T.ink900 }}>
+          {value}
+        </div>
+        {sparkData && sparkData.length > 1 && (
+          <SparkLine
+            data={sparkData}
+            positive={delta === null || delta === undefined || delta >= 0}
+            width={60}
+            height={28}
+          />
+        )}
       </div>
+      {delta !== null && delta !== undefined && (
+        <div style={{ marginTop: 4 }}>
+          <DeltaBadge value={delta} />
+        </div>
+      )}
       {subLabel && (
         <div
           style={{
