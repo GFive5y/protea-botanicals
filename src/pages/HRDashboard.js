@@ -24,21 +24,44 @@ import HRLoans from "../components/hq/HRLoans";
 import HRPerformance from "../components/hq/HRPerformance";
 import HRPayroll from "../components/hq/HRPayroll";
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
-  gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink500,
   white: "#fff",
-  red: "#c0392b",
+  red: T.danger,
 };
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -60,21 +83,22 @@ function TabBtn({ active, label, badge, onClick }) {
     <button
       onClick={onClick}
       style={{
-        background: active ? C.green : "transparent",
-        color: active ? C.white : C.green,
+        background: "transparent",
+        color: active ? T.accent : T.ink400,
         border: "none",
         borderBottom: active
-          ? `3px solid ${C.accent}`
-          : "3px solid transparent",
+          ? `2px solid ${T.accent}`
+          : "2px solid transparent",
         borderRadius: 0,
-        padding: "12px 20px",
+        padding: "10px 16px",
         fontSize: "11px",
-        fontWeight: 600,
-        letterSpacing: "0.2em",
+        fontWeight: active ? 700 : 400,
+        letterSpacing: "0.06em",
         textTransform: "uppercase",
-        fontFamily: FONTS.body,
+        fontFamily: T.font,
         cursor: "pointer",
         position: "relative",
+        marginBottom: "-1px",
       }}
     >
       {label}
@@ -237,9 +261,10 @@ function HROverview({ tenantId, onNavigate }) {
     <div>
       <h2
         style={{
-          fontFamily: FONTS.heading,
-          fontSize: 22,
-          color: C.green,
+          fontFamily: T.font,
+          fontSize: 18,
+          fontWeight: 600,
+          color: T.ink900,
           marginBottom: 20,
         }}
       >
@@ -259,12 +284,12 @@ function HROverview({ tenantId, onNavigate }) {
             onClick={() => onNavigate(tile.tab)}
             style={{
               background: C.white,
-              border: `1px solid ${C.border}`,
-              borderTop: `3px solid ${tile.color}`,
-              borderRadius: 2,
-              padding: "18px 20px",
+              border: `1px solid ${T.ink150}`,
+              borderRadius: 6,
+              padding: "16px 18px",
               cursor: "pointer",
-              transition: "box-shadow 0.15s, transform 0.1s",
+              boxShadow: T.shadow,
+              transition: "box-shadow 0.15s",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)";
@@ -298,11 +323,12 @@ function HROverview({ tenantId, onNavigate }) {
             </div>
             <div
               style={{
-                fontFamily: FONTS.heading,
-                fontSize: 32,
-                fontWeight: 300,
+                fontFamily: T.font,
+                fontSize: 28,
+                fontWeight: 400,
                 color: tile.color,
                 lineHeight: 1,
+                letterSpacing: "-0.02em",
               }}
             >
               {tile.value}
@@ -350,17 +376,17 @@ function HROverview({ tenantId, onNavigate }) {
             key={tab}
             onClick={() => onNavigate(tab)}
             style={{
-              padding: "10px 20px",
+              padding: "8px 16px",
               fontSize: "11px",
               fontWeight: 600,
-              letterSpacing: "0.2em",
+              letterSpacing: "0.06em",
               textTransform: "uppercase",
-              fontFamily: FONTS.body,
+              fontFamily: T.font,
               cursor: "pointer",
-              background: highlight ? C.red : C.mid,
-              color: C.white,
+              background: highlight ? T.danger : T.accent,
+              color: "#fff",
               border: "none",
-              borderRadius: "2px",
+              borderRadius: "4px",
             }}
           >
             {label}
@@ -423,34 +449,28 @@ export default function HRDashboard() {
   return (
     <div style={{ fontFamily: FONTS.body }}>
       {/* Header */}
-      <div
-        style={{
-          background: C.green,
-          padding: "20px 32px",
-          borderRadius: "2px",
-          marginBottom: 0,
-        }}
-      >
-        <span
-          style={{
-            color: C.accent,
-            fontSize: "11px",
-            letterSpacing: "0.3em",
-            textTransform: "uppercase",
-          }}
-        >
-          Protea Botanicals
-        </span>
+      <div style={{ marginBottom: 0 }}>
         <h1
           style={{
-            color: C.white,
-            fontFamily: FONTS.heading,
-            fontSize: "24px",
-            margin: "4px 0 0",
+            color: T.ink900,
+            fontFamily: T.font,
+            fontSize: "22px",
+            fontWeight: 600,
+            margin: "0 0 4px",
           }}
         >
           HR Dashboard
         </h1>
+        <p
+          style={{
+            fontFamily: T.font,
+            fontSize: 13,
+            color: T.ink500,
+            margin: 0,
+          }}
+        >
+          Staff · Leave · Timesheets · Contracts · Payroll
+        </p>
       </div>
 
       <SystemStatusBar />
