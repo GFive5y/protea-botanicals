@@ -1307,11 +1307,11 @@ export default function HQSuppliers() {
     return acc;
   }, {});
   const categoryColor = {
-    hardware: C.info,
-    terpene: C.accent,
-    packaging: C.warn,
-    distillate: "#7c3aed",
-    other: C.muted,
+    hardware: T.info,
+    terpene: T.accentMid,
+    packaging: "#b5935a",
+    distillate: T.info,
+    other: T.ink400,
   };
 
   const saveLocalInput = async (input) => {
