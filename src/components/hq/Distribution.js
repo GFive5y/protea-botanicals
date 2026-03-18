@@ -284,9 +284,7 @@ export default function Distribution() {
 
   if (error) {
     return (
-      <div
-        style={{ ...sCard, borderLeft: `3px solid ${C.red}`, margin: "20px 0" }}
-      >
+      <div style={{ ...sCard, margin: "20px 0" }}>
         <div style={sLabel}>Error Loading Distribution Data</div>
         <p style={{ fontSize: "13px", color: C.red, margin: "8px 0 0" }}>
           {error}
@@ -2081,7 +2079,19 @@ function FlowStep({ label, done, active }) {
 
 function MiniStat({ label, value, color }) {
   return (
-    <div style={{ background: "#fff", padding: "16px 18px" }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "1px",
+        background: T.ink150,
+        borderRadius: "6px",
+        overflow: "hidden",
+        border: `1px solid ${T.ink150}`,
+        boxShadow: T.shadow,
+        marginBottom: "24px",
+      }}
+    >
       <div
         style={{
           fontSize: "10px",

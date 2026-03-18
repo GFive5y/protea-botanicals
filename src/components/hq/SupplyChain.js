@@ -399,16 +399,16 @@ function FlowStep({ label, active = false }) {
   return (
     <span
       style={{
-        background: active ? T.accent : "#ffffff",
-        color: active ? "#ffffff" : T.ink500,
+        background: active ? T.accentLit : "#ffffff",
+        color: active ? T.accent : T.ink400,
         padding: "4px 12px",
         borderRadius: "3px",
         fontFamily: T.fontUi,
         fontSize: "11px",
-        fontWeight: active ? 600 : 400,
+        fontWeight: active ? 700 : 400,
         letterSpacing: "0.06em",
         textTransform: "uppercase",
-        border: active ? "none" : `1px solid ${T.ink150}`,
+        border: `1px solid ${active ? T.accentBd : T.ink150}`,
       }}
     >
       {label}
