@@ -1,14 +1,16 @@
-// HQPurchaseOrders.js v1.1 — WP-B: Purchase Order Flow (Import-Aware)
-// Protea Botanicals · Phase 2 · March 2026
-//
-// v1.1 fixes:
-//   - handleReceive: auto-create inventory_items when no match found
-//     (previously silently skipped all items if not pre-existing in inventory)
-//   - handleReceive: write stock_movements for every received item
-//   - handleReceive: stamp item_id back onto purchase_order_items after create/find
-//   - handleCreate: remove line_total from insert (GENERATED column — never insert)
-//
-// v1.0 — New file — WP-B: Purchase Order Flow
+// src/components/hq/HQPurchaseOrders.js v2.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all numeric/financial values
+//   - Stat cards: coloured top borders removed — semantic colour on value only
+//   - Buttons: 4-variant system (primary/ghost/danger/advance)
+//   - Overdue alert: standard warning template
+//   - Toast: standard success template (no emoji prefix)
+//   - Status badges: semantic token colours
+//   - Filter chips: underline-adjacent style matching global tab pattern
+//   - Emoji removed from button labels
+// v1.1: Auto-create inventory_items on receive + stock_movements
+// v1.0: WP-B Purchase Order Flow
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -16,11 +18,41 @@ import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 
-// ─── FX Rate Hook ─────────────────────────────────────────────────────────────
+// ── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+// ── FX Rate Hook ─────────────────────────────────────────────────────────────
 function useFxRate() {
   const [fxRate, setFxRate] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
-
   const fetchRate = useCallback(async () => {
     try {
       const res = await fetch(
@@ -35,17 +67,15 @@ function useFxRate() {
       setFxLoading(false);
     }
   }, []);
-
   useEffect(() => {
     fetchRate();
     const t = setInterval(fetchRate, 60000);
     return () => clearInterval(t);
   }, [fetchRate]);
-
   return { fxRate, fxLoading };
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 const STATUSES = [
   "draft",
   "ordered",
@@ -56,12 +86,12 @@ const STATUSES = [
 ];
 
 const STATUS_META = {
-  draft: { label: "Draft", color: "#9E9E9E", bg: "#F5F5F5" },
-  ordered: { label: "Ordered", color: "#1976D2", bg: "#E3F2FD" },
-  in_transit: { label: "In Transit", color: "#E65100", bg: "#FFF3E0" },
-  customs: { label: "Customs", color: "#7B1FA2", bg: "#F3E5F5" },
-  received: { label: "Received", color: "#2E7D32", bg: "#E8F5E9" },
-  complete: { label: "Complete", color: "#00695C", bg: "#E0F2F1" },
+  draft: { label: "Draft", color: T.ink500, bg: T.ink075 },
+  ordered: { label: "Ordered", color: T.info, bg: T.infoBg },
+  in_transit: { label: "In Transit", color: T.warning, bg: T.warningBg },
+  customs: { label: "Customs", color: "#6B21A8", bg: "#F5F3FF" },
+  received: { label: "Received", color: T.success, bg: T.successBg },
+  complete: { label: "Complete", color: T.accent, bg: T.accentLit },
 };
 
 const NEXT_STATUS = {
@@ -76,19 +106,16 @@ const SHIPPING_MODES = [
     id: "ddp_air",
     label: "DDP Air (per kg)",
     note: "Door-to-door · 10–18 days",
-    icon: "✈️",
   },
   {
     id: "standard_air",
     label: "Standard Air",
     note: "Half cube $800 flat · ~4 weeks",
-    icon: "📦",
   },
   {
     id: "sea_freight",
     label: "Sea Freight",
     note: "$650/CBM self-pickup · 45–55 days",
-    icon: "🚢",
   },
 ];
 
@@ -99,22 +126,16 @@ const DDP_TIERS = [
   { maxKg: Infinity, rateUsd: 14.9 },
 ];
 
-// ─── Category mapping: supplier_products → inventory_items ───────────────────
-// supplier_products.category: "terpene" | "hardware"
-// inventory_items.category:   "finished_product" | "raw_material" | "terpene" | "hardware"
 function supplierCatToInventoryCat(cat) {
   if (cat === "terpene") return "terpene";
   if (cat === "hardware") return "hardware";
   return "raw_material";
 }
-
 function defaultUnitForCat(cat) {
   if (cat === "terpene") return "ml";
   if (cat === "hardware") return "pcs";
   return "pcs";
 }
-
-// ─── Shipping Calculation ─────────────────────────────────────────────────────
 function calcShippingUsd(mode, weightKg, seaCustom = 650) {
   if (mode === "ddp_air") {
     const tier =
@@ -127,7 +148,6 @@ function calcShippingUsd(mode, weightKg, seaCustom = 650) {
   return 0;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 const fmtZar = (n) =>
   `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -141,7 +161,82 @@ const isOverdue = (po) => {
   );
 };
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// ── Shared style objects ─────────────────────────────────────────────────────
+const sCard = {
+  background: "#fff",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 8,
+  padding: "20px",
+  boxShadow: T.shadow,
+};
+
+const mkBtn = (variant = "primary") => {
+  const base = {
+    padding: "9px 18px",
+    borderRadius: 4,
+    border: "none",
+    cursor: "pointer",
+    fontFamily: T.fontUi,
+    fontWeight: 600,
+    fontSize: 13,
+    transition: "opacity 0.15s",
+    letterSpacing: "0.04em",
+  };
+  const v = {
+    primary: { background: T.accent, color: "#fff" },
+    ghost: {
+      background: "transparent",
+      color: T.accent,
+      border: `1px solid ${T.accentBd}`,
+    },
+    danger: { background: T.danger, color: "#fff" },
+    success: { background: T.success, color: "#fff" },
+    advance: {
+      background: T.info,
+      color: "#fff",
+      padding: "7px 14px",
+      fontSize: 12,
+    },
+    small: {
+      background: T.ink075,
+      color: T.ink700,
+      padding: "5px 12px",
+      fontSize: 12,
+      fontWeight: 500,
+    },
+  };
+  return { ...base, ...(v[variant] || v.primary) };
+};
+
+const sInput = {
+  padding: "9px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontFamily: T.fontUi,
+  fontSize: 13,
+  width: "100%",
+  boxSizing: "border-box",
+  color: T.ink900,
+};
+const sTh = {
+  padding: "10px 14px",
+  textAlign: "left",
+  fontSize: 10,
+  fontWeight: 700,
+  color: T.ink400,
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
+  borderBottom: `1px solid ${T.ink150}`,
+};
+const sTd = {
+  padding: "12px 14px",
+  fontSize: 13,
+  color: T.ink700,
+  borderBottom: `1px solid ${T.ink075}`,
+  verticalAlign: "middle",
+};
+
+// ── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || STATUS_META.draft;
   return (
@@ -149,12 +244,14 @@ function StatusBadge({ status }) {
       style={{
         display: "inline-block",
         padding: "3px 10px",
-        borderRadius: 12,
-        fontSize: 12,
-        fontWeight: 600,
+        borderRadius: 3,
+        fontSize: 11,
+        fontWeight: 700,
         color: meta.color,
         background: meta.bg,
-        letterSpacing: "0.3px",
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        fontFamily: T.fontUi,
       }}
     >
       {meta.label}
@@ -162,10 +259,9 @@ function StatusBadge({ status }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export default function HQPurchaseOrders() {
   const { fxRate, fxLoading } = useFxRate();
-
   const [pos, setPos] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -174,7 +270,6 @@ export default function HQPurchaseOrders() {
   const [selectedPo, setSelectedPo] = useState(null);
   const [toast, setToast] = useState("");
 
-  // Create PO state
   const [step, setStep] = useState(1);
   const [selSupplier, setSelSupplier] = useState(null);
   const [catalogue, setCatalogue] = useState([]);
@@ -188,22 +283,19 @@ export default function HQPurchaseOrders() {
   const [catFilter, setCatFilter] = useState("all");
   const ctx = usePageContext("procurement", null);
 
-  // ── Data fetching ────────────────────────────────────────────────────────
   const fetchPOs = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("purchase_orders")
       .select("*, suppliers(name, country, currency)")
       .order("created_at", { ascending: false });
-    if (error) {
+    if (error)
       console.error(
         "[HQPurchaseOrders] fetchPOs error:",
         error.message,
         error.code,
         error.details,
       );
-    }
-    console.log("[HQPurchaseOrders] rows returned:", data?.length ?? 0);
     setPos(data || []);
     setLoading(false);
   }, []);
@@ -231,7 +323,6 @@ export default function HQPurchaseOrders() {
     setCatLoading(false);
   };
 
-  // ── Line Item Management ─────────────────────────────────────────────────
   const addItem = (product) => {
     setLineItems((prev) => {
       const exists = prev.find((i) => i.product_id === product.id);
@@ -256,19 +347,16 @@ export default function HQPurchaseOrders() {
       ];
     });
   };
-
   const updateQty = (productId, raw) => {
     const qty = Math.max(1, parseInt(raw) || 1);
     setLineItems((prev) =>
       prev.map((i) => (i.product_id === productId ? { ...i, qty } : i)),
     );
   };
-
   const removeItem = (productId) => {
     setLineItems((prev) => prev.filter((i) => i.product_id !== productId));
   };
 
-  // ── Derived Totals ───────────────────────────────────────────────────────
   const totalWeight = lineItems.reduce(
     (s, i) => s + i.weight_kg_per_unit * i.qty,
     0,
@@ -287,7 +375,6 @@ export default function HQPurchaseOrders() {
   const landedPerUnit = totalUnits > 0 ? landedZar / totalUnits : 0;
   const shipPerUnit = totalUnits > 0 ? shipCostUsd / totalUnits : 0;
 
-  // ── Reset Create Panel ───────────────────────────────────────────────────
   const resetCreate = () => {
     setStep(1);
     setSelSupplier(null);
@@ -297,20 +384,16 @@ export default function HQPurchaseOrders() {
     setPoNotes("");
     setCatFilter("all");
   };
-
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 4500);
   };
 
-  // ── Create PO ────────────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!selSupplier || lineItems.length === 0) return;
     setCreating(true);
-
     const poNumber = `PO-${Date.now().toString().slice(-8)}`;
     const lockedRate = usdZar;
-
     const { data: po, error } = await supabase
       .from("purchase_orders")
       .insert({
@@ -331,15 +414,11 @@ export default function HQPurchaseOrders() {
       })
       .select()
       .single();
-
     if (error || !po) {
       console.error("[HQPurchaseOrders] PO create error:", error);
       setCreating(false);
       return;
     }
-
-    // Insert line items
-    // ⚠ NEVER include line_total — it is a GENERATED column in Supabase
     const itemInserts = lineItems.map((item) => ({
       po_id: po.id,
       supplier_product_id: item.product_id,
@@ -350,27 +429,22 @@ export default function HQPurchaseOrders() {
       ),
       weight_kg: parseFloat((item.weight_kg_per_unit * item.qty).toFixed(4)),
       unit_cost: parseFloat(item.unit_price_usd.toFixed(4)),
-      // line_total intentionally omitted — GENERATED COLUMN
       notes: `${item.name}${item.sku ? ` (${item.sku})` : ""}`,
     }));
-
     const { error: lineErr } = await supabase
       .from("purchase_order_items")
       .insert(itemInserts);
-    if (lineErr) {
+    if (lineErr)
       console.error("[HQPurchaseOrders] PO line insert error:", lineErr);
-    }
-
     setCreating(false);
     setShowCreate(false);
     resetCreate();
     showToast(
-      `✅ ${poNumber} created — FX rate locked at R${lockedRate.toFixed(4)}/USD`,
+      `${poNumber} created — FX rate locked at R${lockedRate.toFixed(4)}/USD`,
     );
     fetchPOs();
   };
 
-  // ── Advance Status ───────────────────────────────────────────────────────
   const handleAdvance = async (po, newStatus) => {
     await supabase
       .from("purchase_orders")
@@ -386,21 +460,16 @@ export default function HQPurchaseOrders() {
         .eq("id", po.id);
     }
     fetchPOs();
-    if (selectedPo?.id === po.id) {
+    if (selectedPo?.id === po.id)
       setSelectedPo((prev) => ({
         ...prev,
         po_status: newStatus,
         status: newStatus,
       }));
-    }
   };
 
-  // ── Receive PO ───────────────────────────────────────────────────────────
-  // v1.1: Auto-creates inventory_items when no match found + writes stock_movements
   const handleReceive = async (po) => {
     setReceiving(true);
-
-    // 1. Mark PO as received
     await supabase
       .from("purchase_orders")
       .update({
@@ -410,41 +479,31 @@ export default function HQPurchaseOrders() {
         received_date: new Date().toISOString().split("T")[0],
       })
       .eq("id", po.id);
-
-    // 2. Fetch line items with supplier product details
     const { data: items } = await supabase
       .from("purchase_order_items")
       .select(
         "*, supplier_products(name, sku, category, unit_price_usd, weight_kg_per_unit)",
       )
       .eq("po_id", po.id);
-
-    let itemsCreated = 0;
-    let itemsUpdated = 0;
-    let movementsWritten = 0;
+    let itemsCreated = 0,
+      itemsUpdated = 0,
+      movementsWritten = 0;
     const errors = [];
-
     if (items && items.length > 0) {
       for (const item of items) {
         const sp = item.supplier_products;
         const productName =
           sp?.name || item.notes?.replace(/ \(.*\)$/, "") || "Unknown Product";
         const qty = parseFloat(item.quantity_ordered) || 0;
-
         if (qty <= 0) continue;
-
         try {
-          // 3. Try to find existing inventory item by name (case-insensitive)
           const { data: existing } = await supabase
             .from("inventory_items")
             .select("id, quantity_on_hand")
             .ilike("name", productName)
             .maybeSingle();
-
           let inventoryItemId = null;
-
           if (existing) {
-            // Update existing quantity
             const newQty = (parseFloat(existing.quantity_on_hand) || 0) + qty;
             await supabase
               .from("inventory_items")
@@ -453,7 +512,6 @@ export default function HQPurchaseOrders() {
             inventoryItemId = existing.id;
             itemsUpdated++;
           } else {
-            // Auto-create inventory item from supplier product data
             const invCategory = supplierCatToInventoryCat(
               sp?.category || "raw_material",
             );
@@ -464,7 +522,6 @@ export default function HQPurchaseOrders() {
             const costPrice = parseFloat(
               item.landed_cost_per_unit_zar || item.unit_cost || 0,
             );
-
             const { data: newItem, error: createErr } = await supabase
               .from("inventory_items")
               .insert({
@@ -484,7 +541,6 @@ export default function HQPurchaseOrders() {
               })
               .select()
               .single();
-
             if (createErr) {
               console.error(
                 `[HQPurchaseOrders] Failed to create inventory item for "${productName}":`,
@@ -493,12 +549,9 @@ export default function HQPurchaseOrders() {
               errors.push(productName);
               continue;
             }
-
             inventoryItemId = newItem?.id;
             itemsCreated++;
           }
-
-          // 4. Write stock movement
           if (inventoryItemId) {
             const { error: moveErr } = await supabase
               .from("stock_movements")
@@ -509,17 +562,12 @@ export default function HQPurchaseOrders() {
                 reference: po.po_number,
                 notes: `Received via PO ${po.po_number} — ${po.suppliers?.name || "supplier"}`,
               });
-
-            if (moveErr) {
+            if (moveErr)
               console.error(
                 `[HQPurchaseOrders] Stock movement error for "${productName}":`,
                 moveErr,
               );
-            } else {
-              movementsWritten++;
-            }
-
-            // 5. Stamp item_id back onto PO line for traceability
+            else movementsWritten++;
             await supabase
               .from("purchase_order_items")
               .update({ item_id: inventoryItemId })
@@ -534,24 +582,20 @@ export default function HQPurchaseOrders() {
         }
       }
     }
-
     setReceiving(false);
     setSelectedPo(null);
-
     const summary = [
       itemsCreated > 0 ? `${itemsCreated} new items created` : null,
       itemsUpdated > 0 ? `${itemsUpdated} items updated` : null,
       movementsWritten > 0 ? `${movementsWritten} movements logged` : null,
-      errors.length > 0 ? `⚠ ${errors.length} failed` : null,
+      errors.length > 0 ? `${errors.length} failed` : null,
     ]
       .filter(Boolean)
       .join(" · ");
-
-    showToast(`📦 PO received — ${summary || "inventory updated"}`);
+    showToast(`PO received — ${summary || "inventory updated"}`);
     fetchPOs();
   };
 
-  // ── Derived Display Lists ────────────────────────────────────────────────
   const filteredPos =
     filterStatus === "all"
       ? pos
@@ -562,93 +606,14 @@ export default function HQPurchaseOrders() {
       ? catalogue
       : catalogue.filter((p) => p.category === catFilter);
   const catCategories = [...new Set(catalogue.map((p) => p.category))];
-
   const statusCounts = STATUSES.reduce((acc, s) => {
     acc[s] = pos.filter((p) => (p.po_status || p.status) === s).length;
     return acc;
   }, {});
 
-  // ── Styles ───────────────────────────────────────────────────────────────
-  const card = {
-    background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #f0ede8",
-    padding: "24px",
-    marginBottom: 20,
-  };
-
-  const btn = (variant = "primary") => ({
-    padding: "10px 20px",
-    borderRadius: 8,
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "Jost, sans-serif",
-    fontWeight: 600,
-    fontSize: 14,
-    transition: "opacity 0.15s",
-    ...(variant === "primary" ? { background: "#2d4a2d", color: "#fff" } : {}),
-    ...(variant === "ghost"
-      ? {
-          background: "transparent",
-          color: "#2d4a2d",
-          border: "1px solid #2d4a2d",
-        }
-      : {}),
-    ...(variant === "danger" ? { background: "#c62828", color: "#fff" } : {}),
-    ...(variant === "success" ? { background: "#2E7D32", color: "#fff" } : {}),
-    ...(variant === "advance"
-      ? {
-          background: "#1976D2",
-          color: "#fff",
-          padding: "8px 16px",
-          fontSize: 13,
-        }
-      : {}),
-    ...(variant === "small"
-      ? {
-          background: "#f5f5f5",
-          color: "#555",
-          padding: "6px 12px",
-          fontSize: 12,
-          fontWeight: 500,
-        }
-      : {}),
-  });
-
-  const input = {
-    padding: "10px 14px",
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    fontFamily: "Jost, sans-serif",
-    fontSize: 14,
-    width: "100%",
-    boxSizing: "border-box",
-  };
-
-  const th = {
-    padding: "12px 16px",
-    textAlign: "left",
-    fontSize: 12,
-    fontWeight: 600,
-    color: "#888",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-    borderBottom: "1px solid #f0ede8",
-  };
-  const td = {
-    padding: "14px 16px",
-    fontSize: 14,
-    color: "#333",
-    borderBottom: "1px solid #f8f6f2",
-    verticalAlign: "middle",
-  };
-
-  // ════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ════════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
-      {/* ── Toast ─────────────────────────────────────────────────────── */}
+    <div style={{ fontFamily: T.fontUi, color: T.ink700 }}>
+      {/* Toast */}
       {toast && (
         <div
           style={{
@@ -656,13 +621,14 @@ export default function HQPurchaseOrders() {
             top: 24,
             right: 24,
             zIndex: 9999,
-            background: "#2d4a2d",
+            background: T.accent,
             color: "#fff",
-            padding: "14px 20px",
-            borderRadius: 10,
-            fontSize: 14,
+            padding: "12px 18px",
+            borderRadius: 6,
+            fontSize: 13,
             fontWeight: 500,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            fontFamily: T.fontUi,
           }}
         >
           {toast}
@@ -675,50 +641,52 @@ export default function HQPurchaseOrders() {
         onAction={() => {}}
         defaultOpen={true}
       />
-      {/* ── Header ────────────────────────────────────────────────────── */}
+
+      {/* Header */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 28,
+          marginBottom: 24,
         }}
       >
         <div>
           <h2
             style={{
               margin: 0,
-              fontSize: 26,
-              fontFamily: "Cormorant Garamond, serif",
-              fontWeight: 600,
-              color: "#2d4a2d",
+              fontSize: 22,
+              fontFamily: T.fontUi,
+              fontWeight: 300,
+              color: T.ink900,
             }}
           >
             Procurement
           </h2>
-          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>
+          <p style={{ margin: "4px 0 0", color: T.ink500, fontSize: 13 }}>
             Import-aware purchase orders · landed cost · inventory receiving
           </p>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div
             style={{
-              background: fxLoading ? "#f5f5f5" : "#e8f5e9",
-              border: "1px solid #c8e6c9",
-              borderRadius: 20,
-              padding: "6px 14px",
-              fontSize: 13,
-              color: "#2E7D32",
+              background: fxLoading ? T.ink075 : T.successBg,
+              border: `1px solid ${T.successBd}`,
+              borderRadius: 4,
+              padding: "6px 12px",
+              fontSize: 12,
+              color: T.success,
               fontWeight: 600,
+              fontFamily: T.fontData,
             }}
           >
             {fxLoading
               ? "Loading FX…"
-              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "Live" : "Cached"}`}
             <InfoTooltip id="po-fx-rate" position="top" />
           </div>
           <button
-            style={btn("primary")}
+            style={mkBtn("primary")}
             onClick={() => {
               resetCreate();
               setShowCreate(true);
@@ -730,83 +698,111 @@ export default function HQPurchaseOrders() {
         </div>
       </div>
 
-      {/* ── KPI Row ───────────────────────────────────────────────────── */}
+      {/* KPI row — flush grid, no coloured borders */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 16,
-          marginBottom: 24,
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 20,
         }}
       >
         {[
-          { label: "Total POs", value: pos.length, color: "#333" },
+          { label: "Total POs", value: pos.length, semantic: null },
           {
             label: "In Transit / Customs",
             value: pos.filter((p) =>
               ["in_transit", "customs"].includes(p.po_status || p.status),
             ).length,
-            color: "#E65100",
+            semantic: "warning",
           },
           {
             label: "Overdue",
             value: overdueCount,
-            color: overdueCount > 0 ? "#c62828" : "#2E7D32",
+            semantic: overdueCount > 0 ? "danger" : null,
           },
           {
-            label: "Completed (30d)",
+            label: "Completed",
             value: pos.filter((p) => (p.po_status || p.status) === "complete")
               .length,
-            color: "#00695C",
+            semantic: "success",
           },
-        ].map((k) => (
-          <div
-            key={k.label}
-            style={{ ...card, padding: "18px 22px", marginBottom: 0 }}
-          >
-            <div style={{ fontSize: 28, fontWeight: 700, color: k.color }}>
-              {k.value}
+        ].map((k) => {
+          const semC = {
+            success: T.success,
+            warning: T.warning,
+            danger: T.danger,
+            info: T.info,
+          };
+          const color = k.semantic ? semC[k.semantic] : T.ink900;
+          return (
+            <div
+              key={k.label}
+              style={{ background: "#fff", padding: "16px 18px" }}
+            >
+              <div
+                style={{
+                  fontFamily: T.fontData,
+                  fontSize: 26,
+                  fontWeight: 400,
+                  color,
+                  lineHeight: 1,
+                }}
+              >
+                {k.value}
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.ink400,
+                  marginTop: 4,
+                  fontFamily: T.fontUi,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {k.label}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-              {k.label}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* ── Overdue Alert ─────────────────────────────────────────────── */}
+      {/* Overdue alert — standard warning template */}
       {overdueCount > 0 && (
         <div
           style={{
-            background: "#fff3e0",
-            border: "1px solid #ffcc80",
-            borderRadius: 10,
-            padding: "14px 18px",
-            marginBottom: 20,
-            fontSize: 14,
-            color: "#E65100",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
+            background: T.warningBg,
+            border: `1px solid ${T.warningBd}`,
+            borderRadius: 6,
+            padding: "12px 16px",
+            marginBottom: 16,
+            fontSize: 13,
+            color: T.warning,
+            fontWeight: 600,
+            fontFamily: T.fontUi,
           }}
         >
-          ⚠️{" "}
-          <strong>
-            {overdueCount} overdue PO{overdueCount > 1 ? "s" : ""}
-          </strong>{" "}
-          — expected arrival date has passed.
+          {overdueCount} overdue PO{overdueCount > 1 ? "s" : ""} — expected
+          arrival date has passed.
         </div>
       )}
 
-      {/* ── PO List ───────────────────────────────────────────────────── */}
-      <div style={card}>
+      {/* PO list */}
+      <div style={sCard}>
         {/* Filter chips */}
         <div
           style={{
             display: "flex",
-            gap: 8,
+            gap: 6,
             flexWrap: "wrap",
-            marginBottom: 20,
+            marginBottom: 16,
           }}
         >
           {[
@@ -820,15 +816,16 @@ export default function HQPurchaseOrders() {
               key={f.id}
               onClick={() => setFilter(f.id)}
               style={{
-                padding: "7px 16px",
+                padding: "5px 14px",
                 borderRadius: 20,
                 border: "none",
                 cursor: "pointer",
-                fontSize: 13,
+                fontSize: 12,
+                fontFamily: T.fontUi,
                 fontWeight: 500,
-                fontFamily: "Jost, sans-serif",
-                background: filterStatus === f.id ? "#2d4a2d" : "#f5f5f5",
-                color: filterStatus === f.id ? "#fff" : "#666",
+                background: filterStatus === f.id ? T.accent : T.ink075,
+                color: filterStatus === f.id ? "#fff" : T.ink500,
+                transition: "background 0.15s",
               }}
             >
               {f.label}
@@ -837,12 +834,12 @@ export default function HQPurchaseOrders() {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: 48, color: "#999" }}>
+          <div style={{ textAlign: "center", padding: 48, color: T.ink400 }}>
             Loading purchase orders…
           </div>
         ) : filteredPos.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 48, color: "#bbb" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+          <div style={{ textAlign: "center", padding: 48, color: T.ink300 }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
             <div>
               No purchase orders
               {filterStatus !== "all"
@@ -850,7 +847,7 @@ export default function HQPurchaseOrders() {
                 : ""}
             </div>
             <button
-              style={{ ...btn("ghost"), marginTop: 16 }}
+              style={{ ...mkBtn("ghost"), marginTop: 14 }}
               onClick={() => {
                 resetCreate();
                 setShowCreate(true);
@@ -861,7 +858,13 @@ export default function HQPurchaseOrders() {
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontFamily: T.fontUi,
+              }}
+            >
               <thead>
                 <tr>
                   {[
@@ -875,7 +878,7 @@ export default function HQPurchaseOrders() {
                     "Expected Arrival",
                     "Actions",
                   ].map((h) => (
-                    <th key={h} style={th}>
+                    <th key={h} style={sTh}>
                       {h}
                     </th>
                   ))}
@@ -893,64 +896,77 @@ export default function HQPurchaseOrders() {
                     <tr
                       key={po.id}
                       style={{
-                        background: overdue ? "#fff8f0" : "transparent",
+                        background: overdue ? T.warningBg : "transparent",
                         cursor: "pointer",
                       }}
                       onClick={() => setSelectedPo(po)}
                     >
-                      <td style={td}>
-                        <strong style={{ color: "#2d4a2d" }}>
+                      <td style={sTd}>
+                        <strong
+                          style={{ color: T.accent, fontFamily: T.fontData }}
+                        >
                           {po.po_number}
                         </strong>
                         {overdue && (
                           <span
                             style={{
                               marginLeft: 8,
-                              fontSize: 11,
-                              color: "#c62828",
-                              fontWeight: 600,
+                              fontSize: 10,
+                              color: T.danger,
+                              fontWeight: 700,
+                              textTransform: "uppercase",
                             }}
                           >
-                            OVERDUE
+                            Overdue
                           </span>
                         )}
                       </td>
-                      <td style={td}>
-                        <div>{po.suppliers?.name || "—"}</div>
-                        <div style={{ fontSize: 12, color: "#999" }}>
+                      <td style={sTd}>
+                        <div style={{ fontWeight: 500 }}>
+                          {po.suppliers?.name || "—"}
+                        </div>
+                        <div style={{ fontSize: 11, color: T.ink400 }}>
                           {po.suppliers?.country}
                         </div>
                       </td>
-                      <td style={td}>
+                      <td style={sTd}>
                         <StatusBadge status={status} />
                       </td>
-                      <td style={td}>
-                        <span style={{ fontSize: 12 }}>
-                          {shipMeta.icon} {shipMeta.label}
-                        </span>
+                      <td style={{ ...sTd, fontSize: 12 }}>{shipMeta.label}</td>
+                      <td style={{ ...sTd, fontFamily: T.fontData }}>
+                        {fmtUsd(po.subtotal)}
                       </td>
-                      <td style={td}>{fmtUsd(po.subtotal)}</td>
-                      <td style={td}>
-                        <strong>{fmtZar(po.landed_cost_zar)}</strong>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontFamily: T.fontData,
+                          fontWeight: 600,
+                          color: T.accent,
+                        }}
+                      >
+                        {fmtZar(po.landed_cost_zar)}
                       </td>
-                      <td style={td}>
-                        {po.usd_zar_rate ? (
-                          <span style={{ fontSize: 12, color: "#666" }}>
-                            R{parseFloat(po.usd_zar_rate).toFixed(4)}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
+                      <td
+                        style={{
+                          ...sTd,
+                          fontFamily: T.fontData,
+                          fontSize: 12,
+                          color: T.ink500,
+                        }}
+                      >
+                        {po.usd_zar_rate
+                          ? `R${parseFloat(po.usd_zar_rate).toFixed(4)}`
+                          : "—"}
                       </td>
-                      <td style={td}>
+                      <td style={sTd}>
                         {po.expected_arrival || po.expected_date || "—"}
                         {overdue && (
-                          <div style={{ fontSize: 11, color: "#c62828" }}>
+                          <div style={{ fontSize: 11, color: T.danger }}>
                             Past due
                           </div>
                         )}
                       </td>
-                      <td style={td} onClick={(e) => e.stopPropagation()}>
+                      <td style={sTd} onClick={(e) => e.stopPropagation()}>
                         <div
                           style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
                         >
@@ -958,7 +974,7 @@ export default function HQPurchaseOrders() {
                             status !== "received" &&
                             status !== "complete" && (
                               <button
-                                style={btn("advance")}
+                                style={mkBtn("advance")}
                                 onClick={() => handleAdvance(po, nextStatus)}
                               >
                                 → {STATUS_META[nextStatus]?.label}
@@ -966,19 +982,19 @@ export default function HQPurchaseOrders() {
                             )}
                           {status === "customs" && (
                             <button
-                              style={btn("success")}
+                              style={mkBtn("success")}
                               onClick={() => handleReceive(po)}
                               disabled={receiving}
                             >
-                              {receiving ? "Receiving…" : "📦 Receive"}
+                              {receiving ? "Receiving…" : "Receive"}
                             </button>
                           )}
                           {status === "received" && (
                             <button
-                              style={{ ...btn("small"), color: "#00695C" }}
+                              style={mkBtn("small")}
                               onClick={() => handleAdvance(po, "complete")}
                             >
-                              ✓ Complete
+                              Complete
                             </button>
                           )}
                         </div>
@@ -992,9 +1008,7 @@ export default function HQPurchaseOrders() {
         )}
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          CREATE PO SLIDE-IN PANEL
-      ══════════════════════════════════════════════════════════════════ */}
+      {/* ── Create PO slide-in ── */}
       {showCreate && (
         <div
           style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex" }}
@@ -1019,8 +1033,8 @@ export default function HQPurchaseOrders() {
             {/* Panel header */}
             <div
               style={{
-                padding: "24px 28px",
-                borderBottom: "1px solid #f0ede8",
+                padding: "20px 24px",
+                borderBottom: `1px solid ${T.ink150}`,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -1034,14 +1048,15 @@ export default function HQPurchaseOrders() {
                 <h3
                   style={{
                     margin: 0,
-                    fontSize: 20,
-                    fontFamily: "Cormorant Garamond, serif",
-                    color: "#2d4a2d",
+                    fontSize: 18,
+                    fontFamily: T.fontUi,
+                    fontWeight: 500,
+                    color: T.ink900,
                   }}
                 >
                   New Purchase Order
                 </h3>
-                <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: T.ink400, marginTop: 3 }}>
                   Step {step} of 3 —{" "}
                   {
                     ["Select Supplier", "Add Items", "Shipping & Confirm"][
@@ -1055,8 +1070,8 @@ export default function HQPurchaseOrders() {
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: 22,
-                  color: "#999",
+                  fontSize: 20,
+                  color: T.ink400,
                 }}
                 onClick={() => {
                   setShowCreate(false);
@@ -1067,30 +1082,32 @@ export default function HQPurchaseOrders() {
               </button>
             </div>
 
-            {/* Step progress */}
+            {/* Progress bar */}
             <div
               style={{
-                padding: "16px 28px",
-                borderBottom: "1px solid #f0ede8",
+                padding: "12px 24px",
+                borderBottom: `1px solid ${T.ink150}`,
                 display: "flex",
-                gap: 8,
+                gap: 6,
               }}
             >
               {[1, 2, 3].map((n) => (
                 <div key={n} style={{ flex: 1 }}>
                   <div
                     style={{
-                      height: 4,
+                      height: 3,
                       borderRadius: 2,
-                      background: step >= n ? "#2d4a2d" : "#e0e0e0",
+                      background: step >= n ? T.accent : T.ink150,
                     }}
                   />
                   <div
                     style={{
-                      fontSize: 11,
-                      color: step >= n ? "#2d4a2d" : "#bbb",
+                      fontSize: 10,
+                      color: step >= n ? T.accent : T.ink300,
                       marginTop: 4,
                       fontWeight: step === n ? 700 : 400,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
                     }}
                   >
                     {["Supplier", "Items", "Shipping"][n - 1]}
@@ -1099,12 +1116,12 @@ export default function HQPurchaseOrders() {
               ))}
             </div>
 
-            {/* Panel body */}
-            <div style={{ padding: 28, flex: 1 }}>
-              {/* STEP 1: Select Supplier */}
+            {/* Body */}
+            <div style={{ padding: 24, flex: 1 }}>
+              {/* Step 1 */}
               {step === 1 && (
                 <div>
-                  <p style={{ color: "#666", marginTop: 0, fontSize: 14 }}>
+                  <p style={{ color: T.ink500, marginTop: 0, fontSize: 13 }}>
                     Choose the supplier for this purchase order.{" "}
                     <InfoTooltip id="po-select-supplier" />
                   </p>
@@ -1113,13 +1130,13 @@ export default function HQPurchaseOrders() {
                       key={s.id}
                       onClick={() => setSelSupplier(s)}
                       style={{
-                        padding: "18px 20px",
-                        borderRadius: 10,
-                        marginBottom: 12,
+                        padding: "16px 18px",
+                        borderRadius: 6,
+                        marginBottom: 10,
                         cursor: "pointer",
-                        border: `2px solid ${selSupplier?.id === s.id ? "#2d4a2d" : "#f0ede8"}`,
+                        border: `2px solid ${selSupplier?.id === s.id ? T.accent : T.ink150}`,
                         background:
-                          selSupplier?.id === s.id ? "#f0f7f0" : "#fff",
+                          selSupplier?.id === s.id ? T.accentLit : "#fff",
                       }}
                     >
                       <div
@@ -1129,19 +1146,25 @@ export default function HQPurchaseOrders() {
                         }}
                       >
                         <div>
-                          <strong style={{ color: "#2d4a2d" }}>{s.name}</strong>
+                          <strong style={{ color: T.ink900 }}>{s.name}</strong>
                           <div
                             style={{
-                              fontSize: 13,
-                              color: "#888",
-                              marginTop: 4,
+                              fontSize: 12,
+                              color: T.ink500,
+                              marginTop: 3,
                             }}
                           >
                             {s.country} · {s.currency}
                           </div>
                         </div>
                         {selSupplier?.id === s.id && (
-                          <span style={{ color: "#2d4a2d", fontSize: 20 }}>
+                          <span
+                            style={{
+                              color: T.success,
+                              fontSize: 18,
+                              fontWeight: 700,
+                            }}
+                          >
                             ✓
                           </span>
                         )}
@@ -1151,9 +1174,10 @@ export default function HQPurchaseOrders() {
                   {suppliers.length === 0 && (
                     <div
                       style={{
-                        color: "#999",
+                        color: T.ink400,
                         textAlign: "center",
                         padding: 32,
+                        fontFamily: T.fontUi,
                       }}
                     >
                       No suppliers found. Add via HQ → Supply Chain.
@@ -1162,14 +1186,14 @@ export default function HQPurchaseOrders() {
                 </div>
               )}
 
-              {/* STEP 2: Add Items */}
+              {/* Step 2 */}
               {step === 2 && (
                 <div>
                   <div
                     style={{
                       display: "flex",
-                      gap: 8,
-                      marginBottom: 16,
+                      gap: 6,
+                      marginBottom: 14,
                       flexWrap: "wrap",
                     }}
                   >
@@ -1178,14 +1202,15 @@ export default function HQPurchaseOrders() {
                         key={c}
                         onClick={() => setCatFilter(c)}
                         style={{
-                          padding: "5px 14px",
+                          padding: "4px 12px",
                           borderRadius: 16,
                           border: "none",
                           cursor: "pointer",
-                          fontSize: 12,
-                          fontFamily: "Jost, sans-serif",
-                          background: catFilter === c ? "#2d4a2d" : "#f5f5f5",
-                          color: catFilter === c ? "#fff" : "#666",
+                          fontSize: 11,
+                          fontFamily: T.fontUi,
+                          background: catFilter === c ? T.accent : T.ink075,
+                          color: catFilter === c ? "#fff" : T.ink500,
+                          fontWeight: catFilter === c ? 700 : 400,
                         }}
                       >
                         {c === "all"
@@ -1199,7 +1224,7 @@ export default function HQPurchaseOrders() {
                       style={{
                         textAlign: "center",
                         padding: 32,
-                        color: "#999",
+                        color: T.ink400,
                       }}
                     >
                       Loading catalogue…
@@ -1207,7 +1232,7 @@ export default function HQPurchaseOrders() {
                   ) : catalogueView.length === 0 ? (
                     <div
                       style={{
-                        color: "#bbb",
+                        color: T.ink300,
                         textAlign: "center",
                         padding: 32,
                       }}
@@ -1218,9 +1243,9 @@ export default function HQPurchaseOrders() {
                     <div>
                       <p
                         style={{
-                          fontSize: 13,
-                          color: "#888",
-                          margin: "0 0 12px",
+                          fontSize: 12,
+                          color: T.ink500,
+                          margin: "0 0 10px",
                         }}
                       >
                         Click a product to add it to the order:
@@ -1234,27 +1259,28 @@ export default function HQPurchaseOrders() {
                             key={p.id}
                             onClick={() => addItem(p)}
                             style={{
-                              padding: "12px 16px",
-                              borderRadius: 8,
-                              marginBottom: 8,
+                              padding: "12px 14px",
+                              borderRadius: 6,
+                              marginBottom: 6,
                               cursor: "pointer",
-                              border: `1px solid ${inOrder ? "#a5d6a7" : "#f0ede8"}`,
-                              background: inOrder ? "#f1f8e9" : "#fafafa",
+                              border: `1px solid ${inOrder ? T.successBd : T.ink150}`,
+                              background: inOrder ? T.successBg : T.ink050,
                               display: "flex",
                               justifyContent: "space-between",
                               alignItems: "center",
                             }}
                           >
                             <div>
-                              <span style={{ fontWeight: 600, fontSize: 14 }}>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>
                                 {p.name}
                               </span>
                               {p.sku && (
                                 <span
                                   style={{
                                     marginLeft: 8,
-                                    fontSize: 12,
-                                    color: "#999",
+                                    fontSize: 11,
+                                    color: T.ink400,
+                                    fontFamily: T.fontData,
                                   }}
                                 >
                                   {p.sku}
@@ -1263,19 +1289,22 @@ export default function HQPurchaseOrders() {
                               <span
                                 style={{
                                   marginLeft: 8,
-                                  fontSize: 11,
-                                  padding: "2px 8px",
-                                  borderRadius: 10,
-                                  background: "#e8f5e9",
-                                  color: "#2E7D32",
+                                  fontSize: 10,
+                                  padding: "2px 7px",
+                                  borderRadius: 3,
+                                  background: T.ink075,
+                                  color: T.ink500,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                  fontWeight: 700,
                                 }}
                               >
                                 {p.category}
                               </span>
                               <div
                                 style={{
-                                  fontSize: 12,
-                                  color: "#888",
+                                  fontSize: 11,
+                                  color: T.ink500,
                                   marginTop: 3,
                                 }}
                               >
@@ -1288,22 +1317,32 @@ export default function HQPurchaseOrders() {
                             </div>
                             <div style={{ textAlign: "right" }}>
                               <div
-                                style={{ fontWeight: 700, color: "#2d4a2d" }}
+                                style={{
+                                  fontFamily: T.fontData,
+                                  fontWeight: 600,
+                                  color: T.accent,
+                                }}
                               >
                                 {fmtUsd(p.unit_price_usd)}
                               </div>
-                              <div style={{ fontSize: 12, color: "#888" }}>
-                                = {fmtZar(p.unit_price_usd * usdZar)}
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: T.ink500,
+                                  fontFamily: T.fontData,
+                                }}
+                              >
+                                {fmtZar(p.unit_price_usd * usdZar)}
                               </div>
                               {inOrder && (
                                 <div
                                   style={{
-                                    fontSize: 11,
-                                    color: "#2E7D32",
-                                    fontWeight: 600,
+                                    fontSize: 10,
+                                    color: T.success,
+                                    fontWeight: 700,
                                   }}
                                 >
-                                  ✓ In order
+                                  In order
                                 </div>
                               )}
                             </div>
@@ -1311,12 +1350,19 @@ export default function HQPurchaseOrders() {
                         );
                       })}
                       {lineItems.length > 0 && (
-                        <div style={{ ...card, padding: 20, marginBottom: 0 }}>
+                        <div
+                          style={{
+                            ...sCard,
+                            padding: 16,
+                            marginTop: 16,
+                            marginBottom: 0,
+                          }}
+                        >
                           <h4
                             style={{
-                              margin: "0 0 14px",
-                              fontSize: 14,
-                              color: "#555",
+                              margin: "0 0 12px",
+                              fontSize: 13,
+                              color: T.ink700,
                             }}
                           >
                             Order Items ({lineItems.length})
@@ -1327,16 +1373,21 @@ export default function HQPurchaseOrders() {
                               style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 12,
-                                padding: "10px 0",
-                                borderBottom: "1px solid #f5f5f5",
+                                gap: 10,
+                                padding: "8px 0",
+                                borderBottom: `1px solid ${T.ink075}`,
                               }}
                             >
-                              <div style={{ flex: 2, fontSize: 13 }}>
+                              <div style={{ flex: 2, fontSize: 12 }}>
                                 <strong>{item.name}</strong>
                                 {item.sku && (
                                   <span
-                                    style={{ color: "#999", marginLeft: 6 }}
+                                    style={{
+                                      color: T.ink400,
+                                      marginLeft: 6,
+                                      fontFamily: T.fontData,
+                                      fontSize: 11,
+                                    }}
                                   >
                                     {item.sku}
                                   </span>
@@ -1349,10 +1400,19 @@ export default function HQPurchaseOrders() {
                                 onChange={(e) =>
                                   updateQty(item.product_id, e.target.value)
                                 }
-                                style={{ ...input, width: 80 }}
+                                style={{
+                                  ...sInput,
+                                  width: 70,
+                                  textAlign: "center",
+                                }}
                               />
                               <div
-                                style={{ flex: 1, fontSize: 13, color: "#555" }}
+                                style={{
+                                  flex: 1,
+                                  fontSize: 12,
+                                  color: T.ink700,
+                                  fontFamily: T.fontData,
+                                }}
                               >
                                 {fmtUsd(item.unit_price_usd * item.qty)}
                               </div>
@@ -1362,7 +1422,7 @@ export default function HQPurchaseOrders() {
                                   background: "none",
                                   border: "none",
                                   cursor: "pointer",
-                                  color: "#e57373",
+                                  color: T.danger,
                                   fontSize: 16,
                                 }}
                               >
@@ -1372,11 +1432,12 @@ export default function HQPurchaseOrders() {
                           ))}
                           <div
                             style={{
-                              marginTop: 12,
-                              fontSize: 13,
-                              color: "#666",
+                              marginTop: 10,
+                              fontSize: 12,
+                              color: T.ink500,
                               display: "flex",
                               justifyContent: "space-between",
+                              fontFamily: T.fontData,
                             }}
                           >
                             <span>
@@ -1394,17 +1455,19 @@ export default function HQPurchaseOrders() {
                 </div>
               )}
 
-              {/* STEP 3: Shipping & Confirm */}
+              {/* Step 3 */}
               {step === 3 && (
                 <div>
-                  <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 20 }}>
                     <label
                       style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "#555",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: T.ink500,
                         display: "block",
                         marginBottom: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
                       }}
                     >
                       Shipping Mode <InfoTooltip id="po-shipping-mode" />
@@ -1414,45 +1477,44 @@ export default function HQPurchaseOrders() {
                         key={m.id}
                         onClick={() => setShipMode(m.id)}
                         style={{
-                          padding: "14px 18px",
-                          borderRadius: 10,
-                          marginBottom: 8,
+                          padding: "12px 16px",
+                          borderRadius: 6,
+                          marginBottom: 6,
                           cursor: "pointer",
-                          border: `2px solid ${shipMode === m.id ? "#2d4a2d" : "#f0ede8"}`,
-                          background: shipMode === m.id ? "#f0f7f0" : "#fff",
+                          border: `2px solid ${shipMode === m.id ? T.accent : T.ink150}`,
+                          background: shipMode === m.id ? T.accentLit : "#fff",
                           display: "flex",
-                          gap: 14,
+                          gap: 12,
                           alignItems: "center",
                         }}
                       >
-                        <span style={{ fontSize: 22 }}>{m.icon}</span>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>
+                        <div style={{ flex: 1 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: 13,
+                              color: T.ink900,
+                            }}
+                          >
                             {m.label}
                           </div>
-                          <div style={{ fontSize: 12, color: "#888" }}>
+                          <div style={{ fontSize: 11, color: T.ink500 }}>
                             {m.note}
                           </div>
                         </div>
                         {shipMode === m.id && (
-                          <span
-                            style={{
-                              marginLeft: "auto",
-                              color: "#2d4a2d",
-                              fontWeight: 700,
-                            }}
-                          >
+                          <span style={{ color: T.success, fontWeight: 700 }}>
                             ✓
                           </span>
                         )}
                       </div>
                     ))}
                     {shipMode === "sea_freight" && (
-                      <div style={{ marginTop: 12 }}>
+                      <div style={{ marginTop: 10 }}>
                         <label
                           style={{
-                            fontSize: 13,
-                            color: "#666",
+                            fontSize: 12,
+                            color: T.ink500,
                             display: "block",
                             marginBottom: 6,
                           }}
@@ -1465,7 +1527,7 @@ export default function HQPurchaseOrders() {
                           onChange={(e) =>
                             setSeaCost(parseFloat(e.target.value) || 650)
                           }
-                          style={{ ...input, width: 160 }}
+                          style={{ ...sInput, width: 140 }}
                         />
                       </div>
                     )}
@@ -1474,18 +1536,20 @@ export default function HQPurchaseOrders() {
                   {shipMode === "ddp_air" && (
                     <div
                       style={{
-                        ...card,
-                        padding: 16,
-                        marginBottom: 20,
-                        background: "#f8f9fa",
+                        ...sCard,
+                        padding: 14,
+                        marginBottom: 16,
+                        background: T.ink050,
                       }}
                     >
                       <div
                         style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: "#888",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: T.ink400,
                           marginBottom: 8,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
                         }}
                       >
                         DDP Air Rate Card (China → SA)
@@ -1500,32 +1564,37 @@ export default function HQPurchaseOrders() {
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
-                              fontSize: 12,
-                              padding: "4px 0",
-                              color: active ? "#2d4a2d" : "#aaa",
+                              fontSize: 11,
+                              padding: "3px 0",
+                              color: active ? T.accent : T.ink300,
                               fontWeight: active ? 700 : 400,
+                              fontFamily: T.fontData,
                             }}
                           >
                             <span>
                               {i === 0 ? "≤" : `${DDP_TIERS[i - 1].maxKg}–`}
                               {t.maxKg === Infinity ? "100+" : t.maxKg}kg
                             </span>
-                            <span>${t.rateUsd}/kg + $25 clearance</span>
-                            {active && <span>← current</span>}
+                            <span>
+                              ${t.rateUsd}/kg + $25 clearance
+                              {active ? " ← current" : ""}
+                            </span>
                           </div>
                         );
                       })}
                     </div>
                   )}
 
-                  <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 20 }}>
                     <label
                       style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "#555",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: T.ink500,
                         display: "block",
-                        marginBottom: 8,
+                        marginBottom: 6,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
                       }}
                     >
                       Notes (optional)
@@ -1535,27 +1604,31 @@ export default function HQPurchaseOrders() {
                       onChange={(e) => setPoNotes(e.target.value)}
                       rows={3}
                       placeholder="Supplier invoice ref, special instructions, etc."
-                      style={{ ...input, resize: "vertical" }}
+                      style={{ ...sInput, resize: "vertical" }}
                     />
                   </div>
 
+                  {/* Cost summary */}
                   <div
                     style={{
-                      ...card,
-                      padding: 20,
-                      background: "#f0f7f0",
-                      border: "1px solid #c8e6c9",
+                      ...sCard,
+                      padding: 16,
+                      background: T.accentLit,
+                      border: `1px solid ${T.accentBd}`,
                     }}
                   >
                     <h4
                       style={{
-                        margin: "0 0 16px",
-                        color: "#2d4a2d",
-                        fontSize: 15,
+                        margin: "0 0 14px",
+                        color: T.accent,
+                        fontSize: 14,
+                        fontFamily: T.fontUi,
                       }}
                     >
-                      💰 Cost Summary — FX Rate locked at R{usdZar.toFixed(4)}
-                      /USD
+                      Cost Summary — FX locked at{" "}
+                      <span style={{ fontFamily: T.fontData }}>
+                        R{usdZar.toFixed(4)}/USD
+                      </span>
                     </h4>
                     {lineItems.map((item) => (
                       <div
@@ -1563,23 +1636,26 @@ export default function HQPurchaseOrders() {
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          fontSize: 13,
-                          padding: "6px 0",
-                          borderBottom: "1px solid #c8e6c9",
+                          fontSize: 12,
+                          padding: "5px 0",
+                          borderBottom: `1px solid ${T.accentBd}`,
+                          fontFamily: T.fontUi,
                         }}
                       >
                         <span>
                           {item.name} × {item.qty}
                         </span>
-                        <span>{fmtUsd(item.unit_price_usd * item.qty)}</span>
+                        <span style={{ fontFamily: T.fontData }}>
+                          {fmtUsd(item.unit_price_usd * item.qty)}
+                        </span>
                       </div>
                     ))}
                     <div
                       style={{
-                        marginTop: 12,
+                        marginTop: 10,
                         display: "flex",
                         flexDirection: "column",
-                        gap: 8,
+                        gap: 6,
                       }}
                     >
                       {[
@@ -1599,11 +1675,15 @@ export default function HQPurchaseOrders() {
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
-                            fontSize: 13,
+                            fontSize: 12,
                           }}
                         >
-                          <span style={{ color: "#555" }}>{label}</span>
-                          <strong style={{ color: "#2d4a2d" }}>{val}</strong>
+                          <span style={{ color: T.ink700 }}>{label}</span>
+                          <strong
+                            style={{ color: T.accent, fontFamily: T.fontData }}
+                          >
+                            {val}
+                          </strong>
                         </div>
                       ))}
                     </div>
@@ -1612,11 +1692,11 @@ export default function HQPurchaseOrders() {
               )}
             </div>
 
-            {/* Panel footer */}
+            {/* Footer */}
             <div
               style={{
-                padding: "20px 28px",
-                borderTop: "1px solid #f0ede8",
+                padding: "16px 24px",
+                borderTop: `1px solid ${T.ink150}`,
                 display: "flex",
                 justifyContent: "space-between",
                 position: "sticky",
@@ -1625,7 +1705,7 @@ export default function HQPurchaseOrders() {
               }}
             >
               <button
-                style={btn("ghost")}
+                style={mkBtn("ghost")}
                 onClick={() => {
                   if (step === 1) {
                     setShowCreate(false);
@@ -1637,7 +1717,7 @@ export default function HQPurchaseOrders() {
               </button>
               {step < 3 ? (
                 <button
-                  style={btn("primary")}
+                  style={mkBtn("primary")}
                   disabled={
                     (step === 1 && !selSupplier) ||
                     (step === 2 && lineItems.length === 0)
@@ -1653,13 +1733,11 @@ export default function HQPurchaseOrders() {
                 </button>
               ) : (
                 <button
-                  style={btn("primary")}
+                  style={mkBtn("primary")}
                   disabled={creating || lineItems.length === 0}
                   onClick={handleCreate}
                 >
-                  {creating
-                    ? "Creating…"
-                    : `✓ Create PO (${fmtZar(landedZar)})`}
+                  {creating ? "Creating…" : `Create PO (${fmtZar(landedZar)})`}
                 </button>
               )}
             </div>
@@ -1667,9 +1745,7 @@ export default function HQPurchaseOrders() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
-          PO DETAIL MODAL
-      ══════════════════════════════════════════════════════════════════ */}
+      {/* ── PO Detail Modal ── */}
       {selectedPo && (
         <div
           style={{
@@ -1687,12 +1763,13 @@ export default function HQPurchaseOrders() {
           <div
             style={{
               background: "#fff",
-              borderRadius: 16,
+              borderRadius: 10,
               width: "100%",
               maxWidth: 680,
               maxHeight: "85vh",
               overflowY: "auto",
-              padding: 32,
+              padding: 28,
+              fontFamily: T.fontUi,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1704,7 +1781,6 @@ export default function HQPurchaseOrders() {
               const shipMeta =
                 SHIPPING_MODES.find((m) => m.id === po.shipping_mode) ||
                 SHIPPING_MODES[0];
-
               return (
                 <>
                   <div
@@ -1712,39 +1788,43 @@ export default function HQPurchaseOrders() {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "flex-start",
-                      marginBottom: 24,
+                      marginBottom: 20,
                     }}
                   >
                     <div>
                       <h3
                         style={{
                           margin: 0,
-                          fontSize: 22,
-                          fontFamily: "Cormorant Garamond, serif",
-                          color: "#2d4a2d",
+                          fontSize: 20,
+                          fontFamily: T.fontUi,
+                          fontWeight: 500,
+                          color: T.ink900,
                         }}
                       >
-                        {po.po_number}
+                        <span style={{ fontFamily: T.fontData }}>
+                          {po.po_number}
+                        </span>
                       </h3>
                       <div
-                        style={{ fontSize: 14, color: "#888", marginTop: 6 }}
+                        style={{ fontSize: 13, color: T.ink500, marginTop: 4 }}
                       >
                         {po.suppliers?.name} · {po.suppliers?.country}
                       </div>
                     </div>
                     <div
-                      style={{ display: "flex", gap: 10, alignItems: "center" }}
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
                     >
                       <StatusBadge status={status} />
                       {overdue && (
                         <span
                           style={{
-                            fontSize: 12,
-                            color: "#c62828",
+                            fontSize: 11,
+                            color: T.danger,
                             fontWeight: 700,
+                            textTransform: "uppercase",
                           }}
                         >
-                          ⚠ OVERDUE
+                          Overdue
                         </span>
                       )}
                       <button
@@ -1753,8 +1833,8 @@ export default function HQPurchaseOrders() {
                           background: "none",
                           border: "none",
                           cursor: "pointer",
-                          fontSize: 22,
-                          color: "#bbb",
+                          fontSize: 20,
+                          color: T.ink300,
                         }}
                       >
                         ✕
@@ -1767,9 +1847,9 @@ export default function HQPurchaseOrders() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      marginBottom: 28,
-                      overflowX: "auto",
+                      marginBottom: 24,
                       gap: 0,
+                      overflowX: "auto",
                     }}
                   >
                     {STATUSES.map((s, i) => {
@@ -1788,16 +1868,19 @@ export default function HQPurchaseOrders() {
                             style={{
                               flex: 1,
                               textAlign: "center",
-                              padding: "8px 4px",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              background: done ? meta.bg : "#f5f5f5",
-                              color: done ? meta.color : "#ccc",
+                              padding: "7px 3px",
+                              borderRadius: 4,
+                              fontSize: 10,
+                              background: done ? meta.bg : T.ink075,
+                              color: done ? meta.color : T.ink300,
                               fontWeight: status === s ? 800 : 500,
                               border:
                                 status === s
                                   ? `2px solid ${meta.color}`
                                   : "2px solid transparent",
+                              fontFamily: T.fontUi,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
                             }}
                           >
                             {meta.label}
@@ -1805,12 +1888,12 @@ export default function HQPurchaseOrders() {
                           {i < STATUSES.length - 1 && (
                             <div
                               style={{
-                                width: 20,
+                                width: 16,
                                 height: 2,
                                 background:
                                   STATUSES.indexOf(status) > i
-                                    ? "#2d4a2d"
-                                    : "#e0e0e0",
+                                    ? T.accent
+                                    : T.ink150,
                                 flexShrink: 0,
                               }}
                             />
@@ -1825,13 +1908,13 @@ export default function HQPurchaseOrders() {
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                      marginBottom: 24,
+                      gap: 10,
+                      marginBottom: 20,
                     }}
                   >
                     {[
                       ["Order Date", po.order_date || "—"],
-                      ["Shipping Mode", `${shipMeta.icon} ${shipMeta.label}`],
+                      ["Shipping Mode", shipMeta.label],
                       [
                         "Expected Arrival",
                         po.expected_arrival || po.expected_date || "Not set",
@@ -1851,32 +1934,41 @@ export default function HQPurchaseOrders() {
                         po.total_weight_kg ? `${po.total_weight_kg} kg` : "—",
                       ],
                       ["Subtotal (USD)", fmtUsd(po.subtotal)],
-                      ["Shipping Cost (USD)", fmtUsd(po.shipping_cost_usd)],
+                      ["Shipping (USD)", fmtUsd(po.shipping_cost_usd)],
                     ].map(([label, val]) => (
                       <div
                         key={label}
                         style={{
-                          background: "#fafafa",
-                          borderRadius: 8,
-                          padding: "12px 16px",
+                          background: T.ink075,
+                          borderRadius: 6,
+                          padding: "10px 14px",
                         }}
                       >
                         <div
                           style={{
-                            fontSize: 11,
-                            color: "#999",
-                            marginBottom: 4,
+                            fontSize: 10,
+                            color: T.ink400,
+                            marginBottom: 3,
                             textTransform: "uppercase",
-                            letterSpacing: "0.3px",
+                            letterSpacing: "0.08em",
+                            fontWeight: 700,
                           }}
                         >
                           {label}
                         </div>
                         <div
                           style={{
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: 600,
-                            color: "#333",
+                            color: T.ink900,
+                            fontFamily: [
+                              "Locked FX Rate",
+                              "Total Weight",
+                              "Subtotal (USD)",
+                              "Shipping (USD)",
+                            ].includes(label)
+                              ? T.fontData
+                              : T.fontUi,
                           }}
                         >
                           {val}
@@ -1888,26 +1980,34 @@ export default function HQPurchaseOrders() {
                   {/* Landed cost */}
                   <div
                     style={{
-                      background: "#f0f7f0",
-                      border: "1px solid #c8e6c9",
-                      borderRadius: 10,
-                      padding: "16px 20px",
-                      marginBottom: 24,
+                      background: T.accentLit,
+                      border: `1px solid ${T.accentBd}`,
+                      borderRadius: 6,
+                      padding: "14px 18px",
+                      marginBottom: 20,
                       display: "flex",
                       justifyContent: "space-between",
                     }}
                   >
                     <div>
                       <div
-                        style={{ fontSize: 12, color: "#555", marginBottom: 4 }}
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          marginBottom: 3,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                          fontWeight: 700,
+                        }}
                       >
                         Total Landed Cost (ZAR)
                       </div>
                       <div
                         style={{
-                          fontSize: 26,
-                          fontWeight: 700,
-                          color: "#2d4a2d",
+                          fontFamily: T.fontData,
+                          fontSize: 24,
+                          fontWeight: 400,
+                          color: T.accent,
                         }}
                       >
                         {fmtZar(po.landed_cost_zar)}
@@ -1915,15 +2015,23 @@ export default function HQPurchaseOrders() {
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div
-                        style={{ fontSize: 12, color: "#555", marginBottom: 4 }}
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          marginBottom: 3,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                          fontWeight: 700,
+                        }}
                       >
-                        FX Rate (locked at order)
+                        FX Rate (locked)
                       </div>
                       <div
                         style={{
-                          fontSize: 18,
-                          fontWeight: 600,
-                          color: "#388E3C",
+                          fontFamily: T.fontData,
+                          fontSize: 16,
+                          fontWeight: 400,
+                          color: T.success,
                         }}
                       >
                         R
@@ -1938,12 +2046,12 @@ export default function HQPurchaseOrders() {
                   {po.notes && (
                     <div
                       style={{
-                        marginBottom: 20,
-                        fontSize: 13,
-                        color: "#666",
-                        background: "#f9f9f9",
-                        padding: "12px 16px",
-                        borderRadius: 8,
+                        marginBottom: 16,
+                        fontSize: 12,
+                        color: T.ink700,
+                        background: T.ink075,
+                        padding: "10px 14px",
+                        borderRadius: 6,
                       }}
                     >
                       <strong>Notes:</strong> {po.notes}
@@ -1951,12 +2059,12 @@ export default function HQPurchaseOrders() {
                   )}
 
                   {/* Actions */}
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {nextStatus &&
                       status !== "received" &&
                       status !== "complete" && (
                         <button
-                          style={btn("advance")}
+                          style={mkBtn("advance")}
                           onClick={() => handleAdvance(po, nextStatus)}
                         >
                           → Advance to {STATUS_META[nextStatus]?.label}
@@ -1964,25 +2072,25 @@ export default function HQPurchaseOrders() {
                       )}
                     {status === "customs" && (
                       <button
-                        style={btn("success")}
+                        style={mkBtn("success")}
                         onClick={() => handleReceive(po)}
                         disabled={receiving}
                       >
                         {receiving
                           ? "Receiving…"
-                          : "📦 Mark as Received & Update Inventory"}
+                          : "Mark as Received & Update Inventory"}
                       </button>
                     )}
                     {status === "received" && (
                       <button
-                        style={btn("primary")}
+                        style={mkBtn("primary")}
                         onClick={() => handleAdvance(po, "complete")}
                       >
-                        ✓ Mark Complete
+                        Mark Complete
                       </button>
                     )}
                     <button
-                      style={btn("ghost")}
+                      style={mkBtn("ghost")}
                       onClick={() => setSelectedPo(null)}
                     >
                       Close
