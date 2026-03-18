@@ -1,33 +1,17 @@
-// src/components/hq/HQCogs.js v3.9
-// v3.9 — WP-GUIDE-B: InfoTooltip injected (batch size, transport, terpene µl)
-// v3.8 — WP-GUIDE-A: usePageContext() + WorkflowGuide v2.0 wired
-// v3.7 — Hardware row shows landed cost split: unit cost + shipping alloc separately
-// v3.6 — Hardware MOQ displayed on cards and in builder
-//         MOQ indicator shows min order qty from supplier_products.moq
-//         Warning shown if batch_size < hardware MOQ
-// v3.5 — Two fixes:
-//   1. ChambersEditor terpene qty label corrected: "ml" → "µl" (stored value IS µl, not ml)
-//      Added sub-hint showing ml conversion below field to prevent confusion
-//   2. Batch scaler: breakdown line items now show ×qty = batch_total when qty > 1
-// v3.4 — Clearer hardware qty label and hint
-// v3.3 — Per-card batch qty selector on costing cards (per-unit + total COGS)
-// v3.2 — hardware_qty > 10 warning
-// v3.1 — Save try/catch/finally, CogsBar negative-pct clamp
-// v3.0 — Multi-chamber hardware profiles with per-chamber distillate & terpene
-// v2.2 — Case-insensitive hardware dedup, manual ZAR override for packaging & labour
-// v2.1 — Inline landed cost calculator in Hardware section
-// v2.0 — Lab testing, µl terpene input, transport, misc, deduped hardware, batch amortisation
-// v1.0 — WP-C: COGS Engine & Local Inputs
-//
-// COGS formula per finished unit:
-//   Hardware:     hardware_qty × (unit_price_usd × usd_zar) + shipping_alloc_zar
-//   Terpene:      per chamber: terpene_qty_ul / 1000 / 50 × unit_price_usd × usd_zar
-//   Distillate:   per chamber: distillate_qty_ml × cost_zar
-//   Packaging:    packaging_qty × cost_zar
-//   Labour:       labour_qty × cost_zar
-//   Lab Testing:  sum(selected_tests) / batch_size
-//   Transport:    transport_cost_zar / batch_size
-//   Misc:         misc_cost_zar / batch_size
+// src/components/hq/HQCogs.js v4.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all displayed numeric / financial values
+//   - Sub-tabs: underline style, emoji removed from labels
+//   - Header: Outfit 300, ink900
+//   - Toast: T.accent background, clean text
+//   - FX badge: success semantic tokens
+//   - Buttons: 4-variant token system
+//   - Domain section headers keep their category colours (hardware/terpene/etc)
+//     as they are functional visual markers in the builder, not branding.
+// v3.9: InfoTooltip — batch size, transport, terpene µl
+// v3.8: WorkflowGuide v2.0
+// v3.7-v3.0: See changelog above
 
 import { useState, useEffect, useCallback } from "react";
 import WorkflowGuide from "../WorkflowGuide";
@@ -35,6 +19,127 @@ import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 import { supabase } from "../../services/supabaseClient";
 
+// ── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+// ── Domain colours (preserved — functional category markers in builder) ──────
+const CATEGORY_COLOURS = {
+  hardware: { bg: "#E3F2FD", color: "#1565C0" },
+  terpene: { bg: "#F3E5F5", color: "#6A1B9A" },
+  distillate: { bg: "#FFF8E1", color: "#F57F17" },
+  packaging: { bg: "#E8F5E9", color: "#2E7D32" },
+  labour: { bg: "#FCE4EC", color: "#880E4F" },
+  lab: { bg: "#E8EAF6", color: "#283593" },
+  transport: { bg: "#E0F7FA", color: "#00695C" },
+  misc: { bg: "#ECEFF1", color: "#455A64" },
+  other: { bg: "#ECEFF1", color: "#455A64" },
+};
+
+const CHAMBER_COLORS = [
+  { bg: "#E3F2FD", border: "#90CAF9", accent: "#1565C0", dot: "#42A5F5" },
+  { bg: "#F3E5F5", border: "#CE93D8", accent: "#6A1B9A", dot: "#AB47BC" },
+  { bg: "#FFF8E1", border: "#FFE082", accent: "#F57F17", dot: "#FFCA28" },
+];
+
+// ── Shared styles ─────────────────────────────────────────────────────────────
+const sCard = {
+  background: "#fff",
+  borderRadius: 8,
+  border: `1px solid ${T.ink150}`,
+  padding: 24,
+  marginBottom: 20,
+  boxShadow: T.shadow,
+};
+
+const mkBtn = (variant = "primary", extra = {}) => {
+  const base = {
+    padding: "9px 18px",
+    borderRadius: 4,
+    border: "none",
+    cursor: "pointer",
+    fontFamily: T.fontUi,
+    fontWeight: 600,
+    fontSize: 13,
+    transition: "opacity 0.15s",
+    letterSpacing: "0.04em",
+  };
+  const v = {
+    primary: { background: T.accent, color: "#fff" },
+    ghost: {
+      background: "transparent",
+      color: T.accent,
+      border: `1px solid ${T.accentBd}`,
+    },
+    danger: { background: T.danger, color: "#fff" },
+    small: {
+      background: T.ink075,
+      color: T.ink700,
+      padding: "5px 12px",
+      fontSize: 12,
+      fontWeight: 500,
+    },
+  };
+  return { ...base, ...(v[variant] || v.primary), ...extra };
+};
+
+const sInput = {
+  padding: "9px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontFamily: T.fontUi,
+  fontSize: 13,
+  width: "100%",
+  boxSizing: "border-box",
+  color: T.ink900,
+};
+const sSelect = { ...sInput, background: "#fff" };
+
+const sLbl = (text) => (
+  <label
+    style={{
+      fontSize: 11,
+      fontWeight: 700,
+      color: T.ink400,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      display: "block",
+      marginBottom: 6,
+      fontFamily: T.fontUi,
+    }}
+  >
+    {text}
+  </label>
+);
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 const CANNALYTICS_TESTS = [
   { id: "potency", label: "Potency / Cannabinoid Profiling", price: 350 },
   { id: "solvents", label: "Residual Solvents", price: 200 },
@@ -64,12 +169,10 @@ const HARDWARE_PROFILES = [
     tip: "Two independent chambers. Mix the same or different strains.",
   },
 ];
-
 function detectHardwareProfile(name) {
   if (!name) return null;
   return HARDWARE_PROFILES.find((p) => p.pattern.test(name)) || null;
 }
-
 function blankChambers(profile) {
   return profile.defaultMl.map((ml, i) => ({
     label: `Chamber ${i + 1}`,
@@ -87,250 +190,49 @@ const DDP_TIERS = [
   { maxKg: Infinity, ratePerKg: 14.9 },
 ];
 const DDP_CLEARANCE_USD = 25;
-
 function calcDdpAir(weightKg) {
   if (!weightKg || weightKg <= 0) return 0;
   const tier = DDP_TIERS.find((t) => weightKg <= t.maxKg);
   return weightKg * tier.ratePerKg + DDP_CLEARANCE_USD;
 }
 
-function LandedCostCalc({ usdZar, onApply }) {
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState("ddp_air");
-  const [weightKg, setWeightKg] = useState("");
-  const [units, setUnits] = useState("");
-  const [seaUSD, setSeaUSD] = useState("");
-
-  let freightUSD = 0;
-  if (mode === "ddp_air" && weightKg)
-    freightUSD = calcDdpAir(parseFloat(weightKg));
-  if (mode === "standard_air") freightUSD = 800;
-  if (mode === "sea" && seaUSD) freightUSD = parseFloat(seaUSD);
-
-  const freightZAR = freightUSD * usdZar;
-  const unitsN = parseFloat(units) || 0;
-  const perUnitZAR = unitsN > 0 ? freightZAR / unitsN : null;
-
-  const s = {
-    padding: "7px 10px",
-    border: "1px solid #ddd",
-    borderRadius: 6,
-    fontFamily: "Jost, sans-serif",
-    fontSize: 13,
-    width: "100%",
-    boxSizing: "border-box",
-    background: "#fff",
-  };
-
-  return (
-    <div style={{ marginTop: 10 }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          background: "none",
-          border: "1px solid #90CAF9",
-          borderRadius: 6,
-          color: "#1565C0",
-          fontSize: 12,
-          padding: "4px 12px",
-          cursor: "pointer",
-          fontFamily: "Jost, sans-serif",
-          fontWeight: 600,
-        }}
-      >
-        {open ? "▲ Hide" : "🚢 Calculate landed cost per unit"}
-      </button>
-      {open && (
-        <div
-          style={{
-            marginTop: 10,
-            background: "#EBF5FB",
-            border: "1px solid #90CAF9",
-            borderRadius: 8,
-            padding: "14px 16px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "#1565C0",
-              marginBottom: 10,
-              textTransform: "uppercase",
-              letterSpacing: "0.4px",
-            }}
-          >
-            Shipping Cost → Per-Unit Allocation
-          </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 10,
-              marginBottom: 10,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
-                Shipping Mode
-              </div>
-              <select
-                value={mode}
-                onChange={(e) => setMode(e.target.value)}
-                style={s}
-              >
-                <option value="ddp_air">DDP Air (per kg)</option>
-                <option value="standard_air">Standard Air ($800 flat)</option>
-                <option value="sea">Sea Freight (manual)</option>
-              </select>
-            </div>
-            {mode === "ddp_air" && (
-              <div>
-                <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
-                  Total shipment weight (kg)
-                </div>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
-                  placeholder="e.g. 12"
-                  style={s}
-                />
-              </div>
-            )}
-            {mode === "sea" && (
-              <div>
-                <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
-                  Freight cost (USD)
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={seaUSD}
-                  onChange={(e) => setSeaUSD(e.target.value)}
-                  placeholder="e.g. 800"
-                  style={s}
-                />
-              </div>
-            )}
-            <div>
-              <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>
-                Units in shipment
-              </div>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={units}
-                onChange={(e) => setUnits(e.target.value)}
-                placeholder="e.g. 1000"
-                style={s}
-              />
-            </div>
-          </div>
-          {freightUSD > 0 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                flexWrap: "wrap",
-                background: "#fff",
-                border: "1px solid #90CAF9",
-                borderRadius: 6,
-                padding: "10px 14px",
-                marginBottom: 10,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "#888",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Total freight
-                </div>
-                <div style={{ fontWeight: 700, color: "#1565C0" }}>
-                  ${freightUSD.toFixed(2)} · R{freightZAR.toFixed(2)}
-                </div>
-              </div>
-              {perUnitZAR !== null && (
-                <>
-                  <div style={{ color: "#ccc" }}>÷</div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "#888",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Units
-                    </div>
-                    <div style={{ fontWeight: 700, color: "#1565C0" }}>
-                      {unitsN.toLocaleString()}
-                    </div>
-                  </div>
-                  <div style={{ color: "#ccc" }}>=</div>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "#888",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Per-unit shipping
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        color: "#1565C0",
-                      }}
-                    >
-                      R{perUnitZAR.toFixed(4)}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      onApply(perUnitZAR.toFixed(4));
-                      setOpen(false);
-                    }}
-                    style={{
-                      marginLeft: "auto",
-                      background: "#1565C0",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 6,
-                      padding: "8px 16px",
-                      cursor: "pointer",
-                      fontFamily: "Jost, sans-serif",
-                      fontWeight: 600,
-                      fontSize: 13,
-                    }}
-                  >
-                    ↑ Apply to recipe
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          <div style={{ fontSize: 10, color: "#5C9BD6" }}>
-            DDP rates: ≤21kg $15.80/kg · 21–50kg $15.50/kg · 50–100kg $15.20/kg
-            · 100kg+ $14.90/kg · +$25 clearance
-          </div>
-        </div>
-      )}
-    </div>
-  );
+const fmtZar = (n) =>
+  `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
+function dedupeByName(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = item.name.toLowerCase().replace(/\s+/g, " ").trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
+const blankRecipe = () => ({
+  product_name: "",
+  sku: "",
+  batch_size: 50,
+  hardware_item_id: "",
+  hardware_qty: 1,
+  shipping_alloc_zar: 0,
+  terpene_item_id: "",
+  terpene_qty_ul: 67,
+  distillate_input_id: "",
+  distillate_qty_ml: 1,
+  packaging_input_id: "",
+  packaging_qty: 1,
+  labour_input_id: "",
+  labour_qty: 1,
+  lab_tests: [],
+  transport_cost_zar: 0,
+  misc_cost_zar: 0,
+  packaging_manual_zar: "",
+  labour_manual_zar: "",
+  chambers: null,
+  notes: "",
+});
 
+// ── FX Hook ───────────────────────────────────────────────────────────────────
 function useFxRate() {
   const [fxRate, setFxRate] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
@@ -356,6 +258,7 @@ function useFxRate() {
   return { fxRate, fxLoading };
 }
 
+// ── COGS calc ─────────────────────────────────────────────────────────────────
 function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   if (!recipe || !usdZar) return null;
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
@@ -363,14 +266,12 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   const di = localInputs.find((i) => i.id === recipe.distillate_input_id);
   const pk = localInputs.find((i) => i.id === recipe.packaging_input_id);
   const lb = localInputs.find((i) => i.id === recipe.labour_input_id);
-
   const hwCost = hw
     ? parseFloat(recipe.hardware_qty || 1) *
         parseFloat(hw.unit_price_usd) *
         usdZar +
       parseFloat(recipe.shipping_alloc_zar || 0)
     : 0;
-
   let tpCost = 0,
     diCost = 0,
     chamberSummary = null;
@@ -378,7 +279,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
     Array.isArray(recipe.chambers) && recipe.chambers.length > 1
       ? recipe.chambers
       : null;
-
   if (chamberData) {
     chamberSummary = chamberData.map((ch) => {
       const chTp = supplierProducts.find((p) => p.id === ch.terpene_item_id);
@@ -413,7 +313,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
         ? parseFloat(recipe.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
         : 0;
   }
-
   const pkRate =
     recipe.packaging_manual_zar != null && recipe.packaging_manual_zar !== ""
       ? parseFloat(recipe.packaging_manual_zar)
@@ -429,7 +328,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
         ? parseFloat(lb.cost_zar)
         : 0;
   const lbCost = lbRate > 0 ? parseFloat(recipe.labour_qty || 1) * lbRate : 0;
-
   const batchSize = Math.max(1, parseInt(recipe.batch_size || 1));
   const labTests = Array.isArray(recipe.lab_tests) ? recipe.lab_tests : [];
   const labTotal = labTests.reduce((s, id) => {
@@ -448,7 +346,6 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
     labPerUnit +
     transportPU +
     miscPU;
-
   return {
     hardware: hwCost,
     terpene: tpCost,
@@ -482,32 +379,240 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   };
 }
 
-const fmtZar = (n) =>
-  `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
-
-function dedupeByName(items) {
-  const seen = new Set();
-  return items.filter((item) => {
-    const key = item.name.toLowerCase().replace(/\s+/g, " ").trim();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+// ── LandedCostCalc (inline calculator in builder) ────────────────────────────
+function LandedCostCalc({ usdZar, onApply }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("ddp_air");
+  const [weightKg, setWeightKg] = useState("");
+  const [units, setUnits] = useState("");
+  const [seaUSD, setSeaUSD] = useState("");
+  let freightUSD = 0;
+  if (mode === "ddp_air" && weightKg)
+    freightUSD = calcDdpAir(parseFloat(weightKg));
+  if (mode === "standard_air") freightUSD = 800;
+  if (mode === "sea" && seaUSD) freightUSD = parseFloat(seaUSD);
+  const freightZAR = freightUSD * usdZar;
+  const unitsN = parseFloat(units) || 0;
+  const perUnitZAR = unitsN > 0 ? freightZAR / unitsN : null;
+  const s = { ...sInput, fontSize: 12 };
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: "none",
+          border: `1px solid ${T.infoBd}`,
+          borderRadius: 4,
+          color: T.info,
+          fontSize: 12,
+          padding: "4px 12px",
+          cursor: "pointer",
+          fontFamily: T.fontUi,
+          fontWeight: 600,
+        }}
+      >
+        {open ? "Hide" : "Calculate landed cost per unit"}
+      </button>
+      {open && (
+        <div
+          style={{
+            marginTop: 10,
+            background: T.infoBg,
+            border: `1px solid ${T.infoBd}`,
+            borderRadius: 6,
+            padding: "14px 16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: T.info,
+              marginBottom: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Shipping Cost → Per-Unit Allocation
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 10,
+              marginBottom: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, color: T.ink500, marginBottom: 4 }}>
+                Shipping Mode
+              </div>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+                style={s}
+              >
+                <option value="ddp_air">DDP Air (per kg)</option>
+                <option value="standard_air">Standard Air ($800 flat)</option>
+                <option value="sea">Sea Freight (manual)</option>
+              </select>
+            </div>
+            {mode === "ddp_air" && (
+              <div>
+                <div style={{ fontSize: 11, color: T.ink500, marginBottom: 4 }}>
+                  Shipment weight (kg)
+                </div>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value)}
+                  placeholder="e.g. 12"
+                  style={s}
+                />
+              </div>
+            )}
+            {mode === "sea" && (
+              <div>
+                <div style={{ fontSize: 11, color: T.ink500, marginBottom: 4 }}>
+                  Freight cost (USD)
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={seaUSD}
+                  onChange={(e) => setSeaUSD(e.target.value)}
+                  placeholder="e.g. 800"
+                  style={s}
+                />
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 11, color: T.ink500, marginBottom: 4 }}>
+                Units in shipment
+              </div>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                placeholder="e.g. 1000"
+                style={s}
+              />
+            </div>
+          </div>
+          {freightUSD > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                flexWrap: "wrap",
+                background: "#fff",
+                border: `1px solid ${T.infoBd}`,
+                borderRadius: 4,
+                padding: "10px 14px",
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Total freight
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontData,
+                    fontWeight: 600,
+                    color: T.info,
+                  }}
+                >
+                  ${freightUSD.toFixed(2)} · R{freightZAR.toFixed(2)}
+                </div>
+              </div>
+              {perUnitZAR !== null && (
+                <>
+                  <div style={{ color: T.ink300 }}>÷</div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: T.ink400,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Units
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: T.fontData,
+                        fontWeight: 600,
+                        color: T.info,
+                      }}
+                    >
+                      {unitsN.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ color: T.ink300 }}>=</div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: T.ink400,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Per-unit shipping
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: T.fontData,
+                        fontSize: 18,
+                        fontWeight: 400,
+                        color: T.info,
+                      }}
+                    >
+                      R{perUnitZAR.toFixed(4)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onApply(perUnitZAR.toFixed(4));
+                      setOpen(false);
+                    }}
+                    style={{
+                      marginLeft: "auto",
+                      ...mkBtn("primary", {
+                        fontSize: 12,
+                        padding: "7px 14px",
+                      }),
+                    }}
+                  >
+                    Apply to recipe
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: T.info, fontFamily: T.fontUi }}>
+            DDP rates: ≤21kg $15.80/kg · 21–50kg $15.50/kg · 50–100kg $15.20/kg
+            · 100kg+ $14.90/kg · +$25 clearance
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-const CATEGORY_COLOURS = {
-  hardware: { bg: "#E3F2FD", color: "#1565C0" },
-  terpene: { bg: "#F3E5F5", color: "#6A1B9A" },
-  distillate: { bg: "#FFF8E1", color: "#F57F17" },
-  packaging: { bg: "#E8F5E9", color: "#2E7D32" },
-  labour: { bg: "#FCE4EC", color: "#880E4F" },
-  lab: { bg: "#E8EAF6", color: "#283593" },
-  transport: { bg: "#E0F7FA", color: "#00695C" },
-  misc: { bg: "#ECEFF1", color: "#455A64" },
-  other: { bg: "#ECEFF1", color: "#455A64" },
-};
-
+// ── CogsBar ───────────────────────────────────────────────────────────────────
 function CogsBar({ breakdown }) {
   if (!breakdown || breakdown.total === 0) return null;
   const categories = [
@@ -520,14 +625,13 @@ function CogsBar({ breakdown }) {
     { key: "transport", label: "Transport" },
     { key: "misc", label: "Misc" },
   ].filter((c) => breakdown[c.key] > 0);
-
   return (
     <div style={{ marginTop: 12 }}>
       <div
         style={{
           display: "flex",
-          height: 10,
-          borderRadius: 5,
+          height: 8,
+          borderRadius: 4,
           overflow: "hidden",
           gap: 1,
         }}
@@ -570,8 +674,9 @@ function CogsBar({ breakdown }) {
                   background: col.color,
                 }}
               />
-              <span style={{ color: "#666" }}>
-                {c.label}: <strong>{fmt(pct)}%</strong>
+              <span style={{ color: T.ink500, fontFamily: T.fontUi }}>
+                {c.label}:{" "}
+                <strong style={{ fontFamily: T.fontData }}>{fmt(pct)}%</strong>
               </span>
             </div>
           );
@@ -581,36 +686,6 @@ function CogsBar({ breakdown }) {
   );
 }
 
-const blankRecipe = () => ({
-  product_name: "",
-  sku: "",
-  batch_size: 50,
-  hardware_item_id: "",
-  hardware_qty: 1,
-  shipping_alloc_zar: 0,
-  terpene_item_id: "",
-  terpene_qty_ul: 67,
-  distillate_input_id: "",
-  distillate_qty_ml: 1,
-  packaging_input_id: "",
-  packaging_qty: 1,
-  labour_input_id: "",
-  labour_qty: 1,
-  lab_tests: [],
-  transport_cost_zar: 0,
-  misc_cost_zar: 0,
-  packaging_manual_zar: "",
-  labour_manual_zar: "",
-  chambers: null,
-  notes: "",
-});
-
-const CHAMBER_COLORS = [
-  { bg: "#E3F2FD", border: "#90CAF9", accent: "#1565C0", dot: "#42A5F5" },
-  { bg: "#F3E5F5", border: "#CE93D8", accent: "#6A1B9A", dot: "#AB47BC" },
-  { bg: "#FFF8E1", border: "#FFE082", accent: "#F57F17", dot: "#FFCA28" },
-];
-
 // ── ChambersEditor ────────────────────────────────────────────────────────────
 function ChambersEditor({
   chambers,
@@ -618,41 +693,36 @@ function ChambersEditor({
   distillateInputs,
   terpeneItems,
   usdZar,
-  fmtZar,
-  fmt,
-  inputStyle,
-  lbl,
 }) {
-  const setChField = (idx, key, val) => {
+  const setChField = (idx, key, val) =>
     onChange(chambers.map((ch, i) => (i === idx ? { ...ch, [key]: val } : ch)));
-  };
-
   const totalDistillate = chambers.reduce(
     (s, ch) => s + parseFloat(ch.distillate_qty_ml || 0),
     0,
   );
-
   return (
     <div>
       <div
         style={{
           display: "flex",
-          gap: 12,
+          gap: 10,
           flexWrap: "wrap",
           marginBottom: 14,
-          background: "#f8f9fa",
-          borderRadius: 8,
+          background: T.ink075,
+          borderRadius: 6,
           padding: "10px 14px",
           alignItems: "center",
         }}
       >
-        <div style={{ fontSize: 13, color: "#555" }}>
-          <strong style={{ color: "#333" }}>{chambers.length} chambers</strong>
-          <span style={{ color: "#aaa", margin: "0 8px" }}>·</span>
-          <strong style={{ color: "#1565C0" }}>
+        <div style={{ fontSize: 13, color: T.ink500, fontFamily: T.fontUi }}>
+          <strong style={{ color: T.ink900 }}>
+            {chambers.length} chambers
+          </strong>
+          <span style={{ color: T.ink300, margin: "0 8px" }}>·</span>
+          <strong style={{ fontFamily: T.fontData, color: "#1565C0" }}>
             {totalDistillate.toFixed(2)}ml
           </strong>
-          <span style={{ fontSize: 11, color: "#aaa", marginLeft: 4 }}>
+          <span style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}>
             total distillate
           </span>
         </div>
@@ -667,7 +737,7 @@ function ChambersEditor({
                 gap: 5,
                 background: col.bg,
                 border: `1px solid ${col.border}`,
-                borderRadius: 6,
+                borderRadius: 4,
                 padding: "3px 10px",
               }}
             >
@@ -681,18 +751,28 @@ function ChambersEditor({
                 }}
               />
               <span
-                style={{ fontSize: 12, color: col.accent, fontWeight: 600 }}
+                style={{
+                  fontSize: 12,
+                  color: col.accent,
+                  fontWeight: 600,
+                  fontFamily: T.fontUi,
+                }}
               >
                 {ch.label || `Ch.${i + 1}`}
               </span>
-              <span style={{ fontSize: 11, color: col.accent }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: col.accent,
+                  fontFamily: T.fontData,
+                }}
+              >
                 {ch.distillate_qty_ml}ml
               </span>
             </div>
           );
         })}
       </div>
-
       {chambers.map((ch, idx) => {
         const col = CHAMBER_COLORS[idx % CHAMBER_COLORS.length];
         const terpPct =
@@ -717,7 +797,6 @@ function ChambersEditor({
           di && di.cost_zar
             ? parseFloat(ch.distillate_qty_ml || 0) * parseFloat(di.cost_zar)
             : 0;
-
         const presets = [
           {
             label: "3%",
@@ -736,13 +815,12 @@ function ChambersEditor({
             ul: Math.round(parseFloat(ch.distillate_qty_ml || 1) * 100),
           },
         ];
-
         return (
           <div
             key={idx}
             style={{
               border: `1.5px solid ${col.border}`,
-              borderRadius: 12,
+              borderRadius: 8,
               marginBottom: 14,
               overflow: "hidden",
             }}
@@ -771,7 +849,7 @@ function ChambersEditor({
                 style={{
                   border: "none",
                   background: "transparent",
-                  fontFamily: "Jost, sans-serif",
+                  fontFamily: T.fontUi,
                   fontWeight: 700,
                   fontSize: 14,
                   color: col.accent,
@@ -785,8 +863,9 @@ function ChambersEditor({
                   fontSize: 11,
                   color: col.accent,
                   background: "rgba(255,255,255,0.6)",
-                  borderRadius: 5,
+                  borderRadius: 4,
                   padding: "2px 8px",
+                  fontFamily: T.fontData,
                 }}
               >
                 {chDiCost > 0 || chTpCost > 0
@@ -794,7 +873,6 @@ function ChambersEditor({
                   : "—"}
               </div>
             </div>
-
             <div style={{ padding: "14px 16px", background: "#fff" }}>
               <div
                 style={{
@@ -808,21 +886,21 @@ function ChambersEditor({
                   <div
                     style={{
                       fontSize: 11,
-                      fontWeight: 600,
-                      color: "#888",
+                      fontWeight: 700,
+                      color: T.ink400,
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 5,
                     }}
                   >
-                    💧 Distillate
+                    Distillate
                   </div>
                   <select
                     value={ch.distillate_input_id}
                     onChange={(e) =>
                       setChField(idx, "distillate_input_id", e.target.value)
                     }
-                    style={{ ...inputStyle, fontSize: 13 }}
+                    style={{ ...sSelect, fontSize: 13 }}
                   >
                     <option value="">— None —</option>
                     {distillateInputs.map((i) => (
@@ -839,10 +917,10 @@ function ChambersEditor({
                   <div
                     style={{
                       fontSize: 11,
-                      fontWeight: 600,
-                      color: "#888",
+                      fontWeight: 700,
+                      color: T.ink400,
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 5,
                     }}
                   >
@@ -856,20 +934,23 @@ function ChambersEditor({
                     onChange={(e) =>
                       setChField(idx, "distillate_qty_ml", e.target.value)
                     }
-                    style={{ ...inputStyle, fontSize: 13 }}
+                    style={{ ...sInput, fontSize: 13 }}
                   />
                 </div>
               </div>
               {di && di.cost_zar && (
                 <div
-                  style={{ fontSize: 11, color: "#F57F17", marginBottom: 10 }}
+                  style={{
+                    fontSize: 11,
+                    color: "#F57F17",
+                    marginBottom: 10,
+                    fontFamily: T.fontData,
+                  }}
                 >
-                  Distillate: R{parseFloat(di.cost_zar).toFixed(2)}/ml ×{" "}
+                  R{parseFloat(di.cost_zar).toFixed(2)}/ml ×{" "}
                   {ch.distillate_qty_ml}ml = {fmtZar(chDiCost)}
                 </div>
               )}
-
-              {/* Terpene row — v3.5: label corrected to µl, ml conversion hint added */}
               <div
                 style={{
                   display: "grid",
@@ -881,21 +962,21 @@ function ChambersEditor({
                   <div
                     style={{
                       fontSize: 11,
-                      fontWeight: 600,
-                      color: "#888",
+                      fontWeight: 700,
+                      color: T.ink400,
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 5,
                     }}
                   >
-                    🌿 Terpene Blend
+                    Terpene Blend
                   </div>
                   <select
                     value={ch.terpene_item_id}
                     onChange={(e) =>
                       setChField(idx, "terpene_item_id", e.target.value)
                     }
-                    style={{ ...inputStyle, fontSize: 13 }}
+                    style={{ ...sSelect, fontSize: 13 }}
                   >
                     <option value="">— None —</option>
                     {terpeneItems.map((p) => (
@@ -910,10 +991,10 @@ function ChambersEditor({
                   <div
                     style={{
                       fontSize: 11,
-                      fontWeight: 600,
+                      fontWeight: 700,
                       color: col.accent,
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 5,
                       display: "flex",
                       alignItems: "center",
@@ -931,11 +1012,7 @@ function ChambersEditor({
                     onChange={(e) =>
                       setChField(idx, "terpene_qty_ul", e.target.value)
                     }
-                    style={{
-                      ...inputStyle,
-                      fontSize: 13,
-                      borderColor: col.border,
-                    }}
+                    style={{ ...sInput, fontSize: 13, borderColor: col.border }}
                   />
                   {parseFloat(ch.terpene_qty_ul) > 0 && (
                     <div
@@ -944,6 +1021,7 @@ function ChambersEditor({
                         color: col.accent,
                         marginTop: 3,
                         fontWeight: 600,
+                        fontFamily: T.fontData,
                       }}
                     >
                       = {(parseFloat(ch.terpene_qty_ul) / 1000).toFixed(4)} ml
@@ -951,12 +1029,11 @@ function ChambersEditor({
                   )}
                 </div>
               </div>
-
               <div
                 style={{
                   marginTop: 8,
                   display: "flex",
-                  gap: 8,
+                  gap: 6,
                   flexWrap: "wrap",
                   alignItems: "center",
                 }}
@@ -967,7 +1044,7 @@ function ChambersEditor({
                     onClick={() => setChField(idx, "terpene_qty_ul", p.ul)}
                     style={{
                       padding: "2px 7px",
-                      borderRadius: 5,
+                      borderRadius: 4,
                       border: `1px solid ${col.border}`,
                       background:
                         parseInt(ch.terpene_qty_ul) === p.ul
@@ -976,8 +1053,8 @@ function ChambersEditor({
                       color: col.accent,
                       cursor: "pointer",
                       fontSize: 11,
-                      fontFamily: "Jost, sans-serif",
-                      fontWeight: 600,
+                      fontFamily: T.fontUi,
+                      fontWeight: 700,
                     }}
                   >
                     {p.label}
@@ -985,12 +1062,17 @@ function ChambersEditor({
                 ))}
                 {parseFloat(ch.terpene_qty_ul) > 0 && (
                   <span
-                    style={{ fontSize: 11, color: col.accent, marginLeft: 4 }}
+                    style={{
+                      fontSize: 11,
+                      color: col.accent,
+                      marginLeft: 4,
+                      fontFamily: T.fontData,
+                    }}
                   >
                     = {(parseFloat(ch.terpene_qty_ul) / 1000).toFixed(4)}ml ·{" "}
                     {terpPct}% of {ch.distillate_qty_ml}ml
                     {tp && (
-                      <span style={{ color: "#aaa" }}>
+                      <span style={{ color: T.ink400 }}>
                         {" "}
                         · {fmtZar(chTpCost)}
                       </span>
@@ -1006,8 +1088,6 @@ function ChambersEditor({
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
 export default function HQCogs() {
   const { fxRate, fxLoading } = useFxRate();
@@ -1056,7 +1136,6 @@ export default function HQCogs() {
     setLocalInputs(r3.data || []);
     setLoading(false);
   }, []);
-
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -1070,7 +1149,6 @@ export default function HQCogs() {
   );
   const packagingInputs = localInputs.filter((i) => i.category === "packaging");
   const labourInputs = localInputs.filter((i) => i.category === "labour");
-
   const activeHwItem = hardwareItems.find(
     (p) => p.id === form.hardware_item_id,
   );
@@ -1085,18 +1163,15 @@ export default function HQCogs() {
   const getCardQty = (id) => cardQty[id] || 1;
   const setCardQtyFor = (id, n) =>
     setCardQty((prev) => ({ ...prev, [id]: Math.max(1, parseInt(n) || 1) }));
-
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 4000);
   };
-
   const openNew = () => {
     setEditingRecipe(null);
     setForm(blankRecipe());
     setShowBuilder(true);
   };
-
   const openEdit = (recipe) => {
     setEditingRecipe(recipe);
     setForm({
@@ -1135,9 +1210,7 @@ export default function HQCogs() {
     });
     setShowBuilder(true);
   };
-
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
   const handleHardwareChange = (hwId) => {
     const hw = hardwareItems.find((p) => p.id === hwId);
     const profile = hw ? detectHardwareProfile(hw.name) : null;
@@ -1151,7 +1224,6 @@ export default function HQCogs() {
         : null,
     }));
   };
-
   const toggleLabTest = (id) => {
     setForm((f) => {
       const tests = Array.isArray(f.lab_tests) ? f.lab_tests : [];
@@ -1208,19 +1280,19 @@ export default function HQCogs() {
         : await supabase.from("product_cogs").insert(payload);
       if (error) {
         console.error("COGS save error:", error);
-        showToast(`❌ Save failed: ${error.message}`);
+        showToast(`Save failed: ${error.message}`);
       } else {
         showToast(
           editingRecipe
-            ? `✅ ${payload.product_name} updated`
-            : `✅ ${payload.product_name} added to COGS registry`,
+            ? `${payload.product_name} updated`
+            : `${payload.product_name} added to COGS registry`,
         );
         setShowBuilder(false);
         fetchAll();
       }
     } catch (err) {
       console.error("COGS save exception:", err);
-      showToast(`❌ Unexpected error: ${err.message}`);
+      showToast(`Unexpected error: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -1232,10 +1304,9 @@ export default function HQCogs() {
       .update({ is_active: false })
       .eq("id", id);
     setDeleteConfirm(null);
-    showToast("🗑 SKU removed from COGS registry");
+    showToast("SKU removed from COGS registry");
     fetchAll();
   };
-
   const handleSaveInput = async (inputId) => {
     setSavingInput(true);
     const val = parseFloat(inputEditVal);
@@ -1244,7 +1315,7 @@ export default function HQCogs() {
         .from("local_inputs")
         .update({ cost_zar: val })
         .eq("id", inputId);
-      showToast("✅ Cost updated");
+      showToast("Cost updated");
     }
     setSavingInput(false);
     setEditingInput(null);
@@ -1258,7 +1329,6 @@ export default function HQCogs() {
     localInputs,
     usdZar,
   );
-
   const terpPct =
     form.distillate_qty_ml > 0
       ? (
@@ -1269,81 +1339,20 @@ export default function HQCogs() {
         ).toFixed(1)
       : null;
 
-  const card = {
-    background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #f0ede8",
-    padding: 24,
-    marginBottom: 20,
-  };
-  const inputStyle = {
-    padding: "10px 14px",
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    fontFamily: "Jost, sans-serif",
-    fontSize: 14,
-    width: "100%",
-    boxSizing: "border-box",
-  };
-  const selectStyle = { ...inputStyle, background: "#fff" };
-  const btn = (variant = "primary", extra = {}) => ({
-    padding: "10px 20px",
-    borderRadius: 8,
-    border: "none",
-    cursor: "pointer",
-    fontFamily: "Jost, sans-serif",
-    fontWeight: 600,
-    fontSize: 14,
-    transition: "opacity 0.15s",
-    ...(variant === "primary" ? { background: "#2d4a2d", color: "#fff" } : {}),
-    ...(variant === "ghost"
-      ? {
-          background: "transparent",
-          color: "#2d4a2d",
-          border: "1px solid #2d4a2d",
-        }
-      : {}),
-    ...(variant === "danger" ? { background: "#c62828", color: "#fff" } : {}),
-    ...(variant === "small"
-      ? {
-          background: "#f5f5f5",
-          color: "#555",
-          padding: "6px 14px",
-          fontSize: 13,
-          fontWeight: 500,
-        }
-      : {}),
-    ...extra,
-  });
-  const lbl = (text) => (
-    <label
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: "#888",
-        textTransform: "uppercase",
-        letterSpacing: "0.4px",
-        display: "block",
-        marginBottom: 6,
-      }}
-    >
-      {text}
-    </label>
-  );
-
   const SUB_TABS = [
-    { id: "costing", label: "📊 SKU COGS Builder" },
-    { id: "local-inputs", label: "🧪 Local Inputs" },
+    { id: "costing", label: "SKU COGS Builder" },
+    { id: "local-inputs", label: "Local Inputs" },
   ];
 
   return (
-    <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
+    <div style={{ fontFamily: T.fontUi, color: T.ink700 }}>
       <WorkflowGuide
         context={ctx}
         tabId="costing"
         onAction={(action) => action.tab && setActiveSubTab(action.tab)}
         defaultOpen={true}
       />
+
       {toast && (
         <div
           style={{
@@ -1351,13 +1360,14 @@ export default function HQCogs() {
             top: 24,
             right: 24,
             zIndex: 9999,
-            background: "#2d4a2d",
+            background: T.accent,
             color: "#fff",
-            padding: "14px 20px",
-            borderRadius: 10,
-            fontSize: 14,
+            padding: "12px 18px",
+            borderRadius: 6,
+            fontSize: 13,
             fontWeight: 500,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            fontFamily: T.fontUi,
           }}
         >
           {toast}
@@ -1370,56 +1380,57 @@ export default function HQCogs() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 28,
+          marginBottom: 24,
         }}
       >
         <div>
           <h2
             style={{
               margin: 0,
-              fontSize: 26,
-              fontFamily: "Cormorant Garamond, serif",
-              fontWeight: 600,
-              color: "#2d4a2d",
+              fontSize: 22,
+              fontFamily: T.fontUi,
+              fontWeight: 300,
+              color: T.ink900,
             }}
           >
             Costing
           </h2>
-          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>
+          <p style={{ margin: "4px 0 0", color: T.ink500, fontSize: 13 }}>
             Cost-of-goods-sold per finished SKU · live ZAR calculations
           </p>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div
             style={{
-              background: fxLoading ? "#f5f5f5" : "#e8f5e9",
-              border: "1px solid #c8e6c9",
-              borderRadius: 20,
-              padding: "6px 14px",
-              fontSize: 13,
-              color: "#2E7D32",
+              background: fxLoading ? T.ink075 : T.successBg,
+              border: `1px solid ${T.successBd}`,
+              borderRadius: 4,
+              padding: "6px 12px",
+              fontSize: 12,
+              color: T.success,
               fontWeight: 600,
+              fontFamily: T.fontData,
             }}
           >
             {fxLoading
               ? "Loading FX…"
-              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "Live" : "Cached"}`}
           </div>
           {activeSubTab === "costing" && (
-            <button style={btn("primary")} onClick={openNew}>
+            <button style={mkBtn("primary")} onClick={openNew}>
               + New SKU Recipe
             </button>
           )}
         </div>
       </div>
 
-      {/* Sub-tab nav */}
+      {/* Sub-tabs — underline, no emoji */}
       <div
         style={{
           display: "flex",
-          gap: 4,
-          borderBottom: "1px solid #f0ede8",
-          marginBottom: 28,
+          gap: 0,
+          borderBottom: `1px solid ${T.ink150}`,
+          marginBottom: 24,
         }}
       >
         {SUB_TABS.map((t) => (
@@ -1427,19 +1438,21 @@ export default function HQCogs() {
             key={t.id}
             onClick={() => setActiveSubTab(t.id)}
             style={{
-              background: "transparent",
+              background: "none",
               border: "none",
               cursor: "pointer",
-              padding: "10px 20px",
-              fontFamily: "Jost, sans-serif",
-              fontSize: 13,
+              padding: "10px 18px",
+              fontFamily: T.fontUi,
+              fontSize: 11,
               fontWeight: activeSubTab === t.id ? 700 : 400,
-              color: activeSubTab === t.id ? "#2d4a2d" : "#999",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: activeSubTab === t.id ? T.accent : T.ink500,
               borderBottom:
                 activeSubTab === t.id
-                  ? "2px solid #2d4a2d"
+                  ? `2px solid ${T.accent}`
                   : "2px solid transparent",
-              transition: "all 0.15s",
+              marginBottom: "-1px",
             }}
           >
             {t.label}
@@ -1450,11 +1463,19 @@ export default function HQCogs() {
       {/* ── LOCAL INPUTS TAB ── */}
       {activeSubTab === "local-inputs" && (
         <div>
-          <div style={card}>
-            <h3 style={{ margin: "0 0 6px", fontSize: 16, color: "#2d4a2d" }}>
+          <div style={sCard}>
+            <h3
+              style={{
+                margin: "0 0 4px",
+                fontSize: 15,
+                color: T.ink900,
+                fontFamily: T.fontUi,
+                fontWeight: 500,
+              }}
+            >
               Local Inputs
             </h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#888" }}>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: T.ink500 }}>
               ZAR costs for locally-sourced inputs. Click a cost to edit.
             </p>
             {["distillate", "packaging", "labour"].map((cat) => {
@@ -1465,21 +1486,22 @@ export default function HQCogs() {
                   <div
                     style={{
                       display: "inline-block",
-                      padding: "3px 12px",
-                      borderRadius: 12,
-                      fontSize: 12,
+                      padding: "3px 10px",
+                      borderRadius: 3,
+                      fontSize: 10,
                       fontWeight: 700,
                       textTransform: "uppercase",
-                      letterSpacing: "0.5px",
+                      letterSpacing: "0.08em",
                       background: col.bg,
                       color: col.color,
                       marginBottom: 12,
+                      fontFamily: T.fontUi,
                     }}
                   >
                     {cat}
                   </div>
                   {items.length === 0 ? (
-                    <div style={{ color: "#bbb", fontSize: 13 }}>
+                    <div style={{ color: T.ink300, fontSize: 13 }}>
                       No {cat} inputs found.
                     </div>
                   ) : (
@@ -1489,22 +1511,22 @@ export default function HQCogs() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 16,
-                          padding: "14px 18px",
-                          borderRadius: 10,
-                          border: "1px solid #f0ede8",
+                          gap: 14,
+                          padding: "12px 16px",
+                          borderRadius: 6,
+                          border: `1px solid ${T.ink150}`,
                           marginBottom: 8,
-                          background: "#fafaf8",
+                          background: T.ink050,
                         }}
                       >
                         <div style={{ flex: 2 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>
                             {inp.name}
                           </div>
                           <div
                             style={{
-                              fontSize: 12,
-                              color: "#999",
+                              fontSize: 11,
+                              color: T.ink400,
                               marginTop: 2,
                             }}
                           >
@@ -1520,7 +1542,7 @@ export default function HQCogs() {
                               flex: 1,
                             }}
                           >
-                            <span style={{ fontSize: 14, color: "#555" }}>
+                            <span style={{ fontSize: 13, color: T.ink500 }}>
                               R
                             </span>
                             <input
@@ -1528,16 +1550,16 @@ export default function HQCogs() {
                               step="0.01"
                               value={inputEditVal}
                               onChange={(e) => setInputEditVal(e.target.value)}
-                              style={{ ...inputStyle, width: 120 }}
+                              style={{ ...sInput, width: 120 }}
                               autoFocus
                             />
-                            <span style={{ fontSize: 12, color: "#999" }}>
+                            <span style={{ fontSize: 12, color: T.ink400 }}>
                               per {inp.unit?.replace("per ", "")}
                             </span>
                             <button
-                              style={btn("primary", {
-                                padding: "8px 16px",
-                                fontSize: 13,
+                              style={mkBtn("primary", {
+                                padding: "7px 14px",
+                                fontSize: 12,
                               })}
                               onClick={() => handleSaveInput(inp.id)}
                               disabled={savingInput}
@@ -1545,7 +1567,7 @@ export default function HQCogs() {
                               {savingInput ? "…" : "Save"}
                             </button>
                             <button
-                              style={btn("small")}
+                              style={mkBtn("small")}
                               onClick={() => {
                                 setEditingInput(null);
                                 setInputEditVal("");
@@ -1559,15 +1581,16 @@ export default function HQCogs() {
                             style={{
                               display: "flex",
                               alignItems: "center",
-                              gap: 16,
+                              gap: 14,
                               flex: 1,
                             }}
                           >
                             <div
                               style={{
+                                fontFamily: T.fontData,
                                 fontSize: 18,
-                                fontWeight: 700,
-                                color: inp.cost_zar ? "#2d4a2d" : "#bbb",
+                                fontWeight: 400,
+                                color: inp.cost_zar ? T.accent : T.ink300,
                                 cursor: "pointer",
                                 flex: 1,
                               }}
@@ -1582,7 +1605,7 @@ export default function HQCogs() {
                                 : "TBD — click to set"}
                             </div>
                             <button
-                              style={btn("small")}
+                              style={mkBtn("small")}
                               onClick={() => {
                                 setEditingInput(inp.id);
                                 setInputEditVal(inp.cost_zar || "");
@@ -1601,17 +1624,17 @@ export default function HQCogs() {
           </div>
           <div
             style={{
-              background: "#f8f9fa",
-              borderRadius: 10,
-              padding: "16px 20px",
+              background: T.ink075,
+              borderRadius: 6,
+              padding: "14px 18px",
               fontSize: 13,
-              color: "#666",
-              border: "1px solid #e0e0e0",
+              color: T.ink500,
+              border: `1px solid ${T.ink150}`,
             }}
           >
-            <strong>ℹ️ Note:</strong> Terpene & hardware are imported items
-            priced in USD — ZAR cost is calculated live. To update imported item
-            prices go to <strong>HQ → Suppliers → Product Catalogue</strong>.
+            Terpene & hardware are imported items priced in USD — ZAR cost is
+            calculated live. To update imported item prices go to{" "}
+            <strong>HQ → Suppliers → Product Catalogue</strong>.
           </div>
         </div>
       )}
@@ -1622,40 +1645,40 @@ export default function HQCogs() {
           {localInputs.some((i) => !i.cost_zar) && (
             <div
               style={{
-                background: "#fff8e1",
-                border: "1px solid #ffe082",
-                borderRadius: 10,
-                padding: "12px 18px",
+                background: T.warningBg,
+                border: `1px solid ${T.warningBd}`,
+                borderRadius: 6,
+                padding: "12px 16px",
                 marginBottom: 20,
                 fontSize: 13,
-                color: "#F57F17",
+                color: T.warning,
+                fontFamily: T.fontUi,
               }}
             >
-              ⚠️ Some local input costs are still <strong>TBD</strong>{" "}
-              (packaging, labour). Set them in the <strong>Local Inputs</strong>{" "}
-              tab.
+              Some local input costs are still <strong>TBD</strong> (packaging,
+              labour). Set them in the <strong>Local Inputs</strong> tab.
             </div>
           )}
           {loading ? (
-            <div style={{ textAlign: "center", padding: 60, color: "#999" }}>
+            <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
               Loading COGS data…
             </div>
           ) : recipes.length === 0 ? (
-            <div style={{ ...card, textAlign: "center", padding: 60 }}>
-              <div style={{ fontSize: 42, marginBottom: 16 }}>🧮</div>
+            <div style={{ ...sCard, textAlign: "center", padding: 60 }}>
               <h3
                 style={{
-                  color: "#2d4a2d",
-                  fontFamily: "Cormorant Garamond, serif",
-                  fontWeight: 600,
+                  color: T.ink900,
+                  fontFamily: T.fontUi,
+                  fontWeight: 400,
+                  marginBottom: 8,
                 }}
               >
                 No SKU recipes yet
               </h3>
-              <p style={{ color: "#999", fontSize: 14, marginBottom: 24 }}>
+              <p style={{ color: T.ink400, fontSize: 13, marginBottom: 24 }}>
                 Build a recipe for each finished product SKU.
               </p>
-              <button style={btn("primary")} onClick={openNew}>
+              <button style={mkBtn("primary")} onClick={openNew}>
                 + Build First SKU Recipe
               </button>
             </div>
@@ -1663,7 +1686,7 @@ export default function HQCogs() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill,minmax(380px,1fr))",
                 gap: 20,
               }}
             >
@@ -1675,7 +1698,7 @@ export default function HQCogs() {
                   usdZar,
                 );
                 return (
-                  <div key={recipe.id} style={{ ...card, marginBottom: 0 }}>
+                  <div key={recipe.id} style={{ ...sCard, marginBottom: 0 }}>
                     <div
                       style={{
                         display: "flex",
@@ -1687,9 +1710,10 @@ export default function HQCogs() {
                       <div>
                         <div
                           style={{
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: "#2d4a2d",
+                            fontSize: 16,
+                            fontWeight: 600,
+                            color: T.ink900,
+                            fontFamily: T.fontUi,
                           }}
                         >
                           {recipe.product_name}
@@ -1697,9 +1721,10 @@ export default function HQCogs() {
                         {recipe.sku && (
                           <div
                             style={{
-                              fontSize: 12,
-                              color: "#999",
+                              fontSize: 11,
+                              color: T.ink400,
                               marginTop: 2,
+                              fontFamily: T.fontData,
                             }}
                           >
                             {recipe.sku}
@@ -1714,7 +1739,13 @@ export default function HQCogs() {
                           }}
                         >
                           {bd && (
-                            <div style={{ fontSize: 11, color: "#aaa" }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: T.ink400,
+                                fontFamily: T.fontUi,
+                              }}
+                            >
                               Batch: {bd.batchSize} units
                             </div>
                           )}
@@ -1724,9 +1755,10 @@ export default function HQCogs() {
                                 fontSize: 11,
                                 background: "#E3F2FD",
                                 color: "#1565C0",
-                                borderRadius: 4,
+                                borderRadius: 3,
                                 padding: "1px 7px",
-                                fontWeight: 600,
+                                fontWeight: 700,
+                                fontFamily: T.fontUi,
                               }}
                             >
                               {bd.chamberSummary.length}-Chamber
@@ -1736,13 +1768,13 @@ export default function HQCogs() {
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
-                          style={btn("small")}
+                          style={mkBtn("small")}
                           onClick={() => openEdit(recipe)}
                         >
                           Edit
                         </button>
                         <button
-                          style={btn("small", { color: "#c62828" })}
+                          style={mkBtn("small", { color: T.danger })}
                           onClick={() => setDeleteConfirm(recipe.id)}
                         >
                           ✕
@@ -1758,11 +1790,11 @@ export default function HQCogs() {
                           <div
                             style={{
                               background: bd?.hasMissingCosts
-                                ? "#fff8e1"
-                                : "#f0f7f0",
-                              border: `1px solid ${bd?.hasMissingCosts ? "#ffe082" : "#c8e6c9"}`,
-                              borderRadius: 10,
-                              padding: "14px 18px",
+                                ? T.warningBg
+                                : T.accentLit,
+                              border: `1px solid ${bd?.hasMissingCosts ? T.warningBd : T.accentBd}`,
+                              borderRadius: 6,
+                              padding: "12px 16px",
                               marginBottom: 10,
                               display: "flex",
                               justifyContent: "space-between",
@@ -1772,20 +1804,22 @@ export default function HQCogs() {
                             <div>
                               <div
                                 style={{
-                                  fontSize: 11,
-                                  color: "#888",
+                                  fontSize: 10,
+                                  color: T.ink400,
                                   marginBottom: 4,
                                   textTransform: "uppercase",
-                                  letterSpacing: "0.3px",
+                                  letterSpacing: "0.08em",
+                                  fontWeight: 700,
                                 }}
                               >
                                 COGS per unit
                               </div>
                               <div
                                 style={{
-                                  fontSize: 28,
-                                  fontWeight: 700,
-                                  color: "#2d4a2d",
+                                  fontFamily: T.fontData,
+                                  fontSize: 26,
+                                  fontWeight: 400,
+                                  color: T.accent,
                                 }}
                               >
                                 {bd ? fmtZar(total) : "—"}
@@ -1795,54 +1829,41 @@ export default function HQCogs() {
                               <div
                                 style={{
                                   fontSize: 11,
-                                  color: "#F57F17",
+                                  color: T.warning,
                                   textAlign: "right",
                                 }}
                               >
-                                ⚠️ Incomplete
+                                Incomplete
                                 <br />
                                 (TBD costs)
                               </div>
                             )}
                           </div>
-
                           {bd?.hwMoq &&
                             getCardQty(recipe.id) < parseInt(bd.hwMoq) && (
                               <div
                                 style={{
-                                  background: "#FFF3E0",
-                                  border: "1px solid #FFB74D",
-                                  borderRadius: 8,
-                                  padding: "9px 14px",
+                                  background: T.warningBg,
+                                  border: `1px solid ${T.warningBd}`,
+                                  borderRadius: 6,
+                                  padding: "9px 12px",
                                   marginBottom: 10,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 8,
                                   fontSize: 12,
+                                  color: T.warning,
+                                  fontFamily: T.fontUi,
                                 }}
                               >
-                                <span style={{ fontSize: 16 }}>⚠️</span>
-                                <div>
-                                  <strong style={{ color: "#E65100" }}>
-                                    Below hardware MOQ
-                                  </strong>
-                                  <span
-                                    style={{ color: "#BF360C", marginLeft: 6 }}
-                                  >
-                                    Minimum order is{" "}
-                                    {parseInt(bd.hwMoq).toLocaleString()} units
-                                    — you're showing{" "}
-                                    {getCardQty(recipe.id).toLocaleString()}
-                                  </span>
-                                </div>
+                                <strong>Below hardware MOQ</strong> — minimum
+                                order is {parseInt(bd.hwMoq).toLocaleString()}{" "}
+                                units
                               </div>
                             )}
                           <div
                             style={{
-                              background: "#fafafa",
-                              border: "1px solid #eee",
-                              borderRadius: 10,
-                              padding: "10px 14px",
+                              background: T.ink050,
+                              border: `1px solid ${T.ink150}`,
+                              borderRadius: 6,
+                              padding: "10px 12px",
                               marginBottom: 14,
                             }}
                           >
@@ -1858,13 +1879,13 @@ export default function HQCogs() {
                                 style={{
                                   fontSize: 11,
                                   fontWeight: 700,
-                                  color: "#555",
+                                  color: T.ink400,
                                   textTransform: "uppercase",
-                                  letterSpacing: "0.4px",
+                                  letterSpacing: "0.08em",
                                   flexShrink: 0,
                                 }}
                               >
-                                Batch
+                                Batch qty
                               </div>
                               <input
                                 type="number"
@@ -1877,12 +1898,12 @@ export default function HQCogs() {
                                 style={{
                                   width: 72,
                                   padding: "4px 8px",
-                                  border: "1px solid #ddd",
-                                  borderRadius: 6,
-                                  fontFamily: "Jost, sans-serif",
+                                  border: `1px solid ${T.ink150}`,
+                                  borderRadius: 4,
+                                  fontFamily: T.fontData,
                                   fontSize: 13,
                                   fontWeight: 700,
-                                  color: "#2d4a2d",
+                                  color: T.accent,
                                   textAlign: "center",
                                 }}
                               />
@@ -1892,14 +1913,14 @@ export default function HQCogs() {
                                   onClick={() => setCardQtyFor(recipe.id, n)}
                                   style={{
                                     padding: "3px 8px",
-                                    borderRadius: 5,
-                                    border: "1px solid #ddd",
-                                    background: qty === n ? "#2d4a2d" : "#fff",
-                                    color: qty === n ? "#fff" : "#555",
+                                    borderRadius: 4,
+                                    border: `1px solid ${T.ink150}`,
+                                    background: qty === n ? T.accent : T.ink050,
+                                    color: qty === n ? "#fff" : T.ink500,
                                     cursor: "pointer",
                                     fontSize: 11,
-                                    fontFamily: "Jost, sans-serif",
-                                    fontWeight: 600,
+                                    fontFamily: T.fontUi,
+                                    fontWeight: 700,
                                   }}
                                 >
                                   {n >= 1000 ? `${n / 1000}k` : n}
@@ -1914,23 +1935,31 @@ export default function HQCogs() {
                                 <div
                                   style={{
                                     fontSize: 10,
-                                    color: "#888",
+                                    color: T.ink400,
                                     textTransform: "uppercase",
+                                    letterSpacing: "0.06em",
                                   }}
                                 >
                                   Total COGS × {qty.toLocaleString()}
                                 </div>
                                 <div
                                   style={{
-                                    fontSize: 16,
-                                    fontWeight: 700,
-                                    color: "#c62828",
+                                    fontFamily: T.fontData,
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: T.danger,
                                   }}
                                 >
                                   {fmtZar(total * qty)}
                                 </div>
                                 {qty > 1 && (
-                                  <div style={{ fontSize: 10, color: "#aaa" }}>
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      color: T.ink400,
+                                      fontFamily: T.fontData,
+                                    }}
+                                  >
                                     {fmtZar(total)}/unit ×{" "}
                                     {qty.toLocaleString()}
                                   </div>
@@ -2008,7 +2037,7 @@ export default function HQCogs() {
                                   justifyContent: "space-between",
                                   alignItems: "center",
                                   padding: "7px 0",
-                                  borderBottom: "1px solid #f5f5f5",
+                                  borderBottom: `1px solid ${T.ink075}`,
                                 }}
                               >
                                 <div
@@ -2028,13 +2057,18 @@ export default function HQCogs() {
                                     }}
                                   />
                                   <div>
-                                    <span style={{ color: "#555" }}>
+                                    <span
+                                      style={{
+                                        color: T.ink700,
+                                        fontFamily: T.fontUi,
+                                      }}
+                                    >
                                       {row.label}
                                     </span>
                                     {row.name && (
                                       <span
                                         style={{
-                                          color: "#bbb",
+                                          color: T.ink300,
                                           marginLeft: 6,
                                           fontSize: 11,
                                         }}
@@ -2048,12 +2082,12 @@ export default function HQCogs() {
                                           marginLeft: 8,
                                           fontSize: 10,
                                           fontWeight: 700,
-                                          letterSpacing: "0.1em",
+                                          letterSpacing: "0.08em",
                                           textTransform: "uppercase",
                                           background: "#E3F2FD",
                                           color: "#1565C0",
-                                          borderRadius: 4,
-                                          padding: "1px 7px",
+                                          borderRadius: 3,
+                                          padding: "1px 6px",
                                         }}
                                       >
                                         MOQ {parseInt(row.moq).toLocaleString()}
@@ -2065,14 +2099,20 @@ export default function HQCogs() {
                                   {bd[row.key] > 0 ? (
                                     <>
                                       <div>
-                                        <strong style={{ color: "#333" }}>
+                                        <strong
+                                          style={{
+                                            fontFamily: T.fontData,
+                                            color: T.ink900,
+                                          }}
+                                        >
                                           {fmtZar(bd[row.key])}
                                         </strong>
                                         <span
                                           style={{
-                                            color: "#bbb",
+                                            color: T.ink300,
                                             fontSize: 11,
                                             marginLeft: 6,
+                                            fontFamily: T.fontData,
                                           }}
                                         >
                                           {fmt(pct)}%
@@ -2085,6 +2125,7 @@ export default function HQCogs() {
                                               fontSize: 10,
                                               color: "#1565C0",
                                               marginTop: 2,
+                                              fontFamily: T.fontData,
                                             }}
                                           >
                                             {fmtZar(row.hwBaseZar)} unit +{" "}
@@ -2096,7 +2137,7 @@ export default function HQCogs() {
                                           <div
                                             style={{
                                               fontSize: 10,
-                                              color: "#bbb",
+                                              color: T.ink300,
                                               marginTop: 2,
                                             }}
                                           >
@@ -2107,9 +2148,10 @@ export default function HQCogs() {
                                         <div
                                           style={{
                                             fontSize: 11,
-                                            color: "#c62828",
+                                            color: T.danger,
                                             fontWeight: 700,
                                             marginTop: 2,
+                                            fontFamily: T.fontData,
                                           }}
                                         >
                                           ×{qty.toLocaleString()} ={" "}
@@ -2119,7 +2161,7 @@ export default function HQCogs() {
                                     </>
                                   ) : (
                                     <span
-                                      style={{ color: "#e0e0e0", fontSize: 12 }}
+                                      style={{ color: T.ink150, fontSize: 12 }}
                                     >
                                       TBD
                                     </span>
@@ -2133,17 +2175,18 @@ export default function HQCogs() {
                           <div
                             style={{
                               marginTop: 14,
-                              borderTop: "1px solid #f0ede8",
+                              borderTop: `1px solid ${T.ink150}`,
                               paddingTop: 12,
                             }}
                           >
                             <div
                               style={{
-                                fontSize: 11,
-                                color: "#888",
+                                fontSize: 10,
+                                color: T.ink400,
                                 textTransform: "uppercase",
-                                letterSpacing: "0.4px",
+                                letterSpacing: "0.08em",
                                 marginBottom: 8,
+                                fontWeight: 700,
                               }}
                             >
                               Per-Chamber Breakdown
@@ -2162,7 +2205,7 @@ export default function HQCogs() {
                                     alignItems: "center",
                                     gap: 8,
                                     padding: "6px 10px",
-                                    borderRadius: 7,
+                                    borderRadius: 5,
                                     background: col.bg,
                                     marginBottom: 5,
                                   }}
@@ -2173,6 +2216,7 @@ export default function HQCogs() {
                                       fontSize: 12,
                                       color: col.accent,
                                       minWidth: 80,
+                                      fontFamily: T.fontUi,
                                     }}
                                   >
                                     {ch.label}
@@ -2180,8 +2224,9 @@ export default function HQCogs() {
                                   <div
                                     style={{
                                       fontSize: 11,
-                                      color: "#666",
+                                      color: T.ink500,
                                       flex: 1,
+                                      fontFamily: T.fontUi,
                                     }}
                                   >
                                     {ch.diName
@@ -2202,6 +2247,7 @@ export default function HQCogs() {
                                       fontSize: 12,
                                       fontWeight: 600,
                                       color: col.accent,
+                                      fontFamily: T.fontData,
                                     }}
                                   >
                                     {fmtZar(ch.diCost + ch.tpCost)}
@@ -2218,7 +2264,7 @@ export default function HQCogs() {
                         style={{
                           marginTop: 12,
                           fontSize: 12,
-                          color: "#888",
+                          color: T.ink400,
                           fontStyle: "italic",
                         }}
                       >
@@ -2249,26 +2295,28 @@ export default function HQCogs() {
           <div
             style={{
               background: "#fff",
-              borderRadius: 14,
+              borderRadius: 10,
               padding: 32,
-              width: 380,
+              width: 360,
               textAlign: "center",
+              fontFamily: T.fontUi,
             }}
           >
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🗑</div>
-            <h3 style={{ margin: "0 0 8px" }}>Remove this SKU?</h3>
-            <p style={{ color: "#888", fontSize: 13, marginBottom: 24 }}>
+            <h3 style={{ margin: "0 0 8px", color: T.ink900 }}>
+              Remove this SKU?
+            </h3>
+            <p style={{ color: T.ink500, fontSize: 13, marginBottom: 24 }}>
               The recipe will be deactivated.
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <button
-                style={btn("danger")}
+                style={mkBtn("danger")}
                 onClick={() => handleDelete(deleteConfirm)}
               >
                 Remove
               </button>
               <button
-                style={btn("ghost")}
+                style={mkBtn("ghost")}
                 onClick={() => setDeleteConfirm(null)}
               >
                 Cancel
@@ -2278,9 +2326,7 @@ export default function HQCogs() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
-          BUILDER PANEL
-      ══════════════════════════════════════════════════════════════════ */}
+      {/* ── BUILDER PANEL ── */}
       {showBuilder && (
         <div
           style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex" }}
@@ -2302,8 +2348,8 @@ export default function HQCogs() {
             {/* Panel header */}
             <div
               style={{
-                padding: "24px 28px",
-                borderBottom: "1px solid #f0ede8",
+                padding: "20px 24px",
+                borderBottom: `1px solid ${T.ink150}`,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -2317,18 +2363,26 @@ export default function HQCogs() {
                 <h3
                   style={{
                     margin: 0,
-                    fontSize: 20,
-                    fontFamily: "Cormorant Garamond, serif",
-                    color: "#2d4a2d",
+                    fontSize: 18,
+                    fontFamily: T.fontUi,
+                    fontWeight: 500,
+                    color: T.ink900,
                   }}
                 >
                   {editingRecipe
                     ? `Edit: ${editingRecipe.product_name}`
                     : "New SKU Recipe"}
                 </h3>
-                <div style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
-                  USD/ZAR: R{usdZar.toFixed(4)} (live) · Terpene cost = price ÷
-                  50ml bottle
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: T.ink400,
+                    marginTop: 3,
+                    fontFamily: T.fontData,
+                  }}
+                >
+                  USD/ZAR: R{usdZar.toFixed(4)} · Terpene cost = price ÷ 50ml
+                  bottle
                 </div>
               </div>
               <button
@@ -2336,8 +2390,8 @@ export default function HQCogs() {
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  fontSize: 22,
-                  color: "#bbb",
+                  fontSize: 20,
+                  color: T.ink300,
                 }}
                 onClick={() => setShowBuilder(false)}
               >
@@ -2346,35 +2400,46 @@ export default function HQCogs() {
             </div>
 
             {/* Panel body */}
-            <div style={{ padding: 28, flex: 1 }}>
+            <div style={{ padding: 24, flex: 1 }}>
               {/* Live preview */}
               {previewBreakdown && previewBreakdown.total > 0 && (
                 <div
                   style={{
-                    background: "#f0f7f0",
-                    border: "1px solid #c8e6c9",
-                    borderRadius: 10,
-                    padding: "16px 20px",
-                    marginBottom: 28,
+                    background: T.accentLit,
+                    border: `1px solid ${T.accentBd}`,
+                    borderRadius: 6,
+                    padding: "14px 18px",
+                    marginBottom: 24,
                   }}
                 >
                   <div
                     style={{
-                      fontSize: 12,
-                      color: "#888",
+                      fontSize: 11,
+                      color: T.ink400,
                       marginBottom: 4,
                       textTransform: "uppercase",
-                      letterSpacing: "0.3px",
+                      letterSpacing: "0.08em",
+                      fontWeight: 700,
                     }}
                   >
                     Live COGS preview
                   </div>
                   <div
-                    style={{ fontSize: 30, fontWeight: 700, color: "#2d4a2d" }}
+                    style={{
+                      fontFamily: T.fontData,
+                      fontSize: 28,
+                      fontWeight: 400,
+                      color: T.accent,
+                    }}
                   >
                     {fmtZar(previewBreakdown.total)}{" "}
                     <span
-                      style={{ fontSize: 14, fontWeight: 400, color: "#888" }}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 400,
+                        color: T.ink400,
+                        fontFamily: T.fontUi,
+                      }}
                     >
                       per unit
                     </span>
@@ -2382,10 +2447,10 @@ export default function HQCogs() {
                   <div
                     style={{
                       display: "flex",
-                      gap: 16,
+                      gap: 14,
                       flexWrap: "wrap",
                       marginTop: 8,
-                      fontSize: 13,
+                      fontSize: 12,
                     }}
                   >
                     {[
@@ -2400,8 +2465,14 @@ export default function HQCogs() {
                     ]
                       .filter(([, v]) => v > 0)
                       .map(([l, v]) => (
-                        <span key={l} style={{ color: "#555" }}>
-                          {l}: <strong>{fmtZar(v)}</strong>
+                        <span
+                          key={l}
+                          style={{ color: T.ink500, fontFamily: T.fontUi }}
+                        >
+                          {l}:{" "}
+                          <strong style={{ fontFamily: T.fontData }}>
+                            {fmtZar(v)}
+                          </strong>
                         </span>
                       ))}
                   </div>
@@ -2413,70 +2484,70 @@ export default function HQCogs() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "2fr 1fr",
-                  gap: 16,
-                  marginBottom: 20,
+                  gap: 14,
+                  marginBottom: 18,
                 }}
               >
                 <div>
-                  {lbl("Product Name *")}
+                  {sLbl("Product Name *")}
                   <input
                     type="text"
                     placeholder="e.g. Postless Cart 1ml — Blue Zushi"
                     value={form.product_name}
                     onChange={(e) => setF("product_name", e.target.value)}
-                    style={inputStyle}
+                    style={sInput}
                   />
                 </div>
                 <div>
-                  {lbl("SKU (optional)")}
+                  {sLbl("SKU (optional)")}
                   <input
                     type="text"
                     placeholder="e.g. CART-1ML-BZ"
                     value={form.sku}
                     onChange={(e) => setF("sku", e.target.value)}
-                    style={inputStyle}
+                    style={sInput}
                   />
                 </div>
               </div>
 
-              {/* Batch size — v3.9: InfoTooltip added */}
+              {/* Batch size */}
               <div
                 style={{
                   background: "#F9FBE7",
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  marginBottom: 16,
+                  borderRadius: 6,
+                  padding: "14px 16px",
+                  marginBottom: 14,
                   border: "1px solid #F0F4C3",
                 }}
               >
                 <div
                   style={{
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: "#558B2F",
                     textTransform: "uppercase",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.08em",
                     marginBottom: 10,
                   }}
                 >
-                  📐 Batch Size for Amortisation
+                  Batch Size for Amortisation
                 </div>
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1fr 2fr",
-                    gap: 16,
+                    gap: 14,
                     alignItems: "flex-end",
                   }}
                 >
                   <div>
                     <label
                       style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "#888",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: T.ink400,
                         textTransform: "uppercase",
-                        letterSpacing: "0.4px",
+                        letterSpacing: "0.08em",
                         display: "flex",
                         alignItems: "center",
                         gap: 4,
@@ -2492,17 +2563,19 @@ export default function HQCogs() {
                       step="1"
                       value={form.batch_size}
                       onChange={(e) => setF("batch_size", e.target.value)}
-                      style={inputStyle}
+                      style={sInput}
                       placeholder="50"
                     />
                   </div>
                   <div
-                    style={{ fontSize: 12, color: "#888", paddingBottom: 2 }}
+                    style={{ fontSize: 12, color: T.ink400, paddingBottom: 2 }}
                   >
-                    Lab, transport and misc costs are divided by this number to
-                    get the per-unit contribution. E.g. R350 potency test ÷{" "}
-                    {form.batch_size || 50} units ={" "}
-                    {fmtZar(350 / (parseInt(form.batch_size) || 50))}/unit.
+                    Lab, transport and misc costs are divided by this number.
+                    E.g. R350 potency test ÷ {form.batch_size || 50} units ={" "}
+                    <span style={{ fontFamily: T.fontData }}>
+                      {fmtZar(350 / (parseInt(form.batch_size) || 50))}
+                    </span>
+                    /unit.
                   </div>
                 </div>
               </div>
@@ -2511,36 +2584,36 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#E3F2FD",
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  marginBottom: 16,
+                  borderRadius: 6,
+                  padding: "14px 16px",
+                  marginBottom: 14,
                 }}
               >
                 <div
                   style={{
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: "#1565C0",
                     textTransform: "uppercase",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.08em",
                     marginBottom: 12,
                   }}
                 >
-                  🔩 Hardware (Imported — USD)
+                  Hardware (Imported — USD)
                 </div>
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "3fr 1fr 1fr",
-                    gap: 12,
+                    gap: 10,
                   }}
                 >
                   <div>
-                    {lbl("Hardware Item")}
+                    {sLbl("Hardware Item")}
                     <select
                       value={form.hardware_item_id}
                       onChange={(e) => handleHardwareChange(e.target.value)}
-                      style={selectStyle}
+                      style={sSelect}
                     >
                       <option value="">— None —</option>
                       {hardwareItems.map((p) => {
@@ -2560,7 +2633,7 @@ export default function HQCogs() {
                           fontSize: 11,
                           color: "#1565C0",
                           background: "#EBF5FB",
-                          borderRadius: 6,
+                          borderRadius: 4,
                           padding: "5px 10px",
                         }}
                       >
@@ -2587,25 +2660,26 @@ export default function HQCogs() {
                             fontSize: 11,
                             background: belowMoq ? "#FFF3E0" : "#E3F2FD",
                             border: `1px solid ${belowMoq ? "#FFB74D" : "#90CAF9"}`,
-                            borderRadius: 6,
-                            padding: "6px 12px",
+                            borderRadius: 4,
+                            padding: "5px 10px",
                           }}
                         >
                           <span
                             style={{
                               fontWeight: 700,
                               color: belowMoq ? "#E65100" : "#1565C0",
+                              fontFamily: T.fontData,
                             }}
                           >
                             MOQ: {moq.toLocaleString()} units
                           </span>
                           {belowMoq ? (
                             <span style={{ color: "#BF360C" }}>
-                              ⚠️ Batch size ({batchSz}) is below minimum order
+                              Batch size ({batchSz}) is below minimum order
                             </span>
                           ) : (
                             <span style={{ color: "#1565C0" }}>
-                              ✓ Batch size ({batchSz}) meets minimum order
+                              Batch size ({batchSz}) meets minimum order
                             </span>
                           )}
                         </div>
@@ -2613,38 +2687,38 @@ export default function HQCogs() {
                     })()}
                   </div>
                   <div>
-                    {lbl("Qty per unit — how many in 1 finished product?")}
+                    {sLbl("Qty per unit")}
                     <input
                       type="number"
                       min="0.001"
                       step="0.001"
                       value={form.hardware_qty}
                       onChange={(e) => setF("hardware_qty", e.target.value)}
-                      style={inputStyle}
+                      style={sInput}
                     />
-                    <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
-                      Almost always <strong>1</strong>. Use batch size above for
-                      order quantities.
+                    <div
+                      style={{ fontSize: 11, color: T.ink400, marginTop: 4 }}
+                    >
+                      Almost always <strong>1</strong>.
                     </div>
                     {parseFloat(form.hardware_qty) > 10 && (
                       <div
                         style={{
                           marginTop: 5,
                           fontSize: 11,
-                          color: "#c62828",
-                          background: "#FFEBEE",
-                          borderRadius: 5,
+                          color: T.danger,
+                          background: T.dangerBg,
+                          borderRadius: 4,
                           padding: "4px 8px",
                         }}
                       >
-                        ⚠️ Qty {form.hardware_qty} looks like a batch size — set
-                        this to <strong>1</strong> and use "Units per batch"
-                        above.
+                        Qty {form.hardware_qty} looks like a batch size — set to
+                        1.
                       </div>
                     )}
                   </div>
                   <div>
-                    {lbl("Ship alloc ZAR")}
+                    {sLbl("Ship alloc ZAR")}
                     <input
                       type="number"
                       min="0"
@@ -2653,7 +2727,7 @@ export default function HQCogs() {
                       onChange={(e) =>
                         setF("shipping_alloc_zar", e.target.value)
                       }
-                      style={inputStyle}
+                      style={sInput}
                       placeholder="0.00"
                     />
                   </div>
@@ -2671,7 +2745,12 @@ export default function HQCogs() {
                       parseFloat(form.shipping_alloc_zar || 0);
                     return (
                       <div
-                        style={{ fontSize: 12, color: "#1565C0", marginTop: 8 }}
+                        style={{
+                          fontSize: 12,
+                          color: "#1565C0",
+                          marginTop: 8,
+                          fontFamily: T.fontData,
+                        }}
                       >
                         = {fmtZar(cost)} ($
                         {fmt(
@@ -2691,14 +2770,14 @@ export default function HQCogs() {
 
               {/* Multi vs single chamber */}
               {isMultiChamber ? (
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 14 }}>
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 700,
                       color: "#1565C0",
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 12,
                     }}
                   >
@@ -2711,50 +2790,46 @@ export default function HQCogs() {
                     distillateInputs={distillateInputs}
                     terpeneItems={terpeneItems}
                     usdZar={usdZar}
-                    fmtZar={fmtZar}
-                    fmt={fmt}
-                    inputStyle={inputStyle}
-                    lbl={lbl}
                   />
                 </div>
               ) : (
                 <>
-                  {/* Terpene — single chamber */}
+                  {/* Terpene */}
                   <div
                     style={{
                       background: "#F3E5F5",
-                      borderRadius: 10,
-                      padding: "16px 18px",
-                      marginBottom: 16,
+                      borderRadius: 6,
+                      padding: "14px 16px",
+                      marginBottom: 14,
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 700,
                         color: "#6A1B9A",
                         textTransform: "uppercase",
-                        letterSpacing: "0.4px",
+                        letterSpacing: "0.08em",
                         marginBottom: 12,
                       }}
                     >
-                      🌿 Terpene (Imported — USD per 50ml bottle)
+                      Terpene (Imported — USD per 50ml bottle)
                     </div>
                     <div
                       style={{
                         display: "grid",
                         gridTemplateColumns: "3fr 1fr",
-                        gap: 12,
+                        gap: 10,
                       }}
                     >
                       <div>
-                        {lbl("Terpene Blend")}
+                        {sLbl("Terpene Blend")}
                         <select
                           value={form.terpene_item_id}
                           onChange={(e) =>
                             setF("terpene_item_id", e.target.value)
                           }
-                          style={selectStyle}
+                          style={sSelect}
                         >
                           <option value="">— None —</option>
                           {terpeneItems.map((p) => (
@@ -2765,14 +2840,13 @@ export default function HQCogs() {
                         </select>
                       </div>
                       <div>
-                        {/* v3.9: InfoTooltip on single-chamber terpene µl label */}
                         <label
                           style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#888",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: T.ink400,
                             textTransform: "uppercase",
-                            letterSpacing: "0.4px",
+                            letterSpacing: "0.08em",
                             display: "flex",
                             alignItems: "center",
                             gap: 4,
@@ -2791,7 +2865,7 @@ export default function HQCogs() {
                           onChange={(e) =>
                             setF("terpene_qty_ul", e.target.value)
                           }
-                          style={inputStyle}
+                          style={sInput}
                           placeholder="67"
                         />
                         {parseFloat(form.terpene_qty_ul) > 0 && (
@@ -2800,7 +2874,8 @@ export default function HQCogs() {
                               fontSize: 10,
                               color: "#6A1B9A",
                               marginTop: 3,
-                              fontWeight: 600,
+                              fontWeight: 700,
+                              fontFamily: T.fontData,
                             }}
                           >
                             ={" "}
@@ -2816,7 +2891,7 @@ export default function HQCogs() {
                       style={{
                         marginTop: 10,
                         display: "flex",
-                        gap: 16,
+                        gap: 14,
                         flexWrap: "wrap",
                         alignItems: "center",
                       }}
@@ -2827,7 +2902,7 @@ export default function HQCogs() {
                           color: "#9C27B0",
                           background: "#EDE7F6",
                           padding: "4px 10px",
-                          borderRadius: 6,
+                          borderRadius: 4,
                         }}
                       >
                         Typical range: 20µl (2%) → 100µl (10%) per 1ml
@@ -2839,7 +2914,8 @@ export default function HQCogs() {
                             style={{
                               fontSize: 11,
                               color: "#6A1B9A",
-                              fontWeight: 600,
+                              fontWeight: 700,
+                              fontFamily: T.fontData,
                             }}
                           >
                             ={" "}
@@ -2847,7 +2923,6 @@ export default function HQCogs() {
                               4,
                             )}
                             ml · {terpPct}% of {form.distillate_qty_ml}ml
-                            distillate
                           </div>
                         )}
                       <div style={{ display: "flex", gap: 6 }}>
@@ -2882,7 +2957,7 @@ export default function HQCogs() {
                             onClick={() => setF("terpene_qty_ul", p.ul)}
                             style={{
                               padding: "3px 8px",
-                              borderRadius: 6,
+                              borderRadius: 4,
                               border: "1px solid #CE93D8",
                               background:
                                 parseInt(form.terpene_qty_ul) === p.ul
@@ -2891,8 +2966,8 @@ export default function HQCogs() {
                               color: "#6A1B9A",
                               cursor: "pointer",
                               fontSize: 11,
-                              fontFamily: "Jost, sans-serif",
-                              fontWeight: 600,
+                              fontFamily: T.fontUi,
+                              fontWeight: 700,
                             }}
                           >
                             {p.label}
@@ -2916,53 +2991,51 @@ export default function HQCogs() {
                               fontSize: 12,
                               color: "#6A1B9A",
                               marginTop: 8,
+                              fontFamily: T.fontData,
                             }}
                           >
                             R{fmt(costPerMl, 4)}/ml × {fmt(terpMl, 4)}ml ={" "}
-                            {fmtZar(costPerMl * terpMl)} · ($
-                            {fmt(tp.unit_price_usd)}/50ml ÷ 50 × R
-                            {usdZar.toFixed(4)})
+                            {fmtZar(costPerMl * terpMl)}
                           </div>
                         );
                       })()}
                   </div>
-
-                  {/* Distillate — single chamber */}
+                  {/* Distillate */}
                   <div
                     style={{
                       background: "#FFF8E1",
-                      borderRadius: 10,
-                      padding: "16px 18px",
-                      marginBottom: 16,
+                      borderRadius: 6,
+                      padding: "14px 16px",
+                      marginBottom: 14,
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 700,
                         color: "#F57F17",
                         textTransform: "uppercase",
-                        letterSpacing: "0.4px",
+                        letterSpacing: "0.08em",
                         marginBottom: 12,
                       }}
                     >
-                      💧 Distillate (Local — ZAR per ml)
+                      Distillate (Local — ZAR per ml)
                     </div>
                     <div
                       style={{
                         display: "grid",
                         gridTemplateColumns: "3fr 1fr",
-                        gap: 12,
+                        gap: 10,
                       }}
                     >
                       <div>
-                        {lbl("Distillate Input")}
+                        {sLbl("Distillate Input")}
                         <select
                           value={form.distillate_input_id}
                           onChange={(e) =>
                             setF("distillate_input_id", e.target.value)
                           }
-                          style={selectStyle}
+                          style={sSelect}
                         >
                           <option value="">— None —</option>
                           {distillateInputs.map((i) => (
@@ -2976,7 +3049,7 @@ export default function HQCogs() {
                         </select>
                       </div>
                       <div>
-                        {lbl("Qty (ml)")}
+                        {sLbl("Qty (ml)")}
                         <input
                           type="number"
                           min="0.01"
@@ -2985,7 +3058,7 @@ export default function HQCogs() {
                           onChange={(e) =>
                             setF("distillate_qty_ml", e.target.value)
                           }
-                          style={inputStyle}
+                          style={sInput}
                         />
                       </div>
                     </div>
@@ -3001,6 +3074,7 @@ export default function HQCogs() {
                               fontSize: 12,
                               color: "#F57F17",
                               marginTop: 8,
+                              fontFamily: T.fontData,
                             }}
                           >
                             ={" "}
@@ -3021,39 +3095,39 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#E8F5E9",
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  marginBottom: 16,
+                  borderRadius: 6,
+                  padding: "14px 16px",
+                  marginBottom: 14,
                 }}
               >
                 <div
                   style={{
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: "#2E7D32",
                     textTransform: "uppercase",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.08em",
                     marginBottom: 12,
                   }}
                 >
-                  📦 Packaging (Local — ZAR per unit)
+                  Packaging (Local — ZAR per unit)
                 </div>
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "3fr 1fr",
-                    gap: 12,
+                    gap: 10,
                   }}
                 >
                   <div>
-                    {lbl("Packaging Input (optional if using manual)")}
+                    {sLbl("Packaging Input")}
                     <select
                       value={form.packaging_input_id}
                       onChange={(e) => {
                         setF("packaging_input_id", e.target.value);
                         if (e.target.value) setF("packaging_manual_zar", "");
                       }}
-                      style={selectStyle}
+                      style={sSelect}
                     >
                       <option value="">— None —</option>
                       {packagingInputs.map((i) => (
@@ -3065,14 +3139,14 @@ export default function HQCogs() {
                     </select>
                   </div>
                   <div>
-                    {lbl("Qty per unit")}
+                    {sLbl("Qty per unit")}
                     <input
                       type="number"
                       min="0.001"
                       step="0.001"
                       value={form.packaging_qty}
                       onChange={(e) => setF("packaging_qty", e.target.value)}
-                      style={inputStyle}
+                      style={sInput}
                     />
                   </div>
                 </div>
@@ -3084,8 +3158,8 @@ export default function HQCogs() {
                     gap: 10,
                   }}
                 >
-                  <div style={{ fontSize: 11, color: "#555", flexShrink: 0 }}>
-                    Or enter cost manually:
+                  <div style={{ fontSize: 11, color: T.ink500, flexShrink: 0 }}>
+                    Or manually:
                   </div>
                   <div
                     style={{
@@ -3099,7 +3173,7 @@ export default function HQCogs() {
                       style={{
                         fontSize: 13,
                         color: "#2E7D32",
-                        fontWeight: 600,
+                        fontWeight: 700,
                       }}
                     >
                       R
@@ -3115,17 +3189,17 @@ export default function HQCogs() {
                       }}
                       placeholder="e.g. 5.50"
                       style={{
-                        ...inputStyle,
+                        ...sInput,
                         width: 120,
                         background: form.packaging_manual_zar
                           ? "#f0fdf4"
                           : undefined,
                         border: form.packaging_manual_zar
-                          ? "1px solid #4CAF50"
-                          : "1px solid #ddd",
+                          ? `1px solid ${T.successBd}`
+                          : `1px solid ${T.ink150}`,
                       }}
                     />
-                    <span style={{ fontSize: 11, color: "#888" }}>
+                    <span style={{ fontSize: 11, color: T.ink400 }}>
                       per unit
                     </span>
                     {form.packaging_manual_zar && (
@@ -3133,7 +3207,8 @@ export default function HQCogs() {
                         style={{
                           fontSize: 12,
                           color: "#2E7D32",
-                          fontWeight: 600,
+                          fontWeight: 700,
+                          fontFamily: T.fontData,
                         }}
                       >
                         ={" "}
@@ -3148,7 +3223,7 @@ export default function HQCogs() {
                 </div>
                 {form.packaging_manual_zar && (
                   <div style={{ fontSize: 11, color: "#2E7D32", marginTop: 4 }}>
-                    ✓ Using manual rate — dropdown ignored
+                    Using manual rate — dropdown ignored
                   </div>
                 )}
               </div>
@@ -3157,39 +3232,39 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#FCE4EC",
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  marginBottom: 16,
+                  borderRadius: 6,
+                  padding: "14px 16px",
+                  marginBottom: 14,
                 }}
               >
                 <div
                   style={{
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 700,
                     color: "#880E4F",
                     textTransform: "uppercase",
-                    letterSpacing: "0.4px",
+                    letterSpacing: "0.08em",
                     marginBottom: 12,
                   }}
                 >
-                  👷 Labour (Local — ZAR per unit)
+                  Labour (Local — ZAR per unit)
                 </div>
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "3fr 1fr",
-                    gap: 12,
+                    gap: 10,
                   }}
                 >
                   <div>
-                    {lbl("Labour Input (optional if using manual)")}
+                    {sLbl("Labour Input")}
                     <select
                       value={form.labour_input_id}
                       onChange={(e) => {
                         setF("labour_input_id", e.target.value);
                         if (e.target.value) setF("labour_manual_zar", "");
                       }}
-                      style={selectStyle}
+                      style={sSelect}
                     >
                       <option value="">— None —</option>
                       {labourInputs.map((i) => (
@@ -3201,14 +3276,14 @@ export default function HQCogs() {
                     </select>
                   </div>
                   <div>
-                    {lbl("Units of labour")}
+                    {sLbl("Units of labour")}
                     <input
                       type="number"
                       min="0.001"
                       step="0.001"
                       value={form.labour_qty}
                       onChange={(e) => setF("labour_qty", e.target.value)}
-                      style={inputStyle}
+                      style={sInput}
                     />
                   </div>
                 </div>
@@ -3220,8 +3295,8 @@ export default function HQCogs() {
                     gap: 10,
                   }}
                 >
-                  <div style={{ fontSize: 11, color: "#555", flexShrink: 0 }}>
-                    Or enter cost manually:
+                  <div style={{ fontSize: 11, color: T.ink500, flexShrink: 0 }}>
+                    Or manually:
                   </div>
                   <div
                     style={{
@@ -3235,7 +3310,7 @@ export default function HQCogs() {
                       style={{
                         fontSize: 13,
                         color: "#880E4F",
-                        fontWeight: 600,
+                        fontWeight: 700,
                       }}
                     >
                       R
@@ -3251,17 +3326,17 @@ export default function HQCogs() {
                       }}
                       placeholder="e.g. 12.00"
                       style={{
-                        ...inputStyle,
+                        ...sInput,
                         width: 120,
                         background: form.labour_manual_zar
                           ? "#fdf2f8"
                           : undefined,
                         border: form.labour_manual_zar
                           ? "1px solid #E91E8C"
-                          : "1px solid #ddd",
+                          : `1px solid ${T.ink150}`,
                       }}
                     />
-                    <span style={{ fontSize: 11, color: "#888" }}>
+                    <span style={{ fontSize: 11, color: T.ink400 }}>
                       per unit
                     </span>
                     {form.labour_manual_zar && (
@@ -3269,7 +3344,8 @@ export default function HQCogs() {
                         style={{
                           fontSize: 12,
                           color: "#880E4F",
-                          fontWeight: 600,
+                          fontWeight: 700,
+                          fontFamily: T.fontData,
                         }}
                       >
                         ={" "}
@@ -3284,7 +3360,7 @@ export default function HQCogs() {
                 </div>
                 {form.labour_manual_zar && (
                   <div style={{ fontSize: 11, color: "#880E4F", marginTop: 4 }}>
-                    ✓ Using manual rate — dropdown ignored
+                    Using manual rate — dropdown ignored
                   </div>
                 )}
               </div>
@@ -3293,9 +3369,9 @@ export default function HQCogs() {
               <div
                 style={{
                   background: "#E8EAF6",
-                  borderRadius: 10,
-                  padding: "16px 18px",
-                  marginBottom: 16,
+                  borderRadius: 6,
+                  padding: "14px 16px",
+                  marginBottom: 14,
                 }}
               >
                 <div
@@ -3309,14 +3385,14 @@ export default function HQCogs() {
                   <div>
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 700,
                         color: "#283593",
                         textTransform: "uppercase",
-                        letterSpacing: "0.4px",
+                        letterSpacing: "0.08em",
                       }}
                     >
-                      🔬 Lab Testing — Cannalytics Africa
+                      Lab Testing — Cannalytics Africa
                     </div>
                     <div
                       style={{ fontSize: 11, color: "#5C6BC0", marginTop: 3 }}
@@ -3337,9 +3413,11 @@ export default function HQCogs() {
                       total / Math.max(1, parseInt(form.batch_size) || 50);
                     return total > 0 ? (
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 11, color: "#888" }}>
+                        <div style={{ fontSize: 11, color: T.ink400 }}>
                           Total:{" "}
-                          <strong style={{ color: "#283593" }}>
+                          <strong
+                            style={{ color: "#283593", fontFamily: T.fontData }}
+                          >
                             {fmtZar(total)}
                           </strong>
                         </div>
@@ -3348,6 +3426,7 @@ export default function HQCogs() {
                             fontSize: 13,
                             fontWeight: 700,
                             color: "#283593",
+                            fontFamily: T.fontData,
                           }}
                         >
                           {fmtZar(perUnit)}/unit
@@ -3374,12 +3453,11 @@ export default function HQCogs() {
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
-                          padding: "10px 12px",
-                          borderRadius: 8,
+                          padding: "9px 12px",
+                          borderRadius: 6,
                           border: `1px solid ${checked ? "#3949AB" : "#C5CAE9"}`,
                           background: checked ? "#E8EAF6" : "#fff",
                           cursor: "pointer",
-                          transition: "all 0.15s",
                         }}
                       >
                         <input
@@ -3387,29 +3465,30 @@ export default function HQCogs() {
                           checked={checked}
                           onChange={() => toggleLabTest(test.id)}
                           style={{
-                            width: 15,
-                            height: 15,
+                            width: 14,
+                            height: 14,
                             accentColor: "#3949AB",
                             flexShrink: 0,
                           }}
                         />
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: checked ? 700 : 400,
-                              color: checked ? "#283593" : "#555",
-                            }}
-                          >
-                            {test.label}
-                          </div>
+                        <div
+                          style={{
+                            flex: 1,
+                            fontSize: 12,
+                            fontWeight: checked ? 700 : 400,
+                            color: checked ? "#283593" : T.ink500,
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          {test.label}
                         </div>
                         <div
                           style={{
                             fontSize: 12,
-                            fontWeight: 600,
+                            fontWeight: 700,
                             color: "#283593",
                             flexShrink: 0,
+                            fontFamily: T.fontData,
                           }}
                         >
                           {fmtZar(test.price)}
@@ -3420,36 +3499,36 @@ export default function HQCogs() {
                 </div>
               </div>
 
-              {/* Transport + Misc — v3.9: InfoTooltip on Transport header */}
+              {/* Transport + Misc */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: 16,
-                  marginBottom: 16,
+                  gap: 14,
+                  marginBottom: 14,
                 }}
               >
                 <div
                   style={{
                     background: "#E0F7FA",
-                    borderRadius: 10,
-                    padding: "16px 18px",
+                    borderRadius: 6,
+                    padding: "14px 16px",
                   }}
                 >
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 700,
                       color: "#00695C",
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 12,
                       display: "flex",
                       alignItems: "center",
                       gap: 6,
                     }}
                   >
-                    🚚 Transport (ZAR per batch){" "}
+                    Transport (ZAR per batch){" "}
                     <InfoTooltip id="cogs-transport" position="top" />
                   </div>
                   <input
@@ -3458,12 +3537,17 @@ export default function HQCogs() {
                     step="0.01"
                     value={form.transport_cost_zar}
                     onChange={(e) => setF("transport_cost_zar", e.target.value)}
-                    style={inputStyle}
+                    style={sInput}
                     placeholder="0.00"
                   />
                   {parseFloat(form.transport_cost_zar) > 0 && (
                     <div
-                      style={{ fontSize: 11, color: "#00695C", marginTop: 6 }}
+                      style={{
+                        fontSize: 11,
+                        color: "#00695C",
+                        marginTop: 6,
+                        fontFamily: T.fontData,
+                      }}
                     >
                       ={" "}
                       {fmtZar(
@@ -3477,21 +3561,21 @@ export default function HQCogs() {
                 <div
                   style={{
                     background: "#ECEFF1",
-                    borderRadius: 10,
-                    padding: "16px 18px",
+                    borderRadius: 6,
+                    padding: "14px 16px",
                   }}
                 >
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 700,
                       color: "#455A64",
                       textTransform: "uppercase",
-                      letterSpacing: "0.4px",
+                      letterSpacing: "0.08em",
                       marginBottom: 12,
                     }}
                   >
-                    ✏️ Miscellaneous (ZAR per batch)
+                    Miscellaneous (ZAR per batch)
                   </div>
                   <input
                     type="number"
@@ -3499,12 +3583,17 @@ export default function HQCogs() {
                     step="0.01"
                     value={form.misc_cost_zar}
                     onChange={(e) => setF("misc_cost_zar", e.target.value)}
-                    style={inputStyle}
+                    style={sInput}
                     placeholder="0.00"
                   />
                   {parseFloat(form.misc_cost_zar) > 0 && (
                     <div
-                      style={{ fontSize: 11, color: "#455A64", marginTop: 6 }}
+                      style={{
+                        fontSize: 11,
+                        color: "#455A64",
+                        marginTop: 6,
+                        fontFamily: T.fontData,
+                      }}
                     >
                       ={" "}
                       {fmtZar(
@@ -3519,12 +3608,12 @@ export default function HQCogs() {
 
               {/* Notes */}
               <div>
-                {lbl("Notes (optional)")}
+                {sLbl("Notes (optional)")}
                 <textarea
                   rows={2}
                   value={form.notes}
                   onChange={(e) => setF("notes", e.target.value)}
-                  style={{ ...inputStyle, resize: "vertical" }}
+                  style={{ ...sInput, resize: "vertical" }}
                   placeholder="Any notes about this recipe…"
                 />
               </div>
@@ -3533,8 +3622,8 @@ export default function HQCogs() {
             {/* Panel footer */}
             <div
               style={{
-                padding: "20px 28px",
-                borderTop: "1px solid #f0ede8",
+                padding: "18px 24px",
+                borderTop: `1px solid ${T.ink150}`,
                 display: "flex",
                 justifyContent: "space-between",
                 position: "sticky",
@@ -3543,21 +3632,21 @@ export default function HQCogs() {
               }}
             >
               <button
-                style={btn("ghost")}
+                style={mkBtn("ghost")}
                 onClick={() => setShowBuilder(false)}
               >
                 Cancel
               </button>
               <button
-                style={btn("primary")}
+                style={mkBtn("primary")}
                 disabled={!form.product_name.trim() || saving}
                 onClick={handleSave}
               >
                 {saving
                   ? "Saving…"
                   : editingRecipe
-                    ? "✓ Update Recipe"
-                    : `✓ Save — ${previewBreakdown ? fmtZar(previewBreakdown.total) : "R0.00"} COGS`}
+                    ? `Update Recipe`
+                    : `Save — ${previewBreakdown ? fmtZar(previewBreakdown.total) : "R0.00"} COGS`}
               </button>
             </div>
           </div>
