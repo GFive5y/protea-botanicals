@@ -1,4 +1,4 @@
-// HRPayroll.js v1.0 — SCHEMA VERIFIED
+// HRPayroll.js v1.1 — WP-VISUAL
 // WP-HR-11: Payroll Export — period CSV with validation
 // Location: src/components/hq/HRPayroll.js
 //
@@ -27,23 +27,48 @@ import { supabase } from "../../services/supabaseClient";
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — all internal C.* and FONTS.* references resolve correctly
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink400,
   white: "#fff",
-  red: "#c0392b",
-  bg: "#f7f6f2",
+  red: T.danger,
+  bg: T.ink075,
 };
-
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -160,7 +185,7 @@ function PeriodSelector({ periods, selected, onSelect }) {
           borderRadius: 2,
           padding: "9px 12px",
           fontSize: 13,
-          fontFamily: FONTS.body,
+          fontFamily: T.font,
           background: C.white,
           color: "#333",
           outline: "none",
@@ -288,7 +313,6 @@ export default function HRPayroll({ tenantId }) {
         .order("period_start", { ascending: false });
 
       if (!error && data) {
-        // Group by period_start + period_end
         const periodMap = {};
         data.forEach((ts) => {
           const key = `${ts.period_start}__${ts.period_end}`;
@@ -398,7 +422,6 @@ export default function HRPayroll({ tenantId }) {
           loanMap[l.staff_profile_id].push(l);
         });
 
-        // Unpaid leave days per staff
         const unpaidMap = {};
         (leaveData || []).forEach((lr) => {
           if (lr.leave_types?.paid === false) {
@@ -419,7 +442,6 @@ export default function HRPayroll({ tenantId }) {
           ),
         );
 
-        // Sort: warnings first, then alphabetical
         rows.sort((a, b) => {
           if (a.issues.length > 0 && b.issues.length === 0) return -1;
           if (a.issues.length === 0 && b.issues.length > 0) return 1;
@@ -518,14 +540,15 @@ export default function HRPayroll({ tenantId }) {
   const selectedPeriodObj = periods.find((p) => p.value === selectedPeriod);
 
   return (
-    <div style={{ fontFamily: FONTS.body }}>
+    <div style={{ fontFamily: T.font }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h2
           style={{
-            fontFamily: FONTS.heading,
+            fontFamily: T.font,
             fontSize: 22,
-            color: C.green,
+            fontWeight: 600,
+            color: T.ink900,
             margin: "0 0 6px",
           }}
         >
@@ -624,12 +647,17 @@ export default function HRPayroll({ tenantId }) {
       {/* Payroll preview */}
       {!loading && payrollRows.length > 0 && (
         <>
-          {/* Summary tiles */}
+          {/* ── STAT GRID (flush, no borderTop) ── */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))",
-              gap: 12,
+              gap: "1px",
+              background: T.ink150,
+              borderRadius: 6,
+              overflow: "hidden",
+              border: `1px solid ${T.ink150}`,
+              boxShadow: T.shadow,
               marginBottom: 20,
             }}
           >
@@ -637,49 +665,51 @@ export default function HRPayroll({ tenantId }) {
               {
                 label: "Staff on Payroll",
                 value: payrollRows.length,
-                color: "#1565c0",
+                color: T.info,
               },
-              { label: "Total Gross", value: zar(totalGross), color: C.green },
+              { label: "Total Gross", value: zar(totalGross), color: T.accent },
               {
                 label: "Total Deductions",
                 value: zar(totalDeductions),
-                color: warningCount > 0 ? "#e65100" : C.muted,
+                color: warningCount > 0 ? T.warning : T.ink400,
               },
-              { label: "Total Net Pay", value: zar(totalNet), color: C.green },
+              {
+                label: "Total Net Pay",
+                value: zar(totalNet),
+                color: T.success,
+              },
               {
                 label: "Warnings",
                 value: warningCount,
-                color: warningCount > 0 ? C.red : C.muted,
+                color: warningCount > 0 ? T.danger : T.ink400,
               },
             ].map((tile) => (
               <div
                 key={tile.label}
-                style={{
-                  background: C.white,
-                  border: `1px solid ${C.border}`,
-                  borderTop: `3px solid ${tile.color}`,
-                  borderRadius: 2,
-                  padding: "12px 14px",
-                }}
+                style={{ background: "#fff", padding: "16px 18px" }}
               >
                 <div
                   style={{
                     fontSize: 10,
                     fontWeight: 700,
-                    letterSpacing: "0.12em",
+                    letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: C.muted,
-                    marginBottom: 4,
+                    color: T.ink400,
+                    marginBottom: 6,
+                    fontFamily: T.font,
                   }}
                 >
                   {tile.label}
                 </div>
                 <div
                   style={{
-                    fontFamily: FONTS.heading,
-                    fontSize: typeof tile.value === "number" ? 26 : 18,
+                    fontFamily: T.font,
+                    fontSize: typeof tile.value === "number" ? 22 : 16,
+                    fontWeight: 400,
                     color: tile.color,
                     lineHeight: 1.2,
+                    letterSpacing: "-0.02em",
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {tile.value}
@@ -752,7 +782,7 @@ export default function HRPayroll({ tenantId }) {
                 cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 700,
-                fontFamily: FONTS.body,
+                fontFamily: T.font,
                 letterSpacing: "0.1em",
               }}
             >
@@ -767,7 +797,7 @@ export default function HRPayroll({ tenantId }) {
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: 12,
-                fontFamily: FONTS.body,
+                fontFamily: T.font,
               }}
             >
               <thead>
@@ -888,6 +918,7 @@ export default function HRPayroll({ tenantId }) {
                         textAlign: "right",
                         fontWeight: 600,
                         color: C.green,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {zar(r.grossPay)}
@@ -897,6 +928,7 @@ export default function HRPayroll({ tenantId }) {
                         padding: "9px 10px",
                         textAlign: "right",
                         color: r.totalDeductions > 0 ? C.red : C.muted,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {r.totalDeductions > 0 ? (
@@ -925,6 +957,7 @@ export default function HRPayroll({ tenantId }) {
                         fontWeight: 700,
                         color: r.netPay > 0 ? C.green : C.red,
                         fontSize: 13,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {zar(r.netPay)}
@@ -978,6 +1011,7 @@ export default function HRPayroll({ tenantId }) {
                       fontWeight: 700,
                       fontSize: 12,
                       color: C.green,
+                      fontFamily: T.font,
                     }}
                   >
                     TOTALS
@@ -988,6 +1022,7 @@ export default function HRPayroll({ tenantId }) {
                       textAlign: "right",
                       fontWeight: 700,
                       color: C.green,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {zar(totalGross)}
@@ -998,6 +1033,7 @@ export default function HRPayroll({ tenantId }) {
                       textAlign: "right",
                       fontWeight: 700,
                       color: C.red,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {zar(totalDeductions)}
@@ -1009,6 +1045,7 @@ export default function HRPayroll({ tenantId }) {
                       fontWeight: 800,
                       color: C.green,
                       fontSize: 14,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
                     {zar(totalNet)}
