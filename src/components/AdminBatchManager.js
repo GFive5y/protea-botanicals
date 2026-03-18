@@ -1,81 +1,101 @@
 // src/components/AdminBatchManager.js
+// v1.3 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // v1.2 — WP-GUIDE-C++: usePageContext 'batches' wired + WorkflowGuide added
 // v1.1 — WP-I: COA source document link on batch card when coa_document_id is set
 // v1.0 — March 2026
-// WP1 — Batch Manager
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
+
+// Legacy aliases — all C.* references resolve correctly
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink400,
+  text: T.ink700,
   white: "#fff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef9f0",
-  lightGreen: "#eafaf1",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
+  red: T.danger,
+  lightRed: T.dangerBg,
+  orange: T.warning,
+  lightOrange: T.warningBg,
+  lightGreen: T.accentLit,
+  blue: T.info,
+  lightBlue: T.infoBg,
   purple: "#6c3483",
   lightPurple: "#f5eef8",
 };
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
-const label = (text) => ({
-  fontSize: 11,
-  fontWeight: 600,
-  letterSpacing: "0.3em",
-  textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: 6,
-  fontFamily: FONTS.body,
-  display: "block",
-});
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const inputStyle = {
   width: "100%",
-  padding: "10px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
-  fontSize: 14,
-  fontFamily: FONTS.body,
-  backgroundColor: C.white,
-  color: C.text,
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontSize: 13,
+  fontFamily: T.font,
+  backgroundColor: "#fff",
+  color: T.ink700,
   boxSizing: "border-box",
   outline: "none",
 };
-const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
-  padding: "10px 20px",
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
+  padding: "9px 20px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: "none",
-  borderRadius: 2,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
   fontSize: 11,
   fontWeight: 700,
-  letterSpacing: "0.2em",
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
   cursor: disabled ? "not-allowed" : "pointer",
-  fontFamily: FONTS.body,
+  fontFamily: T.font,
   opacity: disabled ? 0.6 : 1,
-  transition: "opacity 0.2s",
+  transition: "opacity 0.15s",
 });
 const hint = {
   fontSize: 11,
-  color: C.muted,
+  color: T.ink400,
   marginTop: 4,
-  fontFamily: FONTS.body,
+  fontFamily: T.font,
 };
 
 function today() {
@@ -103,21 +123,26 @@ function pct(a, b) {
   return ((a / b) * 100).toFixed(1);
 }
 
+// ─── EXPIRY BADGE ─────────────────────────────────────────────────────────────
 function ExpiryBadge({ expiryDate }) {
   const days = daysUntil(expiryDate);
   if (days === null) return null;
+  const style = {
+    padding: "2px 10px",
+    borderRadius: 20,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.07em",
+    fontFamily: T.font,
+  };
   if (days < 0)
     return (
       <span
         style={{
-          padding: "2px 10px",
-          borderRadius: 20,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          backgroundColor: C.lightRed,
-          color: C.red,
-          border: `1px solid ${C.red}`,
+          ...style,
+          background: T.dangerBg,
+          color: T.danger,
+          border: `1px solid ${T.dangerBd}`,
         }}
       >
         EXPIRED
@@ -127,14 +152,10 @@ function ExpiryBadge({ expiryDate }) {
     return (
       <span
         style={{
-          padding: "2px 10px",
-          borderRadius: 20,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          backgroundColor: C.lightOrange,
-          color: C.orange,
-          border: `1px solid ${C.orange}`,
+          ...style,
+          background: T.warningBg,
+          color: T.warning,
+          border: `1px solid ${T.warningBd}`,
         }}
       >
         EXPIRING {days}d
@@ -143,14 +164,10 @@ function ExpiryBadge({ expiryDate }) {
   return (
     <span
       style={{
-        padding: "2px 10px",
-        borderRadius: 20,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        backgroundColor: C.lightGreen,
-        color: C.mid,
-        border: `1px solid ${C.accent}`,
+        ...style,
+        background: T.successBg,
+        color: T.success,
+        border: `1px solid ${T.successBd}`,
       }}
     >
       ACTIVE
@@ -158,42 +175,15 @@ function ExpiryBadge({ expiryDate }) {
   );
 }
 
-function StatPill({ label: l, value, color = C.green }) {
-  return (
-    <div style={{ textAlign: "center", flex: 1 }}>
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: 700,
-          fontFamily: FONTS.heading,
-          color,
-        }}
-      >
-        {value}
-      </div>
-      <div
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.15em",
-          textTransform: "uppercase",
-          color: C.muted,
-          fontFamily: FONTS.body,
-        }}
-      >
-        {l}
-      </div>
-    </div>
-  );
-}
-
-function ProgressBar({ value, max, color = C.accent }) {
+// ─── PROGRESS BAR ────────────────────────────────────────────────────────────
+function ProgressBar({ value, max, color = T.accentMid }) {
   const pctVal = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div
       style={{
-        height: 4,
-        backgroundColor: C.border,
-        borderRadius: 2,
+        height: 6,
+        background: T.ink150,
+        borderRadius: 3,
         overflow: "hidden",
         marginTop: 4,
       }}
@@ -202,8 +192,8 @@ function ProgressBar({ value, max, color = C.accent }) {
         style={{
           height: "100%",
           width: `${pctVal}%`,
-          backgroundColor: color,
-          borderRadius: 2,
+          background: color,
+          borderRadius: 3,
           transition: "width 0.4s ease",
         }}
       />
@@ -211,6 +201,7 @@ function ProgressBar({ value, max, color = C.accent }) {
   );
 }
 
+// ─── COA BADGE ───────────────────────────────────────────────────────────────
 function COADocumentBadge({ coaDocumentId, onViewInDocuments }) {
   if (!coaDocumentId) return null;
   return (
@@ -219,28 +210,29 @@ function COADocumentBadge({ coaDocumentId, onViewInDocuments }) {
         e.stopPropagation();
         if (onViewInDocuments) onViewInDocuments(coaDocumentId);
       }}
-      title="This COA was ingested via the Document Engine — click to view source document"
+      title="AI ingested COA — click to view source document"
       style={{
         fontSize: 10,
         padding: "2px 8px",
         borderRadius: 20,
-        backgroundColor: C.lightPurple,
+        background: C.lightPurple,
         color: C.purple,
         border: `1px solid ${C.purple}`,
         fontWeight: 700,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.07em",
         cursor: onViewInDocuments ? "pointer" : "default",
-        fontFamily: FONTS.body,
+        fontFamily: T.font,
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
       }}
     >
-      🔬 AI INGESTED
+      AI INGESTED
     </button>
   );
 }
 
+// ─── BATCH CARD ───────────────────────────────────────────────────────────────
 function BatchCard({
   batch,
   stats,
@@ -251,33 +243,32 @@ function BatchCard({
 }) {
   const qr = stats?.qr_count || 0;
   const claimed = stats?.claimed_count || 0;
-  const activation = pct(claimed, qr);
+  const rate = pct(claimed, qr);
   const days = daysUntil(batch.expiry_date);
-  const cardBorder =
+  const cardBd =
     days !== null && days < 0
-      ? C.red
+      ? T.dangerBd
       : days !== null && days <= 30
-        ? C.orange
-        : C.border;
+        ? T.warningBd
+        : T.ink150;
 
   return (
     <div
       style={{
-        background: C.white,
-        border: `1px solid ${cardBorder}`,
-        borderRadius: 2,
+        background: "#fff",
+        border: `1px solid ${cardBd}`,
+        borderRadius: 8,
         padding: 20,
         display: "flex",
         flexDirection: "column",
         gap: 12,
-        position: "relative",
-        transition: "box-shadow 0.2s",
+        boxShadow: T.shadow,
+        transition: "box-shadow 0.15s",
       }}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)")
-      }
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = T.shadowMd)}
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = T.shadow)}
     >
+      {/* Card header */}
       <div
         style={{
           display: "flex",
@@ -289,10 +280,10 @@ function BatchCard({
         <div>
           <div
             style={{
-              fontFamily: FONTS.heading,
-              fontSize: 18,
-              color: C.green,
+              fontFamily: T.font,
+              fontSize: 16,
               fontWeight: 600,
+              color: T.ink900,
             }}
           >
             {batch.product_name || "Unnamed Product"}
@@ -300,11 +291,11 @@ function BatchCard({
           <div
             style={{
               fontSize: 11,
-              color: C.muted,
-              letterSpacing: "0.1em",
+              color: T.ink400,
+              letterSpacing: "0.06em",
               textTransform: "uppercase",
               marginTop: 2,
-              fontFamily: FONTS.body,
+              fontFamily: T.font,
             }}
           >
             {batch.batch_number}
@@ -312,53 +303,96 @@ function BatchCard({
         </div>
         <ExpiryBadge expiryDate={batch.expiry_date} />
       </div>
+
+      {/* Attributes */}
       <div
         style={{
           display: "flex",
-          gap: 16,
+          gap: 12,
           fontSize: 12,
-          color: C.muted,
-          fontFamily: FONTS.body,
+          color: T.ink500,
+          fontFamily: T.font,
           flexWrap: "wrap",
         }}
       >
-        {batch.strain && <span>🌿 {batch.strain.replace(/-/g, " ")}</span>}
-        {batch.product_type && <span>📦 {batch.product_type}</span>}
-        {batch.volume && <span>💧 {batch.volume}</span>}
-        {batch.thc_content && <span>⚗️ THC {batch.thc_content}%</span>}
+        {batch.strain && <span>{batch.strain.replace(/-/g, " ")}</span>}
+        {batch.product_type && <span>· {batch.product_type}</span>}
+        {batch.volume && <span>· {batch.volume}</span>}
+        {batch.thc_content && <span>· THC {batch.thc_content}%</span>}
       </div>
+
+      {/* Stat grid — flush 4-cell */}
       <div
         style={{
-          display: "flex",
-          gap: 0,
-          padding: "12px 0",
-          borderTop: `1px solid ${C.border}`,
-          borderBottom: `1px solid ${C.border}`,
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
         }}
       >
-        <StatPill
-          label="Produced"
-          value={batch.units_produced || "—"}
-          color={C.green}
-        />
-        <div style={{ width: 1, background: C.border }} />
-        <StatPill label="QR Codes" value={qr} color={C.blue} />
-        <div style={{ width: 1, background: C.border }} />
-        <StatPill label="Claimed" value={claimed} color={C.accent} />
-        <div style={{ width: 1, background: C.border }} />
-        <StatPill
-          label="Rate %"
-          value={`${activation}%`}
-          color={parseFloat(activation) >= 50 ? C.accent : C.orange}
-        />
+        {[
+          {
+            label: "Produced",
+            value: batch.units_produced || "—",
+            color: T.accent,
+          },
+          { label: "QR Codes", value: qr, color: T.info },
+          { label: "Claimed", value: claimed, color: T.accentMid },
+          {
+            label: "Rate",
+            value: `${rate}%`,
+            color: parseFloat(rate) >= 50 ? T.success : T.warning,
+          },
+        ].map((s) => (
+          <div
+            key={s.label}
+            style={{
+              background: "#fff",
+              padding: "10px 12px",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 400,
+                fontFamily: T.font,
+                color: s.color,
+                lineHeight: 1,
+                letterSpacing: "-0.01em",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {s.value}
+            </div>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                marginTop: 3,
+                fontFamily: T.font,
+              }}
+            >
+              {s.label}
+            </div>
+          </div>
+        ))}
       </div>
+
+      {/* Activation bar */}
       <div>
         <div
           style={{
             fontSize: 10,
-            color: C.muted,
-            fontFamily: FONTS.body,
-            letterSpacing: "0.1em",
+            color: T.ink400,
+            fontFamily: T.font,
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             marginBottom: 2,
           }}
@@ -367,22 +401,26 @@ function BatchCard({
         </div>
         <ProgressBar
           value={claimed}
-          max={qr}
-          color={parseFloat(activation) >= 50 ? C.accent : C.orange}
+          max={qr || 1}
+          color={parseFloat(rate) >= 50 ? T.success : T.warning}
         />
       </div>
+
+      {/* Dates */}
       <div
         style={{
           display: "flex",
           gap: 16,
           fontSize: 11,
-          color: C.muted,
-          fontFamily: FONTS.body,
+          color: T.ink400,
+          fontFamily: T.font,
         }}
       >
         <span>Produced: {fmtDate(batch.production_date)}</span>
         <span>Expires: {fmtDate(batch.expiry_date)}</span>
       </div>
+
+      {/* Badges */}
       <div
         style={{
           display: "flex",
@@ -397,11 +435,12 @@ function BatchCard({
               fontSize: 10,
               padding: "2px 8px",
               borderRadius: 20,
-              backgroundColor: C.lightGreen,
-              color: C.mid,
-              border: `1px solid ${C.accent}`,
+              background: T.successBg,
+              color: T.success,
+              border: `1px solid ${T.successBd}`,
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.07em",
+              fontFamily: T.font,
             }}
           >
             LAB CERTIFIED
@@ -413,11 +452,12 @@ function BatchCard({
               fontSize: 10,
               padding: "2px 8px",
               borderRadius: 20,
-              backgroundColor: "#f0fff4",
+              background: "#f0fff4",
               color: "#276749",
               border: "1px solid #276749",
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.07em",
+              fontFamily: T.font,
             }}
           >
             ORGANIC
@@ -432,77 +472,97 @@ function BatchCard({
               fontSize: 10,
               padding: "2px 8px",
               borderRadius: 20,
-              backgroundColor: C.lightBlue,
-              color: C.blue,
-              border: `1px solid ${C.blue}`,
+              background: T.infoBg,
+              color: T.info,
+              border: `1px solid ${T.infoBd}`,
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.07em",
               textDecoration: "none",
+              fontFamily: T.font,
             }}
           >
-            📄 VIEW COA
+            VIEW COA
           </a>
         ) : (
-          <span style={{ fontSize: 10, color: C.muted }}>No COA uploaded</span>
+          <span style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+            No COA uploaded
+          </span>
         )}
         <COADocumentBadge
           coaDocumentId={batch.coa_document_id}
           onViewInDocuments={onViewDocumentSource}
         />
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button
           onClick={() => onGoToQR(batch.id)}
           style={{
-            ...makeBtn(C.mid),
-            fontSize: 10,
+            ...makeBtn(T.accent),
+            fontSize: 11,
             padding: "8px 14px",
             flex: 1,
           }}
         >
-          🔲 Generate QR
+          Generate QR
         </button>
         <button
           onClick={() => onEdit(batch)}
           style={{
-            ...makeBtn("transparent", C.mid),
-            border: `1px solid ${C.border}`,
-            fontSize: 10,
+            ...makeBtn("transparent", T.accentMid),
+            border: `1px solid ${T.accentBd}`,
+            fontSize: 11,
             padding: "8px 14px",
           }}
         >
-          ✏️ Edit
+          Edit
         </button>
         <button
           onClick={() => onArchive(batch)}
           style={{
-            ...makeBtn("transparent", C.muted),
-            border: `1px solid ${C.border}`,
-            fontSize: 10,
+            ...makeBtn("transparent", T.ink400),
+            border: `1px solid ${T.ink150}`,
+            fontSize: 11,
             padding: "8px 14px",
           }}
         >
-          📁 Archive
+          Archive
         </button>
       </div>
     </div>
   );
 }
 
+// ─── FORM HELPERS ─────────────────────────────────────────────────────────────
 function Row({ children }) {
   return (
-    <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>{children}</div>
+    <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>{children}</div>
   );
 }
 function Field({ label: l, children, flex = 1 }) {
   return (
     <div style={{ flex }}>
-      <span style={label(l)}>{l}</span>
+      <label
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.07em",
+          textTransform: "uppercase",
+          color: T.ink400,
+          marginBottom: 5,
+          fontFamily: T.font,
+          display: "block",
+        }}
+      >
+        {l}
+      </label>
       {children}
     </div>
   );
 }
 
+// ─── BATCH FORM (DRAWER) ──────────────────────────────────────────────────────
 function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
   const isEdit = !!initial?.id;
   const [form, setForm] = useState({
@@ -534,7 +594,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== "application/pdf") {
-      setUploadMsg("⚠ Please upload a PDF file.");
+      setUploadMsg("Please upload a PDF file.");
       return;
     }
     setUploading(true);
@@ -552,11 +612,9 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         .from("coa-documents")
         .getPublicUrl(fileName);
       set("coa_url", urlData.publicUrl);
-      setUploadMsg("✅ COA uploaded successfully");
+      setUploadMsg("COA uploaded successfully");
     } catch (err) {
-      setUploadMsg(
-        `⚠ Upload failed: ${err.message}. Check 'coa-documents' bucket exists in Supabase Storage.`,
-      );
+      setUploadMsg(`Upload failed: ${err.message}`);
     } finally {
       setUploading(false);
     }
@@ -612,6 +670,25 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
     }
   };
 
+  const sectionHdr = (label) => (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        marginBottom: 12,
+        marginTop: 8,
+        paddingBottom: 8,
+        borderBottom: `1px solid ${T.ink150}`,
+        fontFamily: T.font,
+      }}
+    >
+      {label}
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -619,17 +696,18 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         top: 0,
         right: 0,
         bottom: 0,
-        width: "min(560px, 100vw)",
-        background: C.white,
+        width: "min(540px,100vw)",
+        background: "#fff",
         boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
         zIndex: 1000,
         overflowY: "auto",
-        fontFamily: FONTS.body,
+        fontFamily: T.font,
       }}
     >
+      {/* Drawer header */}
       <div
         style={{
-          background: C.green,
+          background: T.accent,
           padding: "20px 24px",
           position: "sticky",
           top: 0,
@@ -637,14 +715,19 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         }}
       >
         <div
-          style={{ fontFamily: FONTS.heading, fontSize: 22, color: C.white }}
+          style={{
+            fontFamily: T.font,
+            fontSize: 18,
+            fontWeight: 600,
+            color: "#fff",
+          }}
         >
           {isEdit ? "Edit Batch" : "New Batch"}
         </div>
-        <div style={{ fontSize: 12, color: C.accent, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: T.accentBd, marginTop: 2 }}>
           {isEdit
             ? `Editing ${initial.batch_number}`
-            : "All fields marked * are required"}
+            : "Fields marked * are required"}
         </div>
         <button
           onClick={onCancel}
@@ -654,7 +737,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             right: 16,
             background: "none",
             border: "none",
-            color: C.white,
+            color: "#fff",
             fontSize: 22,
             cursor: "pointer",
             lineHeight: 1,
@@ -663,36 +746,25 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           ×
         </button>
       </div>
+
       <div style={{ padding: 24 }}>
         {error && (
           <div
             style={{
-              padding: "12px 16px",
-              background: C.lightRed,
-              border: `1px solid ${C.red}`,
-              borderRadius: 2,
-              color: C.red,
+              padding: "10px 14px",
+              background: T.dangerBg,
+              border: `1px solid ${T.dangerBd}`,
+              borderRadius: 4,
+              color: T.danger,
               fontSize: 13,
-              marginBottom: 20,
+              marginBottom: 16,
             }}
           >
-            ⚠ {error}
+            {error}
           </div>
         )}
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.2em",
-            color: C.muted,
-            textTransform: "uppercase",
-            marginBottom: 12,
-            borderBottom: `1px solid ${C.border}`,
-            paddingBottom: 8,
-          }}
-        >
-          Batch Identity
-        </div>
+
+        {sectionHdr("Batch Identity")}
         <Row>
           <Field label="Batch Number *" flex={1}>
             <input
@@ -701,9 +773,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               onChange={(e) => set("batch_number", e.target.value)}
               placeholder="PB-001-2026"
             />
-            <div style={hint}>
-              Auto-suggested from last batch — you can edit
-            </div>
+            <div style={hint}>Auto-suggested — you can edit</div>
           </Field>
         </Row>
         <Row>
@@ -738,7 +808,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               onChange={(e) => set("strain", e.target.value)}
               placeholder="gelato-41"
             />
-            <div style={hint}>Use hyphenated lowercase (e.g. purple-punch)</div>
+            <div style={hint}>Hyphenated lowercase (e.g. purple-punch)</div>
           </Field>
           <Field label="Volume" flex={1}>
             <input
@@ -781,21 +851,8 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
             />
           </Field>
         </Row>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.2em",
-            color: C.muted,
-            textTransform: "uppercase",
-            marginBottom: 12,
-            borderBottom: `1px solid ${C.border}`,
-            paddingBottom: 8,
-            marginTop: 8,
-          }}
-        >
-          Dates
-        </div>
+
+        {sectionHdr("Dates")}
         <Row>
           <Field label="Production Date">
             <input
@@ -816,31 +873,19 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               <div
                 style={{
                   ...hint,
-                  color: daysUntil(form.expiry_date) <= 30 ? C.orange : C.mid,
+                  color:
+                    daysUntil(form.expiry_date) <= 30 ? T.warning : T.accentMid,
                 }}
               >
                 {daysUntil(form.expiry_date) < 0
-                  ? "⚠ Expired"
+                  ? "Expired"
                   : `${daysUntil(form.expiry_date)} days remaining`}
               </div>
             )}
           </Field>
         </Row>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.2em",
-            color: C.muted,
-            textTransform: "uppercase",
-            marginBottom: 12,
-            borderBottom: `1px solid ${C.border}`,
-            paddingBottom: 8,
-            marginTop: 8,
-          }}
-        >
-          Lab &amp; Certification
-        </div>
+
+        {sectionHdr("Lab & Certification")}
         <Row>
           <Field label="Lab Name" flex={2}>
             <input
@@ -865,17 +910,18 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                gap: 8,
                 cursor: "pointer",
-                fontSize: 14,
-                color: C.text,
+                fontSize: 13,
+                color: T.ink700,
+                fontFamily: T.font,
               }}
             >
               <input
                 type="checkbox"
                 checked={form.lab_certified}
                 onChange={(e) => set("lab_certified", e.target.checked)}
-                style={{ width: 16, height: 16, cursor: "pointer" }}
+                style={{ width: 15, height: 15 }}
               />
               Lab Certified
             </label>
@@ -885,52 +931,40 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                gap: 8,
                 cursor: "pointer",
-                fontSize: 14,
-                color: C.text,
+                fontSize: 13,
+                color: T.ink700,
+                fontFamily: T.font,
               }}
             >
               <input
                 type="checkbox"
                 checked={form.organic}
                 onChange={(e) => set("organic", e.target.checked)}
-                style={{ width: 16, height: 16, cursor: "pointer" }}
+                style={{ width: 15, height: 15 }}
               />
               Organic
             </label>
           </Field>
         </Row>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.2em",
-            color: C.muted,
-            textTransform: "uppercase",
-            marginBottom: 12,
-            borderBottom: `1px solid ${C.border}`,
-            paddingBottom: 8,
-            marginTop: 8,
-          }}
-        >
-          Certificate of Analysis (COA)
-        </div>
+
+        {sectionHdr("Certificate of Analysis (COA)")}
         {form.coa_url ? (
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 12,
-              padding: "12px 16px",
-              background: C.lightGreen,
-              border: `1px solid ${C.accent}`,
-              borderRadius: 2,
-              marginBottom: 16,
+              padding: "12px 14px",
+              background: T.successBg,
+              border: `1px solid ${T.successBd}`,
+              borderRadius: 4,
+              marginBottom: 14,
             }}
           >
-            <span style={{ fontSize: 13, color: C.mid, flex: 1 }}>
-              ✅ COA uploaded
+            <span style={{ fontSize: 13, color: T.success, flex: 1 }}>
+              COA uploaded
             </span>
             <a
               href={form.coa_url}
@@ -938,7 +972,7 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               rel="noopener noreferrer"
               style={{
                 fontSize: 11,
-                color: C.blue,
+                color: T.info,
                 fontWeight: 600,
                 textDecoration: "none",
               }}
@@ -949,11 +983,11 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
               onClick={() => set("coa_url", "")}
               style={{
                 fontSize: 11,
-                color: C.red,
+                color: T.danger,
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                fontFamily: FONTS.body,
+                fontFamily: T.font,
               }}
             >
               Remove
@@ -963,24 +997,34 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           <div
             onClick={() => fileRef.current?.click()}
             style={{
-              border: `2px dashed ${C.border}`,
-              borderRadius: 2,
-              padding: "24px",
+              border: `2px dashed ${T.ink150}`,
+              borderRadius: 4,
+              padding: "20px",
               textAlign: "center",
               cursor: "pointer",
-              marginBottom: 16,
-              background: C.cream,
-              transition: "border-color 0.2s",
+              marginBottom: 14,
+              background: T.ink075,
+              transition: "border-color 0.15s",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = C.accent)}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = C.border)}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.borderColor = T.accentBd)
+            }
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = T.ink150)}
           >
-            <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
-            <div style={{ fontSize: 13, color: C.mid, fontFamily: FONTS.body }}>
+            <div
+              style={{ fontSize: 13, color: T.accentMid, fontFamily: T.font }}
+            >
               {uploading ? "Uploading…" : "Click to upload COA PDF"}
             </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-              PDF files only · Max 10MB
+            <div
+              style={{
+                fontSize: 11,
+                color: T.ink400,
+                marginTop: 3,
+                fontFamily: T.font,
+              }}
+            >
+              PDF only · Max 10MB
             </div>
           </div>
         )}
@@ -995,44 +1039,45 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
           <div
             style={{
               fontSize: 12,
-              color: uploadMsg.startsWith("✅") ? C.mid : C.orange,
-              marginBottom: 12,
+              color: uploadMsg.includes("success") ? T.success : T.warning,
+              marginBottom: 10,
+              fontFamily: T.font,
             }}
           >
             {uploadMsg}
           </div>
         )}
-        <div style={{ marginBottom: 20 }}>
-          <span style={label("Or Paste Existing COA URL")}>
-            Or Paste Existing COA URL
-          </span>
+
+        <Field label="Or Paste Existing COA URL">
           <input
             style={inputStyle}
             value={form.coa_url}
             onChange={(e) => set("coa_url", e.target.value)}
-            placeholder="https://..."
+            placeholder="https://…"
           />
-        </div>
+        </Field>
+
         <div
           style={{
             display: "flex",
-            gap: 12,
-            paddingTop: 12,
-            borderTop: `1px solid ${C.border}`,
+            gap: 10,
+            paddingTop: 16,
+            marginTop: 16,
+            borderTop: `1px solid ${T.ink150}`,
           }}
         >
           <button
             onClick={handleSave}
             disabled={saving}
-            style={{ ...makeBtn(C.green, C.white, saving), flex: 1 }}
+            style={{ ...makeBtn(T.accent, "#fff", saving), flex: 1 }}
           >
             {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Batch"}
           </button>
           <button
             onClick={onCancel}
             style={{
-              ...makeBtn("transparent", C.muted),
-              border: `1px solid ${C.border}`,
+              ...makeBtn("transparent", T.ink400),
+              border: `1px solid ${T.ink150}`,
             }}
           >
             Cancel
@@ -1050,7 +1095,6 @@ export default function AdminBatchManager({
   onNavigateToQR,
   onNavigateToDocuments,
 }) {
-  // WP-GUIDE-C++: wire 'batches' context for WorkflowGuide live status
   const ctx = usePageContext("batches", null);
 
   const [batches, setBatches] = useState([]);
@@ -1064,10 +1108,10 @@ export default function AdminBatchManager({
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [toast, setToast] = useState("");
 
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
-  };
+  }, []);
 
   const fetchBatches = useCallback(async () => {
     setLoading(true);
@@ -1090,28 +1134,22 @@ export default function AdminBatchManager({
       }
       setStatsMap(map);
       setBatches(batchData || []);
-      await suggestNext(batchData || []);
+      // Suggest next batch number
+      let max = 0;
+      for (const b of batchData || []) {
+        const parts = (b.batch_number || "").split("-");
+        const n = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(n) && n > max) max = n;
+      }
+      setSuggestedNum(
+        `PB-001-${new Date().getFullYear()}-${String(max + 1).padStart(3, "0")}`,
+      );
     } catch (err) {
       console.error("fetchBatches error:", err);
     } finally {
       setLoading(false);
     }
   }, []);
-
-  const suggestNext = async (batchList) => {
-    if (!batchList || batchList.length === 0) {
-      setSuggestedNum("PB-001-2026");
-      return;
-    }
-    let max = 0;
-    for (const b of batchList) {
-      const parts = (b.batch_number || "").split("-");
-      const n = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(n) && n > max) max = n;
-    }
-    const year = new Date().getFullYear();
-    setSuggestedNum(`PB-001-${year}-${String(max + 1).padStart(3, "0")}`);
-  };
 
   useEffect(() => {
     fetchBatches();
@@ -1129,18 +1167,11 @@ export default function AdminBatchManager({
     }
   };
 
-  const handleSave = (saved) => {
+  const handleSave = () => {
     setShowForm(false);
     setEditBatch(null);
-    showToast(editBatch ? "Batch updated." : "Batch created successfully.");
+    showToast(editBatch ? "Batch updated." : "Batch created.");
     fetchBatches();
-  };
-
-  const handleGoToQR = (batchId) => {
-    if (onNavigateToQR) onNavigateToQR(batchId);
-  };
-  const handleViewDocumentSource = (documentId) => {
-    if (onNavigateToDocuments) onNavigateToDocuments(documentId);
   };
 
   const filtered = batches.filter((b) => {
@@ -1169,9 +1200,16 @@ export default function AdminBatchManager({
     .reduce((s, b) => s + (b.units_produced || 0), 0);
   const totalQR = Object.values(statsMap).reduce((s, v) => s + v.qr_count, 0);
 
+  const FILTER_TABS = [
+    { key: "active", label: "Active" },
+    { key: "expiring", label: "Expiring" },
+    { key: "archived", label: "Archived" },
+    { key: "all", label: "All" },
+  ];
+
   return (
-    <div style={{ fontFamily: FONTS.body, position: "relative" }}>
-      {/* WP-GUIDE-C++: WorkflowGuide with live batch context */}
+    <div style={{ fontFamily: T.font, position: "relative" }}>
+      {/* WorkflowGuide — always first */}
       <WorkflowGuide
         context={ctx}
         tabId="batches"
@@ -1187,19 +1225,19 @@ export default function AdminBatchManager({
             bottom: 24,
             left: "50%",
             transform: "translateX(-50%)",
-            background: C.green,
-            color: C.white,
+            background: T.accent,
+            color: "#fff",
             padding: "12px 24px",
-            borderRadius: 2,
+            borderRadius: 6,
             fontSize: 13,
             fontWeight: 600,
             zIndex: 2000,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-            fontFamily: FONTS.body,
-            letterSpacing: "0.05em",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            fontFamily: T.font,
+            letterSpacing: "0.04em",
           }}
         >
-          ✓ {toast}
+          {toast}
         </div>
       )}
 
@@ -1217,15 +1255,16 @@ export default function AdminBatchManager({
         <div>
           <h2
             style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: 24,
-              margin: 0,
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
             Batch Manager
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: T.ink400 }}>
             Create and manage production batches · COA uploads · QR code linking
           </div>
         </div>
@@ -1234,89 +1273,106 @@ export default function AdminBatchManager({
             setEditBatch(null);
             setShowForm(true);
           }}
-          style={makeBtn(C.mid)}
+          style={makeBtn(T.accent)}
         >
           + New Batch
         </button>
       </div>
 
-      {/* Stats strip */}
+      {/* ── STAT GRID (flush, no borderTop) ── */}
       <div
-        style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 24,
+        }}
       >
         {[
-          { label: "Active Batches", value: activeBatches, color: C.green },
+          { label: "Active Batches", value: activeBatches, color: T.accent },
           {
             label: "Expiring Soon",
             value: expiringBatches,
-            color: expiringBatches > 0 ? C.orange : C.muted,
+            color: expiringBatches > 0 ? T.warning : T.ink400,
           },
-          { label: "Total Units", value: totalUnits, color: C.blue },
-          { label: "QR Codes Issued", value: totalQR, color: C.accent },
+          {
+            label: "Total Units",
+            value: totalUnits.toLocaleString("en-ZA"),
+            color: T.info,
+          },
+          {
+            label: "QR Codes Issued",
+            value: totalQR.toLocaleString("en-ZA"),
+            color: T.accentMid,
+          },
         ].map((s) => (
           <div
             key={s.label}
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: "16px 20px",
-              flex: "1 1 160px",
-              minWidth: 140,
-            }}
+            style={{ background: "#fff", padding: "16px 18px" }}
           >
             <div
               style={{
-                fontSize: 28,
-                fontWeight: 700,
-                fontFamily: FONTS.heading,
-                color: s.color,
-                lineHeight: 1,
-              }}
-            >
-              {s.value}
-            </div>
-            <div
-              style={{
                 fontSize: 10,
-                letterSpacing: "0.15em",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
-                marginTop: 4,
+                color: T.ink400,
+                marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {s.label}
+            </div>
+            <div
+              style={{
+                fontFamily: T.font,
+                fontSize: 22,
+                fontWeight: 400,
+                color: s.color,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {s.value}
             </div>
           </div>
         ))}
       </div>
 
+      {/* Expiring warning */}
       {expiringBatches > 0 && (
         <div
           style={{
             padding: "12px 16px",
-            background: C.lightOrange,
-            border: `1px solid ${C.orange}`,
-            borderRadius: 2,
+            background: T.warningBg,
+            border: `1px solid ${T.warningBd}`,
+            borderRadius: 6,
             marginBottom: 20,
             fontSize: 13,
-            color: C.orange,
+            color: T.warning,
             fontWeight: 600,
+            fontFamily: T.font,
           }}
         >
-          ⚠ {expiringBatches} batch{expiringBatches > 1 ? "es" : ""} expiring
+          {expiringBatches} batch{expiringBatches > 1 ? "es" : ""} expiring
           within 30 days — review distribution plan.
           <button
             onClick={() => setFilter("expiring")}
             style={{
               marginLeft: 12,
               fontSize: 11,
-              color: C.orange,
+              color: T.warning,
               background: "none",
               border: "none",
               cursor: "pointer",
               textDecoration: "underline",
-              fontFamily: FONTS.body,
+              fontFamily: T.font,
             }}
           >
             View expiring →
@@ -1324,7 +1380,7 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Search + filter */}
+      {/* Search + filter tabs */}
       <div
         style={{
           display: "flex",
@@ -1335,56 +1391,61 @@ export default function AdminBatchManager({
         }}
       >
         <input
-          style={{ ...inputStyle, maxWidth: 300 }}
+          style={{ ...inputStyle, maxWidth: 280 }}
           placeholder="Search batch, product, strain…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {/* Underline-only filter tabs */}
         <div
           style={{
             display: "flex",
+            borderBottom: `2px solid ${T.ink150}`,
             gap: 0,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            overflow: "hidden",
           }}
         >
-          {[
-            { key: "active", label: "Active" },
-            { key: "expiring", label: "Expiring" },
-            { key: "archived", label: "Archived" },
-            { key: "all", label: "All" },
-          ].map((f) => (
+          {FILTER_TABS.map((f) => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
               style={{
                 padding: "8px 16px",
+                background: "transparent",
                 border: "none",
+                borderBottom:
+                  filter === f.key
+                    ? `2px solid ${T.accent}`
+                    : "2px solid transparent",
+                fontFamily: T.font,
                 fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
+                fontWeight: filter === f.key ? 700 : 400,
+                letterSpacing: "0.06em",
                 textTransform: "uppercase",
+                color: filter === f.key ? T.accent : T.ink400,
                 cursor: "pointer",
-                fontFamily: FONTS.body,
-                transition: "all 0.15s",
-                backgroundColor: filter === f.key ? C.green : C.white,
-                color: filter === f.key ? C.white : C.muted,
+                marginBottom: -2,
               }}
             >
               {f.label}
             </button>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: C.muted, marginLeft: "auto" }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: T.ink400,
+            marginLeft: "auto",
+            fontFamily: T.font,
+          }}
+        >
           {filtered.length} batch{filtered.length !== 1 ? "es" : ""}
         </div>
         <button
           onClick={fetchBatches}
           style={{
-            ...makeBtn("transparent", C.muted),
-            border: `1px solid ${C.border}`,
-            padding: "8px 16px",
+            ...makeBtn("transparent", T.ink400),
+            border: `1px solid ${T.ink150}`,
+            padding: "7px 14px",
             fontSize: 11,
           }}
         >
@@ -1398,8 +1459,9 @@ export default function AdminBatchManager({
           style={{
             padding: "60px",
             textAlign: "center",
-            color: C.muted,
-            fontSize: 14,
+            color: T.ink400,
+            fontSize: 13,
+            fontFamily: T.font,
           }}
         >
           Loading batches…
@@ -1409,22 +1471,29 @@ export default function AdminBatchManager({
           style={{
             padding: "60px",
             textAlign: "center",
-            border: `1px dashed ${C.border}`,
-            borderRadius: 2,
+            border: `1px dashed ${T.ink150}`,
+            borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🌿</div>
           <div
             style={{
-              fontFamily: FONTS.heading,
               fontSize: 20,
-              color: C.green,
+              fontWeight: 600,
+              color: T.ink700,
               marginBottom: 8,
+              fontFamily: T.font,
             }}
           >
             {filter === "archived" ? "No archived batches" : "No batches found"}
           </div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: T.ink400,
+              marginBottom: 20,
+              fontFamily: T.font,
+            }}
+          >
             {filter === "archived"
               ? "Archived batches will appear here."
               : "Create your first batch to get started."}
@@ -1435,7 +1504,7 @@ export default function AdminBatchManager({
                 setEditBatch(null);
                 setShowForm(true);
               }}
-              style={makeBtn(C.mid)}
+              style={makeBtn(T.accentMid)}
             >
               + Create First Batch
             </button>
@@ -1459,19 +1528,22 @@ export default function AdminBatchManager({
                 setShowForm(true);
               }}
               onArchive={(b) => setArchiveTarget(b)}
-              onGoToQR={handleGoToQR}
-              onViewDocumentSource={handleViewDocumentSource}
+              onGoToQR={(id) => onNavigateToQR && onNavigateToQR(id)}
+              onViewDocumentSource={(id) =>
+                onNavigateToDocuments && onNavigateToDocuments(id)
+              }
             />
           ))}
         </div>
       )}
 
+      {/* Archive confirm modal */}
       {archiveTarget && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: "rgba(0,0,0,0.45)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1480,32 +1552,34 @@ export default function AdminBatchManager({
         >
           <div
             style={{
-              background: C.white,
-              borderRadius: 2,
+              background: "#fff",
+              borderRadius: 8,
               padding: 32,
               maxWidth: 400,
               width: "90%",
               textAlign: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+              fontFamily: T.font,
             }}
           >
             <div
               style={{
-                fontFamily: FONTS.heading,
-                fontSize: 22,
-                color: C.green,
-                marginBottom: 12,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.ink900,
+                marginBottom: 8,
               }}
             >
               Archive Batch?
             </div>
-            <div style={{ fontSize: 14, color: C.muted, marginBottom: 8 }}>
+            <div style={{ fontSize: 14, color: T.ink500, marginBottom: 6 }}>
               <strong>{archiveTarget.batch_number}</strong> —{" "}
               {archiveTarget.product_name}
             </div>
             <div
               style={{
                 fontSize: 13,
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: 24,
                 lineHeight: 1.6,
               }}
@@ -1516,15 +1590,15 @@ export default function AdminBatchManager({
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <button
                 onClick={() => handleArchive(archiveTarget)}
-                style={makeBtn(C.orange)}
+                style={makeBtn(T.warning)}
               >
                 Archive
               </button>
               <button
                 onClick={() => setArchiveTarget(null)}
                 style={{
-                  ...makeBtn("transparent", C.muted),
-                  border: `1px solid ${C.border}`,
+                  ...makeBtn("transparent", T.ink400),
+                  border: `1px solid ${T.ink150}`,
                 }}
               >
                 Cancel
@@ -1534,6 +1608,7 @@ export default function AdminBatchManager({
         </div>
       )}
 
+      {/* Drawer backdrop + form */}
       {showForm && (
         <>
           <div
