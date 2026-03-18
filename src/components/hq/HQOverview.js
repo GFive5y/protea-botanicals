@@ -1,11 +1,6 @@
-// src/components/hq/HQOverview.js — v3.1 — WP-THEME-2: Inter font
+// src/components/hq/HQOverview.js — v4.0 — WP-VISUAL: revenue hero + delta badges
+// v3.1 — WP-THEME-2: Inter font
 // v3.0 — WP-THEME: Unified design system applied
-//   - Outfit replaces Cormorant Garamond + Jost everywhere
-//   - DM Mono for all metric values
-//   - Emoji icons removed — SVG / text indicators only
-//   - Coloured top borders removed — semantic state on value colour only
-//   - Alert bars use standard 4-variant template
-//   - Buttons use standard 4-variant system
 // v2.1 — WP-GUIDE-C: wire overview context to WorkflowGuide
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -122,7 +117,7 @@ const T = {
 
 const DONUT_COLOURS = [T.accent, T.accentMid, "#52B788", T.accentBd, T.ink300];
 
-// ─── WorkflowGuide content (unchanged) ──────────────────────────────────────
+// ─── WorkflowGuide content ───────────────────────────────────────────────────
 const GUIDE_STEPS = [
   {
     number: 1,
@@ -215,6 +210,7 @@ export default function HQOverview({ onNavigate }) {
   const ctx = usePageContext("overview", null);
 
   const [scanTrend, setScanTrend] = useState([]);
+  const [revenueTrend, setRevenueTrend] = useState([]);
   const [qrTypeDist, setQrTypeDist] = useState([]);
   const [weeklySpark, setWeeklySpark] = useState([]);
   const [stats, setStats] = useState(null);
@@ -231,6 +227,8 @@ export default function HQOverview({ onNavigate }) {
   const [fxUpdatedAt, setFxUpdatedAt] = useState(null);
   const [fxRefreshing, setFxRefreshing] = useState(false);
   const [fxCountdown, setFxCountdown] = useState(60);
+  const [scanDelta, setScanDelta] = useState(null); // % vs prior 7 days
+  const [revDelta, setRevDelta] = useState(null); // % vs prior month
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
 
@@ -572,7 +570,75 @@ export default function HQOverview({ onNavigate }) {
         fxRate: currentFx,
       });
 
-      // ── Scan trend (Area hero + sparkline) ──────────────────────────
+      // ── Revenue trend (Area hero — orders.total by day) ──────────────
+      try {
+        const d30r = new Date();
+        d30r.setDate(d30r.getDate() - 30);
+        const { data: revRaw } = await supabase
+          .from("orders")
+          .select("created_at,total")
+          .gte("created_at", d30r.toISOString())
+          .order("created_at", { ascending: true });
+        const revDayMap = {};
+        (revRaw || []).forEach((o) => {
+          const day = new Date(o.created_at).toLocaleDateString("en-ZA", {
+            month: "short",
+            day: "numeric",
+          });
+          revDayMap[day] = (revDayMap[day] || 0) + (parseFloat(o.total) || 0);
+        });
+        setRevenueTrend(
+          Object.entries(revDayMap).map(([date, total]) => ({ date, total })),
+        );
+        // Revenue delta: MTD vs same number of days last month
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          1,
+        );
+        const lastMonthSameDay = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          now.getDate(),
+        );
+        const { data: lastMonthRev } = await supabase
+          .from("orders")
+          .select("total")
+          .gte("created_at", lastMonthStart.toISOString())
+          .lte("created_at", lastMonthSameDay.toISOString());
+        const lastMonthTotal = (lastMonthRev || []).reduce(
+          (s, o) => s + (parseFloat(o.total) || 0),
+          0,
+        );
+        const thisMonthTotal = (revRaw || [])
+          .filter((o) => new Date(o.created_at) >= monthStart)
+          .reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+        if (lastMonthTotal > 0) {
+          setRevDelta(
+            ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100,
+          );
+        }
+      } catch (_) {}
+
+      // ── Prior-period scan delta (this 7d vs prev 7d) ─────────────────
+      try {
+        const d7 = new Date();
+        d7.setDate(d7.getDate() - 7);
+        const d14 = new Date();
+        d14.setDate(d14.getDate() - 14);
+        const { count: prevCount } = await supabase
+          .from("scan_logs")
+          .select("id", { count: "exact", head: true })
+          .gte("scanned_at", d14.toISOString())
+          .lt("scanned_at", d7.toISOString());
+        if (prevCount > 0) {
+          setScanDelta(((recentScanCount - prevCount) / prevCount) * 100);
+        }
+      } catch (_) {}
+
+      // ── Scan trend (sparkline) ───────────────────────────────────────
       try {
         const d30 = new Date();
         d30.setDate(d30.getDate() - 30);
@@ -608,6 +674,7 @@ export default function HQOverview({ onNavigate }) {
             .map(([, v]) => ({ v })),
         );
       } catch (_) {}
+
       // ── QR type distribution (Donut + HBar) ─────────────────────────
       try {
         const { data: typeRaw } = await supabase
@@ -730,6 +797,76 @@ export default function HQOverview({ onNavigate }) {
         defaultOpen={false}
       />
 
+      {/* ── REVENUE HERO — Area chart (orders.total last 30 days) ── */}
+      {revenueTrend.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <ChartCard
+            title="Revenue — Last 30 Days"
+            height={320}
+            action={
+              revDelta !== null ? (
+                <DeltaBadge value={revDelta} suffix="%" decimals={1} />
+              ) : null
+            }
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={revenueTrend}
+                margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+              >
+                <defs>
+                  <linearGradient id="ov-rev-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={T.accent} stopOpacity={0.18} />
+                    <stop offset="95%" stopColor={T.accent} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  horizontal={true}
+                  vertical={false}
+                  stroke={T.ink150}
+                  strokeWidth={0.5}
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  dy={6}
+                  interval="preserveStartEnd"
+                  maxRotation={0}
+                />
+                <YAxis
+                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={55}
+                  tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      formatter={(v) =>
+                        `R ${Number(v).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      }
+                    />
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  name="Revenue"
+                  stroke={T.accent}
+                  strokeWidth={2}
+                  fill="url(#ov-rev-grad)"
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
+      )}
+
       {/* ── ROW 1: OPERATIONS HEALTH ── */}
       <SectionLabel label="Operations Health" />
       <div style={tileGrid}>
@@ -791,10 +928,10 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ── CHART: Scan Activity — Area Hero ── */}
+      {/* ── CHART: Scan Activity — Area (secondary, below ops) ── */}
       {scanTrend.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <ChartCard title="Scan Activity — Last 30 Days" height={320}>
+          <ChartCard title="Scan Activity — Last 30 Days" height={240}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={scanTrend}
@@ -867,6 +1004,7 @@ export default function HQOverview({ onNavigate }) {
           onClick={() => nav("analytics")}
           hint="Analytics"
           sparkData={weeklySpark}
+          delta={scanDelta}
         />
         <MetricTile
           label="Loyalty Points"
@@ -1131,6 +1269,7 @@ export default function HQOverview({ onNavigate }) {
                   color: T.success,
                   lineHeight: 1,
                   letterSpacing: "-0.02em",
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {fxRate
@@ -1147,7 +1286,7 @@ export default function HQOverview({ onNavigate }) {
           {/* Gross margin radial gauge */}
           {erpStats.avgMarginPct !== null &&
             erpStats.avgMarginPct !== undefined && (
-              <div style={{ marginTop: 20 }}>
+              <div style={{ marginTop: 20, marginBottom: 28 }}>
                 <ChartCard title="Gross Margin — Retail Channel" height={220}>
                   <MarginGauge
                     value={erpStats.avgMarginPct}
@@ -1430,6 +1569,7 @@ export default function HQOverview({ onNavigate }) {
                         fontWeight: 600,
                         fontSize: 14,
                         fontFamily: T.fontData,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {item.quantity_on_hand ?? 0}
@@ -1469,7 +1609,6 @@ export default function HQOverview({ onNavigate }) {
         >
           Quick Actions
         </div>
-
         <div
           style={{
             fontSize: 10,
@@ -1519,7 +1658,6 @@ export default function HQOverview({ onNavigate }) {
             </a>
           ))}
         </div>
-
         {onNavigate && (
           <>
             <div
@@ -1639,44 +1777,6 @@ const SEMANTIC = {
   danger: { text: "#991B1B", bg: "#FEF2F2", bd: "#FECACA" },
   info: { text: "#1E3A5F", bg: "#EFF6FF", bd: "#BFDBFE" },
 };
-
-function EmptyChart({ label = "No data yet" }) {
-  return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
-          background: T.ink075,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M2 12L6 8L9 11L13 6"
-            stroke={T.ink300}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-      <span style={{ ...T.caption, color: T.ink400 }}>{label}</span>
-    </div>
-  );
-}
 
 function MarginGauge({ value, color }) {
   const pct = Math.min(Math.max((value || 0) / 100, 0), 1);
