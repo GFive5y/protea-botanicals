@@ -1,4 +1,4 @@
-// HRDisciplinary.js v1.0
+// HRDisciplinary.js v1.1
 // Protea Botanicals · HR Module · Disciplinary Records
 // WP-HR-6 · March 2026
 // src/components/hq/HRDisciplinary.js
@@ -47,40 +47,69 @@ const RECORD_TYPES = [
   { value: "dismissal", label: "Dismissal", hrOnly: true, validMonths: null },
 ];
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — preserve all internal logic referencing C
+const C = {
+  green: T.accent,
+  greenLight: T.accentLit,
+  greenMid: T.accentMid,
+  amber: T.warning,
+  amberLight: T.warningBg,
+  red: T.danger,
+  redLight: T.dangerBg,
+  blue: T.info,
+  blueLight: T.infoBg,
+  border: T.ink150,
+  bg: T.ink075,
+  white: "#fff",
+  text: T.ink700,
+  muted: T.ink400,
+};
+
 const STATUS_CFG = {
-  draft: { label: "Draft", bg: "#f5f5f5", color: "#616161" },
-  issued: { label: "Issued", bg: "#fff8e1", color: "#f57f17" },
-  acknowledged: { label: "Acknowledged", bg: "#e8f5e9", color: "#2e7d32" },
-  appealed: { label: "Appealed", bg: "#e3f2fd", color: "#1565c0" },
-  lapsed: { label: "Lapsed", bg: "#f5f5f5", color: "#9e9e9e" },
-  closed: { label: "Closed", bg: "#f5f5f5", color: "#9e9e9e" },
+  draft: { label: "Draft", bg: T.ink075, color: T.ink500 },
+  issued: { label: "Issued", bg: T.warningBg, color: T.warning },
+  acknowledged: { label: "Acknowledged", bg: T.successBg, color: T.success },
+  appealed: { label: "Appealed", bg: T.infoBg, color: T.info },
+  lapsed: { label: "Lapsed", bg: T.ink075, color: T.ink400 },
+  closed: { label: "Closed", bg: T.ink075, color: T.ink400 },
 };
 
 const TYPE_CFG = {
-  verbal_warning: { color: "#f57f17", bg: "#fff8e1" },
+  verbal_warning: { color: T.warning, bg: T.warningBg },
   written_warning: { color: "#e65100", bg: "#fff3e0" },
-  final_warning: { color: "#c62828", bg: "#fdecea" },
-  notice_to_attend: { color: "#1565c0", bg: "#e3f2fd" },
+  final_warning: { color: T.danger, bg: T.dangerBg },
+  notice_to_attend: { color: T.info, bg: T.infoBg },
   suspension: { color: "#6a1b9a", bg: "#f3e5f5" },
   hearing_outcome: { color: "#4e342e", bg: "#efebe9" },
   dismissal: { color: "#b71c1c", bg: "#ffebee" },
-};
-
-const C = {
-  green: "#3d6b35",
-  greenLight: "#e8f5e9",
-  greenMid: "#2e7d32",
-  amber: "#f57f17",
-  amberLight: "#fff8e1",
-  red: "#c62828",
-  redLight: "#fdecea",
-  blue: "#1565c0",
-  blueLight: "#e3f2fd",
-  border: "#ece8e2",
-  bg: "#faf8f5",
-  white: "#fff",
-  text: "#2d2d2d",
-  muted: "#aaa",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,7 +126,7 @@ function daysUntil(d) {
   return Math.ceil((new Date(d) - new Date()) / 86400000);
 }
 function typeCfg(type) {
-  return TYPE_CFG[type] || { color: C.muted, bg: "#f5f5f5" };
+  return TYPE_CFG[type] || { color: T.ink400, bg: T.ink075 };
 }
 function typeLabel(type) {
   return RECORD_TYPES.find((r) => r.value === type)?.label || type;
@@ -112,6 +141,7 @@ function TypeBadge({ type }) {
         color: cfg.color,
         fontSize: 10,
         fontWeight: 700,
+        fontFamily: T.font,
         padding: "2px 8px",
         borderRadius: 20,
         letterSpacing: "0.04em",
@@ -126,8 +156,8 @@ function TypeBadge({ type }) {
 function StatusBadge({ status }) {
   const cfg = STATUS_CFG[status] || {
     label: status,
-    bg: "#f5f5f5",
-    color: C.muted,
+    bg: T.ink075,
+    color: T.ink400,
   };
   return (
     <span
@@ -136,6 +166,7 @@ function StatusBadge({ status }) {
         color: cfg.color,
         fontSize: 10,
         fontWeight: 700,
+        fontFamily: T.font,
         padding: "2px 8px",
         borderRadius: 20,
         letterSpacing: "0.04em",
@@ -182,7 +213,6 @@ function generateDisciplinaryLetter(
     <div><div class="company">${tenantName}</div><div class="doc-type">${tLabel}</div></div>
     <div style="text-align:right;font-size:10pt;color:#555">Date issued: ${fmtDate(record.issued_date || new Date())}<br>Ref: DISC-${record.id?.slice(0, 8).toUpperCase() || "DRAFT"}</div>
   </div>
-
   <h2>Notice of ${tLabel}</h2>
   <table>
     <tr><td>Employee</td><td>${staffName}</td></tr>
@@ -192,24 +222,18 @@ function generateDisciplinaryLetter(
     ${record.witness_1_name ? `<tr><td>Witness</td><td>${record.witness_1_name}${record.witness_2_name ? `, ${record.witness_2_name}` : ""}</td></tr>` : ""}
     ${record.rule_infringed ? `<tr><td>Rule / Policy Infringed</td><td>${record.rule_infringed}</td></tr>` : ""}
   </table>
-
   <div class="body-text"><strong>Description of Incident:</strong><br>${record.description || "See attached incident report."}</div>
-
   ${record.outcome ? `<div class="body-text"><strong>Outcome / Sanctions:</strong><br>${record.outcome}${record.sanctions_applied ? "<br><em>" + record.sanctions_applied + "</em>" : ""}</div>` : ""}
-
   <div class="warning-box">
     You are hereby issued this <strong>${tLabel}</strong>. ${validUntilText}
     Further misconduct of a similar nature may result in more serious disciplinary action, up to and including dismissal.
     You have the right to appeal this decision within 5 business days of receipt.
   </div>
-
   ${record.hearing_date ? `<div class="body-text"><strong>Hearing Details:</strong><br>Date: ${fmtDate(record.hearing_date)}<br>${record.hearing_location ? "Location: " + record.hearing_location : ""}</div>` : ""}
-
   <div class="sig-grid">
     <div><div style="height:48px"></div><div class="sig-line">Employee: ${staffName}<br>Date: ____________________</div></div>
     <div><div style="height:48px"></div><div class="sig-line">Employer: ${tenantName}<br>Date: ____________________</div></div>
   </div>
-
   <div class="footer">${tenantName} · Disciplinary Record · STRICTLY CONFIDENTIAL · Generated ${new Date().toLocaleDateString("en-ZA")}</div>
 </body></html>`;
 }
@@ -226,8 +250,8 @@ const s = {
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    background: C.white,
-    border: `1px solid ${C.border}`,
+    background: "#fff",
+    border: `1px solid ${T.ink150}`,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -236,29 +260,33 @@ const s = {
     textAlign: "left",
     fontSize: 10,
     fontWeight: 700,
-    color: C.muted,
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    borderBottom: `1px solid ${C.border}`,
-    background: C.bg,
+    borderBottom: `1px solid ${T.ink150}`,
+    background: T.ink075,
     whiteSpace: "nowrap",
   },
   td: {
     padding: "11px 14px",
-    borderBottom: `1px solid #f5f2ee`,
+    borderBottom: `1px solid ${T.ink150}`,
     verticalAlign: "middle",
     fontSize: 13,
+    fontFamily: T.font,
   },
-  btn: (bg, color = C.white) => ({
+  btn: (bg, color = "#fff") => ({
     padding: "6px 14px",
     background: bg,
     color,
     border: `1px solid ${bg}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   outBtn: (color) => ({
     padding: "6px 14px",
@@ -266,40 +294,42 @@ const s = {
     color,
     border: `1px solid ${color}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     cursor: "pointer",
     outline: "none",
     width: "100%",
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
     width: "100%",
   },
   textarea: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
     width: "100%",
@@ -309,7 +339,8 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: "#888",
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
@@ -327,16 +358,17 @@ const s = {
     width: "100%",
     maxWidth: 660,
     height: "100vh",
-    background: C.white,
+    background: "#fff",
     display: "flex",
     flexDirection: "column",
     boxShadow: "-4px 0 32px rgba(0,0,0,0.12)",
     overflowY: "hidden",
+    fontFamily: T.font,
   },
   dHead: {
     padding: "18px 24px",
-    borderBottom: `1px solid ${C.border}`,
-    background: C.bg,
+    borderBottom: `1px solid ${T.ink150}`,
+    background: T.ink075,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -345,8 +377,8 @@ const s = {
   dBody: { flex: 1, overflowY: "auto", padding: 24 },
   dFoot: {
     padding: "14px 24px",
-    borderTop: `1px solid ${C.border}`,
-    background: C.bg,
+    borderTop: `1px solid ${T.ink150}`,
+    background: T.ink075,
     flexShrink: 0,
     display: "flex",
     justifyContent: "space-between",
@@ -360,51 +392,51 @@ const s = {
   },
   field: { marginBottom: 16 },
   section: {
-    fontFamily: "'Cormorant Garamond', serif",
-    fontSize: 16,
-    fontWeight: 600,
-    color: C.text,
+    fontFamily: T.font,
+    fontSize: 11,
+    fontWeight: 700,
+    color: T.ink400,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
     margin: "20px 0 12px 0",
     paddingBottom: 8,
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
   },
   toast: (t) => ({
     padding: "10px 16px",
     borderRadius: 6,
     fontSize: 13,
     marginBottom: 12,
-    background: t === "success" ? C.greenLight : C.redLight,
-    color: t === "success" ? C.greenMid : C.red,
+    fontFamily: T.font,
+    background: t === "success" ? T.successBg : T.dangerBg,
+    color: t === "success" ? T.success : T.danger,
   }),
   error: {
     padding: "12px 16px",
-    background: C.redLight,
-    color: C.red,
+    background: T.dangerBg,
+    color: T.danger,
     borderRadius: 6,
     marginBottom: 16,
     fontSize: 13,
+    fontFamily: T.font,
   },
-  statCard: {
-    padding: "10px 16px",
-    background: C.white,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    flex: "1 1 120px",
-  },
+  statCard: { background: "#fff", padding: "16px 18px" },
   statNum: {
-    fontFamily: "'Cormorant Garamond', serif",
+    fontFamily: T.font,
     fontSize: 22,
-    fontWeight: 700,
+    fontWeight: 400,
     lineHeight: 1,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
   },
   statLbl: {
-    fontSize: 11,
-    color: C.muted,
+    fontSize: 10,
+    fontWeight: 700,
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.1em",
+    marginTop: 6,
   },
 };
 
@@ -591,7 +623,8 @@ function RecordDrawer({
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: C.red,
+                fontFamily: T.font,
+                color: T.danger,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 marginBottom: 3,
@@ -601,9 +634,10 @@ function RecordDrawer({
             </div>
             <div
               style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 20,
+                fontFamily: T.font,
+                fontSize: 17,
                 fontWeight: 600,
+                color: T.ink700,
               }}
             >
               {staffName}
@@ -616,7 +650,7 @@ function RecordDrawer({
               border: "none",
               fontSize: 20,
               cursor: "pointer",
-              color: C.muted,
+              color: T.ink400,
             }}
             onClick={onClose}
           >
@@ -628,27 +662,28 @@ function RecordDrawer({
         <div
           style={{
             display: "flex",
-            borderBottom: `1px solid ${C.border}`,
+            borderBottom: `1px solid ${T.ink150}`,
             flexShrink: 0,
-            background: C.bg,
+            background: T.ink075,
           }}
         >
           {DRAWER_TABS.map((t) => (
             <button
               key={t}
               style={{
-                padding: "9px 18px",
+                padding: "10px 16px",
                 cursor: "pointer",
                 border: "none",
-                background: "none",
-                fontSize: 12,
-                fontFamily: "'Jost', sans-serif",
-                color: tab === t ? C.red : "#555",
+                background: "transparent",
+                fontSize: 11,
+                fontFamily: T.font,
+                color: tab === t ? T.danger : T.ink400,
                 borderBottom:
-                  tab === t ? `2px solid ${C.red}` : "2px solid transparent",
+                  tab === t ? `2px solid ${T.danger}` : "2px solid transparent",
                 fontWeight: tab === t ? 700 : 400,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
                 marginBottom: -1,
-                textTransform: "capitalize",
               }}
               onClick={() => setTab(t)}
             >
@@ -761,7 +796,6 @@ function RecordDrawer({
                   />
                 </div>
               </div>
-
               <div style={s.section}>Outcome</div>
               <div style={s.field}>
                 <label style={s.label}>Outcome</label>
@@ -842,7 +876,6 @@ function RecordDrawer({
                   placeholder="Employee's written response to the charge…"
                 />
               </div>
-
               <div style={s.section}>Appeal</div>
               <div style={s.field}>
                 <label
@@ -851,6 +884,7 @@ function RecordDrawer({
                     alignItems: "center",
                     gap: 8,
                     fontSize: 13,
+                    fontFamily: T.font,
                     cursor: "pointer",
                   }}
                 >
@@ -881,7 +915,7 @@ function RecordDrawer({
           <div style={{ display: "flex", gap: 8 }}>
             {!isNew && (
               <button
-                style={s.outBtn(C.blue)}
+                style={s.outBtn(T.info)}
                 onClick={() =>
                   printLetter(generateDisciplinaryLetter(record, staffName, ""))
                 }
@@ -891,7 +925,7 @@ function RecordDrawer({
             )}
             {!isNew && record.status === "draft" && (
               <button
-                style={s.outBtn(C.amber)}
+                style={s.outBtn(T.warning)}
                 onClick={markIssued}
                 disabled={saving}
               >
@@ -900,10 +934,10 @@ function RecordDrawer({
             )}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={s.outBtn("#aaa")} onClick={onClose}>
+            <button style={s.outBtn(T.ink300)} onClick={onClose}>
               Cancel
             </button>
-            <button style={s.btn(C.red)} onClick={save} disabled={saving}>
+            <button style={s.btn(T.danger)} onClick={save} disabled={saving}>
               {saving ? "Saving…" : isNew ? "Create Record" : "Save Changes"}
             </button>
           </div>
@@ -935,9 +969,9 @@ function ProgressiveTracker({ records }) {
   if (active.length === 0) return null;
 
   const steps = [
-    { label: "Verbal", color: "#f57f17", active: verbal > 0 },
+    { label: "Verbal", color: T.warning, active: verbal > 0 },
     { label: "Written", color: "#e65100", active: written > 0 },
-    { label: "Final", color: "#c62828", active: final > 0 },
+    { label: "Final", color: T.danger, active: final > 0 },
     { label: "Dismissal", color: "#b71c1c", active: false },
   ];
 
@@ -945,8 +979,8 @@ function ProgressiveTracker({ records }) {
     <div
       style={{
         padding: "12px 16px",
-        background: "#fff8f8",
-        border: `1px solid #ffcdd2`,
+        background: T.dangerBg,
+        border: `1px solid ${T.dangerBd}`,
         borderRadius: 8,
         marginBottom: 16,
       }}
@@ -955,7 +989,8 @@ function ProgressiveTracker({ records }) {
         style={{
           fontSize: 11,
           fontWeight: 700,
-          color: C.red,
+          fontFamily: T.font,
+          color: T.danger,
           textTransform: "uppercase",
           letterSpacing: "0.06em",
           marginBottom: 10,
@@ -972,17 +1007,18 @@ function ProgressiveTracker({ records }) {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: step.active ? step.color : "#e0e0e0",
+                  background: step.active ? step.color : T.ink150,
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 14,
+                  fontFamily: T.font,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   margin: "0 auto 4px",
                   border: step.active
                     ? `2px solid ${step.color}`
-                    : "2px solid #e0e0e0",
+                    : `2px solid ${T.ink150}`,
                 }}
               >
                 {i + 1}
@@ -990,7 +1026,8 @@ function ProgressiveTracker({ records }) {
               <div
                 style={{
                   fontSize: 10,
-                  color: step.active ? step.color : C.muted,
+                  fontFamily: T.font,
+                  color: step.active ? step.color : T.ink400,
                   fontWeight: step.active ? 700 : 400,
                 }}
               >
@@ -1002,7 +1039,7 @@ function ProgressiveTracker({ records }) {
                 style={{
                   height: 2,
                   flex: 1,
-                  background: i < level ? steps[i].color : "#e0e0e0",
+                  background: i < level ? steps[i].color : T.ink150,
                   marginBottom: 18,
                 }}
               />
@@ -1096,7 +1133,6 @@ export default function HRDisciplinary({ tenantId }) {
     return ms && mt && mst;
   });
 
-  // Active warnings (within valid_until, not lapsed)
   const activeWarnings = records.filter(
     (r) =>
       r.valid_until &&
@@ -1106,31 +1142,28 @@ export default function HRDisciplinary({ tenantId }) {
   const pendingAck = records.filter(
     (r) => r.status === "issued" && !r.acknowledged_at,
   );
-
-  // Stats
   const statsByType = RECORD_TYPES.reduce((acc, t) => {
     acc[t.value] = records.filter((r) => r.record_type === t.value).length;
     return acc;
   }, {});
-
-  // Per-staff active records for progressive tracker
   const staffRecords = staffFilter
     ? records.filter((r) => r.staff_profile_id === staffFilter)
     : [];
 
   return (
-    <div style={{ fontFamily: "'Jost', sans-serif", color: C.text }}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       {/* Alert banners */}
       {pendingAck.length > 0 && (
         <div
           style={{
             padding: "10px 14px",
-            background: C.amberLight,
-            border: `1px solid ${C.amber}`,
+            background: T.warningBg,
+            border: `1px solid ${T.warningBd}`,
             borderRadius: 6,
             marginBottom: 12,
             fontSize: 13,
-            color: C.amber,
+            fontFamily: T.font,
+            color: T.warning,
             fontWeight: 600,
           }}
         >
@@ -1139,26 +1172,36 @@ export default function HRDisciplinary({ tenantId }) {
         </div>
       )}
 
-      {/* Stats row */}
+      {/* Stats — flush grid */}
       <div
-        style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 20,
+        }}
       >
         {[
-          { label: "Total Records", num: records.length, color: C.text },
+          { label: "Total Records", num: records.length, color: T.ink700 },
           {
             label: "Active Warnings",
             num: activeWarnings.length,
-            color: activeWarnings.length > 0 ? C.red : C.muted,
+            color: activeWarnings.length > 0 ? T.danger : T.ink400,
           },
           {
             label: "Pending Acknowledgement",
             num: pendingAck.length,
-            color: pendingAck.length > 0 ? C.amber : C.muted,
+            color: pendingAck.length > 0 ? T.warning : T.ink400,
           },
           {
             label: "Dismissals",
             num: statsByType.dismissal || 0,
-            color: statsByType.dismissal > 0 ? "#b71c1c" : C.muted,
+            color: statsByType.dismissal > 0 ? "#b71c1c" : T.ink400,
           },
         ].map(({ label, num, color }) => (
           <div key={label} style={s.statCard}>
@@ -1233,7 +1276,7 @@ export default function HRDisciplinary({ tenantId }) {
         </select>
       </div>
 
-      {/* Progressive discipline tracker (shows when filtering by staff) */}
+      {/* Progressive discipline tracker */}
       {staffFilter && staffRecords.length > 0 && (
         <ProgressiveTracker records={staffRecords} />
       )}
@@ -1243,18 +1286,26 @@ export default function HRDisciplinary({ tenantId }) {
 
       {/* Table */}
       {loading ? (
-        <div style={{ padding: "40px", textAlign: "center", color: C.muted }}>
+        <div
+          style={{
+            padding: "40px",
+            textAlign: "center",
+            color: T.ink400,
+            fontFamily: T.font,
+          }}
+        >
           Loading disciplinary records…
         </div>
       ) : filtered.length === 0 ? (
         <div
-          style={{ padding: "48px 24px", textAlign: "center", color: C.muted }}
+          style={{ padding: "48px 24px", textAlign: "center", color: T.ink400 }}
         >
           <div style={{ fontSize: 36, marginBottom: 8 }}>⚠</div>
           <div
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 17,
+              fontFamily: T.font,
+              fontSize: 15,
+              color: T.ink400,
               marginBottom: 6,
             }}
           >
@@ -1262,7 +1313,7 @@ export default function HRDisciplinary({ tenantId }) {
               ? "No disciplinary records on file"
               : "No records match your filters"}
           </div>
-          <div style={{ fontSize: 12, color: "#ccc" }}>
+          <div style={{ fontSize: 12, fontFamily: T.font, color: T.ink300 }}>
             Records are created per staff member using the dropdown above
           </div>
         </div>
@@ -1271,14 +1322,20 @@ export default function HRDisciplinary({ tenantId }) {
           <table style={s.table}>
             <thead>
               <tr>
-                <th style={s.th}>Staff Member</th>
-                <th style={s.th}>Type</th>
-                <th style={s.th}>Subject</th>
-                <th style={s.th}>Incident</th>
-                <th style={s.th}>Valid Until</th>
-                <th style={s.th}>Status</th>
-                <th style={s.th}>Appeal</th>
-                <th style={s.th}></th>
+                {[
+                  "Staff Member",
+                  "Type",
+                  "Subject",
+                  "Incident",
+                  "Valid Until",
+                  "Status",
+                  "Appeal",
+                  "",
+                ].map((h) => (
+                  <th key={h} style={s.th}>
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -1289,7 +1346,7 @@ export default function HRDisciplinary({ tenantId }) {
                 return (
                   <tr
                     key={r.id}
-                    style={{ background: expiring ? "#fffde7" : C.white }}
+                    style={{ background: expiring ? T.warningBg : "#fff" }}
                   >
                     <td style={s.td}>
                       <strong>{staffName(r.staff_profile_id)}</strong>
@@ -1323,7 +1380,8 @@ export default function HRDisciplinary({ tenantId }) {
                               style={{
                                 fontSize: 9,
                                 fontWeight: 700,
-                                color: C.amber,
+                                fontFamily: T.font,
+                                color: T.warning,
                                 textTransform: "uppercase",
                               }}
                             >
@@ -1335,7 +1393,8 @@ export default function HRDisciplinary({ tenantId }) {
                               style={{
                                 fontSize: 9,
                                 fontWeight: 700,
-                                color: C.muted,
+                                fontFamily: T.font,
+                                color: T.ink400,
                                 textTransform: "uppercase",
                               }}
                             >
@@ -1344,7 +1403,7 @@ export default function HRDisciplinary({ tenantId }) {
                           )}
                         </div>
                       ) : (
-                        <span style={{ color: "#ccc" }}>—</span>
+                        <span style={{ color: T.ink150 }}>—</span>
                       )}
                     </td>
                     <td style={s.td}>
@@ -1354,24 +1413,25 @@ export default function HRDisciplinary({ tenantId }) {
                       {r.appeal_lodged ? (
                         <span
                           style={{
-                            color: C.blue,
+                            color: T.info,
                             fontSize: 11,
                             fontWeight: 600,
+                            fontFamily: T.font,
                           }}
                         >
                           Yes
                         </span>
                       ) : (
-                        <span style={{ color: "#ccc" }}>—</span>
+                        <span style={{ color: T.ink150 }}>—</span>
                       )}
                     </td>
                     <td style={s.td}>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
                           style={{
-                            ...s.outBtn(C.red),
+                            ...s.outBtn(T.danger),
                             padding: "3px 10px",
-                            fontSize: 11,
+                            fontSize: 10,
                           }}
                           onClick={() => openEdit(r)}
                         >
@@ -1379,20 +1439,19 @@ export default function HRDisciplinary({ tenantId }) {
                         </button>
                         <button
                           style={{
-                            ...s.outBtn(C.blue),
+                            ...s.outBtn(T.info),
                             padding: "3px 10px",
-                            fontSize: 11,
+                            fontSize: 10,
                           }}
-                          onClick={() => {
-                            const fullRecord = { ...r };
+                          onClick={() =>
                             printLetter(
                               generateDisciplinaryLetter(
-                                fullRecord,
+                                { ...r },
                                 staffName(r.staff_profile_id),
                                 "",
                               ),
-                            );
-                          }}
+                            )
+                          }
                         >
                           PDF
                         </button>
@@ -1406,7 +1465,8 @@ export default function HRDisciplinary({ tenantId }) {
           <div
             style={{
               fontSize: 11,
-              color: C.muted,
+              fontFamily: T.font,
+              color: T.ink400,
               marginTop: 8,
               textAlign: "right",
             }}
