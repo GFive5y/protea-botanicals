@@ -24,29 +24,68 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "../viz";
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy C/F aliases — preserve all internal logic
 const C = {
-  bg: "#faf9f6",
-  warmBg: "#f4f0e8",
-  primaryDark: "#1b4332",
-  primaryMid: "#2d6a4f",
+  bg: T.ink050,
+  warmBg: T.ink075,
+  primaryDark: T.accent,
+  primaryMid: T.accentMid,
   accentGreen: "#52b788",
   gold: "#b5935a",
-  text: "#1a1a1a",
-  muted: "#888888",
-  border: "#e8e0d4",
-  white: "#ffffff",
-  red: "#c0392b",
-  blue: "#2c4a6e",
-  orange: "#e67e22",
+  text: T.ink900,
+  muted: T.ink500,
+  border: T.ink150,
+  white: "#fff",
+  red: T.danger,
+  blue: T.info,
+  orange: T.warning,
 };
-const F = {
-  heading: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-  body: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-};
+const F = { heading: T.font, body: T.font };
 
 const sLabel = {
   fontSize: "9px",
@@ -352,7 +391,12 @@ export default function Distribution() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "12px",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: "6px",
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
           marginBottom: "24px",
         }}
       >
@@ -365,6 +409,199 @@ export default function Distribution() {
           color={C.primaryDark}
         />
       </div>
+
+      {/* ── CHARTS: Shipment pipeline + Items by destination ── */}
+      {!loading &&
+        shipments.length > 0 &&
+        (() => {
+          const statusOrder = [
+            "preparing",
+            "shipped",
+            "in_transit",
+            "delivered",
+            "confirmed",
+            "cancelled",
+          ];
+          const statusLabels = {
+            preparing: "Preparing",
+            shipped: "Shipped",
+            in_transit: "In Transit",
+            delivered: "Delivered",
+            confirmed: "Confirmed",
+            cancelled: "Cancelled",
+          };
+          const statusColors = {
+            preparing: T.info,
+            shipped: "#b5935a",
+            in_transit: "#b5935a",
+            delivered: "#52b788",
+            confirmed: T.accent,
+            cancelled: T.danger,
+          };
+          const pipelineData = statusOrder
+            .map((s) => ({
+              status: statusLabels[s],
+              count: shipments.filter((sh) => sh.status === s).length,
+              color: statusColors[s],
+            }))
+            .filter((d) => d.count > 0);
+
+          const destMap = {};
+          shipments.forEach((s) => {
+            const dest = (s.destination_name || "Unknown")
+              .split(" ")
+              .slice(0, 2)
+              .join(" ");
+            destMap[dest] =
+              (destMap[dest] || 0) +
+              (s.shipment_items || []).reduce(
+                (sum, i) => sum + (i.quantity || 0),
+                0,
+              );
+          });
+          const destData = Object.entries(destMap)
+            .map(([name, items]) => ({ name, items }))
+            .sort((a, b) => b.items - a.items)
+            .slice(0, 6);
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <ChartCard title="Shipment Pipeline" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={pipelineData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="status"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          formatter={(v) =>
+                            `${v} shipment${v !== 1 ? "s" : ""}`
+                          }
+                        />
+                      }
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Shipments"
+                      isAnimationActive={false}
+                      maxBarSize={36}
+                      radius={[3, 3, 0, 0]}
+                    >
+                      {pipelineData.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Items Shipped by Destination" height={200}>
+                {destData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={destData}
+                      layout="vertical"
+                      margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
+                    >
+                      <CartesianGrid
+                        horizontal={false}
+                        vertical
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={80}
+                      />
+                      <Tooltip
+                        content={
+                          <ChartTooltip formatter={(v) => `${v} units`} />
+                        }
+                      />
+                      <Bar
+                        dataKey="items"
+                        name="Units"
+                        fill={T.accentMid}
+                        isAnimationActive={false}
+                        maxBarSize={20}
+                        radius={[0, 3, 3, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div
+                    style={{
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No destination data
+                  </div>
+                )}
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* Toolbar */}
       <div
@@ -1844,35 +2081,28 @@ function FlowStep({ label, done, active }) {
 
 function MiniStat({ label, value, color }) {
   return (
-    <div
-      style={{
-        background: C.white,
-        border: `1px solid ${C.border}`,
-        borderTop: `3px solid ${color}`,
-        borderRadius: "2px",
-        padding: "12px 16px",
-        textAlign: "center",
-      }}
-    >
+    <div style={{ background: "#fff", padding: "16px 18px" }}>
       <div
         style={{
-          fontSize: "9px",
-          fontWeight: 600,
-          letterSpacing: "0.15em",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: C.muted,
-          marginBottom: "4px",
+          color: T.ink400,
+          marginBottom: "6px",
+          fontFamily: T.fontUi,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontFamily: F.heading,
-          fontSize: "28px",
-          fontWeight: 300,
+          fontFamily: T.fontData,
+          fontSize: "26px",
+          fontWeight: 400,
           color,
           lineHeight: 1,
+          letterSpacing: "-0.02em",
         }}
       >
         {value}
