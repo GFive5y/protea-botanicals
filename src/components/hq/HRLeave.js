@@ -11,32 +11,61 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── Colours ─────────────────────────────────────────────────────────────────
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — preserve all internal logic that references C
 const C = {
-  green: "#3d6b35",
-  greenLight: "#e8f5e9",
-  greenMid: "#2e7d32",
-  amber: "#f57f17",
-  amberLight: "#fff8e1",
-  red: "#c62828",
-  redLight: "#fdecea",
-  blue: "#1565c0",
-  blueLight: "#e3f2fd",
-  grey: "#616161",
-  greyLight: "#f5f5f5",
-  border: "#ece8e2",
-  bg: "#faf8f5",
+  green: T.accent,
+  greenLight: T.accentLit,
+  greenMid: T.accentMid,
+  amber: T.warning,
+  amberLight: T.warningBg,
+  red: T.danger,
+  redLight: T.dangerBg,
+  blue: T.info,
+  blueLight: T.infoBg,
+  grey: T.ink500,
+  greyLight: T.ink075,
+  border: T.ink150,
+  bg: T.ink075,
   white: "#fff",
-  text: "#2d2d2d",
-  muted: "#aaa",
+  text: T.ink700,
+  muted: T.ink400,
 };
 
 const STATUS_CFG = {
-  pending: { label: "Pending", bg: C.amberLight, color: C.amber },
-  admin_approved: { label: "Approved", bg: C.greenLight, color: C.greenMid },
-  approved: { label: "Approved", bg: C.greenLight, color: C.greenMid },
-  rejected: { label: "Rejected", bg: C.redLight, color: C.red },
-  cert_pending: { label: "Cert Required", bg: "#fff3e0", color: "#e65100" },
+  pending: { label: "Pending", bg: T.warningBg, color: T.warning },
+  admin_approved: { label: "Approved", bg: T.successBg, color: T.success },
+  approved: { label: "Approved", bg: T.successBg, color: T.success },
+  rejected: { label: "Rejected", bg: T.dangerBg, color: T.danger },
+  cert_pending: { label: "Cert Required", bg: T.warningBg, color: T.warning },
 };
 
 const SUB_TABS = ["Requests", "Balances", "Calendar", "Leave Types"];
@@ -82,23 +111,25 @@ function StatusBadge({ status }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = {
-  wrapper: { fontFamily: "'Jost', sans-serif", color: C.text },
+  wrapper: { fontFamily: T.font, color: T.ink700 },
   subTabs: {
     display: "flex",
-    borderBottom: `2px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
     marginBottom: 24,
     gap: 0,
   },
   subTab: (a) => ({
-    padding: "9px 18px",
+    padding: "10px 16px",
     cursor: "pointer",
     border: "none",
-    background: "none",
-    fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    color: a ? C.green : "#555",
-    borderBottom: a ? `2px solid ${C.green}` : "2px solid transparent",
+    background: "transparent",
+    fontSize: 11,
+    fontFamily: T.font,
+    color: a ? T.accent : T.ink400,
+    borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
     marginBottom: -2,
   }),
   table: {
@@ -136,44 +167,48 @@ const s = {
   },
   approveBtn: {
     padding: "5px 14px",
-    background: C.green,
-    color: C.white,
+    background: T.accent,
+    color: "#fff",
     border: "none",
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
     marginRight: 6,
   },
   rejectBtn: {
     padding: "5px 14px",
     background: "none",
-    color: C.red,
-    border: `1px solid ${C.red}`,
+    color: T.danger,
+    border: `1px solid ${T.dangerBd}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   },
   input: {
     width: "100%",
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
     boxSizing: "border-box",
     outline: "none",
   },
   select: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     cursor: "pointer",
     outline: "none",
   },
@@ -181,39 +216,39 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: "#888",
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 5,
   },
   sectionTitle: {
-    fontFamily: "'Cormorant Garamond', serif",
+    fontFamily: T.font,
     fontSize: 17,
     fontWeight: 600,
-    color: C.text,
+    color: T.ink700,
     margin: "0 0 16px 0",
   },
   statCard: {
-    padding: "10px 16px",
-    background: C.white,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    flex: "1 1 120px",
+    background: "#fff",
+    padding: "16px 18px",
   },
   statNum: {
-    fontFamily: "'Cormorant Garamond', serif",
+    fontFamily: T.font,
     fontSize: 22,
-    fontWeight: 700,
+    fontWeight: 400,
     lineHeight: 1,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
   },
   statLabel: {
-    fontSize: 11,
-    color: C.muted,
+    fontSize: 10,
+    fontWeight: 700,
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.1em",
+    marginTop: 6,
   },
   emptyState: {
     padding: "48px 24px",
@@ -247,12 +282,12 @@ const s = {
     justifyContent: "center",
   },
   modalBox: {
-    background: C.white,
+    background: "#fff",
     borderRadius: 8,
     padding: 28,
     width: "100%",
     maxWidth: 420,
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
   },
 };
 
@@ -448,24 +483,36 @@ function LeaveRequests({ tenantId, staffList, leaveTypes }) {
           alignItems: "center",
         }}
       >
-        <div style={{ display: "flex", gap: 10, flex: 1, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "1px",
+            background: T.ink150,
+            borderRadius: 6,
+            overflow: "hidden",
+            border: `1px solid ${T.ink150}`,
+            boxShadow: T.shadow,
+            flex: 1,
+          }}
+        >
           {[
             {
               label: "Pending",
               num: requests.filter((r) => r.status === "pending").length,
-              color: C.amber,
+              color: T.warning,
             },
             {
               label: "Approved",
               num: requests.filter((r) =>
                 ["admin_approved", "approved"].includes(r.status),
               ).length,
-              color: C.greenMid,
+              color: T.success,
             },
             {
               label: "Rejected",
               num: requests.filter((r) => r.status === "rejected").length,
-              color: C.red,
+              color: T.danger,
             },
           ].map(({ label, num, color }) => (
             <div key={label} style={s.statCard}>
@@ -661,9 +708,9 @@ function LeaveRequests({ tenantId, staffList, leaveTypes }) {
           <div style={{ fontSize: 36, marginBottom: 8 }}>🗓</div>
           <div
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 17,
-              color: C.muted,
+              fontFamily: T.font,
+              fontSize: 15,
+              color: T.ink400,
               marginBottom: 6,
             }}
           >
@@ -891,9 +938,9 @@ function LeaveBalances({ tenantId, staffList, leaveTypes }) {
           <div style={{ fontSize: 36, marginBottom: 8 }}>📊</div>
           <div
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 17,
-              color: C.muted,
+              fontFamily: T.font,
+              fontSize: 15,
+              color: T.ink400,
               marginBottom: 6,
             }}
           >
@@ -1002,10 +1049,13 @@ function LeaveBalances({ tenantId, staffList, leaveTypes }) {
                       <>
                         <div
                           style={{
-                            fontFamily: "'Cormorant Garamond', serif",
+                            fontFamily: T.font,
                             fontSize: 26,
-                            fontWeight: 600,
-                            color: (bal.available || 0) <= 2 ? C.red : C.green,
+                            fontWeight: 400,
+                            letterSpacing: "-0.02em",
+                            fontVariantNumeric: "tabular-nums",
+                            color:
+                              (bal.available || 0) <= 2 ? T.danger : T.accent,
                             lineHeight: 1,
                           }}
                         >
@@ -1195,9 +1245,11 @@ function LeaveCalendar({ tenantId, staffList, leaveTypes }) {
         </button>
         <span
           style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 20,
-            fontWeight: 600,
+            fontFamily: T.font,
+            fontSize: 18,
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
+            color: T.ink700,
           }}
         >
           {monthName}
