@@ -1,5 +1,5 @@
-// src/components/hq/HQPricing.js v4.0
-// WP-THEME: Unified design system applied
+// src/components/hq/HQPricing.js v4.1 — WP-THEME-2: Inter font
+// v4.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all numeric / financial values
 //   - Header: Outfit 300, ink900
@@ -44,8 +44,8 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
-  fontData: "'DM Mono','Courier New',monospace",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
