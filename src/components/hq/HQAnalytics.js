@@ -13,10 +13,26 @@
 // v3.2: Margin fix + po_status fix | v3.1: scan_logs schema
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
+import { ChartCard, ChartTooltip } from "../viz";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -46,7 +62,39 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+  label: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+  },
+  kpi: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 24,
+    fontWeight: 400,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
+  },
+  body: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 13,
+    fontWeight: 400,
+  },
+  caption: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 11,
+    fontWeight: 400,
+  },
+  data: {
+    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+    fontSize: 12,
+    fontWeight: 400,
+    fontVariantNumeric: "tabular-nums",
+  },
 };
 
 // Legacy aliases
@@ -889,6 +937,210 @@ function OverviewAnalytics({ data }) {
         <KPI label="Suppliers" value={data.suppliers.length} semantic={null} />
       </div>
 
+      {/* ── CHART: Platform Activity Overview ── */}
+      {data.scans.length > 0 &&
+        (() => {
+          const dayMap = {};
+          data.scans.forEach((s) => {
+            const day = new Date(s.scanned_at).toLocaleDateString("en-ZA", {
+              month: "short",
+              day: "numeric",
+            });
+            dayMap[day] = (dayMap[day] || 0) + 1;
+          });
+          const trendData = Object.entries(dayMap)
+            .slice(-14)
+            .map(([date, count]) => ({ date, count }));
+          if (trendData.length < 2) return null;
+          return (
+            <ChartCard title="Scan Activity — Last 14 Days" height={200}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={trendData}
+                  margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="ov-an-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor={T.accentMid}
+                        stopOpacity={0.18}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor={T.accentMid}
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke={T.ink150}
+                    strokeWidth={0.5}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={6}
+                    interval="preserveStartEnd"
+                    maxRotation={0}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    content={<ChartTooltip formatter={(v) => `${v} scans`} />}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    name="Scans"
+                    stroke={T.accentMid}
+                    strokeWidth={2}
+                    fill="url(#ov-an-grad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          );
+        })()}
+
+      {/* ── CHARTS: Inventory Split + Production Status ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Donut — inventory by category */}
+        {(() => {
+          const catMap = {};
+          inv.forEach((i) => {
+            const cat = CATEGORY_LABELS[i.category] || i.category || "Other";
+            catMap[cat] = (catMap[cat] || 0) + 1;
+          });
+          const pieData = Object.entries(catMap).map(([name, value]) => ({
+            name,
+            value,
+          }));
+          const COLOURS = [T.success, T.info, T.accentMid, "#92400E", T.ink400];
+          if (pieData.length < 2) return <div />;
+          return (
+            <ChartCard title="Inventory by Category" height={220}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={82}
+                    dataKey="value"
+                    paddingAngle={3}
+                    isAnimationActive={false}
+                  >
+                    {pieData.map((_, i) => (
+                      <Cell key={i} fill={COLOURS[i % COLOURS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={<ChartTooltip formatter={(v) => `${v} items`} />}
+                  />
+                  <Legend
+                    iconSize={8}
+                    iconType="square"
+                    formatter={(v) => (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: T.font,
+                        }}
+                      >
+                        {v}
+                      </span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          );
+        })()}
+
+        {/* Bar — production run status */}
+        {(() => {
+          const statusMap = {};
+          runs.forEach((r) => {
+            statusMap[r.status] = (statusMap[r.status] || 0) + 1;
+          });
+          const barData = Object.entries(statusMap).map(([status, count]) => ({
+            status: status.replace("_", " "),
+            count,
+          }));
+          const barColors = {
+            completed: T.success,
+            in_progress: T.warning,
+            planned: T.info,
+            cancelled: T.danger,
+          };
+          if (barData.length === 0) return <div />;
+          return (
+            <ChartCard title="Production Runs by Status" height={220}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barData}
+                  margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                >
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke={T.ink150}
+                    strokeWidth={0.5}
+                  />
+                  <XAxis
+                    dataKey="status"
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={6}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    content={<ChartTooltip formatter={(v) => `${v} runs`} />}
+                  />
+                  <Bar
+                    dataKey="count"
+                    name="Runs"
+                    isAnimationActive={false}
+                    maxBarSize={36}
+                    radius={[3, 3, 0, 0]}
+                  >
+                    {barData.map((d, i) => (
+                      <Cell
+                        key={i}
+                        fill={
+                          barColors[d.status.replace(" ", "_")] || T.accentMid
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          );
+        })()}
+      </div>
+
       {/* Pipeline strip */}
       <div style={sCard}>
         <div style={sLabel}>Supply Chain Pipeline — Live Status</div>
@@ -1153,6 +1405,74 @@ function SupplyChainAnalytics({ data }) {
           })}
         </div>
       </div>
+
+      {/* ── CHART: Inventory by Category ── */}
+      {Object.keys(categories).length > 0 &&
+        (() => {
+          const barData = Object.entries(categories).map(([cat, d]) => ({
+            name: (CATEGORY_LABELS[cat] || cat).split(" ")[0],
+            value: d.count,
+            cost: Math.round(d.cost),
+          }));
+          return (
+            <ChartCard title="Inventory Items by Category" height={220}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barData}
+                  margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+                >
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke={T.ink150}
+                    strokeWidth={0.5}
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={6}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltip
+                        formatter={(v, n) =>
+                          n === "value"
+                            ? `${v} items`
+                            : `R${v.toLocaleString("en-ZA")}`
+                        }
+                      />
+                    }
+                  />
+                  <Bar
+                    dataKey="value"
+                    name="Items"
+                    fill={T.accent}
+                    isAnimationActive={false}
+                    maxBarSize={28}
+                    radius={[3, 3, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="cost"
+                    name="Cost Value"
+                    fill={T.accentMid}
+                    isAnimationActive={false}
+                    maxBarSize={28}
+                    radius={[3, 3, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          );
+        })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         {/* PO Pipeline */}
@@ -1839,6 +2159,198 @@ function ScansAnalytics({ data }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
+      {/* ── CHART: Scan Activity Area ── */}
+      {(() => {
+        const dayMap = {};
+        scans.forEach((s) => {
+          const day = new Date(s.scanned_at).toLocaleDateString("en-ZA", {
+            month: "short",
+            day: "numeric",
+          });
+          dayMap[day] = dayMap[day] || { date: day, scans: 0, points: 0 };
+          dayMap[day].scans++;
+          dayMap[day].points += s.points_awarded || 0;
+        });
+        const trendData = Object.values(dayMap).slice(-20);
+        if (trendData.length < 2) return null;
+        return (
+          <div style={{ marginBottom: 20 }}>
+            <ChartCard title="Scan Activity — Daily Trend" height={260}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={trendData}
+                  margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                >
+                  <defs>
+                    <linearGradient
+                      id="an-scan-grad"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor={T.accentMid}
+                        stopOpacity={0.18}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor={T.accentMid}
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke={T.ink150}
+                    strokeWidth={0.5}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={6}
+                    interval="preserveStartEnd"
+                    maxRotation={0}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltip
+                        formatter={(v, n) =>
+                          n === "points" ? `${v} pts` : `${v} scans`
+                        }
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="scans"
+                    name="Scans"
+                    stroke={T.accentMid}
+                    strokeWidth={2}
+                    fill="url(#an-scan-grad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="points"
+                    name="Points"
+                    stroke={T.info}
+                    strokeWidth={1.5}
+                    fill="none"
+                    dot={false}
+                    isAnimationActive={false}
+                    strokeDasharray="4 3"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+        );
+      })()}
+
+      {/* ── CHART: Scan Outcome Stacked Bar ── */}
+      {outcomeList.length > 0 &&
+        (() => {
+          const typeOutcome = {};
+          scans.forEach((s) => {
+            const t = s.qr_type || "unknown";
+            const o = s.scan_outcome || "unknown";
+            typeOutcome[t] = typeOutcome[t] || {};
+            typeOutcome[t][o] = (typeOutcome[t][o] || 0) + 1;
+          });
+          const allOutcomes = [
+            ...new Set(scans.map((s) => s.scan_outcome || "unknown")),
+          ].slice(0, 4);
+          const barData = Object.entries(typeOutcome)
+            .slice(0, 6)
+            .map(([type, outcomes]) => ({
+              type: type.replace(/_/g, " "),
+              ...outcomes,
+            }));
+          const barColors = [T.success, T.warning, T.ink400, T.danger];
+          if (barData.length < 2) return null;
+          return (
+            <div style={{ marginBottom: 20 }}>
+              <ChartCard title="Scan Outcomes by QR Type" height={220}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={barData}
+                    margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="type"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend
+                      iconSize={8}
+                      iconType="square"
+                      formatter={(v) => (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: T.ink500,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {v.replace(/_/g, " ")}
+                        </span>
+                      )}
+                    />
+                    {allOutcomes.map((o, i) => (
+                      <Bar
+                        key={o}
+                        dataKey={o}
+                        name={o}
+                        stackId="a"
+                        fill={barColors[i % barColors.length]}
+                        isAnimationActive={false}
+                        maxBarSize={32}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          );
+        })()}
+
       {/* Period KPIs */}
       <div
         style={{
@@ -2260,10 +2772,10 @@ function PipelineCard({ stage, items, color }) {
       style={{
         background: T.ink075,
         border: `1px solid ${T.ink150}`,
+        borderLeft: `3px solid ${color}`,
         borderRadius: 6,
         padding: 14,
         textAlign: "center",
-        borderTop: `3px solid ${color}`,
       }}
     >
       <div
