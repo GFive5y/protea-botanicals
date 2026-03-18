@@ -14,29 +14,56 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — preserve all internal logic
 const C = {
-  bg: "#faf9f6",
-  primaryDark: "#1b4332",
-  primaryMid: "#2d6a4f",
+  bg: T.ink050,
+  primaryDark: T.accent,
+  primaryMid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  text: "#1a1a1a",
-  muted: "#474747",
-  border: "#e8e0d4",
-  white: "#ffffff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef9f0",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  platinum: "#7b68ee",
-  lightPlatinum: "#f0eeff",
+  text: T.ink900,
+  muted: T.ink500,
+  border: T.ink150,
+  white: "#fff",
+  red: T.danger,
+  lightRed: T.dangerBg,
+  orange: T.warning,
+  lightOrange: T.warningBg,
+  blue: T.info,
+  lightBlue: T.infoBg,
+  platinum: T.info,
+  lightPlatinum: T.infoBg,
 };
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const F = { heading: T.font, body: T.font };
 
 const TIERS = {
   platinum: {
@@ -153,7 +180,7 @@ function ScoreRing({ score, size = 80 }) {
       >
         <div
           style={{
-            fontFamily: F.heading,
+            fontFamily: T.font,
             fontSize: size * 0.28,
             fontWeight: 700,
             color: tier.color,
@@ -501,7 +528,7 @@ function RetailerCard({
           >
             <div
               style={{
-                fontFamily: F.heading,
+                fontFamily: T.font,
                 fontSize: 18,
                 fontWeight: 600,
                 color: C.primaryDark,
@@ -1514,31 +1541,33 @@ export default function RetailerHealth() {
             style={{
               background: C.white,
               border: `1px solid ${C.border}`,
-              borderTop: `3px solid ${k.color}`,
-              borderRadius: 2,
-              padding: "14px 16px",
-              textAlign: "center",
+              borderLeft: `3px solid ${k.color}`,
+              borderRadius: 4,
+              padding: "14px 18px",
+              boxShadow: T.shadow,
             }}
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.15em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
-                marginBottom: 4,
+                color: T.ink400,
+                marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {k.label}
             </div>
             <div
               style={{
-                fontFamily: F.heading,
+                fontFamily: T.fontData,
                 fontSize: 24,
-                fontWeight: 300,
+                fontWeight: 400,
                 color: k.color,
                 lineHeight: 1,
+                letterSpacing: "-0.02em",
               }}
             >
               {k.value}
