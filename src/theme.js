@@ -67,11 +67,11 @@ export const T = {
 
   // ── TYPOGRAPHY ────────────────────────────────────────────────────────────
   font: {
-    ui: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
-    data: "'DM Mono', 'Courier New', monospace",
+    ui: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+    data: "'Inter', 'Helvetica Neue', Arial, sans-serif",
     // ui:   used for ALL text — headings, body, labels, buttons
-    // data: used ONLY for numeric metric values, codes, IDs, SKUs
-    // No Cormorant Garamond. No Jost. No Georgia. No system fonts.
+    // data: used for numeric metric values, codes, IDs, SKUs
+    // No Outfit. No DM Mono. No Cormorant Garamond. No Jost.
   },
 
   // ── TYPE SCALE ────────────────────────────────────────────────────────────
@@ -87,10 +87,29 @@ export const T = {
     },
     body: { fontSize: "13px", fontWeight: 400, lineHeight: "1.6" },
     caption: { fontSize: "11px", fontWeight: 400 },
-    metricLg: { fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em" }, // DM Mono
-    metricMd: { fontSize: "22px", fontWeight: 400, letterSpacing: "-0.01em" }, // DM Mono
-    metricSm: { fontSize: "16px", fontWeight: 500 }, // DM Mono
-    code: { fontSize: "12px", fontWeight: 400 }, // DM Mono
+    metricLg: {
+      fontSize: "32px",
+      fontWeight: 300,
+      letterSpacing: "-0.03em",
+      fontVariantNumeric: "tabular-nums",
+    },
+    metricMd: {
+      fontSize: "24px",
+      fontWeight: 400,
+      letterSpacing: "-0.02em",
+      fontVariantNumeric: "tabular-nums",
+    },
+    metricSm: {
+      fontSize: "18px",
+      fontWeight: 400,
+      letterSpacing: "-0.01em",
+      fontVariantNumeric: "tabular-nums",
+    },
+    code: {
+      fontSize: "12px",
+      fontWeight: 400,
+      fontVariantNumeric: "tabular-nums",
+    },
   },
 
   // ── SPACING ───────────────────────────────────────────────────────────────
