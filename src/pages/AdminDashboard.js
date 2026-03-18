@@ -14,6 +14,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "../components/WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 import SystemStatusBar from "../components/SystemStatusBar";
 import AdminAnalytics from "./AdminAnalytics";
 import StockControl from "../components/StockControl";
@@ -54,8 +55,8 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
-  fontData: "'DM Mono','Courier New',monospace",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -174,7 +175,7 @@ function MetricGrid({ children }) {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
         gap: "1px",
         background: T.ink150,
         border: `1px solid ${T.ink150}`,
@@ -241,6 +242,7 @@ export default function AdminDashboard() {
   const [fraudAlerts, setFraudAlerts] = useState(0);
   const [tenantId, setTenantId] = useState(null);
 
+  const ctx = usePageContext("admin", null);
   const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -515,87 +517,9 @@ export default function AdminDashboard() {
       {tab === "overview" && (
         <div>
           <WorkflowGuide
-            title="Admin Dashboard"
-            description="Day-to-day operations for your shop. Check the Comms badge first — reply to customers and close tickets. Then review batches, QR codes, and fraud alerts."
-            steps={[
-              {
-                number: 1,
-                label: "Comms",
-                desc: "Reply to customer messages and resolve open support tickets. Badge turns red when attention is needed.",
-                status: "required",
-              },
-              {
-                number: 2,
-                label: "Batches",
-                desc: "Review active batches and stock levels. Low stock means products may disappear from the shop.",
-                status: "required",
-              },
-              {
-                number: 3,
-                label: "QR Codes",
-                desc: "Generate QR codes for new stock batches. Codes are HMAC-signed — always use the QR Engine.",
-                status: "required",
-              },
-              {
-                number: 4,
-                label: "Customers",
-                desc: "Monitor loyalty scores and engagement. CRM scoring only — use Comms tab for messaging.",
-                status: "optional",
-              },
-              {
-                number: 5,
-                label: "Fraud",
-                desc: "Review flagged accounts daily. Dismiss false positives or suspend confirmed abuse.",
-                status: "required",
-              },
-              {
-                number: 6,
-                label: "Notifications",
-                desc: "Check SMS/email delivery log for failures. This is an ops log — NOT a comms channel.",
-                status: "optional",
-              },
-            ]}
-            warnings={[
-              "Comms tab (v4.7) replaced the old Messages + Support tabs. Do NOT re-add those tabs.",
-              "Notifications tab = SMS/email delivery log ONLY. It is not a comms channel.",
-              "Customers tab = CRM engagement scoring ONLY. It is not a comms channel.",
-              "customer_messages uses .body field. ticket_messages uses .content field. Never swap these.",
-              "ORDER BY production_date on batches — there is no created_at column on the batches table.",
-              "UPDATE only on user_profiles — never use upsert.",
-            ]}
-            dataFlow={[
-              {
-                direction: "in",
-                from: "HQ ships batch",
-                to: "Batches tab (stock level updates)",
-              },
-              {
-                direction: "in",
-                from: "Customer scans QR",
-                to: "Analytics tab + Customers tab (loyalty points)",
-              },
-              {
-                direction: "in",
-                from: "Customer sends message",
-                to: "Comms tab badge (realtime)",
-              },
-              {
-                direction: "out",
-                from: "Admin replies in Comms",
-                to: "Customer receives WhatsApp + inbox message",
-              },
-              {
-                direction: "out",
-                from: "Admin generates QR codes",
-                to: "QR codes assigned to batch, ready for distribution",
-              },
-            ]}
-            tips={[
-              "The Comms badge is realtime — no refresh needed. Watch it during business hours.",
-              "The QR Engine auto-selects the most recent batch. Always verify the correct batch before bulk generating.",
-              "Customers tab shows tier distribution — useful for targeting Broadcast messages in the Comms tab.",
-            ]}
-            storageKey="admin_overview"
+            context={ctx}
+            tabId="admin"
+            onAction={(action) => action.tab && setTab(action.tab)}
             defaultOpen={false}
           />
 
