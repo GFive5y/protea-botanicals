@@ -12,9 +12,22 @@
 // v2.0: WP-W unified pipeline, lifecycle badges, archive, audit export
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "../viz";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -44,6 +57,7 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -1514,6 +1528,166 @@ function OverviewPanel({
           </div>
         ))}
       </div>
+
+      {/* ── CHARTS: Batch yield history + Monthly output ── */}
+      {runs.length > 0 &&
+        (() => {
+          const yieldData = runs
+            .filter((r) => r.actual_units && r.planned_units)
+            .slice(0, 10)
+            .reverse()
+            .map((r) => ({
+              run: (r.run_number || r.id?.slice(0, 6) || "").slice(-8),
+              yield: calcYield(r.actual_units, r.planned_units),
+              actual: r.actual_units,
+            }));
+
+          const monthlyMap = {};
+          runs.forEach((r) => {
+            const d = new Date(r.created_at);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+            const label = d.toLocaleDateString("en-ZA", {
+              month: "short",
+              year: "2-digit",
+            });
+            if (!monthlyMap[key]) monthlyMap[key] = { month: label, units: 0 };
+            monthlyMap[key].units += r.actual_units || r.planned_units || 0;
+          });
+          const monthlyData = Object.values(monthlyMap).slice(-6);
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.2fr 1fr",
+                gap: 16,
+              }}
+            >
+              <ChartCard
+                title="Batch Yield History (last 10 runs)"
+                height={200}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={yieldData}
+                    margin={{ top: 8, right: 12, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="run"
+                      tick={{ fill: T.ink400, fontSize: 9, fontFamily: T.font }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      domain={[80, 100]}
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={32}
+                      tickFormatter={(v) => `${v}%`}
+                    />
+                    <Tooltip
+                      content={<ChartTooltip formatter={(v) => `${v}%`} />}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="yield"
+                      name="Yield"
+                      stroke={T.accentMid}
+                      strokeWidth={2}
+                      dot={(props) => {
+                        const { cx, cy, value } = props;
+                        return (
+                          <circle
+                            key={`dot-${cx}-${cy}`}
+                            cx={cx}
+                            cy={cy}
+                            r={4}
+                            fill={value < 95 ? T.warning : T.accentMid}
+                            stroke="#fff"
+                            strokeWidth={1.5}
+                          />
+                        );
+                      }}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Monthly Production Output" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={monthlyData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="month"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={36}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={<ChartTooltip formatter={(v) => `${v} units`} />}
+                    />
+                    <Bar
+                      dataKey="units"
+                      name="Units"
+                      fill={T.accentMid}
+                      isAnimationActive={false}
+                      maxBarSize={40}
+                      radius={[3, 3, 0, 0]}
+                    >
+                      {monthlyData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={
+                            i === monthlyData.length - 1
+                              ? T.accent
+                              : T.accentMid
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* Recent batches */}
       {batches.length > 0 && (
