@@ -1,17 +1,13 @@
-// src/components/StockControl.js v1.5
-// WP-GUIDE-C: InfoTooltip injected — shop-visibility on Sell Price column
-// v1.4 — Admin PO Detail Modal (OrdersView):
-//         - PO cards are now clickable -> opens full detail slide-in panel
-//         - Admin has full status control over ALL POs including cancelled
-//           (can un-cancel back to any status)
-//         - Edit notes, expected_date, supplier_invoice_ref, usd_zar_rate inline
-//         - Line items table with qty, unit price, line EXW, landed/unit ZAR
-//         - "Open in Procurement" redirect note for shipping management
-//         - fetchAll query upgraded to include supplier_products on line items
-// v1.3 — Item History Drilldown
-// v1.2 — WP-K: Publish to Shop
-// v1.1 — WP-I: Document source badge
-// v1.0 — Protea Botanicals — Inventory Management System (WP5.1)
+// src/components/StockControl.js v2.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all metric/numeric values
+//   - StatCard: coloured top borders removed — semantic colour on value only
+//   - Category pills: neutral ink075 background, semantic text colour
+//   - Sub-tab buttons: standard underline style
+//   - Card left-border accents removed (decorative use)
+//   - Purple removed — doc source badge uses info-blue
+// v1.5: InfoTooltip shop-visibility | v1.4: PO Detail Modal | v1.3: Item History
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -19,64 +15,98 @@ import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
 
-const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  cream: "#faf9f6",
-  warm: "#f4f0e8",
-  white: "#fff",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
-  error: "#c0392b",
-  red: "#e74c3c",
-  blue: "#2c4a6e",
-  purple: "#6c3483",
-  lightPurple: "#f5eef8",
-};
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
+// ── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
+// Legacy aliases (keeps internal logic unchanged)
+const C = {
+  green: T.accent,
+  mid: T.accentMid,
+  accent: "#52b788",
+  gold: "#b5935a",
+  cream: T.ink050,
+  warm: T.ink075,
+  white: "#fff",
+  border: T.ink150,
+  muted: T.ink500,
+  text: T.ink900,
+  error: T.danger,
+  red: T.danger,
+  blue: T.info,
+  purple: T.info,
+  lightPurple: T.infoBg,
+};
+
+const F = {
+  heading: T.fontUi, // ★ WP-THEME: Outfit replaces Cormorant everywhere
+  body: T.fontUi,
+};
+
+// ── Shared style objects ─────────────────────────────────────────────────────
 const sLabel = {
-  fontSize: "9px",
-  letterSpacing: "0.3em",
+  fontSize: "10px",
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: "4px",
-  fontFamily: F.body,
+  color: T.ink400,
+  marginBottom: "6px",
+  fontFamily: T.fontUi,
+  fontWeight: 700,
 };
 const sCard = {
-  background: C.white,
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  background: "#fff",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: "6px",
   padding: "20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+  boxShadow: T.shadow,
 };
 const sBtn = (v = "primary") => ({
   padding: "8px 16px",
-  background: v === "primary" ? C.green : "transparent",
-  color: v === "primary" ? C.white : C.mid,
-  border: v === "primary" ? "none" : `1px solid ${C.mid}`,
-  borderRadius: "2px",
-  fontSize: "10px",
-  letterSpacing: "0.15em",
+  background: v === "primary" ? T.accent : "transparent",
+  color: v === "primary" ? "#fff" : T.accentMid,
+  border: v === "primary" ? "none" : `1px solid ${T.accentBd}`,
+  borderRadius: "4px",
+  fontSize: "11px",
+  letterSpacing: "0.06em",
   textTransform: "uppercase",
   fontWeight: 600,
   cursor: "pointer",
-  fontFamily: F.body,
-  transition: "all 0.15s",
+  fontFamily: T.fontUi,
+  transition: "opacity 0.15s",
 });
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: "4px",
   fontSize: "13px",
-  fontFamily: F.body,
-  background: C.white,
+  fontFamily: T.fontUi,
+  background: "#fff",
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
@@ -86,22 +116,22 @@ const sTable = {
   width: "100%",
   borderCollapse: "collapse",
   fontSize: "13px",
-  fontFamily: F.body,
+  fontFamily: T.fontUi,
 };
 const sTh = {
   textAlign: "left",
   padding: "10px 12px",
-  fontSize: "9px",
-  letterSpacing: "0.2em",
+  fontSize: "10px",
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: C.muted,
-  borderBottom: `2px solid ${C.border}`,
-  fontWeight: 500,
+  color: T.ink400,
+  borderBottom: `2px solid ${T.ink150}`,
+  fontWeight: 700,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${C.border}`,
-  color: C.text,
+  borderBottom: `1px solid ${T.ink075}`,
+  color: T.ink700,
   verticalAlign: "middle",
 };
 
@@ -112,10 +142,10 @@ const CATEGORY_LABELS = {
   hardware: "Hardware",
 };
 const CATEGORY_COLORS = {
-  finished_product: C.accent,
-  raw_material: C.blue,
-  terpene: "#9b6b9e",
-  hardware: C.gold,
+  finished_product: T.success,
+  raw_material: T.info,
+  terpene: T.accentMid,
+  hardware: "#92400E",
 };
 const UNIT_LABELS = { pcs: "pcs", ml: "ml", g: "g", bottles: "bottles" };
 const MOVEMENT_LABELS = {
@@ -127,15 +157,14 @@ const MOVEMENT_LABELS = {
   production_in: "Production In",
   production_out: "Production Out",
 };
-
 const ALL_PO_STATUSES = [
-  { id: "draft", label: "Draft", color: C.muted },
-  { id: "submitted", label: "Submitted", color: C.blue },
-  { id: "confirmed", label: "Confirmed", color: C.accent },
-  { id: "shipped", label: "Shipped", color: C.gold },
-  { id: "received", label: "Received", color: C.green },
-  { id: "complete", label: "Complete", color: "#00695C" },
-  { id: "cancelled", label: "Cancelled", color: C.red },
+  { id: "draft", label: "Draft", color: T.ink500 },
+  { id: "submitted", label: "Submitted", color: T.info },
+  { id: "confirmed", label: "Confirmed", color: T.accentMid },
+  { id: "shipped", label: "Shipped", color: "#92400E" },
+  { id: "received", label: "Received", color: T.accent },
+  { id: "complete", label: "Complete", color: T.success },
+  { id: "cancelled", label: "Cancelled", color: T.danger },
 ];
 const PO_STATUS_COLORS = ALL_PO_STATUSES.reduce((a, s) => {
   a[s.id] = s.color;
@@ -166,6 +195,7 @@ function buildDocSourceMap(movements) {
   }
   return map;
 }
+
 function DocumentSourceBadge({ movement }) {
   if (!movement) return null;
   return (
@@ -174,21 +204,22 @@ function DocumentSourceBadge({ movement }) {
       style={{
         fontSize: "9px",
         padding: "1px 6px",
-        borderRadius: 20,
-        background: C.lightPurple,
-        color: C.purple,
-        border: `1px solid ${C.purple}`,
+        borderRadius: 3,
+        background: T.infoBg,
+        color: T.info,
+        border: `1px solid ${T.infoBd}`,
         fontWeight: 700,
         letterSpacing: "0.08em",
-        fontFamily: F.body,
+        fontFamily: T.fontUi,
         whiteSpace: "nowrap",
         cursor: "default",
       }}
     >
-      🔬 DOC
+      DOC
     </span>
   );
 }
+
 function LiveShopBadge() {
   return (
     <span
@@ -196,22 +227,23 @@ function LiveShopBadge() {
       style={{
         fontSize: "9px",
         padding: "2px 7px",
-        borderRadius: "20px",
-        background: "#d4edda",
-        color: C.green,
-        border: `1px solid ${C.accent}`,
+        borderRadius: "3px",
+        background: T.successBg,
+        color: T.success,
+        border: `1px solid ${T.successBd}`,
         fontWeight: 700,
         letterSpacing: "0.08em",
-        fontFamily: F.body,
+        fontFamily: T.fontUi,
         whiteSpace: "nowrap",
         cursor: "default",
         marginLeft: "6px",
       }}
     >
-      🛍 LIVE
+      LIVE
     </span>
   );
 }
+
 function isLiveInShop(item) {
   return (
     item.category === "finished_product" &&
@@ -220,6 +252,7 @@ function isLiveInShop(item) {
   );
 }
 
+// ─── Main component ──────────────────────────────────────────────────────────
 export default function StockControl() {
   const [subTab, setSubTab] = useState("overview");
   const [items, setItems] = useState([]);
@@ -273,11 +306,11 @@ export default function StockControl() {
   }, [fetchAll]);
 
   const TABS = [
-    { id: "overview", label: "Overview", icon: "◎" },
-    { id: "items", label: "Items", icon: "◈" },
-    { id: "movements", label: "Movements", icon: "↕" },
-    { id: "orders", label: "Purchase Orders", icon: "📋" },
-    { id: "suppliers", label: "Suppliers", icon: "🏭" },
+    { id: "overview", label: "Overview" },
+    { id: "items", label: "Items" },
+    { id: "movements", label: "Movements" },
+    { id: "orders", label: "Purchase Orders" },
+    { id: "suppliers", label: "Suppliers" },
   ];
 
   if (error)
@@ -285,12 +318,12 @@ export default function StockControl() {
       <div
         style={{
           ...sCard,
-          borderLeft: `3px solid ${C.error}`,
+          borderLeft: `3px solid ${T.danger}`,
           margin: "20px 0",
         }}
       >
         <div style={sLabel}>Error</div>
-        <p style={{ fontSize: "13px", color: C.error }}>{error}</p>
+        <p style={{ fontSize: "13px", color: T.danger }}>{error}</p>
         <button onClick={fetchAll} style={{ ...sBtn(), marginTop: "12px" }}>
           Retry
         </button>
@@ -298,19 +331,22 @@ export default function StockControl() {
     );
 
   return (
-    <div>
+    <div style={{ fontFamily: T.fontUi }}>
       <WorkflowGuide
         context={ctx}
         tabId="admin-stock"
         onAction={() => {}}
         defaultOpen={true}
       />
+
+      {/* Sub-tab bar — standard underline style */}
       <div
         style={{
           display: "flex",
-          gap: "6px",
-          flexWrap: "wrap",
+          gap: 0,
+          borderBottom: `1px solid ${T.ink150}`,
           marginBottom: "24px",
+          overflowX: "auto",
         }}
       >
         {TABS.map((t) => (
@@ -318,27 +354,44 @@ export default function StockControl() {
             key={t.id}
             onClick={() => setSubTab(t.id)}
             style={{
-              padding: "8px 16px",
-              background: subTab === t.id ? C.green : C.white,
-              color: subTab === t.id ? C.white : C.muted,
-              border: `1px solid ${subTab === t.id ? C.green : C.border}`,
-              borderRadius: "2px",
-              fontSize: "10px",
-              letterSpacing: "0.12em",
+              padding: "10px 16px",
+              background: "none",
+              border: "none",
+              borderBottom:
+                subTab === t.id
+                  ? `2px solid ${T.accent}`
+                  : "2px solid transparent",
+              fontFamily: T.fontUi,
+              fontSize: "11px",
+              fontWeight: subTab === t.id ? 700 : 400,
+              letterSpacing: "0.06em",
               textTransform: "uppercase",
+              color: subTab === t.id ? T.accent : T.ink500,
               cursor: "pointer",
-              fontFamily: F.body,
-              fontWeight: subTab === t.id ? 600 : 400,
+              whiteSpace: "nowrap",
+              marginBottom: "-1px",
             }}
           >
-            {t.icon} {t.label}
+            {t.label}
           </button>
         ))}
       </div>
+
       {loading ? (
-        <div style={{ textAlign: "center", padding: "60px", color: C.muted }}>
-          <div style={{ fontSize: "24px", marginBottom: "12px" }}>◎</div>Loading
-          stock data...
+        <div style={{ textAlign: "center", padding: "60px", color: T.ink500 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              border: `2px solid ${T.ink150}`,
+              borderTopColor: T.accent,
+              borderRadius: "50%",
+              animation: "spin 0.8s linear infinite",
+              margin: "0 auto 12px",
+            }}
+          />
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          Loading stock data...
         </div>
       ) : (
         <>
@@ -377,39 +430,67 @@ export default function StockControl() {
   );
 }
 
-function StatCard({ label, value, sub, color }) {
+// ─── Stat card — no coloured top border ──────────────────────────────────────
+function StatCard({ label, value, sub, semantic }) {
+  const colors = {
+    success: T.success,
+    warning: T.warning,
+    danger: T.danger,
+    info: T.info,
+  };
+  const color = semantic ? colors[semantic] : T.ink900;
   return (
     <div
-      style={{ ...sCard, borderTop: `3px solid ${color}`, textAlign: "center" }}
+      style={{
+        background: "#fff",
+        border: `1px solid ${T.ink150}`,
+        borderRadius: "6px",
+        padding: "16px 18px",
+        boxShadow: T.shadow,
+      }}
     >
       <div
         style={{
-          fontSize: "9px",
-          letterSpacing: "0.2em",
+          fontSize: "10px",
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: C.muted,
+          color: T.ink400,
           marginBottom: "6px",
+          fontFamily: T.fontUi,
+          fontWeight: 700,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontSize: "28px",
-          fontWeight: 600,
+          fontFamily: T.fontData,
+          fontSize: "26px",
+          fontWeight: 400,
           color,
-          fontFamily: F.heading,
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
         }}
       >
         {value}
       </div>
-      <div style={{ fontSize: "11px", color: C.muted, marginTop: "2px" }}>
-        {sub}
-      </div>
+      {sub && (
+        <div
+          style={{
+            fontSize: "11px",
+            color: T.ink500,
+            marginTop: "4px",
+            fontFamily: T.fontUi,
+          }}
+        >
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
 
+// ─── Overview ─────────────────────────────────────────────────────────────────
 function OverviewView({ items, movements, orders }) {
   const active = items.filter((i) => i.is_active);
   const lowStock = active.filter(
@@ -439,59 +520,108 @@ function OverviewView({ items, movements, orders }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
+      {/* Metric grid */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "16px",
+          gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: "6px",
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
         }}
       >
-        <StatCard
-          label="Total SKUs"
-          value={active.length}
-          sub="Active items"
-          color={C.accent}
-        />
-        <StatCard
-          label="Stock Value (Sell)"
-          value={`R${totalValue.toLocaleString()}`}
-          sub="At sell prices"
-          color={C.green}
-        />
-        <StatCard
-          label="Stock Cost"
-          value={`R${totalCost.toLocaleString()}`}
-          sub="At cost prices"
-          color={C.blue}
-        />
-        <StatCard
-          label="Low Stock"
-          value={lowStock.length}
-          sub="Below reorder level"
-          color={lowStock.length > 0 ? C.gold : C.accent}
-        />
-        <StatCard
-          label="Out of Stock"
-          value={outOfStock.length}
-          sub="Zero quantity"
-          color={outOfStock.length > 0 ? C.red : C.accent}
-        />
-        <StatCard
-          label="Open POs"
-          value={pendingPOs.length}
-          sub="Not yet received"
-          color={C.blue}
-        />
-        <StatCard
-          label="Live in Shop"
-          value={liveCount}
-          sub="Customer-facing"
-          color={liveCount > 0 ? C.accent : C.muted}
-        />
+        {[
+          { label: "Total SKUs", value: active.length, semantic: "success" },
+          {
+            label: "Stock Value",
+            value: `R${totalValue.toLocaleString()}`,
+            semantic: null,
+          },
+          {
+            label: "Stock Cost",
+            value: `R${totalCost.toLocaleString()}`,
+            semantic: "info",
+          },
+          {
+            label: "Low Stock",
+            value: lowStock.length,
+            semantic: lowStock.length > 0 ? "warning" : "success",
+          },
+          {
+            label: "Out of Stock",
+            value: outOfStock.length,
+            semantic: outOfStock.length > 0 ? "danger" : "success",
+          },
+          { label: "Open POs", value: pendingPOs.length, semantic: "info" },
+          {
+            label: "Live in Shop",
+            value: liveCount,
+            semantic: liveCount > 0 ? "success" : null,
+          },
+        ].map((s, i) => {
+          const colors = {
+            success: T.success,
+            warning: T.warning,
+            danger: T.danger,
+            info: T.info,
+          };
+          const color = s.semantic ? colors[s.semantic] : T.ink900;
+          return (
+            <div key={i} style={{ background: "#fff", padding: "16px 18px" }}>
+              <div
+                style={{
+                  fontSize: "10px",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: "6px",
+                  fontFamily: T.fontUi,
+                  fontWeight: 700,
+                }}
+              >
+                {s.label}
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontData,
+                  fontSize: "24px",
+                  fontWeight: 400,
+                  color,
+                  lineHeight: 1,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {s.value}
+              </div>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Low stock alert */}
       {lowStock.length > 0 && (
-        <div style={{ ...sCard, borderLeft: `3px solid ${C.gold}` }}>
-          <div style={sLabel}>⚠ Low Stock Alerts</div>
+        <div
+          style={{
+            background: T.warningBg,
+            border: `1px solid ${T.warningBd}`,
+            borderRadius: "6px",
+            padding: "14px 18px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.warning,
+              marginBottom: "10px",
+            }}
+          >
+            Low Stock Alerts
+          </div>
           {lowStock.map((item) => (
             <div
               key={item.id}
@@ -500,18 +630,21 @@ function OverviewView({ items, movements, orders }) {
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "8px 0",
-                borderBottom: `1px solid ${C.border}`,
+                borderBottom: `1px solid ${T.warningBd}`,
               }}
             >
               <div>
-                <span style={{ fontSize: "13px", fontWeight: 500 }}>
+                <span
+                  style={{ fontSize: "13px", fontWeight: 500, color: T.ink900 }}
+                >
                   {item.name}
                 </span>
                 <span
                   style={{
                     fontSize: "11px",
-                    color: C.muted,
+                    color: T.ink500,
                     marginLeft: "8px",
+                    fontFamily: T.fontData,
                   }}
                 >
                   {item.sku}
@@ -520,9 +653,10 @@ function OverviewView({ items, movements, orders }) {
               <div>
                 <span
                   style={{
+                    fontFamily: T.fontData,
                     fontSize: "14px",
                     fontWeight: 600,
-                    color: item.quantity_on_hand <= 0 ? C.red : C.gold,
+                    color: item.quantity_on_hand <= 0 ? T.danger : T.warning,
                   }}
                 >
                   {item.quantity_on_hand} {UNIT_LABELS[item.unit]}
@@ -530,23 +664,25 @@ function OverviewView({ items, movements, orders }) {
                 <span
                   style={{
                     fontSize: "11px",
-                    color: C.muted,
+                    color: T.ink500,
                     marginLeft: "8px",
                   }}
                 >
-                  (min: {item.reorder_level})
+                  min: {item.reorder_level}
                 </span>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Category breakdown */}
       <div style={sCard}>
         <div style={sLabel}>Stock by Category</div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
             gap: "12px",
             marginTop: "12px",
           }}
@@ -555,42 +691,47 @@ function OverviewView({ items, movements, orders }) {
             <div
               key={cat}
               style={{
-                padding: "12px",
-                background: C.cream,
-                borderLeft: `3px solid ${CATEGORY_COLORS[cat] || C.muted}`,
+                padding: "12px 14px",
+                background: T.ink075,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: "6px",
               }}
             >
               <div
                 style={{
                   fontSize: "10px",
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: CATEGORY_COLORS[cat] || C.muted,
+                  color: CATEGORY_COLORS[cat] || T.ink500,
                   marginBottom: "4px",
+                  fontWeight: 700,
                 }}
               >
                 {CATEGORY_LABELS[cat] || cat}
               </div>
               <div
                 style={{
+                  fontFamily: T.fontData,
                   fontSize: "18px",
-                  fontWeight: 600,
-                  fontFamily: F.heading,
+                  fontWeight: 400,
+                  color: T.ink900,
                 }}
               >
                 {d.count} items
               </div>
-              <div style={{ fontSize: "11px", color: C.muted }}>
+              <div style={{ fontSize: "11px", color: T.ink500 }}>
                 R{d.value.toLocaleString()} value
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Recent movements */}
       <div style={sCard}>
         <div style={sLabel}>Recent Stock Movements</div>
         {recent.length === 0 ? (
-          <p style={{ fontSize: "13px", color: C.muted, marginTop: "12px" }}>
+          <p style={{ fontSize: "13px", color: T.ink500, marginTop: "12px" }}>
             No movements recorded yet.
           </p>
         ) : (
@@ -616,9 +757,10 @@ function OverviewView({ items, movements, orders }) {
                       style={{
                         fontSize: "10px",
                         padding: "2px 8px",
-                        borderRadius: "2px",
-                        background: m.quantity >= 0 ? "#d4edda" : "#fde8e8",
-                        color: m.quantity >= 0 ? C.green : C.red,
+                        borderRadius: "3px",
+                        background: m.quantity >= 0 ? T.successBg : T.dangerBg,
+                        color: m.quantity >= 0 ? T.success : T.danger,
+                        fontWeight: 600,
                       }}
                     >
                       {MOVEMENT_LABELS[m.movement_type] || m.movement_type}
@@ -628,14 +770,15 @@ function OverviewView({ items, movements, orders }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
+                      fontFamily: T.fontData,
                       fontWeight: 600,
-                      color: m.quantity >= 0 ? C.green : C.red,
+                      color: m.quantity >= 0 ? T.success : T.danger,
                     }}
                   >
                     {m.quantity >= 0 ? "+" : ""}
                     {m.quantity}
                   </td>
-                  <td style={{ ...sTd, color: C.muted }}>
+                  <td style={{ ...sTd, color: T.ink500 }}>
                     {m.reference || "—"}
                   </td>
                 </tr>
@@ -648,6 +791,7 @@ function OverviewView({ items, movements, orders }) {
   );
 }
 
+// ─── Items ────────────────────────────────────────────────────────────────────
 function ItemsView({ items, suppliers, movements, onRefresh }) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -656,6 +800,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
   const [saving, setSaving] = useState(false);
   const [historyItem, setHistoryItem] = useState(null);
   const docSourceMap = buildDocSourceMap(movements);
+
   const filtered = items.filter((i) => {
     if (filter !== "all" && i.category !== filter) return false;
     if (
@@ -699,6 +844,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
       setSaving(false);
     }
   };
+
   const handleDeactivate = async (item) => {
     if (!window.confirm(`Deactivate "${item.name}"?`)) return;
     const { error } = await supabase
@@ -753,6 +899,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
           + Add Item
         </button>
       </div>
+
       {showForm && (
         <ItemForm
           item={editItem}
@@ -765,6 +912,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
           saving={saving}
         />
       )}
+
       <div style={{ ...sCard, padding: "0", overflow: "auto" }}>
         <table style={sTable}>
           <thead>
@@ -776,7 +924,6 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
               <th style={{ ...sTh, textAlign: "right" }}>Reorder</th>
               <th style={{ ...sTh, textAlign: "right" }}>Cost</th>
               <th style={{ ...sTh, textAlign: "right" }}>
-                {/* WP-GUIDE-C: shop-visibility tooltip */}
                 <span
                   style={{
                     display: "flex",
@@ -802,7 +949,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                   style={{
                     ...sTd,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink500,
                     padding: "40px",
                   }}
                 >
@@ -821,9 +968,9 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                     <td
                       style={{
                         ...sTd,
+                        fontFamily: T.fontData,
                         fontSize: "11px",
-                        fontFamily: "monospace",
-                        color: C.muted,
+                        color: T.ink500,
                       }}
                     >
                       {item.sku}
@@ -846,11 +993,12 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                         style={{
                           fontSize: "9px",
                           padding: "2px 8px",
-                          borderRadius: "2px",
-                          background: `${CATEGORY_COLORS[item.category]}18`,
-                          color: CATEGORY_COLORS[item.category],
+                          borderRadius: "3px",
+                          background: T.ink075,
+                          color: CATEGORY_COLORS[item.category] || T.ink500,
                           letterSpacing: "0.1em",
                           textTransform: "uppercase",
+                          fontWeight: 700,
                         }}
                       >
                         {CATEGORY_LABELS[item.category]}
@@ -860,35 +1008,58 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                       style={{
                         ...sTd,
                         textAlign: "right",
+                        fontFamily: T.fontData,
                         fontWeight: 600,
-                        color: isOut ? C.red : isLow ? C.gold : C.text,
+                        color: isOut ? T.danger : isLow ? T.warning : T.ink900,
                       }}
                     >
                       {item.quantity_on_hand} {UNIT_LABELS[item.unit]}
-                      {isOut && <span style={{ marginLeft: "4px" }}>⛔</span>}
-                      {isLow && !isOut && (
-                        <span style={{ marginLeft: "4px" }}>⚠️</span>
+                      {isOut && (
+                        <span style={{ marginLeft: "4px", fontSize: "10px" }}>
+                          !
+                        </span>
                       )}
                     </td>
-                    <td style={{ ...sTd, textAlign: "right", color: C.muted }}>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        color: T.ink500,
+                      }}
+                    >
                       {item.reorder_level}
                     </td>
-                    <td style={{ ...sTd, textAlign: "right" }}>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                      }}
+                    >
                       R{(item.cost_price || 0).toFixed(2)}
                     </td>
-                    <td style={{ ...sTd, textAlign: "right", fontWeight: 500 }}>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 500,
+                      }}
+                    >
                       R{(item.sell_price || 0).toFixed(2)}
                     </td>
                     <td
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        color: margin(item) ? C.accent : C.muted,
+                        fontFamily: T.fontData,
+                        color: margin(item) ? T.success : T.ink400,
                       }}
                     >
                       {margin(item) ? `${margin(item)}%` : "—"}
                     </td>
-                    <td style={{ ...sTd, fontSize: "12px", color: C.muted }}>
+                    <td style={{ ...sTd, fontSize: "12px", color: T.ink500 }}>
                       {item.suppliers?.name || "—"}
                     </td>
                     <td style={sTd}>
@@ -904,12 +1075,12 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                             ...sBtn("outline"),
                             padding: "4px 10px",
                             fontSize: "9px",
-                            color: C.blue,
-                            borderColor: C.blue,
+                            color: T.info,
+                            borderColor: T.infoBd,
                           }}
                           title="View history"
                         >
-                          📋
+                          Log
                         </button>
                         <button
                           onClick={() => {
@@ -930,8 +1101,8 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                             ...sBtn("outline"),
                             padding: "4px 10px",
                             fontSize: "9px",
-                            color: C.red,
-                            borderColor: C.red,
+                            color: T.danger,
+                            borderColor: T.dangerBd,
                           }}
                         >
                           ✕
@@ -948,7 +1119,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
       <div
         style={{
           fontSize: "11px",
-          color: C.muted,
+          color: T.ink500,
           marginTop: "12px",
           textAlign: "right",
         }}
@@ -956,13 +1127,13 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
         Showing {filtered.length} of {items.filter((i) => i.is_active).length}{" "}
         active items
         {liveCount > 0 && (
-          <span style={{ marginLeft: 12, color: C.green }}>
-            · 🛍 {liveCount} live in shop
+          <span style={{ marginLeft: 12, color: T.success }}>
+            · {liveCount} live in shop
           </span>
         )}
         {Object.keys(docSourceMap).length > 0 && (
-          <span style={{ marginLeft: 12, color: C.purple }}>
-            · 🔬 {Object.keys(docSourceMap).length} via doc ingestion
+          <span style={{ marginLeft: 12, color: T.info }}>
+            · {Object.keys(docSourceMap).length} via doc ingestion
           </span>
         )}
       </div>
@@ -977,6 +1148,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
   );
 }
 
+// ─── Item History Modal ───────────────────────────────────────────────────────
 function ItemHistoryModal({ item, movements, onClose }) {
   const sorted = [...movements].sort(
     (a, b) => new Date(a.created_at) - new Date(b.created_at),
@@ -993,6 +1165,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
   const totalOut = sorted
     .filter((m) => m.quantity < 0)
     .reduce((s, m) => s + parseFloat(m.quantity), 0);
+
   return (
     <div
       style={{
@@ -1010,9 +1183,9 @@ function ItemHistoryModal({ item, movements, onClose }) {
     >
       <div
         style={{
-          width: "min(640px, 100vw)",
+          width: "min(640px,100vw)",
           height: "100vh",
-          background: C.white,
+          background: "#fff",
           boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
           display: "flex",
           flexDirection: "column",
@@ -1022,8 +1195,8 @@ function ItemHistoryModal({ item, movements, onClose }) {
         <div
           style={{
             padding: "20px 24px",
-            borderBottom: `1px solid ${C.border}`,
-            background: C.cream,
+            borderBottom: `1px solid ${T.ink150}`,
+            background: T.ink050,
             flexShrink: 0,
           }}
         >
@@ -1035,22 +1208,33 @@ function ItemHistoryModal({ item, movements, onClose }) {
             }}
           >
             <div>
-              <div style={{ ...sLabel }}>Stock Audit Trail</div>
               <div
                 style={{
-                  fontFamily: F.heading,
-                  fontSize: "22px",
-                  fontWeight: 400,
-                  color: C.green,
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: "4px",
+                }}
+              >
+                Stock Audit Trail
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontUi,
+                  fontSize: "20px",
+                  fontWeight: 600,
+                  color: T.accent,
                 }}
               >
                 {item.name}
               </div>
               <div
                 style={{
-                  fontFamily: "monospace",
+                  fontFamily: T.fontData,
                   fontSize: "11px",
-                  color: C.muted,
+                  color: T.ink500,
                   marginTop: "2px",
                 }}
               >
@@ -1064,7 +1248,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
                 border: "none",
                 fontSize: "20px",
                 cursor: "pointer",
-                color: C.muted,
+                color: T.ink400,
               }}
             >
               ✕
@@ -1073,7 +1257,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
           <div
             style={{
               display: "flex",
-              gap: "16px",
+              gap: "12px",
               marginTop: "16px",
               flexWrap: "wrap",
             }}
@@ -1082,28 +1266,31 @@ function ItemHistoryModal({ item, movements, onClose }) {
               {
                 label: "Current Stock",
                 value: `${item.quantity_on_hand} ${item.unit}`,
-                color: item.quantity_on_hand <= 0 ? C.red : C.green,
-                big: true,
+                color: item.quantity_on_hand <= 0 ? T.danger : T.success,
               },
               {
                 label: "Total In",
                 value: `+${totalIn.toFixed(2)}`,
-                color: C.green,
+                color: T.success,
               },
-              { label: "Total Out", value: totalOut.toFixed(2), color: C.red },
-              { label: "Movements", value: movements.length, color: C.muted },
+              {
+                label: "Total Out",
+                value: totalOut.toFixed(2),
+                color: T.danger,
+              },
+              { label: "Movements", value: movements.length, color: T.ink500 },
               {
                 label: "Cost Price",
                 value: `R${(item.cost_price || 0).toFixed(2)}`,
-                color: C.gold,
+                color: T.warning,
               },
             ].map((s) => (
               <div
                 key={s.label}
                 style={{
-                  background: C.white,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: "2px",
+                  background: "#fff",
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: "4px",
                   padding: "10px 14px",
                   minWidth: "90px",
                 }}
@@ -1111,20 +1298,21 @@ function ItemHistoryModal({ item, movements, onClose }) {
                 <div
                   style={{
                     fontSize: "9px",
-                    letterSpacing: "0.2em",
+                    letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: C.muted,
-                    fontFamily: F.body,
+                    color: T.ink400,
+                    fontFamily: T.fontUi,
                     marginBottom: "4px",
+                    fontWeight: 700,
                   }}
                 >
                   {s.label}
                 </div>
                 <div
                   style={{
-                    fontSize: s.big ? "20px" : "16px",
+                    fontFamily: T.fontData,
+                    fontSize: "16px",
                     fontWeight: 600,
-                    fontFamily: F.heading,
                     color: s.color,
                   }}
                 >
@@ -1140,7 +1328,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
               style={{
                 padding: "48px",
                 textAlign: "center",
-                color: C.muted,
+                color: T.ink500,
                 fontSize: "13px",
               }}
             >
@@ -1152,7 +1340,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: "12px",
-                fontFamily: F.body,
+                fontFamily: T.fontUi,
               }}
             >
               <thead>
@@ -1160,7 +1348,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
                   style={{
                     position: "sticky",
                     top: 0,
-                    background: C.warm,
+                    background: T.ink075,
                     zIndex: 1,
                   }}
                 >
@@ -1184,15 +1372,15 @@ function ItemHistoryModal({ item, movements, onClose }) {
                 {display.map((m, i) => (
                   <tr
                     key={m.id}
-                    style={{ background: i % 2 === 0 ? C.white : "#fafaf8" }}
+                    style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
                   >
                     <td
                       style={{ ...sTd, padding: "10px 16px", fontSize: "11px" }}
                     >
-                      <div style={{ color: C.text, fontWeight: 500 }}>
+                      <div style={{ color: T.ink900, fontWeight: 500 }}>
                         {new Date(m.created_at).toLocaleDateString("en-ZA")}
                       </div>
-                      <div style={{ fontSize: "10px", color: C.muted }}>
+                      <div style={{ fontSize: "10px", color: T.ink500 }}>
                         {new Date(m.created_at).toLocaleTimeString("en-ZA", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -1204,12 +1392,13 @@ function ItemHistoryModal({ item, movements, onClose }) {
                         style={{
                           fontSize: "9px",
                           padding: "2px 8px",
-                          borderRadius: "2px",
-                          background: m.quantity >= 0 ? "#d4edda" : "#fde8e8",
-                          color: m.quantity >= 0 ? C.green : C.red,
+                          borderRadius: "3px",
+                          background:
+                            m.quantity >= 0 ? T.successBg : T.dangerBg,
+                          color: m.quantity >= 0 ? T.success : T.danger,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          fontWeight: 600,
+                          fontWeight: 700,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -1221,10 +1410,10 @@ function ItemHistoryModal({ item, movements, onClose }) {
                         ...sTd,
                         textAlign: "right",
                         padding: "10px 8px",
+                        fontFamily: T.fontData,
                         fontWeight: 700,
                         fontSize: "13px",
-                        color: m.quantity >= 0 ? C.green : C.red,
-                        fontFamily: F.heading,
+                        color: m.quantity >= 0 ? T.success : T.danger,
                       }}
                     >
                       {m.quantity >= 0 ? "+" : ""}
@@ -1235,19 +1424,19 @@ function ItemHistoryModal({ item, movements, onClose }) {
                         ...sTd,
                         textAlign: "right",
                         padding: "10px 8px",
+                        fontFamily: T.fontData,
                         fontWeight: 600,
                         fontSize: "13px",
-                        fontFamily: F.heading,
-                        color: m.runningBalance <= 0 ? C.red : C.text,
+                        color: m.runningBalance <= 0 ? T.danger : T.ink900,
                       }}
                     >
                       {m.runningBalance.toFixed(2)}
                       <span
                         style={{
                           fontSize: "9px",
-                          color: C.muted,
+                          color: T.ink400,
                           marginLeft: "3px",
-                          fontFamily: F.body,
+                          fontFamily: T.fontUi,
                           fontWeight: 400,
                         }}
                       >
@@ -1259,8 +1448,8 @@ function ItemHistoryModal({ item, movements, onClose }) {
                         ...sTd,
                         padding: "10px 8px",
                         fontSize: "11px",
-                        color: C.blue,
-                        fontFamily: "monospace",
+                        color: T.info,
+                        fontFamily: T.fontData,
                       }}
                     >
                       {m.reference || "—"}
@@ -1270,7 +1459,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
                         ...sTd,
                         padding: "10px 16px",
                         fontSize: "11px",
-                        color: C.muted,
+                        color: T.ink500,
                         maxWidth: "180px",
                       }}
                     >
@@ -1294,15 +1483,15 @@ function ItemHistoryModal({ item, movements, onClose }) {
         <div
           style={{
             padding: "14px 24px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.cream,
+            borderTop: `1px solid ${T.ink150}`,
+            background: T.ink050,
             flexShrink: 0,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
           }}
         >
-          <span style={{ fontSize: "11px", color: C.muted }}>
+          <span style={{ fontSize: "11px", color: T.ink500 }}>
             {movements.length} total · balance:{" "}
             <strong>
               {item.quantity_on_hand} {item.unit}
@@ -1317,6 +1506,7 @@ function ItemHistoryModal({ item, movements, onClose }) {
   );
 }
 
+// ─── Item Form ────────────────────────────────────────────────────────────────
 function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
   const [form, setForm] = useState({
     sku: item?.sku || "",
@@ -1356,30 +1546,30 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
     gap: "12px",
     marginBottom: "12px",
   };
-  const lbl = (t) => (
+  const lbl = (t, note) => (
     <label
       style={{
         fontSize: "11px",
-        color: C.muted,
+        color: T.ink500,
         display: "block",
         marginBottom: "4px",
       }}
     >
       {t}
+      {note && (
+        <span style={{ marginLeft: 6, fontSize: "9px", color: T.accentMid }}>
+          {note}
+        </span>
+      )}
     </label>
   );
   const willBeLive =
     form.category === "finished_product" &&
     parseFloat(form.sell_price || 0) > 0 &&
     parseFloat(form.quantity_on_hand || 0) > 0;
+
   return (
-    <div
-      style={{
-        ...sCard,
-        marginBottom: "20px",
-        borderLeft: `3px solid ${C.accent}`,
-      }}
-    >
+    <div style={{ ...sCard, marginBottom: "20px" }}>
       <div style={{ ...sLabel, marginBottom: "16px" }}>
         {item ? "Edit Item" : "Add New Item"}
       </div>
@@ -1466,21 +1656,10 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
           />
         </div>
         <div>
-          <label
-            style={{
-              fontSize: "11px",
-              color: C.muted,
-              display: "block",
-              marginBottom: "4px",
-            }}
-          >
-            Sell Price (ZAR)
-            {form.category === "finished_product" && (
-              <span style={{ marginLeft: 6, fontSize: "9px", color: C.accent }}>
-                ← shown in shop
-              </span>
-            )}
-          </label>
+          {lbl(
+            "Sell Price (ZAR)",
+            form.category === "finished_product" ? "← shown in shop" : null,
+          )}
           <input
             style={sInput}
             type="number"
@@ -1528,21 +1707,12 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
           />
         </div>
         <div>
-          <label
-            style={{
-              fontSize: "11px",
-              color: C.muted,
-              display: "block",
-              marginBottom: "4px",
-            }}
-          >
-            Strain ID
-            {form.category === "finished_product" && (
-              <span style={{ marginLeft: 6, fontSize: "9px", color: C.accent }}>
-                ← links to shop profile
-              </span>
-            )}
-          </label>
+          {lbl(
+            "Strain ID",
+            form.category === "finished_product"
+              ? "← links to shop profile"
+              : null,
+          )}
           <input
             style={sInput}
             value={form.strain_id}
@@ -1559,42 +1729,43 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
           onChange={(e) => set("description", e.target.value)}
         />
       </div>
+
       {form.category === "finished_product" && (
         <div
           style={{
-            background: willBeLive ? "#f0faf5" : "#fdf9f0",
-            border: `1px solid ${willBeLive ? C.accent : C.gold}`,
-            borderLeft: `4px solid ${willBeLive ? C.accent : C.gold}`,
-            borderRadius: "2px",
-            padding: "16px",
+            background: willBeLive ? T.successBg : T.warningBg,
+            border: `1px solid ${willBeLive ? T.successBd : T.warningBd}`,
+            borderRadius: "6px",
+            padding: "14px 16px",
             marginBottom: "16px",
           }}
         >
           <div
             style={{
-              fontSize: "9px",
-              letterSpacing: "0.3em",
-              textTransform: "uppercase",
-              color: willBeLive ? C.green : C.gold,
-              fontFamily: F.body,
-              marginBottom: "8px",
+              fontSize: "10px",
               fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: willBeLive ? T.success : T.warning,
+              marginBottom: "6px",
             }}
           >
-            🛍 Shop Listing
+            Shop Listing
           </div>
           {willBeLive ? (
-            <div style={{ fontSize: "13px", fontWeight: 600, color: C.green }}>
-              ✓ Will appear in customer shop — R
+            <div
+              style={{ fontSize: "13px", fontWeight: 600, color: T.success }}
+            >
+              Will appear in customer shop — R
               {parseFloat(form.sell_price).toLocaleString("en-ZA", {
                 minimumFractionDigits: 2,
               })}{" "}
               · {form.quantity_on_hand} {form.unit}
             </div>
           ) : (
-            <div style={{ fontSize: "12px", color: C.muted }}>
-              ⚠ Not yet live — requires: category = finished_product · sell
-              price &gt; R0 · stock &gt; 0
+            <div style={{ fontSize: "12px", color: T.warning }}>
+              Not yet live — requires: finished_product · sell price &gt; R0 ·
+              stock &gt; 0
             </div>
           )}
         </div>
@@ -1611,6 +1782,7 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
   );
 }
 
+// ─── Movements ────────────────────────────────────────────────────────────────
 function MovementsView({ movements, items, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1622,6 +1794,7 @@ function MovementsView({ movements, items, onRefresh }) {
     notes: "",
   });
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
   const handleRecord = async () => {
     if (!form.item_id || !form.quantity) {
       alert("Select an item and enter quantity.");
@@ -1667,6 +1840,7 @@ function MovementsView({ movements, items, onRefresh }) {
       setSaving(false);
     }
   };
+
   return (
     <div>
       <div
@@ -1677,7 +1851,7 @@ function MovementsView({ movements, items, onRefresh }) {
           marginBottom: "20px",
         }}
       >
-        <div style={{ fontSize: "11px", color: C.muted }}>
+        <div style={{ fontSize: "11px", color: T.ink500 }}>
           {movements.length} movements recorded
         </div>
         <button onClick={() => setShowForm(!showForm)} style={sBtn()}>
@@ -1685,13 +1859,7 @@ function MovementsView({ movements, items, onRefresh }) {
         </button>
       </div>
       {showForm && (
-        <div
-          style={{
-            ...sCard,
-            marginBottom: "20px",
-            borderLeft: `3px solid ${C.accent}`,
-          }}
-        >
+        <div style={{ ...sCard, marginBottom: "20px" }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             Record Stock Movement
           </div>
@@ -1702,99 +1870,80 @@ function MovementsView({ movements, items, onRefresh }) {
               gap: "12px",
             }}
           >
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Item *
-              </label>
-              <select
-                style={sSelect}
-                value={form.item_id}
-                onChange={(e) => set("item_id", e.target.value)}
-              >
-                <option value="">— Select Item —</option>
-                {items
+            {[
+              {
+                label: "Item *",
+                key: "item_id",
+                type: "select",
+                options: items
                   .filter((i) => i.is_active)
-                  .map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name} ({i.sku})
+                  .map((i) => ({ value: i.id, label: `${i.name} (${i.sku})` })),
+              },
+              {
+                label: "Movement Type",
+                key: "movement_type",
+                type: "select",
+                options: Object.entries(MOVEMENT_LABELS).map(([k, v]) => ({
+                  value: k,
+                  label: v,
+                })),
+              },
+              {
+                label: "Quantity *",
+                key: "quantity",
+                type: "number",
+                placeholder: "e.g. 50",
+              },
+              {
+                label: "Reference",
+                key: "reference",
+                placeholder: "PO number, order #, etc.",
+              },
+            ].map((f) => (
+              <div key={f.key}>
+                <label
+                  style={{
+                    fontSize: "11px",
+                    color: T.ink500,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {f.label}
+                </label>
+                {f.type === "select" ? (
+                  <select
+                    style={sSelect}
+                    value={form[f.key]}
+                    onChange={(e) => set(f.key, e.target.value)}
+                  >
+                    <option value="">
+                      {f.label === "Item *" ? "— Select Item —" : "—"}
                     </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Movement Type
-              </label>
-              <select
-                style={sSelect}
-                value={form.movement_type}
-                onChange={(e) => set("movement_type", e.target.value)}
-              >
-                {Object.entries(MOVEMENT_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Quantity *
-              </label>
-              <input
-                style={sInput}
-                type="number"
-                step="0.01"
-                placeholder="e.g. 50"
-                value={form.quantity}
-                onChange={(e) => set("quantity", e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Reference
-              </label>
-              <input
-                style={sInput}
-                placeholder="PO number, order #, etc."
-                value={form.reference}
-                onChange={(e) => set("reference", e.target.value)}
-              />
-            </div>
+                    {(f.options || []).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    style={sInput}
+                    type={f.type || "text"}
+                    step={f.type === "number" ? "0.01" : undefined}
+                    placeholder={f.placeholder}
+                    value={form[f.key]}
+                    onChange={(e) => set(f.key, e.target.value)}
+                  />
+                )}
+              </div>
+            ))}
           </div>
           <div style={{ marginTop: "12px" }}>
             <label
               style={{
                 fontSize: "11px",
-                color: C.muted,
+                color: T.ink500,
                 display: "block",
                 marginBottom: "4px",
               }}
@@ -1842,7 +1991,7 @@ function MovementsView({ movements, items, onRefresh }) {
                   style={{
                     ...sTd,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink500,
                     padding: "40px",
                   }}
                 >
@@ -1861,9 +2010,9 @@ function MovementsView({ movements, items, onRefresh }) {
                   <td
                     style={{
                       ...sTd,
+                      fontFamily: T.fontData,
                       fontSize: "11px",
-                      fontFamily: "monospace",
-                      color: C.muted,
+                      color: T.ink500,
                     }}
                   >
                     {m.inventory_items?.sku || "—"}
@@ -1876,9 +2025,11 @@ function MovementsView({ movements, items, onRefresh }) {
                         style={{
                           fontSize: "10px",
                           padding: "2px 8px",
-                          borderRadius: "2px",
-                          background: m.quantity >= 0 ? "#d4edda" : "#fde8e8",
-                          color: m.quantity >= 0 ? C.green : C.red,
+                          borderRadius: "3px",
+                          background:
+                            m.quantity >= 0 ? T.successBg : T.dangerBg,
+                          color: m.quantity >= 0 ? T.success : T.danger,
+                          fontWeight: 600,
                         }}
                       >
                         {MOVEMENT_LABELS[m.movement_type] || m.movement_type}
@@ -1892,17 +2043,18 @@ function MovementsView({ movements, items, onRefresh }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
+                      fontFamily: T.fontData,
                       fontWeight: 600,
-                      color: m.quantity >= 0 ? C.green : C.red,
+                      color: m.quantity >= 0 ? T.success : T.danger,
                     }}
                   >
                     {m.quantity >= 0 ? "+" : ""}
                     {m.quantity}
                   </td>
-                  <td style={{ ...sTd, color: C.muted }}>
+                  <td style={{ ...sTd, color: T.ink500 }}>
                     {m.reference || "—"}
                   </td>
-                  <td style={{ ...sTd, color: C.muted, fontSize: "12px" }}>
+                  <td style={{ ...sTd, color: T.ink500, fontSize: "12px" }}>
                     {m.notes || "—"}
                   </td>
                 </tr>
@@ -1915,9 +2067,7 @@ function MovementsView({ movements, items, onRefresh }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PURCHASE ORDERS — v1.4
-// ═══════════════════════════════════════════════════════════════════════════
+// ─── Orders ───────────────────────────────────────────────────────────────────
 function OrdersView({ orders, suppliers, items, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2068,24 +2218,19 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           marginBottom: "20px",
         }}
       >
-        <div style={{ fontSize: "11px", color: C.muted }}>
+        <div style={{ fontSize: "11px", color: T.ink500 }}>
           {orders.length} purchase orders ·{" "}
-          <span style={{ color: C.accent }}>
-            click any card to view &amp; edit
+          <span style={{ color: T.accentMid }}>
+            click any card to view & edit
           </span>
         </div>
         <button onClick={() => setShowForm(!showForm)} style={sBtn()}>
           {showForm ? "Cancel" : "+ Create PO"}
         </button>
       </div>
+
       {showForm && (
-        <div
-          style={{
-            ...sCard,
-            marginBottom: "20px",
-            borderLeft: `3px solid ${C.accent}`,
-          }}
-        >
+        <div style={{ ...sCard, marginBottom: "20px" }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             New Purchase Order
           </div>
@@ -2101,7 +2246,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
               <label
                 style={{
                   fontSize: "11px",
-                  color: C.muted,
+                  color: T.ink500,
                   display: "block",
                   marginBottom: "4px",
                 }}
@@ -2127,7 +2272,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
               <label
                 style={{
                   fontSize: "11px",
-                  color: C.muted,
+                  color: T.ink500,
                   display: "block",
                   marginBottom: "4px",
                 }}
@@ -2145,7 +2290,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
               <label
                 style={{
                   fontSize: "11px",
-                  color: C.muted,
+                  color: T.ink500,
                   display: "block",
                   marginBottom: "4px",
                 }}
@@ -2212,8 +2357,8 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                   style={{
                     ...sBtn("outline"),
                     padding: "4px 8px",
-                    color: C.red,
-                    borderColor: C.red,
+                    color: T.danger,
+                    borderColor: T.dangerBd,
                   }}
                 >
                   ✕
@@ -2231,7 +2376,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
             <label
               style={{
                 fontSize: "11px",
-                color: C.muted,
+                color: T.ink500,
                 display: "block",
                 marginBottom: "4px",
               }}
@@ -2258,13 +2403,14 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           </div>
         </div>
       )}
+
       <div style={{ display: "grid", gap: "12px" }}>
         {orders.length === 0 ? (
           <div
             style={{
               ...sCard,
               textAlign: "center",
-              color: C.muted,
+              color: T.ink500,
               padding: "40px",
             }}
           >
@@ -2273,7 +2419,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
         ) : (
           orders.map((po) => {
             const status = poStatus(po);
-            const sc = PO_STATUS_COLORS[status] || C.muted;
+            const sc = PO_STATUS_COLORS[status] || T.ink500;
             const isCancelled = status === "cancelled";
             return (
               <div
@@ -2284,13 +2430,11 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                     "0 4px 16px rgba(0,0,0,0.09)")
                 }
                 onMouseLeave={(e) =>
-                  (e.currentTarget.style.boxShadow =
-                    "0 2px 8px rgba(0,0,0,0.03)")
+                  (e.currentTarget.style.boxShadow = T.shadow)
                 }
                 style={{
                   ...sCard,
                   cursor: "pointer",
-                  borderLeft: `3px solid ${sc}`,
                   opacity: isCancelled ? 0.72 : 1,
                   transition: "box-shadow 0.15s",
                 }}
@@ -2305,10 +2449,10 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                   <div>
                     <div
                       style={{
+                        fontFamily: T.fontData,
                         fontSize: "16px",
                         fontWeight: 600,
-                        fontFamily: F.heading,
-                        color: isCancelled ? C.muted : C.text,
+                        color: isCancelled ? T.ink400 : T.ink900,
                       }}
                     >
                       {po.po_number}
@@ -2316,7 +2460,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                     <div
                       style={{
                         fontSize: "12px",
-                        color: C.muted,
+                        color: T.ink500,
                         marginTop: "2px",
                       }}
                     >
@@ -2335,12 +2479,13 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                       style={{
                         fontSize: "10px",
                         padding: "3px 10px",
-                        borderRadius: "2px",
+                        borderRadius: "3px",
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
                         background: `${sc}18`,
                         color: sc,
                         border: `1px solid ${sc}35`,
+                        fontWeight: 600,
                       }}
                     >
                       {status}
@@ -2354,7 +2499,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                       }}
                       style={{ ...sSelect, width: "130px", fontSize: "10px" }}
                     >
-                      <option value="">⚙ Set status...</option>
+                      <option value="">Set status...</option>
                       {ALL_PO_STATUSES.filter((s) => s.id !== status).map(
                         (s) => (
                           <option key={s.id} value={s.id}>
@@ -2372,7 +2517,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                     marginTop: "10px",
                     flexWrap: "wrap",
                     fontSize: "12px",
-                    color: C.muted,
+                    color: T.ink500,
                   }}
                 >
                   {po.purchase_order_items?.length > 0 && (
@@ -2389,7 +2534,6 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                   )}
                   {po.shipping_mode && (
                     <span>
-                      ✈️{" "}
                       {po.shipping_mode === "supplier_included"
                         ? "Supplier Incl."
                         : po.shipping_mode === "ddp_air"
@@ -2398,7 +2542,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                     </span>
                   )}
                   {po.landed_cost_zar && (
-                    <span style={{ color: C.green, fontWeight: 600 }}>
+                    <span style={{ color: T.success, fontWeight: 600 }}>
                       Landed: R
                       {parseFloat(po.landed_cost_zar).toLocaleString("en-ZA", {
                         minimumFractionDigits: 2,
@@ -2410,7 +2554,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                   <div
                     style={{
                       fontSize: "12px",
-                      color: C.muted,
+                      color: T.ink500,
                       fontStyle: "italic",
                       marginTop: "6px",
                     }}
@@ -2421,12 +2565,12 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
                 <div
                   style={{
                     fontSize: "10px",
-                    color: C.accent,
+                    color: T.accentMid,
                     marginTop: "8px",
                     letterSpacing: "0.04em",
                   }}
                 >
-                  Click to view details &amp; edit →
+                  Click to view details & edit →
                 </div>
               </div>
             );
@@ -2438,9 +2582,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           po={selectedPo}
           items={items}
           onClose={() => setSelectedPo(null)}
-          onStatusChange={(newStatus) =>
-            handleStatusChange(selectedPo, newStatus)
-          }
+          onStatusChange={(ns) => handleStatusChange(selectedPo, ns)}
           onRefresh={onRefresh}
         />
       )}
@@ -2448,7 +2590,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
   );
 }
 
-// ─── PO Detail Modal ─────────────────────────────────────────────────────
+// ─── PO Detail Modal ──────────────────────────────────────────────────────────
 function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2461,7 +2603,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
   });
 
   const status = localPo.po_status || localPo.status || "draft";
-  const sc = PO_STATUS_COLORS[status] || C.muted;
+  const sc = PO_STATUS_COLORS[status] || T.ink500;
   const isCancelled = status === "cancelled";
   const lines = localPo.purchase_order_items || [];
 
@@ -2515,7 +2657,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
     <div
       style={{
         padding: "10px 0",
-        borderBottom: `1px solid ${C.border}`,
+        borderBottom: `1px solid ${T.ink075}`,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "flex-start",
@@ -2524,10 +2666,10 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
       <span
         style={{
           fontSize: "11px",
-          color: C.muted,
+          color: T.ink500,
           textTransform: "uppercase",
           letterSpacing: "0.1em",
-          fontFamily: F.body,
+          fontFamily: T.fontUi,
           flexShrink: 0,
           paddingRight: 16,
         }}
@@ -2538,8 +2680,9 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
         style={{
           fontSize: "13px",
           fontWeight: hl ? 600 : 400,
-          color: hl ? C.green : C.text,
+          color: hl ? T.success : T.ink900,
           textAlign: "right",
+          fontFamily: hl ? T.fontData : T.fontUi,
         }}
       >
         {value || "—"}
@@ -2564,9 +2707,9 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
     >
       <div
         style={{
-          width: "min(680px, 100vw)",
+          width: "min(680px,100vw)",
           height: "100vh",
-          background: C.white,
+          background: "#fff",
           boxShadow: "-4px 0 32px rgba(0,0,0,0.15)",
           display: "flex",
           flexDirection: "column",
@@ -2576,8 +2719,8 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
         <div
           style={{
             padding: "20px 24px",
-            borderBottom: `1px solid ${C.border}`,
-            background: C.cream,
+            borderBottom: `1px solid ${T.ink150}`,
+            background: T.ink050,
             flexShrink: 0,
           }}
         >
@@ -2589,19 +2732,30 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             }}
           >
             <div>
-              <div style={{ ...sLabel }}>Purchase Order — Admin View</div>
               <div
                 style={{
-                  fontFamily: F.heading,
-                  fontSize: "26px",
-                  fontWeight: 400,
-                  color: isCancelled ? C.muted : C.green,
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: "4px",
+                }}
+              >
+                Purchase Order
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontData,
+                  fontSize: "24px",
+                  fontWeight: 600,
+                  color: isCancelled ? T.ink400 : T.accent,
                 }}
               >
                 {localPo.po_number}
               </div>
               <div
-                style={{ fontSize: "12px", color: C.muted, marginTop: "2px" }}
+                style={{ fontSize: "12px", color: T.ink500, marginTop: "2px" }}
               >
                 {localPo.suppliers?.name || "—"}
                 {localPo.suppliers?.country
@@ -2614,7 +2768,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                 style={{
                   fontSize: "11px",
                   padding: "4px 12px",
-                  borderRadius: "2px",
+                  borderRadius: "3px",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   background: `${sc}18`,
@@ -2632,7 +2786,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                   border: "none",
                   fontSize: "20px",
                   cursor: "pointer",
-                  color: C.muted,
+                  color: T.ink400,
                 }}
               >
                 ✕
@@ -2642,18 +2796,25 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
           <div style={{ marginTop: "16px" }}>
             <div
               style={{
-                fontSize: "9px",
-                letterSpacing: "0.2em",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: "8px",
-                fontFamily: F.body,
               }}
             >
-              ⚙ Admin — Set Status
+              Set Status
               {isCancelled && (
-                <span style={{ marginLeft: 8, color: C.red, fontSize: "10px" }}>
-                  (select any status below to un-cancel)
+                <span
+                  style={{
+                    marginLeft: 8,
+                    color: T.danger,
+                    fontSize: "10px",
+                    fontWeight: 400,
+                  }}
+                >
+                  (select any status to un-cancel)
                 </span>
               )}
             </div>
@@ -2665,16 +2826,16 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                   disabled={s.id === status}
                   style={{
                     padding: "5px 12px",
-                    borderRadius: "2px",
-                    border: `1px solid ${s.id === status ? s.color : C.border}`,
-                    background: s.id === status ? `${s.color}18` : C.white,
-                    color: s.id === status ? s.color : C.muted,
+                    borderRadius: "3px",
+                    border: `1px solid ${s.id === status ? s.color : T.ink150}`,
+                    background: s.id === status ? `${s.color}18` : "#fff",
+                    color: s.id === status ? s.color : T.ink500,
                     fontSize: "9px",
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
                     fontWeight: s.id === status ? 700 : 400,
                     cursor: s.id === status ? "default" : "pointer",
-                    fontFamily: F.body,
+                    fontFamily: T.fontUi,
                   }}
                 >
                   {s.id === status ? "✓ " : ""}
@@ -2684,6 +2845,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             </div>
           </div>
         </div>
+
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
           <div style={{ ...sCard, marginBottom: "20px", padding: "0 16px" }}>
             {row("Supplier Invoice Ref", localPo.supplier_invoice_ref)}
@@ -2743,14 +2905,9 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
             {localPo.total_weight_kg &&
               row("Total Weight", `${localPo.total_weight_kg} kg`)}
           </div>
+
           {editing ? (
-            <div
-              style={{
-                ...sCard,
-                marginBottom: "20px",
-                borderLeft: `3px solid ${C.accent}`,
-              }}
-            >
+            <div style={{ ...sCard, marginBottom: "20px" }}>
               <div style={{ ...sLabel, marginBottom: "14px" }}>
                 Edit PO Details
               </div>
@@ -2759,7 +2916,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                   <label
                     style={{
                       fontSize: "11px",
-                      color: C.muted,
+                      color: T.ink500,
                       display: "block",
                       marginBottom: "4px",
                     }}
@@ -2785,7 +2942,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                     <label
                       style={{
                         fontSize: "11px",
-                        color: C.muted,
+                        color: T.ink500,
                         display: "block",
                         marginBottom: "4px",
                       }}
@@ -2808,7 +2965,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                     <label
                       style={{
                         fontSize: "11px",
-                        color: C.muted,
+                        color: T.ink500,
                         display: "block",
                         marginBottom: "4px",
                       }}
@@ -2831,14 +2988,14 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                     <label
                       style={{
                         fontSize: "11px",
-                        color: C.muted,
+                        color: T.ink500,
                         display: "block",
                         marginBottom: "4px",
                       }}
                     >
                       USD/ZAR Override{" "}
-                      <span style={{ fontSize: "9px", color: C.gold }}>
-                        ⚠ affects landed cost
+                      <span style={{ fontSize: "9px", color: T.warning }}>
+                        affects landed cost
                       </span>
                     </label>
                     <input
@@ -2886,23 +3043,24 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                 <div
                   style={{
                     ...sCard,
-                    background: C.cream,
+                    background: T.ink050,
                     fontSize: "13px",
                     fontStyle: "italic",
                     marginBottom: "12px",
                   }}
                 >
-                  📝 {localPo.notes}
+                  {localPo.notes}
                 </div>
               )}
               <button
                 onClick={() => setEditing(true)}
                 style={{ ...sBtn("outline"), fontSize: "9px" }}
               >
-                ✏ Edit Notes / Dates / Invoice Ref / FX Rate
+                Edit Notes / Dates / Invoice Ref / FX Rate
               </button>
             </div>
           )}
+
           {lines.length > 0 && (
             <div>
               <div style={{ ...sLabel, marginBottom: "10px" }}>
@@ -2939,7 +3097,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                         <tr
                           key={line.id || idx}
                           style={{
-                            background: idx % 2 === 0 ? C.white : "#fafaf8",
+                            background: idx % 2 === 0 ? "#fff" : T.ink050,
                           }}
                         >
                           <td style={sTd}>
@@ -2948,24 +3106,37 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                               <div
                                 style={{
                                   fontSize: "10px",
-                                  color: C.muted,
-                                  fontFamily: "monospace",
+                                  color: T.ink500,
+                                  fontFamily: T.fontData,
                                 }}
                               >
                                 {line.supplier_products.sku}
                               </div>
                             )}
                           </td>
-                          <td style={{ ...sTd, textAlign: "right" }}>
+                          <td
+                            style={{
+                              ...sTd,
+                              textAlign: "right",
+                              fontFamily: T.fontData,
+                            }}
+                          >
                             {line.quantity_ordered}
                           </td>
-                          <td style={{ ...sTd, textAlign: "right" }}>
+                          <td
+                            style={{
+                              ...sTd,
+                              textAlign: "right",
+                              fontFamily: T.fontData,
+                            }}
+                          >
                             ${unitPrice.toFixed(4)}
                           </td>
                           <td
                             style={{
                               ...sTd,
                               textAlign: "right",
+                              fontFamily: T.fontData,
                               fontWeight: 500,
                             }}
                           >
@@ -2975,9 +3146,10 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                             style={{
                               ...sTd,
                               textAlign: "right",
+                              fontFamily: T.fontData,
                               color: line.landed_cost_per_unit_zar
-                                ? C.green
-                                : C.muted,
+                                ? T.success
+                                : T.ink400,
                               fontWeight: line.landed_cost_per_unit_zar
                                 ? 600
                                 : 400,
@@ -2993,22 +3165,26 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                                 style={{
                                   fontSize: "10px",
                                   padding: "2px 6px",
-                                  background: "#d4edda",
-                                  color: C.green,
+                                  background: T.successBg,
+                                  color: T.success,
+                                  borderRadius: "3px",
+                                  fontWeight: 600,
                                 }}
                               >
-                                ✓ linked
+                                linked
                               </span>
                             ) : (
                               <span
                                 style={{
                                   fontSize: "10px",
                                   padding: "2px 6px",
-                                  background: "#fff3e0",
-                                  color: "#E65100",
+                                  background: T.warningBg,
+                                  color: T.warning,
+                                  borderRadius: "3px",
+                                  fontWeight: 600,
                                 }}
                               >
-                                ⚠ none
+                                none
                               </span>
                             )}
                           </td>
@@ -3017,7 +3193,7 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr style={{ background: C.cream }}>
+                    <tr style={{ background: T.ink075 }}>
                       <td
                         colSpan={3}
                         style={{
@@ -3030,7 +3206,12 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
                         Subtotal (EXW):
                       </td>
                       <td
-                        style={{ ...sTd, fontWeight: 700, textAlign: "right" }}
+                        style={{
+                          ...sTd,
+                          fontFamily: T.fontData,
+                          fontWeight: 700,
+                          textAlign: "right",
+                        }}
                       >
                         ${parseFloat(localPo.subtotal || 0).toFixed(2)}
                       </td>
@@ -3044,25 +3225,26 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
           <div
             style={{
               marginTop: "20px",
-              background: "#f0f4ff",
-              border: "1px solid #c5cae9",
-              borderRadius: "2px",
+              background: T.infoBg,
+              border: `1px solid ${T.infoBd}`,
+              borderRadius: "6px",
               padding: "14px 16px",
               fontSize: "12px",
-              color: "#3949AB",
-              fontFamily: F.body,
+              color: T.info,
+              fontFamily: T.fontUi,
             }}
           >
-            💡 <strong>Shipping &amp; landed cost</strong> is managed in{" "}
-            <strong>HQ → Procurement</strong>. Use the "Edit Shipping" button
+            Shipping & landed cost is managed in{" "}
+            <strong>HQ → Procurement</strong>. Use the Edit Shipping button
             there to set weight, freight mode, and update per-item costs.
           </div>
         </div>
+
         <div
           style={{
             padding: "14px 24px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.cream,
+            borderTop: `1px solid ${T.ink150}`,
+            background: T.ink050,
             flexShrink: 0,
             display: "flex",
             justifyContent: "flex-end",
@@ -3077,14 +3259,12 @@ function PODetailModal({ po, items, onClose, onStatusChange, onRefresh }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SUPPLIERS
-// ═══════════════════════════════════════════════════════════════════════════
+// ─── Suppliers ────────────────────────────────────────────────────────────────
 function SuppliersView({ suppliers, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editSupplier, setEditSupplier] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
+  const EMPTY = {
     name: "",
     contact_name: "",
     email: "",
@@ -3092,8 +3272,10 @@ function SuppliersView({ suppliers, onRefresh }) {
     country: "",
     website: "",
     notes: "",
-  });
+  };
+  const [form, setForm] = useState(EMPTY);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
   const openEdit = (s) => {
     setEditSupplier(s);
     setForm({
@@ -3107,6 +3289,7 @@ function SuppliersView({ suppliers, onRefresh }) {
     });
     setShowForm(true);
   };
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       alert("Supplier name is required.");
@@ -3131,15 +3314,7 @@ function SuppliersView({ suppliers, onRefresh }) {
       }
       setShowForm(false);
       setEditSupplier(null);
-      setForm({
-        name: "",
-        contact_name: "",
-        email: "",
-        phone: "",
-        country: "",
-        website: "",
-        notes: "",
-      });
+      setForm(EMPTY);
       onRefresh();
     } catch (err) {
       alert("Error: " + err.message);
@@ -3147,6 +3322,7 @@ function SuppliersView({ suppliers, onRefresh }) {
       setSaving(false);
     }
   };
+
   return (
     <div>
       <div
@@ -3157,21 +3333,13 @@ function SuppliersView({ suppliers, onRefresh }) {
           marginBottom: "20px",
         }}
       >
-        <div style={{ fontSize: "11px", color: C.muted }}>
+        <div style={{ fontSize: "11px", color: T.ink500 }}>
           {suppliers.filter((s) => s.is_active).length} active suppliers
         </div>
         <button
           onClick={() => {
             setEditSupplier(null);
-            setForm({
-              name: "",
-              contact_name: "",
-              email: "",
-              phone: "",
-              country: "",
-              website: "",
-              notes: "",
-            });
+            setForm(EMPTY);
             setShowForm(!showForm);
           }}
           style={sBtn()}
@@ -3180,13 +3348,7 @@ function SuppliersView({ suppliers, onRefresh }) {
         </button>
       </div>
       {showForm && (
-        <div
-          style={{
-            ...sCard,
-            marginBottom: "20px",
-            borderLeft: `3px solid ${C.accent}`,
-          }}
-        >
+        <div style={{ ...sCard, marginBottom: "20px" }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             {editSupplier ? "Edit Supplier" : "Add New Supplier"}
           </div>
@@ -3197,115 +3359,39 @@ function SuppliersView({ suppliers, onRefresh }) {
               gap: "12px",
             }}
           >
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Company Name *
-              </label>
-              <input
-                style={sInput}
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Contact Person
-              </label>
-              <input
-                style={sInput}
-                value={form.contact_name}
-                onChange={(e) => set("contact_name", e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Email
-              </label>
-              <input
-                style={sInput}
-                type="email"
-                value={form.email}
-                onChange={(e) => set("email", e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Phone
-              </label>
-              <input
-                style={sInput}
-                value={form.phone}
-                onChange={(e) => set("phone", e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Country
-              </label>
-              <input
-                style={sInput}
-                value={form.country}
-                onChange={(e) => set("country", e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: "11px",
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
-                Website
-              </label>
-              <input
-                style={sInput}
-                value={form.website}
-                onChange={(e) => set("website", e.target.value)}
-              />
-            </div>
+            {[
+              { k: "name", label: "Company Name *" },
+              { k: "contact_name", label: "Contact Person" },
+              { k: "email", label: "Email", type: "email" },
+              { k: "phone", label: "Phone" },
+              { k: "country", label: "Country" },
+              { k: "website", label: "Website" },
+            ].map((f) => (
+              <div key={f.k}>
+                <label
+                  style={{
+                    fontSize: "11px",
+                    color: T.ink500,
+                    display: "block",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {f.label}
+                </label>
+                <input
+                  style={sInput}
+                  type={f.type || "text"}
+                  value={form[f.k]}
+                  onChange={(e) => set(f.k, e.target.value)}
+                />
+              </div>
+            ))}
           </div>
           <div style={{ marginTop: "12px" }}>
             <label
               style={{
                 fontSize: "11px",
-                color: C.muted,
+                color: T.ink500,
                 display: "block",
                 marginBottom: "4px",
               }}
@@ -3344,7 +3430,7 @@ function SuppliersView({ suppliers, onRefresh }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))",
           gap: "16px",
         }}
       >
@@ -3362,10 +3448,10 @@ function SuppliersView({ suppliers, onRefresh }) {
                 <div>
                   <div
                     style={{
-                      fontSize: "16px",
+                      fontFamily: T.fontUi,
+                      fontSize: "15px",
                       fontWeight: 600,
-                      fontFamily: F.heading,
-                      color: C.text,
+                      color: T.ink900,
                     }}
                   >
                     {s.name}
@@ -3374,7 +3460,7 @@ function SuppliersView({ suppliers, onRefresh }) {
                     <div
                       style={{
                         fontSize: "12px",
-                        color: C.muted,
+                        color: T.ink500,
                         marginTop: "2px",
                       }}
                     >
@@ -3394,21 +3480,28 @@ function SuppliersView({ suppliers, onRefresh }) {
                 </button>
               </div>
               <div
-                style={{ marginTop: "12px", fontSize: "12px", color: C.muted }}
+                style={{
+                  marginTop: "12px",
+                  fontSize: "12px",
+                  color: T.ink500,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "2px",
+                }}
               >
-                {s.country && <div>📍 {s.country}</div>}
-                {s.email && <div>✉ {s.email}</div>}
-                {s.phone && <div>📞 {s.phone}</div>}
-                {s.website && <div>🌐 {s.website}</div>}
+                {s.country && <div>{s.country}</div>}
+                {s.email && <div>{s.email}</div>}
+                {s.phone && <div>{s.phone}</div>}
+                {s.website && <div>{s.website}</div>}
               </div>
               {s.notes && (
                 <div
                   style={{
                     marginTop: "8px",
                     fontSize: "12px",
-                    color: C.muted,
+                    color: T.ink500,
                     fontStyle: "italic",
-                    borderTop: `1px solid ${C.border}`,
+                    borderTop: `1px solid ${T.ink150}`,
                     paddingTop: "8px",
                   }}
                 >

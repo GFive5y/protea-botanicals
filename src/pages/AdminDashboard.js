@@ -1,24 +1,19 @@
-// AdminDashboard.js v4.9
+// AdminDashboard.js v5.0
 // Protea Botanicals — March 2026
+// ★ v5.0: WP-NAV Sub-B
+//   - useLocation + useEffect: reads ?tab= query param → syncs tab state
+//   - Green header banner removed — sidebar provides context
+//   - Horizontal tab bar removed — sidebar handles all tab routing
+//   - TabBtn component retained (used internally by quick actions)
 // ★ v4.9: WP-HR-2 — HR tab added (AdminHRPanel)
-//   - Import AdminHRPanel
-//   - Added '🧑‍💼 HR' TabBtn to tab bar
-//   - Added render case: tab === 'hr'
 // ★ v4.8: WP-X System Intelligence Layer
-//   - SystemStatusBar added below header (live counts + pending setup checklist)
-//   - Overview tab overhauled: 3-row tile grid (Today · Action Required · Platform Health)
-//   - WorkflowGuide added to Overview tab (contextual onboarding)
-//   - New live counts: scansToday, newCustomers, pointsToday, fraudAlerts
 // ★ v4.7: WP-U Unified Comms Centre
-//   - New "comms" tab replaces separate "messages" and "support" tabs
-//   - AdminCommsCenter.js handles customer_messages + support_tickets + wholesale_messages
-//   - commsBadge = unread inbound messages + open tickets combined
-//   - AdminSupportPanel + AdminMessages imports removed
 // ★ v4.6: WP-R Phase 6 — realtime KPI strip (qr_codes table)
 // ★ v4.5: WP-S Batch QR Chain
 // ★ v4.4: BUG-002 fix — Overview KPIs rewired to qr_codes table
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "../components/WorkflowGuide";
 import SystemStatusBar from "../components/SystemStatusBar";
@@ -133,45 +128,6 @@ function StatCard({ label, value, sub, color = C.green, icon, onClick }) {
   );
 }
 
-function TabBtn({ active, label, badge, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        ...makeBtn(
-          active ? C.green : "transparent",
-          active ? C.white : C.green,
-        ),
-        borderBottom: active
-          ? `3px solid ${C.accent}`
-          : "3px solid transparent",
-        borderRadius: 0,
-        padding: "12px 20px",
-        position: "relative",
-      }}
-    >
-      {label}
-      {badge > 0 && (
-        <span
-          style={{
-            display: "inline-block",
-            background: C.red,
-            color: C.white,
-            borderRadius: 10,
-            fontSize: 9,
-            fontWeight: 700,
-            padding: "1px 5px",
-            marginLeft: 6,
-            verticalAlign: "middle",
-          }}
-        >
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -202,21 +158,29 @@ export default function AdminDashboard() {
     avgTimeToClaim: null,
     userCount: 0,
   });
-  // v4.8: additional live stats for overview
   const [scansToday, setScansToday] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
   const [pointsToday, setPointsToday] = useState(0);
   const [fraudAlerts, setFraudAlerts] = useState(0);
-
-  // v4.9: tenantId needed for AdminHRPanel
   const [tenantId, setTenantId] = useState(null);
+
+  // ★ v5.0: sync ?tab= query param from sidebar navigation
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const t = params.get("tab");
+    if (t) {
+      setTab(t);
+    } else if (location.pathname === "/admin" && !location.search) {
+      setTab("overview");
+    }
+  }, [location.search, location.pathname]);
 
   const fetchUsers = useCallback(async () => {
     const { data } = await supabase.from("user_profiles").select("*");
     setUsers(data || []);
   }, []);
 
-  // v4.9: fetch current user's tenant_id for HR module
   const fetchTenantId = useCallback(async () => {
     try {
       const {
@@ -232,7 +196,6 @@ export default function AdminDashboard() {
     } catch (_) {}
   }, []);
 
-  // v4.7: combined comms badge = unread inbound messages + open tickets
   const fetchCommsBadge = useCallback(async () => {
     try {
       const [msgRes, tickRes] = await Promise.all([
@@ -320,7 +283,6 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // v4.8: fetch today's live counts
   const fetchTodayStats = useCallback(async () => {
     try {
       const todayStart = new Date();
@@ -368,7 +330,6 @@ export default function AdminDashboard() {
     fetchTenantId,
   ]);
 
-  // Realtime: customer_messages → refresh comms badge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-msgs")
@@ -391,7 +352,6 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchCommsBadge]);
 
-  // Realtime: support_tickets → refresh comms badge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-tickets")
@@ -404,7 +364,6 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchCommsBadge]);
 
-  // Realtime: qr_codes → refresh KPI strip
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-kpi")
@@ -428,31 +387,15 @@ export default function AdminDashboard() {
 
   return (
     <div style={{ fontFamily: FONTS.body }}>
-      {/* Header */}
-      <div
-        style={{
-          background: C.green,
-          padding: "20px 32px",
-          borderRadius: "2px",
-          marginBottom: 0,
-        }}
-      >
-        <span
-          style={{
-            color: C.accent,
-            fontSize: "11px",
-            letterSpacing: "0.3em",
-            textTransform: "uppercase",
-          }}
-        >
-          Protea Botanicals
-        </span>
+      {/* ★ v5.0: Simplified header — sidebar provides tier/role context */}
+      <div style={{ marginBottom: 0 }}>
         <h1
           style={{
-            color: C.white,
             fontFamily: FONTS.heading,
             fontSize: "24px",
-            margin: "4px 0 0",
+            fontWeight: 300,
+            color: C.green,
+            margin: "0 0 4px",
           }}
         >
           Admin Dashboard
@@ -462,93 +405,8 @@ export default function AdminDashboard() {
       {/* System Status Bar — WP-X */}
       <SystemStatusBar />
 
-      {/* Tab Bar */}
-      <div
-        style={{
-          background: C.white,
-          borderBottom: `1px solid ${C.border}`,
-          display: "flex",
-          gap: 0,
-          overflowX: "auto",
-          marginBottom: "24px",
-          borderRadius: "2px",
-          marginTop: "12px",
-        }}
-      >
-        <TabBtn
-          active={tab === "overview"}
-          label="Overview"
-          onClick={() => setTab("overview")}
-        />
-        <TabBtn
-          active={tab === "batches"}
-          label="Batches"
-          onClick={() => setTab("batches")}
-        />
-        <TabBtn
-          active={tab === "shipments"}
-          label="Shipments"
-          onClick={() => setTab("shipments")}
-        />
-        <TabBtn
-          active={tab === "qr_codes"}
-          label="QR Codes"
-          onClick={() => {
-            setQrInitialBatchId(null);
-            setTab("qr_codes");
-          }}
-        />
-        <TabBtn
-          active={tab === "users"}
-          label="Users"
-          onClick={() => setTab("users")}
-        />
-        <TabBtn
-          active={tab === "customers"}
-          label="Customers"
-          onClick={() => setTab("customers")}
-        />
-        <TabBtn
-          active={tab === "comms"}
-          label="💬 Comms"
-          badge={commsBadge}
-          onClick={() => setTab("comms")}
-        />
-        <TabBtn
-          active={tab === "security"}
-          label="Security"
-          onClick={() => setTab("security")}
-        />
-        <TabBtn
-          active={tab === "notifications"}
-          label="Notifications"
-          onClick={() => setTab("notifications")}
-        />
-        <TabBtn
-          active={tab === "analytics"}
-          label="Analytics"
-          onClick={() => setTab("analytics")}
-        />
-        <TabBtn
-          active={tab === "stock"}
-          label="Stock"
-          onClick={() => setTab("stock")}
-        />
-        <TabBtn
-          active={tab === "documents"}
-          label="📄 Documents"
-          onClick={() => {
-            setDocumentsTargetId(null);
-            setTab("documents");
-          }}
-        />
-        {/* v4.9: HR tab */}
-        <TabBtn
-          active={tab === "hr"}
-          label="🧑‍💼 HR"
-          onClick={() => setTab("hr")}
-        />
-      </div>
+      {/* ★ v5.0: Tab bar removed — sidebar handles all tab routing */}
+      <div style={{ marginBottom: "20px" }} />
 
       {error && (
         <div
@@ -584,7 +442,6 @@ export default function AdminDashboard() {
       ═══════════════════════════════════════════════════════ */}
       {tab === "overview" && (
         <div>
-          {/* Workflow Guide */}
           <WorkflowGuide
             title="Admin Dashboard"
             description="Day-to-day operations for your shop. Check the Comms badge first — reply to customers and close tickets. Then review batches, QR codes, and fraud alerts."
@@ -670,7 +527,7 @@ export default function AdminDashboard() {
             defaultOpen={false}
           />
 
-          {/* ── ROW 1: Today's Activity ── */}
+          {/* ROW 1: Today's Activity */}
           <div
             style={{
               fontSize: 10,
@@ -718,7 +575,7 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* ── ROW 2: Action Required ── */}
+          {/* ROW 2: Action Required */}
           <div
             style={{
               fontSize: 10,
@@ -771,7 +628,7 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* ── ROW 3: Platform Health ── */}
+          {/* ROW 3: Platform Health */}
           <div
             style={{
               fontSize: 10,
@@ -822,7 +679,7 @@ export default function AdminDashboard() {
             />
           </div>
 
-          {/* ── Quick Actions ── */}
+          {/* Quick Actions */}
           <h3
             style={{
               fontFamily: FONTS.heading,
@@ -836,7 +693,7 @@ export default function AdminDashboard() {
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button
               onClick={() => setTab("comms")}
-              style={{ ...makeBtn(commsBadge > 0 ? C.red : C.mid) }}
+              style={makeBtn(commsBadge > 0 ? C.red : C.mid)}
             >
               💬 COMMS {commsBadge > 0 ? `(${commsBadge})` : ""}
             </button>
@@ -869,7 +726,7 @@ export default function AdminDashboard() {
             </button>
             <button
               onClick={() => setTab("security")}
-              style={{ ...makeBtn(fraudAlerts > 0 ? C.red : C.mid) }}
+              style={makeBtn(fraudAlerts > 0 ? C.red : C.mid)}
             >
               🛡️ FRAUD {fraudAlerts > 0 ? `(${fraudAlerts})` : ""}
             </button>
@@ -909,7 +766,6 @@ export default function AdminDashboard() {
         />
       )}
       {tab === "customers" && <AdminCustomerEngagement />}
-      {/* v4.7: Unified Comms Centre — customer_messages + support_tickets + wholesale */}
       {tab === "comms" && <AdminCommsCenter />}
       {tab === "security" && <AdminFraudSecurity />}
       {tab === "notifications" && <AdminNotifications />}
@@ -922,7 +778,6 @@ export default function AdminDashboard() {
       {tab === "analytics" && <AdminAnalytics />}
       {tab === "stock" && <StockControl />}
       {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
-      {/* v4.9: HR Module */}
       {tab === "hr" && <AdminHRPanel tenantId={tenantId} />}
 
       {/* USERS */}
