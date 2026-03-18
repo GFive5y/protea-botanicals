@@ -42,8 +42,8 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
-  fontData: "'DM Mono','Courier New',monospace",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -1104,7 +1104,7 @@ export default function HQProduction() {
           gap: 0,
           borderBottom: `1px solid ${T.ink150}`,
           marginBottom: "24px",
-          overflowX: "auto",
+          flexWrap: "nowrap",
         }}
       >
         {SUB_TABS.map((t) => (
@@ -2811,15 +2811,13 @@ function NewRunPanel({ items, onComplete }) {
         if (niErr) throw niErr;
         finId = ni.id;
       }
-      await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: finId,
-          quantity: finalActual,
-          movement_type: "production_in",
-          reference: runNumber,
-          notes: `Batch ${runNumber}: ${finishedName}`,
-        });
+      await supabase.from("stock_movements").insert({
+        item_id: finId,
+        quantity: finalActual,
+        movement_type: "production_in",
+        reference: runNumber,
+        notes: `Batch ${runNumber}: ${finishedName}`,
+      });
       const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
       await supabase
         .from("inventory_items")
@@ -3501,15 +3499,13 @@ function HistoryPanel({ runs, onRefresh }) {
         if (mvs?.length > 0) {
           for (const mv of mvs) {
             const rev = -mv.quantity;
-            await supabase
-              .from("stock_movements")
-              .insert({
-                item_id: mv.item_id,
-                quantity: rev,
-                movement_type: "adjustment",
-                reference: `VOID-${run.run_number}`,
-                notes: `Reversal: deleted run ${run.run_number}`,
-              });
+            await supabase.from("stock_movements").insert({
+              item_id: mv.item_id,
+              quantity: rev,
+              movement_type: "adjustment",
+              reference: `VOID-${run.run_number}`,
+              notes: `Reversal: deleted run ${run.run_number}`,
+            });
             const { data: item } = await supabase
               .from("inventory_items")
               .select("quantity_on_hand")
@@ -4135,15 +4131,13 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
         form.channel === "wholesale" && partner ? partner.name : form.channel;
-      await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: form.item_id,
-          quantity: -qty,
-          movement_type: "sale_out",
-          reference: ref,
-          notes: form.notes || `Allocated to ${ref}`,
-        });
+      await supabase.from("stock_movements").insert({
+        item_id: form.item_id,
+        quantity: -qty,
+        movement_type: "sale_out",
+        reference: ref,
+        notes: form.notes || `Allocated to ${ref}`,
+      });
       const newQty = available - qty;
       await supabase
         .from("inventory_items")
