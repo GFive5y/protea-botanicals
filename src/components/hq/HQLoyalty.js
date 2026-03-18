@@ -42,8 +42,8 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
-  fontData: "'DM Mono','Courier New',monospace",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -2899,7 +2899,12 @@ export default function HQLoyalty() {
 
   return (
     <div
-      style={{ fontFamily: T.fontUi, background: T.ink050, minHeight: "100%" }}
+      style={{
+        fontFamily: T.fontUi,
+        background: T.ink050,
+        minHeight: "100%",
+        scrollbarGutter: "stable",
+      }}
     >
       <WorkflowGuide
         context={ctx}
@@ -3048,7 +3053,7 @@ export default function HQLoyalty() {
       </div>
 
       {/* Tab content */}
-      <div style={{ padding: "24px 28px", maxWidth: 960 }}>
+      <div style={{ display: "flex", gap: 0 }}>
         {activeTab === 0 && (
           <TabSchema
             config={config}
