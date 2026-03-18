@@ -14,9 +14,23 @@
 // v3.4–v3.1: See changelog above
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  BarChart,
+  Bar,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "../viz";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -46,6 +60,7 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -1054,6 +1069,215 @@ export default function HQPricing() {
               </table>
             </div>
           </div>
+
+          {/* ── CHARTS: Margin by channel + Price vs Margin scatter ── */}
+          {summaryRows.length > 0 &&
+            (() => {
+              // HBar: avg margin per channel across all priced SKUs
+              const channelMargins = CHANNELS.map((ch) => {
+                const priced = summaryRows
+                  .map((r) => r.channels.find((c) => c.id === ch.id))
+                  .filter((c) => c?.margin !== null && c?.margin !== undefined);
+                const avg =
+                  priced.length > 0
+                    ? priced.reduce((s, c) => s + c.margin, 0) / priced.length
+                    : null;
+                return { channel: ch.label, avg, count: priced.length };
+              }).filter((c) => c.avg !== null);
+
+              // Scatter: each priced SKU/channel combo → sell price vs margin
+              const scatterData = [];
+              summaryRows.forEach((r) => {
+                r.channels.forEach((ch) => {
+                  if (ch.sell && ch.margin !== null) {
+                    scatterData.push({
+                      name: `${r.name} (${ch.id})`,
+                      sell: Math.round(ch.sell),
+                      margin: parseFloat(ch.margin.toFixed(1)),
+                      channel: ch.id,
+                    });
+                  }
+                });
+              });
+              const SCATTER_COLOURS = {
+                wholesale: T.info,
+                retail: T.accentMid,
+                website: "#52B788",
+              };
+
+              if (channelMargins.length === 0 && scatterData.length === 0)
+                return null;
+              return (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      scatterData.length > 1 ? "1fr 1fr" : "1fr",
+                    gap: 20,
+                    marginBottom: 24,
+                  }}
+                >
+                  {channelMargins.length > 0 && (
+                    <ChartCard title="Avg Margin by Channel" height={220}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={channelMargins}
+                          layout="vertical"
+                          margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
+                        >
+                          <CartesianGrid
+                            horizontal={false}
+                            vertical
+                            stroke={T.ink150}
+                            strokeWidth={0.5}
+                          />
+                          <XAxis
+                            type="number"
+                            domain={[0, 100]}
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 10,
+                              fontFamily: T.font,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(v) => `${v}%`}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="channel"
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 11,
+                              fontFamily: T.font,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={72}
+                          />
+                          <Tooltip
+                            content={
+                              <ChartTooltip
+                                formatter={(v) =>
+                                  `${parseFloat(v).toFixed(1)}%`
+                                }
+                              />
+                            }
+                          />
+                          <ReferenceLine
+                            x={35}
+                            stroke={T.success}
+                            strokeDasharray="4 3"
+                            strokeWidth={1}
+                          />
+                          <ReferenceLine
+                            x={20}
+                            stroke={T.warning}
+                            strokeDasharray="4 3"
+                            strokeWidth={1}
+                          />
+                          <Bar
+                            dataKey="avg"
+                            name="Avg Margin"
+                            isAnimationActive={false}
+                            maxBarSize={28}
+                            radius={[0, 3, 3, 0]}
+                          >
+                            {channelMargins.map((d, i) => (
+                              <Cell
+                                key={i}
+                                fill={
+                                  d.avg >= 35
+                                    ? T.success
+                                    : d.avg >= 20
+                                      ? T.warning
+                                      : T.danger
+                                }
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  )}
+
+                  {scatterData.length > 1 && (
+                    <ChartCard title="Price vs Margin (all SKUs)" height={220}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart
+                          margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                        >
+                          <CartesianGrid stroke={T.ink150} strokeWidth={0.5} />
+                          <XAxis
+                            type="number"
+                            dataKey="sell"
+                            name="Sell Price"
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 10,
+                              fontFamily: T.font,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(v) => `R${v}`}
+                            label={{
+                              value: "Sell Price",
+                              position: "insideBottom",
+                              offset: -4,
+                              fontSize: 9,
+                              fill: T.ink400,
+                            }}
+                          />
+                          <YAxis
+                            type="number"
+                            dataKey="margin"
+                            name="Margin %"
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 10,
+                              fontFamily: T.font,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={36}
+                            tickFormatter={(v) => `${v}%`}
+                          />
+                          <Tooltip
+                            content={
+                              <ChartTooltip
+                                formatter={(v, n) =>
+                                  n === "Margin %" ? `${v}%` : `R${v}`
+                                }
+                              />
+                            }
+                          />
+                          <ReferenceLine
+                            y={35}
+                            stroke={T.success}
+                            strokeDasharray="4 3"
+                            strokeWidth={1}
+                          />
+                          <ReferenceLine
+                            y={20}
+                            stroke={T.warning}
+                            strokeDasharray="4 3"
+                            strokeWidth={1}
+                          />
+                          <Scatter data={scatterData} isAnimationActive={false}>
+                            {scatterData.map((d, i) => (
+                              <Cell
+                                key={i}
+                                fill={SCATTER_COLOURS[d.channel] || T.accentMid}
+                              />
+                            ))}
+                          </Scatter>
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  )}
+                </div>
+              );
+            })()}
 
           {/* Selected SKU detail */}
           <div ref={detailRef} />
