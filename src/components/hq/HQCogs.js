@@ -14,10 +14,24 @@
 // v3.7-v3.0: See changelog above
 
 import { useState, useEffect, useCallback } from "react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 import { supabase } from "../../services/supabaseClient";
+import { ChartCard, ChartTooltip } from "../viz";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -47,6 +61,7 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -1659,6 +1674,165 @@ export default function HQCogs() {
               labour). Set them in the <strong>Local Inputs</strong> tab.
             </div>
           )}
+          {/* ── CHARTS: SKU COGS comparison + cost composition ── */}
+          {!loading &&
+            recipes.length > 0 &&
+            (() => {
+              const allBreakdowns = recipes
+                .map((r) => ({
+                  name:
+                    r.product_name.length > 18
+                      ? r.product_name.slice(0, 16) + "…"
+                      : r.product_name,
+                  fullName: r.product_name,
+                  ...calcCogs(r, supplierProducts, localInputs, usdZar),
+                }))
+                .filter((b) => b.total > 0);
+
+              // Aggregate cost composition across all SKUs
+              const totals = {
+                hardware: 0,
+                terpene: 0,
+                distillate: 0,
+                packaging: 0,
+                labour: 0,
+                lab: 0,
+                transport: 0,
+                misc: 0,
+              };
+              allBreakdowns.forEach((b) => {
+                Object.keys(totals).forEach((k) => {
+                  totals[k] += b[k] || 0;
+                });
+              });
+              const grandTotal = Object.values(totals).reduce(
+                (s, v) => s + v,
+                0,
+              );
+              const donutData = Object.entries(totals)
+                .filter(([, v]) => v > 0)
+                .map(([key, value]) => ({
+                  name: key.charAt(0).toUpperCase() + key.slice(1),
+                  value: Math.round(value),
+                  color: CATEGORY_COLOURS[key]?.color || T.ink400,
+                }));
+
+              if (allBreakdowns.length === 0) return null;
+              return (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      allBreakdowns.length > 1 ? "1.4fr 1fr" : "1fr",
+                    gap: 20,
+                    marginBottom: 24,
+                  }}
+                >
+                  <ChartCard title="COGS per SKU" height={220}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={allBreakdowns}
+                        margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                      >
+                        <CartesianGrid
+                          horizontal
+                          vertical={false}
+                          stroke={T.ink150}
+                          strokeWidth={0.5}
+                        />
+                        <XAxis
+                          dataKey="name"
+                          tick={{
+                            fill: T.ink400,
+                            fontSize: 10,
+                            fontFamily: T.font,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          dy={6}
+                        />
+                        <YAxis
+                          tick={{
+                            fill: T.ink400,
+                            fontSize: 10,
+                            fontFamily: T.font,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={48}
+                          tickFormatter={(v) => `R${v.toFixed(0)}`}
+                        />
+                        <Tooltip
+                          content={
+                            <ChartTooltip
+                              formatter={(v) => `R${parseFloat(v).toFixed(2)}`}
+                            />
+                          }
+                        />
+                        <Bar
+                          dataKey="total"
+                          name="COGS/unit"
+                          fill={T.accentMid}
+                          isAnimationActive={false}
+                          maxBarSize={40}
+                          radius={[3, 3, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  {donutData.length > 1 && (
+                    <ChartCard title="Cost Composition (all SKUs)" height={220}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={donutData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={52}
+                            outerRadius={78}
+                            dataKey="value"
+                            paddingAngle={3}
+                            isAnimationActive={false}
+                          >
+                            {donutData.map((d, i) => (
+                              <Cell key={i} fill={d.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={
+                              <ChartTooltip
+                                formatter={(v) =>
+                                  grandTotal > 0
+                                    ? `R${v.toLocaleString("en-ZA")} (${((v / grandTotal) * 100).toFixed(1)}%)`
+                                    : `R${v}`
+                                }
+                              />
+                            }
+                          />
+                          <Legend
+                            iconSize={8}
+                            iconType="square"
+                            formatter={(v) => (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: T.ink500,
+                                  fontFamily: T.font,
+                                }}
+                              >
+                                {v}
+                              </span>
+                            )}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  )}
+                </div>
+              );
+            })()}
+
           {loading ? (
             <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
               Loading COGS data…
