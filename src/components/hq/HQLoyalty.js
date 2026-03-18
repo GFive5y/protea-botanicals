@@ -12,10 +12,24 @@
 // v2.0: Schema Selector + Live Config
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
+import { ChartCard, ChartTooltip } from "../viz";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const T = {
@@ -44,6 +58,8 @@ const T = {
   accentBd: "#A7D9B8",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  ink400: "#888888",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -1594,6 +1610,209 @@ function TabEconomics({ draft, setDraft, liveStats }) {
           />
         </PreviewBox>
       </SectionCard>
+      {/* ── CHARTS: Points trend + Tier distribution ── */}
+      {liveStats &&
+        (() => {
+          // We need per-day data — fetch it from transactions passed in
+          // Use liveStats totals to build a simple donut + summary area
+          const totalIssued = liveStats.totalPtsIssued || 0;
+          const totalRedeemed = liveStats.totalPtsRedeemed || 0;
+          const outstanding = Math.max(0, totalIssued - totalRedeemed);
+          const donutData = [
+            { name: "Redeemed", value: totalRedeemed },
+            { name: "Outstanding", value: outstanding },
+          ].filter((d) => d.value > 0);
+          const DONUT_COLOURS = [T.accentMid, T.info];
+
+          // Period bars using 30d vs all-time
+          const barData = [
+            {
+              period: "All Time",
+              issued: totalIssued,
+              redeemed: totalRedeemed,
+            },
+            {
+              period: "30 Days",
+              issued: liveStats.totalPtsIssued30d || 0,
+              redeemed: liveStats.totalPtsRedeemed30d || 0,
+            },
+          ];
+
+          if (totalIssued === 0) return null;
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.2fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <ChartCard title="Points Issued vs Redeemed" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={barData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="loy-iss-grad"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={T.accentMid}
+                          stopOpacity={0.2}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={T.accentMid}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="loy-red-grad"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={T.info}
+                          stopOpacity={0.15}
+                        />
+                        <stop offset="95%" stopColor={T.info} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="period"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={40}
+                      tickFormatter={(v) =>
+                        v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+                      }
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          formatter={(v) => `${v.toLocaleString()} pts`}
+                        />
+                      }
+                    />
+                    <Legend
+                      iconSize={8}
+                      iconType="square"
+                      formatter={(v) => (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: T.ink500,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {v}
+                        </span>
+                      )}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="issued"
+                      name="Issued"
+                      stroke={T.accentMid}
+                      strokeWidth={2}
+                      fill="url(#loy-iss-grad)"
+                      dot={{ r: 4, fill: T.accentMid }}
+                      isAnimationActive={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="redeemed"
+                      name="Redeemed"
+                      stroke={T.info}
+                      strokeWidth={2}
+                      fill="url(#loy-red-grad)"
+                      dot={{ r: 4, fill: T.info }}
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Points Balance" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={76}
+                      dataKey="value"
+                      paddingAngle={4}
+                      isAnimationActive={false}
+                    >
+                      {donutData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={DONUT_COLOURS[i % DONUT_COLOURS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          formatter={(v) => `${v.toLocaleString()} pts`}
+                        />
+                      }
+                    />
+                    <Legend
+                      iconSize={8}
+                      iconType="square"
+                      formatter={(v) => (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: T.ink500,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {v}
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          );
+        })()}
+
       <SectionCard title="Programme Cost Dashboard" accent={T.accentMid}>
         {liveStats ? (
           <div
