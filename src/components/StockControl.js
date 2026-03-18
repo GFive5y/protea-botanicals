@@ -1,5 +1,5 @@
-// src/components/StockControl.js v2.0
-// WP-THEME: Unified design system applied
+// src/components/StockControl.js v2.1 — WP-THEME-2: Inter font
+// v2.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all metric/numeric values
 //   - StatCard: coloured top borders removed — semantic colour on value only
@@ -40,8 +40,8 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
-  fontData: "'DM Mono','Courier New',monospace",
+  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
+  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
@@ -1807,15 +1807,13 @@ function MovementsView({ movements, items, onRefresh }) {
         form.movement_type,
       );
       const finalQty = isOut ? -Math.abs(qty) : Math.abs(qty);
-      const { error: mE } = await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: form.item_id,
-          quantity: finalQty,
-          movement_type: form.movement_type,
-          reference: form.reference || null,
-          notes: form.notes || null,
-        });
+      const { error: mE } = await supabase.from("stock_movements").insert({
+        item_id: form.item_id,
+        quantity: finalQty,
+        movement_type: form.movement_type,
+        reference: form.reference || null,
+        notes: form.notes || null,
+      });
       if (mE) throw mE;
       const item = items.find((i) => i.id === form.item_id);
       if (item) {
@@ -2137,16 +2135,14 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
         .select()
         .single();
       if (pE) throw pE;
-      const { error: lE } = await supabase
-        .from("purchase_order_items")
-        .insert(
-          valid.map((l) => ({
-            po_id: po.id,
-            item_id: l.item_id,
-            quantity_ordered: parseFloat(l.quantity_ordered),
-            unit_cost: parseFloat(l.unit_cost),
-          })),
-        );
+      const { error: lE } = await supabase.from("purchase_order_items").insert(
+        valid.map((l) => ({
+          po_id: po.id,
+          item_id: l.item_id,
+          quantity_ordered: parseFloat(l.quantity_ordered),
+          unit_cost: parseFloat(l.unit_cost),
+        })),
+      );
       if (lE) throw lE;
       setShowForm(false);
       setForm({
@@ -2183,15 +2179,13 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
     if (newStatus === "received" && po.purchase_order_items) {
       for (const line of po.purchase_order_items) {
         if (!line.item_id) continue;
-        await supabase
-          .from("stock_movements")
-          .insert({
-            item_id: line.item_id,
-            quantity: line.quantity_ordered,
-            movement_type: "purchase_in",
-            reference: po.po_number,
-            notes: `Auto-recorded from PO ${po.po_number}`,
-          });
+        await supabase.from("stock_movements").insert({
+          item_id: line.item_id,
+          quantity: line.quantity_ordered,
+          movement_type: "purchase_in",
+          reference: po.po_number,
+          notes: `Auto-recorded from PO ${po.po_number}`,
+        });
         const item = items.find((i) => i.id === line.item_id);
         if (item)
           await supabase
