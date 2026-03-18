@@ -14,7 +14,23 @@
 //   ★ Last-updated timestamp + manual refresh button
 
 import { useState, useEffect, useCallback } from "react";
+import {
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { ChartCard, ChartTooltip } from "../viz";
 import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
@@ -173,6 +189,91 @@ function periodFilter(dateStr, period) {
   const start = periodStart(period);
   if (!start) return true;
   return new Date(dateStr) >= new Date(start);
+}
+
+// ─── Chart constants ──────────────────────────────────────────────────────────
+const CC = {
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  success: "#166534",
+  danger: "#991B1B",
+  warning: "#92400E",
+  info: "#1E3A5F",
+  gold: "#b5935a",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink400: "#888888",
+  ink500: "#5A5A5A",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+};
+const DONUT_COST_COLOURS = [CC.accentMid, CC.gold, CC.danger, "#52B788"];
+
+function PLMarginGauge({ value, label, color }) {
+  const pct = Math.min(Math.max((value || 0) / 100, 0), 1);
+  const r = 62,
+    cx = 90,
+    cy = 98,
+    startAngle = -210,
+    totalDeg = 240;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const arcPath = (start, end) => {
+    const x1 = cx + r * Math.cos(toRad(start)),
+      y1 = cy + r * Math.sin(toRad(start));
+    const x2 = cx + r * Math.cos(toRad(end)),
+      y2 = cy + r * Math.sin(toRad(end));
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${end - start > 180 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  };
+  return (
+    <svg
+      viewBox="0 0 180 170"
+      width="100%"
+      height="100%"
+      style={{ display: "block" }}
+    >
+      <path
+        d={arcPath(startAngle, startAngle + totalDeg)}
+        fill="none"
+        stroke={CC.ink150}
+        strokeWidth={14}
+        strokeLinecap="round"
+      />
+      {pct > 0.01 && (
+        <path
+          d={arcPath(startAngle, startAngle + totalDeg * pct)}
+          fill="none"
+          stroke={color}
+          strokeWidth={14}
+          strokeLinecap="round"
+        />
+      )}
+      <text
+        x={cx}
+        y={cy - 6}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fill={color}
+        fontSize="24"
+        fontWeight="400"
+        fontFamily={CC.font}
+        style={{ fontVariantNumeric: "tabular-nums" }}
+      >
+        {value !== null && value !== undefined ? `${value.toFixed(1)}%` : "—"}
+      </text>
+      <text
+        x={cx}
+        y={cy + 18}
+        textAnchor="middle"
+        fill={CC.ink400}
+        fontSize="9"
+        fontWeight="600"
+        fontFamily={CC.font}
+        letterSpacing="0.08em"
+      >
+        {(label || "").toUpperCase()}
+      </text>
+    </svg>
+  );
 }
 
 // ─── Waterfall Row ────────────────────────────────────────────────────────────
@@ -1123,6 +1224,261 @@ export default function HQProfitLoss() {
 
           {/* RIGHT: INTEL PANELS */}
           <div>
+            {/* ── CHART: Net Margin Gauge ── */}
+            {!loading && websiteRevenue > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <ChartCard title="Net Margin" height={200}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      height: "100%",
+                      gap: 8,
+                    }}
+                  >
+                    <PLMarginGauge
+                      value={grossMarginPct}
+                      label="Gross Margin"
+                      color={
+                        grossMarginPct >= 35
+                          ? CC.success
+                          : grossMarginPct >= 20
+                            ? CC.warning
+                            : CC.danger
+                      }
+                    />
+                    <PLMarginGauge
+                      value={netMarginPct}
+                      label="Net Margin"
+                      color={
+                        netMarginPct >= 20
+                          ? CC.success
+                          : netMarginPct >= 10
+                            ? CC.warning
+                            : CC.danger
+                      }
+                    />
+                  </div>
+                </ChartCard>
+              </div>
+            )}
+
+            {/* ── CHART: Cost Composition Donut ── */}
+            {!loading &&
+              importCogsHardware + localCogsTotal + loyaltyCost + totalOpex >
+                0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <ChartCard title="Cost Composition" height={220}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            {
+                              name: "Import COGS",
+                              value: Math.round(importCogsHardware),
+                            },
+                            {
+                              name: "Local COGS",
+                              value: Math.round(localCogsTotal),
+                            },
+                            {
+                              name: "Loyalty Cost",
+                              value: Math.round(loyaltyCost),
+                            },
+                            { name: "OpEx", value: Math.round(totalOpex) },
+                          ].filter((d) => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={52}
+                          outerRadius={80}
+                          dataKey="value"
+                          paddingAngle={3}
+                          isAnimationActive={false}
+                        >
+                          {[CC.accentMid, CC.gold, CC.danger, "#52B788"].map(
+                            (c, i) => (
+                              <Cell key={i} fill={c} />
+                            ),
+                          )}
+                        </Pie>
+                        <Tooltip
+                          content={
+                            <ChartTooltip
+                              formatter={(v) => `R${v.toLocaleString("en-ZA")}`}
+                            />
+                          }
+                        />
+                        <Legend
+                          iconSize={8}
+                          iconType="square"
+                          formatter={(v) => (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: CC.ink500,
+                                fontFamily: CC.font,
+                              }}
+                            >
+                              {v}
+                            </span>
+                          )}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </div>
+              )}
+
+            {/* ── CHART: Revenue vs COGS trend (30-day rolling) ── */}
+            {!loading &&
+              (() => {
+                const dayMap = {};
+                orders.forEach((o) => {
+                  const day = new Date(o.created_at).toLocaleDateString(
+                    "en-ZA",
+                    { month: "short", day: "numeric" },
+                  );
+                  dayMap[day] = dayMap[day] || {
+                    date: day,
+                    revenue: 0,
+                    cogs: 0,
+                  };
+                  dayMap[day].revenue += parseFloat(o.total) || 0;
+                  dayMap[day].cogs +=
+                    avgFullCogsPerUnit * (parseInt(o.items_count) || 1);
+                });
+                const trendData = Object.values(dayMap)
+                  .slice(-20)
+                  .map((d) => ({
+                    ...d,
+                    net: d.revenue - d.cogs,
+                    revenue: Math.round(d.revenue),
+                    cogs: Math.round(d.cogs),
+                    net: Math.round(d.revenue - d.cogs),
+                  }));
+                if (trendData.length < 2) return null;
+                return (
+                  <div style={{ marginBottom: 20 }}>
+                    <ChartCard title="Revenue vs COGS Trend" height={220}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={trendData}
+                          margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                        >
+                          <defs>
+                            <linearGradient
+                              id="pl-rev-grad"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor={CC.accentMid}
+                                stopOpacity={0.15}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor={CC.accentMid}
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                            <linearGradient
+                              id="pl-cogs-grad"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor={CC.danger}
+                                stopOpacity={0.1}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor={CC.danger}
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            horizontal
+                            vertical={false}
+                            stroke={CC.ink150}
+                            strokeWidth={0.5}
+                          />
+                          <XAxis
+                            dataKey="date"
+                            tick={{
+                              fill: CC.ink400,
+                              fontSize: 10,
+                              fontFamily: CC.font,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            dy={6}
+                            interval="preserveStartEnd"
+                            maxRotation={0}
+                          />
+                          <YAxis
+                            tick={{
+                              fill: CC.ink400,
+                              fontSize: 10,
+                              fontFamily: CC.font,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={46}
+                            tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
+                          />
+                          <Tooltip
+                            content={
+                              <ChartTooltip
+                                formatter={(v) =>
+                                  `R${v.toLocaleString("en-ZA")}`
+                                }
+                              />
+                            }
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="revenue"
+                            name="Revenue"
+                            stroke={CC.accentMid}
+                            strokeWidth={2}
+                            fill="url(#pl-rev-grad)"
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="cogs"
+                            name="COGS"
+                            stroke={CC.danger}
+                            strokeWidth={1.5}
+                            fill="url(#pl-cogs-grad)"
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="net"
+                            name="Net"
+                            stroke={CC.gold}
+                            strokeWidth={1.5}
+                            dot={false}
+                            isAnimationActive={false}
+                            strokeDasharray="4 3"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
+                );
+              })()}
+
             {/* FX Impact */}
             <div style={{ ...card, padding: 0 }}>
               <SectionHeader icon="📡" label="Live FX Impact" />
