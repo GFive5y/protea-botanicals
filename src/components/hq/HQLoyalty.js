@@ -3022,7 +3022,7 @@ export default function HQLoyalty() {
         </div>
 
         {/* Sub-tabs — standard underline style */}
-        <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 0, flexWrap: "nowrap" }}>
           {SUB_TABS.map((tab, i) => (
             <button
               key={tab.key}
