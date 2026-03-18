@@ -1,4 +1,4 @@
-// HRSettings.js v1.0
+// HRSettings.js v1.1 — WP-VISUAL
 // Protea Botanicals · HR Module · HR Settings
 // WP-HR-5 · March 2026
 // src/components/hq/HRSettings.js
@@ -10,17 +10,48 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
+// ─── THEME ───────────────────────────────────────────────────────────────────
+
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — all internal C.* references resolve correctly
 const C = {
-  green: "#3d6b35",
-  greenLight: "#e8f5e9",
-  greenMid: "#2e7d32",
-  red: "#c62828",
-  redLight: "#fdecea",
-  border: "#ece8e2",
-  bg: "#faf8f5",
+  green: T.accent,
+  greenLight: T.accentLit,
+  greenMid: T.accentMid,
+  red: T.danger,
+  redLight: T.dangerBg,
+  border: T.ink150,
+  bg: T.ink075,
   white: "#fff",
-  text: "#2d2d2d",
-  muted: "#aaa",
+  text: T.ink700,
+  muted: T.ink400,
 };
 
 const LEAVE_COLORS = [
@@ -42,16 +73,19 @@ const s = {
     borderBottom: `2px solid ${C.border}`,
     marginBottom: 24,
   },
+  // Underline-only sub-tab pattern
   subTab: (a) => ({
-    padding: "9px 18px",
+    padding: "10px 16px",
     cursor: "pointer",
     border: "none",
-    background: "none",
-    fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    color: a ? C.green : "#555",
-    borderBottom: a ? `2px solid ${C.green}` : "2px solid transparent",
+    background: "transparent",
+    fontSize: 11,
+    fontFamily: T.font,
+    color: a ? T.accent : T.ink400,
+    borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
     marginBottom: -2,
   }),
   card: {
@@ -75,10 +109,10 @@ const s = {
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
-    borderRadius: 6,
+    border: `1px solid ${C.border}`,
+    borderRadius: 4,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
     background: C.white,
     outline: "none",
     boxSizing: "border-box",
@@ -88,9 +122,9 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: "#888",
+    color: T.ink400,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.07em",
     marginBottom: 4,
   },
   btn: (bg, color = C.white) => ({
@@ -98,28 +132,30 @@ const s = {
     background: bg,
     color,
     border: `1px solid ${bg}`,
-    borderRadius: 5,
+    borderRadius: 4,
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.04em",
   }),
   outBtn: (color) => ({
     padding: "7px 14px",
     background: "none",
     color,
     border: `1px solid ${color}`,
-    borderRadius: 5,
+    borderRadius: 4,
     fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
   }),
   toast: (t) => ({
     padding: "10px 16px",
-    borderRadius: 6,
+    borderRadius: 4,
     fontSize: 13,
     marginBottom: 16,
+    fontFamily: T.font,
     background: t === "success" ? C.greenLight : C.redLight,
     color: t === "success" ? C.greenMid : C.red,
   }),
@@ -131,13 +167,16 @@ const s = {
     background: active ? C.greenLight : "#f5f5f5",
     color: active ? C.greenMid : C.muted,
     textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    fontFamily: T.font,
   }),
   sectionTitle: {
-    fontFamily: "'Cormorant Garamond', serif",
-    fontSize: 18,
+    fontFamily: T.font,
+    fontSize: 16,
     fontWeight: 600,
-    color: C.text,
+    color: T.ink900,
     margin: "0 0 16px 0",
+    letterSpacing: "-0.01em",
   },
 };
 
@@ -161,7 +200,7 @@ const EMPTY_LT = {
 function LeaveTypesSettings({ tenantId }) {
   const [types, setTypes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // null = list, {} = new, {id,...} = edit
+  const [editing, setEditing] = useState(null); // null = list, 'new' = new, id = edit
   const [form, setForm] = useState(EMPTY_LT);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -273,6 +312,7 @@ function LeaveTypesSettings({ tenantId }) {
     }
   };
 
+  // ── Edit / New form ──
   if (editing !== null) {
     return (
       <div>
@@ -289,9 +329,10 @@ function LeaveTypesSettings({ tenantId }) {
           </button>
           <span
             style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 18,
+              fontFamily: T.font,
+              fontSize: 16,
               fontWeight: 600,
+              color: T.ink900,
             }}
           >
             {editing === "new" ? "New Leave Type" : `Edit: ${form.name}`}
@@ -425,6 +466,7 @@ function LeaveTypesSettings({ tenantId }) {
                   gap: 6,
                   fontSize: 13,
                   cursor: "pointer",
+                  fontFamily: T.font,
                 }}
               >
                 <input
@@ -450,7 +492,7 @@ function LeaveTypesSettings({ tenantId }) {
           <button style={s.btn(C.green)} onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save Leave Type"}
           </button>
-          <button style={s.outBtn("#aaa")} onClick={cancel}>
+          <button style={s.outBtn(C.muted)} onClick={cancel}>
             Cancel
           </button>
         </div>
@@ -458,6 +500,7 @@ function LeaveTypesSettings({ tenantId }) {
     );
   }
 
+  // ── List view ──
   return (
     <div>
       <div
@@ -504,7 +547,9 @@ function LeaveTypesSettings({ tenantId }) {
                     marginBottom: 4,
                   }}
                 >
-                  <strong style={{ fontSize: 14 }}>{lt.name}</strong>
+                  <strong style={{ fontSize: 14, fontFamily: T.font }}>
+                    {lt.name}
+                  </strong>
                   {lt.code && (
                     <span
                       style={{
@@ -533,6 +578,7 @@ function LeaveTypesSettings({ tenantId }) {
                     display: "flex",
                     gap: 16,
                     flexWrap: "wrap",
+                    fontFamily: T.font,
                   }}
                 >
                   <span>
@@ -572,7 +618,7 @@ function LeaveTypesSettings({ tenantId }) {
                     </button>
                     <button
                       style={{
-                        ...s.outBtn("#aaa"),
+                        ...s.outBtn(C.muted),
                         padding: "4px 10px",
                         fontSize: 11,
                       }}
@@ -603,11 +649,18 @@ function LeaveTypesSettings({ tenantId }) {
 }
 
 // ── Work Hours sub-tab ─────────────────────────────────────────────────────
-function WorkHoursSettings({ tenantId }) {
+function WorkHoursSettings() {
   return (
     <div>
       <p style={s.sectionTitle}>Work Hour Standards</p>
-      <p style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>
+      <p
+        style={{
+          fontSize: 13,
+          color: C.muted,
+          marginBottom: 20,
+          fontFamily: T.font,
+        }}
+      >
         Standard work hours are set per employment contract. The values below
         are the system defaults used when creating new contracts. Edit
         individual contracts in the Contracts tab to override.
@@ -640,35 +693,42 @@ function WorkHoursSettings({ tenantId }) {
               key={label}
               style={{
                 flex: "1 1 160px",
-                padding: "12px 16px",
-                background: C.bg,
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
+                padding: "16px 18px",
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 4,
               }}
             >
               <div
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: C.muted,
+                  color: T.ink400,
                   textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  marginBottom: 4,
+                  letterSpacing: "0.1em",
+                  marginBottom: 6,
+                  fontFamily: T.font,
                 }}
               >
                 {label}
               </div>
               <div
                 style={{
-                  fontFamily: "'Cormorant Garamond', serif",
+                  fontFamily: T.font,
                   fontSize: 22,
-                  fontWeight: 700,
-                  color: C.green,
+                  fontWeight: 400,
+                  color: T.accent,
+                  lineHeight: 1,
+                  letterSpacing: "-0.02em",
+                  fontVariantNumeric: "tabular-nums",
+                  marginBottom: 4,
                 }}
               >
                 {value}
               </div>
-              <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>
+              <div
+                style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
+              >
                 {note}
               </div>
             </div>
@@ -680,9 +740,10 @@ function WorkHoursSettings({ tenantId }) {
             padding: "12px 14px",
             background: "#fffde7",
             border: "1px solid #fff9c4",
-            borderRadius: 6,
+            borderRadius: 4,
             fontSize: 12,
             color: "#7c6f00",
+            fontFamily: T.font,
           }}
         >
           ℹ SA BCEA compliance: Full-time employees are entitled to a minimum
@@ -696,10 +757,11 @@ function WorkHoursSettings({ tenantId }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 const TABS = ["Leave Types", "Work Hours"];
+
 export default function HRSettings({ tenantId }) {
   const [tab, setTab] = useState("Leave Types");
   return (
-    <div style={{ fontFamily: "'Jost', sans-serif", color: C.text }}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       <div style={s.subTabs}>
         {TABS.map((t) => (
           <button key={t} style={s.subTab(tab === t)} onClick={() => setTab(t)}>
