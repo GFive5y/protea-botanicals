@@ -12,7 +12,20 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../services/supabaseClient";
+import { ChartCard, ChartTooltip } from "../components/viz";
 import WorkflowGuide from "../components/WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import SystemStatusBar from "../components/SystemStatusBar";
@@ -699,6 +712,141 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {tab === "overview" &&
+        (() => {
+          const platformBarData = [
+            { label: "QR Codes", value: analytics.total, color: T.info },
+            { label: "Claimed", value: analytics.claimed, color: T.success },
+            {
+              label: "Distributed",
+              value: analytics.distributed,
+              color: "#b5935a",
+            },
+            { label: "In Stock", value: analytics.inStock, color: T.accentMid },
+            { label: "Users", value: analytics.userCount, color: T.accent },
+          ].filter((d) => d.value > 0);
+
+          const activityData = [
+            { metric: "Scans Today", value: scansToday },
+            { metric: "New Customers", value: newCustomers },
+            { metric: "Points Today", value: pointsToday },
+            { metric: "Fraud Alerts", value: fraudAlerts },
+          ].filter((d) => d.value > 0);
+
+          if (platformBarData.length === 0) return null;
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.4fr 1fr",
+                gap: 20,
+                marginTop: 24,
+              }}
+            >
+              <ChartCard title="Platform Overview" height={220}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={platformBarData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.fontUi,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.fontUi,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={36}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar
+                      dataKey="value"
+                      name="Count"
+                      isAnimationActive={false}
+                      maxBarSize={40}
+                      radius={[3, 3, 0, 0]}
+                    >
+                      {platformBarData.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {activityData.length > 0 && (
+                <ChartCard title="Today's Activity" height={220}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={activityData}
+                      layout="vertical"
+                      margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
+                    >
+                      <CartesianGrid
+                        horizontal={false}
+                        vertical
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.fontUi,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="metric"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.fontUi,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={88}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar
+                        dataKey="value"
+                        name="Count"
+                        fill={T.accentMid}
+                        isAnimationActive={false}
+                        maxBarSize={22}
+                        radius={[0, 3, 3, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+            </div>
+          );
+        })()}
 
       {tab === "shipments" && <AdminShipments />}
       {tab === "production" && <AdminProductionModule />}
