@@ -1,15 +1,6 @@
-// src/components/hq/HQAnalytics.js v4.1 — WP-THEME-2: Inter font + WorkflowGuide + usePageContext + InfoTooltip + Toast
+// src/components/hq/HQAnalytics.js v4.2 — WP-VIZ: revenue trend, grouped bar, stacked bar, funnel
+// v4.1 — WP-THEME-2: Inter font + WorkflowGuide + usePageContext + InfoTooltip + Toast
 // v4.0 — WP-THEME: Unified design system applied
-//   - Outfit replaces Cormorant Garamond + Jost everywhere
-//   - DM Mono for all metric values in KPI + tables
-//   - KPI: coloured top borders removed — semantic colour on value only
-//   - PipelineCard: coloured top borders removed
-//   - Sub-tabs: standard underline style, emoji removed from labels
-//   - sLabel: ink400 replaces accent green
-//   - Live feed: standard info template
-//   - Alert pills: semantic token colours
-//   - Overdue shipment: standard danger template
-//   - Category cards: left border only (no coloured top border)
 // v3.2: Margin fix + po_status fix | v3.1: scan_logs schema
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -196,6 +187,7 @@ export default function HQAnalytics() {
           return fallback;
         }
       };
+
       result.inventory = (
         await safe(async () => {
           const r = await supabase
@@ -279,6 +271,18 @@ export default function HQAnalytics() {
           .limit(50);
         return r.data || [];
       });
+
+      // WP-VIZ: orders for revenue trend + channel mix + funnel
+      result.orders = await safe(async () => {
+        const r = await supabase
+          .from("orders")
+          .select("id,created_at,total,status,items_count")
+          .not("status", "in", '("cancelled","failed")')
+          .order("created_at", { ascending: false })
+          .limit(500);
+        return r.data || [];
+      });
+
       setData(result);
       setLastUpdated(new Date());
     } catch (err) {
@@ -520,7 +524,7 @@ export default function HQAnalytics() {
         </div>
       </div>
 
-      {/* Live feed — standard info template */}
+      {/* Live feed */}
       {liveEvents.length > 0 && (
         <div
           style={{
@@ -574,7 +578,7 @@ export default function HQAnalytics() {
         </div>
       )}
 
-      {/* Sub-tabs — standard underline style */}
+      {/* Sub-tabs */}
       <div
         style={{
           display: "flex",
@@ -670,6 +674,10 @@ function OverviewAnalytics({ data }) {
   const inv = data.inventory;
   const runs = data.productionRuns;
   const shipments = data.shipments;
+  const orders = data.orders || [];
+  const scans = data.scans;
+  const now = new Date();
+
   const finishedInv = inv.filter((i) => i.category === "finished_product");
   const stockValue = finishedInv.reduce(
     (s, i) => s + (i.quantity_on_hand || 0) * (i.sell_price || 0),
@@ -718,11 +726,10 @@ function OverviewAnalytics({ data }) {
       (sh.shipment_items || []).reduce((is, i) => is + (i.quantity || 0), 0),
     0,
   );
-  const now = new Date();
-  const scans7d = data.scans.filter(
+  const scans7d = scans.filter(
     (s) => new Date(s.scanned_at) >= new Date(now - 7 * 86400000),
   ).length;
-  const scans30d = data.scans.filter(
+  const scans30d = scans.filter(
     (s) => new Date(s.scanned_at) >= new Date(now - 30 * 86400000),
   ).length;
   const totalPoints = data.loyalty
@@ -786,10 +793,73 @@ function OverviewAnalytics({ data }) {
     success: T.successBd,
   };
 
+  // ── Revenue trend data (Chart #1 — Line via AreaChart fill=none) ──
+  const revTrendData = (() => {
+    const dayMap = {};
+    orders.forEach((o) => {
+      const day = new Date(o.created_at).toLocaleDateString("en-ZA", {
+        month: "short",
+        day: "numeric",
+      });
+      dayMap[day] = (dayMap[day] || 0) + (parseFloat(o.total) || 0);
+    });
+    return Object.entries(dayMap)
+      .slice(-20)
+      .map(([date, revenue]) => ({ date, revenue: Math.round(revenue) }));
+  })();
+
+  // ── Grouped Bar: scans current 7d vs prior 7d by qr_type (Chart #4) ──
+  const groupedBarData = (() => {
+    const d7 = new Date(now - 7 * 86400000);
+    const d14 = new Date(now - 14 * 86400000);
+    const curr = {},
+      prior = {};
+    scans.forEach((s) => {
+      const t = s.qr_type || "unknown";
+      const dt = new Date(s.scanned_at);
+      if (dt >= d7) curr[t] = (curr[t] || 0) + 1;
+      else if (dt >= d14) prior[t] = (prior[t] || 0) + 1;
+    });
+    const types = [
+      ...new Set([...Object.keys(curr), ...Object.keys(prior)]),
+    ].slice(0, 6);
+    return types.map((t) => ({
+      type: t.replace(/_/g, " "),
+      current: curr[t] || 0,
+      prior: prior[t] || 0,
+    }));
+  })();
+
+  // ── Stacked Bar: scan outcomes by week (Chart #6) ──
+  const stackedBarData = (() => {
+    const weekMap = {};
+    const outcomes = new Set();
+    scans.forEach((s) => {
+      const wk = new Date(s.scanned_at);
+      wk.setHours(0, 0, 0, 0);
+      wk.setDate(wk.getDate() - wk.getDay()); // start of week
+      const key = wk.toLocaleDateString("en-ZA", {
+        month: "short",
+        day: "numeric",
+      });
+      const out = s.scan_outcome || "unknown";
+      outcomes.add(out);
+      weekMap[key] = weekMap[key] || {};
+      weekMap[key][out] = (weekMap[key][out] || 0) + 1;
+    });
+    return Object.entries(weekMap)
+      .slice(-8)
+      .map(([week, vals]) => ({ week, ...vals }));
+  })();
+  const stackedOutcomes = [
+    ...new Set(scans.map((s) => s.scan_outcome || "unknown")),
+  ].slice(0, 4);
+  const stackColours = [T.success, T.accentMid, T.warning, T.ink400];
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
       {alerts.length > 0 && (
-        <div style={{ ...sCard }}>
+        <div style={sCard}>
           <div style={sLabel}>Command Centre — Live Alerts</div>
           <div
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}
@@ -815,7 +885,7 @@ function OverviewAnalytics({ data }) {
         </div>
       )}
 
-      {/* Row 1 */}
+      {/* KPI grids */}
       <div
         style={{
           display: "grid",
@@ -856,8 +926,6 @@ function OverviewAnalytics({ data }) {
           semantic={outOfStock.length > 0 ? "danger" : "success"}
         />
       </div>
-
-      {/* Row 2 */}
       <div
         style={{
           display: "grid",
@@ -901,8 +969,6 @@ function OverviewAnalytics({ data }) {
           semantic={null}
         />
       </div>
-
-      {/* Row 3 */}
       <div
         style={{
           display: "grid",
@@ -915,7 +981,7 @@ function OverviewAnalytics({ data }) {
           boxShadow: T.shadow,
         }}
       >
-        <KPI label="Total Scans" value={data.scans.length} semantic="info" />
+        <KPI label="Total Scans" value={scans.length} semantic="info" />
         <KPI
           label="Scans (7d)"
           value={scans7d}
@@ -937,11 +1003,72 @@ function OverviewAnalytics({ data }) {
         <KPI label="Suppliers" value={data.suppliers.length} semantic={null} />
       </div>
 
-      {/* ── CHART: Platform Activity Overview ── */}
-      {data.scans.length > 0 &&
+      {/* ── CHART #1: Revenue Trend — Line (via Area fill=none) ── */}
+      {revTrendData.length >= 2 && (
+        <ChartCard title="Revenue Trend — Last 30 Days" height={220}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={revTrendData}
+              margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+            >
+              <defs>
+                <linearGradient id="an-rev-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={T.accent} stopOpacity={0.12} />
+                  <stop offset="95%" stopColor={T.accent} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                horizontal
+                vertical={false}
+                stroke={T.ink150}
+                strokeWidth={0.5}
+              />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+                interval="preserveStartEnd"
+                maxRotation={0}
+              />
+              <YAxis
+                dataKey="revenue"
+                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                axisLine={false}
+                tickLine={false}
+                width={52}
+                tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
+              />
+              <Tooltip
+                content={
+                  <ChartTooltip
+                    formatter={(v) =>
+                      `R ${Number(v).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    }
+                  />
+                }
+              />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                name="Revenue"
+                stroke={T.accent}
+                strokeWidth={2}
+                fill="url(#an-rev-grad)"
+                dot={false}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      {/* ── CHART: Scan Activity Overview ── */}
+      {scans.length > 0 &&
         (() => {
           const dayMap = {};
-          data.scans.forEach((s) => {
+          scans.forEach((s) => {
             const day = new Date(s.scanned_at).toLocaleDateString("en-ZA", {
               month: "short",
               day: "numeric",
@@ -989,6 +1116,7 @@ function OverviewAnalytics({ data }) {
                     maxRotation={0}
                   />
                   <YAxis
+                    dataKey="count"
                     tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
@@ -1014,9 +1142,145 @@ function OverviewAnalytics({ data }) {
           );
         })()}
 
-      {/* ── CHARTS: Inventory Split + Production Status ── */}
+      {/* ── CHART #4: Grouped Bar — current vs prior 7d by QR type ── */}
+      {groupedBarData.length > 0 && (
+        <ChartCard
+          title="Scan Volume — Current vs Prior 7 Days by Type"
+          height={220}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={groupedBarData}
+              margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+              barCategoryGap="30%"
+            >
+              <CartesianGrid
+                horizontal
+                vertical={false}
+                stroke={T.ink150}
+                strokeWidth={0.5}
+              />
+              <XAxis
+                dataKey="type"
+                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+              />
+              <YAxis
+                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                axisLine={false}
+                tickLine={false}
+                width={24}
+                allowDecimals={false}
+              />
+              <Tooltip
+                content={<ChartTooltip formatter={(v) => `${v} scans`} />}
+              />
+              <Legend
+                iconSize={8}
+                iconType="square"
+                formatter={(v) => (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: T.ink500,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    {v}
+                  </span>
+                )}
+              />
+              <Bar
+                dataKey="current"
+                name="Current 7d"
+                fill={T.accent}
+                radius={[3, 3, 0, 0]}
+                isAnimationActive={false}
+                maxBarSize={24}
+              />
+              <Bar
+                dataKey="prior"
+                name="Prior 7d"
+                fill={T.accentBd}
+                radius={[3, 3, 0, 0]}
+                isAnimationActive={false}
+                maxBarSize={24}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      {/* ── CHART #6: Stacked Bar — scan outcomes by week ── */}
+      {stackedBarData.length >= 2 && stackedOutcomes.length > 0 && (
+        <ChartCard title="Scan Outcomes by Week — Stacked" height={220}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={stackedBarData}
+              margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+              barCategoryGap="25%"
+            >
+              <CartesianGrid
+                horizontal
+                vertical={false}
+                stroke={T.ink150}
+                strokeWidth={0.5}
+              />
+              <XAxis
+                dataKey="week"
+                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+              />
+              <YAxis
+                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                axisLine={false}
+                tickLine={false}
+                width={24}
+                allowDecimals={false}
+              />
+              <Tooltip content={<ChartTooltip />} />
+              <Legend
+                iconSize={8}
+                iconType="square"
+                formatter={(v) => (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: T.ink500,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    {v.replace(/_/g, " ")}
+                  </span>
+                )}
+              />
+              {stackedOutcomes.map((o, i) => (
+                <Bar
+                  key={o}
+                  dataKey={o}
+                  name={o}
+                  stackId="a"
+                  fill={stackColours[i % stackColours.length]}
+                  isAnimationActive={false}
+                  maxBarSize={36}
+                  radius={
+                    i === stackedOutcomes.length - 1
+                      ? [3, 3, 0, 0]
+                      : [0, 0, 0, 0]
+                  }
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
+
+      {/* ── Donut + Production bar ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* Donut — inventory by category */}
         {(() => {
           const catMap = {};
           inv.forEach((i) => {
@@ -1070,8 +1334,6 @@ function OverviewAnalytics({ data }) {
             </ChartCard>
           );
         })()}
-
-        {/* Bar — production run status */}
         {(() => {
           const statusMap = {};
           runs.forEach((r) => {
@@ -1196,7 +1458,7 @@ function OverviewAnalytics({ data }) {
             stage="Scans"
             color={T.accent}
             items={[
-              { label: "Total", value: data.scans.length },
+              { label: "Total", value: scans.length },
               { label: "7-day", value: scans7d },
             ]}
           />
@@ -1340,7 +1602,6 @@ function SupplyChainAnalytics({ data }) {
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* Category breakdown */}
       <div style={sCard}>
         <div style={sLabel}>Inventory by Category</div>
         <div
@@ -1406,7 +1667,6 @@ function SupplyChainAnalytics({ data }) {
         </div>
       </div>
 
-      {/* ── CHART: Inventory by Category ── */}
       {Object.keys(categories).length > 0 &&
         (() => {
           const barData = Object.entries(categories).map(([cat, d]) => ({
@@ -1475,7 +1735,6 @@ function SupplyChainAnalytics({ data }) {
         })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* PO Pipeline */}
         <div style={sCard}>
           <div style={sLabel}>Purchase Order Pipeline</div>
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
@@ -1533,8 +1792,6 @@ function SupplyChainAnalytics({ data }) {
             })}
           </div>
         </div>
-
-        {/* Supplier spend */}
         <div style={sCard}>
           <div style={sLabel}>Supplier Spend (Received/Complete POs)</div>
           {supplierSpendList.length === 0 ? (
@@ -1585,7 +1842,6 @@ function SupplyChainAnalytics({ data }) {
         </div>
       </div>
 
-      {/* Top items table */}
       <div style={sCard}>
         <div style={sLabel}>Top Items by Stock Value</div>
         <table
@@ -2093,6 +2349,7 @@ function DistributionAnalytics({ data }) {
 // ─── Scans & Loyalty ─────────────────────────────────────────────────────────
 function ScansAnalytics({ data }) {
   const scans = data.scans;
+  const orders = data.orders || [];
   const now = new Date();
   const periods = [
     {
@@ -2157,9 +2414,144 @@ function ScansAnalytics({ data }) {
         ? T.ink400
         : T.warning;
 
+  // ── CHART #14: Conversion Funnel — scan → points awarded → orders ──
+  const pointsAwardedCount = scans.filter(
+    (s) => s.scan_outcome === "points_awarded",
+  ).length;
+  const ordersCount = orders.length;
+  const funnelStages = [
+    { label: "Total Scans", count: scans.length, color: T.accent },
+    { label: "Points Awarded", count: pointsAwardedCount, color: T.accentMid },
+    { label: "Orders Placed", count: ordersCount, color: T.success },
+  ];
+  const funnelMax = funnelStages[0].count || 1;
+
   return (
     <div style={{ display: "grid", gap: "20px" }}>
-      {/* ── CHART: Scan Activity Area ── */}
+      {/* ── CHART #14: Funnel ── */}
+      {scans.length > 0 && (
+        <div style={{ ...sCard }}>
+          <div style={sLabel}>Conversion Funnel — Scan → Points → Order</div>
+          <div
+            style={{
+              marginTop: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {funnelStages.map((stage, i) => {
+              const pct = funnelMax > 0 ? (stage.count / funnelMax) * 100 : 0;
+              const prevPct =
+                i > 0
+                  ? funnelStages[i - 1].count > 0
+                    ? ((stage.count / funnelStages[i - 1].count) * 100).toFixed(
+                        1,
+                      )
+                    : "0"
+                  : null;
+              return (
+                <div key={stage.label}>
+                  {prevPct !== null && (
+                    <div
+                      style={{
+                        textAlign: "center",
+                        fontSize: 10,
+                        color: T.ink400,
+                        fontFamily: T.fontUi,
+                        fontWeight: 600,
+                        letterSpacing: "0.06em",
+                        marginBottom: 4,
+                      }}
+                    >
+                      ↓ {prevPct}% conversion
+                    </div>
+                  )}
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 12 }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        fontFamily: T.fontUi,
+                        color: T.ink500,
+                        width: 110,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {stage.label}
+                    </div>
+                    <div style={{ flex: 1, position: "relative" }}>
+                      <div
+                        style={{
+                          height: 32,
+                          background: T.ink075,
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${pct}%`,
+                            background: stage.color,
+                            borderRadius: 4,
+                            transition: "width 0.4s",
+                            display: "flex",
+                            alignItems: "center",
+                            paddingLeft: 10,
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          {pct > 15 && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#fff",
+                                fontFamily: T.fontUi,
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {stage.count.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: stage.color,
+                        fontFamily: T.fontUi,
+                        fontVariantNumeric: "tabular-nums",
+                        minWidth: 60,
+                        textAlign: "right",
+                      }}
+                    >
+                      {pct > 15 ? "" : stage.count.toLocaleString()}
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: T.ink400,
+                          fontWeight: 400,
+                          marginLeft: 4,
+                        }}
+                      >
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Scan Activity Area */}
       {(() => {
         const dayMap = {};
         scans.forEach((s) => {
@@ -2174,93 +2566,86 @@ function ScansAnalytics({ data }) {
         const trendData = Object.values(dayMap).slice(-20);
         if (trendData.length < 2) return null;
         return (
-          <div style={{ marginBottom: 20 }}>
-            <ChartCard title="Scan Activity — Daily Trend" height={260}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={trendData}
-                  margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
-                >
-                  <defs>
-                    <linearGradient
-                      id="an-scan-grad"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor={T.accentMid}
-                        stopOpacity={0.18}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={T.accentMid}
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    horizontal
-                    vertical={false}
-                    stroke={T.ink150}
-                    strokeWidth={0.5}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
-                    axisLine={false}
-                    tickLine={false}
-                    dy={6}
-                    interval="preserveStartEnd"
-                    maxRotation={0}
-                  />
-                  <YAxis
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={24}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    content={
-                      <ChartTooltip
-                        formatter={(v, n) =>
-                          n === "points" ? `${v} pts` : `${v} scans`
-                        }
-                      />
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="scans"
-                    name="Scans"
-                    stroke={T.accentMid}
-                    strokeWidth={2}
-                    fill="url(#an-scan-grad)"
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="points"
-                    name="Points"
-                    stroke={T.info}
-                    strokeWidth={1.5}
-                    fill="none"
-                    dot={false}
-                    isAnimationActive={false}
-                    strokeDasharray="4 3"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
+          <ChartCard title="Scan Activity — Daily Trend" height={260}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={trendData}
+                margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+              >
+                <defs>
+                  <linearGradient id="an-scan-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor={T.accentMid}
+                      stopOpacity={0.18}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={T.accentMid}
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  horizontal
+                  vertical={false}
+                  stroke={T.ink150}
+                  strokeWidth={0.5}
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  dy={6}
+                  interval="preserveStartEnd"
+                  maxRotation={0}
+                />
+                <YAxis
+                  dataKey="scans"
+                  tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={24}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      formatter={(v, n) =>
+                        n === "points" ? `${v} pts` : `${v} scans`
+                      }
+                    />
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="scans"
+                  name="Scans"
+                  stroke={T.accentMid}
+                  strokeWidth={2}
+                  fill="url(#an-scan-grad)"
+                  dot={false}
+                  isAnimationActive={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="points"
+                  name="Points"
+                  stroke={T.info}
+                  strokeWidth={1.5}
+                  fill="none"
+                  dot={false}
+                  isAnimationActive={false}
+                  strokeDasharray="4 3"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
         );
       })()}
 
-      {/* ── CHART: Scan Outcome Stacked Bar ── */}
+      {/* Stacked outcomes by type */}
       {outcomeList.length > 0 &&
         (() => {
           const typeOutcome = {};
@@ -2282,72 +2667,62 @@ function ScansAnalytics({ data }) {
           const barColors = [T.success, T.warning, T.ink400, T.danger];
           if (barData.length < 2) return null;
           return (
-            <div style={{ marginBottom: 20 }}>
-              <ChartCard title="Scan Outcomes by QR Type" height={220}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={barData}
-                    margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
-                  >
-                    <CartesianGrid
-                      horizontal
-                      vertical={false}
-                      stroke={T.ink150}
-                      strokeWidth={0.5}
+            <ChartCard title="Scan Outcomes by QR Type" height={220}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barData}
+                  margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+                >
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke={T.ink150}
+                    strokeWidth={0.5}
+                  />
+                  <XAxis
+                    dataKey="type"
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={6}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend
+                    iconSize={8}
+                    iconType="square"
+                    formatter={(v) => (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: T.font,
+                        }}
+                      >
+                        {v.replace(/_/g, " ")}
+                      </span>
+                    )}
+                  />
+                  {allOutcomes.map((o, i) => (
+                    <Bar
+                      key={o}
+                      dataKey={o}
+                      name={o}
+                      stackId="a"
+                      fill={barColors[i % barColors.length]}
+                      isAnimationActive={false}
+                      maxBarSize={32}
                     />
-                    <XAxis
-                      dataKey="type"
-                      tick={{
-                        fill: T.ink400,
-                        fontSize: 10,
-                        fontFamily: T.font,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                      dy={6}
-                    />
-                    <YAxis
-                      tick={{
-                        fill: T.ink400,
-                        fontSize: 10,
-                        fontFamily: T.font,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={24}
-                      allowDecimals={false}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Legend
-                      iconSize={8}
-                      iconType="square"
-                      formatter={(v) => (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: T.ink500,
-                            fontFamily: T.font,
-                          }}
-                        >
-                          {v.replace(/_/g, " ")}
-                        </span>
-                      )}
-                    />
-                    {allOutcomes.map((o, i) => (
-                      <Bar
-                        key={o}
-                        dataKey={o}
-                        name={o}
-                        stackId="a"
-                        fill={barColors[i % barColors.length]}
-                        isAnimationActive={false}
-                        maxBarSize={32}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </div>
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
           );
         })()}
 
@@ -2375,7 +2750,6 @@ function ScansAnalytics({ data }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* QR Type */}
         <div style={sCard}>
           <div style={sLabel}>Scans by QR Type</div>
           {typeList.length === 0 ? (
@@ -2448,8 +2822,6 @@ function ScansAnalytics({ data }) {
             </div>
           )}
         </div>
-
-        {/* Top codes */}
         <div style={sCard}>
           <div style={sLabel}>Top Scanned Codes</div>
           {topCodes.length === 0 ? (
@@ -2518,7 +2890,6 @@ function ScansAnalytics({ data }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        {/* Province */}
         <div style={sCard}>
           <div style={sLabel}>Scans by Province (IP)</div>
           {topProvinces.length === 0 ? (
@@ -2590,8 +2961,6 @@ function ScansAnalytics({ data }) {
             </div>
           )}
         </div>
-
-        {/* Outcomes */}
         <div style={sCard}>
           <div style={sLabel}>Scan Outcomes</div>
           {outcomeList.length === 0 ? (
@@ -2668,7 +3037,6 @@ function ScansAnalytics({ data }) {
         </div>
       </div>
 
-      {/* Loyalty KPIs */}
       <div
         style={{
           display: "grid",
@@ -2713,7 +3081,6 @@ function ScansAnalytics({ data }) {
 }
 
 // ─── Shared components ────────────────────────────────────────────────────────
-// KPI — no coloured top border, DM Mono value, semantic colour on value only
 function KPI({ label, value, semantic, sub }) {
   const semC = {
     success: T.success,
@@ -2765,7 +3132,6 @@ function KPI({ label, value, semantic, sub }) {
   );
 }
 
-// PipelineCard — no coloured top border
 function PipelineCard({ stage, items, color }) {
   return (
     <div
