@@ -1,7 +1,9 @@
-// src/components/hq/HQProfitLoss.js v2.5 — WP-THEME-2: Inter font + InfoTooltip + Toast
+// src/components/hq/HQProfitLoss.js v2.6 — WP-VIZ: Recharts waterfall chart
+// v2.5 — WP-THEME-2: Inter font + InfoTooltip + Toast
 // v2.4 — WP-GUIDE-C: usePageContext 'pl' wired + WorkflowGuide added
 // Protea Botanicals · Phase 2 · March 2026
 //
+// v2.6 — WP-VIZ: wfCalc() helper + WaterfallChart (ComposedChart) above HTML detail
 // v2.4 — WP-GUIDE-C: wire usePageContext('pl') context + WorkflowGuide at top of render
 // v2.3 — WP-R Phase 6: realtime subscription for revenue tiles (orders table).
 //         Any INSERT/UPDATE/DELETE on orders triggers fetchAll automatically.
@@ -22,11 +24,14 @@ import {
   PieChart,
   Pie,
   Cell,
+  ComposedChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
@@ -207,7 +212,139 @@ const CC = {
   ink500: "#5A5A5A",
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
-const DONUT_COST_COLOURS = [CC.accentMid, CC.gold, CC.danger, "#52B788"];
+
+// ─── Waterfall helper (Chart #7) ─────────────────────────────────────────────
+/**
+ * wfCalc — transforms flat P&L steps into Recharts ComposedChart waterfall data.
+ * Each step gets: offset (invisible spacer), display (visible bar), value (signed).
+ * type: 'total' = starts from zero (accent), 'positive' = success, 'negative' = danger.
+ */
+function wfCalc(steps) {
+  let running = 0;
+  return steps.map((s) => {
+    if (s.type === "total") {
+      const result = {
+        label: s.label,
+        offset: 0,
+        display: Math.abs(s.value),
+        value: s.value,
+        type: s.type,
+      };
+      running = s.value;
+      return result;
+    }
+    const isNeg = s.value < 0;
+    const offset = isNeg ? running + s.value : running;
+    running += s.value;
+    return {
+      label: s.label,
+      offset,
+      display: Math.abs(s.value),
+      value: s.value,
+      type: s.type,
+    };
+  });
+}
+
+// ─── Waterfall Chart Component (Chart #7) ────────────────────────────────────
+function WaterfallChart({
+  revenue,
+  totalCogs,
+  grossProfit,
+  totalOpexIncLoyalty,
+  netProfit,
+}) {
+  if (revenue === 0) return null;
+
+  const steps = wfCalc([
+    { label: "Revenue", value: revenue, type: "total" },
+    { label: "COGS", value: -Math.abs(totalCogs), type: "negative" },
+    { label: "Gross Profit", value: grossProfit, type: "total" },
+    { label: "OpEx", value: -Math.abs(totalOpexIncLoyalty), type: "negative" },
+    { label: "Net Profit", value: netProfit, type: "total" },
+  ]);
+
+  const barColour = (entry) => {
+    if (entry.type === "total") return entry.value >= 0 ? CC.accent : CC.danger;
+    if (entry.type === "negative") return CC.danger;
+    return CC.success;
+  };
+
+  // Custom bar that colours each cell individually
+  const CustomBar = (props) => {
+    const { x, y, width, height, index } = props;
+    if (!height || height <= 0) return null;
+    const fill = barColour(steps[index]);
+    return (
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={fill}
+        rx={3}
+        ry={3}
+      />
+    );
+  };
+
+  const zarFmt = (v) =>
+    `R${Math.abs(v).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart
+        data={steps}
+        margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+      >
+        <CartesianGrid
+          horizontal={true}
+          vertical={false}
+          stroke={CC.ink150}
+          strokeWidth={0.5}
+        />
+        <XAxis
+          dataKey="label"
+          tick={{ fill: CC.ink400, fontSize: 11, fontFamily: CC.font }}
+          axisLine={false}
+          tickLine={false}
+          dy={6}
+        />
+        <YAxis
+          tick={{ fill: CC.ink400, fontSize: 11, fontFamily: CC.font }}
+          axisLine={false}
+          tickLine={false}
+          width={62}
+          tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
+        />
+        <Tooltip
+          content={
+            <ChartTooltip
+              formatter={(v, name) => (name === "display" ? zarFmt(v) : null)}
+              labelFormatter={(l) => l}
+            />
+          }
+        />
+        <ReferenceLine y={0} stroke={CC.ink150} strokeWidth={1} />
+        {/* Invisible spacer bar — creates the floating effect */}
+        <Bar
+          dataKey="offset"
+          stackId="wf"
+          fill="transparent"
+          isAnimationActive={false}
+        />
+        {/* Visible value bar */}
+        <Bar
+          dataKey="display"
+          stackId="wf"
+          shape={<CustomBar />}
+          isAnimationActive={false}
+          maxBarSize={56}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
 
 function PLMarginGauge({ value, label, color }) {
   const pct = Math.min(Math.max((value || 0) / 100, 0), 1);
@@ -276,7 +413,7 @@ function PLMarginGauge({ value, label, color }) {
   );
 }
 
-// ─── Waterfall Row ────────────────────────────────────────────────────────────
+// ─── Waterfall Row (HTML detail) ──────────────────────────────────────────────
 function WRow({
   label,
   value,
@@ -400,10 +537,8 @@ export default function HQProfitLoss() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
 
-  // WP-GUIDE-C: wire 'pl' context for WorkflowGuide
   const ctx = usePageContext("pl", null);
 
-  // Raw data
   const [orders, setOrders] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [recipes, setRecipes] = useState([]);
@@ -857,415 +992,431 @@ export default function HQProfitLoss() {
           Loading P&L data…
         </div>
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.4fr 1fr",
-            gap: 24,
-            alignItems: "start",
-          }}
-        >
-          {/* LEFT: WATERFALL */}
-          <div>
-            <div style={card}>
-              <SectionHeader icon="💰" label="Revenue" />
-              <WRow
-                label="Website / direct sales"
-                sub={`${filteredOrders.length} orders · ${totalUnitsSold} units · ${PERIODS.find((p) => p.id === period)?.label}`}
-                value={websiteRevenue}
-                indent={1}
-                highlight={websiteRevenue > 0 ? "green" : undefined}
-              />
-              <WRow
-                label="Wholesale / store sales"
-                sub="Not yet tracked — add wholesale invoices to orders table or enter manually below"
-                value={0}
-                indent={1}
-                dim
-              />
-              <WRow
-                label="Total Revenue"
-                value={websiteRevenue}
-                bold
-                highlight={websiteRevenue > 0 ? "green" : undefined}
-              />
+        <>
+          {/* ── WATERFALL CHART (Chart #7) ── */}
+          {websiteRevenue > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <ChartCard title="P&L Waterfall" height={280}>
+                <WaterfallChart
+                  revenue={websiteRevenue}
+                  totalCogs={totalCogs}
+                  grossProfit={grossProfit}
+                  totalOpexIncLoyalty={totalOpexIncLoyalty}
+                  netProfit={netProfit}
+                />
+              </ChartCard>
+            </div>
+          )}
 
-              <SectionHeader icon="📦" label="Cost of Goods Sold" />
-              <WRow
-                label="Imported hardware & terpenes (recipe cost)"
-                sub={
-                  avgImportCogsPerUnit > 0
-                    ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
-                    : "⚠ Set hardware & terpene prices in HQ → Suppliers"
-                }
-                value={importCogsHardware}
-                indent={1}
-                negative
-                dim={avgImportCogsPerUnit === 0}
-              />
-              <WRow
-                label="Local inputs (distillate · packaging · labour)"
-                sub={
-                  avgLocalCogsPerUnit > 0
-                    ? `R${fmt(avgLocalCogsPerUnit)} avg local/unit × ${totalUnitsSold} units sold`
-                    : "⚠ Set costs in HQ → Costing → Local Inputs tab"
-                }
-                value={localCogsTotal}
-                indent={1}
-                negative
-                dim={avgLocalCogsPerUnit === 0}
-              />
-              <WRow
-                label="Total COGS"
-                value={totalCogs}
-                bold
-                negative
-                highlight={totalCogs > 0 ? "red" : undefined}
-              />
-              {totalInventoryInvestment > 0 && (
-                <div
-                  style={{
-                    margin: "0 16px 8px",
-                    padding: "8px 12px",
-                    background: "#f8f9fa",
-                    border: "1px solid #e8e8e8",
-                    borderRadius: 6,
-                    fontSize: 11,
-                    color: "#999",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>
-                    📦 Inventory investment this period (balance sheet, not P&L)
-                    — {completedPOs.length} PO
-                    {completedPOs.length !== 1 ? "s" : ""} totalling{" "}
-                    <strong style={{ color: "#666" }}>
-                      {fmtZar(totalInventoryInvestment)}
-                    </strong>
-                  </span>
-                  <span
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.4fr 1fr",
+              gap: 24,
+              alignItems: "start",
+            }}
+          >
+            {/* LEFT: HTML WATERFALL DETAIL */}
+            <div>
+              <div style={card}>
+                <SectionHeader icon="💰" label="Revenue" />
+                <WRow
+                  label="Website / direct sales"
+                  sub={`${filteredOrders.length} orders · ${totalUnitsSold} units · ${PERIODS.find((p) => p.id === period)?.label}`}
+                  value={websiteRevenue}
+                  indent={1}
+                  highlight={websiteRevenue > 0 ? "green" : undefined}
+                />
+                <WRow
+                  label="Wholesale / store sales"
+                  sub="Not yet tracked — add wholesale invoices to orders table or enter manually below"
+                  value={0}
+                  indent={1}
+                  dim
+                />
+                <WRow
+                  label="Total Revenue"
+                  value={websiteRevenue}
+                  bold
+                  highlight={websiteRevenue > 0 ? "green" : undefined}
+                />
+
+                <SectionHeader icon="📦" label="Cost of Goods Sold" />
+                <WRow
+                  label="Imported hardware & terpenes (recipe cost)"
+                  sub={
+                    avgImportCogsPerUnit > 0
+                      ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
+                      : "⚠ Set hardware & terpene prices in HQ → Suppliers"
+                  }
+                  value={importCogsHardware}
+                  indent={1}
+                  negative
+                  dim={avgImportCogsPerUnit === 0}
+                />
+                <WRow
+                  label="Local inputs (distillate · packaging · labour)"
+                  sub={
+                    avgLocalCogsPerUnit > 0
+                      ? `R${fmt(avgLocalCogsPerUnit)} avg local/unit × ${totalUnitsSold} units sold`
+                      : "⚠ Set costs in HQ → Costing → Local Inputs tab"
+                  }
+                  value={localCogsTotal}
+                  indent={1}
+                  negative
+                  dim={avgLocalCogsPerUnit === 0}
+                />
+                <WRow
+                  label="Total COGS"
+                  value={totalCogs}
+                  bold
+                  negative
+                  highlight={totalCogs > 0 ? "red" : undefined}
+                />
+                {totalInventoryInvestment > 0 && (
+                  <div
                     style={{
-                      color: "#bbb",
-                      marginLeft: 8,
-                      whiteSpace: "nowrap",
+                      margin: "0 16px 8px",
+                      padding: "8px 12px",
+                      background: "#f8f9fa",
+                      border: "1px solid #e8e8e8",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      color: "#999",
+                      display: "flex",
+                      justifyContent: "space-between",
                     }}
                   >
-                    P&L shows {totalUnitsSold} units sold only
-                  </span>
-                </div>
-              )}
+                    <span>
+                      📦 Inventory investment this period (balance sheet, not
+                      P&L) — {completedPOs.length} PO
+                      {completedPOs.length !== 1 ? "s" : ""} totalling{" "}
+                      <strong style={{ color: "#666" }}>
+                        {fmtZar(totalInventoryInvestment)}
+                      </strong>
+                    </span>
+                    <span
+                      style={{
+                        color: "#bbb",
+                        marginLeft: 8,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      P&L shows {totalUnitsSold} units sold only
+                    </span>
+                  </div>
+                )}
 
-              <SectionHeader icon="📊" label="Gross Profit" />
-              <WRow
-                label="Gross Profit"
-                sub={`Gross margin: ${fmt(grossMarginPct)}%`}
-                value={grossProfit}
-                bold
-                borderTop
-                highlight={
-                  grossMarginPct >= 35
-                    ? "green"
-                    : grossMarginPct >= 20
-                      ? "orange"
-                      : "red"
-                }
-              />
+                <SectionHeader icon="📊" label="Gross Profit" />
+                <WRow
+                  label="Gross Profit"
+                  sub={`Gross margin: ${fmt(grossMarginPct)}%`}
+                  value={grossProfit}
+                  bold
+                  borderTop
+                  highlight={
+                    grossMarginPct >= 35
+                      ? "green"
+                      : grossMarginPct >= 20
+                        ? "orange"
+                        : "red"
+                  }
+                />
 
-              <SectionHeader icon="⚙️" label="Operating Costs" />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "8px 16px 8px 36px",
-                  background:
-                    loyaltyCost > 0 ? "rgba(181,147,90,0.04)" : "transparent",
-                }}
-              >
-                <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
-                  Loyalty programme cost
-                </span>
-                <span style={{ fontSize: 11, color: "#aaa", flex: 2 }}>
-                  {earnedPoints.toLocaleString()} pts × R
-                  {fmt(costPerPointIssued, 4)}/pt
-                  {loyaltyConfig
-                    ? ` (R${fmt(redemptionValue, 2)} val · ${Math.round(breakageRate * 100)}% breakage)`
-                    : " (default rates)"}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: loyaltyCost > 0 ? "#c62828" : "#bbb",
-                    minWidth: 100,
-                    textAlign: "right",
-                  }}
-                >
-                  {loyaltyCost > 0 ? `−${fmtZar(loyaltyCost)}` : "—"}
-                </span>
-                <div style={{ width: 24 }} />
-              </div>
-
-              {opexItems.map((item) => (
+                <SectionHeader icon="⚙️" label="Operating Costs" />
                 <div
-                  key={item.id}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
                     padding: "8px 16px 8px 36px",
+                    background:
+                      loyaltyCost > 0 ? "rgba(181,147,90,0.04)" : "transparent",
                   }}
                 >
                   <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
-                    {item.label}
+                    Loyalty programme cost
                   </span>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 4 }}
-                  >
-                    <span style={{ fontSize: 13, color: "#888" }}>R</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      value={item.amount}
-                      onChange={(e) =>
-                        setOpexItems((prev) =>
-                          prev.map((i) =>
-                            i.id === item.id
-                              ? { ...i, amount: e.target.value }
-                              : i,
-                          ),
-                        )
-                      }
-                      placeholder="0"
-                      style={{ ...inputStyle, width: 120 }}
-                    />
-                  </div>
+                  <span style={{ fontSize: 11, color: "#aaa", flex: 2 }}>
+                    {earnedPoints.toLocaleString()} pts × R
+                    {fmt(costPerPointIssued, 4)}/pt
+                    {loyaltyConfig
+                      ? ` (R${fmt(redemptionValue, 2)} val · ${Math.round(breakageRate * 100)}% breakage)`
+                      : " (default rates)"}
+                  </span>
                   <span
                     style={{
                       fontSize: 13,
-                      color: "#c62828",
+                      color: loyaltyCost > 0 ? "#c62828" : "#bbb",
                       minWidth: 100,
                       textAlign: "right",
                     }}
                   >
-                    {item.amount ? `−${fmtZar(item.amount, true)}` : "—"}
+                    {loyaltyCost > 0 ? `−${fmtZar(loyaltyCost)}` : "—"}
                   </span>
-                  <button
-                    onClick={() => removeOpex(item.id)}
+                  <div style={{ width: 24 }} />
+                </div>
+
+                {opexItems.map((item) => (
+                  <div
+                    key={item.id}
                     style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "#ddd",
-                      fontSize: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "8px 16px 8px 36px",
                     }}
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
+                    <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
+                      {item.label}
+                    </span>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      <span style={{ fontSize: 13, color: "#888" }}>R</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={item.amount}
+                        onChange={(e) =>
+                          setOpexItems((prev) =>
+                            prev.map((i) =>
+                              i.id === item.id
+                                ? { ...i, amount: e.target.value }
+                                : i,
+                            ),
+                          )
+                        }
+                        placeholder="0"
+                        style={{ ...inputStyle, width: 120 }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: "#c62828",
+                        minWidth: 100,
+                        textAlign: "right",
+                      }}
+                    >
+                      {item.amount ? `−${fmtZar(item.amount, true)}` : "—"}
+                    </span>
+                    <button
+                      onClick={() => removeOpex(item.id)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#ddd",
+                        fontSize: 16,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  padding: "10px 16px 10px 36px",
-                  borderTop: "1px dashed #f0ede8",
-                }}
-              >
-                <input
-                  type="text"
-                  value={newOpexLabel}
-                  onChange={(e) => setNewOpexLabel(e.target.value)}
-                  placeholder="Add cost item…"
-                  style={{ ...inputStyle, flex: 2 }}
-                  onKeyDown={(e) => e.key === "Enter" && addOpex()}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={newOpexAmount}
-                  onChange={(e) => setNewOpexAmount(e.target.value)}
-                  placeholder="Amount"
-                  style={{ ...inputStyle, width: 110 }}
-                  onKeyDown={(e) => e.key === "Enter" && addOpex()}
-                />
-                <button
-                  onClick={addOpex}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#2d4a2d",
-                    color: "#fff",
-                    cursor: "pointer",
-                    fontFamily: T.font.ui,
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  + Add
-                </button>
-              </div>
-              <WRow
-                label="Total OpEx (incl. loyalty)"
-                value={totalOpexIncLoyalty}
-                bold
-                negative
-                highlight={totalOpexIncLoyalty > 0 ? "red" : undefined}
-              />
-
-              <SectionHeader icon="🏁" label="Net Profit / Loss" />
-              <div
-                style={{
-                  padding: "20px 16px",
-                  background: netProfit >= 0 ? "#f0f7f0" : "#fff8f8",
-                  borderTop:
-                    "2px solid " + (netProfit >= 0 ? "#c8e6c9" : "#ffcdd2"),
-                }}
-              >
                 <div
                   style={{
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 16px 10px 36px",
+                    borderTop: "1px dashed #f0ede8",
                   }}
                 >
-                  <div>
-                    <div
-                      style={{ fontSize: 13, color: "#888", marginBottom: 4 }}
-                    >
-                      Net {netProfit >= 0 ? "Profit" : "Loss"}
-                    </div>
-                    <div
-                      style={{
-                        ...T.type.metricLg,
-                        fontFamily: T.font.ui,
-                        color: netProfit >= 0 ? "#2E7D32" : "#c62828",
-                      }}
-                    >
-                      {netProfit < 0 ? "−" : ""}
-                      {fmtZar(Math.abs(netProfit))}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div
-                      style={{ fontSize: 12, color: "#888", marginBottom: 6 }}
-                    >
-                      Net Margin
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 28,
-                        fontWeight: 700,
-                        color: pctColour(netMarginPct),
-                      }}
-                    >
-                      {fmt(netMarginPct)}%
-                    </div>
-                  </div>
-                </div>
-                {websiteRevenue > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 16,
-                        fontSize: 12,
-                        color: "#888",
-                        marginBottom: 6,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span>
-                        Gross margin:{" "}
-                        <strong style={{ color: pctColour(grossMarginPct) }}>
-                          {fmt(grossMarginPct)}%
-                        </strong>
-                      </span>
-                      <span>
-                        Net margin:{" "}
-                        <strong style={{ color: pctColour(netMarginPct) }}>
-                          {fmt(netMarginPct)}%
-                        </strong>
-                      </span>
-                      <span>
-                        Loyalty cost:{" "}
-                        <strong style={{ color: "#b5935a" }}>
-                          {fmtZar(loyaltyCost)} ({earnedPoints.toLocaleString()}{" "}
-                          pts)
-                        </strong>
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        height: 8,
-                        borderRadius: 4,
-                        background: "#e0e0e0",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${Math.max(0, Math.min(100, netMarginPct))}%`,
-                          background: pctColour(netMarginPct),
-                          borderRadius: 4,
-                          transition: "width 0.5s",
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT: INTEL PANELS */}
-          <div>
-            {/* ── CHART: Net Margin Gauge ── */}
-            {!loading && websiteRevenue > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <ChartCard title="Net Margin" height={200}>
-                  <div
+                  <input
+                    type="text"
+                    value={newOpexLabel}
+                    onChange={(e) => setNewOpexLabel(e.target.value)}
+                    placeholder="Add cost item…"
+                    style={{ ...inputStyle, flex: 2 }}
+                    onKeyDown={(e) => e.key === "Enter" && addOpex()}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    value={newOpexAmount}
+                    onChange={(e) => setNewOpexAmount(e.target.value)}
+                    placeholder="Amount"
+                    style={{ ...inputStyle, width: 110 }}
+                    onKeyDown={(e) => e.key === "Enter" && addOpex()}
+                  />
+                  <button
+                    onClick={addOpex}
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      height: "100%",
-                      gap: 8,
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "none",
+                      background: "#2d4a2d",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontFamily: T.font.ui,
+                      fontSize: 13,
+                      fontWeight: 600,
                     }}
                   >
-                    <PLMarginGauge
-                      value={grossMarginPct}
-                      label="Gross Margin"
-                      color={
-                        grossMarginPct >= 35
-                          ? CC.success
-                          : grossMarginPct >= 20
-                            ? CC.warning
-                            : CC.danger
-                      }
-                    />
-                    <PLMarginGauge
-                      value={netMarginPct}
-                      label="Net Margin"
-                      color={
-                        netMarginPct >= 20
-                          ? CC.success
-                          : netMarginPct >= 10
-                            ? CC.warning
-                            : CC.danger
-                      }
-                    />
-                  </div>
-                </ChartCard>
-              </div>
-            )}
+                    + Add
+                  </button>
+                </div>
+                <WRow
+                  label="Total OpEx (incl. loyalty)"
+                  value={totalOpexIncLoyalty}
+                  bold
+                  negative
+                  highlight={totalOpexIncLoyalty > 0 ? "red" : undefined}
+                />
 
-            {/* ── CHART: Cost Composition Donut ── */}
-            {!loading &&
-              importCogsHardware + localCogsTotal + loyaltyCost + totalOpex >
+                <SectionHeader icon="🏁" label="Net Profit / Loss" />
+                <div
+                  style={{
+                    padding: "20px 16px",
+                    background: netProfit >= 0 ? "#f0f7f0" : "#fff8f8",
+                    borderTop:
+                      "2px solid " + (netProfit >= 0 ? "#c8e6c9" : "#ffcdd2"),
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{ fontSize: 13, color: "#888", marginBottom: 4 }}
+                      >
+                        Net {netProfit >= 0 ? "Profit" : "Loss"}
+                      </div>
+                      <div
+                        style={{
+                          ...T.type.metricLg,
+                          fontFamily: T.font.ui,
+                          color: netProfit >= 0 ? "#2E7D32" : "#c62828",
+                        }}
+                      >
+                        {netProfit < 0 ? "−" : ""}
+                        {fmtZar(Math.abs(netProfit))}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div
+                        style={{ fontSize: 12, color: "#888", marginBottom: 6 }}
+                      >
+                        Net Margin
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          color: pctColour(netMarginPct),
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {fmt(netMarginPct)}%
+                      </div>
+                    </div>
+                  </div>
+                  {websiteRevenue > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 16,
+                          fontSize: 12,
+                          color: "#888",
+                          marginBottom: 6,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>
+                          Gross margin:{" "}
+                          <strong style={{ color: pctColour(grossMarginPct) }}>
+                            {fmt(grossMarginPct)}%
+                          </strong>
+                        </span>
+                        <span>
+                          Net margin:{" "}
+                          <strong style={{ color: pctColour(netMarginPct) }}>
+                            {fmt(netMarginPct)}%
+                          </strong>
+                        </span>
+                        <span>
+                          Loyalty cost:{" "}
+                          <strong style={{ color: "#b5935a" }}>
+                            {fmtZar(loyaltyCost)} (
+                            {earnedPoints.toLocaleString()} pts)
+                          </strong>
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          borderRadius: 4,
+                          background: "#e0e0e0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${Math.max(0, Math.min(100, netMarginPct))}%`,
+                            background: pctColour(netMarginPct),
+                            borderRadius: 4,
+                            transition: "width 0.5s",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: INTEL PANELS */}
+            <div>
+              {/* Margin Gauges */}
+              {websiteRevenue > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <ChartCard title="Net Margin" height={200}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        height: "100%",
+                        gap: 8,
+                      }}
+                    >
+                      <PLMarginGauge
+                        value={grossMarginPct}
+                        label="Gross Margin"
+                        color={
+                          grossMarginPct >= 35
+                            ? CC.success
+                            : grossMarginPct >= 20
+                              ? CC.warning
+                              : CC.danger
+                        }
+                      />
+                      <PLMarginGauge
+                        value={netMarginPct}
+                        label="Net Margin"
+                        color={
+                          netMarginPct >= 20
+                            ? CC.success
+                            : netMarginPct >= 10
+                              ? CC.warning
+                              : CC.danger
+                        }
+                      />
+                    </div>
+                  </ChartCard>
+                </div>
+              )}
+
+              {/* Cost Composition Donut */}
+              {importCogsHardware + localCogsTotal + loyaltyCost + totalOpex >
                 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <ChartCard title="Cost Composition" height={220}>
@@ -1329,9 +1480,8 @@ export default function HQProfitLoss() {
                 </div>
               )}
 
-            {/* ── CHART: Revenue vs COGS trend (30-day rolling) ── */}
-            {!loading &&
-              (() => {
+              {/* Revenue vs COGS trend */}
+              {(() => {
                 const dayMap = {};
                 orders.forEach((o) => {
                   const day = new Date(o.created_at).toLocaleDateString(
@@ -1351,7 +1501,6 @@ export default function HQProfitLoss() {
                   .slice(-20)
                   .map((d) => ({
                     ...d,
-                    net: d.revenue - d.cogs,
                     revenue: Math.round(d.revenue),
                     cogs: Math.round(d.cogs),
                     net: Math.round(d.revenue - d.cogs),
@@ -1479,478 +1628,496 @@ export default function HQProfitLoss() {
                 );
               })()}
 
-            {/* FX Impact */}
-            <div style={{ ...card, padding: 0 }}>
-              <SectionHeader icon="📡" label="Live FX Impact" />
-              <div style={{ padding: "16px 20px" }}>
-                <p style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}>
-                  What if USD/ZAR moves? Enter a scenario rate to see the impact
-                  on gross margin.
-                </p>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "center",
-                    marginBottom: 16,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#555",
-                      whiteSpace: "nowrap",
-                    }}
+              {/* FX Impact */}
+              <div style={{ ...card, padding: 0 }}>
+                <SectionHeader icon="📡" label="Live FX Impact" />
+                <div style={{ padding: "16px 20px" }}>
+                  <p
+                    style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}
                   >
-                    If rate moves to R
-                  </span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="10"
-                    max="30"
-                    value={fxScenario}
-                    onChange={(e) => setFxScenario(e.target.value)}
-                    placeholder={usdZar.toFixed(2)}
-                    style={{ ...inputStyle, width: 90 }}
-                  />
-                  <span style={{ fontSize: 13, color: "#555" }}>/ USD</span>
-                </div>
-                {fxScenario ? (
+                    What if USD/ZAR moves? Enter a scenario rate to see the
+                    impact on gross margin.
+                  </p>
                   <div
                     style={{
-                      background: scenarioGross >= 0 ? "#f0f7f0" : "#fff8f8",
-                      borderRadius: 10,
-                      padding: "14px 16px",
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      marginBottom: 16,
                     }}
                   >
-                    {[
-                      ["Current rate", `R${usdZar.toFixed(4)}/USD`],
-                      ["Scenario rate", `R${fmt(scenarioRate, 4)}/USD`],
-                      [
-                        "Est. import COGS (sold units)",
-                        fmtZar(scenarioImportCogs),
-                      ],
-                    ].map(([label, val], i) => (
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: "#555",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      If rate moves to R
+                    </span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="10"
+                      max="30"
+                      value={fxScenario}
+                      onChange={(e) => setFxScenario(e.target.value)}
+                      placeholder={usdZar.toFixed(2)}
+                      style={{ ...inputStyle, width: 90 }}
+                    />
+                    <span style={{ fontSize: 13, color: "#555" }}>/ USD</span>
+                  </div>
+                  {fxScenario ? (
+                    <div
+                      style={{
+                        background: scenarioGross >= 0 ? "#f0f7f0" : "#fff8f8",
+                        borderRadius: 10,
+                        padding: "14px 16px",
+                      }}
+                    >
+                      {[
+                        ["Current rate", `R${usdZar.toFixed(4)}/USD`],
+                        ["Scenario rate", `R${fmt(scenarioRate, 4)}/USD`],
+                        [
+                          "Est. import COGS (sold units)",
+                          fmtZar(scenarioImportCogs),
+                        ],
+                      ].map(([label, val], i) => (
+                        <div
+                          key={label}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: 13,
+                            marginBottom: 8,
+                          }}
+                        >
+                          <span style={{ color: "#888" }}>{label}</span>
+                          <strong
+                            style={{ color: i === 2 ? "#c62828" : "#333" }}
+                          >
+                            {val}
+                          </strong>
+                        </div>
+                      ))}
                       <div
-                        key={label}
                         style={{
                           display: "flex",
                           justifyContent: "space-between",
-                          fontSize: 13,
-                          marginBottom: 8,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          borderTop: "1px solid #e0e0e0",
+                          paddingTop: 8,
                         }}
                       >
-                        <span style={{ color: "#888" }}>{label}</span>
-                        <strong style={{ color: i === 2 ? "#c62828" : "#333" }}>
-                          {val}
+                        <span>Gross Profit at scenario</span>
+                        <strong
+                          style={{ color: pctColour(scenarioGrossMargin) }}
+                        >
+                          {fmtZar(scenarioGross)} ({fmt(scenarioGrossMargin)}%)
                         </strong>
                       </div>
-                    ))}
+                    </div>
+                  ) : (
                     <div
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        borderTop: "1px solid #e0e0e0",
-                        paddingTop: 8,
+                        fontSize: 13,
+                        color: "#aaa",
+                        fontStyle: "italic",
                       }}
                     >
-                      <span>Gross Profit at scenario</span>
-                      <strong style={{ color: pctColour(scenarioGrossMargin) }}>
-                        {fmtZar(scenarioGross)} ({fmt(scenarioGrossMargin)}%)
+                      Current gross margin:{" "}
+                      <strong
+                        style={{
+                          color: pctColour(grossMarginPct),
+                          fontStyle: "normal",
+                        }}
+                      >
+                        {fmt(grossMarginPct)}%
                       </strong>
                     </div>
-                  </div>
-                ) : (
+                  )}
+                </div>
+              </div>
+
+              {/* Loyalty Programme Summary */}
+              <div style={{ ...card, padding: 0 }}>
+                <SectionHeader icon="⭐" label="Loyalty Programme Cost" />
+                <div style={{ padding: "16px 20px" }}>
                   <div
-                    style={{ fontSize: 13, color: "#aaa", fontStyle: "italic" }}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 12,
+                      marginBottom: 14,
+                    }}
                   >
-                    Current gross margin:{" "}
-                    <strong
-                      style={{
-                        color: pctColour(grossMarginPct),
-                        fontStyle: "normal",
-                      }}
-                    >
-                      {fmt(grossMarginPct)}%
-                    </strong>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Loyalty Programme Summary */}
-            <div style={{ ...card, padding: 0 }}>
-              <SectionHeader icon="⭐" label="Loyalty Programme Cost" />
-              <div style={{ padding: "16px 20px" }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                    marginBottom: 14,
-                  }}
-                >
-                  {[
-                    ["Points Issued", earnedPoints.toLocaleString(), "#b5935a"],
-                    ["Est. Programme Cost", fmtZar(loyaltyCost), "#c62828"],
-                    [
-                      "Cost/Revenue %",
-                      websiteRevenue > 0
-                        ? `${fmt((loyaltyCost / websiteRevenue) * 100)}%`
-                        : "—",
-                      "#E65100",
-                    ],
-                    ["Cost/Point", `R${fmt(costPerPointIssued, 4)}`, "#2d4a2d"],
-                  ].map(([label, val, color]) => (
-                    <div
-                      key={label}
-                      style={{
-                        background: "#fafaf8",
-                        borderRadius: 8,
-                        padding: "10px 12px",
-                      }}
-                    >
+                    {[
+                      [
+                        "Points Issued",
+                        earnedPoints.toLocaleString(),
+                        "#b5935a",
+                      ],
+                      ["Est. Programme Cost", fmtZar(loyaltyCost), "#c62828"],
+                      [
+                        "Cost/Revenue %",
+                        websiteRevenue > 0
+                          ? `${fmt((loyaltyCost / websiteRevenue) * 100)}%`
+                          : "—",
+                        "#E65100",
+                      ],
+                      [
+                        "Cost/Point",
+                        `R${fmt(costPerPointIssued, 4)}`,
+                        "#2d4a2d",
+                      ],
+                    ].map(([label, val, color]) => (
                       <div
-                        style={{ fontSize: 11, color: "#aaa", marginBottom: 3 }}
-                      >
-                        {label}
-                      </div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color }}>
-                        {val}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#999",
-                    background: "#f9f9f9",
-                    borderRadius: 6,
-                    padding: "8px 10px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Cost/pt = R{fmt(redemptionValue, 2)} redemption value ×{" "}
-                  {100 - Math.round(breakageRate * 100)}% expected redemption
-                  rate.
-                  {loyaltyConfig
-                    ? " Config from loyalty_config table."
-                    : " Using default rates — link loyalty_config for live values."}
-                </div>
-              </div>
-            </div>
-
-            {/* Best Margin SKU */}
-            <div style={{ ...card, padding: 0 }}>
-              <SectionHeader icon="🏆" label="Best Margin SKU" />
-              <div style={{ padding: "16px 20px" }}>
-                {bestSkuMargin ? (
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        color: "#2d4a2d",
-                        marginBottom: 4,
-                      }}
-                    >
-                      {bestSkuMargin.name}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#999",
-                        marginBottom: 12,
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {bestSkuMargin.channel} channel
-                    </div>
-                    <div style={{ display: "flex", gap: 16 }}>
-                      {[
-                        ["Sell Price", fmtZar(bestSkuMargin.sell)],
-                        ["COGS", fmtZar(bestSkuMargin.cogs)],
-                        ["Margin", `${fmt(bestSkuMargin.margin)}%`],
-                      ].map(([l, v]) => (
-                        <div key={l} style={{ textAlign: "center" }}>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "#999",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {l}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 15,
-                              fontWeight: 700,
-                              color:
-                                l === "Margin"
-                                  ? pctColour(bestSkuMargin.margin)
-                                  : "#333",
-                            }}
-                          >
-                            {v}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p style={{ color: "#bbb", fontSize: 13 }}>
-                    Set retail prices in <strong>HQ → Pricing</strong> to see
-                    best margin SKU.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Break-Even */}
-            <div style={{ ...card, padding: 0 }}>
-              <SectionHeader icon="⚖️" label="Break-Even Calculator" />
-              <div style={{ padding: "16px 20px" }}>
-                {avgSellPrice > 0 && avgCogsPerUnit > 0 ? (
-                  <div>
-                    <div
-                      style={{ fontSize: 13, color: "#888", marginBottom: 14 }}
-                    >
-                      At avg retail <strong>{fmtZar(avgSellPrice)}</strong> and
-                      avg COGS <strong>{fmtZar(avgCogsPerUnit)}</strong>:
-                    </div>
-                    <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-                      <div
+                        key={label}
                         style={{
-                          textAlign: "center",
-                          flex: 1,
-                          background: "#f8f8f8",
+                          background: "#fafaf8",
                           borderRadius: 8,
-                          padding: "12px 8px",
+                          padding: "10px 12px",
                         }}
                       >
                         <div
                           style={{
                             fontSize: 11,
                             color: "#aaa",
-                            marginBottom: 4,
+                            marginBottom: 3,
                           }}
                         >
-                          Contribution/unit
+                          {label}
                         </div>
-                        <div
-                          style={{
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: "#2d4a2d",
-                          }}
-                        >
-                          {fmtZar(avgSellPrice - avgCogsPerUnit)}
+                        <div style={{ fontSize: 15, fontWeight: 700, color }}>
+                          {val}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#999",
+                      background: "#f9f9f9",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Cost/pt = R{fmt(redemptionValue, 2)} redemption value ×{" "}
+                    {100 - Math.round(breakageRate * 100)}% expected redemption
+                    rate.
+                    {loyaltyConfig
+                      ? " Config from loyalty_config table."
+                      : " Using default rates — link loyalty_config for live values."}
+                  </div>
+                </div>
+              </div>
+
+              {/* Best Margin SKU */}
+              <div style={{ ...card, padding: 0 }}>
+                <SectionHeader icon="🏆" label="Best Margin SKU" />
+                <div style={{ padding: "16px 20px" }}>
+                  {bestSkuMargin ? (
+                    <div>
                       <div
                         style={{
-                          textAlign: "center",
-                          flex: 1,
-                          background: "#f8f8f8",
-                          borderRadius: 8,
-                          padding: "12px 8px",
+                          fontSize: 18,
+                          fontWeight: 700,
+                          color: "#2d4a2d",
+                          marginBottom: 4,
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "#aaa",
-                            marginBottom: 4,
-                          }}
-                        >
-                          Break-even units
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: breakEvenUnits ? "#E65100" : "#bbb",
-                          }}
-                        >
-                          {breakEvenUnits
-                            ? breakEvenUnits.toLocaleString()
-                            : totalOpexIncLoyalty === 0
-                              ? "Set OpEx ←"
-                              : "∞"}
-                        </div>
+                        {bestSkuMargin.name}
                       </div>
-                    </div>
-                    {breakEvenUnits && (
                       <div
                         style={{
                           fontSize: 12,
-                          color: "#888",
-                          background: "#fff8e1",
-                          borderRadius: 8,
-                          padding: "10px 14px",
+                          color: "#999",
+                          marginBottom: 12,
+                          textTransform: "capitalize",
                         }}
                       >
-                        You need to sell <strong>{breakEvenUnits}</strong> units
-                        at retail to cover{" "}
-                        <strong>{fmtZar(totalOpexIncLoyalty)}</strong> in
-                        operating costs.
+                        {bestSkuMargin.channel} channel
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <p style={{ color: "#bbb", fontSize: 13 }}>
-                    Set retail prices in <strong>HQ → Pricing</strong> and COGS
-                    in <strong>HQ → Costing</strong> to calculate break-even.
-                  </p>
-                )}
+                      <div style={{ display: "flex", gap: 16 }}>
+                        {[
+                          ["Sell Price", fmtZar(bestSkuMargin.sell)],
+                          ["COGS", fmtZar(bestSkuMargin.cogs)],
+                          ["Margin", `${fmt(bestSkuMargin.margin)}%`],
+                        ].map(([l, v]) => (
+                          <div key={l} style={{ textAlign: "center" }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "#999",
+                                marginBottom: 4,
+                              }}
+                            >
+                              {l}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 15,
+                                fontWeight: 700,
+                                color:
+                                  l === "Margin"
+                                    ? pctColour(bestSkuMargin.margin)
+                                    : "#333",
+                              }}
+                            >
+                              {v}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ color: "#bbb", fontSize: 13 }}>
+                      Set retail prices in <strong>HQ → Pricing</strong> to see
+                      best margin SKU.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Channel Comparison */}
-            <div style={{ ...card, padding: 0 }}>
-              <SectionHeader icon="📈" label="Channel Margin Comparison" />
-              <div style={{ padding: "16px 20px" }}>
-                {pricing.length === 0 ? (
-                  <p style={{ color: "#bbb", fontSize: 13 }}>
-                    No pricing data yet. Set prices in{" "}
-                    <strong>HQ → Pricing</strong>.
-                  </p>
-                ) : (
-                  ["wholesale", "retail", "website"].map((ch) => {
-                    const chPrices = pricing.filter(
-                      (p) => p.channel === ch && p.sell_price_zar,
-                    );
-                    if (chPrices.length === 0)
-                      return (
-                        <div
-                          key={ch}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            padding: "8px 0",
-                            fontSize: 13,
-                            borderBottom: "1px solid #f5f5f5",
-                          }}
-                        >
-                          <span
+              {/* Break-Even */}
+              <div style={{ ...card, padding: 0 }}>
+                <SectionHeader icon="⚖️" label="Break-Even Calculator" />
+                <div style={{ padding: "16px 20px" }}>
+                  {avgSellPrice > 0 && avgCogsPerUnit > 0 ? (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#888",
+                          marginBottom: 14,
+                        }}
+                      >
+                        At avg retail <strong>{fmtZar(avgSellPrice)}</strong>{" "}
+                        and avg COGS <strong>{fmtZar(avgCogsPerUnit)}</strong>:
+                      </div>
+                      <div
+                        style={{ display: "flex", gap: 16, marginBottom: 16 }}
+                      >
+                        {[
+                          [
+                            "Contribution/unit",
+                            fmtZar(avgSellPrice - avgCogsPerUnit),
+                            "#2d4a2d",
+                          ],
+                          [
+                            "Break-even units",
+                            breakEvenUnits
+                              ? breakEvenUnits.toLocaleString()
+                              : totalOpexIncLoyalty === 0
+                                ? "Set OpEx ←"
+                                : "∞",
+                            breakEvenUnits ? "#E65100" : "#bbb",
+                          ],
+                        ].map(([l, v, color]) => (
+                          <div
+                            key={l}
                             style={{
-                              textTransform: "capitalize",
-                              color: "#bbb",
+                              textAlign: "center",
+                              flex: 1,
+                              background: "#f8f8f8",
+                              borderRadius: 8,
+                              padding: "12px 8px",
                             }}
                           >
-                            {ch}
-                          </span>
-                          <span style={{ color: "#ddd" }}>No prices set</span>
-                        </div>
-                      );
-                    const validPrices = chPrices.filter((p) =>
-                      recipesWithCogs.find((r) => r.id === p.product_cogs_id),
-                    );
-                    if (validPrices.length === 0)
-                      return (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "#aaa",
+                                marginBottom: 4,
+                              }}
+                            >
+                              {l}
+                            </div>
+                            <div
+                              style={{ fontSize: 18, fontWeight: 700, color }}
+                            >
+                              {v}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {breakEvenUnits && (
                         <div
-                          key={ch}
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            padding: "8px 0",
-                            fontSize: 13,
-                            borderBottom: "1px solid #f5f5f5",
+                            fontSize: 12,
+                            color: "#888",
+                            background: "#fff8e1",
+                            borderRadius: 8,
+                            padding: "10px 14px",
                           }}
                         >
-                          <span
-                            style={{
-                              textTransform: "capitalize",
-                              color: "#888",
-                            }}
-                          >
-                            {ch}
-                          </span>
-                          <span style={{ color: "#ccc", fontSize: 11 }}>
-                            COGS not configured
-                          </span>
+                          You need to sell <strong>{breakEvenUnits}</strong>{" "}
+                          units at retail to cover{" "}
+                          <strong>{fmtZar(totalOpexIncLoyalty)}</strong> in
+                          operating costs.
                         </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p style={{ color: "#bbb", fontSize: 13 }}>
+                      Set retail prices in <strong>HQ → Pricing</strong> and
+                      COGS in <strong>HQ → Costing</strong> to calculate
+                      break-even.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Channel Comparison */}
+              <div style={{ ...card, padding: 0 }}>
+                <SectionHeader icon="📈" label="Channel Margin Comparison" />
+                <div style={{ padding: "16px 20px" }}>
+                  {pricing.length === 0 ? (
+                    <p style={{ color: "#bbb", fontSize: 13 }}>
+                      No pricing data yet. Set prices in{" "}
+                      <strong>HQ → Pricing</strong>.
+                    </p>
+                  ) : (
+                    ["wholesale", "retail", "website"].map((ch) => {
+                      const chPrices = pricing.filter(
+                        (p) => p.channel === ch && p.sell_price_zar,
                       );
-                    const avgMargin =
-                      validPrices.reduce((s, p) => {
-                        const recipe = recipesWithCogs.find(
-                          (r) => r.id === p.product_cogs_id,
-                        );
-                        if (!recipe) return s;
+                      if (chPrices.length === 0)
                         return (
-                          s +
-                          ((parseFloat(p.sell_price_zar) - recipe.cogsPerUnit) /
-                            parseFloat(p.sell_price_zar)) *
-                            100
+                          <div
+                            key={ch}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "8px 0",
+                              fontSize: 13,
+                              borderBottom: "1px solid #f5f5f5",
+                            }}
+                          >
+                            <span
+                              style={{
+                                textTransform: "capitalize",
+                                color: "#bbb",
+                              }}
+                            >
+                              {ch}
+                            </span>
+                            <span style={{ color: "#ddd" }}>No prices set</span>
+                          </div>
                         );
-                      }, 0) / validPrices.length;
-                    const col = pctColour(avgMargin);
-                    return (
-                      <div key={ch} style={{ marginBottom: 14 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            marginBottom: 5,
-                          }}
-                        >
-                          <span
+                      const validPrices = chPrices.filter((p) =>
+                        recipesWithCogs.find((r) => r.id === p.product_cogs_id),
+                      );
+                      if (validPrices.length === 0)
+                        return (
+                          <div
+                            key={ch}
                             style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "8px 0",
                               fontSize: 13,
-                              textTransform: "capitalize",
-                              color: "#555",
-                              fontWeight: 600,
+                              borderBottom: "1px solid #f5f5f5",
                             }}
                           >
-                            {ch}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: col,
-                            }}
-                          >
-                            {fmt(avgMargin)}% avg margin
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            height: 6,
-                            borderRadius: 3,
-                            background: "#f0f0f0",
-                            overflow: "hidden",
-                          }}
-                        >
+                            <span
+                              style={{
+                                textTransform: "capitalize",
+                                color: "#888",
+                              }}
+                            >
+                              {ch}
+                            </span>
+                            <span style={{ color: "#ccc", fontSize: 11 }}>
+                              COGS not configured
+                            </span>
+                          </div>
+                        );
+                      const avgMargin =
+                        validPrices.reduce((s, p) => {
+                          const recipe = recipesWithCogs.find(
+                            (r) => r.id === p.product_cogs_id,
+                          );
+                          if (!recipe) return s;
+                          return (
+                            s +
+                            ((parseFloat(p.sell_price_zar) -
+                              recipe.cogsPerUnit) /
+                              parseFloat(p.sell_price_zar)) *
+                              100
+                          );
+                        }, 0) / validPrices.length;
+                      const col = pctColour(avgMargin);
+                      return (
+                        <div key={ch} style={{ marginBottom: 14 }}>
                           <div
                             style={{
-                              height: "100%",
-                              width: `${Math.min(100, Math.max(0, avgMargin))}%`,
-                              background: col,
-                              transition: "width 0.4s",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              marginBottom: 5,
                             }}
-                          />
+                          >
+                            <span
+                              style={{
+                                fontSize: 13,
+                                textTransform: "capitalize",
+                                color: "#555",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {ch}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: col,
+                              }}
+                            >
+                              {fmt(avgMargin)}% avg margin
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              height: 6,
+                              borderRadius: 3,
+                              background: "#f0f0f0",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${Math.min(100, Math.max(0, avgMargin))}%`,
+                                background: col,
+                                transition: "width 0.4s",
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#bbb",
+                              marginTop: 3,
+                            }}
+                          >
+                            {validPrices.length} SKU
+                            {validPrices.length !== 1 ? "s" : ""} with pricing
+                          </div>
                         </div>
-                        <div
-                          style={{ fontSize: 11, color: "#bbb", marginTop: 3 }}
-                        >
-                          {validPrices.length} SKU
-                          {validPrices.length !== 1 ? "s" : ""} with pricing
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
+
       {toast && (
         <div
           style={{
