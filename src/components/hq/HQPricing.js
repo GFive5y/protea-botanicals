@@ -1,14 +1,121 @@
-// src/components/hq/HQPricing.js v3.5 — WP-GUIDE-C+: usePageContext 'pricing' wired + WorkflowGuide added
-// v3.4 — Batch P&L boxes always show per-unit price alongside total
-// v3.3 — Per-unit COGS always shown prominently, batch P&L secondary
-// v3.2 — Edit scrolls to detail panel, quantity P&L strip, hardware_qty warning
-// v3.1 — calcCogsTotal mirrors HQCogs v3.1 exactly
+// src/components/hq/HQPricing.js v4.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost everywhere
+//   - DM Mono for all numeric / financial values
+//   - Header: Outfit 300, ink900
+//   - Toast: T.accent, clean text
+//   - FX badge: success semantic tokens
+//   - KPI values: DM Mono, semantic colour
+//   - Margin badges: token colours
+//   - Buttons: token system
+//   - ChannelCard: dirty border → accentBd; save button uses token primary
+//   - Summary table: ink tokens throughout
+// v3.5: usePageContext 'pricing' + WorkflowGuide
+// v3.4–v3.1: See changelog above
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+
+const sCard = {
+  background: "#fff",
+  borderRadius: 8,
+  border: `1px solid ${T.ink150}`,
+  padding: 24,
+  marginBottom: 20,
+  boxShadow: T.shadow,
+};
+const sInput = {
+  padding: "9px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontFamily: T.fontUi,
+  fontSize: 13,
+  width: "100%",
+  boxSizing: "border-box",
+  color: T.ink900,
+};
+const sTh = {
+  padding: "10px 14px",
+  textAlign: "left",
+  fontSize: 10,
+  fontWeight: 700,
+  color: T.ink400,
+  textTransform: "uppercase",
+  letterSpacing: "0.1em",
+  borderBottom: `1px solid ${T.ink150}`,
+};
+const sTd = {
+  padding: "12px 14px",
+  borderBottom: `1px solid ${T.ink075}`,
+  color: T.ink700,
+  verticalAlign: "middle",
+  fontSize: 13,
+};
+
+const mkBtn = (variant = "primary", extra = {}) => {
+  const base = {
+    padding: "8px 16px",
+    borderRadius: 4,
+    border: "none",
+    cursor: "pointer",
+    fontFamily: T.fontUi,
+    fontWeight: 600,
+    fontSize: 12,
+    transition: "all 0.15s",
+    letterSpacing: "0.04em",
+  };
+  const v = {
+    primary: { background: T.accent, color: "#fff" },
+    ghost: {
+      background: "transparent",
+      color: T.accent,
+      border: `1px solid ${T.accentBd}`,
+    },
+    muted: { background: T.ink075, color: T.ink400, cursor: "default" },
+    toggle: {
+      background: T.ink075,
+      color: T.ink500,
+      border: `1px solid ${T.ink150}`,
+    },
+    toggleOn: { background: T.accent, color: "#fff" },
+  };
+  return { ...base, ...(v[variant] || v.primary), ...extra };
+};
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 const CANNALYTICS_TESTS = [
   { id: "potency", price: 350 },
   { id: "solvents", price: 200 },
@@ -20,6 +127,13 @@ const CANNALYTICS_TESTS = [
   { id: "foreign_matter", price: 100 },
 ];
 
+const CHANNELS = [
+  { id: "wholesale", label: "Wholesale", desc: "B2B retailer price" },
+  { id: "retail", label: "Retail", desc: "In-store price" },
+  { id: "website", label: "Website", desc: "Online store price" },
+];
+
+// ── FX Hook ───────────────────────────────────────────────────────────────────
 function useFxRate() {
   const [fxRate, setFxRate] = useState(null);
   const [fxLoading, setFxLoading] = useState(true);
@@ -45,6 +159,7 @@ function useFxRate() {
   return { fxRate, fxLoading };
 }
 
+// ── COGS calc ─────────────────────────────────────────────────────────────────
 function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
   if (!recipe || !usdZar) return 0;
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
@@ -106,66 +221,54 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
     const t = CANNALYTICS_TESTS.find((x) => x.id === id);
     return s + (t ? t.price : 0);
   }, 0);
-  const labPerUnit = labTotal / batchSize;
-  const transPerU = parseFloat(recipe.transport_cost_zar || 0) / batchSize;
-  const miscPerU = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
   return (
     hwCost +
     tpCost +
     diCost +
     pkCost +
     lbCost +
-    labPerUnit +
-    transPerU +
-    miscPerU
+    labTotal / batchSize +
+    parseFloat(recipe.transport_cost_zar || 0) / batchSize +
+    parseFloat(recipe.misc_cost_zar || 0) / batchSize
   );
 }
 
 const fmtZar = (n) =>
   `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
+function calcMargin(sell, cogs) {
+  if (!sell || sell <= 0) return null;
+  return ((sell - cogs) / sell) * 100;
+}
+function recommendedPrice(cogs, targetPct) {
+  if (!targetPct || targetPct >= 100 || targetPct <= 0) return null;
+  return cogs / (1 - targetPct / 100);
+}
 
-const CHANNELS = [
-  {
-    id: "wholesale",
-    label: "Wholesale",
-    icon: "🏭",
-    desc: "B2B retailer price",
-  },
-  { id: "retail", label: "Retail", icon: "🏪", desc: "In-store price" },
-  { id: "website", label: "Website", icon: "🌐", desc: "Online store price" },
-];
-
-function marginColour(pct) {
+// ── Margin helpers ────────────────────────────────────────────────────────────
+function marginTokens(pct) {
   if (pct === null || isNaN(pct))
-    return { color: "#bbb", bg: "#f5f5f5", label: "—" };
-  if (pct < 0) return { color: "#c62828", bg: "#FFEBEE", label: "Loss" };
-  if (pct < 20) return { color: "#c62828", bg: "#FFEBEE", label: "Low" };
-  if (pct < 35) return { color: "#E65100", bg: "#FFF3E0", label: "OK" };
-  return { color: "#2E7D32", bg: "#E8F5E9", label: "Good" };
-}
-function calcMargin(sellPrice, cogs) {
-  if (!sellPrice || sellPrice <= 0) return null;
-  return ((sellPrice - cogs) / sellPrice) * 100;
-}
-function recommendedPrice(cogs, targetMarginPct) {
-  if (!targetMarginPct || targetMarginPct >= 100 || targetMarginPct <= 0)
-    return null;
-  return cogs / (1 - targetMarginPct / 100);
+    return { color: T.ink300, bg: T.ink075, label: "—" };
+  if (pct < 0) return { color: T.danger, bg: T.dangerBg, label: "Loss" };
+  if (pct < 20) return { color: T.danger, bg: T.dangerBg, label: "Low" };
+  if (pct < 35) return { color: T.warning, bg: T.warningBg, label: "OK" };
+  return { color: T.success, bg: T.successBg, label: "Good" };
 }
 
 function MarginBadge({ pct, large = false }) {
-  const c = marginColour(pct);
+  const c = marginTokens(pct);
   return (
     <span
       style={{
         display: "inline-block",
         padding: large ? "6px 14px" : "3px 10px",
         borderRadius: 20,
-        fontSize: large ? 16 : 12,
+        fontSize: large ? 15 : 11,
         fontWeight: 700,
         color: c.color,
         background: c.bg,
+        fontFamily: T.fontData,
+        letterSpacing: "-0.01em",
       }}
     >
       {pct !== null && !isNaN(pct) ? `${fmt(pct)}%` : "—"}
@@ -174,6 +277,7 @@ function MarginBadge({ pct, large = false }) {
   );
 }
 
+// ── FX Sensitivity table ──────────────────────────────────────────────────────
 function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
   const scenarios = [-2, -1, 0, +1, +2].map((delta) => {
     const rate = baseRate + delta;
@@ -184,24 +288,18 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table
-        style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: 13,
+          fontFamily: T.fontUi,
+        }}
       >
         <thead>
           <tr>
             {["USD/ZAR Rate", "Est. COGS", "Margin at current price", ""].map(
               (h) => (
-                <th
-                  key={h}
-                  style={{
-                    padding: "8px 12px",
-                    textAlign: "left",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#888",
-                    textTransform: "uppercase",
-                    borderBottom: "1px solid #f0ede8",
-                  }}
-                >
+                <th key={h} style={sTh}>
                   {h}
                 </th>
               ),
@@ -212,12 +310,15 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
           {scenarios.map((s) => (
             <tr
               key={s.rate}
-              style={{ background: s.delta === 0 ? "#f0f7f0" : "transparent" }}
+              style={{
+                background: s.delta === 0 ? T.accentLit : "transparent",
+              }}
             >
               <td
                 style={{
-                  padding: "10px 12px",
+                  ...sTd,
                   fontWeight: s.delta === 0 ? 700 : 400,
+                  fontFamily: T.fontData,
                 }}
               >
                 R{fmt(s.rate, 2)}/USD{" "}
@@ -227,11 +328,20 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
                     ? `(+R${s.delta})`
                     : `(−R${Math.abs(s.delta)})`}
               </td>
-              <td style={{ padding: "10px 12px" }}>{fmtZar(s.scenarioCogs)}</td>
-              <td style={{ padding: "10px 12px" }}>
+              <td style={{ ...sTd, fontFamily: T.fontData }}>
+                {fmtZar(s.scenarioCogs)}
+              </td>
+              <td style={sTd}>
                 <MarginBadge pct={s.margin} />
               </td>
-              <td style={{ padding: "10px 12px", fontSize: 11, color: "#aaa" }}>
+              <td
+                style={{
+                  ...sTd,
+                  fontSize: 11,
+                  color: T.ink400,
+                  fontFamily: T.fontData,
+                }}
+              >
                 {s.delta !== 0 && s.margin !== null
                   ? `${fmt(Math.abs(s.margin - (scenarios[2].margin || 0)))}pp ${s.delta > 0 ? "▼" : "▲"}`
                   : ""}
@@ -244,6 +354,7 @@ function FxSensitivity({ baseCogs, baseRate, sellPrice }) {
   );
 }
 
+// ── ChannelCard ───────────────────────────────────────────────────────────────
 function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
   const existing = pricing.find((p) => p.channel === channel.id);
   const [sellPrice, setSellPrice] = useState(
@@ -257,7 +368,7 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
   const [dirty, setDirty] = useState(false);
   const sell = parseFloat(sellPrice) || 0;
   const margin = sell > 0 ? calcMargin(sell, cogs) : null;
-  const mc = marginColour(margin);
+  const mc = marginTokens(margin);
   const recPrice = targetPct
     ? recommendedPrice(cogs, parseFloat(targetPct))
     : null;
@@ -279,41 +390,18 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
     }
   };
 
-  const inputBase = {
-    padding: "10px 14px",
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    fontFamily: "Jost, sans-serif",
-    fontSize: 14,
-    width: "100%",
-    boxSizing: "border-box",
-  };
-  const lbl = (text) => (
-    <label
-      style={{
-        fontSize: 11,
-        fontWeight: 600,
-        color: "#888",
-        textTransform: "uppercase",
-        letterSpacing: "0.4px",
-        display: "block",
-        marginBottom: 6,
-      }}
-    >
-      {text}
-    </label>
-  );
-
   return (
     <div
       style={{
         background: "#fff",
-        borderRadius: 12,
-        border: `2px solid ${dirty ? "#2d4a2d" : "#f0ede8"}`,
+        borderRadius: 8,
+        border: `2px solid ${dirty ? T.accent : T.ink150}`,
         padding: 20,
         transition: "border-color 0.2s",
+        boxShadow: T.shadow,
       }}
     >
+      {/* Channel header */}
       <div
         style={{
           display: "flex",
@@ -322,21 +410,56 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           marginBottom: 16,
         }}
       >
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <span style={{ fontSize: 22 }}>{channel.icon}</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#2d4a2d" }}>
-              {channel.label}
-            </div>
-            <div style={{ fontSize: 11, color: "#999" }}>{channel.desc}</div>
+        <div>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 14,
+              color: T.ink900,
+              fontFamily: T.fontUi,
+            }}
+          >
+            {channel.label}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: T.ink400,
+              marginTop: 2,
+              fontFamily: T.fontUi,
+            }}
+          >
+            {channel.desc}
           </div>
         </div>
         {margin !== null && <MarginBadge pct={margin} large />}
       </div>
+
+      {/* Sell price */}
       <div style={{ marginBottom: 14 }}>
-        {lbl("Sell Price (ZAR) — per unit")}
+        <label
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: T.ink400,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            display: "block",
+            marginBottom: 6,
+            fontFamily: T.fontUi,
+          }}
+        >
+          Sell Price (ZAR) — per unit
+        </label>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16, color: "#555", fontWeight: 600 }}>
+          <span
+            style={{
+              fontSize: 16,
+              color: T.ink500,
+              fontWeight: 600,
+              fontFamily: T.fontData,
+            }}
+          >
             R
           </span>
           <input
@@ -350,19 +473,35 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             }}
             placeholder="0.00"
             style={{
-              ...inputBase,
+              ...sInput,
               fontSize: 16,
               fontWeight: 600,
-              color: "#2d4a2d",
-              border: `1px solid ${dirty ? "#2d4a2d" : "#ddd"}`,
+              color: T.accent,
+              fontFamily: T.fontData,
+              border: `1px solid ${dirty ? T.accent : T.ink150}`,
               flex: 1,
             }}
           />
         </div>
       </div>
+
+      {/* Slider */}
       {sell > 0 && (
         <div style={{ marginBottom: 14 }}>
-          {lbl("Adjust Price (what-if)")}
+          <label
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: T.ink400,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              display: "block",
+              marginBottom: 6,
+              fontFamily: T.fontUi,
+            }}
+          >
+            Adjust Price (what-if)
+          </label>
           <input
             type="range"
             min={Math.max(1, Math.round(cogs * 0.8))}
@@ -380,24 +519,27 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               display: "flex",
               justifyContent: "space-between",
               fontSize: 11,
-              color: "#bbb",
+              color: T.ink300,
               marginTop: 2,
+              fontFamily: T.fontData,
             }}
           >
             <span>{fmtZar(Math.max(1, cogs * 0.8))}</span>
-            <span style={{ fontWeight: 600, color: mc.color }}>
+            <span style={{ fontWeight: 700, color: mc.color }}>
               {fmtZar(sell)}
             </span>
             <span>{fmtZar(sell * 2.5)}</span>
           </div>
         </div>
       )}
+
+      {/* P&L display */}
       {sell > 0 && (
         <>
           <div
             style={{
               background: mc.bg,
-              borderRadius: 8,
+              borderRadius: 6,
               padding: "10px 14px",
               marginBottom: qtyUnits > 1 ? 6 : 14,
             }}
@@ -405,8 +547,10 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             <div
               style={{
                 fontSize: 10,
-                color: "#888",
+                color: T.ink400,
                 textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontWeight: 700,
                 marginBottom: 6,
               }}
             >
@@ -416,58 +560,77 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                fontSize: 13,
+                fontSize: 12,
+                fontFamily: T.fontUi,
               }}
             >
-              <span style={{ color: "#666" }}>
-                COGS: <strong>{fmtZar(cogs)}</strong>
+              <span style={{ color: T.ink500 }}>
+                COGS:{" "}
+                <strong style={{ fontFamily: T.fontData }}>
+                  {fmtZar(cogs)}
+                </strong>
               </span>
-              <span style={{ color: "#666" }}>
+              <span style={{ color: T.ink500 }}>
                 Profit:{" "}
-                <strong style={{ color: mc.color }}>
+                <strong style={{ color: mc.color, fontFamily: T.fontData }}>
                   {fmtZar(sell - cogs)}
                 </strong>
               </span>
-              <span style={{ color: "#666" }}>
+              <span style={{ color: T.ink500 }}>
                 Margin:{" "}
-                <strong style={{ color: mc.color }}>{fmt(margin)}%</strong>
+                <strong style={{ color: mc.color, fontFamily: T.fontData }}>
+                  {fmt(margin)}%
+                </strong>
               </span>
             </div>
           </div>
           {qtyUnits > 1 && (
             <div
               style={{
-                background: "#f5f5f5",
-                borderRadius: 8,
+                background: T.ink075,
+                borderRadius: 6,
                 padding: "8px 12px",
                 marginBottom: 14,
                 fontSize: 12,
               }}
             >
-              <div style={{ color: "#888", marginBottom: 4 }}>
+              <div
+                style={{
+                  color: T.ink400,
+                  marginBottom: 4,
+                  fontFamily: T.fontUi,
+                }}
+              >
                 × {qtyUnits.toLocaleString()} units
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontFamily: T.fontUi,
+                }}
+              >
+                <span style={{ color: T.ink500 }}>
                   Total COGS:{" "}
-                  <strong style={{ color: "#c62828" }}>
+                  <strong style={{ color: T.danger, fontFamily: T.fontData }}>
                     {fmtZar(cogs * qtyUnits)}
                   </strong>
                 </span>
-                <span style={{ color: "#666" }}>
-                  Total Revenue:{" "}
-                  <strong style={{ color: "#2d4a2d" }}>
+                <span style={{ color: T.ink500 }}>
+                  Revenue:{" "}
+                  <strong style={{ color: T.accent, fontFamily: T.fontData }}>
                     {fmtZar(sell * qtyUnits)}
                   </strong>
                 </span>
               </div>
-              <div style={{ marginTop: 3 }}>
-                <span style={{ color: "#666" }}>
-                  Total Profit:{" "}
+              <div style={{ marginTop: 3, fontFamily: T.fontUi }}>
+                <span style={{ color: T.ink500 }}>
+                  Gross Profit:{" "}
                   <strong
                     style={{
                       color:
-                        (sell - cogs) * qtyUnits >= 0 ? "#2d4a2d" : "#c62828",
+                        (sell - cogs) * qtyUnits >= 0 ? T.accent : T.danger,
+                      fontFamily: T.fontData,
                     }}
                   >
                     {fmtZar((sell - cogs) * qtyUnits)}
@@ -478,8 +641,23 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
           )}
         </>
       )}
+
+      {/* Target margin */}
       <div style={{ marginBottom: 14 }}>
-        {lbl("Target Margin % → Recommended Price")}
+        <label
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: T.ink400,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            display: "block",
+            marginBottom: 6,
+            fontFamily: T.fontUi,
+          }}
+        >
+          Target Margin % → Recommended Price
+        </label>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
             type="number"
@@ -493,39 +671,26 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             }}
             placeholder="e.g. 40"
             style={{
+              ...sInput,
               width: 80,
-              padding: "8px 12px",
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              fontFamily: "Jost, sans-serif",
-              fontSize: 14,
+              textAlign: "center",
+              fontFamily: T.fontData,
             }}
           />
-          <span style={{ fontSize: 13, color: "#888" }}>% →</span>
+          <span style={{ fontSize: 12, color: T.ink400 }}>% →</span>
           {recPrice ? (
-            <button
-              onClick={applyRec}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid #2d4a2d",
-                background: "#f0f7f0",
-                color: "#2d4a2d",
-                cursor: "pointer",
-                fontFamily: "Jost, sans-serif",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-              title="Click to apply"
-            >
-              {fmtZar(recPrice)} ↑ apply
+            <button onClick={applyRec} style={mkBtn("ghost", { fontSize: 12 })}>
+              <span style={{ fontFamily: T.fontData }}>{fmtZar(recPrice)}</span>{" "}
+              — apply
             </button>
           ) : (
-            <span style={{ fontSize: 12, color: "#bbb" }}>Enter % above</span>
+            <span style={{ fontSize: 12, color: T.ink300 }}>Enter % above</span>
           )}
         </div>
       </div>
-      <div style={{ marginBottom: 16 }}>
+
+      {/* Notes */}
+      <div style={{ marginBottom: 14 }}>
         <input
           type="text"
           value={notes}
@@ -534,48 +699,39 @@ function ChannelCard({ channel, cogs, qtyUnits = 1, pricing, onSave }) {
             setDirty(true);
           }}
           placeholder="Notes (optional)"
-          style={{
-            width: "100%",
-            padding: "8px 12px",
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            fontFamily: "Jost, sans-serif",
-            fontSize: 13,
-            boxSizing: "border-box",
-          }}
+          style={{ ...sInput, fontSize: 12 }}
         />
       </div>
+
+      {/* Save button */}
       <button
         onClick={handleSave}
         disabled={saving || !dirty}
         style={{
           width: "100%",
-          padding: "11px",
-          borderRadius: 8,
+          padding: "10px",
+          borderRadius: 4,
           border: "none",
           cursor: dirty ? "pointer" : "default",
-          fontFamily: "Jost, sans-serif",
-          fontWeight: 600,
-          fontSize: 14,
-          background: dirty ? "#2d4a2d" : "#f0f0f0",
-          color: dirty ? "#fff" : "#bbb",
+          fontFamily: T.fontUi,
+          fontWeight: 700,
+          fontSize: 13,
+          background: dirty ? T.accent : T.ink075,
+          color: dirty ? "#fff" : T.ink400,
           transition: "all 0.2s",
+          letterSpacing: "0.04em",
         }}
       >
-        {saving ? "Saving…" : dirty ? `✓ Save ${channel.label} Price` : "Saved"}
+        {saving ? "Saving…" : dirty ? `Save ${channel.label} Price` : "Saved"}
       </button>
     </div>
   );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ══════════════════════════════════════════════════════════════════════════════
 export default function HQPricing() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
-
-  // WP-GUIDE-C+: wire 'pricing' context for WorkflowGuide live status
   const ctx = usePageContext("pricing", null);
 
   const [recipes, setRecipes] = useState([]);
@@ -609,7 +765,6 @@ export default function HQPricing() {
     setLoading(false);
     if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id);
   }, [selectedId]);
-
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -617,12 +772,11 @@ export default function HQPricing() {
   const selectAndScroll = (id) => {
     setSelectedId(id);
     setTimeout(() => {
-      if (detailRef.current) {
+      if (detailRef.current)
         detailRef.current.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
-      }
     }, 50);
   };
   const showToast = (msg) => {
@@ -650,10 +804,10 @@ export default function HQPricing() {
     }
     if (error) {
       console.error("Pricing save error:", error);
-      showToast("❌ Save failed — check console");
+      showToast("Save failed — check console");
       return;
     }
-    showToast(`✅ ${channelId} price saved`);
+    showToast(`${channelId} price saved`);
     const { data } = await supabase.from("product_pricing").select("*");
     setPricing(data || []);
     setPricingVersion((v) => v + 1);
@@ -678,17 +832,8 @@ export default function HQPricing() {
     return { id: r.id, name: r.product_name, sku: r.sku, cogs, channels };
   });
 
-  const card = {
-    background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #f0ede8",
-    padding: 24,
-    marginBottom: 20,
-  };
-
   return (
-    <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
-      {/* Toast */}
+    <div style={{ fontFamily: T.fontUi, color: T.ink700 }}>
       {toast && (
         <div
           style={{
@@ -696,20 +841,20 @@ export default function HQPricing() {
             top: 24,
             right: 24,
             zIndex: 9999,
-            background: "#2d4a2d",
+            background: T.accent,
             color: "#fff",
-            padding: "14px 20px",
-            borderRadius: 10,
-            fontSize: 14,
+            padding: "12px 18px",
+            borderRadius: 6,
+            fontSize: 13,
             fontWeight: 500,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.18)",
+            fontFamily: T.fontUi,
           }}
         >
           {toast}
         </div>
       )}
 
-      {/* WP-GUIDE-C+: WorkflowGuide with live pricing context */}
       <WorkflowGuide
         context={ctx}
         tabId="pricing"
@@ -723,90 +868,96 @@ export default function HQPricing() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 28,
+          marginBottom: 24,
         }}
       >
         <div>
           <h2
             style={{
               margin: 0,
-              fontSize: 26,
-              fontFamily: "Cormorant Garamond, serif",
-              fontWeight: 600,
-              color: "#2d4a2d",
+              fontSize: 22,
+              fontFamily: T.fontUi,
+              fontWeight: 300,
+              color: T.ink900,
             }}
           >
             Pricing & Margin
           </h2>
-          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>
+          <p style={{ margin: "4px 0 0", color: T.ink500, fontSize: 13 }}>
             Set sell prices per channel · live margin calculations · FX
             sensitivity
           </p>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div
             style={{
-              background: fxLoading ? "#f5f5f5" : "#e8f5e9",
-              border: "1px solid #c8e6c9",
-              borderRadius: 20,
-              padding: "6px 14px",
-              fontSize: 13,
-              color: "#2E7D32",
+              background: fxLoading ? T.ink075 : T.successBg,
+              border: `1px solid ${T.successBd}`,
+              borderRadius: 4,
+              padding: "6px 12px",
+              fontSize: 12,
+              color: T.success,
               fontWeight: 600,
+              fontFamily: T.fontData,
             }}
           >
             {fxLoading
               ? "Loading FX…"
-              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "Live" : "Cached"}`}
           </div>
           <button
             onClick={() => setShowFxPanel((v) => !v)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              background: showFxPanel ? "#2d4a2d" : "#fff",
-              color: showFxPanel ? "#fff" : "#555",
-              cursor: "pointer",
-              fontFamily: "Jost, sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
+            style={mkBtn(showFxPanel ? "toggleOn" : "toggle")}
           >
-            📊 FX Sensitivity
+            FX Sensitivity
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: 60, color: "#999" }}>
+        <div style={{ textAlign: "center", padding: 60, color: T.ink400 }}>
           Loading pricing data…
         </div>
       ) : recipes.length === 0 ? (
-        <div style={{ ...card, textAlign: "center", padding: 60 }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>💰</div>
+        <div style={{ ...sCard, textAlign: "center", padding: 60 }}>
           <h3
             style={{
-              color: "#2d4a2d",
-              fontFamily: "Cormorant Garamond, serif",
+              color: T.ink900,
+              fontFamily: T.fontUi,
+              fontWeight: 400,
+              marginBottom: 8,
             }}
           >
             No SKU recipes yet
           </h3>
-          <p style={{ color: "#999", fontSize: 14 }}>
+          <p style={{ color: T.ink400, fontSize: 13 }}>
             Build COGS recipes in <strong>HQ → Costing</strong> first, then set
             prices here.
           </p>
         </div>
       ) : (
         <>
-          {/* All-SKUs Summary */}
-          <div style={card}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, color: "#2d4a2d" }}>
+          {/* Summary table */}
+          <div style={sCard}>
+            <h3
+              style={{
+                margin: "0 0 16px",
+                fontSize: 15,
+                color: T.ink900,
+                fontFamily: T.fontUi,
+                fontWeight: 500,
+              }}
+            >
               All SKUs — Margin Overview
             </h3>
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontFamily: T.fontUi,
+                }}
+              >
                 <thead>
                   <tr>
                     {[
@@ -817,19 +968,7 @@ export default function HQPricing() {
                       "Website",
                       "",
                     ].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "10px 14px",
-                          textAlign: "left",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#888",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.4px",
-                          borderBottom: "1px solid #f0ede8",
-                        }}
-                      >
+                      <th key={h} style={sTh}>
                         {h}
                       </th>
                     ))}
@@ -843,79 +982,70 @@ export default function HQPricing() {
                       style={{
                         cursor: "pointer",
                         background:
-                          selectedId === row.id ? "#f0f7f0" : "transparent",
+                          selectedId === row.id ? T.accentLit : "transparent",
                         transition: "background 0.1s",
                       }}
                     >
-                      <td
-                        style={{
-                          padding: "12px 14px",
-                          borderBottom: "1px solid #f8f6f2",
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, color: "#2d4a2d" }}>
+                      <td style={sTd}>
+                        <div style={{ fontWeight: 600, color: T.ink900 }}>
                           {row.name}
                         </div>
                         {row.sku && (
-                          <div style={{ fontSize: 11, color: "#bbb" }}>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: T.ink400,
+                              fontFamily: T.fontData,
+                            }}
+                          >
                             {row.sku}
                           </div>
                         )}
                       </td>
                       <td
                         style={{
-                          padding: "12px 14px",
-                          borderBottom: "1px solid #f8f6f2",
+                          ...sTd,
+                          fontFamily: T.fontData,
                           fontWeight: 600,
+                          color: T.accent,
                         }}
                       >
                         {fmtZar(row.cogs)}
                       </td>
                       {row.channels.map((ch) => (
-                        <td
-                          key={ch.id}
-                          style={{
-                            padding: "12px 14px",
-                            borderBottom: "1px solid #f8f6f2",
-                          }}
-                        >
+                        <td key={ch.id} style={sTd}>
                           {ch.sell ? (
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                              <div
+                                style={{
+                                  fontFamily: T.fontData,
+                                  fontWeight: 600,
+                                  marginBottom: 4,
+                                }}
+                              >
                                 {fmtZar(ch.sell)}
                               </div>
                               <MarginBadge pct={ch.margin} />
                             </div>
                           ) : (
-                            <span style={{ fontSize: 12, color: "#ddd" }}>
+                            <span style={{ fontSize: 12, color: T.ink150 }}>
                               Not set
                             </span>
                           )}
                         </td>
                       ))}
-                      <td
-                        style={{
-                          padding: "12px 14px",
-                          borderBottom: "1px solid #f8f6f2",
-                        }}
-                      >
+                      <td style={sTd}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             selectAndScroll(row.id);
                           }}
-                          style={{
-                            padding: "5px 12px",
-                            borderRadius: 6,
-                            border: "1px solid #ddd",
-                            background: "#f9f9f9",
-                            cursor: "pointer",
-                            fontSize: 12,
-                            color: "#555",
-                            fontFamily: "Jost, sans-serif",
-                          }}
+                          style={mkBtn("ghost", {
+                            fontSize: 11,
+                            padding: "4px 10px",
+                          })}
                         >
-                          Edit →
+                          Edit
                         </button>
                       </td>
                     </tr>
@@ -925,32 +1055,39 @@ export default function HQPricing() {
             </div>
           </div>
 
-          {/* Selected SKU Detail */}
+          {/* Selected SKU detail */}
           <div ref={detailRef} />
           {selected && (
             <div>
-              <div style={{ ...card, padding: "20px 24px", marginBottom: 20 }}>
+              {/* SKU header card */}
+              <div style={{ ...sCard, padding: "18px 22px", marginBottom: 16 }}>
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                   }}
                 >
                   <div>
                     <h3
                       style={{
                         margin: 0,
-                        fontSize: 20,
-                        fontFamily: "Cormorant Garamond, serif",
-                        color: "#2d4a2d",
+                        fontSize: 18,
+                        fontFamily: T.fontUi,
+                        fontWeight: 500,
+                        color: T.ink900,
                       }}
                     >
                       {selected.product_name}
                     </h3>
                     {selected.sku && (
                       <div
-                        style={{ fontSize: 13, color: "#aaa", marginTop: 3 }}
+                        style={{
+                          fontSize: 12,
+                          color: T.ink400,
+                          marginTop: 3,
+                          fontFamily: T.fontData,
+                        }}
                       >
                         {selected.sku}
                       </div>
@@ -962,22 +1099,22 @@ export default function HQPricing() {
                         style={{
                           marginTop: 8,
                           display: "flex",
-                          gap: 10,
+                          gap: 8,
                           flexWrap: "wrap",
                         }}
                       >
                         {selected.lab_tests?.length > 0 && (
                           <span
                             style={{
-                              fontSize: 12,
-                              background: "#E8EAF6",
-                              color: "#283593",
-                              borderRadius: 10,
-                              padding: "3px 10px",
-                              fontWeight: 600,
+                              fontSize: 11,
+                              background: T.infoBg,
+                              color: T.info,
+                              borderRadius: 3,
+                              padding: "2px 8px",
+                              fontWeight: 700,
                             }}
                           >
-                            🔬 {selected.lab_tests.length} lab test
+                            {selected.lab_tests.length} lab test
                             {selected.lab_tests.length > 1 ? "s" : ""} ÷{" "}
                             {selected.batch_size || 1} units
                           </span>
@@ -985,29 +1122,29 @@ export default function HQPricing() {
                         {parseFloat(selected.transport_cost_zar) > 0 && (
                           <span
                             style={{
-                              fontSize: 12,
-                              background: "#E0F7FA",
-                              color: "#00695C",
-                              borderRadius: 10,
-                              padding: "3px 10px",
-                              fontWeight: 600,
+                              fontSize: 11,
+                              background: T.accentLit,
+                              color: T.accent,
+                              borderRadius: 3,
+                              padding: "2px 8px",
+                              fontWeight: 700,
                             }}
                           >
-                            🚚 Transport ÷ {selected.batch_size || 1}
+                            Transport ÷ {selected.batch_size || 1}
                           </span>
                         )}
                         {parseFloat(selected.misc_cost_zar) > 0 && (
                           <span
                             style={{
-                              fontSize: 12,
-                              background: "#ECEFF1",
-                              color: "#455A64",
-                              borderRadius: 10,
-                              padding: "3px 10px",
-                              fontWeight: 600,
+                              fontSize: 11,
+                              background: T.ink075,
+                              color: T.ink500,
+                              borderRadius: 3,
+                              padding: "2px 8px",
+                              fontWeight: 700,
                             }}
                           >
-                            ✏️ Misc ÷ {selected.batch_size || 1}
+                            Misc ÷ {selected.batch_size || 1}
                           </span>
                         )}
                       </div>
@@ -1016,10 +1153,11 @@ export default function HQPricing() {
                   <div style={{ textAlign: "right" }}>
                     <div
                       style={{
-                        fontSize: 11,
-                        color: "#aaa",
+                        fontSize: 10,
+                        color: T.ink400,
                         textTransform: "uppercase",
-                        letterSpacing: "0.3px",
+                        letterSpacing: "0.08em",
+                        fontWeight: 700,
                         marginBottom: 4,
                       }}
                     >
@@ -1027,35 +1165,50 @@ export default function HQPricing() {
                     </div>
                     <div
                       style={{
-                        fontSize: 28,
-                        fontWeight: 700,
-                        color: "#2d4a2d",
+                        fontFamily: T.fontData,
+                        fontSize: 26,
+                        fontWeight: 400,
+                        color: T.accent,
                       }}
                     >
                       {fmtZar(selectedCogs)}
                     </div>
-                    <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: T.ink400,
+                        marginTop: 2,
+                        fontFamily: T.fontData,
+                      }}
+                    >
                       at R{usdZar.toFixed(4)}/USD
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* FX Sensitivity panel */}
               {showFxPanel && selectedCogs > 0 && (
                 <div
-                  style={{ ...card, background: "#f8f9fa", marginBottom: 20 }}
+                  style={{ ...sCard, background: T.ink050, marginBottom: 16 }}
                 >
                   <h4
                     style={{
-                      margin: "0 0 14px",
-                      fontSize: 15,
-                      color: "#2d4a2d",
+                      margin: "0 0 12px",
+                      fontSize: 14,
+                      color: T.ink900,
+                      fontFamily: T.fontUi,
+                      fontWeight: 500,
                     }}
                   >
-                    📊 FX Sensitivity — {selected.product_name}
+                    FX Sensitivity — {selected.product_name}
                   </h4>
                   <p
-                    style={{ margin: "0 0 14px", fontSize: 13, color: "#888" }}
+                    style={{
+                      margin: "0 0 12px",
+                      fontSize: 13,
+                      color: T.ink500,
+                    }}
                   >
                     How your margin changes if USD/ZAR moves ±R2. Using highest
                     sell price set across channels.
@@ -1078,7 +1231,7 @@ export default function HQPricing() {
                         sellPrice={bestSell}
                       />
                     ) : (
-                      <p style={{ color: "#bbb", fontSize: 13 }}>
+                      <p style={{ color: T.ink300, fontSize: 13 }}>
                         Set at least one sell price below to see FX sensitivity.
                       </p>
                     );
@@ -1086,12 +1239,12 @@ export default function HQPricing() {
                 </div>
               )}
 
-              {/* Quantity scenario strip */}
+              {/* Quantity / Batch P&L strip */}
               <div
                 style={{
-                  background: "#f8faf8",
-                  border: "1px solid #e0ede0",
-                  borderRadius: 10,
+                  background: T.accentLit,
+                  border: `1px solid ${T.accentBd}`,
+                  borderRadius: 8,
                   padding: "16px 18px",
                   marginBottom: 20,
                 }}
@@ -1100,17 +1253,18 @@ export default function HQPricing() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 16,
+                    gap: 14,
                     marginBottom: 14,
                     flexWrap: "wrap",
                   }}
                 >
+                  {/* Per-unit COGS anchor */}
                   <div
                     style={{
                       background: "#fff",
-                      border: "2px solid #2d4a2d",
-                      borderRadius: 8,
-                      padding: "10px 18px",
+                      border: `2px solid ${T.accentBd}`,
+                      borderRadius: 6,
+                      padding: "10px 16px",
                       display: "flex",
                       alignItems: "baseline",
                       gap: 8,
@@ -1118,10 +1272,11 @@ export default function HQPricing() {
                   >
                     <div
                       style={{
-                        fontSize: 11,
-                        color: "#888",
+                        fontSize: 10,
+                        color: T.ink400,
                         textTransform: "uppercase",
-                        letterSpacing: "0.3px",
+                        letterSpacing: "0.08em",
+                        fontWeight: 700,
                         flexShrink: 0,
                       }}
                     >
@@ -1129,23 +1284,29 @@ export default function HQPricing() {
                     </div>
                     <div
                       style={{
-                        fontSize: 26,
-                        fontWeight: 700,
-                        color: "#2d4a2d",
+                        fontFamily: T.fontData,
+                        fontSize: 24,
+                        fontWeight: 400,
+                        color: T.accent,
                       }}
                     >
                       {fmtZar(selectedCogs)}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "#888" }}>
-                    ← This is what ONE unit costs to make.
+                  <div style={{ fontSize: 12, color: T.ink500 }}>
+                    This is what ONE unit costs to make.
                     <br />
-                    <span style={{ color: "#2d4a2d", fontWeight: 600 }}>
+                    <strong style={{ color: T.accent }}>
                       Sell prices below are also per unit.
-                    </span>
+                    </strong>
                   </div>
                 </div>
-                <div style={{ borderTop: "1px solid #e8f0e8", paddingTop: 12 }}>
+                <div
+                  style={{
+                    borderTop: `1px solid ${T.accentBd}`,
+                    paddingTop: 12,
+                  }}
+                >
                   <div
                     style={{
                       display: "flex",
@@ -1156,11 +1317,11 @@ export default function HQPricing() {
                   >
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 700,
-                        color: "#2d4a2d",
+                        color: T.accent,
                         textTransform: "uppercase",
-                        letterSpacing: "0.4px",
+                        letterSpacing: "0.08em",
                         flexShrink: 0,
                       }}
                     >
@@ -1175,32 +1336,23 @@ export default function HQPricing() {
                         setQtyUnits(Math.max(1, parseInt(e.target.value) || 1))
                       }
                       style={{
-                        padding: "6px 10px",
-                        border: "1px solid #c8e6c9",
-                        borderRadius: 6,
-                        fontFamily: "Jost, sans-serif",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: "#2d4a2d",
+                        ...sInput,
                         width: 90,
                         textAlign: "center",
+                        fontFamily: T.fontData,
+                        fontWeight: 700,
+                        color: T.accent,
+                        border: `1px solid ${T.accentBd}`,
                       }}
                     />
                     {[1, 50, 100, 500, 1000].map((n) => (
                       <button
                         key={n}
                         onClick={() => setQtyUnits(n)}
-                        style={{
+                        style={mkBtn(qtyUnits === n ? "primary" : "ghost", {
                           padding: "4px 10px",
-                          borderRadius: 6,
-                          border: "1px solid #c8e6c9",
-                          background: qtyUnits === n ? "#2d4a2d" : "#fff",
-                          color: qtyUnits === n ? "#fff" : "#2d4a2d",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          fontFamily: "Jost, sans-serif",
-                          fontWeight: 600,
-                        }}
+                          fontSize: 11,
+                        })}
                       >
                         {n === 1 ? "1" : n >= 1000 ? `${n / 1000}k` : n}
                       </button>
@@ -1237,7 +1389,7 @@ export default function HQPricing() {
                         style={{
                           marginTop: 12,
                           display: "flex",
-                          gap: 16,
+                          gap: 12,
                           flexWrap: "wrap",
                           alignItems: "center",
                         }}
@@ -1245,60 +1397,66 @@ export default function HQPricing() {
                         <div
                           style={{
                             background: "#fff",
-                            border: "1px solid #ddd",
-                            borderRadius: 8,
+                            border: `1px solid ${T.ink150}`,
+                            borderRadius: 6,
                             padding: "8px 14px",
-                            minWidth: 160,
+                            minWidth: 150,
                           }}
                         >
                           <div
                             style={{
                               fontSize: 10,
-                              color: "#888",
+                              color: T.ink400,
                               textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              fontWeight: 700,
                             }}
                           >
                             Total COGS × {qtyUnits.toLocaleString()}
                           </div>
                           <div
                             style={{
-                              fontSize: 18,
-                              fontWeight: 700,
-                              color: "#c62828",
+                              fontFamily: T.fontData,
+                              fontSize: 17,
+                              fontWeight: 400,
+                              color: T.danger,
                             }}
                           >
                             {fmtZar(totalCogs)}
                           </div>
                           <div
-                            style={{ display: "flex", gap: 10, marginTop: 4 }}
+                            style={{
+                              fontSize: 10,
+                              color: T.ink400,
+                              fontFamily: T.fontData,
+                              marginTop: 2,
+                            }}
                           >
-                            <span style={{ fontSize: 10, color: "#aaa" }}>
-                              {fmtZar(selectedCogs)}/unit
-                            </span>
-                            {qtyUnits > 1 && (
-                              <span style={{ fontSize: 10, color: "#aaa" }}>
-                                × {qtyUnits.toLocaleString()} units
-                              </span>
-                            )}
+                            {fmtZar(selectedCogs)}/unit ×{" "}
+                            {qtyUnits.toLocaleString()}
                           </div>
                         </div>
                         {bestSell > 0 ? (
                           <>
-                            <div style={{ fontSize: 20, color: "#ddd" }}>→</div>
+                            <div style={{ fontSize: 18, color: T.ink300 }}>
+                              →
+                            </div>
                             <div
                               style={{
                                 background: "#fff",
-                                border: "1px solid #ddd",
-                                borderRadius: 8,
+                                border: `1px solid ${T.ink150}`,
+                                borderRadius: 6,
                                 padding: "8px 14px",
-                                minWidth: 160,
+                                minWidth: 150,
                               }}
                             >
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: "#888",
+                                  color: T.ink400,
                                   textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                  fontWeight: 700,
                                 }}
                               >
                                 Total Revenue
@@ -1306,56 +1464,57 @@ export default function HQPricing() {
                               </div>
                               <div
                                 style={{
-                                  fontSize: 18,
-                                  fontWeight: 700,
-                                  color: "#2d4a2d",
+                                  fontFamily: T.fontData,
+                                  fontSize: 17,
+                                  fontWeight: 400,
+                                  color: T.accent,
                                 }}
                               >
                                 {fmtZar(totalRev)}
                               </div>
                               <div
                                 style={{
-                                  display: "flex",
-                                  gap: 10,
-                                  marginTop: 4,
+                                  fontSize: 10,
+                                  color: T.ink400,
+                                  fontFamily: T.fontData,
+                                  marginTop: 2,
                                 }}
                               >
-                                <span style={{ fontSize: 10, color: "#aaa" }}>
-                                  {fmtZar(bestSell)}/unit
-                                </span>
-                                {qtyUnits > 1 && (
-                                  <span style={{ fontSize: 10, color: "#aaa" }}>
-                                    × {qtyUnits.toLocaleString()}
-                                  </span>
-                                )}
+                                {fmtZar(bestSell)}/unit ×{" "}
+                                {qtyUnits.toLocaleString()}
                               </div>
                             </div>
-                            <div style={{ fontSize: 20, color: "#ddd" }}>→</div>
+                            <div style={{ fontSize: 18, color: T.ink300 }}>
+                              →
+                            </div>
                             <div
                               style={{
                                 background:
-                                  totalProfit >= 0 ? "#f0f7f0" : "#FFEBEE",
-                                border: `1px solid ${totalProfit >= 0 ? "#c8e6c9" : "#ffcdd2"}`,
-                                borderRadius: 8,
+                                  totalProfit >= 0 ? "#fff" : T.dangerBg,
+                                border: `1px solid ${totalProfit >= 0 ? T.successBd : T.dangerBd}`,
+                                borderRadius: 6,
                                 padding: "8px 14px",
-                                minWidth: 160,
+                                minWidth: 150,
                               }}
                             >
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: "#888",
+                                  color: T.ink400,
                                   textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                  fontWeight: 700,
                                 }}
                               >
                                 Gross Profit
                               </div>
                               <div
                                 style={{
-                                  fontSize: 18,
-                                  fontWeight: 700,
+                                  fontFamily: T.fontData,
+                                  fontSize: 17,
+                                  fontWeight: 400,
                                   color:
-                                    totalProfit >= 0 ? "#2d4a2d" : "#c62828",
+                                    totalProfit >= 0 ? T.success : T.danger,
                                 }}
                               >
                                 {fmtZar(totalProfit)}
@@ -1363,12 +1522,18 @@ export default function HQPricing() {
                               <div
                                 style={{
                                   display: "flex",
-                                  gap: 10,
+                                  gap: 8,
                                   marginTop: 4,
                                   alignItems: "center",
                                 }}
                               >
-                                <span style={{ fontSize: 10, color: "#aaa" }}>
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    color: T.ink400,
+                                    fontFamily: T.fontData,
+                                  }}
+                                >
                                   {fmtZar(totalProfit / qtyUnits)}/unit
                                 </span>
                                 {margin !== null && (
@@ -1381,7 +1546,7 @@ export default function HQPricing() {
                           <div
                             style={{
                               fontSize: 12,
-                              color: "#bbb",
+                              color: T.ink400,
                               fontStyle: "italic",
                             }}
                           >
@@ -1398,7 +1563,7 @@ export default function HQPricing() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gridTemplateColumns: "repeat(3,1fr)",
                   gap: 16,
                 }}
               >
@@ -1416,21 +1581,24 @@ export default function HQPricing() {
                 ))}
               </div>
 
-              {/* Legend */}
+              {/* Margin legend */}
               <div
                 style={{
-                  marginTop: 16,
+                  marginTop: 14,
                   display: "flex",
-                  gap: 16,
+                  gap: 14,
                   flexWrap: "wrap",
                   fontSize: 12,
+                  alignItems: "center",
                 }}
               >
-                <span style={{ color: "#888" }}>Margin guide:</span>
+                <span style={{ color: T.ink400, fontFamily: T.fontUi }}>
+                  Margin guide:
+                </span>
                 {[
-                  { label: "< 20% — Low (red)", color: "#c62828" },
-                  { label: "20–35% — OK (orange)", color: "#E65100" },
-                  { label: "> 35% — Good (green)", color: "#2E7D32" },
+                  { label: "< 20% — Low", color: T.danger },
+                  { label: "20–35% — OK", color: T.warning },
+                  { label: "> 35% — Good", color: T.success },
                 ].map((g) => (
                   <div
                     key={g.label}
@@ -1444,7 +1612,9 @@ export default function HQPricing() {
                         background: g.color,
                       }}
                     />
-                    <span style={{ color: "#888" }}>{g.label}</span>
+                    <span style={{ color: T.ink400, fontFamily: T.fontUi }}>
+                      {g.label}
+                    </span>
                   </div>
                 ))}
               </div>
