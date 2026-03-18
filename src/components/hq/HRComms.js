@@ -1,4 +1,4 @@
-// HRComms.js v1.0
+// HRComms.js v1.1
 // Protea Botanicals · HR Module · Staff Communications
 // WP-HR-7 · March 2026
 // src/components/hq/HRComms.js
@@ -10,29 +10,58 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
+// Legacy aliases — preserve all internal logic referencing C
 const C = {
-  green: "#3d6b35",
-  greenLight: "#e8f5e9",
-  greenMid: "#2e7d32",
-  amber: "#f57f17",
-  amberLight: "#fff8e1",
-  red: "#c62828",
-  redLight: "#fdecea",
-  blue: "#1565c0",
-  blueLight: "#e3f2fd",
-  purple: "#6a1b9a",
-  purpleLight: "#f3e5f5",
-  border: "#ece8e2",
-  bg: "#faf8f5",
+  green: T.accent,
+  greenLight: T.accentLit,
+  greenMid: T.accentMid,
+  amber: T.warning,
+  amberLight: T.warningBg,
+  red: T.danger,
+  redLight: T.dangerBg,
+  blue: T.info,
+  blueLight: T.infoBg,
+  purple: T.info,
+  purpleLight: T.infoBg,
+  border: T.ink150,
+  bg: T.ink075,
   white: "#fff",
-  text: "#2d2d2d",
-  muted: "#aaa",
+  text: T.ink700,
+  muted: T.ink400,
 };
 
 const PRIORITY_CFG = {
-  normal: { label: "Normal", color: C.muted, bg: "#f5f5f5" },
-  high: { label: "High", color: C.amber, bg: C.amberLight },
-  urgent: { label: "Urgent", color: C.red, bg: C.redLight },
+  normal: { label: "Normal", color: T.ink400, bg: T.ink075 },
+  high: { label: "High", color: T.warning, bg: T.warningBg },
+  urgent: { label: "Urgent", color: T.danger, bg: T.dangerBg },
 };
 
 const MESSAGE_TYPES = [
@@ -71,6 +100,7 @@ function PriorityBadge({ priority }) {
         borderRadius: 20,
         letterSpacing: "0.04em",
         textTransform: "uppercase",
+        fontFamily: T.font,
       }}
     >
       {cfg.label}
@@ -81,31 +111,35 @@ function PriorityBadge({ priority }) {
 const s = {
   subTabs: {
     display: "flex",
-    borderBottom: `2px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
     marginBottom: 24,
   },
   subTab: (a) => ({
-    padding: "9px 18px",
+    padding: "10px 16px",
     cursor: "pointer",
     border: "none",
-    background: "none",
-    fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    color: a ? C.green : "#555",
-    borderBottom: a ? `2px solid ${C.green}` : "2px solid transparent",
+    background: "transparent",
+    fontSize: 11,
+    fontFamily: T.font,
+    color: a ? T.accent : T.ink400,
+    borderBottom: a ? `2px solid ${T.accent}` : "2px solid transparent",
     fontWeight: a ? 700 : 400,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
     marginBottom: -2,
   }),
-  btn: (bg, color = C.white) => ({
+  btn: (bg, color = "#fff") => ({
     padding: "7px 16px",
     background: bg,
     color,
     border: `1px solid ${bg}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   outBtn: (color) => ({
     padding: "7px 14px",
@@ -113,40 +147,42 @@ const s = {
     color,
     border: `1px solid ${color}`,
     borderRadius: 5,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
     cursor: "pointer",
-    fontFamily: "'Jost', sans-serif",
+    fontFamily: T.font,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
   }),
   select: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     cursor: "pointer",
     outline: "none",
     width: "100%",
   },
   input: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
     width: "100%",
   },
   textarea: {
     padding: "8px 12px",
-    border: `1px solid #ddd`,
+    border: `1px solid ${T.ink150}`,
     borderRadius: 6,
     fontSize: 13,
-    fontFamily: "'Jost', sans-serif",
-    background: C.white,
+    fontFamily: T.font,
+    background: "#fff",
     outline: "none",
     boxSizing: "border-box",
     width: "100%",
@@ -156,7 +192,8 @@ const s = {
     display: "block",
     fontSize: 11,
     fontWeight: 600,
-    color: "#888",
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     marginBottom: 4,
@@ -166,56 +203,57 @@ const s = {
     borderRadius: 6,
     fontSize: 13,
     marginBottom: 16,
-    background: t === "success" ? C.greenLight : C.redLight,
-    color: t === "success" ? C.greenMid : C.red,
+    background: t === "success" ? T.successBg : T.dangerBg,
+    color: t === "success" ? T.success : T.danger,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 10,
+    fontFamily: T.font,
   }),
   error: {
     padding: "12px 16px",
-    background: C.redLight,
-    color: C.red,
+    background: T.dangerBg,
+    color: T.danger,
     borderRadius: 6,
     marginBottom: 16,
     fontSize: 13,
+    fontFamily: T.font,
   },
   statCard: {
-    padding: "10px 16px",
-    background: C.white,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    display: "flex",
-    gap: 8,
-    alignItems: "center",
-    flex: "1 1 120px",
+    background: "#fff",
+    padding: "16px 18px",
   },
   statNum: {
-    fontFamily: "'Cormorant Garamond', serif",
+    fontFamily: T.font,
     fontSize: 22,
-    fontWeight: 700,
+    fontWeight: 400,
     lineHeight: 1,
+    letterSpacing: "-0.02em",
+    fontVariantNumeric: "tabular-nums",
   },
   statLbl: {
-    fontSize: 11,
-    color: C.muted,
+    fontSize: 10,
+    fontWeight: 700,
+    fontFamily: T.font,
+    color: T.ink400,
     textTransform: "uppercase",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.1em",
+    marginTop: 6,
   },
   msgRow: (unread) => ({
     padding: "14px 16px",
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
     cursor: "pointer",
-    background: unread ? "#fdfcfa" : C.white,
+    background: unread ? T.ink050 : "#fff",
     display: "flex",
     gap: 12,
     alignItems: "flex-start",
     transition: "background 0.1s",
   }),
   msgPanel: {
-    background: C.white,
-    border: `1px solid ${C.border}`,
+    background: "#fff",
+    border: `1px solid ${T.ink150}`,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -228,10 +266,11 @@ const s = {
     maxWidth: "75%",
     padding: "10px 14px",
     borderRadius: mine ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-    background: mine ? C.green : C.bg,
-    color: mine ? C.white : C.text,
+    background: mine ? T.accent : T.ink075,
+    color: mine ? "#fff" : T.ink700,
     fontSize: 13,
     lineHeight: 1.5,
+    fontFamily: T.font,
   }),
   grid2: {
     display: "grid",
@@ -241,13 +280,15 @@ const s = {
   },
   field: { marginBottom: 16 },
   section: {
-    fontFamily: "'Cormorant Garamond', serif",
-    fontSize: 16,
-    fontWeight: 600,
-    color: C.text,
+    fontFamily: T.font,
+    fontSize: 11,
+    fontWeight: 700,
+    color: T.ink400,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
     margin: "20px 0 12px 0",
     paddingBottom: 8,
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink150}`,
   },
 };
 
@@ -437,10 +478,10 @@ function Inbox({ tenantId, staffList, currentUserId }) {
               <button
                 key={f.key}
                 style={{
-                  ...s.outBtn(filter === f.key ? C.green : "#ddd"),
+                  ...s.outBtn(filter === f.key ? T.accent : T.ink150),
                   padding: "5px 12px",
-                  fontSize: 11,
-                  color: filter === f.key ? C.green : C.muted,
+                  fontSize: 10,
+                  color: filter === f.key ? T.accent : T.ink400,
                 }}
                 onClick={() => setFilter(f.key)}
               >
@@ -450,10 +491,10 @@ function Inbox({ tenantId, staffList, currentUserId }) {
           </div>
           <button
             style={{
-              ...s.outBtn("#ddd"),
+              ...s.outBtn(T.ink150),
               padding: "5px 12px",
               fontSize: 11,
-              color: C.muted,
+              color: T.ink400,
               marginLeft: "auto",
             }}
             onClick={load}
@@ -468,7 +509,12 @@ function Inbox({ tenantId, staffList, currentUserId }) {
         <div style={s.msgPanel}>
           {loading ? (
             <div
-              style={{ padding: "40px", textAlign: "center", color: C.muted }}
+              style={{
+                padding: "40px",
+                textAlign: "center",
+                color: T.ink400,
+                fontFamily: T.font,
+              }}
             >
               Loading messages…
             </div>
@@ -477,15 +523,12 @@ function Inbox({ tenantId, staffList, currentUserId }) {
               style={{
                 padding: "48px 24px",
                 textAlign: "center",
-                color: C.muted,
+                color: T.ink400,
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
               <div
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 16,
-                }}
+                style={{ fontFamily: T.font, fontSize: 15, color: T.ink400 }}
               >
                 No messages
               </div>
@@ -502,21 +545,21 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                   style={{
                     ...s.msgRow(unread),
                     background: isSelected
-                      ? "#f0f7ee"
+                      ? T.accentLit
                       : unread
-                        ? "#fdfcfa"
-                        : C.white,
+                        ? T.ink050
+                        : "#fff",
                   }}
                   onClick={() => openMessage(msg)}
                   onMouseEnter={(e) => {
                     if (!isSelected)
-                      e.currentTarget.style.background = "#f9f7f4";
+                      e.currentTarget.style.background = T.ink075;
                   }}
                   onMouseLeave={(e) => {
                     if (!isSelected)
                       e.currentTarget.style.background = unread
-                        ? "#fdfcfa"
-                        : C.white;
+                        ? T.ink050
+                        : "#fff";
                   }}
                 >
                   <div
@@ -524,7 +567,7 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: unread ? C.green : "transparent",
+                      background: unread ? T.accent : "transparent",
                       marginTop: 6,
                       flexShrink: 0,
                     }}
@@ -542,7 +585,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                         style={{
                           fontWeight: unread ? 700 : 500,
                           fontSize: 13,
-                          color: C.text,
+                          fontFamily: T.font,
+                          color: T.ink700,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -553,7 +597,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                       <span
                         style={{
                           fontSize: 10,
-                          color: C.muted,
+                          fontFamily: T.font,
+                          color: T.ink400,
                           whiteSpace: "nowrap",
                           marginLeft: 8,
                         }}
@@ -564,8 +609,9 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                     <div
                       style={{
                         fontSize: 12,
+                        fontFamily: T.font,
                         fontWeight: unread ? 600 : 400,
-                        color: C.text,
+                        color: T.ink700,
                         marginBottom: 2,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -577,7 +623,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                     <div
                       style={{
                         fontSize: 11,
-                        color: C.muted,
+                        fontFamily: T.font,
+                        color: T.ink400,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -601,8 +648,9 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                           style={{
                             fontSize: 9,
                             fontWeight: 700,
-                            color: C.amber,
-                            background: C.amberLight,
+                            fontFamily: T.font,
+                            color: T.warning,
+                            background: T.warningBg,
                             padding: "1px 6px",
                             borderRadius: 20,
                             textTransform: "uppercase",
@@ -615,7 +663,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                         <span
                           style={{
                             fontSize: 9,
-                            color: C.muted,
+                            fontFamily: T.font,
+                            color: T.ink400,
                             textTransform: "capitalize",
                           }}
                         >
@@ -645,8 +694,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
           <div
             style={{
               padding: "14px 18px",
-              borderBottom: `1px solid ${C.border}`,
-              background: C.bg,
+              borderBottom: `1px solid ${T.ink150}`,
+              background: T.ink075,
               flexShrink: 0,
             }}
           >
@@ -662,13 +711,16 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                   style={{
                     fontWeight: 700,
                     fontSize: 14,
-                    color: C.text,
+                    fontFamily: T.font,
+                    color: T.ink700,
                     marginBottom: 3,
                   }}
                 >
                   {selected.subject || "(no subject)"}
                 </div>
-                <div style={{ fontSize: 11, color: C.muted }}>
+                <div
+                  style={{ fontSize: 11, fontFamily: T.font, color: T.ink400 }}
+                >
                   From: {staffName(selected.sender_id)} ·{" "}
                   {fmtDate(selected.created_at)}
                 </div>
@@ -679,7 +731,7 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                   border: "none",
                   fontSize: 16,
                   cursor: "pointer",
-                  color: C.muted,
+                  color: T.ink400,
                 }}
                 onClick={() => setSelected(null)}
               >
@@ -697,16 +749,21 @@ function Inbox({ tenantId, staffList, currentUserId }) {
               >
                 {selected.acknowledged_at ? (
                   <span
-                    style={{ fontSize: 11, color: C.greenMid, fontWeight: 600 }}
+                    style={{
+                      fontSize: 11,
+                      fontFamily: T.font,
+                      color: T.accentMid,
+                      fontWeight: 600,
+                    }}
                   >
                     ✓ Acknowledged {fmtDate(selected.acknowledged_at)}
                   </span>
                 ) : (
                   <button
                     style={{
-                      ...s.btn(C.amber),
+                      ...s.btn(T.warning),
                       padding: "4px 12px",
-                      fontSize: 11,
+                      fontSize: 10,
                     }}
                     onClick={() => acknowledge(selected)}
                   >
@@ -720,7 +777,14 @@ function Inbox({ tenantId, staffList, currentUserId }) {
           {/* Thread messages */}
           <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px" }}>
             {threadLoading ? (
-              <div style={{ textAlign: "center", color: C.muted, padding: 20 }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  color: T.ink400,
+                  fontFamily: T.font,
+                  padding: 20,
+                }}
+              >
                 Loading thread…
               </div>
             ) : (
@@ -733,7 +797,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                         <div
                           style={{
                             fontSize: 10,
-                            color: C.muted,
+                            fontFamily: T.font,
+                            color: T.ink400,
                             marginBottom: 3,
                             marginLeft: 4,
                           }}
@@ -745,7 +810,8 @@ function Inbox({ tenantId, staffList, currentUserId }) {
                       <div
                         style={{
                           fontSize: 9,
-                          color: C.muted,
+                          fontFamily: T.font,
+                          color: T.ink400,
                           marginTop: 3,
                           textAlign: mine ? "right" : "left",
                           marginLeft: mine ? 0 : 4,
@@ -764,7 +830,7 @@ function Inbox({ tenantId, staffList, currentUserId }) {
           <div
             style={{
               padding: "12px 18px",
-              borderTop: `1px solid ${C.border}`,
+              borderTop: `1px solid ${T.ink150}`,
               flexShrink: 0,
             }}
           >
@@ -781,7 +847,7 @@ function Inbox({ tenantId, staffList, currentUserId }) {
               />
               <button
                 style={{
-                  ...s.btn(C.green),
+                  ...s.btn(T.accent),
                   alignSelf: "flex-end",
                   padding: "8px 16px",
                 }}
@@ -873,28 +939,29 @@ function Compose({ tenantId, staffList, currentUserId, onSent }) {
 
   return (
     <div style={{ maxWidth: 620 }}>
-      <p
+      <div
         style={{
-          fontFamily: "'Cormorant Garamond', serif",
-          fontSize: 18,
+          fontFamily: T.font,
+          fontSize: 15,
           fontWeight: 600,
-          color: C.text,
+          color: T.ink700,
           marginBottom: 20,
         }}
       >
         New Message
-      </p>
+      </div>
       {toast && <ToastMsg toast={toast} onDismiss={() => setToast(null)} />}
 
       <div
         style={{
           padding: "10px 14px",
-          background: "#e3f2fd",
-          border: "1px solid #90caf9",
+          background: T.infoBg,
+          border: `1px solid ${T.infoBd}`,
           borderRadius: 6,
           marginBottom: 16,
           fontSize: 12,
-          color: "#1565c0",
+          fontFamily: T.font,
+          color: T.info,
         }}
       >
         📧 <strong>Email delivery note:</strong> Messages go to staff HR portal
@@ -976,6 +1043,7 @@ function Compose({ tenantId, staffList, currentUserId, onSent }) {
             alignItems: "center",
             gap: 8,
             fontSize: 13,
+            fontFamily: T.font,
             cursor: "pointer",
           }}
         >
@@ -994,11 +1062,11 @@ function Compose({ tenantId, staffList, currentUserId, onSent }) {
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button style={s.btn(C.green)} onClick={send} disabled={saving}>
+        <button style={s.btn(T.accent)} onClick={send} disabled={saving}>
           {saving ? "Sending…" : "Send Message"}
         </button>
         <button
-          style={s.outBtn("#aaa")}
+          style={s.outBtn(T.ink300)}
           onClick={() =>
             setForm({
               recipient_id: "",
@@ -1107,25 +1175,26 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 24 }}>
       {/* Recipient picker */}
       <div>
-        <p
+        <div
           style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 16,
+            fontFamily: T.font,
+            fontSize: 13,
             fontWeight: 600,
+            color: T.ink700,
             marginBottom: 12,
           }}
         >
           Recipients
-        </p>
+        </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <button
-            style={{ ...s.outBtn(C.green), padding: "4px 12px", fontSize: 11 }}
+            style={{ ...s.outBtn(T.accent), padding: "4px 12px", fontSize: 10 }}
             onClick={selectAll}
           >
             Select All
           </button>
           <button
-            style={{ ...s.outBtn("#aaa"), padding: "4px 12px", fontSize: 11 }}
+            style={{ ...s.outBtn(T.ink300), padding: "4px 12px", fontSize: 10 }}
             onClick={clearAll}
           >
             Clear
@@ -1133,7 +1202,8 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
           <span
             style={{
               fontSize: 11,
-              color: C.muted,
+              fontFamily: T.font,
+              color: T.ink400,
               alignSelf: "center",
               marginLeft: 4,
             }}
@@ -1143,7 +1213,7 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
         </div>
         <div
           style={{
-            border: `1px solid ${C.border}`,
+            border: `1px solid ${T.ink150}`,
             borderRadius: 8,
             overflow: "hidden",
             maxHeight: 400,
@@ -1155,8 +1225,9 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
               style={{
                 padding: 24,
                 textAlign: "center",
-                color: C.muted,
+                color: T.ink400,
                 fontSize: 13,
+                fontFamily: T.font,
               }}
             >
               No active staff members
@@ -1172,11 +1243,11 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
                   padding: "10px 14px",
                   cursor: "pointer",
                   background: selected.includes(st.id)
-                    ? C.greenLight
+                    ? T.accentLit
                     : i % 2 === 0
-                      ? C.white
-                      : C.bg,
-                  borderBottom: `1px solid ${C.border}`,
+                      ? "#fff"
+                      : T.ink075,
+                  borderBottom: `1px solid ${T.ink150}`,
                 }}
               >
                 <input
@@ -1188,7 +1259,9 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
                   <div
                     style={{
                       fontSize: 13,
+                      fontFamily: T.font,
                       fontWeight: selected.includes(st.id) ? 600 : 400,
+                      color: T.ink700,
                     }}
                   >
                     {st.preferred_name || st.full_name}
@@ -1196,12 +1269,13 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
                       <span
                         style={{
                           fontSize: 9,
-                          color: C.amber,
-                          background: C.amberLight,
+                          color: T.warning,
+                          background: T.warningBg,
                           padding: "1px 5px",
                           borderRadius: 10,
                           marginLeft: 6,
                           fontWeight: 700,
+                          fontFamily: T.font,
                         }}
                       >
                         NO ACCOUNT
@@ -1209,7 +1283,13 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
                     )}
                   </div>
                   {st.job_title && (
-                    <div style={{ fontSize: 11, color: C.muted }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontFamily: T.font,
+                        color: T.ink400,
+                      }}
+                    >
                       {st.job_title}
                     </div>
                   )}
@@ -1222,16 +1302,17 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
 
       {/* Message form */}
       <div>
-        <p
+        <div
           style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 16,
+            fontFamily: T.font,
+            fontSize: 13,
             fontWeight: 600,
+            color: T.ink700,
             marginBottom: 12,
           }}
         >
           Message
-        </p>
+        </div>
         {toast && <ToastMsg toast={toast} onDismiss={() => setToast(null)} />}
 
         <div style={s.grid2}>
@@ -1290,6 +1371,7 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
               alignItems: "center",
               gap: 8,
               fontSize: 13,
+              fontFamily: T.font,
               cursor: "pointer",
             }}
           >
@@ -1308,10 +1390,10 @@ function Broadcast({ tenantId, staffList, currentUserId }) {
         </div>
         <button
           style={{
-            ...s.btn(selected.length === 0 ? "#aaa" : C.green),
+            ...s.btn(selected.length === 0 ? T.ink300 : T.accent),
             width: "100%",
             padding: "10px",
-            fontSize: 13,
+            fontSize: 12,
           }}
           onClick={send}
           disabled={saving || selected.length === 0}
@@ -1361,18 +1443,28 @@ export default function HRComms({ tenantId }) {
   }, [tenantId]);
 
   return (
-    <div style={{ fontFamily: "'Jost', sans-serif", color: C.text }}>
-      {/* Stats */}
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
+      {/* Stats — flush grid */}
       <div
-        style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 20,
+        }}
       >
         {[
           {
             label: "Unread",
             num: unreadCount,
-            color: unreadCount > 0 ? C.green : C.muted,
+            color: unreadCount > 0 ? T.accent : T.ink400,
           },
-          { label: "Staff", num: staffList.length, color: C.text },
+          { label: "Staff", num: staffList.length, color: T.ink700 },
         ].map(({ label, num, color }) => (
           <div key={label} style={s.statCard}>
             <div style={{ ...s.statNum, color }}>{num}</div>
@@ -1392,11 +1484,12 @@ export default function HRComms({ tenantId }) {
             {t === "Inbox" && unreadCount > 0 && (
               <span
                 style={{
-                  background: C.red,
-                  color: C.white,
+                  background: T.danger,
+                  color: "#fff",
                   borderRadius: 10,
                   fontSize: 9,
                   fontWeight: 700,
+                  fontFamily: T.font,
                   padding: "1px 5px",
                   marginLeft: 6,
                   verticalAlign: "middle",
