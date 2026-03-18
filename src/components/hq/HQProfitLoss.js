@@ -1,4 +1,5 @@
-// src/components/hq/HQProfitLoss.js v2.4 — WP-GUIDE-C: usePageContext 'pl' wired + WorkflowGuide added
+// src/components/hq/HQProfitLoss.js v2.5 — WP-THEME-2: Inter font + InfoTooltip + Toast
+// v2.4 — WP-GUIDE-C: usePageContext 'pl' wired + WorkflowGuide added
 // Protea Botanicals · Phase 2 · March 2026
 //
 // v2.4 — WP-GUIDE-C: wire usePageContext('pl') context + WorkflowGuide at top of render
@@ -16,6 +17,8 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
+import InfoTooltip from "../InfoTooltip";
+import { T } from "../../theme";
 
 // ─── FX Hook ──────────────────────────────────────────────────────────────────
 function useFxRate() {
@@ -320,6 +323,11 @@ export default function HQProfitLoss() {
   const [newOpexLabel, setNewOpexLabel] = useState("");
   const [newOpexAmount, setNewOpexAmount] = useState("");
   const [fxScenario, setFxScenario] = useState("");
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -549,13 +557,13 @@ export default function HQProfitLoss() {
     padding: "8px 12px",
     border: "1px solid #ddd",
     borderRadius: 8,
-    fontFamily: "Jost, sans-serif",
+    fontFamily: T.font.ui,
     fontSize: 14,
     boxSizing: "border-box",
   };
 
   return (
-    <div style={{ fontFamily: "Jost, sans-serif", color: "#333" }}>
+    <div style={{ fontFamily: T.font.ui, color: "#333" }}>
       {/* WP-GUIDE-C: WorkflowGuide with live pl context */}
       <WorkflowGuide
         context={ctx}
@@ -576,17 +584,20 @@ export default function HQProfitLoss() {
         }}
       >
         <div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 26,
-              fontFamily: "Cormorant Garamond, serif",
-              fontWeight: 600,
-              color: "#2d4a2d",
-            }}
-          >
-            P&L Dashboard
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <h2
+              style={{
+                margin: 0,
+                ...T.type.pageTitle,
+                fontFamily: T.font.ui,
+                fontWeight: 600,
+                color: "#2d4a2d",
+              }}
+            >
+              P&L Dashboard
+            </h2>
+            <InfoTooltip id="pl-title" />
+          </div>
           <p style={{ margin: "4px 0 0", color: "#888", fontSize: 13 }}>
             Live profit & loss · supplier cost to customer sale
             {lastUpdated && (
@@ -609,20 +620,23 @@ export default function HQProfitLoss() {
             flexWrap: "wrap",
           }}
         >
-          <div
-            style={{
-              background: fxLoading ? "#f5f5f5" : "#e8f5e9",
-              border: "1px solid #c8e6c9",
-              borderRadius: 20,
-              padding: "6px 14px",
-              fontSize: 13,
-              color: "#2E7D32",
-              fontWeight: 600,
-            }}
-          >
-            {fxLoading
-              ? "Loading FX…"
-              : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                background: fxLoading ? "#f5f5f5" : "#e8f5e9",
+                border: "1px solid #c8e6c9",
+                borderRadius: 20,
+                padding: "6px 14px",
+                fontSize: 13,
+                color: "#2E7D32",
+                fontWeight: 600,
+              }}
+            >
+              {fxLoading
+                ? "Loading FX…"
+                : `USD/ZAR R${usdZar.toFixed(4)} ${fxRate?.source === "live" ? "🟢" : "🟡"}`}
+            </div>
+            <InfoTooltip id="pl-fx-rate" />
           </div>
           <select
             value={period}
@@ -651,7 +665,7 @@ export default function HQProfitLoss() {
               background: "#fafafa",
               color: "#555",
               cursor: loading ? "wait" : "pointer",
-              fontFamily: "Jost, sans-serif",
+              fontFamily: T.font.ui,
               fontSize: 13,
               fontWeight: 600,
               opacity: loading ? 0.5 : 1,
@@ -985,7 +999,7 @@ export default function HQProfitLoss() {
                     background: "#2d4a2d",
                     color: "#fff",
                     cursor: "pointer",
-                    fontFamily: "Jost, sans-serif",
+                    fontFamily: T.font.ui,
                     fontSize: 13,
                     fontWeight: 600,
                   }}
@@ -1025,8 +1039,8 @@ export default function HQProfitLoss() {
                     </div>
                     <div
                       style={{
-                        fontSize: 36,
-                        fontWeight: 800,
+                        ...T.type.metricLg,
+                        fontFamily: T.font.ui,
                         color: netProfit >= 0 ? "#2E7D32" : "#c62828",
                       }}
                     >
@@ -1579,6 +1593,26 @@ export default function HQProfitLoss() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: 24,
+            right: 24,
+            zIndex: 9999,
+            background: toast.type === "error" ? T.danger.text : T.accent.dark,
+            color: "#fff",
+            padding: "12px 18px",
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: T.font.ui,
+            boxShadow: T.shadow.hover,
+          }}
+        >
+          {toast.msg}
         </div>
       )}
     </div>
