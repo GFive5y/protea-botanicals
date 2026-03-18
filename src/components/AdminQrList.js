@@ -22,7 +22,7 @@ const C = {
   gold: "#b5935a",
   cream: "#faf9f6",
   border: "#e0dbd2",
-  muted: "#888888",
+  muted: "#474747",
   text: "#1a1a1a",
   error: "#c0392b",
   success: "#27ae60",

@@ -203,7 +203,7 @@ const CC = {
   gold: "#b5935a",
   ink150: "#E2E2E2",
   ink075: "#F4F4F3",
-  ink400: "#888888",
+  ink400: "#474747",
   ink500: "#5A5A5A",
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };

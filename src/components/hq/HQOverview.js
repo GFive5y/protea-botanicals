@@ -37,7 +37,7 @@ const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
   ink500: "#5A5A5A",
-  ink300: "#B0B0B0",
+  ink300: "#999999",
   ink150: "#E2E2E2",
   ink075: "#F4F4F3",
   ink050: "#FAFAF9",
@@ -57,7 +57,7 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  ink400: "#888888",
+  ink400: "#474747",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
@@ -1806,7 +1806,7 @@ function MetricTile({
           fontWeight: 700,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: "#B0B0B0",
+          color: "#999999",
           marginBottom: 8,
           display: "flex",
           justifyContent: "space-between",
@@ -1818,7 +1818,7 @@ function MetricTile({
           <span
             style={{
               fontSize: 9,
-              color: "#B0B0B0",
+              color: "#999999",
               fontWeight: 500,
               textTransform: "none",
               letterSpacing: 0,
@@ -1857,7 +1857,7 @@ function MetricTile({
         <div
           style={{
             fontSize: 9,
-            color: "#B0B0B0",
+            color: "#999999",
             marginTop: 2,
             letterSpacing: "0.08em",
             textTransform: "uppercase",

@@ -29,7 +29,7 @@ const T = {
   cream: "#faf9f6",
   sand: "#f0ebe3",
   text: "#1a1a1a",
-  muted: "#888888",
+  muted: "#474747",
   red: "#dc2626",
   red2: "#c0392b",
   border: "#e8e0d4",

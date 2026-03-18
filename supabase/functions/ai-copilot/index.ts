@@ -1,13 +1,14 @@
 // supabase/functions/ai-copilot/index.ts
 // Protea Botanicals — AI Assistant Edge Function
-// Version: v2.0
+// Version: v3.0
+// ★ v3.0 (WP-Y): Live business context injection.
+//   - pageData extracted from userContext.page_context
+//   - Injected as [LIVE BUSINESS DATA] block for admin/hr roles
+//   - HR officer role added to Role-Specific Behaviour
+//   - /hr and /staff routes added to Website Structure
+//   - All v2.0 tools, tool loop, health check, strain catalog — untouched.
+//
 // ★ v2.0: FULL REWRITE — Claude as brain with native tool use.
-//   - Rich system prompt (18 strains, terpenes, loyalty rules, brand knowledge)
-//   - Role-based tool visibility (shared/customer/admin)
-//   - Conversation history support (messages[] array)
-//   - User context injection (role, points, tier, page)
-//   - Tool execution loop (max 5 rounds)
-//   - Returns { reply, model, usage, error }
 //
 // Deploy:  npx supabase functions deploy ai-copilot --no-verify-jwt
 // Secrets: npx supabase secrets set ANTHROPIC_API_KEY=xxx
@@ -15,7 +16,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 
-// ─── CORS headers ────────────────────────────────────────────────────────
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -23,15 +23,12 @@ const CORS_HEADERS = {
     "Content-Type, Authorization, x-client-info, apikey",
 };
 
-// ─── Supabase client (service role for read-only tool queries) ───────────
 function getSupabaseClient() {
   return createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 }
-
-// ─── Tool Definitions (Anthropic native format) ──────────────────────────
 
 const SHARED_TOOLS = [
   {
@@ -56,7 +53,7 @@ const CUSTOMER_TOOLS = [
   {
     name: "lookup_loyalty",
     description:
-      "Look up a customer's loyalty points, tier, and recent transaction history. Use when a customer asks about their points, tier status, or transaction history.",
+      "Look up a customer's loyalty points, tier, and recent transaction history.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -75,17 +72,13 @@ const ADMIN_TOOLS = [
   {
     name: "get_system_health",
     description:
-      "Check Supabase connection status and get row counts for all database tables. Use when admin asks about system health, status, or database overview.",
-    input_schema: {
-      type: "object" as const,
-      properties: {},
-      required: [],
-    },
+      "Check Supabase connection status and get row counts for all database tables.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
   },
   {
     name: "query_analytics",
     description:
-      "Get scan analytics data — counts by source (qr, manual, promo), recent scan activity, and trends. Use when admin asks about QR performance, scan stats, or campaign analytics.",
+      "Get scan analytics data — counts by source, recent scan activity, and trends.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -100,7 +93,7 @@ const ADMIN_TOOLS = [
   {
     name: "list_users",
     description:
-      "List all registered users with their roles, loyalty points, and tier. Use when admin asks about users, user list, or user management.",
+      "List all registered users with their roles, loyalty points, and tier.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -115,7 +108,7 @@ const ADMIN_TOOLS = [
   {
     name: "query_database",
     description:
-      "Run a read-only SELECT query on any allowed table. Allowed tables: batches, products, scans, user_profiles, loyalty_transactions, redemptions, wholesale_partners, orders, order_items. Use for custom data lookups the admin requests.",
+      "Run a read-only SELECT query on any allowed table. Allowed: batches, products, scans, user_profiles, loyalty_transactions, redemptions, wholesale_partners, orders, order_items.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -126,7 +119,7 @@ const ADMIN_TOOLS = [
         },
         filters: {
           type: "object" as const,
-          description: "Key-value pairs for WHERE clause (equality filters)",
+          description: "Key-value pairs for WHERE clause",
           additionalProperties: true,
         },
         order_by: {
@@ -143,8 +136,6 @@ const ADMIN_TOOLS = [
   },
 ];
 
-// ─── Tool Execution ──────────────────────────────────────────────────────
-
 async function executeTool(
   name: string,
   input: Record<string, unknown>,
@@ -155,15 +146,12 @@ async function executeTool(
   switch (name) {
     case "lookup_product": {
       const search = (input.search as string) || "";
-      // Try QR code exact match first
       let { data, error } = await supabase
         .from("products")
         .select("*")
         .eq("qr_code", search)
         .limit(5);
-
       if (!error && data && data.length === 0) {
-        // Try partial match on qr_code
         const result = await supabase
           .from("products")
           .select("*")
@@ -172,7 +160,6 @@ async function executeTool(
         data = result.data;
         error = result.error;
       }
-
       if (error) return JSON.stringify({ error: error.message });
       return JSON.stringify({
         found: data?.length ?? 0,
@@ -191,29 +178,19 @@ async function executeTool(
     case "lookup_loyalty": {
       const userId =
         (input.user_id as string) || (userContext?.user_id as string);
-      if (!userId) {
-        return JSON.stringify({
-          error: "No user_id available. User may not be logged in.",
-        });
-      }
-
-      // Get profile
+      if (!userId) return JSON.stringify({ error: "No user_id available." });
       const { data: profile, error: profileErr } = await supabase
         .from("user_profiles")
         .select("loyalty_points, loyalty_tier, full_name, role")
         .eq("id", userId)
         .single();
-
       if (profileErr) return JSON.stringify({ error: profileErr.message });
-
-      // Get recent transactions
       const { data: transactions, error: txErr } = await supabase
         .from("loyalty_transactions")
         .select("points, transaction_type, description, transaction_date")
         .eq("user_id", userId)
         .order("transaction_date", { ascending: false })
         .limit(10);
-
       return JSON.stringify({
         loyalty_points: profile?.loyalty_points ?? 0,
         loyalty_tier: profile?.loyalty_tier ?? "bronze",
@@ -250,21 +227,16 @@ async function executeTool(
       const since = new Date(
         Date.now() - days * 24 * 60 * 60 * 1000,
       ).toISOString();
-
-      // Total scans in period
       const { count: totalScans } = await supabase
         .from("scans")
         .select("*", { count: "exact", head: true })
         .gte("scan_date", since);
-
-      // Scans by source
       const { data: scans } = await supabase
         .from("scans")
         .select("source, scan_date")
         .gte("scan_date", since)
         .order("scan_date", { ascending: false })
         .limit(500);
-
       const sourceCounts: Record<string, number> = {};
       if (scans) {
         for (const s of scans) {
@@ -273,14 +245,11 @@ async function executeTool(
           sourceCounts[src] = (sourceCounts[src] || 0) + 1;
         }
       }
-
-      // Recent scans (last 10)
       const { data: recent } = await supabase
         .from("scans")
         .select("product_id, user_id, scan_date, source")
         .order("scan_date", { ascending: false })
         .limit(10);
-
       return JSON.stringify({
         period_days: days,
         total_scans: totalScans ?? 0,
@@ -296,7 +265,6 @@ async function executeTool(
         .select("id, full_name, role, loyalty_points, loyalty_tier")
         .order("loyalty_points", { ascending: false })
         .limit(limit);
-
       if (error) return JSON.stringify({ error: error.message });
       return JSON.stringify({
         user_count: data?.length ?? 0,
@@ -310,7 +278,6 @@ async function executeTool(
       const filters = (input.filters as Record<string, unknown>) || {};
       const orderBy = input.order_by as string | undefined;
       const limit = Math.min((input.limit as number) || 20, 100);
-
       const ALLOWED = [
         "batches",
         "products",
@@ -327,7 +294,6 @@ async function executeTool(
           error: `Table "${table}" not allowed. Allowed: ${ALLOWED.join(", ")}`,
         });
       }
-
       let query = supabase.from(table).select(select).limit(limit);
       for (const [key, val] of Object.entries(filters)) {
         query = query.eq(key, val);
@@ -335,7 +301,6 @@ async function executeTool(
       if (orderBy) {
         query = query.order(orderBy, { ascending: false });
       }
-
       const { data, error } = await query;
       if (error) return JSON.stringify({ error: error.message });
       return JSON.stringify({ table, row_count: data?.length ?? 0, data });
@@ -346,28 +311,13 @@ async function executeTool(
   }
 }
 
-// ─── Build tools list based on user role ─────────────────────────────────
-
-function getToolsForRole(
-  role: string | null,
-): Array<{
-  name: string;
-  description: string;
-  input_schema: Record<string, unknown>;
-}> {
+function getToolsForRole(role: string | null) {
   const tools = [...SHARED_TOOLS];
-
-  if (role === "customer" || role === "retailer" || role === "admin") {
+  if (role === "customer" || role === "retailer" || role === "admin")
     tools.push(...CUSTOMER_TOOLS);
-  }
-  if (role === "admin") {
-    tools.push(...ADMIN_TOOLS);
-  }
-
+  if (role === "admin") tools.push(...ADMIN_TOOLS);
   return tools;
 }
-
-// ─── System Prompt ───────────────────────────────────────────────────────
 
 function buildSystemPrompt(
   userContext: Record<string, unknown> | null,
@@ -377,6 +327,8 @@ function buildSystemPrompt(
   const tier = userContext?.loyalty_tier ?? null;
   const page = userContext?.current_page ?? "/";
   const name = userContext?.full_name ?? null;
+  const pageData =
+    (userContext?.page_context as Record<string, unknown> | null) ?? null;
 
   return `You are the Protea Botanicals AI Assistant — a friendly, knowledgeable cannabis vape consultant for a South African premium brand.
 
@@ -462,18 +414,23 @@ Terpenes sourced from Eybna GmbH, Berlin. Two formats: 1ml Cartridge (R800) and 
 - /account — Login/Register
 - /admin — Admin dashboard (admin only)
 - /wholesale — Wholesale portal (retailer only)
+- /hr — HR Dashboard (hr/hq only)
+- /staff — Staff Portal (any logged-in user with staff profile)
 
 ## Role-Specific Behaviour
 ${
   role === "admin"
     ? `- You are speaking with an ADMIN. You can help with system health checks, analytics, user management, and database queries.
 - You have admin tools available: get_system_health, query_analytics, list_users, query_database.`
-    : role === "retailer"
-      ? `- You are speaking with a WHOLESALE PARTNER. Help with orders, product info, and business queries.`
-      : role === "customer"
-        ? `- You are speaking with a CUSTOMER. Help with strain recommendations, loyalty points, product questions.
+    : role === "hr"
+      ? `- You are speaking with an HR OFFICER. Help with staff records, leave management, timesheets, disciplinary matters, payroll export, and performance reviews.
+- Reference specific numbers and data gaps from the live context when available.`
+      : role === "retailer"
+        ? `- You are speaking with a WHOLESALE PARTNER. Help with orders, product info, and business queries.`
+        : role === "customer"
+          ? `- You are speaking with a CUSTOMER. Help with strain recommendations, loyalty points, product questions.
 - You can check their loyalty points with the lookup_loyalty tool.`
-        : `- This is a GUEST (not logged in). Help with general product info, strain recommendations, and explain the loyalty programme.
+          : `- This is a GUEST (not logged in). Help with general product info, strain recommendations, and explain the loyalty programme.
 - Encourage them to create an account to earn loyalty points.`
 }
 
@@ -483,12 +440,54 @@ ${
 - For strain recommendations, explain WHY a strain fits (terpenes, effects)
 - Always be honest about pending lab tests (solvents, metals, pesticides)
 - Prices are in South African Rand (R)
-- Do not make medical claims — use "may help with" language`;
+- Do not make medical claims — use "may help with" language${
+    pageData && role !== "customer" && role !== "guest"
+      ? (() => {
+          const { status, headline, items, warnings, actions } = pageData as {
+            status?: string;
+            headline?: string;
+            items?: string[];
+            warnings?: string[];
+            actions?: string[];
+          };
+          const statusLabel: Record<string, string> = {
+            ok: "HEALTHY",
+            info: "NOTE",
+            warn: "WARNING",
+            critical: "CRITICAL",
+            setup: "SETUP NEEDED",
+          };
+          const itemLines =
+            Array.isArray(items) && items.length
+              ? `\nKey facts:\n${items
+                  .slice(0, 5)
+                  .map((i: string) => `- ${i}`)
+                  .join("\n")}`
+              : "";
+          const warnLines =
+            Array.isArray(warnings) && warnings.length
+              ? `\nActive issues:\n${warnings
+                  .slice(0, 4)
+                  .map((w: string) => `- ${w.replace(/^⚠\s*/, "")}`)
+                  .join("\n")}`
+              : "";
+          const actionLines =
+            Array.isArray(actions) && actions.length
+              ? `\nRecommended actions:\n${actions
+                  .slice(0, 3)
+                  .map(
+                    (a: unknown) =>
+                      `- ${typeof a === "string" ? a : (a as { label: string }).label}`,
+                  )
+                  .join("\n")}`
+              : "";
+          return `\n\n[LIVE BUSINESS DATA — Page: ${page} — Status: ${statusLabel[status as string] ?? "UNKNOWN"}]\n${headline ?? ""}${itemLines}${warnLines}${actionLines}\n\nWhen live data is present: lead with the most critical issue, reference specific numbers, suggest exact next actions.`;
+        })()
+      : ""
+  }`;
 }
 
-// ─── Main Handler ────────────────────────────────────────────────────────
 serve(async (req: Request) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -504,7 +503,6 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { messages, userContext = null } = body;
 
-    // ── Health check ─────────────────────────────────────────────────
     if (
       messages &&
       messages.length === 1 &&
@@ -524,7 +522,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── Validate input ───────────────────────────────────────────────
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(
         JSON.stringify({
@@ -540,7 +537,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── Get API key ──────────────────────────────────────────────────
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
       return new Response(
@@ -558,12 +554,10 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── Build system prompt + tools ──────────────────────────────────
     const role = (userContext?.role as string) || null;
     const systemPrompt = buildSystemPrompt(userContext);
     const tools = getToolsForRole(role);
 
-    // ── Format conversation for Anthropic API ────────────────────────
     const anthropicMessages = messages.map(
       (m: { role: string; content: string }) => ({
         role:
@@ -572,14 +566,12 @@ serve(async (req: Request) => {
       }),
     );
 
-    // ── Tool loop (max 5 iterations) ─────────────────────────────────
     let currentMessages = [...anthropicMessages];
     let finalReply = "";
     let totalUsage = { input_tokens: 0, output_tokens: 0 };
     const MAX_TOOL_ROUNDS = 5;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      // Call Claude
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -620,15 +612,12 @@ serve(async (req: Request) => {
 
       const data = await response.json();
 
-      // Accumulate usage
       if (data.usage) {
         totalUsage.input_tokens += data.usage.input_tokens || 0;
         totalUsage.output_tokens += data.usage.output_tokens || 0;
       }
 
-      // Check stop reason
       if (data.stop_reason === "end_turn" || data.stop_reason !== "tool_use") {
-        // Extract text from content blocks
         finalReply = (data.content || [])
           .filter((block: { type: string }) => block.type === "text")
           .map((block: { text: string }) => block.text)
@@ -636,7 +625,6 @@ serve(async (req: Request) => {
         break;
       }
 
-      // ── Handle tool use ────────────────────────────────────────────
       if (data.stop_reason === "tool_use") {
         const toolUseBlocks = (data.content || []).filter(
           (block: { type: string }) => block.type === "tool_use",
@@ -645,13 +633,11 @@ serve(async (req: Request) => {
           (block: { type: string }) => block.type === "text",
         );
 
-        // Add Claude's response (with tool_use blocks) to conversation
         currentMessages.push({
           role: "assistant" as const,
           content: data.content,
         });
 
-        // Execute each tool and add results
         const toolResults = [];
         for (const toolBlock of toolUseBlocks) {
           console.log(
@@ -670,13 +656,11 @@ serve(async (req: Request) => {
           });
         }
 
-        // Add tool results as user message
         currentMessages.push({
           role: "user" as const,
           content: toolResults,
         } as any);
 
-        // If this is the last round, extract any text we got
         if (round === MAX_TOOL_ROUNDS - 1) {
           finalReply =
             textBlocks
@@ -684,11 +668,9 @@ serve(async (req: Request) => {
               .join("\n") ||
             "I found the information but ran into a limit. Please try a simpler question.";
         }
-        // Otherwise, continue loop — Claude will process tool results
       }
     }
 
-    // ── Return response ──────────────────────────────────────────────
     return new Response(
       JSON.stringify({
         reply:

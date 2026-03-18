@@ -1,11 +1,26 @@
-// src/App.js — Protea Botanicals v5.0
+// src/App.js — Protea Botanicals v6.1
 // ─────────────────────────────────────────────────────────────────────────────
+// ★ v6.1 CHANGELOG (WP-NAV background fix):
+//   1. ADD: maxWidth={1200} to /admin + /admin/qr AppShell
+//   2. ADD: maxWidth={1400} to /hq/* + /hr/* AppShell
+//   3. ADD: maxWidth={1000} to /staff/* AppShell
+//   AppShell v1.2 now provides the cream background + padding that
+//   PageShell previously supplied — fixes dark gap bleed.
+//
+// ★ v6.0 CHANGELOG (WP-NAV Sub-A):
+//   1. ADD: import AppShell from "./components/AppShell"
+//   2. REPLACE: /admin — NavBar + div + PageShell → AppShell
+//   3. REPLACE: /admin/qr — NavBar + div + PageShell → AppShell
+//   4. REPLACE: /hq/* — NavBar + div + PageShell → AppShell
+//   5. REPLACE: /hr/* — NavBar + div + PageShell → AppShell
+//   6. REPLACE: /staff/* — NavBar + div + PageShell → AppShell
+//   NavBar retained for all public routes. WithNav unchanged.
+//
 // ★ v5.0 CHANGELOG (WP-HR-12):
 //   1. ADD: import StaffPortal from "./pages/StaffPortal"
 //   2. ADD: RequireStaff auth guard (any logged-in user — profile check inside)
 //   3. ADD: /staff/* route guarded by RequireStaff
 //   4. ADD: My Portal nav link (visible to all logged-in users)
-//   All v4.0 nav, auth, cart, route logic — untouched.
 //
 // ★ v4.0 CHANGELOG (WP-HR-5):
 //   1. ADD: import HRDashboard from "./pages/HRDashboard"
@@ -59,6 +74,7 @@ import ShopDashboard from "./pages/ShopDashboard";
 import TerpenePage from "./pages/TerpenePage";
 
 import PageShell from "./components/PageShell";
+import AppShell from "./components/AppShell"; // ★ v6.0
 import { CartProvider, useCart } from "./contexts/CartContext";
 import { TenantProvider, useTenant } from "./services/tenantService";
 
@@ -991,57 +1007,44 @@ export default function App() {
                   </WithNav>
                 }
               />
+
+              {/* ★ v6.0: AppShell routes — premium nav sidebar ──────── */}
               <Route
                 path="/admin"
                 element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <PageShell maxWidth={1200}>
-                        <RequireAuth>
-                          <RequireRole allowedRoles={["admin"]}>
-                            <AdminDashboardRouter />
-                          </RequireRole>
-                        </RequireAuth>
-                      </PageShell>
-                    </div>
-                  </>
+                  <AppShell maxWidth={1200}>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["admin"]}>
+                        <AdminDashboardRouter />
+                      </RequireRole>
+                    </RequireAuth>
+                  </AppShell>
                 }
               />
               <Route
                 path="/admin/qr"
                 element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <PageShell maxWidth={1200}>
-                        <RequireAuth>
-                          <RequireRole allowedRoles={["admin"]}>
-                            <AdminQrGenerator />
-                          </RequireRole>
-                        </RequireAuth>
-                      </PageShell>
-                    </div>
-                  </>
+                  <AppShell maxWidth={1200}>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["admin"]}>
+                        <AdminQrGenerator />
+                      </RequireRole>
+                    </RequireAuth>
+                  </AppShell>
                 }
               />
               <Route
                 path="/hq/*"
                 element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <PageShell maxWidth={1400}>
-                        <RequireAuth>
-                          <RequireRole allowedRoles={["admin"]}>
-                            <RequireHQ>
-                              <HQDashboard />
-                            </RequireHQ>
-                          </RequireRole>
-                        </RequireAuth>
-                      </PageShell>
-                    </div>
-                  </>
+                  <AppShell maxWidth={1400}>
+                    <RequireAuth>
+                      <RequireRole allowedRoles={["admin"]}>
+                        <RequireHQ>
+                          <HQDashboard />
+                        </RequireHQ>
+                      </RequireRole>
+                    </RequireAuth>
+                  </AppShell>
                 }
               />
 
@@ -1049,18 +1052,13 @@ export default function App() {
               <Route
                 path="/hr/*"
                 element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <PageShell maxWidth={1200}>
-                        <RequireAuth>
-                          <RequireHR>
-                            <HRDashboard />
-                          </RequireHR>
-                        </RequireAuth>
-                      </PageShell>
-                    </div>
-                  </>
+                  <AppShell maxWidth={1400}>
+                    <RequireAuth>
+                      <RequireHR>
+                        <HRDashboard />
+                      </RequireHR>
+                    </RequireAuth>
+                  </AppShell>
                 }
               />
 
@@ -1068,16 +1066,11 @@ export default function App() {
               <Route
                 path="/staff/*"
                 element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <PageShell maxWidth={1200}>
-                        <RequireStaff>
-                          <StaffPortal />
-                        </RequireStaff>
-                      </PageShell>
-                    </div>
-                  </>
+                  <AppShell maxWidth={1000}>
+                    <RequireStaff>
+                      <StaffPortal />
+                    </RequireStaff>
+                  </AppShell>
                 }
               />
 

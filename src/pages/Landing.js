@@ -251,29 +251,29 @@ export default function Landing() {
         }}
       >
         <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        .landing-font { font-family: 'Cormorant Garamond', Georgia, serif; }
-        .body-font { font-family: 'Jost', sans-serif; }
-        .portal-card { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease; cursor: pointer; }
-        .portal-card:hover { transform: translateY(-12px) scale(1.03); box-shadow: 0 32px 64px rgba(0,0,0,0.18) !important; }
-        .portal-card:hover .card-cta { letter-spacing: 3px; }
-        .card-cta { transition: letter-spacing 0.3s ease; }
-        .reveal { opacity: 0; transform: translateY(40px); transition: opacity 0.8s ease, transform 0.8s ease; }
-        .reveal.visible { opacity: 1; transform: translateY(0); }
-        .scroll-indicator { animation: bounce 2s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
-        .grain { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0.025; z-index: 999; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); }
-        .hero-leaf { animation: sway 6s ease-in-out infinite; }
-        @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+                  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap');
+                  * { box-sizing: border-box; margin: 0; padding: 0; }
+                  .landing-font { font-family: 'Cormorant Garamond', Georgia, serif; }
+                  .body-font { font-family: 'Jost', sans-serif; }
+                  .portal-card { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease; cursor: pointer; }
+                  .portal-card:hover { transform: translateY(-12px) scale(1.03); box-shadow: 0 32px 64px rgba(0,0,0,0.18) !important; }
+                  .portal-card:hover .card-cta { letter-spacing: 3px; }
+                  .card-cta { transition: letter-spacing 0.3s ease; }
+                  .reveal { opacity: 0; transform: translateY(40px); transition: opacity 0.8s ease, transform 0.8s ease; }
+                  .reveal.visible { opacity: 1; transform: translateY(0); }
+                  .scroll-indicator { animation: bounce 2s infinite; }
+                  @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+                  .grain { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0.025; z-index: 999; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); }
+                  .hero-leaf { animation: sway 6s ease-in-out infinite; }
+                  @keyframes sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
 
-        /* ── WP-J: Mobile Responsiveness ─────────────────────────────────── */
-        @media (max-width: 600px) {
-          .landing-video { height: 300px !important; }
-          .landing-section { padding: 56px 20px !important; }
-          .landing-hero-desc { margin-bottom: 40px !important; }
-        }
-        `}</style>
+                  /* ── WP-J: Mobile Responsiveness ─────────────────────────────────── */
+                  @media (max-width: 600px) {
+                    .landing-video { height: 300px !important; }
+                    .landing-section { padding: 56px 20px !important; }
+                    .landing-hero-desc { margin-bottom: 40px !important; }
+                  }
+                  `}</style>
 
         <div className="grain" />
         <PromoBanner promo={promo} onNavigate={navigate} />

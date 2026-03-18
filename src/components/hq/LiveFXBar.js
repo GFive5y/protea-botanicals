@@ -1,5 +1,6 @@
-// src/components/hq/LiveFXBar.js — v1.5
+// src/components/hq/LiveFXBar.js — v1.6
 // Protea Botanicals — WP-X System Intelligence Layer
+// v1.6: WP-NAV colour pass — full light theme to match AppShell
 // v1.5: Chart readability pass — taller chart (260px), larger/brighter Y-axis
 //       rate labels, larger/brighter X-axis date labels with tick marks,
 //       bigger stats bar text. Fixed broken fontSize="" from partial edit.
@@ -21,21 +22,21 @@ const FRANK_BASE = "https://api.frankfurter.app";
 const SKU_LS_KEY = "pb_fx_pinned_sku";
 
 const C = {
-  bg: "#08150e",
-  bgMid: "#0d1f14",
-  bgCard: "#0a1a10",
-  border: "#1c3a24",
-  grid: "#112618",
-  green: "#52b788",
-  greenBr: "#74c69d",
+  bg: "#ffffff",
+  bgMid: "#f4f0e8",
+  bgCard: "#faf9f6",
+  border: "#e8e0d4",
+  grid: "#e8f5e9",
+  green: "#2d6a4f",
+  greenBr: "#52b788",
   gold: "#b5935a",
-  goldBr: "#d4b07a",
-  text: "#d8f3dc",
-  muted: "#5a9e6e",
-  dimmed: "#2e5c3a",
-  white: "#f0faf2",
-  up: "#40c97a",
-  down: "#e05a5a",
+  goldBr: "#b5935a",
+  text: "#1a1a1a",
+  muted: "#474747",
+  dimmed: "#aaaaaa",
+  white: "#ffffff",
+  up: "#2E7D32",
+  down: "#c62828",
   amber: "#f39c12",
 };
 
@@ -48,8 +49,8 @@ const PERIODS = [
 ];
 
 const INJECTED_CSS = `
-@keyframes fx-flash-up   { 0%{background:rgba(64,201,122,0.18)} 100%{background:transparent} }
-@keyframes fx-flash-down { 0%{background:rgba(224,90,90,0.16)}  100%{background:transparent} }
+@keyframes fx-flash-up   { 0%{background:rgba(46,125,50,0.12)} 100%{background:transparent} }
+@keyframes fx-flash-down { 0%{background:rgba(198,40,40,0.10)}  100%{background:transparent} }
 @keyframes fx-blink      { 0%,100%{opacity:1} 50%{opacity:0.3} }
 @keyframes ticker-scroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
 @keyframes fx-chart-in   { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
@@ -58,9 +59,9 @@ const INJECTED_CSS = `
 .fx-flash-down { animation: fx-flash-down 0.9s ease forwards; }
 .fx-live-dot   { animation: fx-blink 1.8s ease-in-out infinite; }
 .fx-period-btn { transition: all 0.15s; cursor: pointer; font-family:'Jost',sans-serif; }
-.fx-period-btn:hover { color:#74c69d !important; border-color:#52b788 !important; }
+.fx-period-btn:hover { color:#2d6a4f !important; border-color:#52b788 !important; }
 .fx-shimmer    { animation: fx-shimmer 1.4s ease-in-out infinite; }
-.fx-sku-row:hover { background: rgba(82,183,136,0.07) !important; }
+.fx-sku-row:hover { background: rgba(45,106,79,0.06) !important; }
 `;
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -103,7 +104,6 @@ async function calcSkuCogs(skuId, fxRate) {
     const toZar = (usd) => parseFloat(usd || 0) * fxRate;
     const batchSize = parseFloat(recipe.batch_size || 1000);
 
-    // ── Parse chambers JSON (multi-chamber SKUs store terpene/distillate per chamber) ──
     let chambers = null;
     try {
       chambers = recipe.chambers
@@ -114,7 +114,6 @@ async function calcSkuCogs(skuId, fxRate) {
     } catch (_) {}
     const isMultiChamber = chambers && chambers.length > 0;
 
-    // ── Collect all IDs ───────────────────────────────────────────────────────
     const suppIds = [recipe.hardware_item_id].filter(Boolean);
     const localIds = [recipe.packaging_input_id, recipe.labour_input_id].filter(
       Boolean,
@@ -132,7 +131,6 @@ async function calcSkuCogs(skuId, fxRate) {
       if (recipe.distillate_input_id) localIds.push(recipe.distillate_input_id);
     }
 
-    // ── Lab tests ─────────────────────────────────────────────────────────────
     let labTests = [];
     try {
       labTests = recipe.lab_tests
@@ -172,14 +170,12 @@ async function calcSkuCogs(skuId, fxRate) {
       (localRes.data || []).map((r) => [r.id, r]),
     );
 
-    // Lab: cost per test × count ÷ batchSize
     const labInput = (labRes.data || []).find(
       (r) => parseFloat(r.cost_zar) > 0,
     );
     const labCostPerTest = labInput ? parseFloat(labInput.cost_zar) : 0;
     const labCostTotal = (labCostPerTest * labCount) / batchSize;
 
-    // ── Hardware (landed = unit cost + shipping alloc) ────────────────────────
     const hw = suppMap[recipe.hardware_item_id];
     const hwBase = hw
       ? toZar(hw.unit_price_usd) * parseFloat(recipe.hardware_qty || 1)
@@ -187,18 +183,14 @@ async function calcSkuCogs(skuId, fxRate) {
     const shippingCost = parseFloat(recipe.shipping_alloc_zar || 0);
     const hwCost = hwBase + shippingCost;
 
-    // ── Terpene + Distillate ──────────────────────────────────────────────────
     let tpCost = 0,
       distCost = 0;
 
     if (isMultiChamber) {
       chambers.forEach((ch) => {
-        // terpene_qty_ul → convert ul to g (÷1000), priced per 50g bottle
         const tp = suppMap[ch.terpene_item_id];
         const tpQg = parseFloat(ch.terpene_qty_ul || 0) / 1000;
         if (tp) tpCost += (toZar(tp.unit_price_usd) / 50) * tpQg;
-
-        // distillate: local_inputs (ZAR/ml) first, supplier fallback
         if (ch.distillate_input_id && localMap[ch.distillate_input_id]) {
           distCost +=
             parseFloat(localMap[ch.distillate_input_id].cost_zar || 0) *
@@ -215,7 +207,6 @@ async function calcSkuCogs(skuId, fxRate) {
         tpCost =
           (toZar(tp.unit_price_usd) / 50) *
           parseFloat(recipe.terpene_qty_g || 0);
-
       if (recipe.distillate_input_id && localMap[recipe.distillate_input_id]) {
         distCost =
           parseFloat(localMap[recipe.distillate_input_id].cost_zar || 0) *
@@ -230,7 +221,6 @@ async function calcSkuCogs(skuId, fxRate) {
       }
     }
 
-    // ── Packaging + Labour (manual override or local_inputs) ──────────────────
     const pk = localMap[recipe.packaging_input_id];
     const pkCost = pk
       ? parseFloat(pk.cost_zar || 0) * parseFloat(recipe.packaging_qty || 1)
@@ -248,7 +238,6 @@ async function calcSkuCogs(skuId, fxRate) {
         ? parseFloat(recipe.labour_manual_zar)
         : lbCost;
 
-    // ── Batch-level costs ÷ batchSize ─────────────────────────────────────────
     const transportCost =
       parseFloat(recipe.transport_cost_zar || 0) / batchSize;
     const miscCost = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
@@ -321,6 +310,7 @@ async function calcSkuCogs(skuId, fxRate) {
     return null;
   }
 }
+
 // ─── COGS breakdown bar ───────────────────────────────────────────────────────
 const COGS_COLOURS = [
   "#52b788",
@@ -330,6 +320,7 @@ const COGS_COLOURS = [
   "#3a6647",
   "#8fbc8f",
 ];
+
 function CogsBreakdownBar({ breakdown }) {
   if (!breakdown || breakdown.length === 0) return null;
   return (
@@ -592,7 +583,6 @@ function HistoryChart({ data, loading }) {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    // Measure immediately + on resize
     const measure = () => {
       if (containerRef.current) {
         const w = containerRef.current.getBoundingClientRect().width;
@@ -602,7 +592,6 @@ function HistoryChart({ data, loading }) {
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(containerRef.current);
-    // Also re-measure after layout settles
     const t = setTimeout(measure, 100);
     return () => {
       ro.disconnect();
@@ -632,7 +621,6 @@ function HistoryChart({ data, loading }) {
     );
   }
 
-  // ── v1.5: taller chart + more padding for readable labels ──────────────
   const W = chartWidth;
   const H = 260;
   const PAD = { top: 18, right: 80, bottom: 48, left: 10 };
@@ -659,25 +647,20 @@ function HistoryChart({ data, loading }) {
     .join(" ");
   const areaD = `${pathD} L ${toX(data.length - 1).toFixed(1)},${(PAD.top + CH).toFixed(1)} L ${PAD.left.toFixed(1)},${(PAD.top + CH).toFixed(1)} Z`;
 
-  // 6 y-axis grid lines
   const yTicks = Array.from({ length: 6 }, (_, i) => {
     const v = yMin + (yRange / 5) * i;
     return { y: toY(v), label: `R${v.toFixed(4)}` };
   });
 
-  // Up to 8 x-axis date labels
-  // Limit to 6 ticks max, space them evenly, use short month format
   const maxTicks = Math.min(6, data.length);
   const xTicks = [];
   for (let t = 0; t < maxTicks; t++) {
     const i = Math.round((t / (maxTicks - 1)) * (data.length - 1));
     const d = new Date(data[i].date || data[i].fetched_at);
-    // Short format: "3 Feb" — avoids overlap
-    const label = d.toLocaleDateString("en-ZA", {
-      day: "numeric",
-      month: "short",
+    xTicks.push({
+      x: toX(i),
+      label: d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" }),
     });
-    xTicks.push({ x: toX(i), label });
   }
 
   const trend = data[data.length - 1].rate >= data[0].rate;
@@ -710,7 +693,6 @@ function HistoryChart({ data, loading }) {
       ref={containerRef}
       style={{ position: "relative", animation: "fx-chart-in 0.3s ease" }}
     >
-      {/* ── v1.5: larger stats bar ── */}
       <div
         style={{ display: "flex", gap: 20, marginBottom: 12, flexWrap: "wrap" }}
       >
@@ -719,7 +701,7 @@ function HistoryChart({ data, loading }) {
           {
             label: "Close",
             val: `R${data[data.length - 1].rate.toFixed(4)}`,
-            color: C.white,
+            color: C.text,
           },
           { label: "Low", val: `R${min.toFixed(4)}`, color: C.down },
           { label: "High", val: `R${max.toFixed(4)}`, color: C.up },
@@ -730,7 +712,6 @@ function HistoryChart({ data, loading }) {
           },
         ].map((s) => (
           <div key={s.label}>
-            {/* v1.5: brighter, larger label */}
             <div
               style={{
                 fontSize: 9,
@@ -742,7 +723,6 @@ function HistoryChart({ data, loading }) {
             >
               {s.label}
             </div>
-            {/* v1.5: larger value */}
             <div
               style={{
                 fontSize: 13,
@@ -768,7 +748,7 @@ function HistoryChart({ data, loading }) {
       >
         <defs>
           <linearGradient id="ha" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={lc} stopOpacity="0.2" />
+            <stop offset="0%" stopColor={lc} stopOpacity="0.15" />
             <stop offset="100%" stopColor={lc} stopOpacity="0" />
           </linearGradient>
           <filter id="lg" x="-20%" y="-20%" width="140%" height="140%">
@@ -780,7 +760,6 @@ function HistoryChart({ data, loading }) {
           </filter>
         </defs>
 
-        {/* ── v1.5: Y-axis grid + readable labels ── */}
         {yTicks.map((t, i) => (
           <g key={i}>
             <line
@@ -805,7 +784,6 @@ function HistoryChart({ data, loading }) {
           </g>
         ))}
 
-        {/* ── v1.5: X-axis tick marks + readable date labels ── */}
         {xTicks.map((t, i) => (
           <g key={i}>
             <line
@@ -830,21 +808,16 @@ function HistoryChart({ data, loading }) {
           </g>
         ))}
 
-        {/* Area fill */}
         <path d={areaD} fill="url(#ha)" />
-
-        {/* Glow layer */}
         <path
           d={pathD}
           fill="none"
           stroke={lc}
           strokeWidth="5"
-          strokeOpacity="0.1"
+          strokeOpacity="0.08"
           filter="url(#lg)"
           strokeLinejoin="round"
         />
-
-        {/* Main line */}
         <path
           d={pathD}
           fill="none"
@@ -854,7 +827,6 @@ function HistoryChart({ data, loading }) {
           strokeLinecap="round"
         />
 
-        {/* Crosshair */}
         {hover && (
           <>
             <line
@@ -898,7 +870,6 @@ function HistoryChart({ data, loading }) {
         )}
       </svg>
 
-      {/* Hover tooltip */}
       {hover &&
         (() => {
           const raw = hover.dateStr;
@@ -937,7 +908,7 @@ function HistoryChart({ data, loading }) {
                 padding: "8px 12px",
                 pointerEvents: "none",
                 minWidth: 152,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.55)",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
                 zIndex: 20,
               }}
             >
@@ -945,7 +916,7 @@ function HistoryChart({ data, loading }) {
                 style={{
                   fontSize: 18,
                   fontWeight: 700,
-                  color: C.white,
+                  color: C.text,
                   fontFamily: "'Courier New', monospace",
                   marginBottom: 4,
                 }}
@@ -1070,7 +1041,6 @@ export default function LiveFXBar() {
     [periodCache],
   );
 
-  // Pre-load 1M on mount so mini chart shows immediately in collapsed bar
   useEffect(() => {
     loadPeriod("1M");
   }, []); // eslint-disable-line
@@ -1221,11 +1191,11 @@ export default function LiveFXBar() {
           overflow: "hidden",
           fontFamily: "'Jost','Courier New',monospace",
           boxShadow:
-            "0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(82,183,136,0.08)",
+            "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(45,106,79,0.06)",
           position: "relative",
         }}
       >
-        {/* Scan-line texture */}
+        {/* Subtle scan-line texture */}
         <div
           style={{
             position: "absolute",
@@ -1233,7 +1203,7 @@ export default function LiveFXBar() {
             pointerEvents: "none",
             zIndex: 0,
             background:
-              "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px)",
+              "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.015) 2px,rgba(0,0,0,0.015) 4px)",
           }}
         />
 
@@ -1278,7 +1248,7 @@ export default function LiveFXBar() {
                   inset: 0,
                   borderRadius: "50%",
                   background: C.green,
-                  boxShadow: `0 0 6px ${C.green}`,
+                  boxShadow: `0 0 6px ${C.greenBr}`,
                 }}
               />
             </span>
@@ -1322,10 +1292,9 @@ export default function LiveFXBar() {
                 fontFamily: "'Courier New',monospace",
                 fontSize: 26,
                 fontWeight: 700,
-                color: C.white,
+                color: C.text,
                 letterSpacing: "0.04em",
                 lineHeight: 1,
-                textShadow: "0 0 20px rgba(82,183,136,0.4)",
               }}
             >
               {rate ? `R${rate.toFixed(4)}` : "R——.——"}
@@ -1366,7 +1335,7 @@ export default function LiveFXBar() {
                   setSkuDropOpen(true);
                 }}
                 style={{
-                  background: "rgba(82,183,136,0.06)",
+                  background: "rgba(45,106,79,0.06)",
                   border: `1px dashed ${C.border}`,
                   borderRadius: 2,
                   padding: "4px 12px",
@@ -1387,7 +1356,7 @@ export default function LiveFXBar() {
                   alignItems: "center",
                   gap: 8,
                   padding: "4px 12px",
-                  background: "rgba(82,183,136,0.07)",
+                  background: "rgba(45,106,79,0.06)",
                   border: `1px solid ${C.border}`,
                   borderRadius: 2,
                 }}
@@ -1439,7 +1408,7 @@ export default function LiveFXBar() {
                       style={{
                         fontSize: 14,
                         fontWeight: 700,
-                        color: C.greenBr,
+                        color: C.green,
                         fontFamily: "'Courier New',monospace",
                         lineHeight: 1.2,
                       }}
@@ -1475,7 +1444,7 @@ export default function LiveFXBar() {
 
           <div style={{ flex: 1 }} />
 
-          {/* ── Mini historical chart in collapsed bar ── */}
+          {/* Mini historical chart */}
           {(() => {
             const miniData =
               periodCache[activePeriod] || periodCache["1M"] || null;
@@ -1519,7 +1488,7 @@ export default function LiveFXBar() {
                 >
                   <defs>
                     <linearGradient id="mini-fill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={lc} stopOpacity="0.2" />
+                      <stop offset="0%" stopColor={lc} stopOpacity="0.15" />
                       <stop offset="100%" stopColor={lc} stopOpacity="0" />
                     </linearGradient>
                   </defs>
@@ -1651,7 +1620,6 @@ export default function LiveFXBar() {
               padding: "20px 22px 22px",
             }}
           >
-            {/* Header + period buttons */}
             <div
               style={{
                 display: "flex",
@@ -1680,7 +1648,7 @@ export default function LiveFXBar() {
                     fontFamily: "'Cormorant Garamond',serif",
                     fontSize: 20,
                     fontWeight: 300,
-                    color: C.white,
+                    color: C.text,
                   }}
                 >
                   {rate ? `R${rate.toFixed(4)}` : "—"}
@@ -1709,14 +1677,14 @@ export default function LiveFXBar() {
                     style={{
                       background:
                         activePeriod === p.id
-                          ? "rgba(82,183,136,0.14)"
+                          ? "rgba(45,106,79,0.10)"
                           : "transparent",
                       border: `1px solid ${activePeriod === p.id ? C.green : C.border}`,
                       borderRadius: 2,
                       padding: "5px 12px",
                       fontSize: 10,
                       fontWeight: activePeriod === p.id ? 700 : 400,
-                      color: activePeriod === p.id ? C.greenBr : C.muted,
+                      color: activePeriod === p.id ? C.green : C.muted,
                       letterSpacing: "0.1em",
                     }}
                   >
@@ -1726,7 +1694,6 @@ export default function LiveFXBar() {
               </div>
             </div>
 
-            {/* Chart */}
             <div
               style={{
                 background: C.bgCard,
@@ -1739,7 +1706,6 @@ export default function LiveFXBar() {
               <HistoryChart data={chartData} loading={chartLoading} />
             </div>
 
-            {/* COGS + Cross rates */}
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
               {/* SKU COGS panel */}
               <div
@@ -1776,12 +1742,12 @@ export default function LiveFXBar() {
                         setSkuDropOpen((o) => !o);
                       }}
                       style={{
-                        background: "rgba(82,183,136,0.07)",
+                        background: "rgba(45,106,79,0.06)",
                         border: `1px solid ${C.border}`,
                         borderRadius: 2,
                         padding: "4px 10px",
                         fontSize: 9,
-                        color: C.greenBr,
+                        color: C.green,
                         cursor: "pointer",
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
@@ -1833,16 +1799,16 @@ export default function LiveFXBar() {
                                 position: "fixed",
                                 right,
                                 top,
-                                background: "#0d1f14",
+                                background: C.bgCard,
                                 border: `1px solid ${C.border}`,
                                 borderRadius: 3,
                                 minWidth: 260,
                                 maxHeight: dropH,
                                 overflowY: "auto",
                                 zIndex: 9999,
-                                boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                                boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
                                 scrollbarWidth: "thin",
-                                scrollbarColor: `${C.green} ${C.bgCard}`,
+                                scrollbarColor: `${C.greenBr} ${C.border}`,
                               }}
                             >
                               <div
@@ -1885,12 +1851,10 @@ export default function LiveFXBar() {
                                     fontSize: 11,
                                     cursor: "pointer",
                                     color:
-                                      sku.id === pinnedSkuId
-                                        ? C.greenBr
-                                        : C.text,
+                                      sku.id === pinnedSkuId ? C.green : C.text,
                                     background:
                                       sku.id === pinnedSkuId
-                                        ? "rgba(82,183,136,0.1)"
+                                        ? "rgba(45,106,79,0.08)"
                                         : "transparent",
                                     borderBottom: `1px solid ${C.border}`,
                                     display: "flex",
@@ -1947,7 +1911,7 @@ export default function LiveFXBar() {
                           fontFamily: "'Cormorant Garamond',serif",
                           fontSize: 34,
                           fontWeight: 300,
-                          color: C.white,
+                          color: C.text,
                         }}
                       >
                         R{liveCogs.total.toFixed(2)}

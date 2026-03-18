@@ -1,14 +1,20 @@
-// src/pages/HQDashboard.js v3.8
+// src/pages/HQDashboard.js v4.0
 // Protea Botanicals — HQ Command Centre
+// ★ v4.0: WP-NAV Sub-B
+//   - useLocation + useEffect: reads ?tab= query param → syncs activeTab
+//   - Header simplified — h1 + "All Tabs Live" badge removed, sidebar provides context
+//   - Horizontal tab bar removed — sidebar handles all tab routing
+//   - Tenant switcher retained in header
 // v3.8: WP-X — LiveFXBar injected above tab content on every tab
 // v3.7: Removed "Production" tab — "HQ Production" is the canonical tab
-// v3.6: Tab 3 now renders HQProduction (dead Production.js placeholder removed)
+// v3.6: Tab 3 now renders HQProduction
 // v3.5: WP-8 Fraud tab added (17th tab)
 // v3.4: Loyalty tab added (WP-O)
 // v3.3: All ERP tabs — procurement, costing, pricing, p&l, reorder, documents
 // v3.1: Supply Chain + Production + Distribution + Shops
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 
 // ── Phase 2B ──────────────────────────────────────────────────────────────────
@@ -55,7 +61,7 @@ const C = {
   accentGreen: "#52b788",
   gold: "#b5935a",
   text: "#1a1a1a",
-  muted: "#888888",
+  muted: "#474747",
   border: "#e8e0d4",
   white: "#ffffff",
   red: "#c62828",
@@ -89,6 +95,18 @@ const TABS = [
 export default function HQDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const { tenant, allTenants, tenantName, isHQ, switchTenant } = useTenant();
+  const location = useLocation();
+
+  // ★ v4.0: sync ?tab= query param from sidebar navigation
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && TABS.find((t) => t.id === tab)) {
+      setActiveTab(tab);
+    } else if (!tab && location.pathname === "/hq") {
+      setActiveTab("overview");
+    }
+  }, [location.search, location.pathname]);
 
   const handleNavigate = (tabId) => {
     if (TABS.find((t) => t.id === tabId)) setActiveTab(tabId);
@@ -96,158 +114,86 @@ export default function HQDashboard() {
 
   return (
     <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: "24px" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "8px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <h1
-              style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: "28px",
-                fontWeight: 300,
-                color: C.primaryDark,
-                margin: 0,
-              }}
-            >
-              HQ Command Centre
-            </h1>
-            <span
-              style={{
-                background: "rgba(82,183,136,0.15)",
-                color: C.accentGreen,
-                padding: "3px 10px",
-                borderRadius: "2px",
-                fontSize: "9px",
-                fontWeight: 700,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-              }}
-            >
-              All Tabs Live
-            </span>
-          </div>
-
-          {/* Tenant Switcher */}
-          {isHQ && allTenants.length > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  color: C.muted,
-                }}
-              >
-                Viewing:
-              </span>
-              <select
-                value={tenant?.id || ""}
-                onChange={(e) => {
-                  const selected = allTenants.find(
-                    (t) => t.id === e.target.value,
-                  );
-                  if (selected) switchTenant(selected);
-                }}
-                style={{
-                  padding: "6px 10px",
-                  border: "1px solid " + C.border,
-                  borderRadius: "2px",
-                  fontFamily: "Jost, sans-serif",
-                  fontSize: "12px",
-                  color: C.text,
-                  background: C.white,
-                  cursor: "pointer",
-                }}
-              >
-                {allTenants.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.type})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-        <p
-          style={{
-            color: C.muted,
-            fontSize: "13px",
-            fontWeight: 300,
-            margin: 0,
-          }}
-        >
-          {tenantName || "Protea Botanicals HQ"} — {allTenants.length} tenant
-          {allTenants.length !== 1 ? "s" : ""} registered
-        </p>
-      </div>
-
-      {/* ── Tab Navigation ───────────────────────────────────────────────── */}
+      {/* ── Header — simplified, sidebar provides tier/role context ── */}
       <div
         style={{
           display: "flex",
-          gap: "4px",
-          borderBottom: "1px solid " + C.border,
-          marginBottom: "28px",
-          overflowX: "auto",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "20px",
         }}
       >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+        <div>
+          <h1
             style={{
-              background: activeTab === tab.id ? C.white : "transparent",
-              border: "none",
-              borderBottom:
-                activeTab === tab.id
-                  ? `2px solid ${tab.alert ? C.red : C.primaryDark}`
-                  : "2px solid transparent",
-              padding: "12px 20px",
-              fontFamily: "Jost, sans-serif",
-              fontSize: "11px",
-              fontWeight: activeTab === tab.id ? 600 : 400,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
-              color:
-                activeTab === tab.id
-                  ? tab.alert
-                    ? C.red
-                    : C.primaryDark
-                  : C.muted,
-              cursor: "pointer",
-              transition: "all 0.15s",
-              whiteSpace: "nowrap",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
+              fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
+              fontSize: "24px",
+              fontWeight: 300,
+              color: C.primaryDark,
+              margin: "0 0 2px",
             }}
           >
-            <span style={{ fontSize: "14px" }}>{tab.icon}</span>
-            {tab.label}
-            {tab.ready && (
-              <span
-                style={{
-                  width: "5px",
-                  height: "5px",
-                  borderRadius: "50%",
-                  background: tab.alert ? C.red : C.accentGreen,
-                  display: "inline-block",
-                }}
-              />
-            )}
-          </button>
-        ))}
+            HQ Command Centre
+          </h1>
+          <p
+            style={{
+              color: C.muted,
+              fontSize: "13px",
+              fontWeight: 300,
+              margin: 0,
+            }}
+          >
+            {tenantName || "Protea Botanicals HQ"} — {allTenants.length} tenant
+            {allTenants.length !== 1 ? "s" : ""} registered
+          </p>
+        </div>
+
+        {/* Tenant Switcher — retained */}
+        {isHQ && allTenants.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 600,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: C.muted,
+              }}
+            >
+              Viewing:
+            </span>
+            <select
+              value={tenant?.id || ""}
+              onChange={(e) => {
+                const selected = allTenants.find(
+                  (t) => t.id === e.target.value,
+                );
+                if (selected) switchTenant(selected);
+              }}
+              style={{
+                padding: "6px 10px",
+                border: "1px solid " + C.border,
+                borderRadius: "2px",
+                fontFamily: "Jost, sans-serif",
+                fontSize: "12px",
+                color: C.text,
+                background: C.white,
+                cursor: "pointer",
+              }}
+            >
+              {allTenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.type})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* ── Tab Content ──────────────────────────────────────────────────── */}
+      {/* ★ v4.0: Tab navigation removed — sidebar handles all tab routing */}
+
+      {/* ── Tab Content ── */}
       <div>
         {/* v3.8: LiveFXBar renders above ALL tab content — persistent across every tab */}
         <LiveFXBar />

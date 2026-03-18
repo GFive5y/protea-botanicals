@@ -6,7 +6,7 @@ const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
   ink500: "#5A5A5A",
-  ink400: "#888888",
+  ink400: "#474747",
   ink150: "#E2E2E2",
   ink075: "#F4F4F3",
   accent: "#1A3D2B",

@@ -27,7 +27,7 @@ const C = {
   purplePale: "#F3E5F5",
   text: "#1a1a1a",
   textMid: "#4a4a4a",
-  textLight: "#888888",
+  textLight: "#474747",
   white: "#ffffff",
 };
 const FD = "'Cormorant Garamond', Georgia, serif";
@@ -201,15 +201,13 @@ async function writeAuditLog(action, targetType, targetId, details) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    await supabase
-      .from("audit_log")
-      .insert({
-        admin_id: user?.id || null,
-        action,
-        target_type: targetType,
-        target_id: targetId || null,
-        details: details || null,
-      });
+    await supabase.from("audit_log").insert({
+      admin_id: user?.id || null,
+      action,
+      target_type: targetType,
+      target_id: targetId || null,
+      details: details || null,
+    });
   } catch (err) {
     console.error("Audit log write error:", err);
   }

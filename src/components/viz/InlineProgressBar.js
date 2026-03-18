@@ -10,7 +10,7 @@ const T = {
   danger: "#991B1B",
   dangerBg: "#FEF2F2",
   ink150: "#E2E2E2",
-  ink400: "#888888",
+  ink400: "#474747",
   ink500: "#5A5A5A",
   accent: "#1A3D2B",
   accentMid: "#2D6A4F",

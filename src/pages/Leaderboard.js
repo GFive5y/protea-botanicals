@@ -11,7 +11,7 @@ const LIGHT_GRN = "#EDF4E5";
 const GOLD = "#C9A84C";
 const BG = "#F9F6F0";
 const MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
-const PODIUM_CLR = { 1: GOLD, 2: "#B0B0B0", 3: "#CD7F32" };
+const PODIUM_CLR = { 1: GOLD, 2: "#999999", 3: "#CD7F32" };
 const PODIUM_H = { 1: 90, 2: 65, 3: 50 };
 
 export default function Leaderboard() {

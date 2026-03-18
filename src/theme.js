@@ -20,7 +20,7 @@ export const T = {
     900: "#0D0D0D", // Primary text — headings, critical labels
     700: "#2C2C2C", // Body text — paragraphs, table cells
     500: "#5A5A5A", // Secondary / muted — captions, placeholders
-    300: "#B0B0B0", // Placeholder text, inactive icons
+    300: "#999999", // Placeholder text, inactive icons
     150: "#E2E2E2", // Borders, dividers, separators
     75: "#F4F4F3", // Subtle fills — row hover, code blocks
     50: "#FAFAF9", // Card backgrounds (white alternative)

@@ -20,7 +20,7 @@ export const C = {
   cream: "#faf9f6",
   footer: "#1a1a1a",
   text: "#1a1a1a",
-  muted: "#888888",
+  muted: "#474747",
   error: "#c0392b",
   warm: "#f4f0e8",
   border: "#e0dbd2",

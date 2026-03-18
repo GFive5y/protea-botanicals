@@ -31,7 +31,7 @@ const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
   ink500: "#5A5A5A",
-  ink300: "#B0B0B0",
+  ink300: "#999999",
   ink150: "#E2E2E2",
   ink075: "#F4F4F3",
   ink050: "#FAFAF9",
@@ -54,7 +54,7 @@ const T = {
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink400: "#888888",
+  ink400: "#474747",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 

@@ -893,7 +893,7 @@ const DEFAULT_STRAIN = {
   line: "Other",
   lineShort: "Other",
   type: "Hybrid",
-  typeColor: "#888888",
+  typeColor: "#474747",
   accentColor: "#aaaaaa",
   gradientFrom: "#2a2a2a",
   gradientTo: "#4a4a4a",

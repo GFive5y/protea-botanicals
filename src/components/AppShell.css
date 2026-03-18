@@ -1,0 +1,24 @@
+/* AppShell.css — WP-NAV v1.2 */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #faf9f6;
+}
+
+.app-shell-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #faf9f6;
+  position: relative;
+  z-index: 1;
+}
+
+/* Mobile: bottom bar takes 60px */
+@media (max-width: 767px) {
+  .app-shell-content {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+}

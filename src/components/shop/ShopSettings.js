@@ -26,7 +26,7 @@ const C = {
   accentGreen: "#52b788",
   gold: "#b5935a",
   text: "#1a1a1a",
-  muted: "#888888",
+  muted: "#474747",
   border: "#e8e0d4",
   white: "#ffffff",
   red: "#c0392b",

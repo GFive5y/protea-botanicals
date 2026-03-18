@@ -25,7 +25,7 @@ const C = {
   cream: "#faf9f6",
   warm: "#f4f0e8",
   text: "#1a1a1a",
-  muted: "#888888",
+  muted: "#474747",
   border: "#e0dbd2",
 };
 

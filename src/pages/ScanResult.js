@@ -73,7 +73,7 @@ const C = {
   cream: "#faf9f6",
   warm: "#f4f0e8",
   text: "#1a1a1a",
-  muted: "#888888",
+  muted: "#474747",
   border: "#e0dbd2",
   white: "#fff",
   error: "#c0392b",
@@ -1412,7 +1412,8 @@ export default function ScanResult() {
             .eq("user_id", currentUser.id)
             .eq("scan_outcome", "points_awarded")
             .gte("scanned_at", sevenDaysAgo);
-          const STREAK_BONUS_PTS = config.pts_streak_bonus || 200, STREAK_INTERVAL = config.streak_interval || 5;
+          const STREAK_BONUS_PTS = config.pts_streak_bonus || 200,
+            STREAK_INTERVAL = config.streak_interval || 5;
           if (weekCount && weekCount % STREAK_INTERVAL === 0) {
             const { data: freshPts } = await supabase
               .from("user_profiles")
@@ -1777,4 +1778,3 @@ export default function ScanResult() {
     </>
   );
 }
-
