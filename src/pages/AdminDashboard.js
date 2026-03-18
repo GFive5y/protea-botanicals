@@ -1,16 +1,14 @@
-// AdminDashboard.js v5.0
-// Protea Botanicals — March 2026
-// ★ v5.0: WP-NAV Sub-B
-//   - useLocation + useEffect: reads ?tab= query param → syncs tab state
-//   - Green header banner removed — sidebar provides context
-//   - Horizontal tab bar removed — sidebar handles all tab routing
-//   - TabBtn component retained (used internally by quick actions)
-// ★ v4.9: WP-HR-2 — HR tab added (AdminHRPanel)
-// ★ v4.8: WP-X System Intelligence Layer
-// ★ v4.7: WP-U Unified Comms Centre
-// ★ v4.6: WP-R Phase 6 — realtime KPI strip (qr_codes table)
-// ★ v4.5: WP-S Batch QR Chain
-// ★ v4.4: BUG-002 fix — Overview KPIs rewired to qr_codes table
+// AdminDashboard.js v6.0
+// WP-THEME: Unified design system applied
+//   - Outfit replaces Cormorant Garamond + Jost
+//   - DM Mono for all metric values
+//   - Emoji removed from quick action buttons and stat cards
+//   - StatCard: no coloured top borders — semantic colour on value only
+//   - Metric rows: flush grid layout matching HQOverview
+//   - Quick Actions: 4-variant button system
+//   - Error bar: standard danger template
+//   - Users table: semantic role badges (warning/info/neutral), DM Mono for points
+// ★ v5.0: WP-NAV Sub-B — URL sync, green banner + tab bar removed
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
@@ -30,58 +28,100 @@ import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCommsCenter from "../components/AdminCommsCenter";
 import AdminHRPanel from "../components/AdminHRPanel";
 
-const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  blue: "#2c4a6e",
-  brown: "#7c3a10",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
-  white: "#fff",
-  red: "#c0392b",
-  lightRed: "#f8d7da",
-  orange: "#e67e22",
-  lightGreen: "#eafaf1",
+// ── Design tokens ────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#888888",
+  ink300: "#B0B0B0",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  fontUi: "'Outfit','Helvetica Neue',Arial,sans-serif",
+  fontData: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
-const makeBtn = (bg, color = C.white) => ({
-  background: bg,
-  color,
-  border: "none",
-  borderRadius: "2px",
-  padding: "10px 20px",
-  fontSize: "11px",
-  fontWeight: 600,
-  letterSpacing: "0.2em",
-  textTransform: "uppercase",
-  fontFamily: FONTS.body,
-  cursor: "pointer",
-  transition: "opacity 0.2s",
-});
 
-function StatCard({ label, value, sub, color = C.green, icon, onClick }) {
+// 4-variant button factory
+const mkBtn = (variant = "primary", size = "md") => {
+  const base = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 4,
+    fontFamily: T.fontUi,
+    fontWeight: 600,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+    transition: "opacity 0.15s",
+    fontSize: size === "sm" ? "10px" : "11px",
+    padding: size === "sm" ? "6px 12px" : "9px 18px",
+  };
+  const v = {
+    primary: { background: T.accent, color: "#fff", border: "none" },
+    secondary: {
+      background: "transparent",
+      color: T.accent,
+      border: `1px solid ${T.accentBd}`,
+    },
+    ghost: {
+      background: "transparent",
+      color: T.ink700,
+      border: `1px solid ${T.ink150}`,
+    },
+    danger: {
+      background: "transparent",
+      color: T.danger,
+      border: `1px solid ${T.dangerBd}`,
+    },
+    warning: {
+      background: "transparent",
+      color: T.warning,
+      border: `1px solid ${T.warningBd}`,
+    },
+  };
+  return { ...base, ...(v[variant] || v.primary) };
+};
+
+// Stat card — no coloured top border, semantic value colour only
+function StatCard({ label, value, sub, semantic, onClick }) {
+  const semColors = {
+    success: T.success,
+    warning: T.warning,
+    danger: T.danger,
+    info: T.info,
+  };
+  const color = semantic ? semColors[semantic] : T.ink900;
   return (
     <div
       onClick={onClick}
       style={{
-        background: C.white,
-        border: `1px solid ${C.border}`,
-        borderRadius: "2px",
-        padding: "20px",
-        flex: "1 1 200px",
-        minWidth: "180px",
+        background: "#fff",
+        padding: "16px 18px",
         cursor: onClick ? "pointer" : "default",
         transition: "box-shadow 0.15s",
       }}
       onMouseEnter={(e) => {
         if (onClick)
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+          e.currentTarget.style.boxShadow = "inset 0 0 0 1px " + T.accentBd;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.boxShadow = "none";
@@ -89,25 +129,25 @@ function StatCard({ label, value, sub, color = C.green, icon, onClick }) {
     >
       <div
         style={{
-          fontSize: "11px",
-          fontWeight: 600,
-          letterSpacing: "0.15em",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: C.muted,
-          fontFamily: FONTS.body,
-          marginBottom: "8px",
+          color: T.ink400,
+          fontFamily: T.fontUi,
+          marginBottom: 6,
         }}
       >
-        {icon && <span style={{ marginRight: "6px" }}>{icon}</span>}
         {label}
       </div>
       <div
         style={{
-          fontSize: "32px",
-          fontWeight: 700,
+          fontFamily: T.fontData,
+          fontSize: "26px",
+          fontWeight: 400,
           color,
-          fontFamily: FONTS.heading,
           lineHeight: 1,
+          letterSpacing: "-0.02em",
         }}
       >
         {value}
@@ -115,15 +155,54 @@ function StatCard({ label, value, sub, color = C.green, icon, onClick }) {
       {sub && (
         <div
           style={{
-            fontSize: "12px",
-            color: C.muted,
-            fontFamily: FONTS.body,
-            marginTop: "4px",
+            fontSize: "11px",
+            color: T.ink500,
+            fontFamily: T.fontUi,
+            marginTop: 4,
           }}
         >
           {sub}
         </div>
       )}
+    </div>
+  );
+}
+
+// Metric grid — flush cells separated by 1px ink150 lines
+function MetricGrid({ children }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+        gap: "1px",
+        background: T.ink150,
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 6,
+        overflow: "hidden",
+        marginBottom: 24,
+        boxShadow: T.shadow,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ text }) {
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        marginBottom: 12,
+        fontFamily: T.fontUi,
+      }}
+    >
+      {text}
     </div>
   );
 }
@@ -137,8 +216,6 @@ function fmtDate(d) {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -164,16 +241,13 @@ export default function AdminDashboard() {
   const [fraudAlerts, setFraudAlerts] = useState(0);
   const [tenantId, setTenantId] = useState(null);
 
-  // ★ v5.0: sync ?tab= query param from sidebar navigation
   const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const t = params.get("tab");
-    if (t) {
-      setTab(t);
-    } else if (location.pathname === "/admin" && !location.search) {
+    if (t) setTab(t);
+    else if (location.pathname === "/admin" && !location.search)
       setTab("overview");
-    }
   }, [location.search, location.pathname]);
 
   const fetchUsers = useCallback(async () => {
@@ -386,15 +460,15 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div style={{ fontFamily: FONTS.body }}>
-      {/* ★ v5.0: Simplified header — sidebar provides tier/role context */}
+    <div style={{ fontFamily: T.fontUi }}>
+      {/* Header */}
       <div style={{ marginBottom: 0 }}>
         <h1
           style={{
-            fontFamily: FONTS.heading,
-            fontSize: "24px",
+            fontFamily: T.fontUi,
+            fontSize: "22px",
             fontWeight: 300,
-            color: C.green,
+            color: T.ink900,
             margin: "0 0 4px",
           }}
         >
@@ -402,32 +476,32 @@ export default function AdminDashboard() {
         </h1>
       </div>
 
-      {/* System Status Bar — WP-X */}
       <SystemStatusBar />
-
-      {/* ★ v5.0: Tab bar removed — sidebar handles all tab routing */}
       <div style={{ marginBottom: "20px" }} />
 
+      {/* Error — standard danger template */}
       {error && (
         <div
           style={{
-            background: "#f8d7da",
-            border: `1px solid ${C.red}`,
+            background: T.dangerBg,
+            border: `1px solid ${T.dangerBd}`,
             padding: "12px 16px",
-            borderRadius: "2px",
-            marginBottom: "20px",
-            color: C.red,
+            borderRadius: 6,
+            marginBottom: 20,
+            color: T.danger,
             fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
           }}
         >
-          ⚠️ {error}
+          <span style={{ flex: 1 }}>{error}</span>
           <button
             onClick={() => setError("")}
             style={{
-              float: "right",
               background: "none",
               border: "none",
-              color: C.red,
+              color: T.danger,
               cursor: "pointer",
               fontSize: "16px",
             }}
@@ -437,9 +511,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════
-          OVERVIEW — v4.8
-      ═══════════════════════════════════════════════════════ */}
+      {/* ── OVERVIEW ── */}
       {tab === "overview" && (
         <div>
           <WorkflowGuide
@@ -527,220 +599,167 @@ export default function AdminDashboard() {
             defaultOpen={false}
           />
 
-          {/* ROW 1: Today's Activity */}
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: C.muted,
-              marginBottom: 12,
-            }}
-          >
-            Today's Activity
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              flexWrap: "wrap",
-              marginBottom: 24,
-            }}
-          >
+          {/* ROW 1 — Today's Activity */}
+          <SectionLabel text="Today's Activity" />
+          <MetricGrid>
             <StatCard
-              icon="📱"
               label="Scans Today"
               value={scansToday}
-              color={C.green}
+              semantic="success"
             />
             <StatCard
-              icon="👥"
               label="New Customers"
               value={newCustomers}
-              color={C.accent}
+              semantic="info"
             />
             <StatCard
-              icon="⭐"
               label="Points Awarded"
               value={pointsToday.toLocaleString()}
-              color={C.gold}
+              semantic={null}
             />
             <StatCard
-              icon="📦"
               label="Active QR Codes"
               value={analytics.inStock}
               sub="in stock, unscanned"
-              color={C.blue}
+              semantic="info"
             />
-          </div>
+          </MetricGrid>
 
-          {/* ROW 2: Action Required */}
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: C.muted,
-              marginBottom: 12,
-            }}
-          >
-            Action Required
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              flexWrap: "wrap",
-              marginBottom: 24,
-            }}
-          >
+          {/* ROW 2 — Action Required */}
+          <SectionLabel text="Action Required" />
+          <MetricGrid>
             <StatCard
-              icon="💬"
               label="Comms"
               value={commsBadge}
               sub={commsBadge > 0 ? "items need attention" : "all clear"}
-              color={commsBadge > 0 ? C.red : C.accent}
+              semantic={commsBadge > 0 ? "danger" : "success"}
               onClick={() => setTab("comms")}
             />
             <StatCard
-              icon="📦"
               label="QR Claim Rate"
               value={`${analytics.claimRate}%`}
               sub={`${analytics.claimed} claimed of ${analytics.total}`}
-              color={parseFloat(analytics.claimRate) < 20 ? C.orange : C.accent}
+              semantic={parseFloat(analytics.claimRate) < 20 ? "warning" : null}
             />
             <StatCard
-              icon="🚨"
               label="Fraud Alerts"
               value={fraudAlerts}
               sub={fraudAlerts > 0 ? "accounts flagged" : "no alerts"}
-              color={fraudAlerts > 0 ? C.red : C.accent}
+              semantic={fraudAlerts > 0 ? "danger" : "success"}
               onClick={() => setTab("security")}
             />
             <StatCard
-              icon="👥"
               label="Total Users"
               value={analytics.userCount}
-              color={C.green}
+              semantic="info"
               onClick={() => setTab("users")}
             />
-          </div>
+          </MetricGrid>
 
-          {/* ROW 3: Platform Health */}
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: C.muted,
-              marginBottom: 12,
-            }}
-          >
-            Platform Health
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              flexWrap: "wrap",
-              marginBottom: 28,
-            }}
-          >
+          {/* ROW 3 — Platform Health */}
+          <SectionLabel text="Platform Health" />
+          <MetricGrid>
             <StatCard
-              icon="🎯"
               label="Points Distributed"
               value={analytics.totalPointsDistributed.toLocaleString()}
-              color={C.gold}
+              semantic={null}
             />
             <StatCard
-              icon="🏬"
               label="Active Stockists"
               value={analytics.activeStockists}
-              color={C.brown}
+              semantic="info"
             />
             <StatCard
-              icon="⏱️"
               label="Avg Time to Claim"
               value={
                 analytics.avgTimeToClaim ? `${analytics.avgTimeToClaim}h` : "—"
               }
               sub="hours from distribution"
-              color={C.blue}
+              semantic={null}
             />
             <StatCard
-              icon="📤"
               label="Distributed"
               value={analytics.distributed}
               sub="with customer, unclaimed"
-              color={C.gold}
+              semantic={null}
             />
-          </div>
+          </MetricGrid>
 
-          {/* Quick Actions */}
-          <h3
+          {/* Quick Actions — no emoji, 4-variant buttons */}
+          <div
             style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: "18px",
-              marginBottom: "14px",
+              fontSize: 13,
+              fontWeight: 600,
+              color: T.ink900,
+              marginBottom: 14,
+              fontFamily: T.fontUi,
             }}
           >
             Quick Actions
-          </h3>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               onClick={() => setTab("comms")}
-              style={makeBtn(commsBadge > 0 ? C.red : C.mid)}
+              style={mkBtn(commsBadge > 0 ? "danger" : "ghost", "sm")}
             >
-              💬 COMMS {commsBadge > 0 ? `(${commsBadge})` : ""}
+              {commsBadge > 0 ? `Comms (${commsBadge})` : "Comms"}
             </button>
-            <button onClick={() => setTab("shipments")} style={makeBtn(C.blue)}>
-              🚚 SHIPMENTS
+            <button
+              onClick={() => setTab("shipments")}
+              style={mkBtn("ghost", "sm")}
+            >
+              Shipments
             </button>
             <button
               onClick={() => setTab("production")}
-              style={makeBtn(C.gold)}
+              style={mkBtn("ghost", "sm")}
             >
-              ⚙️ PRODUCTION RUNS
+              Production
             </button>
-            <button onClick={() => setTab("batches")} style={makeBtn(C.green)}>
-              🌿 BATCHES
+            <button
+              onClick={() => setTab("batches")}
+              style={mkBtn("ghost", "sm")}
+            >
+              Batches
             </button>
             <button
               onClick={() => {
                 setQrInitialBatchId(null);
                 setTab("qr_codes");
               }}
-              style={makeBtn(C.accent)}
+              style={mkBtn("secondary", "sm")}
             >
-              📷 QR ENGINE
+              QR Engine
             </button>
-            <button onClick={() => setTab("stock")} style={makeBtn(C.mid)}>
-              📦 STOCK
+            <button
+              onClick={() => setTab("stock")}
+              style={mkBtn("ghost", "sm")}
+            >
+              Stock
             </button>
-            <button onClick={() => setTab("customers")} style={makeBtn(C.mid)}>
-              👥 CUSTOMERS
+            <button
+              onClick={() => setTab("customers")}
+              style={mkBtn("ghost", "sm")}
+            >
+              Customers
             </button>
             <button
               onClick={() => setTab("security")}
-              style={makeBtn(fraudAlerts > 0 ? C.red : C.mid)}
+              style={mkBtn(fraudAlerts > 0 ? "danger" : "ghost", "sm")}
             >
-              🛡️ FRAUD {fraudAlerts > 0 ? `(${fraudAlerts})` : ""}
+              {fraudAlerts > 0 ? `Fraud (${fraudAlerts})` : "Fraud"}
             </button>
             <button
               onClick={() => {
                 setDocumentsTargetId(null);
                 setTab("documents");
               }}
-              style={makeBtn(C.mid)}
+              style={mkBtn("ghost", "sm")}
             >
-              📄 DOCUMENTS
+              Documents
             </button>
-            <button onClick={() => setTab("hr")} style={makeBtn(C.mid)}>
-              🧑‍💼 HR
+            <button onClick={() => setTab("hr")} style={mkBtn("ghost", "sm")}>
+              HR
             </button>
             <button
               onClick={() => {
@@ -749,9 +768,9 @@ export default function AdminDashboard() {
                 fetchCommsBadge();
                 fetchTodayStats();
               }}
-              style={makeBtn(C.mid)}
+              style={mkBtn("ghost", "sm")}
             >
-              ↻ REFRESH
+              Refresh
             </button>
           </div>
         </div>
@@ -785,9 +804,10 @@ export default function AdminDashboard() {
         <div>
           <h2
             style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: "22px",
+              fontFamily: T.fontUi,
+              fontSize: "20px",
+              fontWeight: 500,
+              color: T.ink900,
               marginBottom: "20px",
             }}
           >
@@ -798,13 +818,14 @@ export default function AdminDashboard() {
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                background: C.white,
-                border: `1px solid ${C.border}`,
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
                 fontSize: "13px",
+                fontFamily: T.fontUi,
               }}
             >
               <thead>
-                <tr style={{ background: C.green, color: C.white }}>
+                <tr style={{ background: T.accent, color: "#fff" }}>
                   {["Email / ID", "Role", "Points", "Tier", "Joined"].map(
                     (h) => (
                       <th
@@ -815,7 +836,7 @@ export default function AdminDashboard() {
                           fontSize: "10px",
                           letterSpacing: "0.1em",
                           textTransform: "uppercase",
-                          fontWeight: 600,
+                          fontWeight: 700,
                         }}
                       >
                         {h}
@@ -832,7 +853,7 @@ export default function AdminDashboard() {
                       style={{
                         padding: "40px",
                         textAlign: "center",
-                        color: C.muted,
+                        color: T.ink500,
                       }}
                     >
                       No users found.
@@ -843,15 +864,16 @@ export default function AdminDashboard() {
                     <tr
                       key={u.id}
                       style={{
-                        borderBottom: `1px solid ${C.border}`,
-                        background: i % 2 === 0 ? C.white : C.cream,
+                        borderBottom: `1px solid ${T.ink075}`,
+                        background: i % 2 === 0 ? "#fff" : T.ink050,
                       }}
                     >
                       <td
                         style={{
                           padding: "10px 12px",
-                          fontFamily: "monospace",
+                          fontFamily: T.fontData,
                           fontSize: "11px",
+                          color: T.ink700,
                         }}
                       >
                         {u.email || u.id?.substring(0, 12) + "..."}
@@ -861,15 +883,20 @@ export default function AdminDashboard() {
                           style={{
                             background:
                               u.role === "admin"
-                                ? C.gold
+                                ? T.warningBg
                                 : u.role === "retailer"
-                                  ? C.brown
-                                  : C.blue,
-                            color: C.white,
+                                  ? T.infoBg
+                                  : T.ink075,
+                            color:
+                              u.role === "admin"
+                                ? T.warning
+                                : u.role === "retailer"
+                                  ? T.info
+                                  : T.ink500,
                             padding: "2px 8px",
-                            borderRadius: "2px",
+                            borderRadius: 3,
                             fontSize: "10px",
-                            fontWeight: 600,
+                            fontWeight: 700,
                             letterSpacing: "0.1em",
                             textTransform: "uppercase",
                           }}
@@ -877,13 +904,21 @@ export default function AdminDashboard() {
                           {u.role || "customer"}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          fontFamily: T.fontData,
+                          fontWeight: 600,
+                          color: T.ink900,
+                        }}
+                      >
                         {u.loyalty_points || 0}
                       </td>
                       <td
                         style={{
                           padding: "10px 12px",
                           textTransform: "capitalize",
+                          color: T.ink700,
                         }}
                       >
                         {u.loyalty_tier || "bronze"}
@@ -892,7 +927,7 @@ export default function AdminDashboard() {
                         style={{
                           padding: "10px 12px",
                           fontSize: "12px",
-                          color: C.muted,
+                          color: T.ink500,
                         }}
                       >
                         {fmtDate(u.created_at)}
