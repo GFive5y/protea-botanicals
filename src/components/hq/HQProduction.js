@@ -896,7 +896,35 @@ export default function HQProduction() {
     setLoading(true);
     setError(null);
     try {
-      const [itemsR, runsR, batchesR, partnersR] = await Promise.all([
+      // WP-R: resolve HQ tenant for batch filtering
+      let hqTenantId = null;
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("tenant_id")
+            .eq("id", user.id)
+            .single();
+          hqTenantId = profile?.tenant_id || null;
+        }
+      } catch (_) {}
+
+      const batchQuery = supabase
+        .from("batches")
+        .select(
+          "id,batch_number,product_name,product_type,strain,volume,status,lifecycle_status,inventory_item_id,low_stock_threshold,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id",
+        )
+        .eq("is_archived", false)
+        .order("production_date", { ascending: false })
+        .limit(200);
+
+      // Apply tenant filter if resolved — falls back to all batches for pure HQ role
+      if (hqTenantId) batchQuery.eq("tenant_id", hqTenantId);
+
+      const [itemsR, runsR, partnersR] = await Promise.all([
         supabase
           .from("inventory_items")
           .select("*")
@@ -910,17 +938,11 @@ export default function HQProduction() {
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
-          .from("batches")
-          .select(
-            "id,batch_number,product_name,product_type,strain,volume,status,lifecycle_status,inventory_item_id,low_stock_threshold,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id",
-          )
-          .eq("is_archived", false)
-          .order("production_date", { ascending: false }),
-        supabase
           .from("wholesale_partners")
           .select("id,business_name,contact_name")
           .order("business_name"),
       ]);
+      const batchesR = await batchQuery;
       if (itemsR.error) throw itemsR.error;
       if (runsR.error) throw runsR.error;
       if (batchesR.error) throw batchesR.error;
