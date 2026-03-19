@@ -538,8 +538,8 @@ export default function Distribution() {
                       margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
                     >
                       <CartesianGrid
-                        horizontal={false}
-                        vertical
+                        horizontal
+                        vertical={false}
                         stroke={T.ink150}
                         strokeWidth={0.5}
                       />
