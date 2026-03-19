@@ -889,6 +889,8 @@ export default function HQProduction() {
   const [runs, setRuns] = useState([]);
   const [batches, setBatches] = useState([]);
   const [partners, setPartners] = useState([]);
+  const [productFormats, setProductFormats] = useState([]);
+  const [productStrains, setProductStrains] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -924,7 +926,7 @@ export default function HQProduction() {
       // Apply tenant filter if resolved — falls back to all batches for pure HQ role
       if (hqTenantId) batchQuery.eq("tenant_id", hqTenantId);
 
-      const [itemsR, runsR, partnersR] = await Promise.all([
+      const [itemsR, runsR, partnersR, formatsR, strainsR] = await Promise.all([
         supabase
           .from("inventory_items")
           .select("*")
@@ -941,6 +943,16 @@ export default function HQProduction() {
           .from("wholesale_partners")
           .select("id,business_name,contact_name")
           .order("business_name"),
+        supabase
+          .from("product_formats")
+          .select("*")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("product_strains")
+          .select("*")
+          .eq("is_active", true)
+          .order("name", { ascending: true }),
       ]);
       const batchesR = await batchQuery;
       if (itemsR.error) throw itemsR.error;
@@ -950,6 +962,8 @@ export default function HQProduction() {
       setRuns(runsR.data || []);
       setBatches(batchesR.data || []);
       setPartners(partnersR.data || []);
+      setProductFormats(formatsR.data || []);
+      setProductStrains(strainsR.data || []);
     } catch (err) {
       console.error("[HQProduction] Fetch error:", err);
       setError(err.message);
@@ -1242,6 +1256,8 @@ export default function HQProduction() {
           {subTab === "new-run" && (
             <NewRunPanel
               items={items}
+              productFormats={productFormats}
+              productStrains={productStrains}
               onComplete={() => {
                 fetchAll();
                 setSubTab("history");
@@ -2777,7 +2793,52 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
 }
 
 // ─── New Run Panel ────────────────────────────────────────────────────────────
-function NewRunPanel({ items, onComplete }) {
+function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
+  // ── Build format catalogue + groups from live DB; fall back to hardcoded if empty ──
+  const formatCatalogue =
+    productFormats.length > 0
+      ? Object.fromEntries(
+          productFormats.map((f) => [
+            f.key,
+            {
+              label: f.label,
+              category: f.category || (f.is_vape ? "vape" : "other"),
+              is_vape: !!f.is_vape,
+              distillate_ml: parseFloat(f.distillate_ml) || 0,
+              chambers: parseInt(f.chambers) || 1,
+              terpene_pct: parseInt(f.terpene_pct) || 10,
+              format_short: f.format_short || f.label,
+              custom_fill: !!f.custom_fill,
+            },
+          ]),
+        )
+      : FORMAT_CATALOGUE;
+
+  const formatGroups =
+    productFormats.length > 0
+      ? (() => {
+          const seen = new Map();
+          productFormats.forEach((f) => {
+            const g =
+              f.group_label ||
+              (f.is_vape ? "── Vape ──" : "── Other Products ──");
+            if (!seen.has(g)) seen.set(g, []);
+            seen.get(g).push(f.key);
+          });
+          return Array.from(seen.entries()).map(([groupLabel, keys]) => ({
+            groupLabel,
+            keys,
+          }));
+        })()
+      : FORMAT_GROUPS;
+
+  const strainOptions =
+    productStrains.length > 0
+      ? productStrains.map((s) => s.name)
+      : STRAIN_OPTIONS;
+
+  const defaultFormatKey = formatGroups[0]?.keys[0] || "vape_1ml";
+
   const [form, setForm] = useState({
     strain: "",
     format_key: "vape_1ml",
@@ -2799,7 +2860,10 @@ function NewRunPanel({ items, onComplete }) {
     setConfirmed(false);
   };
 
-  const fmt = FORMAT_CATALOGUE[form.format_key] || FORMAT_CATALOGUE["vape_1ml"];
+  const fmt =
+    formatCatalogue[form.format_key] ||
+    formatCatalogue[defaultFormatKey] ||
+    FORMAT_CATALOGUE["vape_1ml"];
   const isVape = fmt.is_vape;
   const planned = parseInt(form.planned_units) || 0;
   const fillMlPerChamber = fmt.custom_fill
@@ -3186,11 +3250,11 @@ function NewRunPanel({ items, onComplete }) {
               value={form.format_key}
               onChange={(e) => set("format_key", e.target.value)}
             >
-              {FORMAT_GROUPS.map((g) => (
+              {formatGroups.map((g) => (
                 <optgroup key={g.groupLabel} label={g.groupLabel}>
                   {g.keys.map((k) => (
                     <option key={k} value={k}>
-                      {FORMAT_CATALOGUE[k].label}
+                      {formatCatalogue[k]?.label || k}
                     </option>
                   ))}
                 </optgroup>
@@ -3239,7 +3303,7 @@ function NewRunPanel({ items, onComplete }) {
               onChange={(e) => set("strain", e.target.value)}
             >
               <option value="">— Select Strain —</option>
-              {STRAIN_OPTIONS.map((s) => (
+              {strainOptions.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
