@@ -112,7 +112,7 @@ const sTd = {
 };
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
-export default function AdminAnalytics() {
+export default function AdminAnalytics({ tenantId }) {
   const ctx = usePageContext("admin-analytics", null);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
@@ -137,29 +137,41 @@ export default function AdminAnalytics() {
       const monthStart = new Date();
       monthStart.setDate(monthStart.getDate() - 30);
 
+      // WP-R: apply tenant filter if available
+      const applyTenant = (q) => (tenantId ? q.eq("tenant_id", tenantId) : q);
+
       const [tot, tod, wk, mo] = await Promise.all([
-        supabase.from("scan_logs").select("*", { count: "exact", head: true }),
-        supabase
-          .from("scan_logs")
-          .select("*", { count: "exact", head: true })
-          .gte("scanned_at", todayStart.toISOString()),
-        supabase
-          .from("scan_logs")
-          .select("*", { count: "exact", head: true })
-          .gte("scanned_at", weekStart.toISOString()),
-        supabase
-          .from("scan_logs")
-          .select("*", { count: "exact", head: true })
-          .gte("scanned_at", monthStart.toISOString()),
+        applyTenant(
+          supabase
+            .from("scan_logs")
+            .select("*", { count: "exact", head: true }),
+        ),
+        applyTenant(
+          supabase
+            .from("scan_logs")
+            .select("*", { count: "exact", head: true }),
+        ).gte("scanned_at", todayStart.toISOString()),
+        applyTenant(
+          supabase
+            .from("scan_logs")
+            .select("*", { count: "exact", head: true }),
+        ).gte("scanned_at", weekStart.toISOString()),
+        applyTenant(
+          supabase
+            .from("scan_logs")
+            .select("*", { count: "exact", head: true }),
+        ).gte("scanned_at", monthStart.toISOString()),
       ]);
 
-      const { data: rows } = await supabase
-        .from("scan_logs")
-        .select(
-          "id,qr_type,campaign_name,scan_outcome,scanned_at,ip_province,ip_city,user_id,qr_code,points_awarded",
-        )
-        .order("scanned_at", { ascending: false })
-        .limit(500);
+      const { data: rows } = await applyTenant(
+        supabase
+          .from("scan_logs")
+          .select(
+            "id,qr_type,campaign_name,scan_outcome,scanned_at,ip_province,ip_city,user_id,qr_code,points_awarded",
+          )
+          .order("scanned_at", { ascending: false })
+          .limit(500),
+      );
 
       const all = rows || [];
       const total = tot.count || 0;
@@ -233,7 +245,7 @@ export default function AdminAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -248,7 +260,7 @@ export default function AdminAnalytics() {
     return () => {
       supabase.removeChannel(sub);
     };
-  }, [fetchAnalytics]);
+  }, [fetchAnalytics, tenantId]);
 
   if (loading)
     return (
@@ -268,14 +280,12 @@ export default function AdminAnalytics() {
   const outcomePie = data.byOutcome
     .slice(0, 5)
     .map((d) => ({ ...d, color: getOutcomeMeta(d.outcome).color }));
-  const typeBarData = data.byType
-    .slice(0, 6)
-    .map((d) => ({
-      name: getTypeMeta(d.qrType).icon,
-      label: getTypeMeta(d.qrType).label,
-      count: d.count,
-      color: getTypeMeta(d.qrType).color,
-    }));
+  const typeBarData = data.byType.slice(0, 6).map((d) => ({
+    name: getTypeMeta(d.qrType).icon,
+    label: getTypeMeta(d.qrType).label,
+    count: d.count,
+    color: getTypeMeta(d.qrType).color,
+  }));
   const provMax = data.byProvince[0]?.count || 1;
 
   return (
