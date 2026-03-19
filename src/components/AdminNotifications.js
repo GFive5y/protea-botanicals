@@ -455,6 +455,21 @@ export default function AdminNotifications() {
     setTimeout(() => setToast(""), 3000);
   };
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "notification_log",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
@@ -462,9 +477,30 @@ export default function AdminNotifications() {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(200);
-    setLogs(data || []);
+    const fetched = data || [];
+    setLogs(fetched);
+
+    // GAP-02: alert on recent delivery failures (last 24h)
+    const since = new Date(Date.now() - 86400000).toISOString();
+    const recentFailed = fetched.filter(
+      (l) => l.status === "failed" && l.created_at >= since,
+    );
+    if (recentFailed.length > 0) {
+      writeAlert(
+        "delivery_failure",
+        "warning",
+        `${recentFailed.length} notification${recentFailed.length > 1 ? "s" : ""} failed in last 24h`,
+        recentFailed
+          .slice(0, 5)
+          .map(
+            (l) =>
+              `${l.type?.toUpperCase()} · ${TRIGGERS[l.trigger]?.label || l.trigger} → ${l.recipient || "unknown"}`,
+          )
+          .join(" · "),
+      );
+    }
     setLoading(false);
-  }, []);
+  }, [writeAlert]);
 
   useEffect(() => {
     fetchLogs();
