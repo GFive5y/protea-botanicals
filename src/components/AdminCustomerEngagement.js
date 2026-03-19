@@ -1,38 +1,64 @@
-// src/components/AdminCustomerEngagement.js v2.2
+// src/components/AdminCustomerEngagement.js v2.3
+// WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // WP-GUIDE-C++: usePageContext 'customers' wired + WorkflowGuide added
-// v2.1 — Inbox / Messaging layer + broadcast, compose, auto-triggers
-// v2.0 — calcEngagement scoring, churn risk, 360 drawer
+// v2.2 — WorkflowGuide · v2.1 — Inbox/Messaging · v2.0 — calcEngagement, churn risk, 360 drawer
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink400,
+  text: T.ink700,
   white: "#fff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef9f0",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
+  red: T.danger,
+  lightRed: T.dangerBg,
+  orange: T.warning,
+  lightOrange: T.warningBg,
+  blue: T.info,
+  lightBlue: T.infoBg,
   platinum: "#7b68ee",
   lightPlatinum: "#f0eeff",
-  lightGreen: "#eafaf1",
+  lightGreen: T.accentLit,
 };
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
@@ -67,14 +93,17 @@ const TIERS = {
     icon: "🥉",
   },
 };
-function getTier(points) {
-  if (points >= 1000) return "platinum";
-  if (points >= 500) return "gold";
-  if (points >= 200) return "silver";
-  return "bronze";
+function getTier(pts) {
+  return pts >= 1000
+    ? "platinum"
+    : pts >= 500
+      ? "gold"
+      : pts >= 200
+        ? "silver"
+        : "bronze";
 }
-function getTierCfg(points) {
-  return TIERS[getTier(points)];
+function getTierCfg(pts) {
+  return TIERS[getTier(pts)];
 }
 
 function fmtDate(d) {
@@ -85,15 +114,6 @@ function fmtDate(d) {
     year: "numeric",
   });
 }
-function fmtDateTime(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-} // eslint-disable-line no-unused-vars
 function daysSince(d) {
   if (!d) return null;
   return Math.floor((new Date() - new Date(d)) / 86400000);
@@ -117,33 +137,6 @@ function profileScore(p) {
   if (p.popia_consented) s += 20;
   return s;
 }
-
-const inputStyle = {
-  padding: "9px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
-  fontSize: 13,
-  fontFamily: FONTS.body,
-  backgroundColor: C.white,
-  color: C.text,
-  outline: "none",
-  boxSizing: "border-box",
-};
-const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
-  padding: "9px 18px",
-  backgroundColor: disabled ? "#ccc" : bg,
-  color,
-  border: "none",
-  borderRadius: 2,
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: "0.2em",
-  textTransform: "uppercase",
-  cursor: disabled ? "not-allowed" : "pointer",
-  fontFamily: FONTS.body,
-  opacity: disabled ? 0.6 : 1,
-});
-
 function calcEngagement(profile) {
   const days = profile.last_active_at ? daysSince(profile.last_active_at) : 999;
   let recency = 0;
@@ -190,10 +183,39 @@ function calcEngagement(profile) {
 }
 function isChurnRisk(profile) {
   const days = daysSince(profile.last_active_at);
-  const lowPoints = (profile.loyalty_points || 0) < 50;
-  const inactiveScans = (profile.total_scans || 0) === 0;
-  return (days !== null && days > 45) || (lowPoints && inactiveScans);
+  return (
+    (days !== null && days > 45) ||
+    ((profile.loyalty_points || 0) < 50 && (profile.total_scans || 0) === 0)
+  );
 }
+
+const inputStyle = {
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontSize: 13,
+  fontFamily: T.font,
+  backgroundColor: "#fff",
+  color: T.ink700,
+  outline: "none",
+  boxSizing: "border-box",
+};
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
+  padding: "9px 18px",
+  backgroundColor: disabled ? "#ccc" : bg,
+  color,
+  border:
+    bg === "transparent" || bg === "#eee" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.07em",
+  textTransform: "uppercase",
+  cursor: disabled ? "not-allowed" : "pointer",
+  fontFamily: T.font,
+  opacity: disabled ? 0.6 : 1,
+  transition: "opacity 0.15s",
+});
 
 function TierBadge({ points }) {
   const t = getTierCfg(points || 0);
@@ -207,11 +229,12 @@ function TierBadge({ points }) {
         borderRadius: 20,
         fontSize: 10,
         fontWeight: 700,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.07em",
         textTransform: "uppercase",
         backgroundColor: t.bg,
         color: t.color,
         border: `1px solid ${t.color}40`,
+        fontFamily: T.font,
       }}
     >
       {t.icon} {t.label}
@@ -219,11 +242,11 @@ function TierBadge({ points }) {
   );
 }
 function EngBar({ score }) {
-  const color = score >= 70 ? C.accent : score >= 40 ? C.gold : C.red;
+  const color = score >= 70 ? T.success : score >= 40 ? "#b5935a" : T.danger;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div
-        style={{ flex: 1, height: 5, background: C.border, borderRadius: 3 }}
+        style={{ flex: 1, height: 5, background: T.ink150, borderRadius: 3 }}
       >
         <div
           style={{
@@ -235,21 +258,30 @@ function EngBar({ score }) {
           }}
         />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 28 }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color,
+          minWidth: 28,
+          fontFamily: T.font,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
         {score}
       </span>
     </div>
   );
 }
 function ScoreBadge({ score }) {
-  const color = score >= 80 ? C.mid : score >= 40 ? C.orange : C.red;
+  const color = score >= 80 ? T.accentMid : score >= 40 ? T.warning : T.danger;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <div
         style={{
           width: 50,
           height: 5,
-          background: C.border,
+          background: T.ink150,
           borderRadius: 3,
           overflow: "hidden",
         }}
@@ -264,7 +296,7 @@ function ScoreBadge({ score }) {
         />
       </div>
       <span
-        style={{ fontSize: 11, color, fontWeight: 600, fontFamily: FONTS.body }}
+        style={{ fontSize: 11, color, fontWeight: 600, fontFamily: T.font }}
       >
         {score}%
       </span>
@@ -276,12 +308,12 @@ function Pill({ label, color, bg }) {
     <span
       style={{
         background: bg || "#eee",
-        color: color || C.muted,
+        color: color || T.ink400,
         borderRadius: 10,
         padding: "2px 8px",
         fontSize: 10,
         fontWeight: 600,
-        fontFamily: FONTS.body,
+        fontFamily: T.font,
         textTransform: "uppercase",
         letterSpacing: "0.06em",
       }}
@@ -290,32 +322,43 @@ function Pill({ label, color, bg }) {
     </span>
   );
 }
-
 const MSG_META = {
-  query: { label: "Query", icon: "💬", color: C.blue },
-  fault: { label: "Fault", icon: "⚠", color: C.red },
-  admin_notice: { label: "Notice", icon: "📢", color: C.mid },
-  birthday: { label: "Birthday", icon: "🎂", color: C.gold },
+  query: { label: "Query", icon: "💬", color: T.info },
+  fault: { label: "Fault", icon: "⚠", color: T.danger },
+  admin_notice: { label: "Notice", icon: "📢", color: T.accentMid },
+  birthday: { label: "Birthday", icon: "🎂", color: "#b5935a" },
   tier_up: { label: "Tier Upgrade", icon: "🏆", color: "#7b68ee" },
   event: { label: "Event", icon: "🎪", color: "#9b6b9e" },
-  response: { label: "Response", icon: "↩️", color: C.mid },
-  broadcast: { label: "Broadcast", icon: "📣", color: C.accent },
-  general: { label: "Message", icon: "📩", color: C.muted },
+  response: { label: "Response", icon: "↩️", color: T.accentMid },
+  broadcast: { label: "Broadcast", icon: "📣", color: T.accentMid },
+  general: { label: "Message", icon: "📩", color: T.ink400 },
 };
 function getMsgMeta(type) {
   return MSG_META[type] || MSG_META.general;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
+const secHdr = (text) => (
+  <div
+    style={{
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: "0.1em",
+      textTransform: "uppercase",
+      color: T.ink400,
+      marginBottom: 12,
+      fontFamily: T.font,
+    }}
+  >
+    {text}
+  </div>
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminCustomerEngagement() {
-  // WP-GUIDE-C++: wire 'customers' context for WorkflowGuide live status
   const ctx = usePageContext("customers", null);
 
   const [customers, setCustomers] = useState([]);
   const [engScores, setEngScores] = useState({});
-  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
@@ -372,23 +415,15 @@ export default function AdminCustomerEngagement() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [custRes, txnRes] = await Promise.all([
+      const [custRes] = await Promise.all([
         supabase
           .from("user_profiles")
           .select("*")
           .eq("role", "customer")
           .order("created_at", { ascending: false }),
-        supabase
-          .from("loyalty_transactions")
-          .select(
-            "id,user_id,points,transaction_type,description,transaction_date,source",
-          )
-          .order("transaction_date", { ascending: false }),
       ]);
-      const custs = custRes.data || [],
-        txns = txnRes.data || [];
+      const custs = custRes.data || [];
       setCustomers(custs);
-      setTransactions(txns);
       const scores = {};
       custs.forEach((c) => {
         scores[c.id] = calcEngagement(c);
@@ -437,16 +472,11 @@ export default function AdminCustomerEngagement() {
         dob.getMonth() === today.getMonth() &&
           dob.getDate() === today.getDate(),
       );
-    } else {
-      setBirthdayAlert(false);
-    }
-    const computedTier = getTier(selected.loyalty_points || 0);
-    const storedTier = selected.loyalty_tier || "bronze";
-    if (computedTier !== storedTier && computedTier !== "bronze") {
-      setTierUpAlert({ old: storedTier, new: computedTier });
-    } else {
-      setTierUpAlert(null);
-    }
+    } else setBirthdayAlert(false);
+    const ct = getTier(selected.loyalty_points || 0),
+      st = selected.loyalty_tier || "bronze";
+    if (ct !== st && ct !== "bronze") setTierUpAlert({ old: st, new: ct });
+    else setTierUpAlert(null);
   }, [selected]);
 
   const loadMessages = useCallback(async () => {
@@ -482,7 +512,7 @@ export default function AdminCustomerEngagement() {
       if (!error) saved++;
     }
     setSaving(false);
-    showToast(`✓ ${saved} customer profiles updated`);
+    showToast(`${saved} customer profiles updated`);
     fetchAll();
   };
 
@@ -506,7 +536,7 @@ export default function AdminCustomerEngagement() {
       return;
     }
     const userId = authData?.user?.id;
-    if (userId) {
+    if (userId)
       await supabase
         .from("user_profiles")
         .upsert({
@@ -520,14 +550,13 @@ export default function AdminCustomerEngagement() {
           profile_complete: false,
           created_at: new Date().toISOString(),
         });
-    }
     try {
       await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "admin_alert",
-          message: `🏪 IN-STORE REGISTRATION\nName: ${regForm.full_name || "Not provided"}\nEmail: ${regForm.email}\nPhone: ${regForm.phone || "—"}\nProvince: ${regForm.province || "—"}\nRegistered by store staff at ${new Date().toLocaleString("en-ZA")}`,
+          message: `🏪 IN-STORE REGISTRATION\nName: ${regForm.full_name || "Not provided"}\nEmail: ${regForm.email}\nPhone: ${regForm.phone || "—"}\nProvince: ${regForm.province || "—"}\nRegistered at ${new Date().toLocaleString("en-ZA")}`,
         }),
       });
     } catch {
@@ -626,8 +655,8 @@ export default function AdminCustomerEngagement() {
     setComposing(true);
     setComposeForm({
       message_type: "birthday",
-      subject: "🎂 Happy Birthday from Protea Botanicals!",
-      body: `Hi ${selected.full_name || "there"},\n\nWishing you a wonderful birthday from all of us at Protea Botanicals! 🌿\n\nAs a thank you, we've added a special birthday bonus to your account. Enjoy your day!`,
+      subject: "Happy Birthday from Protea Botanicals!",
+      body: `Hi ${selected.full_name || "there"},\n\nWishing you a wonderful birthday from all of us at Protea Botanicals!\n\nAs a thank you, we've added a special birthday bonus to your account. Enjoy your day!`,
       bonus_points: 50,
     });
   };
@@ -635,8 +664,8 @@ export default function AdminCustomerEngagement() {
     setComposing(true);
     setComposeForm({
       message_type: "tier_up",
-      subject: `🏆 You've reached ${tierUpAlert?.new ? TIERS[tierUpAlert.new]?.label : "a new tier"}!`,
-      body: `Hi ${selected.full_name || "there"},\n\nCongratulations! You've been upgraded to ${TIERS[tierUpAlert?.new]?.label || "a new tier"} status at Protea Botanicals. 🎉\n\nKeep scanning and earning to unlock even more exclusive rewards. Thank you for your loyalty!`,
+      subject: `You've reached ${tierUpAlert?.new ? TIERS[tierUpAlert.new]?.label : "a new tier"}!`,
+      body: `Hi ${selected.full_name || "there"},\n\nCongratulations! You've been upgraded to ${TIERS[tierUpAlert?.new]?.label || "a new tier"} status at Protea Botanicals.\n\nKeep scanning and earning to unlock even more exclusive rewards. Thank you for your loyalty!`,
       bonus_points: 0,
     });
   };
@@ -683,7 +712,7 @@ export default function AdminCustomerEngagement() {
     loadMessages();
   };
 
-  // ── Computed stats ──
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const avgEng =
     customers.length > 0
       ? Math.round(
@@ -713,7 +742,7 @@ export default function AdminCustomerEngagement() {
     tierCounts[getTier(c.loyalty_points || 0)]++;
   });
 
-  // ── Filter + sort ──
+  // ── Filter + sort ──────────────────────────────────────────────────────────
   let displayed = [...customers];
   if (filter === "at_risk") displayed = displayed.filter((c) => isChurnRisk(c));
   if (filter === "active")
@@ -767,9 +796,16 @@ export default function AdminCustomerEngagement() {
     (m) => m.direction === "inbound" && !m.read_at,
   ).length;
 
+  const FILTER_TABS = [
+    { key: "all", label: "All" },
+    { key: "active", label: "Active" },
+    { key: "at_risk", label: "At Risk" },
+    { key: "opted_in", label: "Opted In" },
+    { key: "complete", label: "Complete" },
+  ];
+
   return (
-    <div style={{ fontFamily: FONTS.body, position: "relative" }}>
-      {/* WP-GUIDE-C++: WorkflowGuide with live customers context */}
+    <div style={{ fontFamily: T.font, position: "relative" }}>
       <WorkflowGuide
         context={ctx}
         tabId="customers"
@@ -784,14 +820,15 @@ export default function AdminCustomerEngagement() {
             bottom: 24,
             left: "50%",
             transform: "translateX(-50%)",
-            background: C.green,
-            color: C.white,
+            background: T.accent,
+            color: "#fff",
             padding: "12px 24px",
-            borderRadius: 2,
+            borderRadius: 6,
             fontSize: 13,
             fontWeight: 600,
             zIndex: 2000,
-            fontFamily: FONTS.body,
+            fontFamily: T.font,
+            boxShadow: T.shadowMd,
           }}
         >
           {toast}
@@ -812,15 +849,16 @@ export default function AdminCustomerEngagement() {
         <div>
           <h2
             style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: 24,
-              margin: 0,
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
             Customer Engagement
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: T.ink400 }}>
             Live engagement scoring · Churn risk detection · Loyalty tier
             management · 360° profiles
           </div>
@@ -831,24 +869,24 @@ export default function AdminCustomerEngagement() {
               setShowBroadcast(true);
               setBroadcastResult(null);
             }}
-            style={{ ...makeBtn(C.gold), letterSpacing: "0.12em" }}
+            style={makeBtn("#b5935a")}
           >
-            📣 Broadcast
+            Broadcast
           </button>
           <button
             onClick={() => {
               setShowRegister(true);
               setRegMsg(null);
             }}
-            style={{ ...makeBtn(C.blue), letterSpacing: "0.12em" }}
+            style={makeBtn(T.info)}
           >
             + Register In-Store
           </button>
           <button
             onClick={fetchAll}
             style={{
-              ...makeBtn("transparent", C.muted),
-              border: `1px solid ${C.border}`,
+              ...makeBtn("transparent", T.ink400),
+              border: `1px solid ${T.ink150}`,
             }}
           >
             ↻ Refresh
@@ -856,80 +894,82 @@ export default function AdminCustomerEngagement() {
           <button
             onClick={handleBulkSave}
             disabled={saving}
-            style={makeBtn(C.green, C.white, saving)}
+            style={makeBtn(T.accent, "#fff", saving)}
           >
-            {saving ? "Saving…" : "💾 Save All Scores"}
+            {saving ? "Saving…" : "Save All Scores"}
           </button>
         </div>
       </div>
 
-      {/* Stats strip */}
+      {/* ── FLUSH STAT GRID ── */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit,minmax(105px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 8,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
           marginBottom: 20,
         }}
       >
         {[
-          { label: "Customers", value: customers.length, color: C.green },
-          { label: "Active (30d)", value: activeCount, color: C.accent },
+          { label: "Customers", value: customers.length, color: T.accent },
+          { label: "Active (30d)", value: activeCount, color: T.accentMid },
           {
             label: "Avg Engagement",
             value: `${avgEng}/100`,
-            color: avgEng >= 60 ? C.accent : avgEng >= 35 ? C.gold : C.red,
+            color:
+              avgEng >= 60 ? T.success : avgEng >= 35 ? "#b5935a" : T.danger,
           },
           {
-            label: "⚠ Churn Risk",
+            label: "Churn Risk",
             value: churnCount,
-            color: churnCount > 0 ? C.red : C.accent,
+            color: churnCount > 0 ? T.danger : T.success,
           },
-          { label: "Marketing Opt-in", value: `${optInRate}%`, color: C.blue },
-          { label: "POPIA Consented", value: popiaCount, color: C.mid },
+          { label: "Mktg Opt-in", value: `${optInRate}%`, color: T.info },
+          { label: "POPIA Consent", value: popiaCount, color: T.accentMid },
           {
             label: "Avg Profile",
             value: `${avgProfile}%`,
-            color: avgProfile > 60 ? C.mid : C.orange,
+            color: avgProfile > 60 ? T.accentMid : T.warning,
           },
-          {
-            label: "💎 Platinum",
-            value: tierCounts.platinum,
-            color: C.platinum,
-          },
-          { label: "🥇 Gold", value: tierCounts.gold, color: C.gold },
-          { label: "🥉 Bronze", value: tierCounts.bronze, color: "#a0674b" },
+          { label: "Platinum", value: tierCounts.platinum, color: "#7b68ee" },
+          { label: "Gold", value: tierCounts.gold, color: "#b5935a" },
+          { label: "Bronze", value: tierCounts.bronze, color: "#a0674b" },
         ].map((s) => (
           <div
             key={s.label}
             style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderTop: `3px solid ${s.color}`,
-              borderRadius: 2,
+              background: "#fff",
               padding: "14px 16px",
               textAlign: "center",
             }}
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.15em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: C.muted,
-                marginBottom: 4,
+                color: T.ink400,
+                marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {s.label}
             </div>
             <div
               style={{
-                fontFamily: FONTS.heading,
-                fontSize: 24,
-                fontWeight: 300,
+                fontFamily: T.font,
+                fontSize: 20,
+                fontWeight: 400,
                 color: s.color,
                 lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
               {s.value}
@@ -942,16 +982,17 @@ export default function AdminCustomerEngagement() {
         <div
           style={{
             padding: "12px 16px",
-            background: C.lightRed,
-            border: `1px solid ${C.red}`,
-            borderRadius: 2,
+            background: T.dangerBg,
+            border: `1px solid ${T.dangerBd}`,
+            borderRadius: 6,
             marginBottom: 16,
             fontSize: 13,
-            color: C.red,
+            color: T.danger,
             fontWeight: 600,
+            fontFamily: T.font,
           }}
         >
-          ⚠ {churnCount} customer{churnCount > 1 ? "s" : ""} at churn risk —
+          {churnCount} customer{churnCount > 1 ? "s" : ""} at churn risk —
           inactive 45+ days or no scans with low points
         </div>
       )}
@@ -975,33 +1016,30 @@ export default function AdminCustomerEngagement() {
         <div
           style={{
             display: "flex",
+            borderBottom: `2px solid ${T.ink150}`,
             gap: 0,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            overflow: "hidden",
           }}
         >
-          {[
-            { key: "all", label: "All" },
-            { key: "active", label: "Active" },
-            { key: "at_risk", label: "⚠ At Risk" },
-            { key: "opted_in", label: "Opted In" },
-            { key: "complete", label: "Complete" },
-          ].map((f) => (
+          {FILTER_TABS.map((f) => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
               style={{
                 padding: "8px 14px",
+                background: "transparent",
                 border: "none",
+                borderBottom:
+                  filter === f.key
+                    ? `2px solid ${T.accent}`
+                    : "2px solid transparent",
+                fontFamily: T.font,
                 fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
+                fontWeight: filter === f.key ? 700 : 400,
+                letterSpacing: "0.06em",
                 textTransform: "uppercase",
+                color: filter === f.key ? T.accent : T.ink400,
                 cursor: "pointer",
-                fontFamily: FONTS.body,
-                backgroundColor: filter === f.key ? C.green : C.white,
-                color: filter === f.key ? C.white : C.muted,
+                marginBottom: -2,
               }}
             >
               {f.label}
@@ -1014,10 +1052,10 @@ export default function AdminCustomerEngagement() {
           onChange={(e) => setTierFilter(e.target.value)}
         >
           <option value="all">All Tiers</option>
-          <option value="platinum">💎 Platinum</option>
-          <option value="gold">🥇 Gold</option>
-          <option value="silver">🥈 Silver</option>
-          <option value="bronze">🥉 Bronze</option>
+          <option value="platinum">Platinum</option>
+          <option value="gold">Gold</option>
+          <option value="silver">Silver</option>
+          <option value="bronze">Bronze</option>
         </select>
         <select
           style={{ ...inputStyle, cursor: "pointer", width: "auto" }}
@@ -1032,14 +1070,28 @@ export default function AdminCustomerEngagement() {
           <option value="join_date">Sort: Join Date</option>
           <option value="profile">Sort: Profile %</option>
         </select>
-        <div style={{ fontSize: 12, color: C.muted, marginLeft: "auto" }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: T.ink400,
+            marginLeft: "auto",
+            fontFamily: T.font,
+          }}
+        >
           {displayed.length} customer{displayed.length !== 1 ? "s" : ""}
         </div>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div style={{ padding: 60, textAlign: "center", color: C.muted }}>
+        <div
+          style={{
+            padding: 60,
+            textAlign: "center",
+            color: T.ink400,
+            fontFamily: T.font,
+          }}
+        >
           Loading customers…
         </div>
       ) : displayed.length === 0 ? (
@@ -1047,39 +1099,46 @@ export default function AdminCustomerEngagement() {
           style={{
             padding: 60,
             textAlign: "center",
-            border: `1px dashed ${C.border}`,
-            borderRadius: 2,
+            border: `1px dashed ${T.ink150}`,
+            borderRadius: 8,
           }}
         >
           <div style={{ fontSize: 32, marginBottom: 12 }}>👥</div>
           <div
             style={{
-              fontFamily: FONTS.heading,
-              fontSize: 20,
-              color: C.green,
+              fontSize: 18,
+              fontWeight: 600,
+              color: T.ink700,
               marginBottom: 8,
+              fontFamily: T.font,
             }}
           >
             No customers found
           </div>
-          <div style={{ fontSize: 13, color: C.muted }}>
+          <div style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}>
             Customers appear here once they sign up and scan a QR code.
           </div>
         </div>
       ) : (
         <div
           style={{
-            background: C.white,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            background: "#fff",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 8,
             overflow: "hidden",
+            boxShadow: T.shadow,
           }}
         >
           <table
-            style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: 13,
+              fontFamily: T.font,
+            }}
           >
             <thead>
-              <tr style={{ background: C.green, color: C.white }}>
+              <tr style={{ background: T.accent, color: "#fff" }}>
                 {[
                   "Customer",
                   "Tier",
@@ -1097,9 +1156,10 @@ export default function AdminCustomerEngagement() {
                       padding: "10px 14px",
                       textAlign: "left",
                       fontSize: 10,
-                      letterSpacing: "0.1em",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      fontWeight: 600,
+                      fontWeight: 700,
+                      fontFamily: T.font,
                     }}
                   >
                     {h}
@@ -1117,8 +1177,8 @@ export default function AdminCustomerEngagement() {
                   <tr
                     key={c.id}
                     style={{
-                      borderBottom: `1px solid ${C.border}`,
-                      background: i % 2 === 0 ? C.white : C.cream,
+                      borderBottom: `1px solid ${T.ink075}`,
+                      background: i % 2 === 0 ? "#fff" : T.ink050,
                       cursor: "pointer",
                     }}
                     onClick={() => {
@@ -1128,25 +1188,25 @@ export default function AdminCustomerEngagement() {
                       setComposing(false);
                     }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = "#f0faf5")
+                      (e.currentTarget.style.background = T.accentLit)
                     }
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.background =
-                        i % 2 === 0 ? C.white : C.cream)
+                        i % 2 === 0 ? "#fff" : T.ink050)
                     }
                   >
                     <td style={{ padding: "12px 14px" }}>
-                      <div style={{ fontWeight: 600, color: C.text }}>
+                      <div style={{ fontWeight: 600, color: T.ink900 }}>
                         {c.full_name || (
-                          <span style={{ color: C.muted }}>Anonymous</span>
+                          <span style={{ color: T.ink400 }}>Anonymous</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: C.muted }}>
+                      <div style={{ fontSize: 11, color: T.ink400 }}>
                         {c.city || ""}
                         {c.province ? `, ${c.province}` : ""}
                       </div>
                       {c.phone && (
-                        <div style={{ fontSize: 11, color: C.muted }}>
+                        <div style={{ fontSize: 11, color: T.ink400 }}>
                           {c.phone}
                         </div>
                       )}
@@ -1161,12 +1221,19 @@ export default function AdminCustomerEngagement() {
                       style={{
                         padding: "12px 14px",
                         fontWeight: 600,
-                        color: C.gold,
+                        color: "#b5935a",
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {(c.loyalty_points || 0).toLocaleString()}
                     </td>
-                    <td style={{ padding: "12px 14px", color: C.muted }}>
+                    <td
+                      style={{
+                        padding: "12px 14px",
+                        color: T.ink400,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
                       {c.total_scans || 0}
                     </td>
                     <td style={{ padding: "12px 14px", minWidth: 90 }}>
@@ -1176,7 +1243,7 @@ export default function AdminCustomerEngagement() {
                       style={{
                         padding: "12px 14px",
                         fontSize: 12,
-                        color: days !== null && days > 30 ? C.red : C.muted,
+                        color: days !== null && days > 30 ? T.danger : T.ink400,
                       }}
                     >
                       {days !== null
@@ -1191,30 +1258,30 @@ export default function AdminCustomerEngagement() {
                           style={{
                             fontSize: 10,
                             padding: "2px 8px",
-                            borderRadius: 2,
-                            background: C.lightRed,
-                            color: C.red,
+                            borderRadius: 4,
+                            background: T.dangerBg,
+                            color: T.danger,
                             fontWeight: 700,
                             textTransform: "uppercase",
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.07em",
                           }}
                         >
-                          ⚠ At Risk
+                          At Risk
                         </span>
                       ) : (
                         <span
                           style={{
                             fontSize: 10,
                             padding: "2px 8px",
-                            borderRadius: 2,
-                            background: C.lightGreen,
-                            color: C.accent,
+                            borderRadius: 4,
+                            background: T.successBg,
+                            color: T.success,
                             fontWeight: 700,
                             textTransform: "uppercase",
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.07em",
                           }}
                         >
-                          ✓ Active
+                          Active
                         </span>
                       )}
                     </td>
@@ -1228,8 +1295,8 @@ export default function AdminCustomerEngagement() {
                           setComposing(false);
                         }}
                         style={{
-                          ...makeBtn("transparent", C.mid),
-                          border: `1px solid ${C.border}`,
+                          ...makeBtn("transparent", T.accentMid),
+                          border: `1px solid ${T.accentBd}`,
                           fontSize: 10,
                           padding: "5px 12px",
                         }}
@@ -1265,18 +1332,20 @@ export default function AdminCustomerEngagement() {
               bottom: 0,
               width: 620,
               maxWidth: "95vw",
-              background: C.cream,
+              background: T.ink050,
               zIndex: 1001,
               overflowY: "auto",
               boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
               display: "flex",
               flexDirection: "column",
+              fontFamily: T.font,
             }}
           >
+            {/* Drawer header */}
             <div
               style={{
-                background: C.green,
-                color: C.white,
+                background: T.accent,
+                color: "#fff",
                 padding: "20px 24px",
                 display: "flex",
                 justifyContent: "space-between",
@@ -1286,22 +1355,11 @@ export default function AdminCustomerEngagement() {
             >
               <div>
                 <div
-                  style={{
-                    fontSize: 22,
-                    fontFamily: FONTS.heading,
-                    fontWeight: 700,
-                  }}
+                  style={{ fontSize: 18, fontWeight: 600, fontFamily: T.font }}
                 >
                   {selected.full_name || "Anonymous Customer"}
                 </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    opacity: 0.8,
-                    marginTop: 2,
-                    fontFamily: FONTS.body,
-                  }}
-                >
+                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>
                   {selected.city}
                   {selected.province ? `, ${selected.province}` : ""}
                   {selected.phone ? ` · ${selected.phone}` : ""}
@@ -1310,28 +1368,29 @@ export default function AdminCustomerEngagement() {
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <TierBadge points={selected.loyalty_points || 0} />
                 <button
+                  onClick={() => setSelected(null)}
                   style={{
-                    background: "rgba(255,255,255,0.2)",
+                    background: "rgba(255,255,255,0.18)",
                     border: "none",
-                    color: C.white,
+                    color: "#fff",
                     cursor: "pointer",
-                    fontSize: 20,
-                    borderRadius: 2,
+                    fontSize: 18,
+                    borderRadius: 4,
                     padding: "4px 10px",
                   }}
-                  onClick={() => setSelected(null)}
                 >
                   ✕
                 </button>
               </div>
             </div>
 
+            {/* Birthday / tier alerts */}
             {(birthdayAlert || tierUpAlert) && (
               <div
                 style={{
                   padding: "12px 24px",
-                  background: "#fef9e7",
-                  borderBottom: `1px solid ${C.gold}`,
+                  background: T.warningBg,
+                  borderBottom: `1px solid ${T.warningBd}`,
                   display: "flex",
                   gap: 10,
                   flexWrap: "wrap",
@@ -1345,15 +1404,16 @@ export default function AdminCustomerEngagement() {
                       alignItems: "center",
                       gap: 8,
                       fontSize: 13,
-                      color: C.gold,
+                      color: "#b5935a",
                       fontWeight: 600,
+                      fontFamily: T.font,
                     }}
                   >
-                    🎂 Birthday today!
+                    Birthday today!{" "}
                     <button
                       onClick={prefillBirthday}
                       style={{
-                        ...makeBtn(C.gold),
+                        ...makeBtn("#b5935a"),
                         fontSize: 9,
                         padding: "3px 10px",
                       }}
@@ -1369,15 +1429,16 @@ export default function AdminCustomerEngagement() {
                       alignItems: "center",
                       gap: 8,
                       fontSize: 13,
-                      color: C.platinum,
+                      color: "#7b68ee",
                       fontWeight: 600,
+                      fontFamily: T.font,
                     }}
                   >
-                    🏆 Tier upgraded to {TIERS[tierUpAlert.new]?.label}!
+                    Tier upgraded to {TIERS[tierUpAlert.new]?.label}!{" "}
                     <button
                       onClick={prefillTierUp}
                       style={{
-                        ...makeBtn(C.platinum),
+                        ...makeBtn("#7b68ee"),
                         fontSize: 9,
                         padding: "3px 10px",
                       }}
@@ -1389,24 +1450,25 @@ export default function AdminCustomerEngagement() {
               </div>
             )}
 
+            {/* Drawer tabs — underline */}
             <div
               style={{
                 display: "flex",
-                borderBottom: `2px solid ${C.border}`,
-                background: C.white,
+                borderBottom: `2px solid ${T.ink150}`,
+                background: "#fff",
                 flexShrink: 0,
                 overflowX: "auto",
               }}
             >
               {[
-                { id: "profile", label: "👤 Profile" },
-                { id: "loyalty", label: "⭐ Loyalty" },
-                { id: "scans", label: "📱 Scans" },
+                { id: "profile", label: "Profile" },
+                { id: "loyalty", label: "Loyalty" },
+                { id: "scans", label: "Scans" },
                 {
                   id: "messages",
-                  label: `💬 Messages${msgUnreadCount > 0 ? ` (${msgUnreadCount})` : ""}`,
+                  label: `Messages${msgUnreadCount > 0 ? ` (${msgUnreadCount})` : ""}`,
                 },
-                { id: "popia", label: "🔒 POPIA" },
+                { id: "popia", label: "POPIA" },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -1414,18 +1476,18 @@ export default function AdminCustomerEngagement() {
                   style={{
                     padding: "12px 18px",
                     fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: "0.12em",
+                    fontWeight: drawerTab === t.id ? 700 : 400,
+                    letterSpacing: "0.07em",
                     textTransform: "uppercase",
-                    fontFamily: FONTS.body,
+                    fontFamily: T.font,
                     cursor: "pointer",
                     border: "none",
                     background: "none",
-                    color: drawerTab === t.id ? C.green : C.muted,
+                    color: drawerTab === t.id ? T.accent : T.ink400,
                     borderBottom:
                       drawerTab === t.id
-                        ? `3px solid ${C.green}`
-                        : "3px solid transparent",
+                        ? `2px solid ${T.accent}`
+                        : "2px solid transparent",
                     marginBottom: -2,
                     whiteSpace: "nowrap",
                   }}
@@ -1436,7 +1498,7 @@ export default function AdminCustomerEngagement() {
             </div>
 
             <div style={{ padding: 24, flex: 1 }}>
-              {/* PROFILE TAB */}
+              {/* PROFILE */}
               {drawerTab === "profile" &&
                 (() => {
                   const eng =
@@ -1445,134 +1507,89 @@ export default function AdminCustomerEngagement() {
                     <>
                       <div
                         style={{
-                          background: C.white,
-                          border: `1px solid ${C.border}`,
-                          borderRadius: 2,
+                          background: "#fff",
+                          border: `1px solid ${T.ink150}`,
+                          borderRadius: 8,
                           padding: 20,
                           marginBottom: 16,
+                          boxShadow: T.shadow,
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            letterSpacing: "0.15em",
-                            textTransform: "uppercase",
-                            color: C.muted,
-                            marginBottom: 14,
-                            fontFamily: FONTS.body,
-                          }}
-                        >
-                          Engagement Score
-                        </div>
+                        {secHdr("Engagement Score")}
                         <div
                           style={{
                             display: "flex",
-                            gap: 12,
+                            gap: 10,
                             marginBottom: 16,
                             flexWrap: "wrap",
                           }}
                         >
-                          <div
-                            style={{
-                              padding: "12px 16px",
-                              background: C.cream,
-                              borderRadius: 2,
-                              flex: 1,
-                              textAlign: "center",
-                            }}
-                          >
+                          {[
+                            {
+                              label: "Score",
+                              value: `${eng.total}/100`,
+                              color:
+                                eng.total >= 70
+                                  ? T.success
+                                  : eng.total >= 40
+                                    ? "#b5935a"
+                                    : T.danger,
+                              bg: T.ink075,
+                            },
+                            {
+                              label: "Profile",
+                              value: `${profileScore(selected)}%`,
+                              color: T.info,
+                              bg: T.ink075,
+                            },
+                            ...(isChurnRisk(selected)
+                              ? [
+                                  {
+                                    label: "Status",
+                                    value: "Churn Risk",
+                                    color: T.danger,
+                                    bg: T.dangerBg,
+                                  },
+                                ]
+                              : []),
+                          ].map((s) => (
                             <div
-                              style={{
-                                fontSize: 9,
-                                color: C.muted,
-                                letterSpacing: "0.15em",
-                                textTransform: "uppercase",
-                                marginBottom: 4,
-                                fontFamily: FONTS.body,
-                              }}
-                            >
-                              Score
-                            </div>
-                            <div
-                              style={{
-                                fontFamily: FONTS.heading,
-                                fontSize: 28,
-                                color:
-                                  eng.total >= 70
-                                    ? C.accent
-                                    : eng.total >= 40
-                                      ? C.orange
-                                      : C.red,
-                              }}
-                            >
-                              {eng.total}/100
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              padding: "12px 16px",
-                              background: C.cream,
-                              borderRadius: 2,
-                              flex: 1,
-                              textAlign: "center",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 9,
-                                color: C.muted,
-                                letterSpacing: "0.15em",
-                                textTransform: "uppercase",
-                                marginBottom: 4,
-                                fontFamily: FONTS.body,
-                              }}
-                            >
-                              Profile
-                            </div>
-                            <div
-                              style={{
-                                fontFamily: FONTS.heading,
-                                fontSize: 28,
-                                color: C.blue,
-                              }}
-                            >
-                              {profileScore(selected)}%
-                            </div>
-                          </div>
-                          {isChurnRisk(selected) && (
-                            <div
+                              key={s.label}
                               style={{
                                 padding: "12px 16px",
-                                background: C.lightRed,
-                                borderRadius: 2,
+                                background: s.bg,
+                                borderRadius: 6,
                                 flex: 1,
                                 textAlign: "center",
+                                minWidth: 80,
                               }}
                             >
                               <div
                                 style={{
                                   fontSize: 9,
-                                  color: C.red,
-                                  letterSpacing: "0.15em",
+                                  color: s.color,
+                                  letterSpacing: "0.1em",
                                   textTransform: "uppercase",
                                   marginBottom: 4,
-                                  fontFamily: FONTS.body,
+                                  fontFamily: T.font,
                                 }}
                               >
-                                Status
+                                {s.label}
                               </div>
                               <div
                                 style={{
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  color: C.red,
+                                  fontSize: 22,
+                                  fontWeight: 400,
+                                  color: s.color,
+                                  letterSpacing: "-0.02em",
+                                  fontFamily: T.font,
+                                  fontVariantNumeric: "tabular-nums",
                                 }}
                               >
-                                ⚠ Churn Risk
+                                {s.value}
                               </div>
                             </div>
-                          )}
+                          ))}
                         </div>
                         {Object.values(eng.breakdown).map((b) => (
                           <div key={b.label} style={{ marginBottom: 8 }}>
@@ -1586,8 +1603,8 @@ export default function AdminCustomerEngagement() {
                               <span
                                 style={{
                                   fontSize: 12,
-                                  color: C.text,
-                                  fontFamily: FONTS.body,
+                                  color: T.ink700,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 {b.label}
@@ -1596,8 +1613,8 @@ export default function AdminCustomerEngagement() {
                                 style={{
                                   fontSize: 12,
                                   fontWeight: 700,
-                                  color: C.accent,
-                                  fontFamily: FONTS.body,
+                                  color: T.accentMid,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 {b.score}/{b.max}
@@ -1606,7 +1623,7 @@ export default function AdminCustomerEngagement() {
                             <div
                               style={{
                                 height: 4,
-                                background: C.border,
+                                background: T.ink150,
                                 borderRadius: 2,
                               }}
                             >
@@ -1614,7 +1631,7 @@ export default function AdminCustomerEngagement() {
                                 style={{
                                   height: "100%",
                                   width: `${b.max > 0 ? (b.score / b.max) * 100 : 0}%`,
-                                  background: C.accent,
+                                  background: T.accentMid,
                                   borderRadius: 2,
                                 }}
                               />
@@ -1624,26 +1641,14 @@ export default function AdminCustomerEngagement() {
                       </div>
                       <div
                         style={{
-                          background: C.white,
-                          border: `1px solid ${C.border}`,
-                          borderRadius: 2,
+                          background: "#fff",
+                          border: `1px solid ${T.ink150}`,
+                          borderRadius: 8,
                           padding: 20,
-                          marginBottom: 16,
+                          boxShadow: T.shadow,
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            letterSpacing: "0.15em",
-                            textTransform: "uppercase",
-                            color: C.muted,
-                            marginBottom: 12,
-                            fontFamily: FONTS.body,
-                          }}
-                        >
-                          Identity
-                        </div>
+                        {secHdr("Identity")}
                         <div
                           style={{
                             display: "grid",
@@ -1652,57 +1657,42 @@ export default function AdminCustomerEngagement() {
                           }}
                         >
                           {[
-                            { label: "Full Name", val: selected.full_name },
-                            { label: "Phone", val: selected.phone },
-                            {
-                              label: "Date of Birth",
-                              val: fmtDate(selected.date_of_birth),
-                            },
-                            { label: "Gender", val: selected.gender },
-                            { label: "Province", val: selected.province },
-                            { label: "City", val: selected.city },
-                            {
-                              label: "Total Scans",
-                              val: selected.total_scans || 0,
-                            },
-                            {
-                              label: "Last Active",
-                              val: fmtDate(selected.last_active_at),
-                            },
-                            {
-                              label: "Member Since",
-                              val: fmtDate(selected.created_at),
-                            },
-                            {
-                              label: "Referral Code",
-                              val: selected.referral_code,
-                            },
-                          ].map(({ label, val }) => (
-                            <div key={label}>
+                            ["Full Name", selected.full_name],
+                            ["Phone", selected.phone],
+                            ["Date of Birth", fmtDate(selected.date_of_birth)],
+                            ["Gender", selected.gender],
+                            ["Province", selected.province],
+                            ["City", selected.city],
+                            ["Total Scans", selected.total_scans || 0],
+                            ["Last Active", fmtDate(selected.last_active_at)],
+                            ["Member Since", fmtDate(selected.created_at)],
+                            ["Referral Code", selected.referral_code],
+                          ].map(([lbl, val]) => (
+                            <div key={lbl}>
                               <div
                                 style={{
                                   fontSize: 10,
-                                  color: C.muted,
-                                  fontFamily: FONTS.body,
+                                  color: T.ink400,
+                                  fontFamily: T.font,
                                   marginBottom: 2,
                                   textTransform: "uppercase",
-                                  letterSpacing: "0.1em",
+                                  letterSpacing: "0.08em",
                                 }}
                               >
-                                {label}
+                                {lbl}
                               </div>
                               <div
                                 style={{
                                   fontSize: 13,
                                   color:
                                     val != null && val !== "—"
-                                      ? C.text
-                                      : C.muted,
-                                  fontFamily: FONTS.body,
+                                      ? T.ink700
+                                      : T.ink400,
+                                  fontFamily: T.font,
                                   fontWeight: 500,
                                 }}
                               >
-                                {val ?? "—"}
+                                {val != null ? val : "—"}
                               </div>
                             </div>
                           ))}
@@ -1712,13 +1702,13 @@ export default function AdminCustomerEngagement() {
                   );
                 })()}
 
-              {/* LOYALTY TAB */}
+              {/* LOYALTY */}
               {drawerTab === "loyalty" && (
                 <>
                   <div
                     style={{
-                      background: C.green,
-                      borderRadius: 2,
+                      background: T.accent,
+                      borderRadius: 8,
                       padding: 20,
                       marginBottom: 16,
                       display: "flex",
@@ -1729,10 +1719,10 @@ export default function AdminCustomerEngagement() {
                     <div>
                       <div
                         style={{
-                          fontSize: 11,
+                          fontSize: 10,
                           color: "rgba(255,255,255,0.7)",
-                          fontFamily: FONTS.body,
-                          letterSpacing: "0.15em",
+                          fontFamily: T.font,
+                          letterSpacing: "0.1em",
                           textTransform: "uppercase",
                           marginBottom: 4,
                         }}
@@ -1741,11 +1731,13 @@ export default function AdminCustomerEngagement() {
                       </div>
                       <div
                         style={{
-                          fontSize: 48,
-                          fontFamily: FONTS.heading,
-                          fontWeight: 700,
-                          color: C.white,
+                          fontSize: 44,
+                          fontWeight: 400,
+                          color: "#fff",
                           lineHeight: 1,
+                          fontFamily: T.font,
+                          letterSpacing: "-0.03em",
+                          fontVariantNumeric: "tabular-nums",
                         }}
                       >
                         {(selected.loyalty_points || 0).toLocaleString()}
@@ -1757,7 +1749,7 @@ export default function AdminCustomerEngagement() {
                         style={{
                           fontSize: 12,
                           color: "rgba(255,255,255,0.6)",
-                          fontFamily: FONTS.body,
+                          fontFamily: T.font,
                           marginTop: 8,
                         }}
                       >
@@ -1767,30 +1759,19 @@ export default function AdminCustomerEngagement() {
                   </div>
                   <div
                     style={{
-                      background: C.white,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 8,
                       padding: 20,
+                      boxShadow: T.shadow,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: "0.15em",
-                        textTransform: "uppercase",
-                        color: C.muted,
-                        marginBottom: 12,
-                        fontFamily: FONTS.body,
-                      }}
-                    >
-                      Transaction History
-                    </div>
+                    {secHdr("Transaction History")}
                     {drawerLoading && (
                       <div
                         style={{
-                          color: C.muted,
-                          fontFamily: FONTS.body,
+                          color: T.ink400,
+                          fontFamily: T.font,
                           fontSize: 13,
                         }}
                       >
@@ -1800,8 +1781,8 @@ export default function AdminCustomerEngagement() {
                     {!drawerLoading && drawerData.txns.length === 0 && (
                       <div
                         style={{
-                          color: C.muted,
-                          fontFamily: FONTS.body,
+                          color: T.ink400,
+                          fontFamily: T.font,
                           fontSize: 13,
                         }}
                       >
@@ -1816,15 +1797,15 @@ export default function AdminCustomerEngagement() {
                           justifyContent: "space-between",
                           alignItems: "center",
                           padding: "10px 0",
-                          borderBottom: `1px solid ${C.border}`,
+                          borderBottom: `1px solid ${T.ink075}`,
                         }}
                       >
                         <div>
                           <div
                             style={{
                               fontSize: 13,
-                              color: C.text,
-                              fontFamily: FONTS.body,
+                              color: T.ink700,
+                              fontFamily: T.font,
                             }}
                           >
                             {tx.description || tx.transaction_type}
@@ -1832,8 +1813,8 @@ export default function AdminCustomerEngagement() {
                           <div
                             style={{
                               fontSize: 11,
-                              color: C.muted,
-                              fontFamily: FONTS.body,
+                              color: T.ink400,
+                              fontFamily: T.font,
                               marginTop: 2,
                             }}
                           >
@@ -1842,10 +1823,11 @@ export default function AdminCustomerEngagement() {
                         </div>
                         <div
                           style={{
-                            fontSize: 16,
-                            fontWeight: 700,
-                            fontFamily: FONTS.heading,
-                            color: tx.points > 0 ? C.mid : C.red,
+                            fontSize: 15,
+                            fontWeight: 600,
+                            fontFamily: T.font,
+                            color: tx.points > 0 ? T.accentMid : T.danger,
+                            fontVariantNumeric: "tabular-nums",
                           }}
                         >
                           {tx.points > 0 ? "+" : ""}
@@ -1857,60 +1839,69 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* SCANS TAB */}
+              {/* SCANS */}
               {drawerTab === "scans" && (
                 <>
                   <div
                     style={{
-                      background: C.white,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
-                      padding: 20,
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3,1fr)",
+                      gap: "1px",
+                      background: T.ink150,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      border: `1px solid ${T.ink150}`,
                       marginBottom: 16,
-                      display: "flex",
-                      gap: 24,
                     }}
                   >
                     {[
                       {
                         label: "Total Scans",
                         val: drawerData.scans.length,
-                        color: C.green,
+                        color: T.accent,
                       },
                       {
                         label: "Points Earned",
                         val: drawerData.scans.filter(
                           (s) => s.scan_outcome === "points_awarded",
                         ).length,
-                        color: C.gold,
+                        color: "#b5935a",
                       },
                       {
                         label: "GPS Scans",
                         val: drawerData.scans.filter(
                           (s) => s.location_source === "gps",
                         ).length,
-                        color: C.blue,
+                        color: T.info,
                       },
                     ].map(({ label, val, color }) => (
-                      <div key={label} style={{ textAlign: "center" }}>
+                      <div
+                        key={label}
+                        style={{
+                          background: "#fff",
+                          padding: "14px",
+                          textAlign: "center",
+                        }}
+                      >
                         <div
                           style={{
-                            fontSize: 36,
-                            fontFamily: FONTS.heading,
-                            fontWeight: 700,
+                            fontSize: 28,
+                            fontWeight: 400,
                             color,
-                            lineHeight: 1,
+                            letterSpacing: "-0.02em",
+                            fontFamily: T.font,
+                            fontVariantNumeric: "tabular-nums",
                           }}
                         >
                           {val}
                         </div>
                         <div
                           style={{
-                            fontSize: 10,
-                            color: C.muted,
-                            fontFamily: FONTS.body,
+                            fontSize: 9,
+                            color: T.ink400,
+                            fontFamily: T.font,
                             textTransform: "uppercase",
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.08em",
                             marginTop: 4,
                           }}
                         >
@@ -1921,30 +1912,19 @@ export default function AdminCustomerEngagement() {
                   </div>
                   <div
                     style={{
-                      background: C.white,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 8,
                       padding: 20,
+                      boxShadow: T.shadow,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: "0.15em",
-                        textTransform: "uppercase",
-                        color: C.muted,
-                        marginBottom: 12,
-                        fontFamily: FONTS.body,
-                      }}
-                    >
-                      Scan Log (scan_logs)
-                    </div>
+                    {secHdr("Scan Log")}
                     {drawerLoading && (
                       <div
                         style={{
-                          color: C.muted,
-                          fontFamily: FONTS.body,
+                          color: T.ink400,
+                          fontFamily: T.font,
                           fontSize: 13,
                         }}
                       >
@@ -1954,8 +1934,8 @@ export default function AdminCustomerEngagement() {
                     {!drawerLoading && drawerData.scans.length === 0 && (
                       <div
                         style={{
-                          color: C.muted,
-                          fontFamily: FONTS.body,
+                          color: T.ink400,
+                          fontFamily: T.font,
                           fontSize: 13,
                         }}
                       >
@@ -1965,10 +1945,10 @@ export default function AdminCustomerEngagement() {
                     {drawerData.scans.map((sc) => {
                       const oc =
                         sc.scan_outcome === "points_awarded"
-                          ? C.mid
+                          ? T.accentMid
                           : sc.scan_outcome === "already_claimed"
-                            ? C.muted
-                            : C.orange;
+                            ? T.ink400
+                            : T.warning;
                       return (
                         <div
                           key={sc.id}
@@ -1976,13 +1956,13 @@ export default function AdminCustomerEngagement() {
                             display: "flex",
                             gap: 12,
                             padding: "10px 0",
-                            borderBottom: `1px solid ${C.border}`,
+                            borderBottom: `1px solid ${T.ink075}`,
                             alignItems: "flex-start",
                           }}
                         >
                           <div
                             style={{
-                              fontSize: 22,
+                              fontSize: 18,
                               lineHeight: 1,
                               flexShrink: 0,
                               marginTop: 2,
@@ -2006,8 +1986,8 @@ export default function AdminCustomerEngagement() {
                               <span
                                 style={{
                                   fontSize: 12,
-                                  fontFamily: FONTS.body,
-                                  color: C.text,
+                                  fontFamily: T.font,
+                                  color: T.ink700,
                                   fontWeight: 600,
                                 }}
                               >
@@ -2016,8 +1996,8 @@ export default function AdminCustomerEngagement() {
                               <span
                                 style={{
                                   fontSize: 11,
-                                  color: C.muted,
-                                  fontFamily: FONTS.body,
+                                  color: T.ink400,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 {timeAgo(sc.scanned_at)}
@@ -2039,22 +2019,22 @@ export default function AdminCustomerEngagement() {
                               {sc.points_awarded > 0 && (
                                 <Pill
                                   label={`+${sc.points_awarded} pts`}
-                                  color={C.gold}
+                                  color="#b5935a"
                                   bg="#fef3dc"
                                 />
                               )}
                               {sc.ip_city && (
                                 <Pill
                                   label={sc.ip_city}
-                                  color={C.blue}
-                                  bg="#e8f0f8"
+                                  color={T.info}
+                                  bg={T.infoBg}
                                 />
                               )}
                               {sc.device_type && (
                                 <Pill
                                   label={sc.device_type}
-                                  color={C.muted}
-                                  bg="#eee"
+                                  color={T.ink400}
+                                  bg={T.ink075}
                                 />
                               )}
                             </div>
@@ -2066,7 +2046,7 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* MESSAGES TAB */}
+              {/* MESSAGES */}
               {drawerTab === "messages" && (
                 <>
                   <div
@@ -2081,9 +2061,10 @@ export default function AdminCustomerEngagement() {
                       style={{
                         fontSize: 11,
                         fontWeight: 700,
-                        letterSpacing: "0.15em",
+                        letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: C.muted,
+                        color: T.ink400,
+                        fontFamily: T.font,
                       }}
                     >
                       Conversation with {selected.full_name || "Customer"}
@@ -2094,7 +2075,7 @@ export default function AdminCustomerEngagement() {
                         setSendMsgResult(null);
                       }}
                       style={{
-                        ...makeBtn(composing ? C.muted : C.green),
+                        ...makeBtn(composing ? T.ink300 : T.accent),
                         fontSize: 9,
                         padding: "5px 12px",
                       }}
@@ -2105,11 +2086,12 @@ export default function AdminCustomerEngagement() {
                   {composing && (
                     <div
                       style={{
-                        background: C.white,
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 2,
+                        background: "#fff",
+                        border: `1px solid ${T.ink150}`,
+                        borderRadius: 8,
                         padding: 18,
                         marginBottom: 16,
+                        boxShadow: T.shadow,
                       }}
                     >
                       <div
@@ -2125,11 +2107,12 @@ export default function AdminCustomerEngagement() {
                             style={{
                               display: "block",
                               fontSize: 10,
-                              color: C.muted,
+                              color: T.ink400,
                               marginBottom: 4,
-                              letterSpacing: "0.1em",
+                              letterSpacing: "0.08em",
                               textTransform: "uppercase",
-                              fontWeight: 600,
+                              fontWeight: 700,
+                              fontFamily: T.font,
                             }}
                           >
                             Type
@@ -2144,12 +2127,12 @@ export default function AdminCustomerEngagement() {
                             }
                             style={{ ...inputStyle, width: "100%" }}
                           >
-                            <option value="admin_notice">📢 Notice</option>
-                            <option value="response">↩️ Response</option>
-                            <option value="birthday">🎂 Birthday</option>
-                            <option value="tier_up">🏆 Tier Upgrade</option>
-                            <option value="event">🎪 Event</option>
-                            <option value="general">📩 General</option>
+                            <option value="admin_notice">Notice</option>
+                            <option value="response">Response</option>
+                            <option value="birthday">Birthday</option>
+                            <option value="tier_up">Tier Upgrade</option>
+                            <option value="event">Event</option>
+                            <option value="general">General</option>
                           </select>
                         </div>
                         <div>
@@ -2157,11 +2140,12 @@ export default function AdminCustomerEngagement() {
                             style={{
                               display: "block",
                               fontSize: 10,
-                              color: C.muted,
+                              color: T.ink400,
                               marginBottom: 4,
-                              letterSpacing: "0.1em",
+                              letterSpacing: "0.08em",
                               textTransform: "uppercase",
-                              fontWeight: 600,
+                              fontWeight: 700,
+                              fontFamily: T.font,
                             }}
                           >
                             Bonus Points
@@ -2186,11 +2170,12 @@ export default function AdminCustomerEngagement() {
                           style={{
                             display: "block",
                             fontSize: 10,
-                            color: C.muted,
+                            color: T.ink400,
                             marginBottom: 4,
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            fontWeight: 600,
+                            fontWeight: 700,
+                            fontFamily: T.font,
                           }}
                         >
                           Subject
@@ -2213,11 +2198,12 @@ export default function AdminCustomerEngagement() {
                           style={{
                             display: "block",
                             fontSize: 10,
-                            color: C.muted,
+                            color: T.ink400,
                             marginBottom: 4,
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
-                            fontWeight: 600,
+                            fontWeight: 700,
+                            fontFamily: T.font,
                           }}
                         >
                           Message *
@@ -2242,54 +2228,65 @@ export default function AdminCustomerEngagement() {
                       {sendMsgResult?.error && (
                         <div
                           style={{
-                            color: C.red,
+                            color: T.danger,
                             fontSize: 12,
                             marginBottom: 8,
+                            fontFamily: T.font,
                           }}
                         >
-                          ⚠ {sendMsgResult.error}
+                          {sendMsgResult.error}
                         </div>
                       )}
                       {sendMsgResult?.success && (
                         <div
                           style={{
-                            color: C.mid,
+                            color: T.accentMid,
                             fontSize: 12,
                             marginBottom: 8,
                             fontWeight: 600,
+                            fontFamily: T.font,
                           }}
                         >
-                          ✅ {sendMsgResult.success}
+                          {sendMsgResult.success}
                         </div>
                       )}
-                      <button
-                        onClick={handleSendMessage}
-                        disabled={sendingMsg}
-                        style={makeBtn(C.green, C.white, sendingMsg)}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
                       >
-                        {sendingMsg ? "Sending…" : "Send Message"}
-                      </button>
-                      {composeForm.bonus_points > 0 && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: C.gold,
-                            marginLeft: 10,
-                            fontWeight: 600,
-                          }}
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={sendingMsg}
+                          style={makeBtn(T.accent, "#fff", sendingMsg)}
                         >
-                          +{composeForm.bonus_points} pts will be added
-                        </span>
-                      )}
+                          {sendingMsg ? "Sending…" : "Send Message"}
+                        </button>
+                        {composeForm.bonus_points > 0 && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "#b5935a",
+                              fontWeight: 600,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            +{composeForm.bonus_points} pts will be added
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                   {msgsLoading ? (
                     <div
                       style={{
-                        color: C.muted,
+                        color: T.ink400,
                         fontSize: 13,
                         textAlign: "center",
                         padding: 24,
+                        fontFamily: T.font,
                       }}
                     >
                       Loading messages…
@@ -2299,17 +2296,17 @@ export default function AdminCustomerEngagement() {
                       style={{
                         textAlign: "center",
                         padding: 32,
-                        color: C.muted,
+                        color: T.ink400,
                         fontSize: 13,
-                        border: `1px dashed ${C.border}`,
-                        borderRadius: 2,
+                        border: `1px dashed ${T.ink150}`,
+                        borderRadius: 8,
+                        fontFamily: T.font,
                       }}
                     >
-                      No messages yet. Use Compose to send the first message to
-                      this customer.
+                      No messages yet. Use Compose to send the first message.
                     </div>
                   ) : (
-                    <div style={{ display: "grid", gap: 1 }}>
+                    <div style={{ display: "grid", gap: 6 }}>
                       {messages.map((msg) => {
                         const m = getMsgMeta(msg.message_type);
                         const isInbound = msg.direction === "inbound",
@@ -2318,10 +2315,10 @@ export default function AdminCustomerEngagement() {
                           <div
                             key={msg.id}
                             style={{
-                              background: isUnread ? "#fff8f0" : C.white,
-                              border: `1px solid ${isUnread ? C.orange + "40" : C.border}`,
-                              borderLeft: `3px solid ${isInbound ? C.blue : m.color}`,
-                              borderRadius: 2,
+                              background: isUnread ? T.warningBg : "#fff",
+                              border: `1px solid ${isUnread ? T.warningBd : T.ink150}`,
+                              borderLeft: `3px solid ${isInbound ? T.info : m.color}`,
+                              borderRadius: 6,
                               padding: "12px 16px",
                               display: "flex",
                               gap: 10,
@@ -2329,7 +2326,7 @@ export default function AdminCustomerEngagement() {
                           >
                             <span
                               style={{
-                                fontSize: 18,
+                                fontSize: 16,
                                 flexShrink: 0,
                                 marginTop: 1,
                               }}
@@ -2349,7 +2346,8 @@ export default function AdminCustomerEngagement() {
                                   style={{
                                     fontSize: 12,
                                     fontWeight: isUnread ? 700 : 500,
-                                    color: isUnread ? C.text : C.muted,
+                                    color: isUnread ? T.ink900 : T.ink400,
+                                    fontFamily: T.font,
                                   }}
                                 >
                                   {msg.subject || m.label}
@@ -2358,8 +2356,8 @@ export default function AdminCustomerEngagement() {
                                       style={{
                                         marginLeft: 6,
                                         fontSize: 9,
-                                        background: C.orange,
-                                        color: C.white,
+                                        background: T.warning,
+                                        color: "#fff",
                                         padding: "1px 6px",
                                         borderRadius: 10,
                                         fontWeight: 700,
@@ -2373,8 +2371,8 @@ export default function AdminCustomerEngagement() {
                                       style={{
                                         marginLeft: 6,
                                         fontSize: 9,
-                                        background: `${C.blue}18`,
-                                        color: C.blue,
+                                        background: T.infoBg,
+                                        color: T.info,
                                         padding: "1px 6px",
                                         borderRadius: 10,
                                         fontWeight: 700,
@@ -2387,8 +2385,9 @@ export default function AdminCustomerEngagement() {
                                 <span
                                   style={{
                                     fontSize: 10,
-                                    color: C.muted,
+                                    color: T.ink400,
                                     flexShrink: 0,
+                                    fontFamily: T.font,
                                   }}
                                 >
                                   {timeAgo(msg.created_at)}
@@ -2397,9 +2396,10 @@ export default function AdminCustomerEngagement() {
                               <div
                                 style={{
                                   fontSize: 12,
-                                  color: C.text,
+                                  color: T.ink700,
                                   lineHeight: 1.6,
                                   whiteSpace: "pre-wrap",
+                                  fontFamily: T.font,
                                 }}
                               >
                                 {msg.body}
@@ -2409,11 +2409,12 @@ export default function AdminCustomerEngagement() {
                                   style={{
                                     marginTop: 6,
                                     fontSize: 11,
-                                    color: C.gold,
+                                    color: "#b5935a",
                                     fontWeight: 600,
+                                    fontFamily: T.font,
                                   }}
                                 >
-                                  🎁 +{msg.metadata.points_awarded} pts bonus
+                                  +{msg.metadata.points_awarded} pts bonus
                                   awarded
                                 </div>
                               )}
@@ -2423,14 +2424,13 @@ export default function AdminCustomerEngagement() {
                               style={{
                                 background: "none",
                                 border: "none",
-                                color: C.muted,
+                                color: T.ink300,
                                 cursor: "pointer",
                                 fontSize: 14,
                                 padding: "2px 6px",
                                 flexShrink: 0,
-                                opacity: 0.5,
                               }}
-                              title="Delete message"
+                              title="Delete"
                             >
                               🗑
                             </button>
@@ -2442,31 +2442,20 @@ export default function AdminCustomerEngagement() {
                 </>
               )}
 
-              {/* POPIA TAB */}
+              {/* POPIA */}
               {drawerTab === "popia" && (
                 <>
                   <div
                     style={{
-                      background: C.white,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 8,
                       padding: 20,
                       marginBottom: 16,
+                      boxShadow: T.shadow,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: "0.15em",
-                        textTransform: "uppercase",
-                        color: C.muted,
-                        marginBottom: 14,
-                        fontFamily: FONTS.body,
-                      }}
-                    >
-                      POPIA Compliance Record
-                    </div>
+                    {secHdr("POPIA Compliance Record")}
                     <div
                       style={{
                         display: "grid",
@@ -2475,47 +2464,42 @@ export default function AdminCustomerEngagement() {
                       }}
                     >
                       {[
-                        {
-                          label: "POPIA Consented",
-                          val: selected.popia_consented
-                            ? "✅ Yes"
-                            : "❌ Not yet",
-                        },
-                        {
-                          label: "Consent Date",
-                          val: fmtDate(selected.popia_date),
-                        },
-                        {
-                          label: "Marketing Opt-In",
-                          val: selected.marketing_opt_in ? "✅ Yes" : "No",
-                        },
-                        {
-                          label: "Analytics Opt-In",
-                          val: selected.analytics_opt_in ? "✅ Yes" : "No",
-                        },
-                        {
-                          label: "Geolocation Consent",
-                          val: selected.geolocation_consent ? "✅ Yes" : "No",
-                        },
-                      ].map(({ label, val }) => (
-                        <div key={label}>
+                        [
+                          "POPIA Consented",
+                          selected.popia_consented ? "Yes" : "Not yet",
+                        ],
+                        ["Consent Date", fmtDate(selected.popia_date)],
+                        [
+                          "Marketing Opt-In",
+                          selected.marketing_opt_in ? "Yes" : "No",
+                        ],
+                        [
+                          "Analytics Opt-In",
+                          selected.analytics_opt_in ? "Yes" : "No",
+                        ],
+                        [
+                          "Geolocation Consent",
+                          selected.geolocation_consent ? "Yes" : "No",
+                        ],
+                      ].map(([lbl, val]) => (
+                        <div key={lbl}>
                           <div
                             style={{
                               fontSize: 10,
-                              color: C.muted,
-                              fontFamily: FONTS.body,
+                              color: T.ink400,
+                              fontFamily: T.font,
                               marginBottom: 2,
                               textTransform: "uppercase",
-                              letterSpacing: "0.1em",
+                              letterSpacing: "0.08em",
                             }}
                           >
-                            {label}
+                            {lbl}
                           </div>
                           <div
                             style={{
                               fontSize: 13,
-                              color: C.text,
-                              fontFamily: FONTS.body,
+                              color: T.ink700,
+                              fontFamily: T.font,
                               fontWeight: 500,
                             }}
                           >
@@ -2527,9 +2511,9 @@ export default function AdminCustomerEngagement() {
                   </div>
                   <div
                     style={{
-                      background: C.lightRed,
-                      border: `1px solid ${C.red}`,
-                      borderRadius: 2,
+                      background: T.dangerBg,
+                      border: `1px solid ${T.dangerBd}`,
+                      borderRadius: 8,
                       padding: 20,
                     }}
                   >
@@ -2537,11 +2521,11 @@ export default function AdminCustomerEngagement() {
                       style={{
                         fontSize: 11,
                         fontWeight: 700,
-                        letterSpacing: "0.15em",
+                        letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: C.red,
+                        color: T.danger,
                         marginBottom: 10,
-                        fontFamily: FONTS.body,
+                        fontFamily: T.font,
                       }}
                     >
                       Data Deletion — POPIA Right to Erasure
@@ -2549,8 +2533,8 @@ export default function AdminCustomerEngagement() {
                     <div
                       style={{
                         fontSize: 13,
-                        color: C.text,
-                        fontFamily: FONTS.body,
+                        color: T.ink700,
+                        fontFamily: T.font,
                         marginBottom: 16,
                         lineHeight: 1.6,
                       }}
@@ -2561,20 +2545,19 @@ export default function AdminCustomerEngagement() {
                     {deleteConfirm?.done ? (
                       <div
                         style={{
-                          color: C.mid,
-                          fontFamily: FONTS.body,
+                          color: T.accentMid,
+                          fontFamily: T.font,
                           fontSize: 13,
                           fontWeight: 600,
                         }}
                       >
-                        ✅ Request sent to admin. Ref:{" "}
-                        {selected.id?.slice(0, 8)}
+                        Request sent to admin. Ref: {selected.id?.slice(0, 8)}
                       </div>
                     ) : deleteConfirm?.error ? (
                       <div
                         style={{
-                          color: C.red,
-                          fontFamily: FONTS.body,
+                          color: T.danger,
+                          fontFamily: T.font,
                           fontSize: 13,
                         }}
                       >
@@ -2583,13 +2566,13 @@ export default function AdminCustomerEngagement() {
                     ) : deleteConfirm?.confirm ? (
                       <div style={{ display: "flex", gap: 10 }}>
                         <button
-                          style={{ ...makeBtn(C.red), fontSize: 10 }}
+                          style={{ ...makeBtn(T.danger), fontSize: 10 }}
                           onClick={() => handleDeleteRequest(selected)}
                         >
                           Confirm — Send Request
                         </button>
                         <button
-                          style={{ ...makeBtn("#eee", C.muted), fontSize: 10 }}
+                          style={{ ...makeBtn("#eee", T.ink400), fontSize: 10 }}
                           onClick={() => setDeleteConfirm(null)}
                         >
                           Cancel
@@ -2597,10 +2580,10 @@ export default function AdminCustomerEngagement() {
                       </div>
                     ) : (
                       <button
-                        style={{ ...makeBtn(C.red), fontSize: 10 }}
+                        style={{ ...makeBtn(T.danger), fontSize: 10 }}
                         onClick={() => setDeleteConfirm({ confirm: true })}
                       >
-                        🗑 Request Data Deletion
+                        Request Data Deletion
                       </button>
                     )}
                   </div>
@@ -2626,30 +2609,29 @@ export default function AdminCustomerEngagement() {
         >
           <div
             style={{
-              background: C.white,
-              borderRadius: 4,
+              background: "#fff",
+              borderRadius: 8,
               padding: 32,
               width: 480,
               maxWidth: "95vw",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-              fontFamily: FONTS.body,
+              boxShadow: T.shadowMd,
+              fontFamily: T.font,
             }}
           >
             <div
               style={{
-                fontFamily: FONTS.heading,
-                fontSize: 22,
-                fontWeight: 700,
-                color: C.green,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.ink900,
                 marginBottom: 6,
               }}
             >
-              📣 Broadcast Message
+              Broadcast Message
             </div>
             <div
               style={{
                 fontSize: 13,
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: 20,
                 lineHeight: 1.5,
               }}
@@ -2661,72 +2643,68 @@ export default function AdminCustomerEngagement() {
               opted-in customers matching your current filter (
               {displayed.length} visible).
             </div>
-            {[
-              {
-                field: "type",
-                label: "Type",
-                el: (
-                  <select
-                    value={broadcastForm.message_type}
-                    onChange={(e) =>
-                      setBroadcastForm((f) => ({
-                        ...f,
-                        message_type: e.target.value,
-                      }))
-                    }
-                    style={{ ...inputStyle, width: "100%" }}
-                  >
-                    <option value="broadcast">📣 Broadcast</option>
-                    <option value="event">🎪 Event</option>
-                    <option value="admin_notice">📢 Notice</option>
-                  </select>
-                ),
-              },
-              {
-                field: "subject",
-                label: "Subject",
-                el: (
-                  <input
-                    type="text"
-                    value={broadcastForm.subject}
-                    onChange={(e) =>
-                      setBroadcastForm((f) => ({
-                        ...f,
-                        subject: e.target.value,
-                      }))
-                    }
-                    style={{ ...inputStyle, width: "100%" }}
-                    placeholder="Optional subject"
-                  />
-                ),
-              },
-            ].map(({ field, label, el }) => (
-              <div key={field} style={{ marginBottom: 12 }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    color: C.muted,
-                    marginBottom: 5,
-                  }}
-                >
-                  {label}
-                </label>
-                {el}
-              </div>
-            ))}
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 5,
+                }}
+              >
+                Type
+              </label>
+              <select
+                value={broadcastForm.message_type}
+                onChange={(e) =>
+                  setBroadcastForm((f) => ({
+                    ...f,
+                    message_type: e.target.value,
+                  }))
+                }
+                style={{ ...inputStyle, width: "100%" }}
+              >
+                <option value="broadcast">Broadcast</option>
+                <option value="event">Event</option>
+                <option value="admin_notice">Notice</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 5,
+                }}
+              >
+                Subject
+              </label>
+              <input
+                type="text"
+                value={broadcastForm.subject}
+                onChange={(e) =>
+                  setBroadcastForm((f) => ({ ...f, subject: e.target.value }))
+                }
+                style={{ ...inputStyle, width: "100%" }}
+                placeholder="Optional subject"
+              />
+            </div>
             <div style={{ marginBottom: 16 }}>
               <label
                 style={{
                   display: "block",
                   fontSize: 11,
                   fontWeight: 600,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: T.ink400,
                   marginBottom: 5,
                 }}
               >
@@ -2743,41 +2721,41 @@ export default function AdminCustomerEngagement() {
               />
             </div>
             {broadcastResult?.error && (
-              <div style={{ color: C.red, fontSize: 12, marginBottom: 8 }}>
-                ⚠ {broadcastResult.error}
+              <div style={{ color: T.danger, fontSize: 12, marginBottom: 8 }}>
+                {broadcastResult.error}
               </div>
             )}
             {broadcastResult?.success && (
               <div
                 style={{
-                  color: C.mid,
+                  color: T.accentMid,
                   fontSize: 13,
                   marginBottom: 8,
                   fontWeight: 600,
                 }}
               >
-                ✅ {broadcastResult.success}
+                {broadcastResult.success}
               </div>
             )}
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={handleBroadcast}
                 disabled={broadcasting}
-                style={{ ...makeBtn(C.gold, C.white, broadcasting), flex: 1 }}
+                style={{ ...makeBtn("#b5935a", "#fff", broadcasting), flex: 1 }}
               >
-                {broadcasting ? "Sending…" : "📣 Send Broadcast"}
+                {broadcasting ? "Sending…" : "Send Broadcast"}
               </button>
               <button
                 onClick={() => {
                   setShowBroadcast(false);
                   setBroadcastResult(null);
                 }}
-                style={makeBtn("#eee", C.muted)}
+                style={makeBtn("#eee", T.ink400)}
               >
                 Cancel
               </button>
             </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: T.ink400, marginTop: 12 }}>
               Only customers with marketing_opt_in = true will receive this
               message.
             </div>
@@ -2800,21 +2778,20 @@ export default function AdminCustomerEngagement() {
         >
           <div
             style={{
-              background: C.white,
-              borderRadius: 4,
+              background: "#fff",
+              borderRadius: 8,
               padding: 32,
               width: 440,
               maxWidth: "95vw",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-              fontFamily: FONTS.body,
+              boxShadow: T.shadowMd,
+              fontFamily: T.font,
             }}
           >
             <div
               style={{
-                fontFamily: FONTS.heading,
-                fontSize: 22,
-                fontWeight: 700,
-                color: C.green,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.ink900,
                 marginBottom: 6,
               }}
             >
@@ -2823,7 +2800,7 @@ export default function AdminCustomerEngagement() {
             <div
               style={{
                 fontSize: 13,
-                color: C.muted,
+                color: T.ink400,
                 marginBottom: 24,
                 lineHeight: 1.5,
               }}
@@ -2857,9 +2834,9 @@ export default function AdminCustomerEngagement() {
                     display: "block",
                     fontSize: 11,
                     fontWeight: 600,
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: C.muted,
+                    color: T.ink400,
                     marginBottom: 5,
                   }}
                 >
@@ -2882,9 +2859,9 @@ export default function AdminCustomerEngagement() {
                   display: "block",
                   fontSize: 11,
                   fontWeight: 600,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: T.ink400,
                   marginBottom: 5,
                 }}
               >
@@ -2916,32 +2893,32 @@ export default function AdminCustomerEngagement() {
               </select>
             </div>
             {regMsg?.error && (
-              <div style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>
-                ⚠ {regMsg.error}
+              <div style={{ color: T.danger, fontSize: 13, marginBottom: 12 }}>
+                {regMsg.error}
               </div>
             )}
             {regMsg?.success && (
               <div
                 style={{
-                  color: C.mid,
+                  color: T.accentMid,
                   fontSize: 13,
                   marginBottom: 12,
                   fontWeight: 600,
                 }}
               >
-                ✅ {regMsg.success}
+                {regMsg.success}
               </div>
             )}
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button
-                style={{ ...makeBtn(C.green, C.white, regLoading), flex: 1 }}
+                style={{ ...makeBtn(T.accent, "#fff", regLoading), flex: 1 }}
                 onClick={handleRegister}
                 disabled={regLoading}
               >
                 {regLoading ? "Registering…" : "Register Customer"}
               </button>
               <button
-                style={makeBtn("#eee", C.muted)}
+                style={makeBtn("#eee", T.ink400)}
                 onClick={() => {
                   setShowRegister(false);
                   setRegMsg(null);
@@ -2953,12 +2930,12 @@ export default function AdminCustomerEngagement() {
             <div
               style={{
                 fontSize: 11,
-                color: C.muted,
+                color: T.ink400,
                 marginTop: 14,
                 lineHeight: 1.5,
               }}
             >
-              📋 POPIA: Obtain verbal consent before registration. Acquisition
+              POPIA: Obtain verbal consent before registration. Acquisition
               channel recorded as "in_store".
             </div>
           </div>
