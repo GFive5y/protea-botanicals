@@ -379,6 +379,7 @@ export default function AdminDashboard() {
   const [scanTrend24h, setScanTrend24h] = useState([]); // [{hour, count}] last 24h
   const [heatmapData, setHeatmapData] = useState([]); // [{date, count}] 84 days
   const [pipelineFilter, setPipelineFilter] = useState(null);
+  const [alerts, setAlerts] = useState([]); // GAP-02: system_alerts
 
   const ctx = usePageContext("admin", null);
   const location = useLocation();
@@ -592,6 +593,19 @@ export default function AdminDashboard() {
     } catch (_) {}
   }, []);
 
+  // GAP-02: system_alerts fetch
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("system_alerts")
+        .select("id,title,body,severity,status,created_at")
+        .in("status", ["open", "acknowledged"])
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setAlerts(data || []);
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     fetchUsers();
     computeAnalytics();
@@ -600,6 +614,7 @@ export default function AdminDashboard() {
     fetchTenantId();
     fetchScanTrend24h();
     fetchHeatmap();
+    fetchAlerts();
   }, [
     fetchUsers,
     computeAnalytics,
@@ -608,6 +623,7 @@ export default function AdminDashboard() {
     fetchTenantId,
     fetchScanTrend24h,
     fetchHeatmap,
+    fetchAlerts,
   ]);
 
   // Realtime: inbound messages → badge
@@ -671,6 +687,24 @@ export default function AdminDashboard() {
       .subscribe();
     return () => supabase.removeChannel(sub);
   }, [fetchScanTrend24h]);
+
+  // GAP-02: Realtime system_alerts
+  useEffect(() => {
+    const sub = supabase
+      .channel("admin-alerts")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "system_alerts" },
+        fetchAlerts,
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "system_alerts" },
+        fetchAlerts,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchAlerts]);
 
   const handleNavigateToQR = (batchId) => {
     setQrInitialBatchId(batchId || null);
@@ -781,6 +815,83 @@ export default function AdminDashboard() {
             onAction={(action) => action.tab && setTab(action.tab)}
             defaultOpen={false}
           />
+
+          {/* GAP-02: System Alerts banner */}
+          {alerts.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              {alerts.map((a) => {
+                const sev = {
+                  critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
+                  warning: {
+                    bg: T.warningBg,
+                    bd: T.warningBd,
+                    color: T.warning,
+                  },
+                  info: { bg: T.infoBg, bd: T.infoBd, color: T.info },
+                }[a.severity] || {
+                  bg: T.ink075,
+                  bd: T.ink150,
+                  color: T.ink700,
+                };
+                return (
+                  <div
+                    key={a.id}
+                    style={{
+                      background: sev.bg,
+                      border: `1px solid ${sev.bd}`,
+                      borderRadius: 6,
+                      padding: "12px 16px",
+                      marginBottom: 8,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: sev.color,
+                          fontFamily: T.fontUi,
+                          marginBottom: 2,
+                        }}
+                      >
+                        {a.title || a.severity?.toUpperCase()}
+                      </div>
+                      {a.body && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: T.ink700,
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          {a.body}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await supabase
+                          .from("system_alerts")
+                          .update({ status: "acknowledged" })
+                          .eq("id", a.id);
+                        fetchAlerts();
+                      }}
+                      style={{
+                        ...mkBtn("ghost", "sm"),
+                        flexShrink: 0,
+                        fontSize: 9,
+                      }}
+                    >
+                      Acknowledge
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* ROW 1 — Today's Activity */}
           <SectionLabel text="Today's Activity" />
