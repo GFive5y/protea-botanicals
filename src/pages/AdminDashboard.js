@@ -1,4 +1,5 @@
-// AdminDashboard.js v6.2 — WP-GUIDE: WorkflowGuide added to users tab
+// AdminDashboard.js v6.3 — WP-VIZ: User Management charts (role donut, tier bar, points bar)
+// v6.2 — WP-GUIDE: WorkflowGuide added to users tab
 // v6.0 — WP-THEME: Unified design system applied
 // ★ v5.0: WP-NAV Sub-B — URL sync, green banner + tab bar removed
 
@@ -9,6 +10,8 @@ import {
   Area,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -1260,6 +1263,294 @@ export default function AdminDashboard() {
           >
             User Management
           </h2>
+
+          {/* Flush stat grid */}
+          {users.length > 0 &&
+            (() => {
+              const customers = users.filter((u) => u.role === "customer");
+              const admins = users.filter((u) => u.role === "admin");
+              const retailers = users.filter((u) => u.role === "retailer");
+              const totalPts = users.reduce(
+                (s, u) => s + (u.loyalty_points || 0),
+                0,
+              );
+              return (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
+                    gap: "1px",
+                    background: T.ink150,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    border: `1px solid ${T.ink150}`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+                    marginBottom: 20,
+                  }}
+                >
+                  {[
+                    {
+                      label: "Total Users",
+                      value: users.length,
+                      color: T.accent,
+                    },
+                    {
+                      label: "Customers",
+                      value: customers.length,
+                      color: T.accentMid,
+                    },
+                    { label: "Admins", value: admins.length, color: T.warning },
+                    {
+                      label: "Retailers",
+                      value: retailers.length,
+                      color: T.info,
+                    },
+                    {
+                      label: "Total Points",
+                      value: totalPts.toLocaleString(),
+                      color: "#b5935a",
+                    },
+                  ].map((s) => (
+                    <div
+                      key={s.label}
+                      style={{
+                        background: "#fff",
+                        padding: "14px 16px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: T.ink400,
+                          marginBottom: 6,
+                          fontFamily: T.fontUi,
+                        }}
+                      >
+                        {s.label}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: T.fontUi,
+                          fontSize: 22,
+                          fontWeight: 400,
+                          color: s.color,
+                          lineHeight: 1,
+                          letterSpacing: "-0.02em",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {s.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+          {/* Charts */}
+          {users.length > 0 &&
+            (() => {
+              // Role donut
+              const roleCounts = users.reduce((acc, u) => {
+                const r = u.role || "customer";
+                acc[r] = (acc[r] || 0) + 1;
+                return acc;
+              }, {});
+              const roleDonut = Object.entries(roleCounts).map(
+                ([role, count]) => ({ name: role, value: count }),
+              );
+              const ROLE_COLORS = {
+                customer: T.accentMid,
+                admin: T.warning,
+                retailer: T.info,
+                hq: T.accent,
+              };
+
+              // Tier distribution bar
+              const TIERS = ["platinum", "gold", "silver", "bronze"];
+              const TIER_COLORS = {
+                platinum: "#7b68ee",
+                gold: "#b5935a",
+                silver: "#8e9ba8",
+                bronze: "#a0674b",
+              };
+              const tierBar = TIERS.map((tier) => ({
+                name: tier.charAt(0).toUpperCase() + tier.slice(1),
+                count: users.filter(
+                  (u) => (u.loyalty_tier || "bronze").toLowerCase() === tier,
+                ).length,
+                color: TIER_COLORS[tier],
+              })).filter((d) => d.count > 0);
+
+              // Top 8 users by points
+              const topPts = [...users]
+                .sort(
+                  (a, b) => (b.loyalty_points || 0) - (a.loyalty_points || 0),
+                )
+                .slice(0, 8)
+                .map((u) => ({
+                  name: (u.email || u.id?.slice(0, 8) || "—")
+                    .split("@")[0]
+                    .slice(0, 12),
+                  points: u.loyalty_points || 0,
+                }));
+
+              return (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: 16,
+                    marginBottom: 20,
+                  }}
+                >
+                  {/* Role donut */}
+                  <ChartCard title="Users by Role" height={200}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={roleDonut}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={75}
+                          paddingAngle={3}
+                          isAnimationActive={false}
+                        >
+                          {roleDonut.map((d, i) => (
+                            <Cell
+                              key={i}
+                              fill={ROLE_COLORS[d.name] || T.ink400}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={
+                            <ChartTooltip formatter={(v) => `${v} users`} />
+                          }
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  {/* Tier bar */}
+                  <ChartCard title="Loyalty Tier Distribution" height={200}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={tierBar}
+                        margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                      >
+                        <CartesianGrid
+                          horizontal
+                          vertical={false}
+                          stroke={T.ink150}
+                          strokeWidth={0.5}
+                        />
+                        <XAxis
+                          dataKey="name"
+                          tick={{
+                            fill: T.ink400,
+                            fontSize: 10,
+                            fontFamily: T.fontUi,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          dy={4}
+                        />
+                        <YAxis
+                          tick={{
+                            fill: T.ink400,
+                            fontSize: 10,
+                            fontFamily: T.fontUi,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={24}
+                          allowDecimals={false}
+                        />
+                        <Tooltip
+                          content={
+                            <ChartTooltip formatter={(v) => `${v} users`} />
+                          }
+                        />
+                        <Bar
+                          dataKey="count"
+                          name="Users"
+                          isAnimationActive={false}
+                          maxBarSize={36}
+                          radius={[3, 3, 0, 0]}
+                        >
+                          {tierBar.map((d, i) => (
+                            <Cell key={i} fill={d.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  {/* Top points bar */}
+                  <ChartCard title="Top Users by Points" height={200}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={topPts}
+                        margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                        layout="vertical"
+                      >
+                        <CartesianGrid
+                          horizontal={false}
+                          vertical
+                          stroke={T.ink150}
+                          strokeWidth={0.5}
+                        />
+                        <XAxis
+                          type="number"
+                          tick={{
+                            fill: T.ink400,
+                            fontSize: 9,
+                            fontFamily: T.fontUi,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          allowDecimals={false}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          tick={{
+                            fill: T.ink400,
+                            fontSize: 9,
+                            fontFamily: T.fontUi,
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={68}
+                        />
+                        <Tooltip
+                          content={
+                            <ChartTooltip formatter={(v) => `${v} pts`} />
+                          }
+                        />
+                        <Bar
+                          dataKey="points"
+                          name="Points"
+                          fill="#b5935a"
+                          isAnimationActive={false}
+                          maxBarSize={14}
+                          radius={[0, 3, 3, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </div>
+              );
+            })()}
+
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
