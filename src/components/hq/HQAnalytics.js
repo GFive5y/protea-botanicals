@@ -1,4 +1,4 @@
-// src/components/hq/HQAnalytics.js v4.2 — WP-VIZ: revenue trend, grouped bar, stacked bar, funnel
+// src/components/hq/HQAnalytics.js v4.3 — Geo tab: GeoAnalyticsDashboard wired in
 // v4.1 — WP-THEME-2: Inter font + WorkflowGuide + usePageContext + InfoTooltip + Toast
 // v4.0 — WP-THEME: Unified design system applied
 // v3.2: Margin fix + po_status fix | v3.1: scan_logs schema
@@ -24,6 +24,7 @@ import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
 import { ChartCard, ChartTooltip } from "../viz";
+import GeoAnalyticsDashboard from "./GeoAnalyticsDashboard";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -397,6 +398,7 @@ export default function HQAnalytics() {
     { id: "production", label: "Production" },
     { id: "distribution", label: "Distribution" },
     { id: "scans", label: "Scans & Loyalty" },
+    { id: "geo", label: "Geo & Intelligence" },
   ];
 
   if (error)
@@ -637,6 +639,7 @@ export default function HQAnalytics() {
           {subTab === "production" && <ProductionAnalytics data={data} />}
           {subTab === "distribution" && <DistributionAnalytics data={data} />}
           {subTab === "scans" && <ScansAnalytics data={data} />}
+          {subTab === "geo" && <GeoAnalyticsDashboard />}
         </>
       ) : null}
 
