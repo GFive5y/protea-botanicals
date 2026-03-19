@@ -1852,7 +1852,7 @@ function AccountView({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
                   gap: "12px 16px",
                   marginBottom: 22,
                 }}
@@ -2519,7 +2519,7 @@ function AccountView({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3,1fr)",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
                   gap: 12,
                   marginBottom: 20,
                 }}
