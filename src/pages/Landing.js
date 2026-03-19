@@ -16,7 +16,7 @@
 // ============================================================================
 
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect, useContext } from "react";
 import { RoleContext } from "../App";
 import AgeGate from "../components/AgeGate";
 import PromoBanner from "../components/PromoBanner";
@@ -272,6 +272,7 @@ export default function Landing() {
                     .landing-video { height: 300px !important; }
                     .landing-section { padding: 56px 20px !important; }
                     .landing-hero-desc { margin-bottom: 40px !important; }
+                    .portal-card { min-width: 100% !important; max-width: 100% !important; }
                   }
                   `}</style>
 
