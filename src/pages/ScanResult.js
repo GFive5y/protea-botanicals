@@ -999,6 +999,25 @@ export default function ScanResult() {
     }
   }, []);
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(
+    async (alertType, severity, title, body, sourceId) => {
+      try {
+        await supabase.from("system_alerts").insert({
+          tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+          alert_type: alertType,
+          severity,
+          status: "open",
+          title,
+          body,
+          source_table: "scan_logs",
+          source_id: sourceId || null,
+        });
+      } catch (_) {}
+    },
+    [],
+  );
+
   const executeScan = useCallback(async () => {
     setPhase("loading");
     if (!qrCode) {
@@ -1095,6 +1114,13 @@ export default function ScanResult() {
           deviceInfo,
           ipGeo,
         });
+        writeAlert(
+          "scan_abuse",
+          "warning",
+          "Max scan limit exceeded",
+          `QR code ${qrCode} has been scanned ${(qr.scan_count || 0) + 1} times — limit is ${qr.max_scans}. IP: ${ipGeo?.ip_city || "unknown"}.`,
+          qr.id,
+        );
         setGuardType("max_scans");
         setPhase("guard");
         return;
@@ -1120,6 +1146,13 @@ export default function ScanResult() {
           setIsSuspended(true);
           setShowProduct(true);
           setShowCoa(true);
+          writeAlert(
+            "suspended_scan",
+            "warning",
+            "Suspended account attempted scan",
+            `User ${currentUser.id} (suspended) scanned QR ${qrCode}. IP: ${ipGeo?.ip_city || "unknown"}.`,
+            qr.id,
+          );
           await supabase
             .from("qr_codes")
             .update({
@@ -1486,6 +1519,7 @@ export default function ScanResult() {
     navigate,
     writeScanLog,
     writeLoyaltyTransaction,
+    writeAlert,
     tierMultiplierUsed,
     tierLabelUsed,
   ]);
