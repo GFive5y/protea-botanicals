@@ -1,4 +1,5 @@
-// src/components/AdminQRCodes.js v2.3
+// src/components/AdminQRCodes.js v2.4
+// WP-VIZ: Donut (codes by type) + Grouped Bar (scans vs claims) + HBar (claim rate) added
 // WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // WP-GUIDE-C: InfoTooltip injected — qr-claim-rate, qr-scan-actions, qr-hmac
 // v2.2 — InfoTooltip injected
@@ -6,11 +7,24 @@
 // v2.0 — Full QR engine: 6 types, scan action stack, banner library, 3-step wizard
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
+import { ChartCard, ChartTooltip } from "./viz";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -905,6 +919,218 @@ function RegistryTab({ batches }) {
           </div>
         ))}
       </div>
+
+      {/* ── WP-VIZ CHARTS ── */}
+      {!loading &&
+        codes.length > 0 &&
+        (() => {
+          // Chart data derived from loaded codes
+          const typeData = QR_TYPES.map((t) => {
+            const items = codes.filter((c) => c.qr_type === t.value);
+            return {
+              name: t.label,
+              icon: t.icon,
+              count: items.length,
+              scans: items.reduce((s, c) => s + (c.scan_count || 0), 0),
+              claimed: items.filter((c) => c.claimed).length,
+              points: items.reduce((s, c) => s + (c.points_value || 0), 0),
+            };
+          }).filter((d) => d.count > 0);
+
+          const DONUT_COLORS = [
+            T.accent,
+            T.accentMid,
+            T.info,
+            "#b5935a",
+            T.warning,
+            T.danger,
+          ];
+
+          const claimBarData = typeData
+            .map((d) => ({
+              name: d.icon,
+              rate:
+                d.count > 0
+                  ? parseFloat(((d.claimed / d.count) * 100).toFixed(1))
+                  : 0,
+              label: d.name,
+            }))
+            .sort((a, b) => b.rate - a.rate);
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 16,
+                marginBottom: 24,
+              }}
+            >
+              {/* Donut — codes by type */}
+              <ChartCard title="QR Codes by Type" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={typeData}
+                      dataKey="count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {typeData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={DONUT_COLORS[i % DONUT_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={<ChartTooltip formatter={(v) => `${v} codes`} />}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* Grouped bar — scans vs claims by type */}
+              <ChartCard title="Scans vs Claims by Type" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={typeData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                    barCategoryGap="30%"
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="icon"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 12,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={4}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar
+                      dataKey="scans"
+                      name="Scans"
+                      fill={T.accent}
+                      radius={[3, 3, 0, 0]}
+                      isAnimationActive={false}
+                      maxBarSize={20}
+                    />
+                    <Bar
+                      dataKey="claimed"
+                      name="Claimed"
+                      fill={T.info}
+                      radius={[3, 3, 0, 0]}
+                      isAnimationActive={false}
+                      maxBarSize={20}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* Horizontal bar — claim rate by type */}
+              <ChartCard title="Claim Rate % by Type" height={200}>
+                <div
+                  style={{
+                    padding: "8px 0",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    height: "100%",
+                    justifyContent: "center",
+                  }}
+                >
+                  {claimBarData.map((d, i) => (
+                    <div
+                      key={d.name}
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <span style={{ fontSize: 14, width: 20, flexShrink: 0 }}>
+                        {d.name}
+                      </span>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 16,
+                          background: T.ink075,
+                          borderRadius: 3,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${Math.min(d.rate, 100)}%`,
+                            background:
+                              d.rate >= 50
+                                ? T.success
+                                : d.rate >= 25
+                                  ? T.accentMid
+                                  : T.warning,
+                            borderRadius: 3,
+                            transition: "width 0.5s",
+                            display: "flex",
+                            alignItems: "center",
+                            paddingLeft: 4,
+                          }}
+                        >
+                          {d.rate >= 15 && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                color: "#fff",
+                                fontWeight: 700,
+                                fontFamily: T.font,
+                              }}
+                            >
+                              {d.rate}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink400,
+                          fontFamily: T.font,
+                          minWidth: 32,
+                          textAlign: "right",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {d.rate < 15 ? `${d.rate}%` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* Filters */}
       <div
