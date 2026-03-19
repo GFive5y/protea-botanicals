@@ -1174,8 +1174,8 @@ export default function AdminDashboard() {
                       margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
                     >
                       <CartesianGrid
-                        horizontal={false}
-                        vertical
+                        horizontal
+                        vertical={false}
                         stroke={T.ink150}
                         strokeWidth={0.5}
                       />
@@ -1503,8 +1503,8 @@ export default function AdminDashboard() {
                         layout="vertical"
                       >
                         <CartesianGrid
-                          horizontal={false}
-                          vertical
+                          horizontal
+                          vertical={false}
                           stroke={T.ink150}
                           strokeWidth={0.5}
                         />
