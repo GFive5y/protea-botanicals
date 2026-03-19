@@ -1,12 +1,26 @@
-// src/components/AdminCustomerEngagement.js v2.3
+// src/components/AdminCustomerEngagement.js v2.4
+// WP-VIZ: Tier Donut + Engagement Buckets HBar + Active vs At-Risk by Tier grouped bar
 // WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // WP-GUIDE-C++: usePageContext 'customers' wired + WorkflowGuide added
 // v2.2 — WorkflowGuide · v2.1 — Inbox/Messaging · v2.0 — calcEngagement, churn risk, 360 drawer
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "./viz";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -977,6 +991,226 @@ export default function AdminCustomerEngagement() {
           </div>
         ))}
       </div>
+
+      {/* ── WP-VIZ CHARTS ── */}
+      {!loading &&
+        customers.length > 0 &&
+        (() => {
+          // Chart 1: Tier donut
+          const tierDonut = [
+            { name: "Platinum", value: tierCounts.platinum, color: "#7b68ee" },
+            { name: "Gold", value: tierCounts.gold, color: "#b5935a" },
+            { name: "Silver", value: tierCounts.silver || 0, color: "#8e9ba8" },
+            { name: "Bronze", value: tierCounts.bronze, color: "#a0674b" },
+          ].filter((d) => d.value > 0);
+
+          // Chart 2: Engagement score buckets (horizontal bar)
+          const buckets = [
+            { label: "81–100", min: 81, max: 100, color: T.success },
+            { label: "61–80", min: 61, max: 80, color: T.accentMid },
+            { label: "41–60", min: 41, max: 60, color: "#b5935a" },
+            { label: "21–40", min: 21, max: 40, color: T.warning },
+            { label: "0–20", min: 0, max: 20, color: T.danger },
+          ].map((b) => ({
+            ...b,
+            count: customers.filter((c) => {
+              const s = engScores[c.id]?.total || 0;
+              return s >= b.min && s <= b.max;
+            }).length,
+          }));
+          const bucketMax = Math.max(...buckets.map((b) => b.count), 1);
+
+          // Chart 3: Active vs at-risk by tier (grouped bar)
+          const tierRiskData = ["platinum", "gold", "silver", "bronze"]
+            .map((tier) => {
+              const group = customers.filter(
+                (c) => getTier(c.loyalty_points || 0) === tier,
+              );
+              return {
+                name: tier.charAt(0).toUpperCase() + tier.slice(1),
+                active: group.filter((c) => !isChurnRisk(c)).length,
+                at_risk: group.filter((c) => isChurnRisk(c)).length,
+              };
+            })
+            .filter((d) => d.active + d.at_risk > 0);
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              {/* Donut — tier mix */}
+              <ChartCard title="Loyalty Tier Mix" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={tierDonut}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {tierDonut.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={
+                        <ChartTooltip formatter={(v) => `${v} customers`} />
+                      }
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* Horizontal bar — engagement score buckets */}
+              <ChartCard title="Engagement Score Distribution" height={200}>
+                <div
+                  style={{
+                    padding: "12px 8px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    height: "100%",
+                    justifyContent: "center",
+                  }}
+                >
+                  {buckets.map((b) => (
+                    <div
+                      key={b.label}
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: b.color,
+                          fontFamily: T.font,
+                          width: 36,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {b.label}
+                      </span>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 16,
+                          background: T.ink075,
+                          borderRadius: 3,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${(b.count / bucketMax) * 100}%`,
+                            background: b.color,
+                            borderRadius: 3,
+                            transition: "width 0.5s",
+                            display: "flex",
+                            alignItems: "center",
+                            paddingLeft: 4,
+                          }}
+                        >
+                          {b.count / bucketMax > 0.2 && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                color: "#fff",
+                                fontWeight: 700,
+                                fontFamily: T.font,
+                              }}
+                            >
+                              {b.count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink400,
+                          fontFamily: T.font,
+                          minWidth: 20,
+                          textAlign: "right",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {b.count / bucketMax <= 0.2 ? b.count : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </ChartCard>
+
+              {/* Grouped bar — active vs at-risk by tier */}
+              <ChartCard title="Active vs At-Risk by Tier" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={tierRiskData}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                    barCategoryGap="30%"
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={4}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Bar
+                      dataKey="active"
+                      name="Active"
+                      fill={T.accentMid}
+                      radius={[3, 3, 0, 0]}
+                      isAnimationActive={false}
+                      maxBarSize={20}
+                    />
+                    <Bar
+                      dataKey="at_risk"
+                      name="At Risk"
+                      fill={T.danger}
+                      radius={[3, 3, 0, 0]}
+                      isAnimationActive={false}
+                      maxBarSize={20}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {churnCount > 0 && (
         <div
