@@ -1,14 +1,24 @@
-// HRDashboard.js v1.0
-// Protea Botanicals · HR Module · HR Officer Dashboard
-// WP-HR-5 · March 2026
-// src/pages/HRDashboard.js
+// HRDashboard.js v1.1
+// WP-VIZ: Leave Status Donut + Timesheet Pipeline Bar + Headcount HBar added to HROverview
+// v1.0 — WP-HR-5 · March 2026 · src/pages/HRDashboard.js
 //
 // Route: /hr — role='hr' OR isHQ access
 // Tabs: Overview | Staff | Leave | Timesheets | Contracts | Settings
-// This is the full HR officer view — broader than AdminHRPanel
 // AdminHRPanel = scoped to Admin's team | HRDashboard = full tenant HR access
 
-import React, { useState, useEffect, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
 import SystemStatusBar from "../components/SystemStatusBar";
@@ -23,7 +33,9 @@ import HRCalendar from "../components/hq/HRCalendar";
 import HRLoans from "../components/hq/HRLoans";
 import HRPerformance from "../components/hq/HRPerformance";
 import HRPayroll from "../components/hq/HRPayroll";
+import { ChartCard, ChartTooltip } from "../components/viz";
 
+// ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
@@ -63,6 +75,7 @@ const C = {
 };
 const FONTS = { heading: T.font, body: T.font };
 
+// ─── TABS ─────────────────────────────────────────────────────────────────────
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "staff", label: "Staff" },
@@ -123,7 +136,7 @@ function TabBtn({ active, label, badge, onClick }) {
   );
 }
 
-// ── HR Overview ─────────────────────────────────────────────────────────────
+// ─── HR OVERVIEW ──────────────────────────────────────────────────────────────
 function HROverview({ tenantId, onNavigate }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -135,19 +148,19 @@ function HROverview({ tenantId, onNavigate }) {
         [
           supabase
             .from("staff_profiles")
-            .select("id, status")
+            .select("id,status,employment_type,department")
             .eq("tenant_id", tenantId),
           supabase
             .from("leave_requests")
-            .select("id, status")
+            .select("id,status")
             .eq("tenant_id", tenantId),
           supabase
             .from("timesheets")
-            .select("id, status")
+            .select("id,status")
             .eq("tenant_id", tenantId),
           supabase
             .from("employment_contracts")
-            .select("id, is_active, end_date, probation_end_date")
+            .select("id,is_active,end_date,probation_end_date")
             .eq("tenant_id", tenantId)
             .eq("is_active", true),
         ],
@@ -165,6 +178,28 @@ function HROverview({ tenantId, onNavigate }) {
       const now = new Date();
       const in60Days = new Date(now.getTime() + 60 * 86400000);
       const in14Days = new Date(now.getTime() + 14 * 86400000);
+
+      // Status breakdowns for charts
+      const staffByStatus = staff.reduce((acc, s) => {
+        const k = s.status || "active";
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+      const staffByDept = staff.reduce((acc, s) => {
+        const k = s.department || "General";
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+      const leaveByStatus = leaves.reduce((acc, l) => {
+        const k = l.status || "pending";
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
+      const tsByStatus = timesheets.reduce((acc, t) => {
+        const k = t.status || "draft";
+        acc[k] = (acc[k] || 0) + 1;
+        return acc;
+      }, {});
 
       setStats({
         totalStaff: staff.length,
@@ -188,6 +223,10 @@ function HROverview({ tenantId, onNavigate }) {
             new Date(c.probation_end_date) <= in14Days &&
             new Date(c.probation_end_date) >= now,
         ).length,
+        staffByStatus,
+        staffByDept,
+        leaveByStatus,
+        tsByStatus,
       });
     } finally {
       setLoading(false);
@@ -200,12 +239,20 @@ function HROverview({ tenantId, onNavigate }) {
 
   if (loading)
     return (
-      <div style={{ color: C.muted, padding: "40px", textAlign: "center" }}>
+      <div
+        style={{
+          color: C.muted,
+          padding: "40px",
+          textAlign: "center",
+          fontFamily: T.font,
+        }}
+      >
         Loading HR overview…
       </div>
     );
   if (!stats) return null;
 
+  // ── Tiles ──────────────────────────────────────────────────────────────────
   const tiles = [
     {
       icon: "👥",
@@ -257,6 +304,59 @@ function HROverview({ tenantId, onNavigate }) {
     },
   ];
 
+  // ── Chart data ─────────────────────────────────────────────────────────────
+  const leaveDonut = [
+    {
+      name: "Pending",
+      value: stats.leaveByStatus["pending"] || 0,
+      color: T.warning,
+    },
+    {
+      name: "Approved",
+      value: stats.leaveByStatus["approved"] || 0,
+      color: T.success,
+    },
+    {
+      name: "Rejected",
+      value: stats.leaveByStatus["rejected"] || 0,
+      color: T.danger,
+    },
+    {
+      name: "Cancelled",
+      value: stats.leaveByStatus["cancelled"] || 0,
+      color: T.ink400,
+    },
+  ].filter((d) => d.value > 0);
+
+  const tsBar = [
+    { name: "Draft", count: stats.tsByStatus["draft"] || 0, color: T.ink400 },
+    {
+      name: "Submitted",
+      count: stats.tsByStatus["staff_submitted"] || 0,
+      color: T.warning,
+    },
+    {
+      name: "Admin Approved",
+      count: stats.tsByStatus["admin_approved"] || 0,
+      color: T.info,
+    },
+    {
+      name: "HR Locked",
+      count: stats.tsByStatus["hr_locked"] || 0,
+      color: T.success,
+    },
+    { name: "Paid", count: stats.tsByStatus["paid"] || 0, color: T.accentMid },
+  ].filter((d) => d.count > 0);
+
+  const deptBar = Object.entries(stats.staffByDept)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 7)
+    .map(([dept, count]) => ({ dept, count }));
+  const deptMax = Math.max(...deptBar.map((d) => d.count), 1);
+
+  const showCharts =
+    leaveDonut.length > 0 || tsBar.length > 0 || deptBar.length > 0;
+
   return (
     <div>
       <h2
@@ -270,12 +370,14 @@ function HROverview({ tenantId, onNavigate }) {
       >
         HR Command Centre
       </h2>
+
+      {/* Tiles grid — unchanged */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
           gap: 14,
-          marginBottom: 32,
+          marginBottom: 28,
         }}
       >
         {tiles.map((tile) => (
@@ -329,6 +431,7 @@ function HROverview({ tenantId, onNavigate }) {
                 color: tile.color,
                 lineHeight: 1,
                 letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
               {tile.value}
@@ -340,6 +443,226 @@ function HROverview({ tenantId, onNavigate }) {
         ))}
       </div>
 
+      {/* ── WP-VIZ CHARTS ── */}
+      {showCharts && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 16,
+            marginBottom: 28,
+          }}
+        >
+          {/* Leave status donut */}
+          <ChartCard title="Leave Requests by Status" height={200}>
+            {leaveDonut.length === 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  fontSize: 13,
+                  color: T.ink400,
+                  fontFamily: T.font,
+                }}
+              >
+                No leave requests yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={leaveDonut}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={75}
+                    paddingAngle={3}
+                    isAnimationActive={false}
+                  >
+                    {leaveDonut.map((d, i) => (
+                      <Cell key={i} fill={d.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={
+                      <ChartTooltip formatter={(v) => `${v} requests`} />
+                    }
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Timesheet pipeline bar */}
+          <ChartCard title="Timesheet Pipeline" height={200}>
+            {tsBar.length === 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  fontSize: 13,
+                  color: T.ink400,
+                  fontFamily: T.font,
+                }}
+              >
+                No timesheets yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={tsBar}
+                  margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                >
+                  <CartesianGrid
+                    horizontal
+                    vertical={false}
+                    stroke={T.ink150}
+                    strokeWidth={0.5}
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: T.ink400, fontSize: 9, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={4}
+                    maxRotation={30}
+                  />
+                  <YAxis
+                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltip formatter={(v) => `${v} timesheets`} />
+                    }
+                  />
+                  <Bar
+                    dataKey="count"
+                    name="Timesheets"
+                    isAnimationActive={false}
+                    maxBarSize={36}
+                    radius={[3, 3, 0, 0]}
+                  >
+                    {tsBar.map((d, i) => (
+                      <Cell key={i} fill={d.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          {/* Headcount by department horizontal bar */}
+          <ChartCard title="Headcount by Department" height={200}>
+            {deptBar.length === 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  fontSize: 13,
+                  color: T.ink400,
+                  fontFamily: T.font,
+                }}
+              >
+                No department data
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "8px 4px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  height: "100%",
+                  justifyContent: "center",
+                }}
+              >
+                {deptBar.map((d) => (
+                  <div
+                    key={d.dept}
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: T.ink700,
+                        fontFamily: T.font,
+                        width: 80,
+                        flexShrink: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {d.dept}
+                    </span>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 16,
+                        background: T.ink075,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${(d.count / deptMax) * 100}%`,
+                          background: T.accentMid,
+                          borderRadius: 3,
+                          transition: "width 0.5s",
+                          display: "flex",
+                          alignItems: "center",
+                          paddingLeft: 4,
+                        }}
+                      >
+                        {d.count / deptMax > 0.2 && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              color: "#fff",
+                              fontWeight: 700,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            {d.count}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                        minWidth: 20,
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {d.count / deptMax <= 0.2 ? d.count : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ChartCard>
+        </div>
+      )}
+
+      {/* Quick Actions — unchanged */}
       <div
         style={{
           fontSize: 10,
@@ -397,14 +720,13 @@ function HROverview({ tenantId, onNavigate }) {
   );
 }
 
-// ── Main dashboard ───────────────────────────────────────────────────────────
+// ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
 export default function HRDashboard() {
   const [tab, setTab] = useState("overview");
   const { tenantId, loading: tenantLoading } = useTenant();
   const [pendingLeave, setPendingLeave] = useState(0);
   const [pendingTS, setPendingTS] = useState(0);
 
-  // Load badge counts
   useEffect(() => {
     if (!tenantId) return;
     const loadBadges = async () => {
@@ -448,7 +770,6 @@ export default function HRDashboard() {
 
   return (
     <div style={{ fontFamily: FONTS.body }}>
-      {/* Header */}
       <div style={{ marginBottom: 0 }}>
         <h1
           style={{
@@ -475,7 +796,6 @@ export default function HRDashboard() {
 
       <SystemStatusBar />
 
-      {/* Tab bar */}
       <div
         style={{
           background: C.white,
@@ -505,7 +825,6 @@ export default function HRDashboard() {
         ))}
       </div>
 
-      {/* Tab content */}
       <div>
         {tab === "overview" && (
           <HROverview tenantId={tenantId} onNavigate={setTab} />
