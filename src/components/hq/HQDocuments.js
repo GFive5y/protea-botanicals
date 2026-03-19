@@ -1,4 +1,5 @@
 // src/components/hq/HQDocuments.js
+// v2.3 — WP-VISUAL: T tokens, Inter font, no Cormorant/Jost
 // v2.2 — WP-GUIDE-C+: usePageContext 'documents' wired + WorkflowGuide added
 // v2.1 — Shipping line detection: after AI extraction, client-side scan of line_items
 //         for shipping/freight/handling keywords. If found and a linked PO exists,
@@ -14,33 +15,64 @@ import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
+
+// Legacy colour aliases — keeps every C.xxx reference working unchanged
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
+  cream: T.ink050,
   white: "#ffffff",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  lightGreen: "#eafaf1",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  amber: "#d4830a",
-  lightAmber: "#fff8ee",
+  border: T.ink150,
+  muted: T.ink400,
+  text: T.ink700,
+  red: T.danger,
+  lightRed: T.dangerBg,
+  lightGreen: T.accentLit,
+  blue: T.info,
+  lightBlue: T.infoBg,
+  amber: T.warning,
+  lightAmber: T.warningBg,
   purple: "#6c3483",
   lightPurple: "#f5eef8",
   orange: "#c0560a",
   lightOrange: "#fff4ee",
 };
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+// F aliases — both point to Inter so all F.heading / F.body refs get Inter
+const F = { heading: T.font, body: T.font };
 
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const SHIPPING_KEYWORDS = [
   "shipping",
   "freight",
@@ -109,7 +141,6 @@ const detectTypeFromName = (name = "") => {
   if (n.includes("contract") || n.includes("agreement")) return "contract";
   return "";
 };
-
 const fileToBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -117,7 +148,6 @@ const fileToBase64 = (file) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-
 const supplierCatToInventoryCat = (cat) => {
   if (cat === "terpene") return "terpene";
   if (cat === "hardware") return "hardware";
@@ -151,10 +181,10 @@ const DOC_TYPE_ICONS = {
   unknown: "📄",
 };
 const STATUS_COLORS = {
-  pending_review: { bg: C.lightAmber, color: C.amber, border: C.amber },
-  confirmed: { bg: C.lightGreen, color: C.mid, border: C.accent },
-  rejected: { bg: C.lightRed, color: C.red, border: C.red },
-  partially_applied: { bg: C.lightBlue, color: C.blue, border: C.blue },
+  pending_review: { bg: T.warningBg, color: T.warning, border: T.warning },
+  confirmed: { bg: T.accentLit, color: T.accentMid, border: T.accentBd },
+  rejected: { bg: T.dangerBg, color: T.danger, border: T.danger },
+  partially_applied: { bg: T.infoBg, color: T.info, border: T.info },
 };
 const STATUS_LABELS = {
   pending_review: "Pending Review",
@@ -164,14 +194,42 @@ const STATUS_LABELS = {
 };
 
 const confidenceColor = (score) => {
-  if (score === null || score === undefined) return C.muted;
-  if (score >= 0.85) return C.accent;
-  if (score >= 0.7) return C.amber;
-  return C.red;
+  if (score === null || score === undefined) return T.ink400;
+  if (score >= 0.85) return T.accentMid;
+  if (score >= 0.7) return T.warning;
+  return T.danger;
 };
 const confidencePct = (score) =>
   score !== null && score !== undefined ? `${Math.round(score * 100)}%` : "—";
 
+// ─── SHARED STYLE HELPERS ─────────────────────────────────────────────────────
+const inputStyle = {
+  padding: "7px 10px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontSize: 12,
+  fontFamily: T.font,
+  background: "#fff",
+  color: T.ink700,
+  outline: "none",
+  boxSizing: "border-box",
+};
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
+  padding: "7px 14px",
+  backgroundColor: disabled ? "#ccc" : bg,
+  color,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.07em",
+  textTransform: "uppercase",
+  cursor: disabled ? "not-allowed" : "pointer",
+  fontFamily: T.font,
+  opacity: disabled ? 0.6 : 1,
+});
+
+// ─── SUB-COMPONENTS ───────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const s = STATUS_COLORS[status] || STATUS_COLORS.pending_review;
   return (
@@ -184,9 +242,9 @@ function StatusBadge({ status }) {
         color: s.color,
         border: `1px solid ${s.border}`,
         fontWeight: 700,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.08em",
         textTransform: "uppercase",
-        fontFamily: F.body,
+        fontFamily: T.font,
         whiteSpace: "nowrap",
       }}
     >
@@ -194,7 +252,6 @@ function StatusBadge({ status }) {
     </span>
   );
 }
-
 function ConfidenceDot({ score }) {
   const color = confidenceColor(score);
   return (
@@ -205,7 +262,7 @@ function ConfidenceDot({ score }) {
         gap: 4,
         fontSize: 10,
         color,
-        fontFamily: F.body,
+        fontFamily: T.font,
       }}
     >
       <span
@@ -222,7 +279,6 @@ function ConfidenceDot({ score }) {
     </span>
   );
 }
-
 function ConfidenceBar({ score }) {
   const pct = score !== null ? Math.max(0, Math.round((score || 0) * 100)) : 0;
   const color = confidenceColor(score);
@@ -232,7 +288,7 @@ function ConfidenceBar({ score }) {
         style={{
           flex: 1,
           height: 5,
-          background: C.border,
+          background: T.ink150,
           borderRadius: 3,
           overflow: "hidden",
         }}
@@ -251,7 +307,7 @@ function ConfidenceBar({ score }) {
         style={{
           fontSize: 11,
           color,
-          fontFamily: F.body,
+          fontFamily: T.font,
           minWidth: 30,
           textAlign: "right",
         }}
@@ -282,27 +338,23 @@ function SupplierCreateForm({
   const [error, setError] = useState("");
   const set = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
-  const inputStyle = {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "6px 8px",
-    border: `1px solid ${C.border}`,
-    borderRadius: 2,
-    fontSize: 11,
-    fontFamily: F.body,
-    outline: "none",
-    background: C.white,
-  };
-  const labelStyle = {
-    fontSize: 9,
-    fontWeight: 700,
-    letterSpacing: "0.15em",
-    textTransform: "uppercase",
-    color: C.muted,
-    fontFamily: F.body,
-    display: "block",
-    marginBottom: 3,
-  };
+  const lbl = (text) => (
+    <label
+      style={{
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        fontFamily: T.font,
+        display: "block",
+        marginBottom: 3,
+      }}
+    >
+      {text}
+    </label>
+  );
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       setError("Supplier name is required");
@@ -321,16 +373,16 @@ function SupplierCreateForm({
     <div
       style={{
         padding: "12px 14px",
-        background: C.lightPurple,
-        borderTop: `1px solid ${C.border}`,
+        background: "#f5eef8",
+        borderTop: `1px solid ${T.ink150}`,
       }}
     >
       <div
         style={{
           fontSize: 10,
           fontWeight: 700,
-          color: C.purple,
-          fontFamily: F.body,
+          color: "#6c3483",
+          fontFamily: T.font,
           marginBottom: 10,
         }}
       >
@@ -338,9 +390,9 @@ function SupplierCreateForm({
       </div>
       <div style={{ display: "grid", gap: 8 }}>
         <div>
-          <label style={labelStyle}>Supplier Name *</label>
+          {lbl("Supplier Name *")}
           <input
-            style={{ ...inputStyle, borderColor: C.purple }}
+            style={{ ...inputStyle, width: "100%", borderColor: "#6c3483" }}
             value={form.name}
             onChange={set("name")}
             placeholder="e.g. Ecogreen Analytics (Pty) Ltd"
@@ -350,18 +402,18 @@ function SupplierCreateForm({
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
         >
           <div>
-            <label style={labelStyle}>Country</label>
+            {lbl("Country")}
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, width: "100%" }}
               value={form.country}
               onChange={set("country")}
               placeholder="e.g. South Africa"
             />
           </div>
           <div>
-            <label style={labelStyle}>Currency</label>
+            {lbl("Currency")}
             <select
-              style={{ ...inputStyle, cursor: "pointer" }}
+              style={{ ...inputStyle, width: "100%", cursor: "pointer" }}
               value={form.currency}
               onChange={set("currency")}
             >
@@ -377,18 +429,18 @@ function SupplierCreateForm({
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
         >
           <div>
-            <label style={labelStyle}>Contact Name</label>
+            {lbl("Contact Name")}
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, width: "100%" }}
               value={form.contact_name}
               onChange={set("contact_name")}
               placeholder="Optional"
             />
           </div>
           <div>
-            <label style={labelStyle}>Email</label>
+            {lbl("Email")}
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, width: "100%" }}
               value={form.email}
               onChange={set("email")}
               placeholder="Optional"
@@ -399,18 +451,18 @@ function SupplierCreateForm({
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
         >
           <div>
-            <label style={labelStyle}>Phone</label>
+            {lbl("Phone")}
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, width: "100%" }}
               value={form.phone}
               onChange={set("phone")}
               placeholder="Optional"
             />
           </div>
           <div>
-            <label style={labelStyle}>Website</label>
+            {lbl("Website")}
             <input
-              style={inputStyle}
+              style={{ ...inputStyle, width: "100%" }}
               value={form.website}
               onChange={set("website")}
               placeholder="Optional"
@@ -418,9 +470,9 @@ function SupplierCreateForm({
           </div>
         </div>
         <div>
-          <label style={labelStyle}>Notes</label>
+          {lbl("Notes")}
           <input
-            style={inputStyle}
+            style={{ ...inputStyle, width: "100%" }}
             value={form.notes}
             onChange={set("notes")}
             placeholder="Optional"
@@ -431,8 +483,8 @@ function SupplierCreateForm({
         <div
           style={{
             fontSize: 10,
-            color: C.red,
-            fontFamily: F.body,
+            color: T.danger,
+            fontFamily: T.font,
             marginTop: 6,
           }}
         >
@@ -446,15 +498,15 @@ function SupplierCreateForm({
           style={{
             flex: 2,
             padding: "8px 0",
-            background: C.purple,
-            color: C.white,
+            background: "#6c3483",
+            color: "#fff",
             border: "none",
-            borderRadius: 2,
+            borderRadius: 4,
             fontSize: 10,
             fontWeight: 700,
-            letterSpacing: "0.1em",
+            letterSpacing: "0.07em",
             cursor: saving ? "not-allowed" : "pointer",
-            fontFamily: F.body,
+            fontFamily: T.font,
             opacity: saving ? 0.7 : 1,
           }}
         >
@@ -467,12 +519,12 @@ function SupplierCreateForm({
             flex: 1,
             padding: "8px 0",
             background: "transparent",
-            color: C.muted,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            color: T.ink400,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 4,
             fontSize: 10,
             cursor: "pointer",
-            fontFamily: F.body,
+            fontFamily: T.font,
           }}
         >
           Cancel
@@ -507,12 +559,12 @@ function UploadZone({ onFileSelected, disabled }) {
       onDrop={handleDrop}
       onClick={() => !disabled && fileRef.current?.click()}
       style={{
-        border: `2px dashed ${dragOver ? C.accent : C.border}`,
-        borderRadius: 4,
+        border: `2px dashed ${dragOver ? T.accentMid : T.ink150}`,
+        borderRadius: 6,
         padding: "20px 16px",
         textAlign: "center",
         cursor: disabled ? "not-allowed" : "pointer",
-        background: dragOver ? "#f0faf5" : C.cream,
+        background: dragOver ? T.accentLit : T.ink050,
         transition: "all 0.2s",
         opacity: disabled ? 0.5 : 1,
       }}
@@ -521,8 +573,8 @@ function UploadZone({ onFileSelected, disabled }) {
       <div
         style={{
           fontSize: 12,
-          color: C.mid,
-          fontFamily: F.body,
+          color: T.accentMid,
+          fontFamily: T.font,
           fontWeight: 600,
         }}
       >
@@ -531,9 +583,9 @@ function UploadZone({ onFileSelected, disabled }) {
       <div
         style={{
           fontSize: 10,
-          color: C.muted,
+          color: T.ink400,
           marginTop: 4,
-          fontFamily: F.body,
+          fontFamily: T.font,
         }}
       >
         PDF · JPG · PNG · WEBP · max 20MB
@@ -558,14 +610,14 @@ function DocListItem({ doc, selected, onClick }) {
         padding: "10px 12px",
         cursor: "pointer",
         borderRadius: 2,
-        background: selected ? "#f0faf5" : "transparent",
+        background: selected ? T.accentLit : "transparent",
         borderLeft: selected
-          ? `3px solid ${C.accent}`
+          ? `3px solid ${T.accentMid}`
           : "3px solid transparent",
         transition: "all 0.15s",
       }}
       onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.background = "#f8fdf9";
+        if (!selected) e.currentTarget.style.background = T.ink050;
       }}
       onMouseLeave={(e) => {
         if (!selected) e.currentTarget.style.background = "transparent";
@@ -584,8 +636,8 @@ function DocListItem({ doc, selected, onClick }) {
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: C.text,
-            fontFamily: F.body,
+            color: T.ink900,
+            fontFamily: T.font,
             flex: 1,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -600,8 +652,8 @@ function DocListItem({ doc, selected, onClick }) {
       <div
         style={{
           fontSize: 10,
-          color: C.muted,
-          fontFamily: F.body,
+          color: T.ink400,
+          fontFamily: T.font,
           marginBottom: 4,
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -618,7 +670,7 @@ function DocListItem({ doc, selected, onClick }) {
         }}
       >
         <StatusBadge status={doc.status} />
-        <span style={{ fontSize: 9, color: C.muted, fontFamily: F.body }}>
+        <span style={{ fontSize: 9, color: T.ink400, fontFamily: T.font }}>
           {fmtDate(doc.uploaded_at)}
         </span>
       </div>
@@ -666,57 +718,48 @@ function ReviewPanel({
     });
   const isReadOnly = doc.status !== "pending_review";
 
-  const panelStyle = {
-    width: 320,
-    minWidth: 320,
-    borderLeft: `1px solid ${C.border}`,
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    background: C.white,
-  };
   const sectionHead = {
     fontSize: 9,
     fontWeight: 700,
-    letterSpacing: "0.25em",
+    letterSpacing: "0.2em",
     textTransform: "uppercase",
-    color: C.muted,
-    fontFamily: F.body,
+    color: T.ink400,
+    fontFamily: T.font,
     padding: "10px 14px 6px",
-    borderBottom: `1px solid ${C.border}`,
-    background: C.cream,
+    borderBottom: `1px solid ${T.ink150}`,
+    background: T.ink050,
   };
   const fieldRow = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     padding: "5px 14px",
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink075}`,
     fontSize: 12,
-    fontFamily: F.body,
+    fontFamily: T.font,
   };
 
   const actionBadgeStyle = (action) => ({
     fontSize: 9,
     padding: "1px 6px",
-    borderRadius: 2,
+    borderRadius: 3,
     background:
       action === "receive_delivery_item"
-        ? C.lightGreen
+        ? T.accentLit
         : action === "update_batch_coa"
-          ? C.lightPurple
+          ? "#f5eef8"
           : action === "update_po_shipping"
             ? C.lightOrange
-            : C.lightBlue,
+            : T.infoBg,
     color:
       action === "receive_delivery_item"
-        ? C.mid
+        ? T.accentMid
         : action === "update_batch_coa"
-          ? C.purple
+          ? "#6c3483"
           : action === "update_po_shipping"
             ? C.orange
-            : C.blue,
-    fontFamily: F.body,
+            : T.info,
+    fontFamily: T.font,
     letterSpacing: "0.05em",
   });
   const actionBadgeLabel = (action, table) => {
@@ -727,22 +770,30 @@ function ReviewPanel({
     if (action === "update_po_shipping") return "🚢 Shipping Cost";
     return table;
   };
-
   const handleSupplierSave = async (supplierData) => {
     await onCreateSupplier(doc.id, supplierData);
     setShowSupplierForm(false);
     setSupplierCreated(true);
   };
-  const supplierUnmatched =
-    extraction.supplier?.name && !extraction.supplier?.matched_id;
 
   return (
-    <div style={panelStyle}>
+    <div
+      style={{
+        width: 320,
+        minWidth: 320,
+        borderLeft: `1px solid ${T.ink150}`,
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+        background: "#fff",
+      }}
+    >
+      {/* Header */}
       <div
         style={{
           padding: "14px",
-          borderBottom: `1px solid ${C.border}`,
-          background: C.cream,
+          borderBottom: `1px solid ${T.ink150}`,
+          background: T.ink050,
         }}
       >
         <div
@@ -761,13 +812,13 @@ function ReviewPanel({
               style={{
                 fontSize: 13,
                 fontWeight: 700,
-                color: C.green,
-                fontFamily: F.body,
+                color: T.accent,
+                fontFamily: T.font,
               }}
             >
               {DOC_TYPE_LABELS[extraction.document_type] || "Document"}
             </div>
-            <div style={{ fontSize: 10, color: C.muted, fontFamily: F.body }}>
+            <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
               {extraction.supplier?.name || "Unknown supplier"}
             </div>
           </div>
@@ -780,8 +831,8 @@ function ReviewPanel({
           <div
             style={{
               fontSize: 10,
-              color: C.muted,
-              fontFamily: F.body,
+              color: T.ink400,
+              fontFamily: T.font,
               marginTop: 6,
               fontStyle: "italic",
             }}
@@ -791,31 +842,32 @@ function ReviewPanel({
         )}
       </div>
 
+      {/* Extracted fields */}
       <div style={sectionHead}>Extracted Fields</div>
       {extraction.reference?.number && (
         <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Reference</span>
-          <span style={{ fontWeight: 600, color: C.text }}>
+          <span style={{ color: T.ink400 }}>Reference</span>
+          <span style={{ fontWeight: 600, color: T.ink700 }}>
             {extraction.reference.number}
           </span>
         </div>
       )}
       {extraction.reference?.date && (
         <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Date</span>
-          <span style={{ color: C.text }}>{extraction.reference.date}</span>
+          <span style={{ color: T.ink400 }}>Date</span>
+          <span style={{ color: T.ink700 }}>{extraction.reference.date}</span>
         </div>
       )}
       {extraction.currency && (
         <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Currency</span>
-          <span style={{ color: C.text }}>{extraction.currency}</span>
+          <span style={{ color: T.ink400 }}>Currency</span>
+          <span style={{ color: T.ink700 }}>{extraction.currency}</span>
         </div>
       )}
       {extraction.total_amount != null && (
         <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Total</span>
-          <span style={{ fontWeight: 600, color: C.green }}>
+          <span style={{ color: T.ink400 }}>Total</span>
+          <span style={{ fontWeight: 600, color: T.accent }}>
             {extraction.currency} {Number(extraction.total_amount).toFixed(2)}
           </span>
         </div>
@@ -823,7 +875,7 @@ function ReviewPanel({
 
       {extraction.supplier?.matched_id ? (
         <div style={fieldRow}>
-          <span style={{ color: C.muted }}>Supplier</span>
+          <span style={{ color: T.ink400 }}>Supplier</span>
           <ConfidenceDot score={extraction.supplier.confidence} />
         </div>
       ) : extraction.supplier?.name ? (
@@ -836,7 +888,7 @@ function ReviewPanel({
               alignItems: "center",
             }}
           >
-            <span style={{ color: C.muted }}>Supplier</span>
+            <span style={{ color: T.ink400 }}>Supplier</span>
             <div
               style={{
                 display: "flex",
@@ -846,32 +898,37 @@ function ReviewPanel({
               }}
             >
               {supplierCreated ? (
-                <span style={{ fontSize: 10, color: C.mid, fontWeight: 600 }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: T.accentMid,
+                    fontWeight: 600,
+                    fontFamily: T.font,
+                  }}
+                >
                   ✅ Supplier created
                 </span>
               ) : (
-                <>
-                  {!showSupplierForm && (
-                    <button
-                      onClick={() => setShowSupplierForm(true)}
-                      style={{
-                        fontSize: 9,
-                        padding: "3px 8px",
-                        background: C.purple,
-                        color: C.white,
-                        border: "none",
-                        borderRadius: 2,
-                        cursor: "pointer",
-                        fontFamily: F.body,
-                        fontWeight: 700,
-                        letterSpacing: "0.05em",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      ➕ Add Supplier
-                    </button>
-                  )}
-                </>
+                !showSupplierForm && (
+                  <button
+                    onClick={() => setShowSupplierForm(true)}
+                    style={{
+                      fontSize: 9,
+                      padding: "3px 8px",
+                      background: "#6c3483",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 3,
+                      cursor: "pointer",
+                      fontFamily: T.font,
+                      fontWeight: 700,
+                      letterSpacing: "0.05em",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ➕ Add Supplier
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -886,6 +943,7 @@ function ReviewPanel({
         </>
       ) : null}
 
+      {/* Line items */}
       {lineItems.length > 0 && (
         <>
           <div style={sectionHead}>Line Items ({lineItems.length})</div>
@@ -895,9 +953,9 @@ function ReviewPanel({
                 key={i}
                 style={{
                   padding: "7px 14px",
-                  borderBottom: `1px solid ${C.border}`,
+                  borderBottom: `1px solid ${T.ink075}`,
                   fontSize: 11,
-                  fontFamily: F.body,
+                  fontFamily: T.font,
                 }}
               >
                 <div
@@ -911,7 +969,7 @@ function ReviewPanel({
                     style={{
                       color: isShippingLine(item.description)
                         ? C.orange
-                        : C.text,
+                        : T.ink700,
                       fontWeight: 500,
                       flex: 1,
                       marginRight: 6,
@@ -927,7 +985,7 @@ function ReviewPanel({
                     display: "flex",
                     gap: 10,
                     marginTop: 2,
-                    color: C.muted,
+                    color: T.ink400,
                   }}
                 >
                   <span>Qty: {item.quantity}</span>
@@ -937,11 +995,11 @@ function ReviewPanel({
                     </span>
                   )}
                   {item.matched_product_id ? (
-                    <span style={{ color: C.accent }}>✓ matched</span>
+                    <span style={{ color: T.accentMid }}>✓ matched</span>
                   ) : isShippingLine(item.description) ? (
                     <span style={{ color: C.orange }}>🚢 shipping</span>
                   ) : (
-                    <span style={{ color: C.amber }}>⚠ unmatched</span>
+                    <span style={{ color: T.warning }}>⚠ unmatched</span>
                   )}
                 </div>
               </div>
@@ -950,6 +1008,7 @@ function ReviewPanel({
         </>
       )}
 
+      {/* Proposed updates */}
       {proposedUpdates.length > 0 && (
         <>
           <div style={sectionHead}>
@@ -962,12 +1021,12 @@ function ReviewPanel({
                 key={i}
                 style={{
                   padding: "8px 14px",
-                  borderBottom: `1px solid ${C.border}`,
+                  borderBottom: `1px solid ${T.ink075}`,
                   background: checkedUpdates.has(i)
                     ? update.action === "update_po_shipping"
                       ? "#fff7f2"
-                      : "#f5fdf8"
-                    : C.white,
+                      : T.accentLit
+                    : "#fff",
                   opacity: isReadOnly ? 0.7 : 1,
                 }}
               >
@@ -993,8 +1052,8 @@ function ReviewPanel({
                     <div
                       style={{
                         fontSize: 11,
-                        color: C.text,
-                        fontFamily: F.body,
+                        color: T.ink700,
+                        fontFamily: T.font,
                         lineHeight: 1.4,
                       }}
                     >
@@ -1020,14 +1079,13 @@ function ReviewPanel({
           </div>
         </>
       )}
-
       {proposedUpdates.length === 0 && (
         <div
           style={{
             padding: 14,
             fontSize: 12,
-            color: C.muted,
-            fontFamily: F.body,
+            color: T.ink400,
+            fontFamily: T.font,
             textAlign: "center",
           }}
         >
@@ -1035,12 +1093,13 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Warnings */}
       {warnings.length > 0 && (
         <div
           style={{
             padding: "8px 14px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.lightAmber,
+            borderTop: `1px solid ${T.ink075}`,
+            background: T.warningBg,
           }}
         >
           {warnings.map((w, i) => (
@@ -1048,8 +1107,8 @@ function ReviewPanel({
               key={i}
               style={{
                 fontSize: 10,
-                color: C.amber,
-                fontFamily: F.body,
+                color: T.warning,
+                fontFamily: T.font,
                 marginBottom: 2,
               }}
             >
@@ -1059,23 +1118,24 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Unknown items */}
       {unknownItems.length > 0 && (
         <div
           style={{
             padding: "8px 14px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.lightRed,
+            borderTop: `1px solid ${T.ink075}`,
+            background: T.dangerBg,
           }}
         >
           <div
             style={{
               fontSize: 9,
               fontWeight: 700,
-              letterSpacing: "0.2em",
-              color: C.red,
+              letterSpacing: "0.15em",
+              color: T.danger,
               marginBottom: 4,
               textTransform: "uppercase",
-              fontFamily: F.body,
+              fontFamily: T.font,
             }}
           >
             Unmatched Items
@@ -1085,8 +1145,8 @@ function ReviewPanel({
               key={i}
               style={{
                 fontSize: 10,
-                color: C.red,
-                fontFamily: F.body,
+                color: T.danger,
+                fontFamily: T.font,
                 marginBottom: 2,
               }}
             >
@@ -1099,20 +1159,21 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Confirmed banner */}
       {doc.status === "confirmed" && doc.applied_updates && (
         <div
           style={{
             padding: "10px 14px",
-            background: C.lightGreen,
-            borderTop: `1px solid ${C.border}`,
+            background: T.accentLit,
+            borderTop: `1px solid ${T.ink075}`,
           }}
         >
           <div
             style={{
               fontSize: 10,
               fontWeight: 700,
-              color: C.mid,
-              fontFamily: F.body,
+              color: T.accentMid,
+              fontFamily: T.font,
             }}
           >
             ✅ Applied {doc.applied_updates.length} update
@@ -1122,9 +1183,9 @@ function ReviewPanel({
             <div
               style={{
                 fontSize: 9,
-                color: C.muted,
+                color: T.ink400,
                 marginTop: 2,
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               {fmtDateTime(doc.confirmed_at)}
@@ -1133,20 +1194,21 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Rejected banner */}
       {doc.status === "rejected" && (
         <div
           style={{
             padding: "10px 14px",
-            background: C.lightRed,
-            borderTop: `1px solid ${C.border}`,
+            background: T.dangerBg,
+            borderTop: `1px solid ${T.ink075}`,
           }}
         >
           <div
             style={{
               fontSize: 10,
               fontWeight: 700,
-              color: C.red,
-              fontFamily: F.body,
+              color: T.danger,
+              fontFamily: T.font,
             }}
           >
             ✗ Rejected
@@ -1155,9 +1217,9 @@ function ReviewPanel({
             <div
               style={{
                 fontSize: 10,
-                color: C.red,
+                color: T.danger,
                 marginTop: 2,
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               {doc.rejection_reason}
@@ -1166,30 +1228,31 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Re-open */}
       {(doc.status === "confirmed" ||
         doc.status === "partially_applied" ||
         doc.status === "rejected") && (
         <div
           style={{
             padding: "10px 14px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.cream,
+            borderTop: `1px solid ${T.ink150}`,
+            background: T.ink050,
           }}
         >
           <button
             onClick={() => onReopen && onReopen()}
             style={{
               width: "100%",
-              padding: "8px",
+              padding: 8,
               background: "transparent",
-              color: C.muted,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
+              color: T.ink400,
+              border: `1px solid ${T.ink150}`,
+              borderRadius: 4,
               fontSize: 10,
               fontWeight: 700,
               cursor: "pointer",
-              fontFamily: F.body,
-              letterSpacing: "0.1em",
+              fontFamily: T.font,
+              letterSpacing: "0.07em",
             }}
           >
             ↺ Re-open for Review
@@ -1197,19 +1260,20 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Reject form */}
       {rejecting && (
         <div
           style={{
             padding: "10px 14px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.lightRed,
+            borderTop: `1px solid ${T.ink075}`,
+            background: T.dangerBg,
           }}
         >
           <div
             style={{
               fontSize: 10,
-              color: C.red,
-              fontFamily: F.body,
+              color: T.danger,
+              fontFamily: T.font,
               marginBottom: 6,
             }}
           >
@@ -1223,10 +1287,10 @@ function ReviewPanel({
               width: "100%",
               boxSizing: "border-box",
               padding: 8,
-              border: `1px solid ${C.red}`,
-              borderRadius: 2,
+              border: `1px solid ${T.danger}`,
+              borderRadius: 4,
               fontSize: 11,
-              fontFamily: F.body,
+              fontFamily: T.font,
               minHeight: 60,
               resize: "vertical",
               outline: "none",
@@ -1241,15 +1305,15 @@ function ReviewPanel({
               }}
               style={{
                 flex: 1,
-                padding: "8px",
-                background: C.red,
-                color: C.white,
+                padding: 8,
+                background: T.danger,
+                color: "#fff",
                 border: "none",
-                borderRadius: 2,
+                borderRadius: 4,
                 fontSize: 10,
                 fontWeight: 700,
                 cursor: "pointer",
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               Confirm Reject
@@ -1259,12 +1323,12 @@ function ReviewPanel({
               style={{
                 padding: "8px 12px",
                 background: "transparent",
-                color: C.muted,
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
+                color: T.ink400,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 4,
                 fontSize: 10,
                 cursor: "pointer",
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               Cancel
@@ -1273,21 +1337,22 @@ function ReviewPanel({
         </div>
       )}
 
+      {/* Action buttons */}
       {!isReadOnly && !rejecting && !showSupplierForm && (
         <div
           style={{
             padding: "12px 14px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.cream,
+            borderTop: `1px solid ${T.ink150}`,
+            background: T.ink050,
           }}
         >
           {confirmError && (
             <div
               style={{
                 fontSize: 10,
-                color: C.red,
+                color: T.danger,
                 marginBottom: 8,
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               ⚠ {confirmError}
@@ -1298,8 +1363,8 @@ function ReviewPanel({
               style={{
                 textAlign: "center",
                 fontSize: 12,
-                color: C.mid,
-                fontFamily: F.body,
+                color: T.accentMid,
+                fontFamily: T.font,
                 fontWeight: 600,
               }}
             >
@@ -1313,15 +1378,15 @@ function ReviewPanel({
                 style={{
                   flex: 2,
                   padding: "10px 0",
-                  background: C.green,
-                  color: C.white,
+                  background: T.accent,
+                  color: "#fff",
                   border: "none",
-                  borderRadius: 2,
+                  borderRadius: 4,
                   fontSize: 10,
                   fontWeight: 700,
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.07em",
                   cursor: checkedUpdates.size === 0 ? "not-allowed" : "pointer",
-                  fontFamily: F.body,
+                  fontFamily: T.font,
                   opacity: confirming ? 0.7 : 1,
                 }}
               >
@@ -1336,13 +1401,13 @@ function ReviewPanel({
                   flex: 1,
                   padding: "10px 0",
                   background: "transparent",
-                  color: C.red,
-                  border: `1px solid ${C.red}`,
-                  borderRadius: 2,
+                  color: T.danger,
+                  border: `1px solid ${T.danger}`,
+                  borderRadius: 4,
                   fontSize: 10,
                   fontWeight: 700,
                   cursor: "pointer",
-                  fontFamily: F.body,
+                  fontFamily: T.font,
                 }}
               >
                 ✗ REJECT
@@ -1405,32 +1470,24 @@ function DocumentLogTable({ documents, onSelectDoc }) {
     URL.revokeObjectURL(url);
   };
 
-  const sInput = {
-    padding: "6px 10px",
-    border: `1px solid ${C.border}`,
-    borderRadius: 2,
-    fontSize: 12,
-    fontFamily: F.body,
-    outline: "none",
-    background: C.white,
-  };
   const sTh = {
     padding: "8px 12px",
     fontSize: 9,
-    fontWeight: 600,
-    letterSpacing: "0.2em",
+    fontWeight: 700,
+    letterSpacing: "0.12em",
     textTransform: "uppercase",
-    color: C.muted,
-    borderBottom: `2px solid ${C.border}`,
+    color: T.ink400,
+    borderBottom: `2px solid ${T.ink150}`,
     textAlign: "left",
-    fontFamily: F.body,
+    fontFamily: T.font,
+    background: T.ink075,
   };
   const sTd = {
     padding: "8px 12px",
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: `1px solid ${T.ink075}`,
     fontSize: 12,
-    fontFamily: F.body,
-    color: C.text,
+    fontFamily: T.font,
+    color: T.ink700,
     verticalAlign: "middle",
   };
 
@@ -1446,13 +1503,13 @@ function DocumentLogTable({ documents, onSelectDoc }) {
         }}
       >
         <input
-          style={{ ...sInput, width: 220 }}
+          style={{ ...inputStyle, width: 220 }}
           placeholder="Search supplier, filename…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          style={sInput}
+          style={inputStyle}
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
         >
@@ -1464,7 +1521,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
           ))}
         </select>
         <select
-          style={sInput}
+          style={inputStyle}
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
@@ -1476,22 +1533,14 @@ function DocumentLogTable({ documents, onSelectDoc }) {
           ))}
         </select>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: C.muted, fontFamily: F.body }}>
+        <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
           {filtered.length} records
         </span>
         <button
           onClick={exportCSV}
           style={{
+            ...makeBtn("transparent", T.accentMid),
             padding: "6px 14px",
-            background: "transparent",
-            color: C.mid,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            fontSize: 10,
-            fontWeight: 700,
-            cursor: "pointer",
-            fontFamily: F.body,
-            letterSpacing: "0.1em",
           }}
         >
           ↓ Export CSV
@@ -1499,10 +1548,11 @@ function DocumentLogTable({ documents, onSelectDoc }) {
       </div>
       <div
         style={{
-          background: C.white,
-          border: `1px solid ${C.border}`,
-          borderRadius: 2,
+          background: "#fff",
+          border: `1px solid ${T.ink150}`,
+          borderRadius: 6,
           overflowX: "auto",
+          boxShadow: T.shadow,
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1532,7 +1582,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   style={{
                     ...sTd,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink400,
                     padding: 40,
                   }}
                 >
@@ -1545,7 +1595,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   key={doc.id}
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "#f8fdf9")
+                    (e.currentTarget.style.background = T.accentLit)
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.background = "transparent")
@@ -1558,7 +1608,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   </td>
                   <td style={sTd}>
                     {doc.supplier_name || (
-                      <span style={{ color: C.muted }}>—</span>
+                      <span style={{ color: T.ink400 }}>—</span>
                     )}
                   </td>
                   <td
@@ -1568,7 +1618,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      color: C.muted,
+                      color: T.ink400,
                       fontSize: 11,
                     }}
                   >
@@ -1582,27 +1632,20 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   </td>
                   <td style={{ ...sTd, textAlign: "center" }}>
                     {doc.applied_updates?.length > 0 ? (
-                      <span style={{ color: C.mid, fontWeight: 600 }}>
+                      <span style={{ color: T.accentMid, fontWeight: 600 }}>
                         {doc.applied_updates.length}
                       </span>
                     ) : (
-                      <span style={{ color: C.muted }}>—</span>
+                      <span style={{ color: T.ink400 }}>—</span>
                     )}
                   </td>
                   <td style={sTd}>
                     <button
                       onClick={() => onSelectDoc(doc)}
                       style={{
+                        ...makeBtn("transparent", T.accentMid),
                         padding: "3px 10px",
-                        background: "transparent",
-                        color: C.mid,
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 2,
                         fontSize: 9,
-                        cursor: "pointer",
-                        fontFamily: F.body,
-                        letterSpacing: "0.1em",
-                        fontWeight: 600,
                       }}
                     >
                       Review →
@@ -1618,6 +1661,8 @@ function DocumentLogTable({ documents, onSelectDoc }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function HQDocuments({ initialDocId = null }) {
   const [view, setView] = useState("review");
@@ -1672,19 +1717,19 @@ export default function HQDocuments({ initialDocId = null }) {
       await Promise.all([
         supabase
           .from("suppliers")
-          .select("id, name, country, currency")
+          .select("id,name,country,currency")
           .eq("is_active", true),
         supabase
           .from("supplier_products")
-          .select("id, name, sku, category, unit_price_usd, supplier_id")
+          .select("id,name,sku,category,unit_price_usd,supplier_id")
           .eq("is_active", true),
         supabase
           .from("inventory_items")
-          .select("id, name, sku, category, quantity_on_hand")
+          .select("id,name,sku,category,quantity_on_hand")
           .eq("is_active", true),
         supabase
           .from("purchase_orders")
-          .select("id, po_number, supplier_id, po_status, expected_arrival")
+          .select("id,po_number,supplier_id,po_status,expected_arrival")
           .in("po_status", ["ordered", "in_transit", "customs"]),
       ]);
     return {
@@ -1802,7 +1847,7 @@ export default function HQDocuments({ initialDocId = null }) {
                 if (ref) {
                   const { data: matchedPO } = await supabase
                     .from("purchase_orders")
-                    .select("id, po_number")
+                    .select("id,po_number")
                     .eq("supplier_id", exData.supplier.matched_id)
                     .eq("po_number", ref)
                     .maybeSingle();
@@ -1945,7 +1990,7 @@ export default function HQDocuments({ initialDocId = null }) {
         notes: supplierData.notes.trim() || null,
         is_active: true,
       })
-      .select("id, name")
+      .select("id,name")
       .single();
     if (insErr) throw new Error(insErr.message);
     await supabase
@@ -1993,14 +2038,13 @@ export default function HQDocuments({ initialDocId = null }) {
             poHeader.order_date = new Date().toISOString().split("T")[0];
           if (!poHeader.po_number)
             poHeader.po_number = `PO-DOC-${Date.now().toString().slice(-8)}`;
-          if (!poHeader.supplier_id) {
+          if (!poHeader.supplier_id)
             poHeader.supplier_id =
               data.supplier?.id ||
               data.supplier?.matched_id ||
               extraction.supplier?.matched_id ||
               selectedDoc.supplier_id ||
               null;
-          }
           if (!poHeader.supplier_id)
             throw new Error(
               "supplier_id could not be resolved — cannot insert PO without a supplier",
@@ -2020,12 +2064,8 @@ export default function HQDocuments({ initialDocId = null }) {
                 .single();
               if (fetchErr || !existingPO) throw poErr;
               newPO = existingPO;
-            } else {
-              throw poErr;
-            }
-          } else {
-            newPO = insertedPO;
-          }
+            } else throw poErr;
+          } else newPO = insertedPO;
           if (items?.length && newPO?.id) {
             const poItems = items
               .map((item) => ({ ...normalisePOItem(item), po_id: newPO.id }))
@@ -2128,7 +2168,7 @@ export default function HQDocuments({ initialDocId = null }) {
           const { data: newProduct, error: spErr } = await supabase
             .from(table)
             .insert(data)
-            .select("id, name, sku, category, unit_price_usd, supplier_id")
+            .select("id,name,sku,category,unit_price_usd,supplier_id")
             .single();
           if (spErr) throw spErr;
           const productNameLower = (
@@ -2221,14 +2261,12 @@ export default function HQDocuments({ initialDocId = null }) {
             shippingUpdate.shipping_mode = data.shipping_mode;
           const { data: poRow, error: poFetchErr } = await supabase
             .from("purchase_orders")
-            .select(
-              "subtotal, usd_zar_rate, clearance_fee_usd, shipping_cost_usd",
-            )
+            .select("subtotal,usd_zar_rate,clearance_fee_usd,shipping_cost_usd")
             .eq("id", record_id)
             .single();
           if (!poFetchErr && poRow) {
-            const fxR = parseFloat(poRow.usd_zar_rate) || fxRate;
-            const subtotal = parseFloat(poRow.subtotal) || 0;
+            const fxR = parseFloat(poRow.usd_zar_rate) || fxRate,
+              subtotal = parseFloat(poRow.subtotal) || 0;
             const newShipping =
               shippingUpdate.shipping_cost_usd != null
                 ? shippingUpdate.shipping_cost_usd
@@ -2255,9 +2293,7 @@ export default function HQDocuments({ initialDocId = null }) {
             .update(data)
             .eq("id", record_id);
           if (error) throw error;
-        } else {
-          throw new Error(`No record_id for update action on ${table}`);
-        }
+        } else throw new Error(`No record_id for update action on ${table}`);
         appliedUpdates.push(update);
       } catch (err) {
         console.error("[handleConfirm] failed update:", err.message, update);
@@ -2298,7 +2334,6 @@ export default function HQDocuments({ initialDocId = null }) {
       .eq("id", selectedDoc.id);
     await fetchDocuments();
   };
-
   const handleReopen = async () => {
     if (!selectedDoc) return;
     await supabase
@@ -2320,8 +2355,8 @@ export default function HQDocuments({ initialDocId = null }) {
     uploadState === "uploading" || uploadState === "processing";
 
   return (
-    <div style={{ fontFamily: F.body, position: "relative" }}>
-      {/* WP-GUIDE-C+: WorkflowGuide with live documents context */}
+    <div style={{ fontFamily: T.font, position: "relative" }}>
+      {/* WP-GUIDE-C+: WorkflowGuide with live documents context — PRESERVED */}
       <WorkflowGuide
         context={ctx}
         tabId="documents"
@@ -2329,6 +2364,7 @@ export default function HQDocuments({ initialDocId = null }) {
         defaultOpen={true}
       />
 
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -2342,15 +2378,16 @@ export default function HQDocuments({ initialDocId = null }) {
         <div>
           <h2
             style={{
-              fontFamily: F.heading,
-              color: C.green,
-              fontSize: 24,
-              margin: 0,
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
             Document Ingestion
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}>
             Upload any business document · AI extracts data · Review and confirm
             DB updates
           </div>
@@ -2358,14 +2395,14 @@ export default function HQDocuments({ initialDocId = null }) {
         <div
           style={{
             display: "flex",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
             overflow: "hidden",
           }}
         >
           {[
-            { id: "review", label: "📋 Review" },
-            { id: "log", label: "📜 History" },
+            { id: "review", label: "Review" },
+            { id: "log", label: "History" },
           ].map((t) => (
             <button
               key={t.id}
@@ -2375,13 +2412,13 @@ export default function HQDocuments({ initialDocId = null }) {
                 border: "none",
                 fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.07em",
                 textTransform: "uppercase",
                 cursor: "pointer",
-                fontFamily: F.body,
+                fontFamily: T.font,
                 transition: "all 0.15s",
-                background: view === t.id ? C.green : C.white,
-                color: view === t.id ? C.white : C.muted,
+                background: view === t.id ? T.accent : "#fff",
+                color: view === t.id ? "#fff" : T.ink400,
               }}
             >
               {t.label}
@@ -2390,17 +2427,18 @@ export default function HQDocuments({ initialDocId = null }) {
         </div>
       </div>
 
+      {/* Initial doc navigation banner */}
       {initialDocId && selectedDoc && (
         <div
           style={{
             padding: "10px 16px",
-            background: C.lightPurple,
-            border: `1px solid ${C.purple}`,
-            borderRadius: 2,
+            background: "#f5eef8",
+            border: `1px solid #6c3483`,
+            borderRadius: 6,
             marginBottom: 16,
             fontSize: 12,
-            color: C.purple,
-            fontFamily: F.body,
+            color: "#6c3483",
+            fontFamily: T.font,
             display: "flex",
             alignItems: "center",
             gap: 8,
@@ -2412,57 +2450,73 @@ export default function HQDocuments({ initialDocId = null }) {
         </div>
       )}
 
+      {/* Flush stat grid */}
       <div
-        style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 8,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 20,
+        }}
       >
         {[
-          { label: "Total Documents", value: documents.length, color: C.green },
+          {
+            label: "Total Documents",
+            value: documents.length,
+            color: T.accent,
+          },
           {
             label: "Pending Review",
             value: documents.filter((d) => d.status === "pending_review")
               .length,
-            color: C.amber,
+            color: T.warning,
           },
           {
             label: "Confirmed",
             value: documents.filter((d) => d.status === "confirmed").length,
-            color: C.accent,
+            color: T.accentMid,
           },
           {
             label: "Rejected",
             value: documents.filter((d) => d.status === "rejected").length,
-            color: C.red,
+            color: T.danger,
           },
         ].map((s) => (
           <div
             key={s.label}
             style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: "12px 16px",
-              flex: "1 1 140px",
-              minWidth: 120,
+              background: "#fff",
+              padding: "14px 16px",
+              textAlign: "center",
             }}
           >
             <div
               style={{
-                fontSize: 24,
-                fontWeight: 700,
-                fontFamily: F.heading,
+                fontSize: 22,
+                fontWeight: 400,
                 color: s.color,
                 lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
+                fontFamily: T.font,
               }}
             >
               {s.value}
             </div>
             <div
               style={{
-                fontSize: 9,
-                letterSpacing: "0.15em",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: C.muted,
-                marginTop: 4,
+                color: T.ink400,
+                marginTop: 6,
+                fontFamily: T.font,
               }}
             >
               {s.label}
@@ -2471,6 +2525,7 @@ export default function HQDocuments({ initialDocId = null }) {
         ))}
       </div>
 
+      {/* ── HISTORY VIEW ── */}
       {view === "log" ? (
         <DocumentLogTable
           documents={documents}
@@ -2480,22 +2535,24 @@ export default function HQDocuments({ initialDocId = null }) {
           }}
         />
       ) : (
+        /* ── REVIEW VIEW ── */
         <div
           style={{
             display: "flex",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            background: C.white,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 8,
+            background: "#fff",
             minHeight: 600,
             overflow: "hidden",
+            boxShadow: T.shadow,
           }}
         >
-          {/* LEFT PANEL */}
+          {/* Left panel */}
           <div
             style={{
               width: 220,
               minWidth: 220,
-              borderRight: `1px solid ${C.border}`,
+              borderRight: `1px solid ${T.ink150}`,
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",
@@ -2504,8 +2561,8 @@ export default function HQDocuments({ initialDocId = null }) {
             <div
               style={{
                 padding: 10,
-                borderBottom: `1px solid ${C.border}`,
-                background: C.cream,
+                borderBottom: `1px solid ${T.ink150}`,
+                background: T.ink050,
               }}
             >
               <div style={{ marginBottom: 8 }}>
@@ -2516,12 +2573,12 @@ export default function HQDocuments({ initialDocId = null }) {
                   style={{
                     width: "100%",
                     padding: "5px 8px",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 2,
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 4,
                     fontSize: 11,
-                    fontFamily: F.body,
-                    background: C.white,
-                    color: C.text,
+                    fontFamily: T.font,
+                    background: "#fff",
+                    color: T.ink700,
                     cursor: "pointer",
                   }}
                 >
@@ -2546,7 +2603,7 @@ export default function HQDocuments({ initialDocId = null }) {
                     <div
                       style={{
                         height: 4,
-                        background: C.border,
+                        background: T.ink150,
                         borderRadius: 2,
                         overflow: "hidden",
                         marginBottom: 6,
@@ -2557,7 +2614,7 @@ export default function HQDocuments({ initialDocId = null }) {
                           height: "100%",
                           borderRadius: 2,
                           width: `${uploadProgress}%`,
-                          background: C.accent,
+                          background: T.accentMid,
                           transition: "width 0.4s ease",
                         }}
                       />
@@ -2566,14 +2623,14 @@ export default function HQDocuments({ initialDocId = null }) {
                   <div
                     style={{
                       fontSize: 10,
-                      fontFamily: F.body,
+                      fontFamily: T.font,
                       textAlign: "center",
                       color:
                         uploadState === "error"
-                          ? C.red
+                          ? T.danger
                           : uploadState === "done"
-                            ? C.mid
-                            : C.muted,
+                            ? T.accentMid
+                            : T.ink400,
                     }}
                   >
                     {uploadState === "error"
@@ -2592,8 +2649,9 @@ export default function HQDocuments({ initialDocId = null }) {
                   style={{
                     padding: 20,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink400,
                     fontSize: 12,
+                    fontFamily: T.font,
                   }}
                 >
                   Loading…
@@ -2603,8 +2661,9 @@ export default function HQDocuments({ initialDocId = null }) {
                   style={{
                     padding: 20,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink400,
                     fontSize: 12,
+                    fontFamily: T.font,
                   }}
                 >
                   No documents yet.
@@ -2624,7 +2683,7 @@ export default function HQDocuments({ initialDocId = null }) {
             </div>
           </div>
 
-          {/* CENTRE PANEL */}
+          {/* Centre panel */}
           <div
             style={{
               flex: 1,
@@ -2638,8 +2697,8 @@ export default function HQDocuments({ initialDocId = null }) {
                 <div
                   style={{
                     padding: "10px 16px",
-                    borderBottom: `1px solid ${C.border}`,
-                    background: C.cream,
+                    borderBottom: `1px solid ${T.ink150}`,
+                    background: T.ink050,
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
@@ -2653,8 +2712,8 @@ export default function HQDocuments({ initialDocId = null }) {
                       style={{
                         fontSize: 12,
                         fontWeight: 600,
-                        color: C.text,
-                        fontFamily: F.body,
+                        color: T.ink700,
+                        fontFamily: T.font,
                       }}
                     >
                       {selectedDoc.file_name}
@@ -2662,8 +2721,8 @@ export default function HQDocuments({ initialDocId = null }) {
                     <div
                       style={{
                         fontSize: 10,
-                        color: C.muted,
-                        fontFamily: F.body,
+                        color: T.ink400,
+                        fontFamily: T.font,
                       }}
                     >
                       {selectedDoc.file_size_kb
@@ -2679,13 +2738,13 @@ export default function HQDocuments({ initialDocId = null }) {
                       rel="noopener noreferrer"
                       style={{
                         fontSize: 10,
-                        color: C.blue,
+                        color: T.info,
                         fontWeight: 600,
                         textDecoration: "none",
-                        fontFamily: F.body,
+                        fontFamily: T.font,
                         padding: "4px 10px",
-                        border: `1px solid ${C.blue}`,
-                        borderRadius: 2,
+                        border: `1px solid ${T.infoBd}`,
+                        borderRadius: 4,
                       }}
                     >
                       ↗ Open
@@ -2707,8 +2766,9 @@ export default function HQDocuments({ initialDocId = null }) {
                         alignItems: "center",
                         justifyContent: "center",
                         height: "100%",
-                        color: C.muted,
+                        color: T.ink400,
                         fontSize: 13,
+                        fontFamily: T.font,
                       }}
                     >
                       Loading preview…
@@ -2748,12 +2808,20 @@ export default function HQDocuments({ initialDocId = null }) {
                         alignItems: "center",
                         justifyContent: "center",
                         height: "100%",
-                        color: C.muted,
+                        color: T.ink400,
                       }}
                     >
                       <div style={{ fontSize: 36, marginBottom: 10 }}>🔒</div>
-                      <div style={{ fontSize: 13 }}>Preview unavailable</div>
-                      <div style={{ fontSize: 11, marginTop: 4 }}>
+                      <div style={{ fontSize: 13, fontFamily: T.font }}>
+                        Preview unavailable
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          marginTop: 4,
+                          fontFamily: T.font,
+                        }}
+                      >
                         File stored securely
                       </div>
                     </div>
@@ -2768,7 +2836,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: C.muted,
+                  color: T.ink400,
                   textAlign: "center",
                   padding: 40,
                 }}
@@ -2776,22 +2844,23 @@ export default function HQDocuments({ initialDocId = null }) {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
                 <div
                   style={{
-                    fontFamily: F.heading,
-                    fontSize: 20,
-                    color: C.green,
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: T.accent,
                     marginBottom: 8,
+                    fontFamily: T.font,
                   }}
                 >
                   No Document Selected
                 </div>
-                <div style={{ fontSize: 13 }}>
+                <div style={{ fontSize: 13, fontFamily: T.font }}>
                   Upload a document or select one from the list to review it.
                 </div>
               </div>
             )}
           </div>
 
-          {/* RIGHT PANEL */}
+          {/* Right panel */}
           {selectedDoc ? (
             <ReviewPanel
               doc={selectedDoc}
@@ -2808,13 +2877,13 @@ export default function HQDocuments({ initialDocId = null }) {
               style={{
                 width: 320,
                 minWidth: 320,
-                borderLeft: `1px solid ${C.border}`,
+                borderLeft: `1px solid ${T.ink150}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: C.muted,
+                color: T.ink400,
                 fontSize: 12,
-                fontFamily: F.body,
+                fontFamily: T.font,
                 textAlign: "center",
                 padding: 20,
               }}
