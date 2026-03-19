@@ -1314,6 +1314,21 @@ export default function AdminShipments() {
     setTimeout(() => setToast(""), 3000);
   }, []);
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "shipments",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -1328,7 +1343,8 @@ export default function AdminShipments() {
           .select("id,name,sku,sell_price,is_active,unit")
           .eq("is_active", true),
       ]);
-      setShipments(shpRes.data || []);
+      const fetchedShipments = shpRes.data || [];
+      setShipments(fetchedShipments);
       setInventoryItems(invRes.data || []);
       const map = {};
       for (const item of itemsRes.data || []) {
@@ -1336,6 +1352,39 @@ export default function AdminShipments() {
         map[item.shipment_id].push(item);
       }
       setItemsMap(map);
+
+      // GAP-02: fire alerts for overdue + disputed shipments
+      const now = new Date();
+      const overdue = fetchedShipments.filter(
+        (s) =>
+          s.estimated_arrival &&
+          new Date(s.estimated_arrival) < now &&
+          !["delivered", "confirmed", "cancelled"].includes(s.status),
+      );
+      const disputed = fetchedShipments.filter((s) => s.status === "disputed");
+      if (overdue.length > 0) {
+        writeAlert(
+          "shipment_overdue",
+          "warning",
+          `${overdue.length} shipment${overdue.length > 1 ? "s" : ""} past estimated arrival`,
+          overdue
+            .map(
+              (s) =>
+                `${s.shipment_number} → ${s.destination_name} (ETA ${s.estimated_arrival?.split("T")[0]})`,
+            )
+            .join(" · "),
+        );
+      }
+      if (disputed.length > 0) {
+        writeAlert(
+          "shipment_disputed",
+          "warning",
+          `${disputed.length} shipment${disputed.length > 1 ? "s" : ""} disputed`,
+          disputed
+            .map((s) => `${s.shipment_number} → ${s.destination_name}`)
+            .join(" · "),
+        );
+      }
     } catch (err) {
       console.error("fetchAll error:", err);
     } finally {
