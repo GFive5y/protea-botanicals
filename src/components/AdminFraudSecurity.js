@@ -521,6 +521,21 @@ export default function AdminFraudSecurity() {
     setTimeout(() => setToast(""), 3200);
   };
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "scans",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -568,6 +583,19 @@ export default function AdminFraudSecurity() {
     }
     setRunning(false);
     showToast(`${flagged} scans auto-flagged and saved`);
+    if (flagged > 0) {
+      writeAlert(
+        "high_anomaly",
+        "warning",
+        `${flagged} suspicious scan pattern${flagged > 1 ? "s" : ""} auto-flagged`,
+        `Auto-detection run flagged ${flagged} scan${flagged > 1 ? "s" : ""} across ${Object.keys(
+          detections.reduce((a, d) => {
+            a[d.reason] = true;
+            return a;
+          }, {}),
+        ).join(", ")} rules.`,
+      );
+    }
     fetchAll();
   };
 
@@ -576,6 +604,14 @@ export default function AdminFraudSecurity() {
       .from("scans")
       .update({ scan_flagged: flagged, flag_reason: reason })
       .eq("id", scanId);
+    if (flagged && reason) {
+      writeAlert(
+        "account_flagged",
+        "warning",
+        `Scan manually flagged — ${reason}`,
+        `Scan ID ${scanId.slice(0, 8)}… flagged by admin. Reason: ${reason}.`,
+      );
+    }
     showToast(`Scan ${flagged ? "flagged" : "cleared"}`);
     fetchAll();
   };
