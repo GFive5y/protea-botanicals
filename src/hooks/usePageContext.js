@@ -577,9 +577,9 @@ const CONTEXT_QUERIES = {
         .gte("created_at", thisMonthIso),
       sb
         .from("loyalty_transactions")
-        .select("points_change, transaction_date")
-        .eq("transaction_type", "redemption")
-        .gte("transaction_date", thisMonthIso),
+        .select("points, created_at")
+        .in("transaction_type", ["REDEEMED", "redeemed", "REDEEMED_POINTS"])
+        .gte("created_at", thisMonthIso),
     ]);
 
     const orders = safeData(ordersRes);
@@ -590,7 +590,7 @@ const CONTEXT_QUERIES = {
     const avgOrder = orderCount > 0 ? revenue / orderCount : 0;
     const redemptionCount = redemptions.length;
     const pointsRedeemed = redemptions.reduce(
-      (sum, r) => sum + Math.abs(safeFloat(r.points_change)),
+      (sum, r) => sum + Math.abs(safeFloat(r.points)),
       0,
     );
 
