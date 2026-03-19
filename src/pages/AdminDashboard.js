@@ -516,7 +516,7 @@ export default function AdminDashboard() {
         supabase
           .from("loyalty_transactions")
           .select("points")
-          .gte("transaction_date", iso)
+          .gte("created_at", iso)
           .not("transaction_type", "in", '("SPENT","REDEEMED")'),
         supabase
           .from("user_profiles")
@@ -1349,7 +1349,7 @@ export default function AdminDashboard() {
           initialTab={qrInitialBatchId ? "generate" : "registry"}
         />
       )}
-      {tab === "analytics" && <AdminAnalytics />}
+      {tab === "analytics" && <AdminAnalytics tenantId={tenantId} />}
       {tab === "stock" && <StockControl />}
       {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
       {tab === "hr" && <AdminHRPanel tenantId={tenantId} />}
