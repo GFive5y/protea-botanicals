@@ -1,9 +1,12 @@
-// src/components/AdminFraudSecurity.js v1.1
+// src/components/AdminFraudSecurity.js v1.2
+// WP-GUIDE: WorkflowGuide + usePageContext added
 // WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // v1.0 — March 2026 · WP8 — Fraud Detection, Security & POPIA
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -484,6 +487,7 @@ function EraseModal({ customer, onClose, onConfirm }) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminFraudSecurity() {
+  const ctx = usePageContext("security", null);
   const [activeTab, setActiveTab] = useState("fraud");
   const [scans, setScans] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -706,6 +710,12 @@ export default function AdminFraudSecurity() {
 
   return (
     <div style={{ fontFamily: T.font, position: "relative" }}>
+      <WorkflowGuide
+        context={ctx}
+        tabId="security"
+        onAction={() => {}}
+        defaultOpen={false}
+      />
       {/* Toast */}
       {toast && (
         <div
