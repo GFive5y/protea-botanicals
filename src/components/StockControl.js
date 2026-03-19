@@ -269,6 +269,7 @@ function isLiveInShop(item) {
 export default function StockControl() {
   const [subTab, setSubTab] = useState("overview");
   const [items, setItems] = useState([]);
+  const [stockAlerts, setStockAlerts] = useState([]);
   const ctx = usePageContext("admin-stock", null);
   const [movements, setMovements] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -370,6 +371,33 @@ export default function StockControl() {
     fetchAll();
   }, [fetchAll]);
 
+  // GAP-02: read system_alerts for stock types
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("system_alerts")
+        .select("id,title,body,severity,status,created_at")
+        .in("alert_type", ["stock_depleted", "reorder_threshold"])
+        .in("status", ["open", "acknowledged"])
+        .order("created_at", { ascending: false })
+        .limit(5);
+      setStockAlerts(data || []);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    fetchAlerts();
+    const sub = supabase
+      .channel("admin-stock-alerts")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "system_alerts" },
+        fetchAlerts,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchAlerts]);
+
   const TABS = [
     { id: "overview", label: "Overview" },
     { id: "items", label: "Items" },
@@ -403,6 +431,72 @@ export default function StockControl() {
         onAction={() => {}}
         defaultOpen={true}
       />
+
+      {/* GAP-02: Stock alert banners */}
+      {stockAlerts.map((a) => {
+        const sev = {
+          critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
+          warning: { bg: T.warningBg, bd: T.warningBd, color: T.warning },
+          info: { bg: T.infoBg, bd: T.infoBd, color: T.info },
+        }[a.severity] || { bg: T.ink075, bd: T.ink150, color: T.ink700 };
+        return (
+          <div
+            key={a.id}
+            style={{
+              background: sev.bg,
+              border: `1px solid ${sev.bd}`,
+              borderRadius: 6,
+              padding: "10px 14px",
+              marginBottom: 10,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: sev.color,
+                  fontFamily: T.fontUi,
+                }}
+              >
+                {a.title}
+              </div>
+              {a.body && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.ink700,
+                    fontFamily: T.fontUi,
+                    marginTop: 2,
+                  }}
+                >
+                  {a.body}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                await supabase
+                  .from("system_alerts")
+                  .update({ status: "acknowledged" })
+                  .eq("id", a.id);
+                fetchAlerts();
+              }}
+              style={{
+                ...sBtn("outline"),
+                fontSize: 9,
+                padding: "3px 8px",
+                flexShrink: 0,
+              }}
+            >
+              Ack
+            </button>
+          </div>
+        );
+      })}
 
       {/* Sub-tab bar — standard underline style */}
       <div
