@@ -276,6 +276,21 @@ export default function StockControl() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "inventory_items",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -302,10 +317,47 @@ export default function StockControl() {
       if (mR.error) throw mR.error;
       if (sR.error) throw sR.error;
       if (oR.error) throw oR.error;
-      setItems(iR.data || []);
+      const fetchedItems = iR.data || [];
+      setItems(fetchedItems);
       setMovements(mR.data || []);
       setSuppliers(sR.data || []);
       setOrders(oR.data || []);
+
+      // GAP-02: fire alerts for depleted + low stock
+      const active = fetchedItems.filter((i) => i.is_active);
+      const depleted = active.filter(
+        (i) => parseFloat(i.quantity_on_hand || 0) <= 0,
+      );
+      const lowStock = active.filter(
+        (i) =>
+          parseFloat(i.reorder_level || 0) > 0 &&
+          parseFloat(i.quantity_on_hand || 0) <=
+            parseFloat(i.reorder_level || 0) &&
+          parseFloat(i.quantity_on_hand || 0) > 0,
+      );
+      if (depleted.length > 0) {
+        writeAlert(
+          "stock_depleted",
+          "critical",
+          `${depleted.length} item${depleted.length > 1 ? "s" : ""} out of stock`,
+          depleted
+            .map((i) => `${i.name} (${i.sku}): 0 ${i.unit || "units"}`)
+            .join(" · "),
+        );
+      }
+      if (lowStock.length > 0) {
+        writeAlert(
+          "reorder_threshold",
+          "warning",
+          `${lowStock.length} item${lowStock.length > 1 ? "s" : ""} below reorder level`,
+          lowStock
+            .map(
+              (i) =>
+                `${i.name}: ${i.quantity_on_hand} ${i.unit || "units"} (min ${i.reorder_level})`,
+            )
+            .join(" · "),
+        );
+      }
     } catch (err) {
       console.error("[StockControl] Fetch error:", err);
       setError(err.message);
