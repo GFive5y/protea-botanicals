@@ -261,7 +261,7 @@ export default function Loyalty() {
         .select("id, subject, content, type")
         .eq("user_id", user.id)
         .in("type", ["referral_reward", "tier_upgrade", "streak_bonus"])
-        .eq("read", false)
+        .is("read_at", null)
         .gte("created_at", sevenDaysAgo)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -1194,6 +1194,8 @@ export default function Loyalty() {
             gap: 0,
             borderBottom: "1px solid #e8e0d4",
             marginBottom: 24,
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
           }}
         >
           {[
@@ -1221,6 +1223,7 @@ export default function Loyalty() {
                 textTransform: "uppercase",
                 color: activeTab === tab.key ? C.green : C.muted,
                 fontFamily: F.body,
+                whiteSpace: "nowrap",
               }}
             >
               {tab.label}
