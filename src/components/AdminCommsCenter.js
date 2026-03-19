@@ -1,12 +1,15 @@
-// src/components/AdminCommsCenter.js v1.3
+// src/components/AdminCommsCenter.js v1.4
+// WP-VIZ: flush stat grid + Activity Donut + Top Customers HBar
 // WP-VISUAL: T tokens, Inter font, underline channel tabs, no Cormorant/Jost
 // WP-GUIDE-C++: usePageContext 'comms' wired + WorkflowGuide added
 // v1.2 — WorkflowGuide · v1.1 — Ticket threads, Templates, Broadcast
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "./viz";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -2205,6 +2208,253 @@ export default function AdminCommsCenter() {
         defaultOpen={true}
       />
       {headerRow}
+
+      {/* ── WP-VIZ: flush stat grid + charts ── */}
+      {!custLoading && (
+        <>
+          {/* Flush stat grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
+              gap: "1px",
+              background: T.ink150,
+              borderRadius: 8,
+              overflow: "hidden",
+              border: `1px solid ${T.ink150}`,
+              boxShadow: T.shadow,
+              marginBottom: 16,
+            }}
+          >
+            {[
+              {
+                label: "Conversations",
+                value: customerList.length,
+                color: T.accent,
+              },
+              {
+                label: "Unread",
+                value: custUnread,
+                color: custUnread > 0 ? T.danger : T.ink400,
+              },
+              {
+                label: "Open Tickets",
+                value: customerList.reduce((s, c) => s + c.openTickets, 0),
+                color: T.warning,
+              },
+              { label: "Partners", value: partners.length, color: T.info },
+              {
+                label: "Partner Unread",
+                value: partUnread,
+                color: partUnread > 0 ? T.danger : T.ink400,
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{
+                  background: "#fff",
+                  padding: "14px 16px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    marginBottom: 6,
+                    fontFamily: T.font,
+                  }}
+                >
+                  {s.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.font,
+                    fontSize: 22,
+                    fontWeight: 400,
+                    color: s.color,
+                    lineHeight: 1,
+                    letterSpacing: "-0.02em",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {s.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts — only when there's data */}
+          {customerList.length > 0 &&
+            (() => {
+              // Donut — customer activity status
+              const withUnread = customerList.filter(
+                (c) => c.unread > 0,
+              ).length;
+              const withTickets = customerList.filter(
+                (c) => c.openTickets > 0 && c.unread === 0,
+              ).length;
+              const clean = customerList.filter(
+                (c) => c.unread === 0 && c.openTickets === 0,
+              ).length;
+              const activityDonut = [
+                { name: "Unread Messages", value: withUnread, color: T.danger },
+                { name: "Open Tickets", value: withTickets, color: T.warning },
+                { name: "Up to Date", value: clean, color: T.success },
+              ].filter((d) => d.value > 0);
+
+              // HBar — top customers by combined activity (unread + open tickets)
+              const topCusts = [...customerList]
+                .map((c) => ({
+                  name: (
+                    c.profile?.full_name ||
+                    c.profile?.email ||
+                    "Anon"
+                  ).slice(0, 16),
+                  score: c.unread * 2 + c.openTickets,
+                }))
+                .filter((d) => d.score > 0)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 7);
+              const topMax = Math.max(...topCusts.map((d) => d.score), 1);
+
+              if (activityDonut.length === 0) return null;
+              return (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 16,
+                    marginBottom: 16,
+                  }}
+                >
+                  {/* Activity donut */}
+                  <ChartCard title="Customer Conversation Status" height={180}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={activityDonut}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={68}
+                          paddingAngle={3}
+                          isAnimationActive={false}
+                        >
+                          {activityDonut.map((d, i) => (
+                            <Cell key={i} fill={d.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={
+                            <ChartTooltip formatter={(v) => `${v} customers`} />
+                          }
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  {/* Top customers needing attention */}
+                  <ChartCard
+                    title="Needs Attention (Top Customers)"
+                    height={180}
+                  >
+                    {topCusts.length === 0 ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: "100%",
+                          fontSize: 13,
+                          color: T.success,
+                          fontFamily: T.font,
+                        }}
+                      >
+                        All conversations up to date
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: "8px 4px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                          height: "100%",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {topCusts.map((d) => (
+                          <div
+                            key={d.name}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: T.ink700,
+                                fontFamily: T.font,
+                                width: 90,
+                                flexShrink: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {d.name}
+                            </span>
+                            <div
+                              style={{
+                                flex: 1,
+                                height: 14,
+                                background: T.ink075,
+                                borderRadius: 3,
+                                overflow: "hidden",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: "100%",
+                                  width: `${(d.score / topMax) * 100}%`,
+                                  background:
+                                    d.score >= 4 ? T.danger : T.warning,
+                                  borderRadius: 3,
+                                  transition: "width 0.5s",
+                                }}
+                              />
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: T.ink400,
+                                fontFamily: T.font,
+                                minWidth: 16,
+                                textAlign: "right",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {d.score}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ChartCard>
+                </div>
+              );
+            })()}
+        </>
+      )}
+
       <ChannelTabs
         channel={channel}
         setChannel={setChannel}
