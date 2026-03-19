@@ -635,8 +635,24 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
     }
     setSaving(true);
     try {
+      // WP-R: resolve tenant_id so HQProduction can filter correctly
+      let tenantId = null;
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("tenant_id")
+            .eq("id", user.id)
+            .single();
+          tenantId = profile?.tenant_id || null;
+        }
+      } catch (_) {}
       const payload = {
         ...form,
+        tenant_id: tenantId,
         units_produced: form.units_produced
           ? parseInt(form.units_produced, 10)
           : null,
