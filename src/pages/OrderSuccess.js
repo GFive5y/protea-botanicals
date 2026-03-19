@@ -157,6 +157,15 @@ export default function OrderSuccess() {
         // 4. Calculate config-driven purchase points
         const purchasePts = calcPurchasePoints(total, cfg, tier);
 
+        // 5a. Read storedCode early — needed by idempotency guard below
+        const storedCode = (() => {
+          try {
+            return localStorage.getItem("protea_referral_code");
+          } catch (_) {
+            return null;
+          }
+        })();
+
         // 5. Idempotency guard — prevent double-award (React 18 StrictMode fires effects twice in dev)
         const { data: existingTxn } = await supabase
           .from("loyalty_transactions")
@@ -214,13 +223,6 @@ export default function OrderSuccess() {
         setPointsAwarded(purchasePts);
 
         // 6. Process referral code if present
-        const storedCode = (() => {
-          try {
-            return localStorage.getItem("protea_referral_code");
-          } catch (_) {
-            return null;
-          }
-        })();
 
         if (storedCode && total >= (cfg.referral_min_order_zar || 100)) {
           // Find referral code owner
