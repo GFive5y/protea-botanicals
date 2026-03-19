@@ -1,11 +1,9 @@
-// src/components/AdminQRCodes.js v2.2
+// src/components/AdminQRCodes.js v2.3
+// WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // WP-GUIDE-C: InfoTooltip injected — qr-claim-rate, qr-scan-actions, qr-hmac
-// v2.1: admin-qr context wired (WP-GUIDE-A)
-// v2.0: Full QR engine — 6 types, scan action stack, banner library, 3-step wizard
-// Replaces: AdminQrList.js (retired) + extracts generator from AdminQrGenerator.js
-//
-// Tabs: QR REGISTRY | GENERATE | BANNERS
-// Column note: existing DB column is `qr_type` (not `type`)
+// v2.2 — InfoTooltip injected
+// v2.1 — admin-qr context wired
+// v2.0 — Full QR engine: 6 types, scan action stack, banner library, 3-step wizard
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -18,33 +16,60 @@ const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
 
-// ── Design Tokens ────────────────────────────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
+// Legacy aliases
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  blue: "#2c4a6e",
+  blue: T.info,
   brown: "#7c3a10",
-  cream: "#faf9f6",
-  warm: "#f4f0e8",
-  border: "#e0dbd2",
-  muted: "#888",
+  cream: T.ink050,
+  warm: T.ink075,
+  border: T.ink150,
+  muted: T.ink400,
   white: "#fff",
-  text: "#1a1a1a",
-  error: "#c0392b",
-  success: "#27ae60",
-  warning: "#e67e22",
-  lightGreen: "#eafaf1",
-  lightRed: "#fdf0ef",
-  lightGold: "#fef9ec",
+  text: T.ink700,
+  error: T.danger,
+  success: T.success,
+  warning: T.warning,
+  lightGreen: T.accentLit,
+  lightRed: T.dangerBg,
+  lightGold: T.warningBg,
 };
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
-// ── QR Type definitions ──────────────────────────────────────────────────────
+// ─── QR TYPE DEFINITIONS ─────────────────────────────────────────────────────
 const QR_TYPES = [
   {
     value: "product_insert",
@@ -95,56 +120,56 @@ const QR_TYPES = [
     desc: "In-store POS card",
   },
 ];
-
 const TYPE_MAP = Object.fromEntries(QR_TYPES.map((t) => [t.value, t]));
 
-// ── Shared style helpers ─────────────────────────────────────────────────────
-const btn = (bg = C.mid, color = C.white, disabled = false) => ({
-  background: disabled ? C.muted : bg,
+// ─── STYLE HELPERS ────────────────────────────────────────────────────────────
+const mkBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
+  background: disabled ? T.ink300 : bg,
   color,
-  border: "none",
-  borderRadius: 2,
-  padding: "10px 20px",
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
+  padding: "9px 18px",
   fontSize: 11,
-  fontWeight: 600,
-  letterSpacing: "0.2em",
+  fontWeight: 700,
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
-  fontFamily: FONTS.body,
+  fontFamily: T.font,
   cursor: disabled ? "not-allowed" : "pointer",
   opacity: disabled ? 0.6 : 1,
-  transition: "opacity 0.18s",
+  transition: "opacity 0.15s",
 });
 const inputStyle = {
   width: "100%",
-  padding: "10px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
   fontSize: 13,
-  fontFamily: FONTS.body,
-  color: C.text,
-  background: C.white,
+  fontFamily: T.font,
+  color: T.ink700,
+  background: "#fff",
   boxSizing: "border-box",
   outline: "none",
 };
-const label = (mb = 8) => ({
+const sectionLabel = {
   fontSize: 10,
   fontWeight: 700,
-  letterSpacing: "0.3em",
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: C.accent,
-  fontFamily: FONTS.body,
-  marginBottom: mb,
+  color: T.ink400,
+  fontFamily: T.font,
+  marginBottom: 8,
   display: "block",
-});
-const card = (extra = {}) => ({
-  background: C.white,
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
+};
+const cardBase = (extra = {}) => ({
+  background: "#fff",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 8,
   padding: 20,
+  boxShadow: T.shadow,
   ...extra,
 });
 
-// ── HMAC signing helper ──────────────────────────────────────────────────────
+// ─── HMAC + CODE HELPERS ─────────────────────────────────────────────────────
 async function callSignQr(productCode, batchId) {
   const {
     data: { session },
@@ -163,11 +188,8 @@ async function callSignQr(productCode, batchId) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `HTTP ${res.status}`);
   }
-  const data = await res.json();
-  return data.signed_qr;
+  return (await res.json()).signed_qr;
 }
-
-// Generate a simple code for non-product types
 function genPromoCode(type, campaign) {
   const slug = campaign
     ? campaign
@@ -178,8 +200,6 @@ function genPromoCode(type, campaign) {
   const rand = Math.random().toString(36).substring(2, 7).toUpperCase();
   return `PB-${type.substring(0, 4).toUpperCase()}-${slug}-${rand}`;
 }
-
-// Fetch next product code number
 async function fetchNextCode() {
   try {
     const { data } = await supabase
@@ -188,7 +208,7 @@ async function fetchNextCode() {
       .like("qr_code", "PB-001-2026-%")
       .order("qr_code", { ascending: false })
       .limit(50);
-    if (!data || !data.length) return "0001";
+    if (!data?.length) return "0001";
     let max = 0;
     for (const p of data) {
       const parts = (p.qr_code || "").split(".")[0].split("-");
@@ -200,7 +220,6 @@ async function fetchNextCode() {
     return "0001";
   }
 }
-
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-ZA", {
@@ -210,8 +229,31 @@ function fmtDate(d) {
   });
 }
 
+// ─── BADGE HELPER ─────────────────────────────────────────────────────────────
+function Badge({ children, bg, color, border }) {
+  return (
+    <span
+      style={{
+        background: bg,
+        color,
+        border: `1px solid ${border || color + "40"}`,
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        padding: "3px 8px",
+        borderRadius: 20,
+        fontFamily: T.font,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// DETAIL PANEL (right slide-in)
+// DETAIL PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function DetailPanel({
   code,
@@ -265,11 +307,10 @@ function DetailPanel({
     : code.scan_actions
       ? JSON.parse(code.scan_actions)
       : [];
-
   const actionSummary = actions.map((a, i) => {
     switch (a.action) {
       case "award_points":
-        return `${i + 1}. Award ${a.points} pts${a.one_time ? " (one-time)" : ` (cooldown ${a.cooldown_hrs}h)`}`;
+        return `${i + 1}. Award ${a.points} pts${a.one_time ? " (one-time)" : `(cooldown ${a.cooldown_hrs}h)`}`;
       case "show_banner":
         return `${i + 1}. Show Banner`;
       case "show_product":
@@ -289,7 +330,6 @@ function DetailPanel({
 
   return (
     <>
-      {/* Overlay */}
       <div
         onClick={onClose}
         style={{
@@ -299,8 +339,6 @@ function DetailPanel({
           zIndex: 200,
         }}
       />
-
-      {/* Panel */}
       <div
         style={{
           position: "fixed",
@@ -308,12 +346,13 @@ function DetailPanel({
           right: 0,
           width: 380,
           height: "100vh",
-          background: C.white,
-          borderLeft: `1px solid ${C.border}`,
+          background: "#fff",
+          borderLeft: `1px solid ${T.ink150}`,
           overflowY: "auto",
           zIndex: 201,
           padding: 24,
           boxSizing: "border-box",
+          fontFamily: T.font,
         }}
       >
         {/* Header */}
@@ -326,18 +365,11 @@ function DetailPanel({
           }}
         >
           <div>
-            <div
-              style={{
-                fontSize: 18,
-                fontFamily: FONTS.heading,
-                color: C.green,
-                fontWeight: 600,
-              }}
-            >
+            <div style={{ fontSize: 16, fontWeight: 600, color: T.ink900 }}>
               {typeInfo.icon} {typeInfo.label}
             </div>
             {code.campaign_name && (
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: T.ink400, marginTop: 2 }}>
                 {code.campaign_name}
               </div>
             )}
@@ -349,7 +381,7 @@ function DetailPanel({
               border: "none",
               fontSize: 20,
               cursor: "pointer",
-              color: C.muted,
+              color: T.ink400,
               padding: 0,
             }}
           >
@@ -357,7 +389,7 @@ function DetailPanel({
           </button>
         </div>
 
-        {/* QR Image */}
+        {/* QR image */}
         <div
           id="dp-qr-svg"
           onClick={() => setShowFullscreen(true)}
@@ -366,8 +398,8 @@ function DetailPanel({
             cursor: "zoom-in",
             marginBottom: 16,
             padding: 16,
-            background: C.cream,
-            borderRadius: 2,
+            background: T.ink075,
+            borderRadius: 8,
           }}
         >
           <QRCodeSVG
@@ -376,14 +408,15 @@ function DetailPanel({
             level="H"
             includeMargin
             bgColor="#fff"
-            fgColor={C.green}
+            fgColor={T.accent}
           />
           <div
             style={{
               fontSize: 10,
-              color: C.muted,
+              color: T.ink400,
               marginTop: 6,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
+              fontFamily: T.font,
             }}
           >
             CLICK TO ENLARGE
@@ -400,52 +433,54 @@ function DetailPanel({
           }}
         >
           {code.hmac_signed && (
-            <span style={{ ...badgeSt(C.lightGreen, C.success) }}>
-              🔒 SIGNED
-            </span>
+            <Badge bg={T.successBg} color={T.success} border={T.successBd}>
+              SIGNED
+            </Badge>
           )}
-          <span
-            style={{
-              ...badgeSt(
-                code.is_active ? C.lightGreen : "#f5f5f5",
-                code.is_active ? C.success : C.muted,
-              ),
-            }}
+          <Badge
+            bg={code.is_active ? T.successBg : T.ink075}
+            color={code.is_active ? T.success : T.ink400}
           >
-            {code.is_active ? "● ACTIVE" : "○ PAUSED"}
-          </span>
-          <span style={{ ...badgeSt(C.cream, C.blue) }}>
+            {code.is_active ? "ACTIVE" : "PAUSED"}
+          </Badge>
+          <Badge bg={T.infoBg} color={T.info} border={T.infoBd}>
             {code.status || "in_stock"}
-          </span>
+          </Badge>
           {code.claimed && (
-            <span style={{ ...badgeSt("#f0f0ff", C.blue) }}>✓ CLAIMED</span>
+            <Badge bg={T.infoBg} color={T.info} border={T.infoBd}>
+              CLAIMED
+            </Badge>
           )}
         </div>
 
-        {/* QR Code string */}
+        {/* QR string */}
         <div style={{ marginBottom: 16 }}>
-          <span style={label()}>QR Code String</span>
+          <span style={sectionLabel}>QR Code String</span>
           <div
             style={{
               fontFamily: "monospace",
               fontSize: 10,
               wordBreak: "break-all",
               padding: "8px 10px",
-              background: C.cream,
-              borderRadius: 2,
-              border: `1px solid ${C.border}`,
+              background: T.ink075,
+              borderRadius: 4,
+              border: `1px solid ${T.ink150}`,
             }}
           >
             {code.qr_code}
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats grid */}
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 8,
+            gap: "1px",
+            background: T.ink150,
+            borderRadius: 6,
+            overflow: "hidden",
+            border: `1px solid ${T.ink150}`,
             marginBottom: 16,
           }}
         >
@@ -463,21 +498,14 @@ function DetailPanel({
             ["Max Scans", code.max_scans || "Unlimited"],
             ["Cooldown", code.cooldown_hrs ? `${code.cooldown_hrs}h` : "None"],
           ].map(([k, v]) => (
-            <div
-              key={k}
-              style={{
-                background: C.cream,
-                borderRadius: 2,
-                padding: "8px 10px",
-              }}
-            >
+            <div key={k} style={{ background: "#fff", padding: "10px 12px" }}>
               <div
                 style={{
                   fontSize: 9,
-                  letterSpacing: "0.15em",
+                  letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: C.muted,
-                  fontFamily: FONTS.body,
+                  color: T.ink400,
+                  fontFamily: T.font,
                 }}
               >
                 {k}
@@ -486,8 +514,9 @@ function DetailPanel({
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: C.green,
-                  fontFamily: FONTS.heading,
+                  color: T.accent,
+                  fontFamily: T.font,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {v}
@@ -496,49 +525,51 @@ function DetailPanel({
           ))}
         </div>
 
-        {/* Batch */}
+        {/* Linked batch */}
         {code.batches && (
           <div
             style={{
               marginBottom: 16,
               padding: "10px 12px",
-              background: C.lightGreen,
-              borderRadius: 2,
-              border: `1px solid ${C.accent}`,
+              background: T.accentLit,
+              borderRadius: 6,
+              border: `1px solid ${T.accentBd}`,
             }}
           >
             <div
               style={{
                 fontSize: 10,
-                color: C.mid,
+                color: T.accentMid,
                 fontWeight: 700,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
+                fontFamily: T.font,
               }}
             >
               Linked Batch
             </div>
-            <div style={{ fontSize: 13, color: C.green, fontWeight: 600 }}>
+            <div style={{ fontSize: 13, color: T.accent, fontWeight: 600 }}>
               {code.batches.product_name}
             </div>
-            <div style={{ fontSize: 11, color: C.muted }}>
+            <div style={{ fontSize: 11, color: T.ink400 }}>
               {code.batches.batch_number}
             </div>
           </div>
         )}
 
-        {/* Scan actions */}
+        {/* Action stack */}
         {actionSummary.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <span style={label()}>Scan Actions</span>
+            <span style={sectionLabel}>Scan Actions</span>
             {actionSummary.map((a, i) => (
               <div
                 key={i}
                 style={{
                   fontSize: 12,
-                  color: C.text,
-                  padding: "4px 0",
-                  borderBottom: `1px solid ${C.border}`,
+                  color: T.ink700,
+                  padding: "5px 0",
+                  borderBottom: `1px solid ${T.ink075}`,
+                  fontFamily: T.font,
                 }}
               >
                 {a}
@@ -552,41 +583,44 @@ function DetailPanel({
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => window.open(scanUrl, "_blank")}
-              style={{ ...btn(C.accent), flex: 1 }}
+              style={{ ...mkBtn(T.accentMid), flex: 1 }}
             >
-              🔍 Test Scan
+              Test Scan
             </button>
             <button
               onClick={copyUrl}
-              style={{ ...btn(copied ? C.accent : C.mid), flex: 1 }}
+              style={{ ...mkBtn(copied ? T.success : T.info), flex: 1 }}
             >
-              {copied ? "✓ Copied" : "Copy URL"}
+              {copied ? "Copied!" : "Copy URL"}
             </button>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={downloadPng} style={{ ...btn(C.gold), flex: 1 }}>
+            <button
+              onClick={downloadPng}
+              style={{ ...mkBtn("#b5935a"), flex: 1 }}
+            >
               Download PNG
             </button>
             <button
               onClick={() => onTogglePause(code)}
               style={{
-                ...btn(code.is_active ? C.warning : C.success),
+                ...mkBtn(code.is_active ? T.warning : T.success),
                 flex: 1,
               }}
             >
               {code.is_active ? "Pause" : "Resume"}
             </button>
           </div>
-          <button onClick={() => onEdit(code)} style={btn(C.blue)}>
-            ✏ Edit in Generator
+          <button onClick={() => onEdit(code)} style={mkBtn(T.info)}>
+            Edit in Generator
           </button>
-          <button onClick={() => onDelete(code)} style={btn(C.error)}>
+          <button onClick={() => onDelete(code)} style={mkBtn(T.danger)}>
             Delete
           </button>
         </div>
       </div>
 
-      {/* Fullscreen QR modal */}
+      {/* Fullscreen modal */}
       {showFullscreen && (
         <div
           onClick={() => setShowFullscreen(false)}
@@ -604,9 +638,9 @@ function DetailPanel({
         >
           <div
             style={{
-              background: C.white,
+              background: "#fff",
               padding: 32,
-              borderRadius: 4,
+              borderRadius: 8,
               textAlign: "center",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -617,14 +651,15 @@ function DetailPanel({
               level="H"
               includeMargin
               bgColor="#fff"
-              fgColor={C.green}
+              fgColor={T.accent}
             />
             <div
               style={{
                 marginTop: 16,
-                fontFamily: FONTS.heading,
-                fontSize: 18,
-                color: C.green,
+                fontSize: 16,
+                fontWeight: 600,
+                color: T.accent,
+                fontFamily: T.font,
               }}
             >
               {code.batches?.product_name ||
@@ -635,7 +670,7 @@ function DetailPanel({
               style={{
                 fontFamily: "monospace",
                 fontSize: 10,
-                color: C.muted,
+                color: T.ink400,
                 marginTop: 4,
                 wordBreak: "break-all",
               }}
@@ -650,15 +685,15 @@ function DetailPanel({
                 marginTop: 16,
               }}
             >
-              <button onClick={() => window.print()} style={btn(C.green)}>
-                🖨 Print
+              <button onClick={() => window.print()} style={mkBtn(T.accent)}>
+                Print
               </button>
-              <button onClick={downloadPng} style={btn(C.gold)}>
+              <button onClick={downloadPng} style={mkBtn("#b5935a")}>
                 Download 512px PNG
               </button>
               <button
                 onClick={() => setShowFullscreen(false)}
-                style={btn(C.muted)}
+                style={mkBtn("transparent", T.ink400)}
               >
                 Close
               </button>
@@ -668,20 +703,6 @@ function DetailPanel({
       )}
     </>
   );
-}
-
-function badgeSt(bg, color) {
-  return {
-    background: bg,
-    color,
-    fontSize: 9,
-    fontWeight: 700,
-    letterSpacing: "0.15em",
-    textTransform: "uppercase",
-    padding: "3px 8px",
-    borderRadius: 20,
-    fontFamily: FONTS.body,
-  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -704,17 +725,15 @@ function RegistryTab({ batches }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("qr_codes")
-      .select(`*, batches(batch_number, product_name, strain)`)
+      .select("*, batches(batch_number, product_name, strain)")
       .order("created_at", { ascending: false });
     if (!error) setCodes(data || []);
     setLoading(false);
   }, []);
-
   useEffect(() => {
     fetchCodes();
   }, [fetchCodes]);
 
-  // Stats
   const stats = {
     total: codes.length,
     signed: codes.filter((c) => c.hmac_signed).length,
@@ -729,42 +748,21 @@ function RegistryTab({ batches }) {
     ).length,
   };
 
-  // Stats strip data — tooltip ids/props attached where needed
-  const statItems = [
-    { k: "Total", v: stats.total, col: C.green },
-    {
-      k: "🔒 Signed",
-      v: stats.signed,
-      col: C.mid,
-      tooltipId: "qr-hmac",
-    },
-    { k: "Unsigned", v: stats.unsigned, col: C.muted },
-    {
-      k: "Claimed",
-      v: stats.claimed,
-      col: C.blue,
-      tooltipId: "qr-claim-rate",
-      tooltipTitle: "What is claim rate?",
-      tooltipBody:
-        "Claim rate is the percentage of active QR codes that have been scanned at least once by a customer. A high claim rate means your loyalty programme is being actively discovered — customers are finding and scanning their product QR codes. A low rate may mean QR codes aren't visible, customers don't know to scan them, or distribution hasn't reached end consumers yet.",
-    },
-    { k: "Available", v: stats.available, col: C.success },
-    { k: "Total Scans", v: stats.scans, col: C.gold },
-    { k: "Active", v: stats.active, col: C.accent },
-    { k: "Paused", v: stats.paused, col: C.warning },
-    { k: "Expired", v: stats.expired, col: C.error },
-  ];
+  const claimRate =
+    stats.total > 0 ? ((stats.claimed / stats.total) * 100).toFixed(1) : "0.0";
 
-  // Filter
   const filtered = codes.filter((c) => {
     if (search) {
       const s = search.toLowerCase();
-      const match =
-        (c.qr_code || "").toLowerCase().includes(s) ||
-        (c.campaign_name || "").toLowerCase().includes(s) ||
-        (c.batches?.product_name || "").toLowerCase().includes(s) ||
-        (c.batches?.batch_number || "").toLowerCase().includes(s);
-      if (!match) return false;
+      if (
+        !(
+          (c.qr_code || "").toLowerCase().includes(s) ||
+          (c.campaign_name || "").toLowerCase().includes(s) ||
+          (c.batches?.product_name || "").toLowerCase().includes(s) ||
+          (c.batches?.batch_number || "").toLowerCase().includes(s)
+        )
+      )
+        return false;
     }
     if (typeFilter !== "all" && c.qr_type !== typeFilter) return false;
     if (statusFilter !== "all") {
@@ -784,7 +782,6 @@ function RegistryTab({ batches }) {
     return true;
   });
 
-  // Group by qr_type → batch/campaign
   const grouped = {};
   QR_TYPES.forEach((t) => {
     grouped[t.value] = {};
@@ -792,14 +789,12 @@ function RegistryTab({ batches }) {
   filtered.forEach((c) => {
     const type = c.qr_type || "product_insert";
     if (!grouped[type]) grouped[type] = {};
-    const grpKey =
-      c.batches?.batch_number || c.campaign_name || "— Ungrouped —";
-    if (!grouped[type][grpKey]) grouped[type][grpKey] = [];
-    grouped[type][grpKey].push(c);
+    const key = c.batches?.batch_number || c.campaign_name || "— Ungrouped —";
+    if (!grouped[type][key]) grouped[type][key] = [];
+    grouped[type][key].push(c);
   });
 
-  const toggleType = (type) =>
-    setCollapsedTypes((p) => ({ ...p, [type]: !p[type] }));
+  const toggleType = (t) => setCollapsedTypes((p) => ({ ...p, [t]: !p[t] }));
   const toggleGroup = (key) =>
     setCollapsedGroups((p) => ({ ...p, [key]: !p[key] }));
 
@@ -808,77 +803,107 @@ function RegistryTab({ batches }) {
       .from("qr_codes")
       .update({ is_active: !code.is_active })
       .eq("id", code.id);
-    setCodes((prev) =>
-      prev.map((c) =>
+    setCodes((p) =>
+      p.map((c) =>
         c.id === code.id ? { ...c, is_active: !code.is_active } : c,
       ),
     );
     if (selectedCode?.id === code.id)
       setSelectedCode((p) => ({ ...p, is_active: !p.is_active }));
   };
-
   const handleDelete = async (code) => {
     await supabase.from("qr_codes").delete().eq("id", code.id);
-    setCodes((prev) => prev.filter((c) => c.id !== code.id));
+    setCodes((p) => p.filter((c) => c.id !== code.id));
     if (selectedCode?.id === code.id) setSelectedCode(null);
     setDeleteTarget(null);
   };
 
   return (
     <div>
-      {/* Stats strip */}
+      {/* ── FLUSH STAT GRID ── */}
       <div
-        style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(80px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 8,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 24,
+        }}
       >
-        {statItems.map(
-          ({ k, v, col, tooltipId, tooltipTitle, tooltipBody }) => (
+        {[
+          { label: "Total", value: stats.total, color: T.accent },
+          {
+            label: "Signed",
+            value: stats.signed,
+            color: T.accentMid,
+            tooltipId: "qr-hmac",
+          },
+          { label: "Unsigned", value: stats.unsigned, color: T.ink400 },
+          {
+            label: "Claimed",
+            value: stats.claimed,
+            color: T.info,
+            tooltipId: "qr-claim-rate",
+          },
+          {
+            label: "Claim Rate",
+            value: `${claimRate}%`,
+            color: parseFloat(claimRate) >= 50 ? T.success : T.warning,
+          },
+          { label: "Available", value: stats.available, color: T.success },
+          { label: "Total Scans", value: stats.scans, color: "#b5935a" },
+          { label: "Active", value: stats.active, color: T.accentMid },
+          { label: "Paused", value: stats.paused, color: T.warning },
+          {
+            label: "Expired",
+            value: stats.expired,
+            color: stats.expired > 0 ? T.danger : T.ink400,
+          },
+        ].map(({ label: lbl, value, color, tooltipId }) => (
+          <div
+            key={lbl}
+            style={{
+              background: "#fff",
+              padding: "12px 14px",
+              textAlign: "center",
+            }}
+          >
             <div
-              key={k}
               style={{
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
-                padding: "10px 14px",
-                minWidth: 80,
-                textAlign: "center",
+                fontSize: 20,
+                fontWeight: 400,
+                color,
+                fontFamily: T.font,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: col,
-                  fontFamily: FONTS.heading,
-                }}
-              >
-                {v}
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: C.muted,
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  fontFamily: FONTS.body,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                }}
-              >
-                {k}
-                {tooltipId && (
-                  <InfoTooltip
-                    id={tooltipId}
-                    title={tooltipTitle}
-                    body={tooltipBody}
-                    position="top"
-                  />
-                )}
-              </div>
+              {value}
             </div>
-          ),
-        )}
+            <div
+              style={{
+                fontSize: 9,
+                color: T.ink400,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                fontFamily: T.font,
+                marginTop: 4,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+              }}
+            >
+              {lbl}
+              {tooltipId && <InfoTooltip id={tooltipId} position="top" />}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
@@ -895,7 +920,7 @@ function RegistryTab({ batches }) {
           [
             "typeFilter",
             typeFilter,
-            setTypeFilter,
+            (v) => setTypeFilter(v),
             [
               ["all", "All Types"],
               ...QR_TYPES.map((t) => [t.value, `${t.icon} ${t.label}`]),
@@ -904,7 +929,7 @@ function RegistryTab({ batches }) {
           [
             "statusFilter",
             statusFilter,
-            setStatusFilter,
+            (v) => setStatusFilter(v),
             [
               ["all", "All Status"],
               ["active", "Active"],
@@ -917,10 +942,10 @@ function RegistryTab({ batches }) {
           [
             "signedFilter",
             signedFilter,
-            setSignedFilter,
+            (v) => setSignedFilter(v),
             [
               ["all", "All"],
-              ["signed", "🔒 Signed"],
+              ["signed", "Signed"],
               ["unsigned", "Unsigned"],
             ],
           ],
@@ -938,7 +963,7 @@ function RegistryTab({ batches }) {
             ))}
           </select>
         ))}
-        <button onClick={fetchCodes} style={btn(C.mid)}>
+        <button onClick={fetchCodes} style={mkBtn(T.accentMid)}>
           ↻ Refresh
         </button>
       </div>
@@ -946,8 +971,8 @@ function RegistryTab({ batches }) {
       {loading && (
         <div
           style={{
-            color: C.muted,
-            fontFamily: FONTS.body,
+            color: T.ink400,
+            fontFamily: T.font,
             fontSize: 13,
             padding: 20,
           }}
@@ -956,12 +981,12 @@ function RegistryTab({ batches }) {
         </div>
       )}
 
-      {/* Registry Tree */}
+      {/* Registry tree */}
       {!loading && (
         <div
           style={{
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 8,
             overflow: "hidden",
           }}
         >
@@ -969,11 +994,10 @@ function RegistryTab({ batches }) {
             const grps = grouped[type.value] || {};
             const total = Object.values(grps).flat().length;
             const collapsed = collapsedTypes[type.value];
-
             return (
               <div
                 key={type.value}
-                style={{ borderBottom: `1px solid ${C.border}` }}
+                style={{ borderBottom: `1px solid ${T.ink150}` }}
               >
                 {/* Type header */}
                 <div
@@ -983,7 +1007,7 @@ function RegistryTab({ batches }) {
                     alignItems: "center",
                     gap: 10,
                     padding: "12px 16px",
-                    background: C.cream,
+                    background: T.ink075,
                     cursor: "pointer",
                     userSelect: "none",
                   }}
@@ -993,8 +1017,8 @@ function RegistryTab({ batches }) {
                     style={{
                       fontWeight: 700,
                       fontSize: 13,
-                      fontFamily: FONTS.body,
-                      color: C.green,
+                      fontFamily: T.font,
+                      color: T.accent,
                       flex: 1,
                     }}
                   >
@@ -1003,13 +1027,13 @@ function RegistryTab({ batches }) {
                   <span
                     style={{
                       fontSize: 11,
-                      color: C.muted,
-                      fontFamily: FONTS.body,
+                      color: T.ink400,
+                      fontFamily: T.font,
                     }}
                   >
                     ({total} code{total !== 1 ? "s" : ""})
                   </span>
-                  <span style={{ color: C.muted }}>
+                  <span style={{ color: T.ink400 }}>
                     {collapsed ? "▸" : "▾"}
                   </span>
                 </div>
@@ -1018,12 +1042,16 @@ function RegistryTab({ batches }) {
                   Object.entries(grps).map(([grpKey, items]) => {
                     const grpCollapsed =
                       collapsedGroups[`${type.value}::${grpKey}`];
+                    const claimedCount = items.filter((c) => c.claimed).length;
+                    const scanTotal = items.reduce(
+                      (s, c) => s + (c.scan_count || 0),
+                      0,
+                    );
                     return (
                       <div
                         key={grpKey}
-                        style={{ borderTop: `1px solid ${C.border}` }}
+                        style={{ borderTop: `1px solid ${T.ink150}` }}
                       >
-                        {/* Batch/campaign sub-header */}
                         <div
                           onClick={() =>
                             toggleGroup(`${type.value}::${grpKey}`)
@@ -1033,7 +1061,7 @@ function RegistryTab({ batches }) {
                             alignItems: "center",
                             gap: 8,
                             padding: "9px 16px 9px 36px",
-                            background: "#f8f7f4",
+                            background: "#f8f8f8",
                             cursor: "pointer",
                             userSelect: "none",
                           }}
@@ -1042,21 +1070,27 @@ function RegistryTab({ batches }) {
                             style={{
                               fontSize: 12,
                               fontWeight: 600,
-                              color: C.text,
-                              fontFamily: FONTS.body,
+                              color: T.ink700,
+                              fontFamily: T.font,
                               flex: 1,
                             }}
                           >
                             {grpKey}
                           </span>
-                          <span style={{ fontSize: 10, color: C.muted }}>
-                            {items.length} code{items.length !== 1 ? "s" : ""}
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: T.ink400,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            {items.length} codes · {claimedCount} claimed ·{" "}
+                            {scanTotal} scans
                           </span>
-                          <span style={{ color: C.muted, fontSize: 11 }}>
+                          <span style={{ color: T.ink400, fontSize: 11 }}>
                             {grpCollapsed ? "▸" : "▾"}
                           </span>
                         </div>
-
                         {!grpCollapsed &&
                           items.map((code) => (
                             <CodeRow
@@ -1077,19 +1111,17 @@ function RegistryTab({ batches }) {
         </div>
       )}
 
-      {/* Detail panel */}
       {selectedCode && (
         <DetailPanel
           code={selectedCode}
           onClose={() => setSelectedCode(null)}
           onEdit={() => {}}
-          onDelete={(code) => setDeleteTarget(code)}
+          onDelete={(c) => setDeleteTarget(c)}
           onTogglePause={handleTogglePause}
           domain={domain}
         />
       )}
 
-      {/* Delete confirm modal */}
       {deleteTarget && (
         <div
           style={{
@@ -1104,34 +1136,36 @@ function RegistryTab({ batches }) {
         >
           <div
             style={{
-              background: C.white,
-              borderRadius: 2,
+              background: "#fff",
+              borderRadius: 8,
               padding: 32,
               maxWidth: 380,
               width: "90%",
               textAlign: "center",
+              boxShadow: T.shadowMd,
+              fontFamily: T.font,
             }}
           >
             <div
               style={{
-                fontSize: 22,
-                fontFamily: FONTS.heading,
-                color: C.error,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.danger,
                 marginBottom: 12,
               }}
             >
               Confirm Delete
             </div>
-            <div style={{ fontSize: 13, color: C.muted, marginBottom: 8 }}>
+            <div style={{ fontSize: 13, color: T.ink400, marginBottom: 8 }}>
               This will permanently delete:
             </div>
             <code
               style={{
                 fontSize: 11,
                 wordBreak: "break-all",
-                background: C.cream,
+                background: T.ink075,
                 padding: "6px 10px",
-                borderRadius: 2,
+                borderRadius: 4,
                 display: "block",
                 marginBottom: 20,
               }}
@@ -1141,13 +1175,13 @@ function RegistryTab({ batches }) {
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button
                 onClick={() => setDeleteTarget(null)}
-                style={btn(C.muted)}
+                style={mkBtn("transparent", T.ink400)}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteTarget)}
-                style={btn(C.error)}
+                style={mkBtn(T.danger)}
               >
                 Delete
               </button>
@@ -1161,7 +1195,6 @@ function RegistryTab({ batches }) {
 
 function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
   const isExpired = code.expires_at && new Date() > new Date(code.expires_at);
-
   return (
     <div
       onClick={onSelect}
@@ -1170,10 +1203,20 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         alignItems: "center",
         gap: 10,
         padding: "10px 16px 10px 52px",
-        borderTop: `1px solid ${C.border}`,
+        borderTop: `1px solid ${T.ink150}`,
         cursor: "pointer",
-        background: selected ? "#f0faf4" : isExpired ? "#fafafa" : C.white,
-        transition: "background 0.12s",
+        background: selected ? T.accentLit : isExpired ? "#fafafa" : "#fff",
+        transition: "background 0.1s",
+      }}
+      onMouseEnter={(e) => {
+        if (!selected) e.currentTarget.style.background = T.ink075;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = selected
+          ? T.accentLit
+          : isExpired
+            ? "#fafafa"
+            : "#fff";
       }}
     >
       <div
@@ -1181,7 +1224,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           width: 6,
           height: 6,
           borderRadius: "50%",
-          background: code.is_active ? C.accent : C.muted,
+          background: code.is_active ? T.accentMid : T.ink300,
           flexShrink: 0,
         }}
       />
@@ -1190,7 +1233,7 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           style={{
             fontFamily: "monospace",
             fontSize: 11,
-            color: C.text,
+            color: T.ink700,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -1200,18 +1243,29 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
         </div>
       </div>
       {code.hmac_signed && (
-        <span style={badgeSt(C.lightGreen, C.success)}>🔒</span>
+        <Badge bg={T.successBg} color={T.success} border={T.successBd}>
+          SIGNED
+        </Badge>
       )}
-      {code.claimed && <span style={badgeSt("#f0f0ff", C.blue)}>CLAIMED</span>}
-      {isExpired && <span style={badgeSt(C.lightRed, C.error)}>EXPIRED</span>}
+      {code.claimed && (
+        <Badge bg={T.infoBg} color={T.info} border={T.infoBd}>
+          CLAIMED
+        </Badge>
+      )}
+      {isExpired && (
+        <Badge bg={T.dangerBg} color={T.danger} border={T.dangerBd}>
+          EXPIRED
+        </Badge>
+      )}
       <span
         style={{
           fontSize: 11,
-          color: C.gold,
+          color: "#b5935a",
           fontWeight: 600,
-          fontFamily: FONTS.body,
-          minWidth: 40,
+          fontFamily: T.font,
+          minWidth: 50,
           textAlign: "right",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {code.points_value || 0}pts
@@ -1219,10 +1273,11 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
       <span
         style={{
           fontSize: 11,
-          color: C.muted,
-          fontFamily: FONTS.body,
-          minWidth: 50,
+          color: T.ink400,
+          fontFamily: T.font,
+          minWidth: 55,
           textAlign: "right",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {code.scan_count || 0} scans
@@ -1230,8 +1285,8 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
       <span
         style={{
           fontSize: 11,
-          color: C.muted,
-          fontFamily: FONTS.body,
+          color: T.ink400,
+          fontFamily: T.font,
           minWidth: 70,
           textAlign: "right",
         }}
@@ -1244,11 +1299,12 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           onTogglePause();
         }}
         style={{
-          ...btn(
-            code.is_active ? "#fff8ec" : C.lightGreen,
-            code.is_active ? C.warning : C.success,
+          ...mkBtn(
+            code.is_active ? T.warningBg : T.successBg,
+            code.is_active ? T.warning : T.success,
           ),
-          padding: "4px 8px",
+          border: `1px solid ${code.is_active ? T.warningBd : T.successBd}`,
+          padding: "3px 8px",
           fontSize: 9,
         }}
       >
@@ -1259,7 +1315,12 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
           e.stopPropagation();
           onDelete();
         }}
-        style={{ ...btn("#fff0f0", C.error), padding: "4px 8px", fontSize: 9 }}
+        style={{
+          ...mkBtn(T.dangerBg, T.danger),
+          border: `1px solid ${T.dangerBd}`,
+          padding: "3px 8px",
+          fontSize: 9,
+        }}
       >
         Delete
       </button>
@@ -1277,8 +1338,6 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
   const [selectedBatchId, setSelectedBatchId] = useState(batches[0]?.id || "");
   const [isBulk, setIsBulk] = useState(false);
   const [bulkQty, setBulkQty] = useState("10");
-
-  // Action builder state
   const [doPoints, setDoPoints] = useState(true);
   const [points, setPoints] = useState("10");
   const [oneTime, setOneTime] = useState(true);
@@ -1299,8 +1358,6 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
   const [redirectDelay, setRedirectDelay] = useState("3000");
   const [expiresAt, setExpiresAt] = useState("");
   const [maxScans, setMaxScans] = useState("");
-
-  // Step 3
   const [domain, setDomain] = useState(
     window.location.origin || "http://localhost:3000",
   );
@@ -1331,9 +1388,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
       setDoProduct(t.batchRequired);
       setDoEventCheckin(t.value === "event");
       setDoRedirect(
-        t.value === "packaging_exterior" ||
-          t.value === "wearable" ||
-          t.value === "retail_display",
+        ["packaging_exterior", "wearable", "retail_display"].includes(t.value),
       );
     }
   }, [selectedType]);
@@ -1379,7 +1434,6 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
     }
     const actions = buildActionStack();
     const pointsVal = doPoints ? parseInt(points) || 0 : 0;
-
     const payload = {
       qr_code: qrCode,
       qr_type: selectedType,
@@ -1397,7 +1451,6 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
       expires_at: expiresAt || null,
       source_label: "generator",
     };
-
     const { error } = await supabase.from("qr_codes").insert(payload);
     if (error) throw error;
     return { qrCode, url: `${domain}/scan/${qrCode}` };
@@ -1411,11 +1464,10 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
       QR_TYPES.find((t) => t.value === selectedType)?.batchRequired &&
       !selectedBatchId
     ) {
-      setGenError("Please select a batch for this QR type.");
+      setGenError("Select a batch for this QR type.");
       setGenerating(false);
       return;
     }
-
     try {
       if (!isBulk) {
         const result = await generateOne(
@@ -1427,18 +1479,16 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
         const qty = Math.min(parseInt(bulkQty) || 10, 200);
         const results = [];
         for (let i = 0; i < qty; i++) {
-          const result = await generateOne(
-            parseInt(productCode) + i,
-            selectedBatchId,
+          results.push(
+            await generateOne(parseInt(productCode) + i, selectedBatchId),
           );
-          results.push(result);
           await new Promise((r) => setTimeout(r, 80));
         }
         setGeneratedCodes(results);
         if (onGenerated) onGenerated();
       }
     } catch (err) {
-      setGenError(err.message || "Generation failed. Check console.");
+      setGenError(err.message || "Generation failed.");
     } finally {
       setGenerating(false);
     }
@@ -1446,14 +1496,14 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
 
   const typeReq = QR_TYPES.find((t) => t.value === selectedType);
 
-  // Step indicator
+  // Step indicator — underline style
   const StepBar = () => (
     <div
       style={{
         display: "flex",
         gap: 0,
         marginBottom: 28,
-        borderBottom: `2px solid ${C.border}`,
+        borderBottom: `2px solid ${T.ink150}`,
       }}
     >
       {[
@@ -1471,20 +1521,20 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
             cursor: step >= parseInt(n) ? "pointer" : "default",
             borderBottom:
               step === parseInt(n)
-                ? `2px solid ${C.mid}`
+                ? `2px solid ${T.accent}`
                 : "2px solid transparent",
             marginBottom: -2,
             fontSize: 11,
             fontWeight: 700,
-            letterSpacing: "0.15em",
+            letterSpacing: "0.08em",
             textTransform: "uppercase",
             color:
               step === parseInt(n)
-                ? C.mid
+                ? T.accent
                 : step > parseInt(n)
-                  ? C.accent
-                  : C.muted,
-            fontFamily: FONTS.body,
+                  ? T.accentMid
+                  : T.ink400,
+            fontFamily: T.font,
           }}
         >
           {n}. {lbl}
@@ -1497,10 +1547,10 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
     <div style={{ maxWidth: 640 }}>
       <StepBar />
 
-      {/* STEP 1 — Purpose */}
+      {/* STEP 1 */}
       {step === 1 && (
         <div>
-          <span style={label()}>QR Type</span>
+          <span style={sectionLabel}>QR Type</span>
           <div
             style={{
               display: "flex",
@@ -1514,14 +1564,14 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                 key={t.value}
                 onClick={() => setSelectedType(t.value)}
                 style={{
-                  ...card({
+                  ...cardBase({
                     padding: "14px 16px",
                     flex: "1 1 140px",
                     cursor: "pointer",
                     minWidth: 130,
-                    border: `2px solid ${selectedType === t.value ? C.accent : C.border}`,
-                    background:
-                      selectedType === t.value ? C.lightGreen : C.white,
+                    border: `2px solid ${selectedType === t.value ? T.accentBd : T.ink150}`,
+                    background: selectedType === t.value ? T.accentLit : "#fff",
+                    borderRadius: 8,
                   }),
                   textAlign: "center",
                 }}
@@ -1531,20 +1581,23 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: C.text,
-                    fontFamily: FONTS.body,
+                    color: T.ink700,
+                    fontFamily: T.font,
                     marginBottom: 4,
                   }}
                 >
                   {t.label}
                 </div>
-                <div style={{ fontSize: 10, color: C.muted }}>{t.desc}</div>
+                <div
+                  style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                >
+                  {t.desc}
+                </div>
               </div>
             ))}
           </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <span style={label()}>Campaign Name (optional)</span>
+          <div style={{ marginBottom: 16 }}>
+            <span style={sectionLabel}>Campaign Name (optional)</span>
             <input
               style={inputStyle}
               placeholder="e.g. Cape Town Launch March 2026"
@@ -1552,10 +1605,9 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
               onChange={(e) => setCampaignName(e.target.value)}
             />
           </div>
-
           {typeReq?.batchRequired && (
-            <div style={{ marginBottom: 20 }}>
-              <span style={label()}>Linked Batch</span>
+            <div style={{ marginBottom: 16 }}>
+              <span style={sectionLabel}>Linked Batch</span>
               <select
                 style={{ ...inputStyle, cursor: "pointer" }}
                 value={selectedBatchId}
@@ -1570,24 +1622,23 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
               </select>
             </div>
           )}
-
           <div style={{ marginBottom: 24 }}>
-            <span style={label()}>Quantity</span>
+            <span style={sectionLabel}>Quantity</span>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <button
                 onClick={() => setIsBulk(false)}
-                style={btn(
-                  isBulk ? "#f0f0f0" : C.green,
-                  isBulk ? C.text : C.white,
+                style={mkBtn(
+                  isBulk ? T.ink075 : T.accent,
+                  isBulk ? T.ink700 : "#fff",
                 )}
               >
                 Single
               </button>
               <button
                 onClick={() => setIsBulk(true)}
-                style={btn(
-                  !isBulk ? "#f0f0f0" : C.green,
-                  !isBulk ? C.text : C.white,
+                style={mkBtn(
+                  !isBulk ? T.ink075 : T.accent,
+                  !isBulk ? T.ink700 : "#fff",
                 )}
               >
                 Bulk
@@ -1603,43 +1654,39 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                 />
               )}
               {isBulk && (
-                <span style={{ fontSize: 11, color: C.muted }}>
+                <span
+                  style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
+                >
                   codes (max 200)
                 </span>
               )}
             </div>
           </div>
-
-          <button onClick={() => setStep(2)} style={btn(C.green)}>
+          <button onClick={() => setStep(2)} style={mkBtn(T.accent)}>
             Next: Scan Actions →
           </button>
         </div>
       )}
 
-      {/* STEP 2 — Scan Actions */}
+      {/* STEP 2 */}
       {step === 2 && (
         <div>
-          {/* Section header with scan-actions tooltip */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 6,
               marginBottom: 16,
-              fontFamily: FONTS.body,
-              fontSize: 12,
-              fontWeight: 700,
-              color: C.green,
-              letterSpacing: "0.15em",
-              textTransform: "uppercase",
             }}
           >
-            Configure Scan Actions
+            <span style={{ ...sectionLabel, marginBottom: 0 }}>
+              Configure Scan Actions
+            </span>
             <InfoTooltip id="qr-scan-actions" position="top" />
           </div>
 
           <ActionToggle
-            label="🎯 Award Points"
+            label="Award Points"
             checked={doPoints}
             onChange={setDoPoints}
           >
@@ -1652,7 +1699,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
               }}
             >
               <div style={{ flex: "1 1 80px" }}>
-                <span style={label(4)}>Points</span>
+                <span style={sectionLabel}>Points</span>
                 <input
                   style={inputStyle}
                   value={points}
@@ -1660,7 +1707,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                 />
               </div>
               <div style={{ flex: "1 1 100px" }}>
-                <span style={label(4)}>Cooldown hrs</span>
+                <span style={sectionLabel}>Cooldown hrs</span>
                 <input
                   style={inputStyle}
                   value={cooldownHrs}
@@ -1676,8 +1723,8 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                     gap: 6,
                     alignItems: "center",
                     fontSize: 12,
-                    color: C.text,
-                    fontFamily: FONTS.body,
+                    color: T.ink700,
+                    fontFamily: T.font,
                     cursor: "pointer",
                     paddingBottom: 10,
                   }}
@@ -1694,7 +1741,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
           </ActionToggle>
 
           <ActionToggle
-            label="🪧 Show Banner"
+            label="Show Banner"
             checked={doBanner}
             onChange={setDoBanner}
           >
@@ -1716,7 +1763,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
 
           {typeReq?.batchRequired && (
             <ActionToggle
-              label="📋 Show Product Info"
+              label="Show Product Info"
               checked={doProduct}
               onChange={setDoProduct}
             >
@@ -1728,7 +1775,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                   marginTop: 10,
                   fontSize: 12,
                   cursor: "pointer",
-                  fontFamily: FONTS.body,
+                  fontFamily: T.font,
                 }}
               >
                 <input
@@ -1742,7 +1789,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
           )}
 
           <ActionToggle
-            label="🎪 Event Check-in"
+            label="Event Check-in"
             checked={doEventCheckin}
             onChange={setDoEventCheckin}
           >
@@ -1755,7 +1802,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
           </ActionToggle>
 
           <ActionToggle
-            label="💬 Custom Message"
+            label="Custom Message"
             checked={doCustomMsg}
             onChange={setDoCustomMsg}
           >
@@ -1795,7 +1842,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
           </ActionToggle>
 
           <ActionToggle
-            label="🔗 Redirect to URL"
+            label="Redirect to URL"
             checked={doRedirect}
             onChange={setDoRedirect}
           >
@@ -1827,7 +1874,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
             }}
           >
             <div>
-              <span style={label()}>Expiry (optional)</span>
+              <span style={sectionLabel}>Expiry (optional)</span>
               <input
                 type="datetime-local"
                 style={inputStyle}
@@ -1836,7 +1883,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
               />
             </div>
             <div>
-              <span style={label()}>Max Scans (blank = unlimited)</span>
+              <span style={sectionLabel}>Max Scans (blank = unlimited)</span>
               <input
                 style={inputStyle}
                 placeholder="e.g. 1000"
@@ -1845,24 +1892,26 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
               />
             </div>
           </div>
-
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setStep(1)} style={btn(C.muted)}>
+            <button
+              onClick={() => setStep(1)}
+              style={mkBtn("transparent", T.ink400)}
+            >
               ← Back
             </button>
-            <button onClick={() => setStep(3)} style={btn(C.green)}>
+            <button onClick={() => setStep(3)} style={mkBtn(T.accent)}>
               Next: Generate →
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 3 — Generate */}
+      {/* STEP 3 */}
       {step === 3 && (
         <div>
           <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
             <div style={{ flex: 2 }}>
-              <span style={label()}>Domain</span>
+              <span style={sectionLabel}>Domain</span>
               <input
                 style={inputStyle}
                 value={domain}
@@ -1872,7 +1921,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
             {selectedType === "product_insert" && (
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={label()}>
+                  <span style={sectionLabel}>
                     {isBulk ? "Start Code" : "Product Code"} (4-digit)
                   </span>
                   <InfoTooltip id="qr-hmac" position="top" />
@@ -1887,7 +1936,14 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                     )
                   }
                 />
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginTop: 4,
+                    fontFamily: T.font,
+                  }}
+                >
                   → PB-001-2026-{productCode.padStart(4, "0")} · HMAC signed
                 </div>
               </div>
@@ -1895,58 +1951,93 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
           </div>
 
           {/* Preview card */}
-          <div style={{ ...card({ marginBottom: 20 }) }}>
-            <span style={label()}>Preview — What Customer Sees</span>
+          <div style={{ ...cardBase({ marginBottom: 20 }) }}>
+            <span style={sectionLabel}>Preview — What Customer Sees</span>
             <div
               style={{
-                background: C.green,
-                color: C.white,
+                background: T.accent,
+                color: "#fff",
                 padding: 16,
-                borderRadius: 2,
+                borderRadius: 8,
                 maxWidth: 280,
               }}
             >
               <div
                 style={{
                   fontSize: 10,
-                  letterSpacing: "0.3em",
-                  color: C.accent,
+                  letterSpacing: "0.1em",
+                  color: T.accentBd,
                   marginBottom: 6,
                   textTransform: "uppercase",
+                  fontFamily: T.font,
                 }}
               >
                 {QR_TYPES.find((t) => t.value === selectedType)?.icon}{" "}
                 {QR_TYPES.find((t) => t.value === selectedType)?.label}
               </div>
               {doPoints && (
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
-                  🎯 +{points} loyalty points
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    marginBottom: 4,
+                    fontFamily: T.font,
+                  }}
+                >
+                  +{points} loyalty points
                 </div>
               )}
               {doBanner && (
-                <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>
-                  🪧 Banner:{" "}
-                  {banners.find((b) => b.id === bannerId)?.name || "—"}
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.8,
+                    marginBottom: 4,
+                    fontFamily: T.font,
+                  }}
+                >
+                  Banner: {banners.find((b) => b.id === bannerId)?.name || "—"}
                 </div>
               )}
               {doProduct && (
-                <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>
-                  📋 Product info{showCoa ? " + COA" : ""}
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.8,
+                    marginBottom: 4,
+                    fontFamily: T.font,
+                  }}
+                >
+                  Product info{showCoa ? " + COA" : ""}
                 </div>
               )}
               {doEventCheckin && (
-                <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>
-                  🎪 Check-in: {eventName || "—"}
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.8,
+                    marginBottom: 4,
+                    fontFamily: T.font,
+                  }}
+                >
+                  Check-in: {eventName || "—"}
                 </div>
               )}
               {doCustomMsg && (
-                <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>
-                  💬 {msgHeadline || "Custom message"}
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.8,
+                    marginBottom: 4,
+                    fontFamily: T.font,
+                  }}
+                >
+                  {msgHeadline || "Custom message"}
                 </div>
               )}
               {doRedirect && (
-                <div style={{ fontSize: 11, opacity: 0.8 }}>
-                  🔗 Redirect → {redirectUrl}{" "}
+                <div style={{ fontSize: 11, opacity: 0.8, fontFamily: T.font }}>
+                  Redirect → {redirectUrl}{" "}
                   {redirectDelay ? `(${redirectDelay}ms)` : ""}
                 </div>
               )}
@@ -1956,27 +2047,31 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
           {genError && (
             <div
               style={{
-                background: C.lightRed,
-                border: `1px solid ${C.error}`,
-                borderRadius: 2,
+                background: T.dangerBg,
+                border: `1px solid ${T.dangerBd}`,
+                borderRadius: 6,
                 padding: "12px 16px",
                 fontSize: 13,
-                color: C.error,
+                color: T.danger,
                 marginBottom: 16,
+                fontFamily: T.font,
               }}
             >
-              ⚠ {genError}
+              {genError}
             </div>
           )}
 
           <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-            <button onClick={() => setStep(2)} style={btn(C.muted)}>
+            <button
+              onClick={() => setStep(2)}
+              style={mkBtn("transparent", T.ink400)}
+            >
               ← Back
             </button>
             <button
               onClick={handleGenerate}
               disabled={generating}
-              style={btn(C.green, C.white, generating)}
+              style={mkBtn(T.accent, "#fff", generating)}
             >
               {generating
                 ? `Generating${isBulk ? ` (${generatedCodes.length}/${bulkQty})` : "…"}`
@@ -1984,7 +2079,6 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
             </button>
           </div>
 
-          {/* Generated output */}
           {generatedCodes.length > 0 && (
             <div ref={qrRef}>
               <div
@@ -1992,26 +2086,35 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
-                  marginBottom: 12,
+                  marginBottom: 16,
                 }}
               >
                 <span
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: C.success,
-                    fontFamily: FONTS.body,
+                    color: T.success,
+                    fontFamily: T.font,
                   }}
                 >
-                  ✓ {generatedCodes.length} code
+                  {generatedCodes.length} code
                   {generatedCodes.length !== 1 ? "s" : ""} generated
                 </span>
               </div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {/* Generated QR grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px,1fr))",
+                  gap: 12,
+                }}
+              >
                 {generatedCodes.slice(0, 12).map((g, i) => (
                   <div
                     key={i}
-                    style={{ ...card({ padding: 16, textAlign: "center" }) }}
+                    style={{
+                      ...cardBase({ padding: 16, textAlign: "center" }),
+                    }}
                   >
                     <QRCodeSVG
                       value={g.url}
@@ -2019,16 +2122,16 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                       level="H"
                       includeMargin
                       bgColor="#fff"
-                      fgColor={C.green}
+                      fgColor={T.accent}
                     />
                     <div
                       style={{
                         fontSize: 9,
-                        color: C.muted,
+                        color: T.ink400,
                         marginTop: 6,
                         fontFamily: "monospace",
                         wordBreak: "break-all",
-                        maxWidth: 130,
+                        maxWidth: 140,
                       }}
                     >
                       {g.qrCode.slice(0, 30)}
@@ -2037,7 +2140,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                     <button
                       onClick={() => window.open(g.url, "_blank")}
                       style={{
-                        ...btn(C.accent),
+                        ...mkBtn(T.accentMid),
                         padding: "4px 10px",
                         fontSize: 9,
                         marginTop: 8,
@@ -2051,8 +2154,9 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                   <div
                     style={{
                       fontSize: 12,
-                      color: C.muted,
+                      color: T.ink400,
                       alignSelf: "center",
+                      fontFamily: T.font,
                     }}
                   >
                     + {generatedCodes.length - 12} more
@@ -2071,11 +2175,12 @@ function ActionToggle({ label: lbl, checked, onChange, children }) {
   return (
     <div
       style={{
-        border: `1px solid ${checked ? C.accent : C.border}`,
-        borderRadius: 2,
+        border: `1px solid ${checked ? T.accentBd : T.ink150}`,
+        borderRadius: 6,
         padding: 14,
         marginBottom: 10,
-        background: checked ? C.lightGreen : C.white,
+        background: checked ? T.accentLit : "#fff",
+        transition: "all 0.15s",
       }}
     >
       <label
@@ -2084,10 +2189,10 @@ function ActionToggle({ label: lbl, checked, onChange, children }) {
           alignItems: "center",
           gap: 10,
           cursor: "pointer",
-          fontFamily: FONTS.body,
+          fontFamily: T.font,
           fontSize: 13,
           fontWeight: 600,
-          color: C.text,
+          color: T.ink700,
         }}
       >
         <input
@@ -2118,7 +2223,7 @@ function BannersTab({ banners, onRefresh }) {
     body: "",
     cta_text: "Learn More",
     cta_link: "/shop",
-    bg_color: "#1b4332",
+    bg_color: T.accent,
     text_color: "#ffffff",
     image_url: "",
     is_active: true,
@@ -2138,13 +2243,11 @@ function BannersTab({ banners, onRefresh }) {
     setCreating(false);
     onRefresh();
   };
-
   const handleDelete = async (b) => {
     await supabase.from("qr_banners").delete().eq("id", b.id);
     setDeleteTarget(null);
     onRefresh();
   };
-
   const toggleActive = async (b) => {
     await supabase
       .from("qr_banners")
@@ -2155,6 +2258,21 @@ function BannersTab({ banners, onRefresh }) {
 
   if (editBanner || creating) {
     const eb = editBanner || emptyBanner;
+    const fld = (lbl, field) => (
+      <div key={field} style={{ marginBottom: 14 }}>
+        <span style={sectionLabel}>{lbl}</span>
+        <input
+          style={inputStyle}
+          value={eb[field] || ""}
+          onChange={(e) =>
+            setEditBanner((p) => ({
+              ...(p || emptyBanner),
+              [field]: e.target.value,
+            }))
+          }
+        />
+      </div>
+    );
     return (
       <div style={{ maxWidth: 600 }}>
         <div
@@ -2170,48 +2288,32 @@ function BannersTab({ banners, onRefresh }) {
               setEditBanner(null);
               setCreating(false);
             }}
-            style={btn(C.muted)}
+            style={mkBtn("transparent", T.ink400)}
           >
             ← Back
           </button>
           <h2
             style={{
-              fontFamily: FONTS.heading,
-              fontSize: 20,
-              color: C.green,
+              fontFamily: T.font,
+              fontSize: 18,
+              fontWeight: 600,
+              color: T.ink900,
               margin: 0,
             }}
           >
             {editBanner ? "Edit Banner" : "New Banner"}
           </h2>
         </div>
-
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}
         >
           <div>
-            {[
-              ["Admin Label", "name", "text"],
-              ["Headline", "headline", "text"],
-              ["Body Text", "body", "text"],
-              ["CTA Button Text", "cta_text", "text"],
-              ["CTA Link", "cta_link", "text"],
-              ["Image URL (optional)", "image_url", "text"],
-            ].map(([lbl, field]) => (
-              <div key={field} style={{ marginBottom: 14 }}>
-                <span style={label(4)}>{lbl}</span>
-                <input
-                  style={inputStyle}
-                  value={eb[field] || ""}
-                  onChange={(e) =>
-                    setEditBanner((p) => ({
-                      ...(p || emptyBanner),
-                      [field]: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            ))}
+            {fld("Admin Label", "name")}
+            {fld("Headline", "headline")}
+            {fld("Body Text", "body")}
+            {fld("CTA Button Text", "cta_text")}
+            {fld("CTA Link", "cta_link")}
+            {fld("Image URL (optional)", "image_url")}
             <div
               style={{
                 display: "grid",
@@ -2220,83 +2322,56 @@ function BannersTab({ banners, onRefresh }) {
                 marginBottom: 14,
               }}
             >
-              <div>
-                <span style={label(4)}>Background Colour</span>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <input
-                    type="color"
-                    value={eb.bg_color || "#1b4332"}
-                    onChange={(e) =>
-                      setEditBanner((p) => ({
-                        ...(p || emptyBanner),
-                        bg_color: e.target.value,
-                      }))
-                    }
-                    style={{
-                      width: 40,
-                      height: 36,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
-                      cursor: "pointer",
-                    }}
-                  />
-                  <input
-                    style={{ ...inputStyle, flex: 1 }}
-                    value={eb.bg_color || ""}
-                    onChange={(e) =>
-                      setEditBanner((p) => ({
-                        ...(p || emptyBanner),
-                        bg_color: e.target.value,
-                      }))
-                    }
-                  />
+              {[
+                ["Background Colour", "bg_color", "#1b4332"],
+                ["Text Colour", "text_color", "#ffffff"],
+              ].map(([lbl, field, def]) => (
+                <div key={field}>
+                  <span style={sectionLabel}>{lbl}</span>
+                  <div
+                    style={{ display: "flex", gap: 8, alignItems: "center" }}
+                  >
+                    <input
+                      type="color"
+                      value={eb[field] || def}
+                      onChange={(e) =>
+                        setEditBanner((p) => ({
+                          ...(p || emptyBanner),
+                          [field]: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: 40,
+                        height: 34,
+                        border: `1px solid ${T.ink150}`,
+                        borderRadius: 4,
+                        cursor: "pointer",
+                      }}
+                    />
+                    <input
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={eb[field] || ""}
+                      onChange={(e) =>
+                        setEditBanner((p) => ({
+                          ...(p || emptyBanner),
+                          [field]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <span style={label(4)}>Text Colour</span>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <input
-                    type="color"
-                    value={eb.text_color || "#ffffff"}
-                    onChange={(e) =>
-                      setEditBanner((p) => ({
-                        ...(p || emptyBanner),
-                        text_color: e.target.value,
-                      }))
-                    }
-                    style={{
-                      width: 40,
-                      height: 36,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 2,
-                      cursor: "pointer",
-                    }}
-                  />
-                  <input
-                    style={{ ...inputStyle, flex: 1 }}
-                    value={eb.text_color || ""}
-                    onChange={(e) =>
-                      setEditBanner((p) => ({
-                        ...(p || emptyBanner),
-                        text_color: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
+              ))}
             </div>
             <button
               onClick={handleSave}
               disabled={saving}
-              style={btn(C.green, C.white, saving)}
+              style={mkBtn(T.accent, "#fff", saving)}
             >
               {saving ? "Saving…" : "Save Banner"}
             </button>
           </div>
-
-          {/* Live preview */}
           <div>
-            <span style={label()}>Live Preview</span>
+            <span style={sectionLabel}>Live Preview</span>
             <BannerPreview banner={editBanner || emptyBanner} />
           </div>
         </div>
@@ -2316,9 +2391,10 @@ function BannersTab({ banners, onRefresh }) {
       >
         <h2
           style={{
-            fontFamily: FONTS.heading,
-            fontSize: 20,
-            color: C.green,
+            fontFamily: T.font,
+            fontSize: 18,
+            fontWeight: 600,
+            color: T.ink900,
             margin: 0,
           }}
         >
@@ -2329,35 +2405,32 @@ function BannersTab({ banners, onRefresh }) {
             setCreating(true);
             setEditBanner({ ...emptyBanner });
           }}
-          style={btn(C.green)}
+          style={mkBtn(T.accent)}
         >
           + New Banner
         </button>
       </div>
-
       {banners.length === 0 && (
         <div
           style={{
-            color: C.muted,
-            fontFamily: FONTS.body,
+            color: T.ink400,
+            fontFamily: T.font,
             fontSize: 13,
             padding: 40,
             textAlign: "center",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            border: `1px dashed ${T.ink150}`,
+            borderRadius: 8,
           }}
         >
-          No banners yet. Create your first banner above, or run the migration
-          SQL to seed 2 starters.
+          No banners yet. Create your first banner above.
         </div>
       )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {banners.map((b) => (
           <div
             key={b.id}
             style={{
-              ...card({ padding: 0, overflow: "hidden" }),
+              ...cardBase({ padding: 0, overflow: "hidden" }),
               display: "flex",
             }}
           >
@@ -2366,9 +2439,9 @@ function BannersTab({ banners, onRefresh }) {
             </div>
             <div
               style={{
-                width: 220,
+                width: 200,
                 padding: 16,
-                borderLeft: `1px solid ${C.border}`,
+                borderLeft: `1px solid ${T.ink150}`,
                 display: "flex",
                 flexDirection: "column",
                 gap: 8,
@@ -2378,9 +2451,9 @@ function BannersTab({ banners, onRefresh }) {
               <div
                 style={{
                   fontWeight: 700,
-                  fontSize: 14,
-                  color: C.text,
-                  fontFamily: FONTS.body,
+                  fontSize: 13,
+                  color: T.ink900,
+                  fontFamily: T.font,
                 }}
               >
                 {b.name}
@@ -2388,16 +2461,17 @@ function BannersTab({ banners, onRefresh }) {
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <div
                   style={{
-                    width: 8,
-                    height: 8,
+                    width: 7,
+                    height: 7,
                     borderRadius: "50%",
-                    background: b.is_active ? C.success : C.muted,
+                    background: b.is_active ? T.success : T.ink300,
                   }}
                 />
                 <span
                   style={{
                     fontSize: 11,
-                    color: b.is_active ? C.success : C.muted,
+                    color: b.is_active ? T.success : T.ink400,
+                    fontFamily: T.font,
                   }}
                 >
                   {b.is_active ? "Active" : "Inactive"}
@@ -2405,24 +2479,26 @@ function BannersTab({ banners, onRefresh }) {
               </div>
               <button
                 onClick={() => setEditBanner({ ...b })}
-                style={btn(C.blue)}
+                style={mkBtn(T.info)}
               >
                 Edit
               </button>
               <button
                 onClick={() => toggleActive(b)}
-                style={btn(b.is_active ? C.warning : C.success)}
+                style={mkBtn(b.is_active ? T.warning : T.success)}
               >
                 {b.is_active ? "Deactivate" : "Activate"}
               </button>
-              <button onClick={() => setDeleteTarget(b)} style={btn(C.error)}>
+              <button
+                onClick={() => setDeleteTarget(b)}
+                style={mkBtn(T.danger)}
+              >
                 Delete
               </button>
             </div>
           </div>
         ))}
       </div>
-
       {deleteTarget && (
         <div
           style={{
@@ -2437,36 +2513,38 @@ function BannersTab({ banners, onRefresh }) {
         >
           <div
             style={{
-              background: C.white,
-              borderRadius: 2,
+              background: "#fff",
+              borderRadius: 8,
               padding: 28,
               maxWidth: 360,
               textAlign: "center",
+              boxShadow: T.shadowMd,
+              fontFamily: T.font,
             }}
           >
             <div
               style={{
-                fontSize: 20,
-                fontFamily: FONTS.heading,
-                color: C.error,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.danger,
                 marginBottom: 10,
               }}
             >
               Delete Banner?
             </div>
-            <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: T.ink400, marginBottom: 20 }}>
               "{deleteTarget.name}" will be permanently deleted.
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
               <button
                 onClick={() => setDeleteTarget(null)}
-                style={btn(C.muted)}
+                style={mkBtn("transparent", T.ink400)}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteTarget)}
-                style={btn(C.error)}
+                style={mkBtn(T.danger)}
               >
                 Delete
               </button>
@@ -2483,20 +2561,20 @@ function BannerPreview({ banner, compact = false }) {
   return (
     <div
       style={{
-        background: banner.bg_color || "#1b4332",
+        background: banner.bg_color || T.accent,
         color: banner.text_color || "#fff",
-        padding: compact ? "16px 20px" : "24px 28px",
+        padding: compact ? "14px 18px" : "24px 28px",
         minHeight: compact ? 80 : 120,
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
+        fontFamily: T.font,
       }}
     >
       {banner.headline && (
         <div
           style={{
-            fontFamily: FONTS.heading,
-            fontSize: compact ? 16 : 20,
+            fontSize: compact ? 15 : 20,
             fontWeight: 600,
             marginBottom: 6,
           }}
@@ -2520,12 +2598,12 @@ function BannerPreview({ banner, compact = false }) {
         <div
           style={{
             display: "inline-block",
-            background: "rgba(255,255,255,0.2)",
-            padding: "6px 14px",
-            borderRadius: 2,
+            background: "rgba(255,255,255,0.18)",
+            padding: "5px 14px",
+            borderRadius: 4,
             fontSize: compact ? 10 : 12,
             fontWeight: 600,
-            letterSpacing: "0.1em",
+            letterSpacing: "0.06em",
             alignSelf: "flex-start",
           }}
         >
@@ -2537,10 +2615,10 @@ function BannerPreview({ banner, compact = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT v2.2 — WP-GUIDE-C: InfoTooltip injected
+// MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function AdminQRCodes() {
-  const [tab, setTab] = useState("registry");
+export default function AdminQRCodes({ initialBatchId, initialTab }) {
+  const [tab, setTab] = useState(initialTab || "registry");
   const [batches, setBatches] = useState([]);
   const [banners, setBanners] = useState([]);
   const ctx = usePageContext("admin-qr", null);
@@ -2548,11 +2626,10 @@ export default function AdminQRCodes() {
   const fetchBatches = useCallback(async () => {
     const { data } = await supabase
       .from("batches")
-      .select("id, batch_number, product_name, strain")
+      .select("id,batch_number,product_name,strain")
       .order("batch_number", { ascending: false });
     setBatches(data || []);
   }, []);
-
   const fetchBanners = useCallback(async () => {
     const { data } = await supabase
       .from("qr_banners")
@@ -2569,39 +2646,45 @@ export default function AdminQRCodes() {
   const TABS = [
     { key: "registry", label: "QR Registry" },
     { key: "generate", label: "Generate" },
-    { key: "banners", label: "🪧 Banners" },
+    { key: "banners", label: "Banners" },
   ];
 
   return (
-    <div style={{ fontFamily: FONTS.body }}>
+    <div style={{ fontFamily: T.font }}>
+      {/* WorkflowGuide — always first */}
       <WorkflowGuide
         context={ctx}
         tabId="admin-qr"
         onAction={() => {}}
         defaultOpen={true}
       />
-      <div
-        style={{
-          fontFamily: FONTS.heading,
-          fontSize: 26,
-          fontWeight: 400,
-          color: C.green,
-          marginBottom: 4,
-        }}
-      >
-        QR Engine v2.0
-      </div>
-      <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>
-        6 QR types · Scan action stack · Banner library · HMAC-signed product
-        codes
+
+      {/* Header */}
+      <div style={{ marginBottom: 4 }}>
+        <h2
+          style={{
+            fontFamily: T.font,
+            fontSize: 22,
+            fontWeight: 600,
+            color: T.ink900,
+            margin: "0 0 4px",
+          }}
+        >
+          QR Engine v2.0
+        </h2>
+        <div style={{ fontSize: 13, color: T.ink400, marginBottom: 24 }}>
+          6 QR types · Scan action stack · Banner library · HMAC-signed product
+          codes
+        </div>
       </div>
 
+      {/* Underline tab bar */}
       <div
         style={{
           display: "flex",
           gap: 0,
-          marginBottom: 32,
-          borderBottom: `2px solid ${C.border}`,
+          marginBottom: 28,
+          borderBottom: `2px solid ${T.ink150}`,
         }}
       >
         {TABS.map((t) => (
@@ -2614,14 +2697,16 @@ export default function AdminQRCodes() {
               background: "none",
               cursor: "pointer",
               borderBottom:
-                tab === t.key ? `2px solid ${C.mid}` : "2px solid transparent",
+                tab === t.key
+                  ? `2px solid ${T.accent}`
+                  : "2px solid transparent",
               marginBottom: -2,
               fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
+              fontWeight: tab === t.key ? 700 : 400,
+              letterSpacing: "0.07em",
               textTransform: "uppercase",
-              color: tab === t.key ? C.mid : C.muted,
-              fontFamily: FONTS.body,
+              color: tab === t.key ? T.accent : T.ink400,
+              fontFamily: T.font,
             }}
           >
             {t.label}
@@ -2634,9 +2719,8 @@ export default function AdminQRCodes() {
         <GenerateTab
           batches={batches}
           banners={banners}
-          onGenerated={() => {
-            setTab("registry");
-          }}
+          onGenerated={() => setTab("registry")}
+          initialBatchId={initialBatchId}
         />
       )}
       {tab === "banners" && (
