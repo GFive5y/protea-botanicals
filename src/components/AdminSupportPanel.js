@@ -1,5 +1,6 @@
-// src/components/AdminSupportPanel.js v1.0
-// WP-P: Customer Communications Platform — Admin Side
+// src/components/AdminSupportPanel.js v1.1
+// WP-VISUAL: T tokens, Inter font, underline sub-nav, pill badges, no Cormorant/Jost
+// v1.0 — WP-P: Customer Communications Platform — Admin Side
 // Features: All tickets, threaded replies, status management,
 //           message template editor, broadcast composer
 // Used in AdminDashboard.js as "Support" tab
@@ -7,42 +8,90 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
 
-const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  blue: "#2c4a6e",
-  cream: "#faf9f6",
-  warm: "#f4f0e8",
-  border: "#e0dbd2",
-  muted: "#888",
-  white: "#fff",
-  text: "#1a1a1a",
-  error: "#c0392b",
-  success: "#27ae60",
-  warning: "#e67e22",
-};
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
 };
 
-const CATEGORIES = [
-  "order",
-  "loyalty",
-  "product",
-  "general",
-  "refund",
-  "technical",
-];
-const STATUSES = ["open", "pending_reply", "resolved", "closed"];
-const STATUS_COLOURS = {
-  open: { bg: "#E3F2FD", text: "#1565C0" },
-  pending_reply: { bg: "#FFF8E1", text: "#F57F17" },
-  resolved: { bg: "#E8F5E9", text: "#27ae60" },
-  closed: { bg: "#F5F5F5", text: "#888" },
+// Legacy colour aliases — keeps every C.xxx reference working unchanged
+const C = {
+  green: T.accent,
+  mid: T.accentMid,
+  accent: "#52b788",
+  gold: "#b5935a",
+  blue: T.info,
+  cream: T.ink050,
+  warm: T.ink075,
+  border: T.ink150,
+  muted: T.ink400,
+  white: "#fff",
+  text: T.ink700,
+  error: T.danger,
+  success: T.success,
+  warning: T.warning,
 };
+const F = { heading: T.font, body: T.font };
+
+// ─── SHARED STYLES ────────────────────────────────────────────────────────────
+const inputStyle = {
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontSize: 13,
+  fontFamily: T.font,
+  background: "#fff",
+  color: T.ink700,
+  outline: "none",
+  boxSizing: "border-box",
+};
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
+  padding: "9px 20px",
+  backgroundColor: disabled ? "#ccc" : bg,
+  color,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.07em",
+  textTransform: "uppercase",
+  cursor: disabled ? "not-allowed" : "pointer",
+  fontFamily: T.font,
+  opacity: disabled ? 0.6 : 1,
+});
+
+const STATUS_COLOURS = {
+  open: { bg: T.infoBg, text: T.info },
+  pending_reply: { bg: T.warningBg, text: T.warning },
+  resolved: { bg: T.successBg, text: T.success },
+  closed: { bg: T.ink075, text: T.ink400 },
+};
+const STATUSES = ["open", "pending_reply", "resolved", "closed"];
 
 const TRIGGER_LABELS = {
   ticket_opened: "Ticket Opened (auto-reply)",
@@ -59,17 +108,18 @@ const TRIGGER_LABELS = {
 
 const SUBTABS = ["Tickets", "Templates", "Broadcast"];
 
+// ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function AdminSupportPanel() {
   const [sub, setSub] = useState("Tickets");
 
   return (
-    <div style={{ fontFamily: F.body }}>
-      {/* Sub-nav */}
+    <div style={{ fontFamily: T.font }}>
+      {/* Underline sub-nav */}
       <div
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `2px solid ${C.border}`,
+          borderBottom: `2px solid ${T.ink150}`,
           marginBottom: 24,
         }}
       >
@@ -83,14 +133,14 @@ export default function AdminSupportPanel() {
               background: "none",
               cursor: "pointer",
               borderBottom:
-                sub === t ? `2px solid ${C.mid}` : "2px solid transparent",
+                sub === t ? `2px solid ${T.accent}` : "2px solid transparent",
               marginBottom: -2,
               fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
+              fontWeight: sub === t ? 700 : 400,
+              letterSpacing: "0.07em",
               textTransform: "uppercase",
-              fontFamily: F.body,
-              color: sub === t ? C.mid : C.muted,
+              fontFamily: T.font,
+              color: sub === t ? T.accent : T.ink400,
             }}
           >
             {t}
@@ -104,7 +154,7 @@ export default function AdminSupportPanel() {
   );
 }
 
-// ── TICKETS PANEL ─────────────────────────────────────────────────────────────
+// ─── TICKETS PANEL ────────────────────────────────────────────────────────────
 function TicketsPanel() {
   const [tickets, setTickets] = useState([]);
   const [active, setActive] = useState(null);
@@ -125,7 +175,6 @@ function TicketsPanel() {
     if (filter !== "all") q.eq("status", filter);
     const { data } = await q;
     setTickets(data || []);
-    // Enrich with profiles
     const ids = [
       ...new Set((data || []).map((t) => t.user_id).filter(Boolean)),
     ];
@@ -147,7 +196,6 @@ function TicketsPanel() {
     loadTickets();
   }, [loadTickets]);
 
-  // Realtime
   useEffect(() => {
     const chan = supabase
       .channel("admin-tickets")
@@ -182,7 +230,6 @@ function TicketsPanel() {
       .eq("ticket_id", ticket.id)
       .order("created_at", { ascending: true });
     setMessages(data || []);
-    // Mark customer messages as read
     const unread = (data || []).filter(
       (m) => m.sender_type === "customer" && !m.read_at,
     );
@@ -208,22 +255,24 @@ function TicketsPanel() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      await supabase.from("ticket_messages").insert({
-        ticket_id: active.id,
-        sender_type: "admin",
-        sender_id: user.id,
-        content: reply.trim(),
-      });
-      // Also write to customer_messages inbox
-      await supabase.from("customer_messages").insert({
-        user_id: active.user_id,
-        subject: `Re: ${active.subject} [${active.ticket_number}]`,
-        content: reply.trim(),
-        type: "support_reply",
-        read: false,
-        created_at: new Date().toISOString(),
-      });
-      // Update ticket status
+      await supabase
+        .from("ticket_messages")
+        .insert({
+          ticket_id: active.id,
+          sender_type: "admin",
+          sender_id: user.id,
+          content: reply.trim(),
+        });
+      await supabase
+        .from("customer_messages")
+        .insert({
+          user_id: active.user_id,
+          subject: `Re: ${active.subject} [${active.ticket_number}]`,
+          content: reply.trim(),
+          type: "support_reply",
+          read: false,
+          created_at: new Date().toISOString(),
+        });
       const newStatus =
         active.status === "pending_reply" ? "open" : active.status;
       await supabase
@@ -246,8 +295,6 @@ function TicketsPanel() {
     await supabase.from("support_tickets").update(update).eq("id", active.id);
     setActive((t) => ({ ...t, status }));
     loadTickets();
-
-    // Auto-reply on resolve
     if (status === "resolved") {
       const prof = profiles[active.user_id];
       const { data: tmpl } = await supabase
@@ -268,17 +315,19 @@ function TicketsPanel() {
         await supabase
           .from("ticket_messages")
           .insert({ ticket_id: active.id, sender_type: "auto", content });
-        await supabase.from("customer_messages").insert({
-          user_id: active.user_id,
-          subject: tmpl.subject.replace(
-            /\{\{(\w+)\}\}/g,
-            (_, k) => vars[k] || "",
-          ),
-          content,
-          type: "support_ticket",
-          read: false,
-          created_at: new Date().toISOString(),
-        });
+        await supabase
+          .from("customer_messages")
+          .insert({
+            user_id: active.user_id,
+            subject: tmpl.subject.replace(
+              /\{\{(\w+)\}\}/g,
+              (_, k) => vars[k] || "",
+            ),
+            content,
+            type: "support_ticket",
+            read: false,
+            created_at: new Date().toISOString(),
+          });
       }
     }
   };
@@ -296,9 +345,9 @@ function TicketsPanel() {
         alignItems: "start",
       }}
     >
-      {/* Ticket list */}
+      {/* ── Ticket list ── */}
       <div>
-        {/* Filter tabs */}
+        {/* Filter pills */}
         <div
           style={{
             display: "flex",
@@ -312,16 +361,16 @@ function TicketsPanel() {
               key={s}
               onClick={() => setFilter(s)}
               style={{
-                padding: "5px 10px",
-                border: `1px solid ${filter === s ? C.mid : C.border}`,
-                background: filter === s ? C.mid : C.white,
-                color: filter === s ? C.white : C.muted,
-                borderRadius: 2,
+                padding: "4px 10px",
+                border: `1px solid ${filter === s ? T.accent : T.ink150}`,
+                background: filter === s ? T.accent : "#fff",
+                color: filter === s ? "#fff" : T.ink400,
+                borderRadius: 20,
                 fontSize: 10,
                 fontWeight: 600,
-                letterSpacing: "0.15em",
+                letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                fontFamily: F.body,
+                fontFamily: T.font,
                 cursor: "pointer",
               }}
             >
@@ -329,19 +378,28 @@ function TicketsPanel() {
             </button>
           ))}
         </div>
+
         {loading ? (
-          <div style={{ color: C.muted, fontSize: 13, padding: 20 }}>
+          <div
+            style={{
+              color: T.ink400,
+              fontSize: 13,
+              padding: 20,
+              fontFamily: T.font,
+            }}
+          >
             Loading…
           </div>
         ) : tickets.length === 0 ? (
           <div
             style={{
-              color: C.muted,
+              color: T.ink400,
               fontSize: 13,
               padding: 20,
               textAlign: "center",
-              border: `1px dashed ${C.border}`,
-              borderRadius: 2,
+              border: `1px dashed ${T.ink150}`,
+              borderRadius: 6,
+              fontFamily: T.font,
             }}
           >
             No {filter !== "all" ? filter.replace("_", " ") : ""} tickets
@@ -356,27 +414,36 @@ function TicketsPanel() {
                 key={t.id}
                 onClick={() => openThread(t)}
                 style={{
-                  border: `1px solid ${isActive ? C.accent : C.border}`,
+                  border: `1px solid ${isActive ? T.accentBd : T.ink150}`,
                   borderLeft: `3px solid ${sc.text}`,
-                  borderRadius: 2,
+                  borderRadius: 6,
                   padding: "12px 14px",
                   marginBottom: 8,
                   cursor: "pointer",
-                  background: isActive ? "#f0faf4" : C.white,
+                  background: isActive ? T.accentLit : "#fff",
                   transition: "all 0.12s",
+                  boxShadow: T.shadow,
                 }}
               >
                 <div
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: C.text,
+                    color: T.ink900,
                     marginBottom: 4,
+                    fontFamily: T.font,
                   }}
                 >
                   {t.subject}
                 </div>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.ink400,
+                    marginBottom: 6,
+                    fontFamily: T.font,
+                  }}
+                >
                   {prof?.full_name || "Customer"} · {t.ticket_number}
                 </div>
                 <div
@@ -392,15 +459,22 @@ function TicketsPanel() {
                       color: sc.text,
                       fontSize: 9,
                       fontWeight: 700,
-                      letterSpacing: "0.12em",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      padding: "2px 7px",
+                      padding: "2px 8px",
                       borderRadius: 20,
+                      fontFamily: T.font,
                     }}
                   >
                     {t.status.replace("_", " ")}
                   </span>
-                  <span style={{ fontSize: 10, color: C.muted }}>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
                     {new Date(t.updated_at).toLocaleDateString("en-ZA", {
                       day: "numeric",
                       month: "short",
@@ -413,13 +487,13 @@ function TicketsPanel() {
         )}
       </div>
 
-      {/* Thread */}
+      {/* ── Thread ── */}
       <div>
         {!active ? (
           <div
             style={{
-              border: `1px dashed ${C.border}`,
-              borderRadius: 2,
+              border: `1px dashed ${T.ink150}`,
+              borderRadius: 8,
               padding: "48px 24px",
               textAlign: "center",
             }}
@@ -427,15 +501,16 @@ function TicketsPanel() {
             <div style={{ fontSize: 28, marginBottom: 12 }}>🎫</div>
             <div
               style={{
-                fontFamily: F.heading,
                 fontSize: 18,
-                color: C.green,
+                fontWeight: 600,
+                color: T.accent,
                 marginBottom: 8,
+                fontFamily: T.font,
               }}
             >
               {openCount} open ticket{openCount !== 1 ? "s" : ""}
             </div>
-            <div style={{ fontSize: 13, color: C.muted }}>
+            <div style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}>
               Select a ticket from the left to view and respond
             </div>
           </div>
@@ -444,11 +519,12 @@ function TicketsPanel() {
             {/* Thread header */}
             <div
               style={{
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 8,
                 padding: "14px 20px",
                 marginBottom: 12,
+                boxShadow: T.shadow,
               }}
             >
               <div
@@ -463,36 +539,43 @@ function TicketsPanel() {
                 <div>
                   <div
                     style={{
-                      fontFamily: F.heading,
-                      fontSize: 18,
-                      color: C.green,
+                      fontSize: 17,
+                      fontWeight: 600,
+                      color: T.ink900,
                       marginBottom: 4,
+                      fontFamily: T.font,
                     }}
                   >
                     {active.subject}
                   </div>
-                  <div style={{ fontSize: 12, color: C.muted }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
                     {profiles[active.user_id]?.full_name} ·{" "}
                     {active.ticket_number} · {active.category}
                   </div>
                 </div>
-                {/* Status changer */}
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {/* Status buttons */}
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                   {STATUSES.map((s) => (
                     <button
                       key={s}
                       onClick={() => setStatus(s)}
                       style={{
                         padding: "5px 10px",
-                        border: `1px solid ${active.status === s ? C.mid : C.border}`,
-                        background: active.status === s ? C.mid : C.white,
-                        color: active.status === s ? C.white : C.muted,
-                        borderRadius: 2,
+                        border: `1px solid ${active.status === s ? T.accent : T.ink150}`,
+                        background: active.status === s ? T.accent : "#fff",
+                        color: active.status === s ? "#fff" : T.ink400,
+                        borderRadius: 4,
                         fontSize: 9,
                         fontWeight: 700,
-                        letterSpacing: "0.1em",
+                        letterSpacing: "0.07em",
                         textTransform: "uppercase",
-                        fontFamily: F.body,
+                        fontFamily: T.font,
                         cursor: "pointer",
                       }}
                     >
@@ -506,8 +589,8 @@ function TicketsPanel() {
             {/* Messages */}
             <div
               style={{
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 8,
                 overflow: "hidden",
                 marginBottom: 12,
                 maxHeight: 440,
@@ -524,13 +607,13 @@ function TicketsPanel() {
                       padding: "14px 18px",
                       borderBottom:
                         i < messages.length - 1
-                          ? `1px solid ${C.border}`
+                          ? `1px solid ${T.ink075}`
                           : "none",
                       background: isCustomer
-                        ? "#f7f5f2"
+                        ? T.ink075
                         : isAuto
-                          ? "#f0f9f4"
-                          : C.white,
+                          ? T.accentLit
+                          : "#fff",
                     }}
                   >
                     <div
@@ -553,15 +636,15 @@ function TicketsPanel() {
                             height: 28,
                             borderRadius: "50%",
                             background: isCustomer
-                              ? C.warm
+                              ? T.ink150
                               : isAuto
-                                ? C.accent
-                                : C.green,
+                                ? T.accentBd
+                                : T.accent,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             fontSize: 11,
-                            color: isCustomer ? C.text : C.white,
+                            color: isCustomer ? T.ink700 : "#fff",
                             fontWeight: 700,
                           }}
                         >
@@ -575,7 +658,8 @@ function TicketsPanel() {
                           style={{
                             fontSize: 12,
                             fontWeight: 600,
-                            color: C.text,
+                            color: T.ink900,
+                            fontFamily: T.font,
                           }}
                         >
                           {isCustomer
@@ -585,7 +669,13 @@ function TicketsPanel() {
                               : "Support Team"}
                         </span>
                       </div>
-                      <span style={{ fontSize: 10, color: C.muted }}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: T.ink400,
+                          fontFamily: T.font,
+                        }}
+                      >
                         {new Date(m.created_at).toLocaleString("en-ZA", {
                           day: "numeric",
                           month: "short",
@@ -597,9 +687,10 @@ function TicketsPanel() {
                     <div
                       style={{
                         fontSize: 13,
-                        color: C.text,
+                        color: T.ink700,
                         lineHeight: 1.7,
                         whiteSpace: "pre-wrap",
+                        fontFamily: T.font,
                       }}
                     >
                       {m.content}
@@ -610,7 +701,7 @@ function TicketsPanel() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Admin reply */}
+            {/* Reply box */}
             <div>
               <textarea
                 value={reply}
@@ -618,17 +709,9 @@ function TicketsPanel() {
                 rows={3}
                 placeholder="Type your reply to the customer…"
                 style={{
+                  ...inputStyle,
                   width: "100%",
-                  padding: "10px 12px",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 2,
-                  fontSize: 13,
-                  fontFamily: F.body,
-                  color: C.text,
-                  background: C.white,
-                  outline: "none",
                   resize: "vertical",
-                  boxSizing: "border-box",
                   marginBottom: 10,
                 }}
               />
@@ -637,42 +720,26 @@ function TicketsPanel() {
                   onClick={sendReply}
                   disabled={sending || !reply.trim()}
                   style={{
-                    background: sending || !reply.trim() ? C.muted : C.green,
-                    color: C.white,
-                    border: "none",
-                    borderRadius: 2,
-                    padding: "10px 24px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    fontFamily: F.body,
-                    cursor:
-                      sending || !reply.trim() ? "not-allowed" : "pointer",
+                    ...makeBtn(T.accent, "#fff", sending || !reply.trim()),
                   }}
                 >
                   {sending ? "Sending…" : "Send Reply"}
                 </button>
                 <button
                   onClick={() => setStatus("resolved")}
-                  style={{
-                    background: C.success,
-                    color: C.white,
-                    border: "none",
-                    borderRadius: 2,
-                    padding: "10px 20px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.2em",
-                    textTransform: "uppercase",
-                    fontFamily: F.body,
-                    cursor: "pointer",
-                  }}
+                  style={{ ...makeBtn(T.success, "#fff") }}
                 >
                   ✓ Resolve
                 </button>
               </div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.ink400,
+                  marginTop: 8,
+                  fontFamily: T.font,
+                }}
+              >
                 Replies are sent to the customer's inbox and trigger a WhatsApp
                 notification if their phone is verified.
               </div>
@@ -684,7 +751,7 @@ function TicketsPanel() {
   );
 }
 
-// ── TEMPLATES PANEL ──────────────────────────────────────────────────────────
+// ─── TEMPLATES PANEL ──────────────────────────────────────────────────────────
 function TemplatesPanel() {
   const [templates, setTemplates] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -698,7 +765,6 @@ function TemplatesPanel() {
       .order("trigger_type");
     setTemplates(data || []);
   }, []);
-
   useEffect(() => {
     load();
   }, [load]);
@@ -719,6 +785,23 @@ function TemplatesPanel() {
     setEditing(null);
   };
 
+  const fldLabel = (text) => (
+    <label
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        display: "block",
+        marginBottom: 5,
+        fontFamily: T.font,
+      }}
+    >
+      {text}
+    </label>
+  );
+
   if (editing)
     return (
       <div style={{ maxWidth: 700 }}>
@@ -736,71 +819,46 @@ function TemplatesPanel() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: C.muted,
+              color: T.ink400,
               fontSize: 20,
               padding: 0,
             }}
           >
             ←
           </button>
-          <div style={{ fontFamily: F.heading, fontSize: 20, color: C.green }}>
+          <div
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              color: T.accent,
+              fontFamily: T.font,
+            }}
+          >
             {editing.id ? "Edit Template" : "New Template"}
           </div>
         </div>
 
         {[
-          ["name", "Admin Label", "text"],
-          ["trigger_type", "Trigger Type", "text"],
-          ["subject", "Email / Inbox Subject", "text"],
+          ["name", "Admin Label"],
+          ["trigger_type", "Trigger Type"],
+          ["subject", "Email / Inbox Subject"],
         ].map(([field, lbl]) => (
           <div key={field} style={{ marginBottom: 14 }}>
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.3em",
-                textTransform: "uppercase",
-                color: C.accent,
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              {lbl}
-            </label>
+            {fldLabel(lbl)}
             <input
               value={editing[field] || ""}
               onChange={(e) =>
                 setEditing((p) => ({ ...p, [field]: e.target.value }))
               }
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
-                fontSize: 13,
-                fontFamily: F.body,
-                boxSizing: "border-box",
-                outline: "none",
-              }}
+              style={{ ...inputStyle, width: "100%" }}
             />
           </div>
         ))}
 
         <div style={{ marginBottom: 14 }}>
-          <label
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.3em",
-              textTransform: "uppercase",
-              color: C.accent,
-              display: "block",
-              marginBottom: 6,
-            }}
-          >
-            Message Content (supports{" "}
-            {"{{first_name}} {{points}} {{tier}} {{code}} {{ticket_number}}"})
-          </label>
+          {fldLabel(
+            `Message Content (supports {{first_name}} {{points}} {{tier}} {{code}} {{ticket_number}})`,
+          )}
           <textarea
             value={editing.content || ""}
             onChange={(e) =>
@@ -808,15 +866,10 @@ function TemplatesPanel() {
             }
             rows={10}
             style={{
+              ...inputStyle,
               width: "100%",
-              padding: "10px 12px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              fontSize: 13,
-              fontFamily: F.body,
-              boxSizing: "border-box",
-              outline: "none",
               resize: "vertical",
+              minHeight: 160,
             }}
           />
         </div>
@@ -835,7 +888,7 @@ function TemplatesPanel() {
                 gap: 6,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               <input
@@ -853,38 +906,14 @@ function TemplatesPanel() {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={() => setEditing(null)}
-            style={{
-              padding: "10px 20px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              background: C.white,
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              fontFamily: F.body,
-              cursor: "pointer",
-              color: C.muted,
-            }}
+            style={{ ...makeBtn("transparent", T.ink400) }}
           >
             Cancel
           </button>
           <button
             onClick={save}
             disabled={saving}
-            style={{
-              background: saving ? C.muted : C.green,
-              color: C.white,
-              border: "none",
-              borderRadius: 2,
-              padding: "10px 24px",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              fontFamily: F.body,
-              cursor: saving ? "not-allowed" : "pointer",
-            }}
+            style={{ ...makeBtn(T.accent, "#fff", saving) }}
           >
             {saving ? "Saving…" : saved ? "✓ Saved" : "Save Template"}
           </button>
@@ -903,10 +932,24 @@ function TemplatesPanel() {
         }}
       >
         <div>
-          <div style={{ fontFamily: F.heading, fontSize: 20, color: C.green }}>
+          <div
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              color: T.accent,
+              fontFamily: T.font,
+            }}
+          >
             Message Templates
           </div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: T.ink400,
+              marginTop: 2,
+              fontFamily: T.font,
+            }}
+          >
             Auto-replies, event notifications, and system messages
           </div>
         </div>
@@ -922,19 +965,7 @@ function TemplatesPanel() {
               is_active: true,
             })
           }
-          style={{
-            background: C.green,
-            color: C.white,
-            border: "none",
-            borderRadius: 2,
-            padding: "10px 20px",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            fontFamily: F.body,
-            cursor: "pointer",
-          }}
+          style={{ ...makeBtn(T.accent, "#fff") }}
         >
           + New Template
         </button>
@@ -942,11 +973,25 @@ function TemplatesPanel() {
 
       <div
         style={{
-          border: `1px solid ${C.border}`,
-          borderRadius: 2,
+          border: `1px solid ${T.ink150}`,
+          borderRadius: 8,
           overflow: "hidden",
+          boxShadow: T.shadow,
         }}
       >
+        {templates.length === 0 && (
+          <div
+            style={{
+              padding: 32,
+              textAlign: "center",
+              color: T.ink400,
+              fontSize: 13,
+              fontFamily: T.font,
+            }}
+          >
+            No templates yet — create your first one above.
+          </div>
+        )}
         {templates.map((t, i) => (
           <div
             key={t.id}
@@ -956,8 +1001,8 @@ function TemplatesPanel() {
               gap: 12,
               padding: "12px 16px",
               borderBottom:
-                i < templates.length - 1 ? `1px solid ${C.border}` : "none",
-              background: i % 2 === 0 ? C.white : C.cream,
+                i < templates.length - 1 ? `1px solid ${T.ink075}` : "none",
+              background: i % 2 === 0 ? "#fff" : T.ink050,
             }}
           >
             <div
@@ -965,40 +1010,46 @@ function TemplatesPanel() {
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                background: t.is_active ? C.success : C.muted,
+                background: t.is_active ? T.success : T.ink300,
                 flexShrink: 0,
               }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: T.ink900,
+                  fontFamily: T.font,
+                }}
+              >
                 {t.name}
               </div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.ink400,
+                  marginTop: 2,
+                  fontFamily: T.font,
+                }}
+              >
                 {TRIGGER_LABELS[t.trigger_type] || t.trigger_type}
                 {t.send_whatsapp && (
-                  <span style={{ marginLeft: 8, color: C.success }}>
+                  <span style={{ marginLeft: 8, color: T.success }}>
                     · WhatsApp
                   </span>
                 )}
                 {t.send_inbox && (
-                  <span style={{ marginLeft: 8, color: C.blue }}>· Inbox</span>
+                  <span style={{ marginLeft: 8, color: T.info }}>· Inbox</span>
                 )}
               </div>
             </div>
             <button
               onClick={() => setEditing({ ...t })}
               style={{
-                background: C.warm,
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
-                padding: "5px 12px",
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                fontFamily: F.body,
-                cursor: "pointer",
-                color: C.text,
+                ...makeBtn("transparent", T.accentMid),
+                padding: "4px 12px",
+                fontSize: 9,
               }}
             >
               Edit
@@ -1010,7 +1061,7 @@ function TemplatesPanel() {
   );
 }
 
-// ── BROADCAST PANEL ───────────────────────────────────────────────────────────
+// ─── BROADCAST PANEL ──────────────────────────────────────────────────────────
 function BroadcastPanel() {
   const [tier, setTier] = useState("all");
   const [subject, setSubject] = useState("");
@@ -1023,16 +1074,15 @@ function BroadcastPanel() {
   const loadPreview = async () => {
     const q = supabase
       .from("user_profiles")
-      .select("id, full_name, loyalty_tier, email")
+      .select("id,full_name,loyalty_tier,email")
       .eq("email_marketing", true);
     if (tier !== "all") q.eq("loyalty_tier", tier);
     const { data } = await q.limit(5);
     setPreview(data || []);
   };
-
   useEffect(() => {
     loadPreview();
-  }, [tier]);
+  }, [tier]); // eslint-disable-line
 
   const send = async () => {
     if (!subject.trim() || !body.trim()) {
@@ -1044,11 +1094,10 @@ function BroadcastPanel() {
     try {
       const q = supabase
         .from("user_profiles")
-        .select("id, full_name")
+        .select("id,full_name")
         .eq("email_marketing", true);
       if (tier !== "all") q.eq("loyalty_tier", tier);
       const { data: recipients } = await q;
-
       const rows = (recipients || []).map((r) => ({
         user_id: r.id,
         subject: subject.trim(),
@@ -1059,12 +1108,8 @@ function BroadcastPanel() {
         read: false,
         created_at: new Date().toISOString(),
       }));
-
-      // Insert in batches of 50
-      for (let i = 0; i < rows.length; i += 50) {
+      for (let i = 0; i < rows.length; i += 50)
         await supabase.from("customer_messages").insert(rows.slice(i, i + 50));
-      }
-
       setSent(rows.length);
       setSubject("");
       setBody("");
@@ -1076,43 +1121,69 @@ function BroadcastPanel() {
     }
   };
 
+  const fldLabel = (text) => (
+    <div
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        display: "block",
+        marginBottom: 5,
+        fontFamily: T.font,
+      }}
+    >
+      {text}
+    </div>
+  );
+
   return (
     <div style={{ maxWidth: 640 }}>
       <div
         style={{
-          fontFamily: F.heading,
-          fontSize: 20,
-          color: C.green,
+          fontSize: 17,
+          fontWeight: 600,
+          color: T.accent,
           marginBottom: 4,
+          fontFamily: T.font,
         }}
       >
         Broadcast Message
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 20 }}>
+      <div
+        style={{
+          fontSize: 12,
+          color: T.ink400,
+          marginBottom: 20,
+          fontFamily: T.font,
+        }}
+      >
         Send a message to all opted-in customers (inbox delivery). Use{" "}
-        {"{{first_name}}"} for personalisation.
+        {"{{" + "first_name" + "}}"} for personalisation.
       </div>
 
       {sent && (
         <div
           style={{
-            background: "#f0f9f4",
-            border: `1px solid ${C.success}50`,
-            borderRadius: 2,
+            background: T.successBg,
+            border: `1px solid ${T.successBd}`,
+            borderRadius: 6,
             padding: "12px 16px",
             fontSize: 13,
-            color: C.success,
+            color: T.success,
             marginBottom: 16,
+            fontFamily: T.font,
           }}
         >
-          ✅ Broadcast sent to {sent} customer{sent !== 1 ? "s" : ""}.
+          Broadcast sent to {sent} customer{sent !== 1 ? "s" : ""}.
           <button
             onClick={() => setSent(null)}
             style={{
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: C.muted,
+              color: T.ink400,
               marginLeft: 12,
               fontSize: 11,
             }}
@@ -1123,31 +1194,11 @@ function BroadcastPanel() {
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <label
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.3em",
-            textTransform: "uppercase",
-            color: C.accent,
-            display: "block",
-            marginBottom: 6,
-          }}
-        >
-          Target Tier
-        </label>
+        {fldLabel("Target Tier")}
         <select
           value={tier}
           onChange={(e) => setTier(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "10px 12px",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            fontSize: 13,
-            fontFamily: F.body,
-            outline: "none",
-          }}
+          style={{ ...inputStyle, width: "100%", cursor: "pointer" }}
         >
           <option value="all">All Customers (opted-in)</option>
           <option value="Bronze">Bronze Tier Only</option>
@@ -1158,50 +1209,17 @@ function BroadcastPanel() {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <label
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.3em",
-            textTransform: "uppercase",
-            color: C.accent,
-            display: "block",
-            marginBottom: 6,
-          }}
-        >
-          Subject
-        </label>
+        {fldLabel("Subject")}
         <input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="e.g. Double Points This Weekend 🌿"
-          style={{
-            width: "100%",
-            padding: "10px 12px",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            fontSize: 13,
-            fontFamily: F.body,
-            boxSizing: "border-box",
-            outline: "none",
-          }}
+          style={{ ...inputStyle, width: "100%" }}
         />
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <label
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.3em",
-            textTransform: "uppercase",
-            color: C.accent,
-            display: "block",
-            marginBottom: 6,
-          }}
-        >
-          Message
-        </label>
+        {fldLabel("Message")}
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -1209,17 +1227,7 @@ function BroadcastPanel() {
           placeholder={
             "Hi {{first_name}},\n\nExciting news from Protea Botanicals..."
           }
-          style={{
-            width: "100%",
-            padding: "10px 12px",
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            fontSize: 13,
-            fontFamily: F.body,
-            boxSizing: "border-box",
-            outline: "none",
-            resize: "vertical",
-          }}
+          style={{ ...inputStyle, width: "100%", resize: "vertical" }}
         />
       </div>
 
@@ -1228,19 +1236,20 @@ function BroadcastPanel() {
           style={{
             marginBottom: 20,
             padding: "10px 14px",
-            background: C.cream,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            background: T.ink075,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
           }}
         >
           <div
             style={{
               fontSize: 10,
               fontWeight: 700,
-              letterSpacing: "0.2em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: C.muted,
+              color: T.ink400,
               marginBottom: 8,
+              fontFamily: T.font,
             }}
           >
             Sample recipients (first 5)
@@ -1248,7 +1257,12 @@ function BroadcastPanel() {
           {preview.map((p) => (
             <div
               key={p.id}
-              style={{ fontSize: 12, color: C.text, padding: "2px 0" }}
+              style={{
+                fontSize: 12,
+                color: T.ink700,
+                padding: "2px 0",
+                fontFamily: T.font,
+              }}
             >
               {p.full_name || "—"} · {p.loyalty_tier || "Bronze"}
             </div>
@@ -1259,13 +1273,14 @@ function BroadcastPanel() {
       {error && (
         <div
           style={{
-            background: "#fdf0ef",
-            border: `1px solid ${C.error}`,
-            borderRadius: 2,
+            background: T.dangerBg,
+            border: `1px solid ${T.dangerBd}`,
+            borderRadius: 6,
             padding: "10px 14px",
             fontSize: 13,
-            color: C.error,
+            color: T.danger,
             marginBottom: 16,
+            fontFamily: T.font,
           }}
         >
           {error}
@@ -1275,19 +1290,7 @@ function BroadcastPanel() {
       <button
         onClick={send}
         disabled={sending}
-        style={{
-          background: sending ? C.muted : C.green,
-          color: C.white,
-          border: "none",
-          borderRadius: 2,
-          padding: "12px 28px",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.2em",
-          textTransform: "uppercase",
-          fontFamily: F.body,
-          cursor: sending ? "not-allowed" : "pointer",
-        }}
+        style={{ ...makeBtn(T.accent, "#fff", sending) }}
       >
         {sending ? "Sending…" : "Send Broadcast"}
       </button>
