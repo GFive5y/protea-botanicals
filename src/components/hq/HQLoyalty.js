@@ -2934,9 +2934,9 @@ export default function HQLoyalty() {
   const isConfigTab = activeTab < 7;
   const isDirty =
     draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false;
-  function showToast(msg, type = "success") {
+  const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
-  }
+  }, []);
 
   useEffect(() => {
     loadAll();
