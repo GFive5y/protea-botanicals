@@ -1,12 +1,28 @@
-// src/components/AdminFraudSecurity.js v1.2
+// src/components/AdminFraudSecurity.js v1.3
+// WP-VIZ: Flagged vs Clean donut + Detection reason bar + Scan trend area
 // WP-GUIDE: WorkflowGuide + usePageContext added
 // WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // v1.0 — March 2026 · WP8 — Fraud Detection, Security & POPIA
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "./viz";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -853,6 +869,297 @@ export default function AdminFraudSecurity() {
           </div>
         ))}
       </div>
+
+      {/* ── WP-VIZ CHARTS ── */}
+      {!loading &&
+        scans.length > 0 &&
+        (() => {
+          // Chart 1: Flagged vs Clean donut
+          const flagDonut = [
+            { name: "Flagged", value: flaggedScans.length, color: T.danger },
+            {
+              name: "Auto-Detected",
+              value: detections.filter(
+                (d) => !scans.find((s) => s.id === d.scanId && s.scan_flagged),
+              ).length,
+              color: T.warning,
+            },
+            {
+              name: "Clean",
+              value:
+                scans.length -
+                flaggedScans.length -
+                detections.filter(
+                  (d) =>
+                    !scans.find((s) => s.id === d.scanId && s.scan_flagged),
+                ).length,
+              color: T.success,
+            },
+          ].filter((d) => d.value > 0);
+
+          // Chart 2: Detection reason bar
+          const reasonBar = [
+            "velocity",
+            "travel",
+            "bulk",
+            "distance",
+            "foreign",
+          ]
+            .map((r) => ({
+              name: r.charAt(0).toUpperCase() + r.slice(1),
+              detected: detections.filter((d) => d.reason === r).length,
+              flagged: scans.filter(
+                (s) =>
+                  s.scan_flagged &&
+                  (s.flag_reason || "").toLowerCase().includes(r),
+              ).length,
+              color: FLAG_COLORS[r]?.color || T.ink400,
+            }))
+            .filter((d) => d.detected + d.flagged > 0);
+
+          // Chart 3: Scan trend — last 14 days
+          const dayMap = {};
+          scans.forEach((s) => {
+            if (!s.scan_date) return;
+            const day = new Date(s.scan_date).toLocaleDateString("en-ZA", {
+              month: "short",
+              day: "numeric",
+            });
+            dayMap[day] = dayMap[day] || { date: day, total: 0, flagged: 0 };
+            dayMap[day].total++;
+            if (s.scan_flagged) dayMap[day].flagged++;
+          });
+          const trendData = Object.values(dayMap).slice(-14);
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 16,
+                marginBottom: 24,
+              }}
+            >
+              {/* Donut — flagged vs clean */}
+              <ChartCard title="Scan Health Overview" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={flagDonut}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {flagDonut.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={<ChartTooltip formatter={(v) => `${v} scans`} />}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* Bar — detections by reason */}
+              <ChartCard title="Detections by Reason" height={200}>
+                {reasonBar.length === 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 13,
+                      color: T.success,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    ✓ No detections
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={reasonBar}
+                      margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                    >
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={4}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={24}
+                        allowDecimals={false}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar
+                        dataKey="detected"
+                        name="Detected"
+                        isAnimationActive={false}
+                        maxBarSize={28}
+                        radius={[3, 3, 0, 0]}
+                      >
+                        {reasonBar.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+
+              {/* Area — scan trend */}
+              <ChartCard title="Scan Activity — Last 14 Days" height={200}>
+                {trendData.length < 2 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 13,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No trend data
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={trendData}
+                      margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="fs-total-grad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={T.accentMid}
+                            stopOpacity={0.15}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={T.accentMid}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                        <linearGradient
+                          id="fs-flag-grad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={T.danger}
+                            stopOpacity={0.2}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={T.danger}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 9,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={4}
+                        interval="preserveStartEnd"
+                        maxRotation={0}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 9,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={22}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        content={
+                          <ChartTooltip
+                            formatter={(v, n) =>
+                              n === "Flagged" ? `${v} flagged` : `${v} scans`
+                            }
+                          />
+                        }
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        name="Total"
+                        stroke={T.accentMid}
+                        strokeWidth={2}
+                        fill="url(#fs-total-grad)"
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="flagged"
+                        name="Flagged"
+                        stroke={T.danger}
+                        strokeWidth={1.5}
+                        fill="url(#fs-flag-grad)"
+                        dot={false}
+                        isAnimationActive={false}
+                        strokeDasharray="4 3"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* ── UNDERLINE TABS ── */}
       <div
