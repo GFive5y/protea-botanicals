@@ -1,13 +1,16 @@
 // src/components/AdminBatchManager.js
+// v1.4 — WP-VIZ: Batch Status Donut + Units Produced HBar + Activation Rate HBar
 // v1.3 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // v1.2 — WP-GUIDE-C++: usePageContext 'batches' wired + WorkflowGuide added
 // v1.1 — WP-I: COA source document link on batch card when coa_document_id is set
 // v1.0 — March 2026
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "./viz";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -1344,6 +1347,311 @@ export default function AdminBatchManager({
           </div>
         ))}
       </div>
+
+      {/* ── WP-VIZ CHARTS ── */}
+      {!loading &&
+        batches.length > 0 &&
+        (() => {
+          // Chart 1: Batch status donut
+          const archived = batches.filter((b) => b.is_archived).length;
+          const expiring = batches.filter(
+            (b) =>
+              !b.is_archived &&
+              daysUntil(b.expiry_date) !== null &&
+              daysUntil(b.expiry_date) <= 30,
+          ).length;
+          const active = batches.filter(
+            (b) =>
+              !b.is_archived &&
+              (daysUntil(b.expiry_date) === null ||
+                daysUntil(b.expiry_date) > 30),
+          ).length;
+          const statusDonut = [
+            { name: "Active", value: active, color: T.success },
+            { name: "Expiring", value: expiring, color: T.warning },
+            { name: "Archived", value: archived, color: T.ink300 },
+          ].filter((d) => d.value > 0);
+
+          // Chart 2: Units produced per batch (top 8, horizontal bars)
+          const unitsBar = [...batches]
+            .filter((b) => !b.is_archived && (b.units_produced || 0) > 0)
+            .sort((a, b) => (b.units_produced || 0) - (a.units_produced || 0))
+            .slice(0, 8)
+            .map((b) => ({
+              name: b.batch_number?.slice(-6) || b.batch_number,
+              units: b.units_produced || 0,
+            }));
+          const unitsMax = Math.max(...unitsBar.map((d) => d.units), 1);
+
+          // Chart 3: Activation rate per batch (top 8 by QR count)
+          const rateBar = batches
+            .filter((b) => !b.is_archived && statsMap[b.id]?.qr_count > 0)
+            .map((b) => ({
+              name: b.batch_number?.slice(-6) || b.batch_number,
+              rate: parseFloat(
+                pct(
+                  statsMap[b.id]?.claimed_count || 0,
+                  statsMap[b.id]?.qr_count || 1,
+                ),
+              ),
+              qr: statsMap[b.id]?.qr_count || 0,
+            }))
+            .sort((a, b) => b.qr - a.qr)
+            .slice(0, 8);
+          const showCharts = statusDonut.length > 0;
+
+          if (!showCharts) return null;
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              {/* Donut — batch status */}
+              <ChartCard title="Batch Status" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusDonut}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {statusDonut.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={
+                        <ChartTooltip formatter={(v) => `${v} batches`} />
+                      }
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* HBar — units produced per batch */}
+              <ChartCard title="Units Produced per Batch" height={200}>
+                {unitsBar.length === 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 13,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No production data
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "8px 4px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      height: "100%",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {unitsBar.map((d) => (
+                      <div
+                        key={d.name}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 9,
+                            color: T.ink400,
+                            fontFamily: "monospace",
+                            width: 54,
+                            flexShrink: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {d.name}
+                        </span>
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 14,
+                            background: T.ink075,
+                            borderRadius: 3,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${(d.units / unitsMax) * 100}%`,
+                              background: T.accentMid,
+                              borderRadius: 3,
+                              transition: "width 0.5s",
+                              display: "flex",
+                              alignItems: "center",
+                              paddingLeft: 4,
+                            }}
+                          >
+                            {d.units / unitsMax > 0.25 && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: "#fff",
+                                  fontWeight: 700,
+                                  fontFamily: T.font,
+                                }}
+                              >
+                                {d.units.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: T.ink400,
+                            fontFamily: T.font,
+                            minWidth: 32,
+                            textAlign: "right",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {d.units / unitsMax <= 0.25
+                            ? d.units.toLocaleString()
+                            : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ChartCard>
+
+              {/* HBar — QR activation rate per batch */}
+              <ChartCard title="QR Activation Rate" height={200}>
+                {rateBar.length === 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 13,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No QR data yet
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "8px 4px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      height: "100%",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {rateBar.map((d) => (
+                      <div
+                        key={d.name}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 9,
+                            color: T.ink400,
+                            fontFamily: "monospace",
+                            width: 54,
+                            flexShrink: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {d.name}
+                        </span>
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 14,
+                            background: T.ink075,
+                            borderRadius: 3,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${Math.min(d.rate, 100)}%`,
+                              background:
+                                d.rate >= 50
+                                  ? T.success
+                                  : d.rate >= 25
+                                    ? T.accentMid
+                                    : T.warning,
+                              borderRadius: 3,
+                              transition: "width 0.5s",
+                              display: "flex",
+                              alignItems: "center",
+                              paddingLeft: 4,
+                            }}
+                          >
+                            {d.rate >= 15 && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: "#fff",
+                                  fontWeight: 700,
+                                  fontFamily: T.font,
+                                }}
+                              >
+                                {d.rate}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: T.ink400,
+                            fontFamily: T.font,
+                            minWidth: 30,
+                            textAlign: "right",
+                          }}
+                        >
+                          {d.rate < 15 ? `${d.rate}%` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* Expiring warning */}
       {expiringBatches > 0 && (
