@@ -918,9 +918,8 @@ export default function HQProduction() {
           .order("production_date", { ascending: false }),
         supabase
           .from("wholesale_partners")
-          .select("id,name,contact_name")
-          .eq("is_active", true)
-          .order("name"),
+          .select("id,business_name,contact_name")
+          .order("business_name"),
       ]);
       if (itemsR.error) throw itemsR.error;
       if (runsR.error) throw runsR.error;
@@ -4304,7 +4303,9 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
     try {
       const partner = partners.find((p) => p.id === form.partner_id);
       const ref =
-        form.channel === "wholesale" && partner ? partner.name : form.channel;
+        form.channel === "wholesale" && partner
+          ? partner.business_name
+          : form.channel;
       await supabase.from("stock_movements").insert({
         item_id: form.item_id,
         quantity: -qty,
@@ -4539,7 +4540,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                   <option value="">— Select Partner —</option>
                   {partners.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}
+                      {p.business_name}
                     </option>
                   ))}
                 </select>
