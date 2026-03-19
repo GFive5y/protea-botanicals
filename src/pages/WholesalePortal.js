@@ -105,16 +105,18 @@ export default function WholesalePortal() {
   }, []);
 
   const fetchOrders = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
-      .from("wholesale_orders")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    setOrders(data || []);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("wholesale_orders")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (!error) setOrders(data || []);
+    } catch (_) {}
   };
 
   const updateCart = (id, qty) => {
