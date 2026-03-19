@@ -1,87 +1,97 @@
 // src/components/AdminShipments.js
-// v1.0 — March 2026
-// WP3 — Distribution & Shipment Tracking
-// Features:
-//   - Shipment card grid with status pipeline
-//   - Create shipment: destination, courier, dates, line items
-//   - Auto shipment number generation
-//   - Status progression: draft → dispatched → in_transit → delivered → confirmed
-//   - Line items: link inventory items or free-text
-//   - Shipment detail modal: full item list, timeline, tracking
-//   - Stats: active shipments, delivered this month, total units shipped
-//   - Search + filter by status
+// v1.1 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
+// v1.0 — March 2026 · WP3 — Distribution & Shipment Tracking
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
+// Legacy aliases
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink400,
+  text: T.ink700,
   white: "#fff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef9f0",
-  lightGreen: "#eafaf1",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  purple: "#6c3483",
-  lightPurple: "#f5eef8",
+  red: T.danger,
+  lightRed: T.dangerBg,
+  orange: T.warning,
+  lightOrange: T.warningBg,
+  lightGreen: T.accentLit,
+  blue: T.info,
+  lightBlue: T.infoBg,
 };
-const FONTS = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', 'Helvetica Neue', sans-serif",
-};
+const FONTS = { heading: T.font, body: T.font };
 
-// ─── Status pipeline ──────────────────────────────────────────────────────────
+// ─── STATUS PIPELINE ─────────────────────────────────────────────────────────
 const STATUS = {
   preparing: {
     label: "Preparing",
-    color: C.muted,
-    bg: "#f5f5f5",
-    icon: "📋",
+    color: T.ink400,
+    bg: T.ink075,
     next: "shipped",
   },
   shipped: {
     label: "Shipped",
-    color: C.blue,
-    bg: C.lightBlue,
-    icon: "📦",
+    color: T.info,
+    bg: T.infoBg,
     next: "in_transit",
   },
   in_transit: {
     label: "In Transit",
-    color: C.orange,
-    bg: C.lightOrange,
-    icon: "🚚",
+    color: T.warning,
+    bg: T.warningBg,
     next: "delivered",
   },
   delivered: {
     label: "Delivered",
-    color: C.mid,
-    bg: C.lightGreen,
-    icon: "✅",
+    color: T.success,
+    bg: T.successBg,
     next: "confirmed",
   },
   confirmed: {
     label: "Confirmed",
-    color: C.accent,
-    bg: C.lightGreen,
-    icon: "🎯",
+    color: T.accentMid,
+    bg: T.accentLit,
     next: null,
   },
   cancelled: {
     label: "Cancelled",
-    color: C.red,
-    bg: C.lightRed,
-    icon: "✕",
+    color: T.danger,
+    bg: T.dangerBg,
     next: null,
   },
 };
@@ -93,45 +103,34 @@ const STATUS_ORDER = [
   "confirmed",
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const inputStyle = {
   width: "100%",
-  padding: "10px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
   fontSize: 13,
-  fontFamily: FONTS.body,
-  backgroundColor: C.white,
-  color: C.text,
+  fontFamily: T.font,
+  backgroundColor: "#fff",
+  color: T.ink700,
   boxSizing: "border-box",
   outline: "none",
 };
-const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "9px 18px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: "none",
-  borderRadius: 2,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
   fontSize: 11,
   fontWeight: 700,
-  letterSpacing: "0.2em",
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
   cursor: disabled ? "not-allowed" : "pointer",
-  fontFamily: FONTS.body,
+  fontFamily: T.font,
   opacity: disabled ? 0.6 : 1,
-  transition: "opacity 0.2s",
+  transition: "opacity 0.15s",
 });
-const sectionHead = {
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: "0.2em",
-  color: C.muted,
-  textTransform: "uppercase",
-  marginBottom: 12,
-  borderBottom: `1px solid ${C.border}`,
-  paddingBottom: 8,
-  marginTop: 4,
-};
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -139,15 +138,6 @@ function fmtDate(d) {
     day: "numeric",
     month: "short",
     year: "numeric",
-  });
-}
-function fmtDateTime(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 function daysUntil(dateStr) {
@@ -161,45 +151,46 @@ function autoShipNumber(existing) {
   return `SHP-${y}${m}-${seq}`;
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// ─── STATUS BADGE ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
-  const s = STATUS[status] || STATUS.draft;
+  const s = STATUS[status] || STATUS.preparing;
   return (
     <span
       style={{
-        padding: "3px 10px",
+        padding: "2px 10px",
         borderRadius: 20,
         fontSize: 10,
         fontWeight: 700,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.07em",
         textTransform: "uppercase",
-        backgroundColor: s.bg,
+        background: s.bg,
         color: s.color,
         border: `1px solid ${s.color}40`,
         whiteSpace: "nowrap",
+        fontFamily: T.font,
       }}
     >
-      {s.icon} {s.label}
+      {s.label}
     </span>
   );
 }
 
-// ─── Status Progress Bar ──────────────────────────────────────────────────────
+// ─── STATUS PIPELINE BAR ─────────────────────────────────────────────────────
 function StatusPipeline({ status }) {
   const idx = STATUS_ORDER.indexOf(status);
   return (
-    <div style={{ display: "flex", gap: 0, marginBottom: 4 }}>
+    <div style={{ display: "flex", gap: 2, marginBottom: 4 }}>
       {STATUS_ORDER.map((s, i) => {
         const active = i <= idx;
         const current = i === idx;
         return (
-          <div key={s} style={{ flex: 1, position: "relative" }}>
+          <div key={s} style={{ flex: 1 }}>
             <div
               style={{
                 height: 4,
-                backgroundColor: active ? STATUS[s].color : C.border,
-                transition: "background-color 0.3s",
-                marginRight: i < STATUS_ORDER.length - 1 ? 2 : 0,
+                background: active ? STATUS[s].color : T.ink150,
+                borderRadius: 2,
+                transition: "background 0.3s",
               }}
             />
             {current && (
@@ -209,9 +200,9 @@ function StatusPipeline({ status }) {
                   color: STATUS[s].color,
                   textAlign: "center",
                   marginTop: 3,
-                  fontFamily: FONTS.body,
+                  fontFamily: T.font,
                   fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                 }}
               >
@@ -225,7 +216,7 @@ function StatusPipeline({ status }) {
   );
 }
 
-// ─── Shipment Card ────────────────────────────────────────────────────────────
+// ─── SHIPMENT CARD ────────────────────────────────────────────────────────────
 function ShipmentCard({
   shipment,
   itemCount,
@@ -234,7 +225,7 @@ function ShipmentCard({
   onView,
   onCancel,
 }) {
-  const s = STATUS[shipment.status] || STATUS.draft;
+  const s = STATUS[shipment.status] || STATUS.preparing;
   const eta = shipment.estimated_arrival
     ? daysUntil(shipment.estimated_arrival)
     : null;
@@ -242,23 +233,27 @@ function ShipmentCard({
     eta !== null &&
     eta < 0 &&
     !["delivered", "confirmed", "cancelled"].includes(shipment.status);
+  const cardBd = isLate
+    ? T.dangerBd
+    : shipment.status === "in_transit"
+      ? T.warningBd
+      : T.ink150;
 
   return (
     <div
       style={{
-        background: C.white,
-        border: `1px solid ${isLate ? C.red : shipment.status === "in_transit" ? C.orange : C.border}`,
-        borderRadius: 2,
+        background: "#fff",
+        border: `1px solid ${cardBd}`,
+        borderRadius: 8,
         padding: 20,
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        transition: "box-shadow 0.2s",
+        boxShadow: T.shadow,
+        transition: "box-shadow 0.15s",
       }}
-      onMouseEnter={(e) =>
-        (e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.07)")
-      }
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = T.shadowMd)}
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = T.shadow)}
     >
       {/* Header */}
       <div
@@ -272,10 +267,10 @@ function ShipmentCard({
         <div>
           <div
             style={{
-              fontFamily: FONTS.heading,
-              fontSize: 18,
-              color: C.green,
+              fontFamily: T.font,
+              fontSize: 15,
               fontWeight: 600,
+              color: T.ink900,
             }}
           >
             {shipment.shipment_number}
@@ -283,7 +278,7 @@ function ShipmentCard({
           <div
             style={{
               fontSize: 13,
-              color: C.text,
+              color: T.ink700,
               fontWeight: 500,
               marginTop: 2,
             }}
@@ -297,17 +292,18 @@ function ShipmentCard({
       {/* Pipeline */}
       <StatusPipeline status={shipment.status} />
 
-      {/* Stats row */}
+      {/* Attributes */}
       <div
         style={{
           display: "flex",
-          gap: 16,
+          gap: 12,
           fontSize: 12,
-          color: C.muted,
+          color: T.ink400,
           flexWrap: "wrap",
+          fontFamily: T.font,
         }}
       >
-        {shipment.courier && <span>🚚 {shipment.courier}</span>}
+        {shipment.courier && <span>{shipment.courier}</span>}
         {shipment.tracking_number && (
           <span style={{ fontFamily: "monospace" }}>
             #{shipment.tracking_number}
@@ -315,7 +311,7 @@ function ShipmentCard({
         )}
         {itemCount > 0 && (
           <span>
-            📦 {itemCount} SKU{itemCount !== 1 ? "s" : ""} · {totalUnits} units
+            {itemCount} SKU{itemCount !== 1 ? "s" : ""} · {totalUnits} units
           </span>
         )}
       </div>
@@ -324,10 +320,11 @@ function ShipmentCard({
       <div
         style={{
           display: "flex",
-          gap: 16,
+          gap: 14,
           fontSize: 11,
-          color: C.muted,
+          color: T.ink400,
           flexWrap: "wrap",
+          fontFamily: T.font,
         }}
       >
         {shipment.shipped_date && (
@@ -337,16 +334,16 @@ function ShipmentCard({
           <span
             style={{
               color: isLate
-                ? C.red
+                ? T.danger
                 : eta !== null && eta <= 2
-                  ? C.orange
-                  : C.muted,
+                  ? T.warning
+                  : T.ink400,
             }}
           >
             ETA: {fmtDate(shipment.estimated_arrival)}
             {eta !== null &&
             !["delivered", "confirmed", "cancelled"].includes(shipment.status)
-              ? " (" + (eta < 0 ? Math.abs(eta) + "d late" : eta + "d") + ")"
+              ? ` (${eta < 0 ? Math.abs(eta) + "d late" : eta + "d"})`
               : ""}
           </span>
         )}
@@ -356,8 +353,15 @@ function ShipmentCard({
       </div>
 
       {isLate && (
-        <div style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>
-          ⚠ Shipment overdue
+        <div
+          style={{
+            fontSize: 11,
+            color: T.danger,
+            fontWeight: 600,
+            fontFamily: T.font,
+          }}
+        >
+          Shipment overdue
         </div>
       )}
 
@@ -366,33 +370,33 @@ function ShipmentCard({
         <button
           onClick={() => onView(shipment)}
           style={{
-            ...makeBtn(C.blue),
+            ...makeBtn(T.info),
             fontSize: 10,
             padding: "7px 14px",
             flex: 1,
           }}
         >
-          📋 Details
+          Details
         </button>
         {s.next && (
           <button
             onClick={() => onAdvance(shipment, s.next)}
             style={{
-              ...makeBtn(STATUS[s.next]?.color || C.mid),
+              ...makeBtn(STATUS[s.next]?.color || T.accentMid),
               fontSize: 10,
               padding: "7px 14px",
               flex: 1,
             }}
           >
-            {STATUS[s.next]?.icon} {STATUS[s.next]?.label}
+            {STATUS[s.next]?.label}
           </button>
         )}
         {!["delivered", "confirmed", "cancelled"].includes(shipment.status) && (
           <button
             onClick={() => onCancel(shipment)}
             style={{
-              ...makeBtn("transparent", C.red),
-              border: `1px solid ${C.red}`,
+              ...makeBtn("transparent", T.danger),
+              border: `1px solid ${T.dangerBd}`,
               fontSize: 10,
               padding: "7px 12px",
             }}
@@ -405,7 +409,7 @@ function ShipmentCard({
   );
 }
 
-// ─── Create Shipment Form ─────────────────────────────────────────────────────
+// ─── CREATE FORM (DRAWER) ─────────────────────────────────────────────────────
 function CreateShipmentForm({
   inventoryItems,
   existingShipments,
@@ -486,10 +490,8 @@ function CreateShipmentForm({
       setError("Add at least one line item.");
       return;
     }
-
     setSaving(true);
     try {
-      // Get current user's tenant_id
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -499,7 +501,6 @@ function CreateShipmentForm({
         .eq("id", user.id)
         .single();
       const tenantId = profile?.tenant_id || null;
-
       const { data: shp, error: shpErr } = await supabase
         .from("shipments")
         .insert({
@@ -517,7 +518,6 @@ function CreateShipmentForm({
         .select()
         .single();
       if (shpErr) throw shpErr;
-
       const items = validLines.map((l) => ({
         shipment_id: shp.id,
         inventory_item_id: l.inventory_item_id || null,
@@ -534,7 +534,6 @@ function CreateShipmentForm({
         .from("shipment_items")
         .insert(items);
       if (itemErr) throw itemErr;
-
       onSave(shp);
     } catch (err) {
       setError(err.message);
@@ -552,6 +551,40 @@ function CreateShipmentForm({
     0,
   );
 
+  const fldLabel = (text) => (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.07em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        marginBottom: 5,
+        fontFamily: T.font,
+      }}
+    >
+      {text}
+    </div>
+  );
+  const sectionHdr = (text) => (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        marginBottom: 12,
+        marginTop: 8,
+        paddingBottom: 8,
+        borderBottom: `1px solid ${T.ink150}`,
+        fontFamily: T.font,
+      }}
+    >
+      {text}
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -559,18 +592,17 @@ function CreateShipmentForm({
         top: 0,
         right: 0,
         bottom: 0,
-        width: "min(600px, 100vw)",
-        background: C.white,
+        width: "min(600px,100vw)",
+        background: "#fff",
         boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
         zIndex: 1000,
         overflowY: "auto",
-        fontFamily: FONTS.body,
+        fontFamily: T.font,
       }}
     >
-      {/* Header */}
       <div
         style={{
-          background: C.green,
+          background: T.accent,
           padding: "20px 24px",
           position: "sticky",
           top: 0,
@@ -578,11 +610,16 @@ function CreateShipmentForm({
         }}
       >
         <div
-          style={{ fontFamily: FONTS.heading, fontSize: 22, color: C.white }}
+          style={{
+            fontFamily: T.font,
+            fontSize: 18,
+            fontWeight: 600,
+            color: "#fff",
+          }}
         >
           New Shipment
         </div>
-        <div style={{ fontSize: 12, color: C.accent, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: T.accentBd, marginTop: 2 }}>
           Create distribution order to retailer
         </div>
         <button
@@ -593,7 +630,7 @@ function CreateShipmentForm({
             right: 16,
             background: "none",
             border: "none",
-            color: C.white,
+            color: "#fff",
             fontSize: 22,
             cursor: "pointer",
           }}
@@ -607,25 +644,23 @@ function CreateShipmentForm({
           <div
             style={{
               padding: "10px 14px",
-              background: C.lightRed,
-              border: `1px solid ${C.red}`,
-              borderRadius: 2,
-              color: C.red,
+              background: T.dangerBg,
+              border: `1px solid ${T.dangerBd}`,
+              borderRadius: 4,
+              color: T.danger,
               fontSize: 13,
               marginBottom: 16,
             }}
           >
-            ⚠ {error}
+            {error}
           </div>
         )}
 
-        <div style={sectionHead}>Shipment Details</div>
+        {sectionHdr("Shipment Details")}
 
         <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-              Shipment Number
-            </div>
+            {fldLabel("Shipment Number")}
             <input
               style={inputStyle}
               value={form.shipment_number}
@@ -633,9 +668,7 @@ function CreateShipmentForm({
             />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-              Status
-            </div>
+            {fldLabel("Status")}
             <select
               style={{ ...inputStyle, cursor: "pointer" }}
               value={form.status}
@@ -646,11 +679,8 @@ function CreateShipmentForm({
             </select>
           </div>
         </div>
-
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-            Destination (Retailer / Stockist) *
-          </div>
+          {fldLabel("Destination (Retailer / Stockist) *")}
           <input
             style={inputStyle}
             value={form.destination_name}
@@ -658,37 +688,29 @@ function CreateShipmentForm({
             placeholder="e.g. Cape Town Dispensary"
           />
         </div>
-
         <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-              Courier
-            </div>
+            {fldLabel("Courier")}
             <input
               style={inputStyle}
               value={form.courier}
               onChange={(e) => set("courier", e.target.value)}
-              placeholder="e.g. Courier Guy, FastWay"
+              placeholder="e.g. Courier Guy"
             />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-              Tracking Number
-            </div>
+            {fldLabel("Tracking Number")}
             <input
               style={inputStyle}
               value={form.tracking_number}
               onChange={(e) => set("tracking_number", e.target.value)}
-              placeholder="Waybill / tracking #"
+              placeholder="Waybill #"
             />
           </div>
         </div>
-
         <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-              Dispatch Date
-            </div>
+            {fldLabel("Dispatch Date")}
             <input
               style={inputStyle}
               type="date"
@@ -697,9 +719,7 @@ function CreateShipmentForm({
             />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-              Estimated Arrival
-            </div>
+            {fldLabel("Estimated Arrival")}
             <input
               style={inputStyle}
               type="date"
@@ -708,11 +728,8 @@ function CreateShipmentForm({
             />
           </div>
         </div>
-
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>
-            Notes
-          </div>
+          {fldLabel("Notes")}
           <textarea
             style={{ ...inputStyle, minHeight: 56, resize: "vertical" }}
             value={form.notes}
@@ -721,21 +738,28 @@ function CreateShipmentForm({
           />
         </div>
 
-        <div style={sectionHead}>Line Items</div>
+        {sectionHdr("Line Items")}
 
         {lineItems.map((line, i) => (
           <div
             key={i}
             style={{
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
+              border: `1px solid ${T.ink150}`,
+              borderRadius: 6,
               padding: 12,
               marginBottom: 10,
             }}
           >
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <div style={{ flex: 3 }}>
-                <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginBottom: 3,
+                    fontFamily: T.font,
+                  }}
+                >
                   Inventory Item (optional)
                 </div>
                 <select
@@ -758,11 +782,11 @@ function CreateShipmentForm({
                   onClick={() => removeLine(i)}
                   style={{
                     background: "none",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 2,
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 4,
                     padding: "6px 10px",
                     cursor: "pointer",
-                    color: C.muted,
+                    color: T.ink400,
                     alignSelf: "flex-end",
                   }}
                 >
@@ -772,7 +796,14 @@ function CreateShipmentForm({
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <div style={{ flex: 3 }}>
-                <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginBottom: 3,
+                    fontFamily: T.font,
+                  }}
+                >
                   Item Name *
                 </div>
                 <input
@@ -783,7 +814,14 @@ function CreateShipmentForm({
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginBottom: 3,
+                    fontFamily: T.font,
+                  }}
+                >
                   SKU
                 </div>
                 <input
@@ -794,7 +832,14 @@ function CreateShipmentForm({
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginBottom: 3,
+                    fontFamily: T.font,
+                  }}
+                >
                   Qty *
                 </div>
                 <input
@@ -807,7 +852,14 @@ function CreateShipmentForm({
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginBottom: 3,
+                    fontFamily: T.font,
+                  }}
+                >
                   Unit Price
                 </div>
                 <input
@@ -826,8 +878,8 @@ function CreateShipmentForm({
         <button
           onClick={addLine}
           style={{
-            ...makeBtn("transparent", C.mid),
-            border: `1px solid ${C.border}`,
+            ...makeBtn("transparent", T.accentMid),
+            border: `1px solid ${T.accentBd}`,
             fontSize: 10,
             padding: "7px 14px",
             marginBottom: 20,
@@ -836,28 +888,37 @@ function CreateShipmentForm({
           + Add Line Item
         </button>
 
-        {/* Totals */}
         {totalUnits > 0 && (
           <div
             style={{
               padding: "12px 16px",
-              background: C.cream,
-              borderRadius: 2,
+              background: T.ink075,
+              borderRadius: 4,
               marginBottom: 20,
               display: "flex",
               justifyContent: "space-between",
               fontSize: 13,
+              fontFamily: T.font,
             }}
           >
-            <span style={{ color: C.muted }}>
+            <span style={{ color: T.ink400 }}>
               Total:{" "}
-              <strong style={{ color: C.text }}>{totalUnits} units</strong>
+              <strong
+                style={{ color: T.ink900, fontVariantNumeric: "tabular-nums" }}
+              >
+                {totalUnits} units
+              </strong>
             </span>
             {totalValue > 0 && (
-              <span style={{ color: C.muted }}>
+              <span style={{ color: T.ink400 }}>
                 Value:{" "}
-                <strong style={{ color: C.green }}>
-                  R{totalValue.toLocaleString()}
+                <strong
+                  style={{
+                    color: T.accent,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  R{totalValue.toLocaleString("en-ZA")}
                 </strong>
               </span>
             )}
@@ -869,21 +930,21 @@ function CreateShipmentForm({
             display: "flex",
             gap: 12,
             paddingTop: 12,
-            borderTop: `1px solid ${C.border}`,
+            borderTop: `1px solid ${T.ink150}`,
           }}
         >
           <button
             onClick={handleSave}
             disabled={saving}
-            style={{ ...makeBtn(C.green, C.white, saving), flex: 1 }}
+            style={{ ...makeBtn(T.accent, "#fff", saving), flex: 1 }}
           >
             {saving ? "Creating…" : "Create Shipment"}
           </button>
           <button
             onClick={onCancel}
             style={{
-              ...makeBtn("transparent", C.muted),
-              border: `1px solid ${C.border}`,
+              ...makeBtn("transparent", T.ink400),
+              border: `1px solid ${T.ink150}`,
             }}
           >
             Cancel
@@ -894,9 +955,9 @@ function CreateShipmentForm({
   );
 }
 
-// ─── Detail Modal ─────────────────────────────────────────────────────────────
+// ─── DETAIL MODAL ─────────────────────────────────────────────────────────────
 function DetailModal({ shipment, items, onClose, onAdvance }) {
-  const s = STATUS[shipment.status] || STATUS.draft;
+  const s = STATUS[shipment.status] || STATUS.preparing;
   const totalUnits = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
   const totalValue = items.reduce((sum, i) => sum + (i.total_cost || 0), 0);
 
@@ -905,7 +966,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.5)",
+        background: "rgba(0,0,0,0.45)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -914,14 +975,15 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
     >
       <div
         style={{
-          background: C.white,
-          borderRadius: 2,
+          background: "#fff",
+          borderRadius: 8,
           padding: 32,
           maxWidth: 560,
           width: "90%",
           maxHeight: "85vh",
           overflowY: "auto",
-          fontFamily: FONTS.body,
+          fontFamily: T.font,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
         }}
       >
         <div
@@ -935,9 +997,10 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
           <div>
             <div
               style={{
-                fontFamily: FONTS.heading,
-                fontSize: 24,
-                color: C.green,
+                fontFamily: T.font,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.ink900,
               }}
             >
               {shipment.shipment_number}
@@ -945,7 +1008,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
             <div
               style={{
                 fontSize: 14,
-                color: C.text,
+                color: T.ink700,
                 fontWeight: 500,
                 marginTop: 2,
               }}
@@ -962,7 +1025,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 12,
+            gap: 10,
             margin: "16px 0",
           }}
         >
@@ -982,23 +1045,31 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
               <div
                 key={r.label}
                 style={{
-                  padding: "10px 14px",
-                  background: C.cream,
-                  borderRadius: 2,
+                  padding: "10px 12px",
+                  background: T.ink075,
+                  borderRadius: 4,
                 }}
               >
                 <div
                   style={{
                     fontSize: 10,
-                    color: C.muted,
-                    letterSpacing: "0.1em",
+                    color: T.ink400,
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     marginBottom: 3,
+                    fontFamily: T.font,
                   }}
                 >
                   {r.label}
                 </div>
-                <div style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: T.ink700,
+                    fontWeight: 500,
+                    fontFamily: T.font,
+                  }}
+                >
                   {r.value}
                 </div>
               </div>
@@ -1007,13 +1078,28 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
 
         {items.length > 0 && (
           <>
-            <div style={sectionHead}>Line Items</div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                marginBottom: 10,
+                paddingBottom: 8,
+                borderBottom: `1px solid ${T.ink150}`,
+                fontFamily: T.font,
+              }}
+            >
+              Line Items
+            </div>
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: 13,
-                marginBottom: 16,
+                marginBottom: 12,
+                fontFamily: T.font,
               }}
             >
               <thead>
@@ -1024,11 +1110,11 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                       style={{
                         textAlign: "left",
                         padding: "6px 8px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink150}`,
                         fontSize: 10,
-                        color: C.muted,
+                        color: T.ink400,
                         textTransform: "uppercase",
-                        letterSpacing: "0.1em",
+                        letterSpacing: "0.07em",
                       }}
                     >
                       {h}
@@ -1042,7 +1128,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink075}`,
                         fontWeight: 500,
                       }}
                     >
@@ -1051,10 +1137,10 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink075}`,
                         fontFamily: "monospace",
                         fontSize: 11,
-                        color: C.muted,
+                        color: T.ink400,
                       }}
                     >
                       {item.sku || "—"}
@@ -1062,8 +1148,9 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink075}`,
                         fontWeight: 600,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {item.quantity}
@@ -1071,8 +1158,9 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
-                        color: C.muted,
+                        borderBottom: `1px solid ${T.ink075}`,
+                        color: T.ink400,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {item.unit_cost ? `R${item.unit_cost}` : "—"}
@@ -1080,13 +1168,14 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                     <td
                       style={{
                         padding: "8px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink075}`,
                         fontWeight: 600,
-                        color: C.green,
+                        color: T.accent,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {item.total_cost
-                        ? `R${item.total_cost.toLocaleString()}`
+                        ? `R${item.total_cost.toLocaleString("en-ZA")}`
                         : "—"}
                     </td>
                   </tr>
@@ -1098,18 +1187,28 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                 display: "flex",
                 justifyContent: "space-between",
                 padding: "10px 8px",
-                background: C.cream,
-                borderRadius: 2,
+                background: T.ink075,
+                borderRadius: 4,
                 fontSize: 13,
                 marginBottom: 16,
+                fontFamily: T.font,
               }}
             >
               <span>
-                <strong>{totalUnits}</strong> units total
+                <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {totalUnits}
+                </strong>{" "}
+                units total
               </span>
               {totalValue > 0 && (
-                <span style={{ fontWeight: 700, color: C.green }}>
-                  R{totalValue.toLocaleString()}
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: T.accent,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  R{totalValue.toLocaleString("en-ZA")}
                 </span>
               )}
             </div>
@@ -1118,13 +1217,28 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
 
         {shipment.notes && (
           <>
-            <div style={sectionHead}>Notes</div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                marginBottom: 8,
+                paddingBottom: 8,
+                borderBottom: `1px solid ${T.ink150}`,
+                fontFamily: T.font,
+              }}
+            >
+              Notes
+            </div>
             <div
               style={{
                 fontSize: 13,
-                color: C.muted,
+                color: T.ink400,
                 fontStyle: "italic",
                 marginBottom: 16,
+                fontFamily: T.font,
               }}
             >
               {shipment.notes}
@@ -1139,16 +1253,19 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
                 onAdvance(shipment, s.next);
                 onClose();
               }}
-              style={{ ...makeBtn(STATUS[s.next]?.color || C.mid), flex: 1 }}
+              style={{
+                ...makeBtn(STATUS[s.next]?.color || T.accentMid),
+                flex: 1,
+              }}
             >
-              {STATUS[s.next]?.icon} Mark {STATUS[s.next]?.label}
+              Mark {STATUS[s.next]?.label}
             </button>
           )}
           <button
             onClick={onClose}
             style={{
-              ...makeBtn("transparent", C.muted),
-              border: `1px solid ${C.border}`,
+              ...makeBtn("transparent", T.ink400),
+              border: `1px solid ${T.ink150}`,
               flex: s.next ? 0 : 1,
             }}
           >
@@ -1174,10 +1291,10 @@ export default function AdminShipments() {
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
 
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
-  };
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -1190,13 +1307,11 @@ export default function AdminShipments() {
         supabase.from("shipment_items").select("*"),
         supabase
           .from("inventory_items")
-          .select("id, name, sku, sell_price, is_active, unit")
+          .select("id,name,sku,sell_price,is_active,unit")
           .eq("is_active", true),
       ]);
-      const shpList = shpRes.data || [];
-      setShipments(shpList);
+      setShipments(shpRes.data || []);
       setInventoryItems(invRes.data || []);
-
       const map = {};
       for (const item of itemsRes.data || []) {
         if (!map[item.shipment_id]) map[item.shipment_id] = [];
@@ -1232,9 +1347,7 @@ export default function AdminShipments() {
       .update(updates)
       .eq("id", shipment.id);
     if (!error) {
-      showToast(
-        `Shipment ${shipment.shipment_number} → ${STATUS[nextStatus]?.label}`,
-      );
+      showToast(`${shipment.shipment_number} → ${STATUS[nextStatus]?.label}`);
       fetchAll();
     }
   };
@@ -1282,8 +1395,15 @@ export default function AdminShipments() {
     return true;
   });
 
+  const FILTER_TABS = [
+    { key: "active", label: "Active" },
+    { key: "delivered", label: "Delivered" },
+    { key: "cancelled", label: "Cancelled" },
+    { key: "all", label: "All" },
+  ];
+
   return (
-    <div style={{ fontFamily: FONTS.body, position: "relative" }}>
+    <div style={{ fontFamily: T.font, position: "relative" }}>
       {/* Toast */}
       {toast && (
         <div
@@ -1292,17 +1412,18 @@ export default function AdminShipments() {
             bottom: 24,
             left: "50%",
             transform: "translateX(-50%)",
-            background: C.green,
-            color: C.white,
+            background: T.accent,
+            color: "#fff",
             padding: "12px 24px",
-            borderRadius: 2,
+            borderRadius: 6,
             fontSize: 13,
             fontWeight: 600,
             zIndex: 2000,
-            fontFamily: FONTS.body,
+            boxShadow: T.shadowMd,
+            fontFamily: T.font,
           }}
         >
-          ✓ {toast}
+          {toast}
         </div>
       )}
 
@@ -1320,77 +1441,89 @@ export default function AdminShipments() {
         <div>
           <h2
             style={{
-              fontFamily: FONTS.heading,
-              color: C.green,
-              fontSize: 24,
-              margin: 0,
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
             Shipments
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: T.ink400 }}>
             Distribute stock to retailers · Track in transit · Confirm delivery
           </div>
         </div>
-        <button onClick={() => setShowCreate(true)} style={makeBtn(C.mid)}>
+        <button onClick={() => setShowCreate(true)} style={makeBtn(T.accent)}>
           + New Shipment
         </button>
       </div>
 
-      {/* Stats */}
+      {/* ── STAT GRID (flush, no borderTop) ── */}
       <div
-        style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 6,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 24,
+        }}
       >
         {[
           {
             label: "Active",
             value: activeShipments,
-            color: activeShipments > 0 ? C.blue : C.muted,
+            color: activeShipments > 0 ? T.info : T.ink400,
           },
           {
             label: "In Transit",
             value: inTransit,
-            color: inTransit > 0 ? C.orange : C.muted,
+            color: inTransit > 0 ? T.warning : T.ink400,
           },
           {
             label: "Delivered (Month)",
             value: deliveredThisMonth,
-            color: C.accent,
+            color: T.success,
           },
-          { label: "Total Units", value: totalUnitsShipped, color: C.green },
+          {
+            label: "Total Units",
+            value: totalUnitsShipped.toLocaleString("en-ZA"),
+            color: T.accent,
+          },
         ].map((s) => (
           <div
             key={s.label}
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: "16px 20px",
-              flex: "1 1 140px",
-              minWidth: 120,
-            }}
+            style={{ background: "#fff", padding: "16px 18px" }}
           >
             <div
               style={{
-                fontSize: 28,
-                fontWeight: 700,
-                fontFamily: FONTS.heading,
-                color: s.color,
-                lineHeight: 1,
-              }}
-            >
-              {s.value}
-            </div>
-            <div
-              style={{
                 fontSize: 10,
-                letterSpacing: "0.15em",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: C.muted,
-                marginTop: 4,
+                color: T.ink400,
+                marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {s.label}
+            </div>
+            <div
+              style={{
+                fontFamily: T.font,
+                fontSize: 22,
+                fontWeight: 400,
+                color: s.color,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {s.value}
             </div>
           </div>
         ))}
@@ -1401,20 +1534,21 @@ export default function AdminShipments() {
         <div
           style={{
             padding: "12px 16px",
-            background: C.lightOrange,
-            border: `1px solid ${C.orange}`,
-            borderRadius: 2,
+            background: T.warningBg,
+            border: `1px solid ${T.warningBd}`,
+            borderRadius: 6,
             marginBottom: 20,
             fontSize: 13,
-            color: C.orange,
+            color: T.warning,
             fontWeight: 600,
+            fontFamily: T.font,
           }}
         >
-          🚚 {inTransit} shipment{inTransit > 1 ? "s" : ""} currently in transit
+          {inTransit} shipment{inTransit > 1 ? "s" : ""} currently in transit
         </div>
       )}
 
-      {/* Search + filter */}
+      {/* Search + underline filter tabs */}
       <div
         style={{
           display: "flex",
@@ -1433,48 +1567,52 @@ export default function AdminShipments() {
         <div
           style={{
             display: "flex",
+            borderBottom: `2px solid ${T.ink150}`,
             gap: 0,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
-            overflow: "hidden",
           }}
         >
-          {[
-            { key: "active", label: "Active" },
-            { key: "delivered", label: "Delivered" },
-            { key: "cancelled", label: "Cancelled" },
-            { key: "all", label: "All" },
-          ].map((f) => (
+          {FILTER_TABS.map((f) => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
               style={{
                 padding: "8px 16px",
+                background: "transparent",
                 border: "none",
+                borderBottom:
+                  filter === f.key
+                    ? `2px solid ${T.accent}`
+                    : "2px solid transparent",
+                fontFamily: T.font,
                 fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
+                fontWeight: filter === f.key ? 700 : 400,
+                letterSpacing: "0.06em",
                 textTransform: "uppercase",
+                color: filter === f.key ? T.accent : T.ink400,
                 cursor: "pointer",
-                fontFamily: FONTS.body,
-                transition: "all 0.15s",
-                backgroundColor: filter === f.key ? C.green : C.white,
-                color: filter === f.key ? C.white : C.muted,
+                marginBottom: -2,
               }}
             >
               {f.label}
             </button>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: C.muted, marginLeft: "auto" }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: T.ink400,
+            marginLeft: "auto",
+            fontFamily: T.font,
+          }}
+        >
           {filtered.length} shipment{filtered.length !== 1 ? "s" : ""}
         </div>
         <button
           onClick={fetchAll}
           style={{
-            ...makeBtn("transparent", C.muted),
-            border: `1px solid ${C.border}`,
-            padding: "8px 16px",
+            ...makeBtn("transparent", T.ink400),
+            border: `1px solid ${T.ink150}`,
+            padding: "7px 14px",
             fontSize: 11,
           }}
         >
@@ -1484,7 +1622,14 @@ export default function AdminShipments() {
 
       {/* Card grid */}
       {loading ? (
-        <div style={{ padding: 60, textAlign: "center", color: C.muted }}>
+        <div
+          style={{
+            padding: 60,
+            textAlign: "center",
+            color: T.ink400,
+            fontFamily: T.font,
+          }}
+        >
           Loading shipments…
         </div>
       ) : filtered.length === 0 ? (
@@ -1492,28 +1637,38 @@ export default function AdminShipments() {
           style={{
             padding: 60,
             textAlign: "center",
-            border: `1px dashed ${C.border}`,
-            borderRadius: 2,
+            border: `1px dashed ${T.ink150}`,
+            borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🚚</div>
           <div
             style={{
-              fontFamily: FONTS.heading,
               fontSize: 20,
-              color: C.green,
+              fontWeight: 600,
+              color: T.ink700,
               marginBottom: 8,
+              fontFamily: T.font,
             }}
           >
             No shipments found
           </div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: T.ink400,
+              marginBottom: 20,
+              fontFamily: T.font,
+            }}
+          >
             {filter === "active"
               ? "Create a shipment to start distributing to retailers."
               : `No ${filter} shipments.`}
           </div>
           {filter === "active" && (
-            <button onClick={() => setShowCreate(true)} style={makeBtn(C.mid)}>
+            <button
+              onClick={() => setShowCreate(true)}
+              style={makeBtn(T.accentMid)}
+            >
               + Create First Shipment
             </button>
           )}
