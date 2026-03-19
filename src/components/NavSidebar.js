@@ -177,12 +177,28 @@ export default function NavSidebar() {
           if (page.sub) {
             return (
               <React.Fragment key={i}>
+                {page.group && page.group !== pages[i - 1]?.group && isOpen && (
+                  <div
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.09em",
+                      textTransform: "uppercase",
+                      color: "#BBBBBB",
+                      padding: "10px 14px 3px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      userSelect: "none",
+                    }}
+                  >
+                    {page.group}
+                  </div>
+                )}
                 <div
                   className={`nav-row${active ? " active" : ""}`}
                   onClick={() =>
                     handleIconClick(page.path, true, () => {
                       setHrExpanded((v) => !v);
-                      handleNav(page.path);
                     })
                   }
                   onMouseEnter={(e) => showTip(e, page.label)}
@@ -232,25 +248,43 @@ export default function NavSidebar() {
           }
 
           return (
-            <div
-              key={i}
-              className={`nav-row${active ? " active" : ""}`}
-              onClick={() => handleIconClick(page.path, false)}
-              onMouseEnter={(e) => showTip(e, page.label)}
-              onMouseLeave={hideTip}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) =>
-                e.key === "Enter" && handleIconClick(page.path, false)
-              }
-            >
-              <div className="nav-icon-zone">
-                <div className="nav-pill">
-                  <span className="nav-icon">{page.icon}</span>
+            <React.Fragment key={i}>
+              {page.group && page.group !== pages[i - 1]?.group && isOpen && (
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.09em",
+                    textTransform: "uppercase",
+                    color: "#BBBBBB",
+                    padding: "10px 14px 3px",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    userSelect: "none",
+                  }}
+                >
+                  {page.group}
                 </div>
+              )}
+              <div
+                className={`nav-row${active ? " active" : ""}`}
+                onClick={() => handleIconClick(page.path, false)}
+                onMouseEnter={(e) => showTip(e, page.label)}
+                onMouseLeave={hideTip}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && handleIconClick(page.path, false)
+                }
+              >
+                <div className="nav-icon-zone">
+                  <div className="nav-pill">
+                    <span className="nav-icon">{page.icon}</span>
+                  </div>
+                </div>
+                <span className="nav-label">{page.label}</span>
               </div>
-              <span className="nav-label">{page.label}</span>
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
