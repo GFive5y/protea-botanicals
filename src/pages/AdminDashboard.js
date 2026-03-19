@@ -1,4 +1,4 @@
-// AdminDashboard.js v6.1 — WP-VIZ: Area 24h scan + PipelineStages + Calendar Heatmap
+// AdminDashboard.js v6.2 — WP-GUIDE: WorkflowGuide added to users tab
 // v6.0 — WP-THEME: Unified design system applied
 // ★ v5.0: WP-NAV Sub-B — URL sync, green banner + tab bar removed
 
@@ -1243,6 +1243,12 @@ export default function AdminDashboard() {
       {/* USERS */}
       {tab === "users" && (
         <div>
+          <WorkflowGuide
+            context={ctx}
+            tabId="admin-users"
+            onAction={() => {}}
+            defaultOpen={false}
+          />
           <h2
             style={{
               fontFamily: T.fontUi,

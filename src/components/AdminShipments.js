@@ -1,9 +1,12 @@
 // src/components/AdminShipments.js
+// v1.2 — WP-GUIDE: WorkflowGuide + usePageContext added
 // v1.1 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // v1.0 — March 2026 · WP3 — Distribution & Shipment Tracking
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -1281,6 +1284,7 @@ function DetailModal({ shipment, items, onClose, onAdvance }) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminShipments() {
+  const ctx = usePageContext("shipments", null);
   const [shipments, setShipments] = useState([]);
   const [itemsMap, setItemsMap] = useState({});
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -1404,6 +1408,12 @@ export default function AdminShipments() {
 
   return (
     <div style={{ fontFamily: T.font, position: "relative" }}>
+      <WorkflowGuide
+        context={ctx}
+        tabId="shipments"
+        onAction={() => {}}
+        defaultOpen={false}
+      />
       {/* Toast */}
       {toast && (
         <div
