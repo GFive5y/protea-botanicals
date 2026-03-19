@@ -1,68 +1,101 @@
-// src/components/AdminCommsCenter.js v1.2
+// src/components/AdminCommsCenter.js v1.3
+// WP-VISUAL: T tokens, Inter font, underline channel tabs, no Cormorant/Jost
 // WP-GUIDE-C++: usePageContext 'comms' wired + WorkflowGuide added
-// v1.1 — Added full ticket thread support, Templates panel, tier-targeted Broadcast.
+// v1.2 — WorkflowGuide · v1.1 — Ticket threads, Templates, Broadcast
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
+// Legacy aliases so all C.* refs resolve
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  warm: "#f4f0e8",
+  cream: T.ink050,
+  warm: T.ink075,
   white: "#fff",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  lightGreen: "#eafaf1",
-  lightGold: "#fef9e7",
-  orange: "#e67e22",
-  success: "#27ae60",
+  border: T.ink150,
+  muted: T.ink400,
+  text: T.ink700,
+  red: T.danger,
+  lightRed: T.dangerBg,
+  blue: T.info,
+  lightBlue: T.infoBg,
+  lightGreen: T.accentLit,
+  lightGold: T.warningBg,
+  orange: T.warning,
+  success: T.success,
   purple: "#6A1B9A",
 };
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', sans-serif",
-};
-const sBtn = (bg = C.green, color = C.white, disabled = false) => ({
+const F = { heading: T.font, body: T.font };
+
+// ─── STYLE HELPERS ────────────────────────────────────────────────────────────
+const sBtn = (bg = T.accent, color = "#fff", disabled = false) => ({
   padding: "8px 16px",
   background: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${C.border}` : "none",
-  borderRadius: 2,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
-  letterSpacing: "0.15em",
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
   cursor: disabled ? "not-allowed" : "pointer",
-  fontFamily: F.body,
+  fontFamily: T.font,
+  opacity: disabled ? 0.6 : 1,
+  transition: "opacity 0.15s",
 });
 const sInp = {
-  padding: "9px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
   fontSize: 13,
-  fontFamily: F.body,
-  background: C.white,
-  color: C.text,
+  fontFamily: T.font,
+  background: "#fff",
+  color: T.ink700,
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
 };
+
 const STATUS_COLOURS = {
-  open: { bg: "#E3F2FD", text: "#1565C0" },
-  pending_reply: { bg: "#FFF8E1", text: "#F57F17" },
-  resolved: { bg: "#E8F5E9", text: "#27ae60" },
-  closed: { bg: "#F5F5F5", text: "#888" },
+  open: { bg: T.infoBg, text: T.info },
+  pending_reply: { bg: T.warningBg, text: T.warning },
+  resolved: { bg: T.successBg, text: T.success },
+  closed: { bg: T.ink075, text: T.ink400 },
 };
 const TICKET_STATUSES = ["open", "pending_reply", "resolved", "closed"];
 const RESPONSE_TEMPLATES = [
@@ -104,6 +137,23 @@ function fmtTime(ts) {
     month: "short",
   });
 }
+
+const TRIGGER_LABELS = {
+  ticket_opened: "Ticket Opened (auto-reply)",
+  ticket_resolved: "Ticket Resolved (auto-reply)",
+  referral_redeemed: "Referral Code Used — Referrer",
+  referral_welcome: "Referral Welcome — New Customer",
+  tier_upgrade_silver: "Tier Upgrade → Silver",
+  tier_upgrade_gold: "Tier Upgrade → Gold",
+  tier_upgrade_platinum: "Tier Upgrade → Platinum",
+  birthday_bonus: "Birthday Bonus",
+  first_purchase: "First Purchase",
+  streak_bonus: "Streak Bonus",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TICKET THREAD
+// ═══════════════════════════════════════════════════════════════════════════════
 function TicketThread({ ticket, profile, onStatusChange, onClose }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -252,14 +302,21 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
     }
   };
 
-  const sc = STATUS_COLOURS[status] || STATUS_COLOURS.open;
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        fontFamily: T.font,
+      }}
+    >
+      {/* Thread header */}
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${C.border}`,
-          background: C.warm,
+          borderBottom: `1px solid ${T.ink150}`,
+          background: T.ink075,
           flexShrink: 0,
         }}
       >
@@ -273,13 +330,18 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
         >
           <div>
             <div
-              style={{ fontFamily: F.heading, fontSize: 17, color: C.green }}
+              style={{
+                fontFamily: T.font,
+                fontSize: 15,
+                fontWeight: 600,
+                color: T.ink900,
+              }}
             >
               {ticket.subject}
             </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
               {profile?.full_name || "Customer"} · {ticket.ticket_number}
-              {ticket.category && ` · ${ticket.category}`}
+              {ticket.category ? ` · ${ticket.category}` : ""}
             </div>
           </div>
           <div
@@ -290,35 +352,38 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
               alignItems: "center",
             }}
           >
-            {TICKET_STATUSES.map((s) => (
-              <button
-                key={s}
-                onClick={() => handleSetStatus(s)}
-                style={{
-                  padding: "4px 9px",
-                  border: `1px solid ${status === s ? C.mid : C.border}`,
-                  background: status === s ? C.mid : C.white,
-                  color: status === s ? C.white : C.muted,
-                  borderRadius: 2,
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  fontFamily: F.body,
-                  cursor: "pointer",
-                }}
-              >
-                {s.replace("_", " ")}
-              </button>
-            ))}
+            {TICKET_STATUSES.map((s) => {
+              const sc = STATUS_COLOURS[s] || STATUS_COLOURS.open;
+              return (
+                <button
+                  key={s}
+                  onClick={() => handleSetStatus(s)}
+                  style={{
+                    padding: "3px 9px",
+                    border: `1px solid ${status === s ? T.accent : T.ink150}`,
+                    background: status === s ? T.accent : "#fff",
+                    color: status === s ? "#fff" : T.ink400,
+                    borderRadius: 20,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.07em",
+                    textTransform: "uppercase",
+                    fontFamily: T.font,
+                    cursor: "pointer",
+                  }}
+                >
+                  {s.replace("_", " ")}
+                </button>
+              );
+            })}
             <button
               onClick={onClose}
               style={{
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: C.muted,
-                fontSize: 16,
+                color: T.ink400,
+                fontSize: 18,
                 padding: "0 4px",
               }}
             >
@@ -327,6 +392,8 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* Messages */}
       <div
         style={{
           flex: 1,
@@ -338,7 +405,14 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
         }}
       >
         {loading ? (
-          <div style={{ textAlign: "center", padding: 32, color: C.muted }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: 32,
+              color: T.ink400,
+              fontFamily: T.font,
+            }}
+          >
             Loading thread…
           </div>
         ) : messages.length === 0 ? (
@@ -346,8 +420,9 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
             style={{
               textAlign: "center",
               padding: 32,
-              color: C.muted,
+              color: T.ink400,
               fontSize: 12,
+              fontFamily: T.font,
             }}
           >
             No messages in this ticket yet.
@@ -367,18 +442,19 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                     height: 28,
                     borderRadius: "50%",
                     background: isCustomer
-                      ? C.warm
+                      ? T.ink150
                       : isAuto
-                        ? C.accent
-                        : C.green,
+                        ? T.accentMid
+                        : T.accent,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: isAuto ? 12 : 11,
-                    color: isCustomer ? C.text : C.white,
+                    color: isCustomer ? T.ink700 : "#fff",
                     fontWeight: 700,
                     flexShrink: 0,
                     marginTop: 2,
+                    fontFamily: T.font,
                   }}
                 >
                   {isAuto
@@ -397,7 +473,12 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                     }}
                   >
                     <span
-                      style={{ fontSize: 12, fontWeight: 600, color: C.text }}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: T.ink900,
+                        fontFamily: T.font,
+                      }}
                     >
                       {isCustomer
                         ? profile?.full_name || "Customer"
@@ -405,24 +486,33 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                           ? "Auto-reply"
                           : "Support Team"}
                     </span>
-                    <span style={{ fontSize: 10, color: C.muted }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                      }}
+                    >
                       {fmtTime(m.created_at)}
                     </span>
                   </div>
                   <div
                     style={{
                       background: isCustomer
-                        ? C.cream
+                        ? T.ink075
                         : isAuto
-                          ? C.lightGreen
-                          : C.white,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: "2px 12px 12px 12px",
+                          ? T.accentLit
+                          : "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: isCustomer
+                        ? "4px 12px 12px 12px"
+                        : "12px 12px 12px 4px",
                       padding: "10px 14px",
                       fontSize: 13,
                       lineHeight: 1.7,
-                      color: C.text,
+                      color: T.ink700,
                       whiteSpace: "pre-wrap",
+                      fontFamily: T.font,
                     }}
                   >
                     {m.content}
@@ -434,11 +524,13 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Reply area */}
       <div
         style={{
           padding: "14px 20px",
-          borderTop: `1px solid ${C.border}`,
-          background: C.white,
+          borderTop: `1px solid ${T.ink150}`,
+          background: "#fff",
           flexShrink: 0,
         }}
       >
@@ -448,10 +540,11 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: C.muted,
-                letterSpacing: "0.15em",
+                color: T.ink400,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginBottom: 2,
+                fontFamily: T.font,
               }}
             >
               Quick Templates
@@ -466,13 +559,13 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
                 style={{
                   textAlign: "left",
                   padding: "7px 11px",
-                  background: C.cream,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 2,
+                  background: T.ink075,
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 4,
                   cursor: "pointer",
                   fontSize: 12,
-                  color: C.text,
-                  fontFamily: F.body,
+                  color: T.ink700,
+                  fontFamily: T.font,
                 }}
               >
                 {t.icon} <strong>{t.label}</strong>
@@ -494,24 +587,31 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
           <button
             onClick={sendReply}
             disabled={sending || !reply.trim()}
-            style={sBtn(C.green, C.white, sending || !reply.trim())}
+            style={sBtn(T.accent, "#fff", sending || !reply.trim())}
           >
             {sending ? "Sending…" : "Send Reply"}
           </button>
           <button
             onClick={() => handleSetStatus("resolved")}
-            style={sBtn(C.success)}
+            style={sBtn(T.success)}
           >
-            ✓ Resolve
+            Resolve
           </button>
           <button
             onClick={() => setShowTemplates((s) => !s)}
-            style={sBtn("transparent", C.muted)}
+            style={sBtn("transparent", T.ink400)}
           >
-            📝 Templates
+            Templates
           </button>
         </div>
-        <div style={{ fontSize: 10, color: C.muted, marginTop: 6 }}>
+        <div
+          style={{
+            fontSize: 10,
+            color: T.ink400,
+            marginTop: 6,
+            fontFamily: T.font,
+          }}
+        >
           Ctrl+Enter to send · Replies mirror to customer inbox
         </div>
       </div>
@@ -519,6 +619,9 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CUSTOMER THREAD
+// ═══════════════════════════════════════════════════════════════════════════════
 function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
   const [messages, setMessages] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -545,7 +648,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
       supabase
         .from("support_tickets")
         .select(
-          "id, ticket_number, subject, status, created_at, updated_at, user_id, category",
+          "id,ticket_number,subject,status,created_at,updated_at,user_id,category",
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: true }),
@@ -602,16 +705,16 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
   };
 
   const msgTypeMeta = {
-    query: { label: "Query", icon: "💬", color: C.blue },
-    fault: { label: "Fault", icon: "⚠️", color: C.red },
-    response: { label: "Reply", icon: "↩️", color: C.mid },
-    support_reply: { label: "Support Reply", icon: "↩️", color: C.mid },
-    admin_notice: { label: "Notice", icon: "📢", color: C.mid },
+    query: { label: "Query", icon: "💬", color: T.info },
+    fault: { label: "Fault", icon: "⚠️", color: T.danger },
+    response: { label: "Reply", icon: "↩️", color: T.accentMid },
+    support_reply: { label: "Support Reply", icon: "↩️", color: T.accentMid },
+    admin_notice: { label: "Notice", icon: "📢", color: T.accentMid },
     tier_upgrade: { label: "Tier Upgrade", icon: "🏆", color: "#6A1B9A" },
-    streak_bonus: { label: "Streak Bonus", icon: "🔥", color: C.gold },
-    birthday: { label: "Birthday", icon: "🎂", color: C.gold },
-    broadcast: { label: "Broadcast", icon: "📣", color: C.accent },
-    general: { label: "Message", icon: "📩", color: C.muted },
+    streak_bonus: { label: "Streak Bonus", icon: "🔥", color: "#b5935a" },
+    birthday: { label: "Birthday", icon: "🎂", color: "#b5935a" },
+    broadcast: { label: "Broadcast", icon: "📣", color: T.accentMid },
+    general: { label: "Message", icon: "📩", color: T.ink400 },
   };
 
   const timeline = [
@@ -635,37 +738,54 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        fontFamily: T.font,
+      }}
+    >
+      {/* Header */}
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${C.border}`,
-          background: C.warm,
+          borderBottom: `1px solid ${T.ink150}`,
+          background: T.ink075,
           flexShrink: 0,
         }}
       >
-        <div style={{ fontFamily: F.heading, fontSize: 18, color: C.green }}>
+        <div
+          style={{
+            fontFamily: T.font,
+            fontSize: 16,
+            fontWeight: 600,
+            color: T.ink900,
+          }}
+        >
           {profile?.full_name || "Anonymous"}
         </div>
         <div
           style={{
             fontSize: 11,
-            color: C.muted,
+            color: T.ink400,
             marginTop: 2,
             display: "flex",
             gap: 12,
             flexWrap: "wrap",
           }}
         >
-          {profile?.email && <span>✉ {profile.email}</span>}
-          {profile?.phone && <span>📱 {profile.phone}</span>}
+          {profile?.email && <span>{profile.email}</span>}
+          {profile?.phone && <span>{profile.phone}</span>}
           {profile?.loyalty_tier && (
             <span style={{ textTransform: "capitalize" }}>
-              🏅 {profile.loyalty_tier} · {profile.loyalty_points || 0} pts
+              {profile.loyalty_tier} · {profile.loyalty_points || 0} pts
             </span>
           )}
         </div>
       </div>
+
+      {/* Timeline */}
       <div
         style={{
           flex: 1,
@@ -677,17 +797,17 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
         }}
       >
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
             Loading thread…
           </div>
         ) : timeline.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>💬</div>
             <div
               style={{
-                fontFamily: F.heading,
-                fontSize: 16,
-                color: C.green,
+                fontSize: 15,
+                fontWeight: 600,
+                color: T.accent,
                 marginBottom: 4,
               }}
             >
@@ -708,15 +828,14 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                   style={{
                     background: "#f5f0ff",
                     border: `1px solid #d8ccff`,
-                    borderLeft: `4px solid #7b68ee`,
-                    borderRadius: 2,
+                    borderLeft: `3px solid #7b68ee`,
+                    borderRadius: 6,
                     padding: "12px 16px",
                     cursor: "pointer",
                     transition: "box-shadow 0.12s",
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.boxShadow =
-                      "0 2px 8px rgba(0,0,0,0.08)")
+                    (e.currentTarget.style.boxShadow = T.shadowMd)
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.boxShadow = "none")
@@ -736,17 +855,18 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                           fontSize: 10,
                           fontWeight: 700,
                           color: "#7b68ee",
-                          letterSpacing: "0.1em",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
+                          fontFamily: T.font,
                         }}
                       >
-                        🎫 Support Ticket
+                        Support Ticket
                       </span>
                       {item.ticket_number && (
                         <span
                           style={{
                             fontSize: 10,
-                            color: C.muted,
+                            color: T.ink400,
                             marginLeft: 8,
                             fontFamily: "monospace",
                           }}
@@ -762,16 +882,23 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                         style={{
                           fontSize: 9,
                           padding: "2px 8px",
-                          borderRadius: 2,
+                          borderRadius: 20,
                           fontWeight: 700,
                           textTransform: "uppercase",
                           background: sc.bg,
                           color: sc.text,
+                          fontFamily: T.font,
                         }}
                       >
                         {item.status?.replace("_", " ")}
                       </span>
-                      <span style={{ fontSize: 10, color: C.muted }}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: T.ink400,
+                          fontFamily: T.font,
+                        }}
+                      >
                         {fmtTime(item.created_at)}
                       </span>
                     </div>
@@ -780,13 +907,21 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                     style={{
                       fontSize: 13,
                       fontWeight: 600,
-                      color: C.text,
+                      color: T.ink700,
                       marginBottom: 2,
+                      fontFamily: T.font,
                     }}
                   >
                     {item.subject}
                   </div>
-                  <div style={{ fontSize: 11, color: "#7b68ee", marginTop: 4 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#7b68ee",
+                      marginTop: 4,
+                      fontFamily: T.font,
+                    }}
+                  >
                     Click to open thread →
                   </div>
                 </div>
@@ -805,12 +940,13 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                 <div
                   style={{
                     fontSize: 10,
-                    color: C.muted,
+                    color: T.ink400,
                     marginBottom: 3,
                     display: "flex",
                     gap: 8,
                     alignItems: "center",
                     justifyContent: isOutbound ? "flex-end" : "flex-start",
+                    fontFamily: T.font,
                   }}
                 >
                   <span>
@@ -825,16 +961,17 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                 </div>
                 <div
                   style={{
-                    background: isOutbound ? C.green : C.white,
-                    color: isOutbound ? C.white : C.text,
-                    border: `1px solid ${isOutbound ? C.green : C.border}`,
+                    background: isOutbound ? T.accent : "#fff",
+                    color: isOutbound ? "#fff" : T.ink700,
+                    border: `1px solid ${isOutbound ? T.accent : T.ink150}`,
                     borderRadius: isOutbound
-                      ? "12px 12px 2px 12px"
-                      : "12px 12px 12px 2px",
+                      ? "12px 12px 4px 12px"
+                      : "12px 12px 12px 4px",
                     padding: "10px 14px",
                     fontSize: 13,
                     lineHeight: 1.6,
                     whiteSpace: "pre-wrap",
+                    fontFamily: T.font,
                   }}
                 >
                   {item.subject && (
@@ -857,26 +994,31 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Toast */}
       {toast && (
         <div
           style={{
             margin: "0 20px",
             padding: "8px 14px",
-            borderRadius: 2,
+            borderRadius: 4,
             fontSize: 12,
             fontWeight: 600,
-            background: toast.ok ? C.lightGreen : C.lightRed,
-            color: toast.ok ? C.mid : C.red,
+            background: toast.ok ? T.successBg : T.dangerBg,
+            color: toast.ok ? T.success : T.danger,
+            fontFamily: T.font,
           }}
         >
           {toast.ok ? "✓" : "⚠"} {toast.msg}
         </div>
       )}
+
+      {/* Reply */}
       <div
         style={{
           padding: "14px 20px",
-          borderTop: `1px solid ${C.border}`,
-          background: C.white,
+          borderTop: `1px solid ${T.ink150}`,
+          background: "#fff",
           flexShrink: 0,
         }}
       >
@@ -886,10 +1028,11 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: C.muted,
-                letterSpacing: "0.15em",
+                color: T.ink400,
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginBottom: 2,
+                fontFamily: T.font,
               }}
             >
               Response Templates
@@ -904,13 +1047,13 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
                 style={{
                   textAlign: "left",
                   padding: "7px 11px",
-                  background: C.cream,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 2,
+                  background: T.ink075,
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 4,
                   cursor: "pointer",
                   fontSize: 12,
-                  color: C.text,
-                  fontFamily: F.body,
+                  color: T.ink700,
+                  fontFamily: T.font,
                 }}
               >
                 {t.icon} <strong>{t.label}</strong> — {t.body.slice(0, 55)}…
@@ -933,7 +1076,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
             <button
               onClick={() => setShowTemplates((s) => !s)}
               style={{
-                ...sBtn("transparent", C.muted),
+                ...sBtn("transparent", T.ink400),
                 padding: "6px 10px",
                 fontSize: 9,
               }}
@@ -944,7 +1087,7 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
               onClick={handleSend}
               disabled={sending || !replyBody.trim()}
               style={{
-                ...sBtn(C.green, C.white, sending || !replyBody.trim()),
+                ...sBtn(T.accent, "#fff", sending || !replyBody.trim()),
                 padding: "8px 14px",
               }}
             >
@@ -957,6 +1100,9 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// WHOLESALE THREAD
+// ═══════════════════════════════════════════════════════════════════════════════
 function WholesaleThread({ partner, adminUser }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1023,20 +1169,34 @@ function WholesaleThread({ partner, adminUser }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        fontFamily: T.font,
+      }}
+    >
       <div
         style={{
           padding: "14px 20px",
-          borderBottom: `1px solid ${C.border}`,
-          background: C.warm,
+          borderBottom: `1px solid ${T.ink150}`,
+          background: T.ink075,
           flexShrink: 0,
         }}
       >
-        <div style={{ fontFamily: F.heading, fontSize: 18, color: C.green }}>
+        <div
+          style={{
+            fontFamily: T.font,
+            fontSize: 16,
+            fontWeight: 600,
+            color: T.ink900,
+          }}
+        >
           🏪 {partner.name}
         </div>
         {partner.contact_name && (
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
             Contact: {partner.contact_name}
           </div>
         )}
@@ -1052,17 +1212,17 @@ function WholesaleThread({ partner, adminUser }) {
         }}
       >
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
             Loading…
           </div>
         ) : messages.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+          <div style={{ textAlign: "center", padding: 40, color: T.ink400 }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🏪</div>
             <div
               style={{
-                fontFamily: F.heading,
-                fontSize: 16,
-                color: C.green,
+                fontSize: 15,
+                fontWeight: 600,
+                color: T.accent,
                 marginBottom: 4,
               }}
             >
@@ -1084,9 +1244,10 @@ function WholesaleThread({ partner, adminUser }) {
                 <div
                   style={{
                     fontSize: 10,
-                    color: C.muted,
+                    color: T.ink400,
                     marginBottom: 3,
                     textAlign: isOutbound ? "right" : "left",
+                    fontFamily: T.font,
                   }}
                 >
                   {isOutbound ? msg.sent_by_name || "Admin" : partner.name} ·{" "}
@@ -1094,16 +1255,17 @@ function WholesaleThread({ partner, adminUser }) {
                 </div>
                 <div
                   style={{
-                    background: isOutbound ? C.blue : C.white,
-                    color: isOutbound ? C.white : C.text,
-                    border: `1px solid ${isOutbound ? C.blue : C.border}`,
+                    background: isOutbound ? T.info : "#fff",
+                    color: isOutbound ? "#fff" : T.ink700,
+                    border: `1px solid ${isOutbound ? T.info : T.ink150}`,
                     borderRadius: isOutbound
-                      ? "12px 12px 2px 12px"
-                      : "12px 12px 12px 2px",
+                      ? "12px 12px 4px 12px"
+                      : "12px 12px 12px 4px",
                     padding: "10px 14px",
                     fontSize: 13,
                     lineHeight: 1.6,
                     whiteSpace: "pre-wrap",
+                    fontFamily: T.font,
                   }}
                 >
                   {msg.subject && (
@@ -1131,11 +1293,12 @@ function WholesaleThread({ partner, adminUser }) {
           style={{
             margin: "0 20px",
             padding: "8px 14px",
-            borderRadius: 2,
+            borderRadius: 4,
             fontSize: 12,
             fontWeight: 600,
-            background: toast.ok ? C.lightGreen : C.lightRed,
-            color: toast.ok ? C.mid : C.red,
+            background: toast.ok ? T.successBg : T.dangerBg,
+            color: toast.ok ? T.success : T.danger,
+            fontFamily: T.font,
           }}
         >
           {toast.ok ? "✓" : "⚠"} {toast.msg}
@@ -1144,8 +1307,8 @@ function WholesaleThread({ partner, adminUser }) {
       <div
         style={{
           padding: "14px 20px",
-          borderTop: `1px solid ${C.border}`,
-          background: C.white,
+          borderTop: `1px solid ${T.ink150}`,
+          background: "#fff",
           flexShrink: 0,
         }}
       >
@@ -1164,14 +1327,21 @@ function WholesaleThread({ partner, adminUser }) {
             onClick={handleSend}
             disabled={sending || !replyBody.trim()}
             style={{
-              ...sBtn(C.blue, C.white, sending || !replyBody.trim()),
+              ...sBtn(T.info, "#fff", sending || !replyBody.trim()),
               padding: "8px 14px",
             }}
           >
             {sending ? "…" : "Send"}
           </button>
         </div>
-        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>
+        <div
+          style={{
+            fontSize: 10,
+            color: T.ink400,
+            marginTop: 4,
+            fontFamily: T.font,
+          }}
+        >
           Admin/HQ only · Not visible to customers
         </div>
       </div>
@@ -1179,19 +1349,9 @@ function WholesaleThread({ partner, adminUser }) {
   );
 }
 
-const TRIGGER_LABELS = {
-  ticket_opened: "Ticket Opened (auto-reply)",
-  ticket_resolved: "Ticket Resolved (auto-reply)",
-  referral_redeemed: "Referral Code Used — Referrer",
-  referral_welcome: "Referral Welcome — New Customer",
-  tier_upgrade_silver: "Tier Upgrade → Silver",
-  tier_upgrade_gold: "Tier Upgrade → Gold",
-  tier_upgrade_platinum: "Tier Upgrade → Platinum",
-  birthday_bonus: "Birthday Bonus",
-  first_purchase: "First Purchase",
-  streak_bonus: "Streak Bonus",
-};
-
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPLATES PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
 function TemplatesPanel() {
   const [templates, setTemplates] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -1208,7 +1368,6 @@ function TemplatesPanel() {
     setTemplates(data || []);
     setLoading(false);
   }, []);
-
   useEffect(() => {
     load();
   }, [load]);
@@ -1229,9 +1388,26 @@ function TemplatesPanel() {
     setEditing(null);
   };
 
+  const fldLabel = (text) => (
+    <label
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        display: "block",
+        marginBottom: 6,
+        fontFamily: T.font,
+      }}
+    >
+      {text}
+    </label>
+  );
+
   if (editing)
     return (
-      <div style={{ maxWidth: 700 }}>
+      <div style={{ maxWidth: 700, fontFamily: T.font }}>
         <div
           style={{
             display: "flex",
@@ -1246,14 +1422,14 @@ function TemplatesPanel() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: C.muted,
+              color: T.ink400,
               fontSize: 20,
               padding: 0,
             }}
           >
             ←
           </button>
-          <div style={{ fontFamily: F.heading, fontSize: 20, color: C.green }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: T.ink900 }}>
             {editing.id ? "Edit Template" : "New Template"}
           </div>
         </div>
@@ -1263,19 +1439,7 @@ function TemplatesPanel() {
           ["subject", "Email / Inbox Subject"],
         ].map(([field, lbl]) => (
           <div key={field} style={{ marginBottom: 14 }}>
-            <label
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.3em",
-                textTransform: "uppercase",
-                color: C.accent,
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              {lbl}
-            </label>
+            {fldLabel(lbl)}
             <input
               value={editing[field] || ""}
               onChange={(e) =>
@@ -1286,20 +1450,9 @@ function TemplatesPanel() {
           </div>
         ))}
         <div style={{ marginBottom: 14 }}>
-          <label
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.3em",
-              textTransform: "uppercase",
-              color: C.accent,
-              display: "block",
-              marginBottom: 6,
-            }}
-          >
-            Message Content (supports{" "}
-            {"{{first_name}} {{points}} {{tier}} {{code}} {{ticket_number}}"})
-          </label>
+          {fldLabel(
+            "Message Content (supports {{first_name}} {{points}} {{tier}} {{code}} {{ticket_number}})",
+          )}
           <textarea
             value={editing.content || ""}
             onChange={(e) =>
@@ -1323,7 +1476,7 @@ function TemplatesPanel() {
                 gap: 6,
                 fontSize: 13,
                 cursor: "pointer",
-                fontFamily: F.body,
+                fontFamily: T.font,
               }}
             >
               <input
@@ -1340,23 +1493,23 @@ function TemplatesPanel() {
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={() => setEditing(null)}
-            style={sBtn("transparent", C.muted)}
+            style={sBtn("transparent", T.ink400)}
           >
             Cancel
           </button>
           <button
             onClick={save}
             disabled={saving}
-            style={sBtn(C.green, C.white, saving)}
+            style={sBtn(T.accent, "#fff", saving)}
           >
-            {saving ? "Saving…" : saved ? "✓ Saved" : "Save Template"}
+            {saving ? "Saving…" : saved ? "Saved" : "Save Template"}
           </button>
         </div>
       </div>
     );
 
   return (
-    <div>
+    <div style={{ fontFamily: T.font }}>
       <div
         style={{
           display: "flex",
@@ -1366,10 +1519,10 @@ function TemplatesPanel() {
         }}
       >
         <div>
-          <div style={{ fontFamily: F.heading, fontSize: 20, color: C.green }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: T.ink900 }}>
             Message Templates
           </div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: T.ink400, marginTop: 2 }}>
             Auto-replies, event notifications, system messages
           </div>
         </div>
@@ -1385,13 +1538,13 @@ function TemplatesPanel() {
               is_active: true,
             })
           }
-          style={sBtn(C.green)}
+          style={sBtn(T.accent)}
         >
           + New Template
         </button>
       </div>
       {loading ? (
-        <div style={{ padding: 32, textAlign: "center", color: C.muted }}>
+        <div style={{ padding: 32, textAlign: "center", color: T.ink400 }}>
           Loading templates…
         </div>
       ) : templates.length === 0 ? (
@@ -1399,17 +1552,17 @@ function TemplatesPanel() {
           style={{
             padding: 40,
             textAlign: "center",
-            border: `1px dashed ${C.border}`,
-            borderRadius: 2,
-            color: C.muted,
+            border: `1px dashed ${T.ink150}`,
+            borderRadius: 8,
+            color: T.ink400,
           }}
         >
           <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
           <div
             style={{
-              fontFamily: F.heading,
-              fontSize: 16,
-              color: C.green,
+              fontSize: 15,
+              fontWeight: 600,
+              color: T.accent,
               marginBottom: 4,
             }}
           >
@@ -1423,9 +1576,10 @@ function TemplatesPanel() {
       ) : (
         <div
           style={{
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 8,
             overflow: "hidden",
+            boxShadow: T.shadow,
           }}
         >
           {templates.map((t, i) => (
@@ -1437,8 +1591,8 @@ function TemplatesPanel() {
                 gap: 12,
                 padding: "12px 16px",
                 borderBottom:
-                  i < templates.length - 1 ? `1px solid ${C.border}` : "none",
-                background: i % 2 === 0 ? C.white : C.cream,
+                  i < templates.length - 1 ? `1px solid ${T.ink150}` : "none",
+                background: i % 2 === 0 ? "#fff" : T.ink050,
               }}
             >
               <div
@@ -1446,23 +1600,37 @@ function TemplatesPanel() {
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: t.is_active ? C.success : C.muted,
+                  background: t.is_active ? T.success : T.ink300,
                   flexShrink: 0,
                 }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: T.ink900,
+                    fontFamily: T.font,
+                  }}
+                >
                   {t.name}
                 </div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.ink400,
+                    marginTop: 2,
+                    fontFamily: T.font,
+                  }}
+                >
                   {TRIGGER_LABELS[t.trigger_type] || t.trigger_type}
                   {t.send_whatsapp && (
-                    <span style={{ marginLeft: 8, color: C.success }}>
+                    <span style={{ marginLeft: 8, color: T.success }}>
                       · WhatsApp
                     </span>
                   )}
                   {t.send_inbox && (
-                    <span style={{ marginLeft: 8, color: C.blue }}>
+                    <span style={{ marginLeft: 8, color: T.info }}>
                       · Inbox
                     </span>
                   )}
@@ -1470,7 +1638,7 @@ function TemplatesPanel() {
               </div>
               <button
                 onClick={() => setEditing({ ...t })}
-                style={sBtn("transparent", C.muted)}
+                style={sBtn("transparent", T.ink400)}
               >
                 Edit
               </button>
@@ -1482,6 +1650,9 @@ function TemplatesPanel() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// BROADCAST PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
 function BroadcastPanel() {
   const [tier, setTier] = useState("all");
   const [subject, setSubject] = useState("");
@@ -1494,13 +1665,12 @@ function BroadcastPanel() {
   const loadPreview = useCallback(async () => {
     const q = supabase
       .from("user_profiles")
-      .select("id, full_name, loyalty_tier, email")
+      .select("id,full_name,loyalty_tier,email")
       .eq("email_marketing", true);
     if (tier !== "all") q.eq("loyalty_tier", tier);
     const { data } = await q.limit(5);
     setPreview(data || []);
   }, [tier]);
-
   useEffect(() => {
     loadPreview();
   }, [loadPreview]);
@@ -1515,7 +1685,7 @@ function BroadcastPanel() {
     try {
       const q = supabase
         .from("user_profiles")
-        .select("id, full_name")
+        .select("id,full_name")
         .eq("email_marketing", true);
       if (tier !== "all") q.eq("loyalty_tier", tier);
       const { data: recipients } = await q;
@@ -1530,9 +1700,8 @@ function BroadcastPanel() {
         sent_by_name: "Protea Botanicals",
         metadata: {},
       }));
-      for (let i = 0; i < rows.length; i += 50) {
+      for (let i = 0; i < rows.length; i += 50)
         await supabase.from("customer_messages").insert(rows.slice(i, i + 50));
-      }
       setSent(rows.length);
       setSubject("");
       setBody("");
@@ -1543,42 +1712,59 @@ function BroadcastPanel() {
     }
   };
 
+  const fldLabel = (text) => (
+    <label
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: T.ink400,
+        display: "block",
+        marginBottom: 6,
+        fontFamily: T.font,
+      }}
+    >
+      {text}
+    </label>
+  );
+
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div style={{ maxWidth: 640, fontFamily: T.font }}>
       <div
         style={{
-          fontFamily: F.heading,
-          fontSize: 20,
-          color: C.green,
+          fontSize: 18,
+          fontWeight: 600,
+          color: T.ink900,
           marginBottom: 4,
         }}
       >
         Broadcast Message
       </div>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 20 }}>
+      <div style={{ fontSize: 12, color: T.ink400, marginBottom: 20 }}>
         Send to opted-in customers (inbox delivery). Use {"{{first_name}}"} for
         personalisation.
       </div>
       {sent && (
         <div
           style={{
-            background: "#f0f9f4",
-            border: `1px solid ${C.success}50`,
-            borderRadius: 2,
+            background: T.successBg,
+            border: `1px solid ${T.successBd}`,
+            borderRadius: 6,
             padding: "12px 16px",
             fontSize: 13,
-            color: C.success,
+            color: T.success,
             marginBottom: 16,
           }}
         >
-          ✅ Broadcast sent to {sent} customer{sent !== 1 ? "s" : ""}.
+          Broadcast sent to {sent} customer{sent !== 1 ? "s" : ""}.
           <button
             onClick={() => setSent(null)}
             style={{
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: C.muted,
+              color: T.ink400,
               marginLeft: 12,
               fontSize: 11,
             }}
@@ -1587,68 +1773,31 @@ function BroadcastPanel() {
           </button>
         </div>
       )}
-      {[
-        {
-          field: "tier",
-          label: "Target Tier",
-          el: (
-            <select
-              value={tier}
-              onChange={(e) => setTier(e.target.value)}
-              style={sInp}
-            >
-              <option value="all">All Customers (opted-in)</option>
-              <option value="Bronze">Bronze Tier Only</option>
-              <option value="Silver">Silver Tier Only</option>
-              <option value="Gold">Gold Tier Only</option>
-              <option value="Platinum">Platinum Tier Only</option>
-            </select>
-          ),
-        },
-        {
-          field: "subject",
-          label: "Subject",
-          el: (
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="e.g. Double Points This Weekend 🌿"
-              style={sInp}
-            />
-          ),
-        },
-      ].map(({ field, label, el }) => (
-        <div key={field} style={{ marginBottom: 16 }}>
-          <label
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.3em",
-              textTransform: "uppercase",
-              color: C.accent,
-              display: "block",
-              marginBottom: 6,
-            }}
-          >
-            {label}
-          </label>
-          {el}
-        </div>
-      ))}
-      <div style={{ marginBottom: 20 }}>
-        <label
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.3em",
-            textTransform: "uppercase",
-            color: C.accent,
-            display: "block",
-            marginBottom: 6,
-          }}
+      <div style={{ marginBottom: 16 }}>
+        {fldLabel("Target Tier")}
+        <select
+          value={tier}
+          onChange={(e) => setTier(e.target.value)}
+          style={sInp}
         >
-          Message
-        </label>
+          <option value="all">All Customers (opted-in)</option>
+          <option value="Bronze">Bronze Tier Only</option>
+          <option value="Silver">Silver Tier Only</option>
+          <option value="Gold">Gold Tier Only</option>
+          <option value="Platinum">Platinum Tier Only</option>
+        </select>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        {fldLabel("Subject")}
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="e.g. Double Points This Weekend"
+          style={sInp}
+        />
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        {fldLabel("Message")}
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -1664,19 +1813,20 @@ function BroadcastPanel() {
           style={{
             marginBottom: 20,
             padding: "10px 14px",
-            background: C.cream,
-            border: `1px solid ${C.border}`,
-            borderRadius: 2,
+            background: T.ink075,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
           }}
         >
           <div
             style={{
               fontSize: 10,
               fontWeight: 700,
-              letterSpacing: "0.2em",
+              letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: C.muted,
+              color: T.ink400,
               marginBottom: 8,
+              fontFamily: T.font,
             }}
           >
             Sample recipients (first 5)
@@ -1684,7 +1834,12 @@ function BroadcastPanel() {
           {preview.map((p) => (
             <div
               key={p.id}
-              style={{ fontSize: 12, color: C.text, padding: "2px 0" }}
+              style={{
+                fontSize: 12,
+                color: T.ink700,
+                padding: "2px 0",
+                fontFamily: T.font,
+              }}
             >
               {p.full_name || "—"} · {p.loyalty_tier || "Bronze"}
             </div>
@@ -1694,12 +1849,12 @@ function BroadcastPanel() {
       {error && (
         <div
           style={{
-            background: C.lightRed,
-            border: `1px solid ${C.red}`,
-            borderRadius: 2,
+            background: T.dangerBg,
+            border: `1px solid ${T.dangerBd}`,
+            borderRadius: 6,
             padding: "10px 14px",
             fontSize: 13,
-            color: C.red,
+            color: T.danger,
             marginBottom: 16,
           }}
         >
@@ -1709,7 +1864,7 @@ function BroadcastPanel() {
       <button
         onClick={send}
         disabled={sending}
-        style={sBtn(sending ? C.muted : C.green, C.white, sending)}
+        style={sBtn(sending ? T.ink300 : T.accent, "#fff", sending)}
       >
         {sending ? "Sending…" : "Send Broadcast"}
       </button>
@@ -1717,11 +1872,93 @@ function BroadcastPanel() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHANNEL TABS (underline style)
+// ═══════════════════════════════════════════════════════════════════════════════
+function ChannelTabs({
+  channel,
+  setChannel,
+  custUnread,
+  partUnread,
+  onRefresh,
+}) {
+  const tabs = [
+    { id: "customers", label: "Customers", badge: custUnread },
+    { id: "wholesale", label: "Wholesale", badge: partUnread },
+    { id: "templates", label: "Templates", badge: 0 },
+    { id: "broadcast", label: "Broadcast", badge: 0 },
+  ];
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 0,
+        borderBottom: `2px solid ${T.ink150}`,
+        flexWrap: "wrap",
+      }}
+    >
+      {tabs.map((ch) => (
+        <button
+          key={ch.id}
+          onClick={() => setChannel(ch.id)}
+          style={{
+            padding: "10px 18px",
+            border: "none",
+            background: "none",
+            borderBottom:
+              channel === ch.id
+                ? `2px solid ${T.accent}`
+                : "2px solid transparent",
+            marginBottom: -2,
+            fontFamily: T.font,
+            fontSize: 11,
+            fontWeight: channel === ch.id ? 700 : 400,
+            letterSpacing: "0.07em",
+            textTransform: "uppercase",
+            color: channel === ch.id ? T.accent : T.ink400,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          {ch.label}
+          {ch.badge > 0 && (
+            <span
+              style={{
+                background: T.danger,
+                color: "#fff",
+                borderRadius: 10,
+                fontSize: 9,
+                fontWeight: 700,
+                padding: "1px 5px",
+              }}
+            >
+              {ch.badge}
+            </span>
+          )}
+        </button>
+      ))}
+      <button
+        onClick={onRefresh}
+        style={{
+          ...sBtn("transparent", T.ink400),
+          padding: "8px 12px",
+          marginLeft: 8,
+          marginBottom: 2,
+        }}
+      >
+        ↻
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminCommsCenter() {
-  // WP-GUIDE-C++: wire 'comms' context for WorkflowGuide live status
   const ctx = usePageContext("comms", null);
 
   const [channel, setChannel] = useState("customers");
@@ -1746,11 +1983,11 @@ export default function AdminCommsCenter() {
       const [msgRes, tickRes] = await Promise.all([
         supabase
           .from("customer_messages")
-          .select("user_id, direction, read_at, created_at, body, message_type")
+          .select("user_id,direction,read_at,created_at,body,message_type")
           .order("created_at", { ascending: false }),
         supabase
           .from("support_tickets")
-          .select("user_id, status, created_at, subject, ticket_number")
+          .select("user_id,status,created_at,subject,ticket_number")
           .order("created_at", { ascending: false }),
       ]);
       const msgs = msgRes.data || [],
@@ -1800,7 +2037,7 @@ export default function AdminCommsCenter() {
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from("user_profiles")
-          .select("id, full_name, email, phone, loyalty_tier, loyalty_points")
+          .select("id,full_name,email,phone,loyalty_tier,loyalty_points")
           .in("id", userIds);
         (profiles || []).forEach((p) => {
           if (userMap[p.id]) userMap[p.id].profile = p;
@@ -1823,12 +2060,12 @@ export default function AdminCommsCenter() {
     try {
       const { data: partnerData } = await supabase
         .from("wholesale_partners")
-        .select("id, name, contact_name, contact_email, contact_phone")
+        .select("id,name,contact_name,contact_email,contact_phone")
         .eq("is_active", true)
         .order("name");
       const { data: wMsgs } = await supabase
         .from("wholesale_messages")
-        .select("partner_id, read_at, direction, created_at, body")
+        .select("partner_id,read_at,direction,created_at,body")
         .order("created_at", { ascending: false });
       const msgMap = {};
       (wMsgs || []).forEach((m) => {
@@ -1881,7 +2118,7 @@ export default function AdminCommsCenter() {
     <div
       style={{
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "space-between",
         marginBottom: 20,
         flexWrap: "wrap",
@@ -1891,19 +2128,84 @@ export default function AdminCommsCenter() {
       <div>
         <h2
           style={{
-            fontFamily: F.heading,
-            color: C.green,
+            fontFamily: T.font,
             fontSize: 22,
-            margin: 0,
+            fontWeight: 600,
+            color: T.ink900,
+            margin: "0 0 4px",
           }}
         >
           Comms Centre
         </h2>
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 3 }}>
+        <div style={{ fontSize: 13, color: T.ink400 }}>
           Customer messages · Support tickets · Wholesale comms
         </div>
       </div>
-      <ChannelButtons
+    </div>
+  );
+
+  if (channel === "templates")
+    return (
+      <div style={{ fontFamily: T.font }}>
+        <WorkflowGuide
+          context={ctx}
+          tabId="comms"
+          onAction={() => {}}
+          defaultOpen={true}
+        />
+        {headerRow}
+        <ChannelTabs
+          channel={channel}
+          setChannel={setChannel}
+          custUnread={custUnread}
+          partUnread={partUnread}
+          onRefresh={() => {
+            fetchCustomerList();
+            fetchPartners();
+          }}
+        />
+        <div style={{ marginTop: 28 }}>
+          <TemplatesPanel />
+        </div>
+      </div>
+    );
+
+  if (channel === "broadcast")
+    return (
+      <div style={{ fontFamily: T.font }}>
+        <WorkflowGuide
+          context={ctx}
+          tabId="comms"
+          onAction={() => {}}
+          defaultOpen={true}
+        />
+        {headerRow}
+        <ChannelTabs
+          channel={channel}
+          setChannel={setChannel}
+          custUnread={custUnread}
+          partUnread={partUnread}
+          onRefresh={() => {
+            fetchCustomerList();
+            fetchPartners();
+          }}
+        />
+        <div style={{ marginTop: 28 }}>
+          <BroadcastPanel />
+        </div>
+      </div>
+    );
+
+  return (
+    <div style={{ fontFamily: T.font }}>
+      <WorkflowGuide
+        context={ctx}
+        tabId="comms"
+        onAction={() => {}}
+        defaultOpen={true}
+      />
+      {headerRow}
+      <ChannelTabs
         channel={channel}
         setChannel={setChannel}
         custUnread={custUnread}
@@ -1913,67 +2215,33 @@ export default function AdminCommsCenter() {
           fetchPartners();
         }}
       />
-    </div>
-  );
-
-  const workflowGuide = (
-    <WorkflowGuide
-      context={ctx}
-      tabId="comms"
-      onAction={() => {}}
-      defaultOpen={true}
-    />
-  );
-
-  if (channel === "templates") {
-    return (
-      <div style={{ fontFamily: F.body }}>
-        {workflowGuide}
-        {headerRow}
-        <TemplatesPanel />
-      </div>
-    );
-  }
-
-  if (channel === "broadcast") {
-    return (
-      <div style={{ fontFamily: F.body }}>
-        {workflowGuide}
-        {headerRow}
-        <BroadcastPanel />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ fontFamily: F.body }}>
-      {workflowGuide}
-      {headerRow}
 
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "280px 1fr",
           gap: 0,
-          border: `1px solid ${C.border}`,
-          borderRadius: 2,
+          border: `1px solid ${T.ink150}`,
+          borderRadius: 8,
           overflow: "hidden",
           minHeight: 560,
+          marginTop: 20,
+          boxShadow: T.shadow,
         }}
       >
         {/* LEFT PANEL */}
         <div
           style={{
-            borderRight: `1px solid ${C.border}`,
+            borderRight: `1px solid ${T.ink150}`,
             display: "flex",
             flexDirection: "column",
-            background: C.cream,
+            background: T.ink050,
           }}
         >
           <div
             style={{
               padding: "12px 14px",
-              borderBottom: `1px solid ${C.border}`,
+              borderBottom: `1px solid ${T.ink150}`,
             }}
           >
             <input
@@ -1988,13 +2256,14 @@ export default function AdminCommsCenter() {
             />
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {/* CUSTOMERS list */}
             {channel === "customers" &&
               (custLoading ? (
                 <div
                   style={{
                     padding: 24,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink400,
                     fontSize: 12,
                   }}
                 >
@@ -2002,7 +2271,7 @@ export default function AdminCommsCenter() {
                 </div>
               ) : filteredCustomers.length === 0 ? (
                 <div
-                  style={{ padding: 24, textAlign: "center", color: C.muted }}
+                  style={{ padding: 24, textAlign: "center", color: T.ink400 }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 8 }}>👥</div>
                   <div style={{ fontSize: 12 }}>
@@ -2019,12 +2288,13 @@ export default function AdminCommsCenter() {
                       onClick={() => setSelectedCustomer(c)}
                       style={{
                         padding: "12px 14px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink150}`,
                         cursor: "pointer",
-                        background: isSelected ? C.lightGreen : "transparent",
+                        background: isSelected ? T.accentLit : "transparent",
                         borderLeft: isSelected
-                          ? `3px solid ${C.accent}`
+                          ? `3px solid ${T.accent}`
                           : "3px solid transparent",
+                        transition: "background 0.1s",
                       }}
                     >
                       <div
@@ -2039,10 +2309,11 @@ export default function AdminCommsCenter() {
                             style={{
                               fontSize: 13,
                               fontWeight: c.unread > 0 ? 700 : 500,
-                              color: C.text,
+                              color: T.ink900,
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
+                              fontFamily: T.font,
                             }}
                           >
                             {p?.full_name || "Anonymous"}
@@ -2050,11 +2321,12 @@ export default function AdminCommsCenter() {
                           <div
                             style={{
                               fontSize: 10,
-                              color: C.muted,
+                              color: T.ink400,
                               marginTop: 1,
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
+                              fontFamily: T.font,
                             }}
                           >
                             {c.lastMessage || p?.email || "No messages"}
@@ -2072,10 +2344,11 @@ export default function AdminCommsCenter() {
                                 style={{
                                   fontSize: 9,
                                   padding: "1px 5px",
-                                  borderRadius: 2,
-                                  background: C.lightRed,
-                                  color: C.red,
+                                  borderRadius: 4,
+                                  background: T.dangerBg,
+                                  color: T.danger,
                                   fontWeight: 700,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 🎫 {c.openTickets} open
@@ -2086,10 +2359,11 @@ export default function AdminCommsCenter() {
                                 style={{
                                   fontSize: 9,
                                   padding: "1px 5px",
-                                  borderRadius: 2,
-                                  background: C.lightGold,
-                                  color: C.gold,
+                                  borderRadius: 4,
+                                  background: T.warningBg,
+                                  color: T.warning,
                                   textTransform: "capitalize",
+                                  fontFamily: T.font,
                                 }}
                               >
                                 {p.loyalty_tier}
@@ -2108,8 +2382,8 @@ export default function AdminCommsCenter() {
                             <span
                               style={{
                                 display: "inline-block",
-                                background: C.red,
-                                color: C.white,
+                                background: T.danger,
+                                color: "#fff",
                                 borderRadius: 10,
                                 fontSize: 9,
                                 fontWeight: 700,
@@ -2120,7 +2394,13 @@ export default function AdminCommsCenter() {
                               {c.unread}
                             </span>
                           )}
-                          <div style={{ fontSize: 10, color: C.muted }}>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: T.ink400,
+                              fontFamily: T.font,
+                            }}
+                          >
                             {fmtTime(c.lastActivity)}
                           </div>
                         </div>
@@ -2129,13 +2409,14 @@ export default function AdminCommsCenter() {
                   );
                 })
               ))}
+            {/* WHOLESALE list */}
             {channel === "wholesale" &&
               (partLoading ? (
                 <div
                   style={{
                     padding: 24,
                     textAlign: "center",
-                    color: C.muted,
+                    color: T.ink400,
                     fontSize: 12,
                   }}
                 >
@@ -2143,7 +2424,7 @@ export default function AdminCommsCenter() {
                 </div>
               ) : partners.length === 0 ? (
                 <div
-                  style={{ padding: 24, textAlign: "center", color: C.muted }}
+                  style={{ padding: 24, textAlign: "center", color: T.ink400 }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 8 }}>🏪</div>
                   <div style={{ fontSize: 12 }}>
@@ -2162,11 +2443,11 @@ export default function AdminCommsCenter() {
                       onClick={() => setSelectedPartner(p)}
                       style={{
                         padding: "12px 14px",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink150}`,
                         cursor: "pointer",
-                        background: isSelected ? "#e8f0ff" : "transparent",
+                        background: isSelected ? T.infoBg : "transparent",
                         borderLeft: isSelected
-                          ? `3px solid ${C.blue}`
+                          ? `3px solid ${T.info}`
                           : "3px solid transparent",
                       }}
                     >
@@ -2181,7 +2462,8 @@ export default function AdminCommsCenter() {
                             style={{
                               fontSize: 13,
                               fontWeight: p.unread > 0 ? 700 : 500,
-                              color: C.text,
+                              color: T.ink900,
+                              fontFamily: T.font,
                             }}
                           >
                             {p.name}
@@ -2189,8 +2471,9 @@ export default function AdminCommsCenter() {
                           <div
                             style={{
                               fontSize: 10,
-                              color: C.muted,
+                              color: T.ink400,
                               marginTop: 1,
+                              fontFamily: T.font,
                             }}
                           >
                             {p.lastMessage ||
@@ -2209,8 +2492,8 @@ export default function AdminCommsCenter() {
                             <span
                               style={{
                                 display: "inline-block",
-                                background: C.red,
-                                color: C.white,
+                                background: T.danger,
+                                color: "#fff",
                                 borderRadius: 10,
                                 fontSize: 9,
                                 fontWeight: 700,
@@ -2222,7 +2505,13 @@ export default function AdminCommsCenter() {
                             </span>
                           )}
                           {p.lastActivity && (
-                            <div style={{ fontSize: 10, color: C.muted }}>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                color: T.ink400,
+                                fontFamily: T.font,
+                              }}
+                            >
                               {fmtTime(p.lastActivity)}
                             </div>
                           )}
@@ -2245,7 +2534,7 @@ export default function AdminCommsCenter() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                color: C.muted,
+                color: T.ink400,
                 padding: 40,
                 textAlign: "center",
               }}
@@ -2253,15 +2542,24 @@ export default function AdminCommsCenter() {
               <div style={{ fontSize: 36, marginBottom: 12 }}>👥</div>
               <div
                 style={{
-                  fontFamily: F.heading,
-                  fontSize: 20,
-                  color: C.green,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: T.accent,
                   marginBottom: 8,
+                  fontFamily: T.font,
                 }}
               >
                 Select a customer
               </div>
-              <div style={{ fontSize: 13, maxWidth: 300, lineHeight: 1.7 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  maxWidth: 300,
+                  lineHeight: 1.7,
+                  fontFamily: T.font,
+                  color: T.ink400,
+                }}
+              >
                 Click any customer on the left to view their full message and
                 support ticket history in one unified thread.
               </div>
@@ -2284,7 +2582,7 @@ export default function AdminCommsCenter() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                color: C.muted,
+                color: T.ink400,
                 padding: 40,
                 textAlign: "center",
               }}
@@ -2292,15 +2590,24 @@ export default function AdminCommsCenter() {
               <div style={{ fontSize: 36, marginBottom: 12 }}>🏪</div>
               <div
                 style={{
-                  fontFamily: F.heading,
-                  fontSize: 20,
-                  color: C.green,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: T.accent,
                   marginBottom: 8,
+                  fontFamily: T.font,
                 }}
               >
                 Select a wholesale partner
               </div>
-              <div style={{ fontSize: 13, maxWidth: 300, lineHeight: 1.7 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  maxWidth: 300,
+                  lineHeight: 1.7,
+                  fontFamily: T.font,
+                  color: T.ink400,
+                }}
+              >
                 Private comms channel — visible to Admin and HQ only, not to
                 retail customers.
               </div>
@@ -2308,15 +2615,16 @@ export default function AdminCommsCenter() {
                 style={{
                   marginTop: 20,
                   padding: "12px 16px",
-                  background: C.lightBlue,
-                  border: `1px solid ${C.blue}20`,
-                  borderRadius: 2,
+                  background: T.infoBg,
+                  border: `1px solid ${T.infoBd}`,
+                  borderRadius: 6,
                   fontSize: 12,
-                  color: C.blue,
+                  color: T.info,
                   maxWidth: 320,
+                  fontFamily: T.font,
                 }}
               >
-                💡 Wholesale partner messages are stored in a separate table —
+                Wholesale partner messages are stored in a separate table —
                 complete data isolation.
               </div>
             </div>
@@ -2330,66 +2638,6 @@ export default function AdminCommsCenter() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ChannelButtons({
-  channel,
-  setChannel,
-  custUnread,
-  partUnread,
-  onRefresh,
-}) {
-  return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      {[
-        { id: "customers", label: "👥 Customers", badge: custUnread },
-        { id: "wholesale", label: "🏪 Wholesale", badge: partUnread },
-        { id: "templates", label: "📝 Templates", badge: 0 },
-        { id: "broadcast", label: "📣 Broadcast", badge: 0 },
-      ].map((ch) => (
-        <button
-          key={ch.id}
-          onClick={() => setChannel(ch.id)}
-          style={{
-            padding: "8px 14px",
-            background: channel === ch.id ? C.green : C.white,
-            color: channel === ch.id ? C.white : C.muted,
-            border: `1px solid ${channel === ch.id ? C.green : C.border}`,
-            borderRadius: 2,
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: "pointer",
-            fontFamily: F.body,
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          {ch.label}
-          {ch.badge > 0 && (
-            <span
-              style={{
-                background: C.red,
-                color: C.white,
-                borderRadius: 10,
-                fontSize: 9,
-                fontWeight: 700,
-                padding: "1px 5px",
-              }}
-            >
-              {ch.badge}
-            </span>
-          )}
-        </button>
-      ))}
-      <button
-        onClick={onRefresh}
-        style={{ ...sBtn("transparent", C.muted), padding: "8px 12px" }}
-      >
-        ↻
-      </button>
     </div>
   );
 }
