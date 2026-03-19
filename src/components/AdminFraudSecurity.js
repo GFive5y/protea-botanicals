@@ -568,6 +568,34 @@ export default function AdminFraudSecurity() {
     fetchAll();
   }, [fetchAll]);
 
+  // GAP-02: read system_alerts for fraud types
+  const [fraudAlerts, setFraudAlerts] = useState([]);
+  const fetchFraudAlerts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("system_alerts")
+        .select("id,title,body,severity,status,created_at")
+        .in("alert_type", ["high_anomaly", "account_flagged"])
+        .in("status", ["open", "acknowledged"])
+        .order("created_at", { ascending: false })
+        .limit(5);
+      setFraudAlerts(data || []);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    fetchFraudAlerts();
+    const sub = supabase
+      .channel("admin-fraud-alerts")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "system_alerts" },
+        fetchFraudAlerts,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchFraudAlerts]);
+
   const handleAutoFlag = async () => {
     setRunning(true);
     let flagged = 0;
@@ -828,6 +856,73 @@ export default function AdminFraudSecurity() {
           ↻ Refresh
         </button>
       </div>
+
+      {/* GAP-02: Fraud alert banners */}
+      {fraudAlerts.map((a) => {
+        const sev = {
+          critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
+          warning: { bg: T.warningBg, bd: T.warningBd, color: T.warning },
+          info: { bg: T.infoBg, bd: T.infoBd, color: T.info },
+        }[a.severity] || { bg: T.ink075, bd: T.ink150, color: T.ink700 };
+        return (
+          <div
+            key={a.id}
+            style={{
+              background: sev.bg,
+              border: `1px solid ${sev.bd}`,
+              borderRadius: 6,
+              padding: "10px 14px",
+              marginBottom: 10,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: sev.color,
+                  fontFamily: T.font,
+                }}
+              >
+                {a.title}
+              </div>
+              {a.body && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.ink700,
+                    fontFamily: T.font,
+                    marginTop: 2,
+                  }}
+                >
+                  {a.body}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                await supabase
+                  .from("system_alerts")
+                  .update({ status: "acknowledged" })
+                  .eq("id", a.id);
+                fetchFraudAlerts();
+              }}
+              style={{
+                ...makeBtn("transparent", sev.color),
+                border: `1px solid ${sev.bd}`,
+                fontSize: 9,
+                padding: "3px 8px",
+                flexShrink: 0,
+              }}
+            >
+              Ack
+            </button>
+          </div>
+        );
+      })}
 
       {/* ── FLUSH STAT GRID ── */}
       <div
