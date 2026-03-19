@@ -426,6 +426,21 @@ export default function AdminCustomerEngagement() {
     supabase.auth.getUser().then(({ data: { user } }) => setAdminUser(user));
   }, []);
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "user_profiles",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -443,6 +458,24 @@ export default function AdminCustomerEngagement() {
         scores[c.id] = calcEngagement(c);
       });
       setEngScores(scores);
+
+      // GAP-02: alert on churn risk
+      const atRisk = custs.filter((c) => isChurnRisk(c));
+      if (atRisk.length > 0) {
+        writeAlert(
+          "churn_risk",
+          "warning",
+          `${atRisk.length} customer${atRisk.length > 1 ? "s" : ""} at churn risk`,
+          atRisk
+            .slice(0, 5)
+            .map(
+              (c) =>
+                `${c.full_name || "Anonymous"} (inactive ${Math.floor((Date.now() - new Date(c.last_active_at || 0)) / 86400000)}d)`,
+            )
+            .join(" · ") +
+            (atRisk.length > 5 ? ` +${atRisk.length - 5} more` : ""),
+        );
+      }
     } catch (err) {
       console.error("CustomerEngagement fetch:", err);
     } finally {
@@ -551,19 +584,17 @@ export default function AdminCustomerEngagement() {
     }
     const userId = authData?.user?.id;
     if (userId)
-      await supabase
-        .from("user_profiles")
-        .upsert({
-          id: userId,
-          role: "customer",
-          loyalty_points: 0,
-          full_name: regForm.full_name || null,
-          phone: regForm.phone || null,
-          province: regForm.province || null,
-          acquisition_channel: "in_store",
-          profile_complete: false,
-          created_at: new Date().toISOString(),
-        });
+      await supabase.from("user_profiles").upsert({
+        id: userId,
+        role: "customer",
+        loyalty_points: 0,
+        full_name: regForm.full_name || null,
+        phone: regForm.phone || null,
+        province: regForm.province || null,
+        acquisition_channel: "in_store",
+        profile_complete: false,
+        created_at: new Date().toISOString(),
+      });
     try {
       await fetch(`${SUPABASE_FUNCTIONS_URL}/send-notification`, {
         method: "POST",
@@ -614,35 +645,29 @@ export default function AdminCustomerEngagement() {
     const metadata = {};
     if (composeForm.bonus_points > 0)
       metadata.points_awarded = Number(composeForm.bonus_points);
-    const { error } = await supabase
-      .from("customer_messages")
-      .insert({
-        user_id: selected.id,
-        direction: "outbound",
-        message_type: composeForm.message_type,
-        subject: composeForm.subject.trim() || null,
-        body: composeForm.body.trim(),
-        sent_by: adminUser?.id || null,
-        sent_by_name: adminUser?.email
-          ? adminUser.email.split("@")[0]
-          : "Admin",
-        metadata,
-      });
+    const { error } = await supabase.from("customer_messages").insert({
+      user_id: selected.id,
+      direction: "outbound",
+      message_type: composeForm.message_type,
+      subject: composeForm.subject.trim() || null,
+      body: composeForm.body.trim(),
+      sent_by: adminUser?.id || null,
+      sent_by_name: adminUser?.email ? adminUser.email.split("@")[0] : "Admin",
+      metadata,
+    });
     if (!error && composeForm.bonus_points > 0) {
       const pts = Number(composeForm.bonus_points);
       await supabase
         .from("user_profiles")
         .update({ loyalty_points: (selected.loyalty_points || 0) + pts })
         .eq("id", selected.id);
-      await supabase
-        .from("loyalty_transactions")
-        .insert({
-          user_id: selected.id,
-          points: pts,
-          transaction_type: "ADMIN_BONUS",
-          description: `Admin bonus: ${composeForm.subject || composeForm.message_type}`,
-          transaction_date: new Date().toISOString(),
-        });
+      await supabase.from("loyalty_transactions").insert({
+        user_id: selected.id,
+        points: pts,
+        transaction_type: "ADMIN_BONUS",
+        description: `Admin bonus: ${composeForm.subject || composeForm.message_type}`,
+        transaction_date: new Date().toISOString(),
+      });
     }
     if (error) {
       setSendMsgResult({
@@ -696,18 +721,16 @@ export default function AdminCustomerEngagement() {
     );
     let sent = 0;
     for (const c of targets) {
-      const { error } = await supabase
-        .from("customer_messages")
-        .insert({
-          user_id: c.id,
-          direction: "outbound",
-          message_type: broadcastForm.message_type,
-          subject: broadcastForm.subject.trim() || null,
-          body: broadcastForm.body.trim(),
-          sent_by: adminUser?.id || null,
-          sent_by_name: "Protea Botanicals",
-          metadata: {},
-        });
+      const { error } = await supabase.from("customer_messages").insert({
+        user_id: c.id,
+        direction: "outbound",
+        message_type: broadcastForm.message_type,
+        subject: broadcastForm.subject.trim() || null,
+        body: broadcastForm.body.trim(),
+        sent_by: adminUser?.id || null,
+        sent_by_name: "Protea Botanicals",
+        metadata: {},
+      });
       if (!error) sent++;
     }
     setBroadcastResult({
