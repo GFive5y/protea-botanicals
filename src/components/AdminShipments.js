@@ -1,12 +1,26 @@
 // src/components/AdminShipments.js
+// v1.3 — WP-VIZ: Status Donut + Units by Destination HBar + Pipeline Stage Bar
 // v1.2 — WP-GUIDE: WorkflowGuide + usePageContext added
 // v1.1 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
 // v1.0 — March 2026 · WP3 — Distribution & Shipment Tracking
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "./viz";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -1538,6 +1552,268 @@ export default function AdminShipments() {
           </div>
         ))}
       </div>
+
+      {/* ── WP-VIZ CHARTS ── */}
+      {!loading &&
+        shipments.length > 0 &&
+        (() => {
+          // Chart 1: Status donut
+          const statusCounts = shipments.reduce((acc, s) => {
+            acc[s.status] = (acc[s.status] || 0) + 1;
+            return acc;
+          }, {});
+          const statusDonut = [
+            {
+              name: "Preparing",
+              value: statusCounts["preparing"] || 0,
+              color: T.ink400,
+            },
+            {
+              name: "Shipped",
+              value: statusCounts["shipped"] || 0,
+              color: T.info,
+            },
+            {
+              name: "In Transit",
+              value: statusCounts["in_transit"] || 0,
+              color: T.warning,
+            },
+            {
+              name: "Delivered",
+              value: statusCounts["delivered"] || 0,
+              color: T.success,
+            },
+            {
+              name: "Confirmed",
+              value: statusCounts["confirmed"] || 0,
+              color: T.accentMid,
+            },
+            {
+              name: "Cancelled",
+              value: statusCounts["cancelled"] || 0,
+              color: T.danger,
+            },
+          ].filter((d) => d.value > 0);
+
+          // Chart 2: Units shipped by destination (top 8)
+          const destMap = {};
+          shipments.forEach((s) => {
+            const dest = s.destination_name || "Unknown";
+            const units = (itemsMap[s.id] || []).reduce(
+              (t, i) => t + (i.quantity || 0),
+              0,
+            );
+            destMap[dest] = (destMap[dest] || 0) + units;
+          });
+          const destBar = Object.entries(destMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([dest, units]) => ({
+              name: dest.length > 14 ? dest.slice(0, 14) + "…" : dest,
+              units,
+            }));
+          const destMax = Math.max(...destBar.map((d) => d.units), 1);
+
+          // Chart 3: Pipeline stage grouped bar
+          const pipelineBar = STATUS_ORDER.map((s) => ({
+            name: STATUS[s].label,
+            count: statusCounts[s] || 0,
+            color: STATUS[s].color,
+          }));
+
+          return (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              {/* Donut — shipment status mix */}
+              <ChartCard title="Shipment Status Mix" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusDonut}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {statusDonut.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={
+                        <ChartTooltip formatter={(v) => `${v} shipments`} />
+                      }
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              {/* HBar — units by destination */}
+              <ChartCard title="Units by Destination" height={200}>
+                {destBar.length === 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 13,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No units data
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      padding: "8px 4px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      height: "100%",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {destBar.map((d) => (
+                      <div
+                        key={d.name}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: T.ink400,
+                            fontFamily: T.font,
+                            width: 72,
+                            flexShrink: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {d.name}
+                        </span>
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 14,
+                            background: T.ink075,
+                            borderRadius: 3,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${(d.units / destMax) * 100}%`,
+                              background: T.accentMid,
+                              borderRadius: 3,
+                              transition: "width 0.5s",
+                              display: "flex",
+                              alignItems: "center",
+                              paddingLeft: 4,
+                            }}
+                          >
+                            {d.units / destMax > 0.25 && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: "#fff",
+                                  fontWeight: 700,
+                                  fontFamily: T.font,
+                                }}
+                              >
+                                {d.units}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: T.ink400,
+                            fontFamily: T.font,
+                            minWidth: 24,
+                            textAlign: "right",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {d.units / destMax <= 0.25 ? d.units : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ChartCard>
+
+              {/* Bar — pipeline stage counts */}
+              <ChartCard title="Shipments by Stage" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={pipelineBar}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fill: T.ink400, fontSize: 9, fontFamily: T.font }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={4}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.font,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={22}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip formatter={(v) => `${v} shipments`} />
+                      }
+                    />
+                    <Bar
+                      dataKey="count"
+                      name="Shipments"
+                      isAnimationActive={false}
+                      maxBarSize={36}
+                      radius={[3, 3, 0, 0]}
+                    >
+                      {pipelineBar.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          );
+        })()}
 
       {/* In-transit alert */}
       {inTransit > 0 && (
