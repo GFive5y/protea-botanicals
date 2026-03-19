@@ -859,7 +859,7 @@ export default function ScanResult() {
   const [guardType, setGuardType] = useState("error");
   const [qrRecord, setQrRecord] = useState(null);
   const [user, setUser] = useState(null);
-  const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
+  // loyaltyConfig fetched fresh inside executeScan — no top-level state needed
 
   // v4.6: suspension state
   const [isSuspended, setIsSuspended] = useState(false);
@@ -890,13 +890,6 @@ export default function ScanResult() {
   const [surveyBonusAwarded, setSurveyBonusAwarded] = useState(0);
 
   useEffect(() => {
-    supabase
-      .from("loyalty_config")
-      .select("*")
-      .single()
-      .then(({ data }) => {
-        if (data) setLoyaltyConfig(data);
-      });
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) setUser(session.user);
     });
@@ -1359,6 +1352,9 @@ export default function ScanResult() {
             break;
         }
       }
+
+      setPointsSkipped(pointsWasSkipped);
+      setPointsSkipReason(pointsWasSkipReason);
 
       await supabase
         .from("qr_codes")
