@@ -51,6 +51,7 @@ import HQFraud from "../components/hq/HQFraud";
 
 // ── WP-X: Live FX Bar ────────────────────────────────────────────────────────
 import LiveFXBar from "../components/hq/LiveFXBar";
+import AlertsBar from "../components/hq/AlertsBar";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -68,20 +69,22 @@ const C = {
 };
 
 const TABS = [
+  // Operations
   { id: "overview", label: "Overview", icon: "📊", ready: true },
   { id: "supply-chain", label: "Supply Chain", icon: "📦", ready: true },
-  { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
-  { id: "shops", label: "Shops", icon: "🏪", ready: true },
-  { id: "analytics", label: "Analytics", icon: "📈", ready: true },
-  { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
   { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
-  { id: "costing", label: "Costing", icon: "🧮", ready: true },
+  { id: "hq-production", label: "Production", icon: "⚙️", ready: true },
+  { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
+  // Finance
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
+  { id: "costing", label: "Costing", icon: "🧮", ready: true },
   { id: "pl", label: "P&L", icon: "📉", ready: true },
+  // Intelligence
+  { id: "analytics", label: "Analytics", icon: "📈", ready: true },
+  { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
   { id: "reorder", label: "Reorder", icon: "🔔", ready: true },
-  { id: "documents", label: "Documents", icon: "📄", ready: true },
-  { id: "hq-production", label: "HQ Production", icon: "⚙️", ready: true },
+  // Platform
   { id: "loyalty", label: "Loyalty", icon: "💎", ready: true },
   {
     id: "fraud",
@@ -90,6 +93,9 @@ const TABS = [
     ready: true,
     alert: true,
   },
+  { id: "documents", label: "Documents", icon: "📄", ready: true },
+  // People
+  { id: "shops", label: "Shops", icon: "🏪", ready: true },
 ];
 
 export default function HQDashboard() {
@@ -197,6 +203,8 @@ export default function HQDashboard() {
       <div>
         {/* v3.8: LiveFXBar renders above ALL tab content — persistent across every tab */}
         <LiveFXBar />
+        {/* WP-X: AlertsBar — dashboard warning lights, invisible until triggered */}
+        <AlertsBar />
 
         {activeTab === "overview" && <HQOverview onNavigate={handleNavigate} />}
         {activeTab === "supply-chain" && <SupplyChain />}
