@@ -1168,8 +1168,7 @@ export default function RetailerHealth() {
           .order("created_at", { ascending: false }),
         supabase
           .from("loyalty_transactions")
-          .select("points,transaction_type,created_at")
-          .catch(() => ({ data: [] })),
+          .select("points,transaction_type,created_at"),
         // v1.1: retail pricing
         supabase
           .from("product_pricing")
