@@ -1,13 +1,5 @@
-// AdminDashboard.js v6.0
-// WP-THEME: Unified design system applied
-//   - Outfit replaces Cormorant Garamond + Jost
-//   - DM Mono for all metric values
-//   - Emoji removed from quick action buttons and stat cards
-//   - StatCard: no coloured top borders — semantic colour on value only
-//   - Metric rows: flush grid layout matching HQOverview
-//   - Quick Actions: 4-variant button system
-//   - Error bar: standard danger template
-//   - Users table: semantic role badges (warning/info/neutral), DM Mono for points
+// AdminDashboard.js v6.1 — WP-VIZ: Area 24h scan + PipelineStages + Calendar Heatmap
+// v6.0 — WP-THEME: Unified design system applied
 // ★ v5.0: WP-NAV Sub-B — URL sync, green banner + tab bar removed
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -25,7 +17,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
-import { ChartCard, ChartTooltip } from "../components/viz";
+import { ChartCard, ChartTooltip, PipelineStages } from "../components/viz";
 import WorkflowGuide from "../components/WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import SystemStatusBar from "../components/SystemStatusBar";
@@ -42,7 +34,7 @@ import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCommsCenter from "../components/AdminCommsCenter";
 import AdminHRPanel from "../components/AdminHRPanel";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
+// ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
@@ -162,6 +154,7 @@ function StatCard({ label, value, sub, semantic, onClick }) {
           color,
           lineHeight: 1,
           letterSpacing: "-0.02em",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -230,6 +223,130 @@ function fmtDate(d) {
   });
 }
 
+// ── Heatmap (Chart #17) — 12-week scan density ────────────────────────────────
+function ScanHeatmap({ heatmapData }) {
+  if (!heatmapData || heatmapData.length === 0) return null;
+  const maxVal = Math.max(...heatmapData.map((d) => d.count), 1);
+  // 5-stop colour scale: ink075 → accent
+  const cellColor = (count) => {
+    if (count === 0) return T.ink075;
+    const pct = count / maxVal;
+    if (pct < 0.2) return T.accentLit;
+    if (pct < 0.4) return T.accentBd;
+    if (pct < 0.65) return "#52B788";
+    if (pct < 0.85) return T.accentMid;
+    return T.accent;
+  };
+  const dayLabels = ["M", "", "W", "", "F", "", ""];
+  const weeks = [];
+  for (let i = 0; i < heatmapData.length; i += 7) {
+    weeks.push(heatmapData.slice(i, i + 7));
+  }
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+        {/* Day labels column */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+            paddingTop: 18,
+          }}
+        >
+          {dayLabels.map((l, i) => (
+            <div
+              key={i}
+              style={{
+                height: 14,
+                width: 12,
+                fontSize: 9,
+                color: T.ink400,
+                fontFamily: T.fontUi,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              {l}
+            </div>
+          ))}
+        </div>
+        {/* Week columns */}
+        {weeks.map((week, wi) => (
+          <div
+            key={wi}
+            style={{ display: "flex", flexDirection: "column", gap: 3 }}
+          >
+            {/* Week label (Mon of that week) */}
+            <div
+              style={{
+                fontSize: 8,
+                color: T.ink400,
+                fontFamily: T.fontUi,
+                height: 14,
+                textAlign: "center",
+              }}
+            >
+              {wi % 3 === 0 && week[0]?.date
+                ? new Date(week[0].date).toLocaleDateString("en-ZA", {
+                    month: "short",
+                    day: "numeric",
+                  })
+                : ""}
+            </div>
+            {week.map((day, di) => (
+              <div
+                key={di}
+                title={`${day.date}: ${day.count} scan${day.count !== 1 ? "s" : ""}`}
+                style={{
+                  width: 14,
+                  height: 14,
+                  background: cellColor(day.count),
+                  borderRadius: 2,
+                  cursor: "default",
+                  border: `1px solid ${day.count > 0 ? "transparent" : T.ink150}`,
+                  transition: "opacity 0.1s",
+                }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      {/* Legend */}
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}
+      >
+        <span style={{ fontSize: 9, color: T.ink400, fontFamily: T.fontUi }}>
+          Less
+        </span>
+        {[
+          T.ink075,
+          T.accentLit,
+          T.accentBd,
+          "#52B788",
+          T.accentMid,
+          T.accent,
+        ].map((c, i) => (
+          <div
+            key={i}
+            style={{
+              width: 12,
+              height: 12,
+              background: c,
+              borderRadius: 2,
+              border: `1px solid ${T.ink150}`,
+            }}
+          />
+        ))}
+        <span style={{ fontSize: 9, color: T.ink400, fontFamily: T.fontUi }}>
+          More
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
@@ -255,8 +372,14 @@ export default function AdminDashboard() {
   const [fraudAlerts, setFraudAlerts] = useState(0);
   const [tenantId, setTenantId] = useState(null);
 
+  // WP-VIZ state
+  const [scanTrend24h, setScanTrend24h] = useState([]); // [{hour, count}] last 24h
+  const [heatmapData, setHeatmapData] = useState([]); // [{date, count}] 84 days
+  const [pipelineFilter, setPipelineFilter] = useState(null);
+
   const ctx = usePageContext("admin", null);
   const location = useLocation();
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const t = params.get("tab");
@@ -405,20 +528,86 @@ export default function AdminDashboard() {
     } catch (_) {}
   }, []);
 
+  // WP-VIZ: 24h scan trend (hourly) — Chart #3
+  const fetchScanTrend24h = useCallback(async () => {
+    try {
+      const since = new Date(Date.now() - 24 * 3600000).toISOString();
+      const { data } = await supabase
+        .from("scan_logs")
+        .select("scanned_at")
+        .gte("scanned_at", since)
+        .order("scanned_at", { ascending: true });
+      const hourMap = {};
+      for (let h = 0; h < 24; h++) {
+        const label = `${h.toString().padStart(2, "0")}:00`;
+        hourMap[label] = 0;
+      }
+      (data || []).forEach((s) => {
+        const h = new Date(s.scanned_at).getHours();
+        const label = `${h.toString().padStart(2, "0")}:00`;
+        hourMap[label] = (hourMap[label] || 0) + 1;
+      });
+      setScanTrend24h(
+        Object.entries(hourMap).map(([hour, count]) => ({ hour, count })),
+      );
+    } catch (_) {}
+  }, []);
+
+  // WP-VIZ: 12-week scan heatmap — Chart #17
+  const fetchHeatmap = useCallback(async () => {
+    try {
+      const since = new Date(Date.now() - 84 * 86400000).toISOString();
+      const { data } = await supabase
+        .from("scan_logs")
+        .select("scanned_at")
+        .gte("scanned_at", since);
+      const dayMap = {};
+      // Seed all 84 days with 0
+      for (let i = 83; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().split("T")[0];
+        dayMap[key] = 0;
+      }
+      (data || []).forEach((s) => {
+        const key = new Date(s.scanned_at).toISOString().split("T")[0];
+        if (key in dayMap) dayMap[key]++;
+      });
+      // Sort by date, build array aligned to Monday
+      const entries = Object.entries(dayMap).sort((a, b) =>
+        a[0] > b[0] ? 1 : -1,
+      );
+      // Pad to start on Monday
+      const firstDate = new Date(entries[0][0]);
+      const dayOfWeek = firstDate.getDay(); // 0=Sun
+      const padDays = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // days before Monday
+      const padded = [
+        ...Array(padDays).fill({ date: "", count: 0 }),
+        ...entries.map(([date, count]) => ({ date, count })),
+      ];
+      setHeatmapData(padded);
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     fetchUsers();
     computeAnalytics();
     fetchCommsBadge();
     fetchTodayStats();
     fetchTenantId();
+    fetchScanTrend24h();
+    fetchHeatmap();
   }, [
     fetchUsers,
     computeAnalytics,
     fetchCommsBadge,
     fetchTodayStats,
     fetchTenantId,
+    fetchScanTrend24h,
+    fetchHeatmap,
   ]);
 
+  // Realtime: inbound messages → badge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-msgs")
@@ -441,6 +630,7 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchCommsBadge]);
 
+  // Realtime: tickets → badge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-tickets")
@@ -453,6 +643,7 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchCommsBadge]);
 
+  // Realtime: QR codes → analytics
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-kpi")
@@ -465,6 +656,19 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [computeAnalytics]);
 
+  // Realtime: new scans → refresh 24h trend
+  useEffect(() => {
+    const sub = supabase
+      .channel("admin-scan-trend")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "scan_logs" },
+        fetchScanTrend24h,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchScanTrend24h]);
+
   const handleNavigateToQR = (batchId) => {
     setQrInitialBatchId(batchId || null);
     setTab("qr_codes");
@@ -473,6 +677,45 @@ export default function AdminDashboard() {
     setDocumentsTargetId(documentId);
     setTab("documents");
   };
+
+  // Pipeline stages for QR flow
+  const qrPipelineStages = [
+    {
+      id: "inStock",
+      label: "In Stock",
+      count: analytics.inStock,
+      variant: "default",
+      value: "inStock",
+    },
+    {
+      id: "distributed",
+      label: "Distributed",
+      count: analytics.distributed,
+      variant: "warning",
+      value: "distributed",
+    },
+    {
+      id: "claimed",
+      label: "Claimed",
+      count: analytics.claimed,
+      variant: "success",
+      value: "claimed",
+    },
+    {
+      id: "comms",
+      label: "Comms",
+      count: commsBadge,
+      variant: commsBadge > 0 ? "danger" : "default",
+      value: "comms",
+    },
+    {
+      id: "fraud",
+      label: "Fraud",
+      count: fraudAlerts,
+      variant: fraudAlerts > 0 ? "danger" : "default",
+      value: "fraud",
+    },
+  ];
 
   return (
     <div style={{ fontFamily: T.fontUi }}>
@@ -562,6 +805,119 @@ export default function AdminDashboard() {
             />
           </MetricGrid>
 
+          {/* ── CHART: 24h Scan Activity Area (Chart #3) ── */}
+          {scanTrend24h.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <ChartCard title="Scan Activity — Last 24 Hours" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={scanTrend24h}
+                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="admin-scan-grad"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={T.accentMid}
+                          stopOpacity={0.2}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={T.accentMid}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      horizontal
+                      vertical={false}
+                      stroke={T.ink150}
+                      strokeWidth={0.5}
+                    />
+                    <XAxis
+                      dataKey="hour"
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.fontUi,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={6}
+                      interval={3}
+                    />
+                    <YAxis
+                      tick={{
+                        fill: T.ink400,
+                        fontSize: 10,
+                        fontFamily: T.fontUi,
+                      }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          formatter={(v) => `${v} scan${v !== 1 ? "s" : ""}`}
+                        />
+                      }
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      name="Scans"
+                      stroke={T.accentMid}
+                      strokeWidth={2}
+                      fill="url(#admin-scan-grad)"
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          )}
+
+          {/* ── CHART: QR + Action Pipeline (Chart #16) ── */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                marginBottom: 10,
+                fontFamily: T.fontUi,
+              }}
+            >
+              Platform Pipeline — click to navigate
+            </div>
+            <PipelineStages
+              stages={qrPipelineStages}
+              selected={pipelineFilter}
+              onSelect={(val) => {
+                setPipelineFilter(val);
+                if (val === "comms") setTab("comms");
+                if (val === "fraud") setTab("security");
+                if (
+                  val === "claimed" ||
+                  val === "distributed" ||
+                  val === "inStock"
+                )
+                  setTab("qr_codes");
+              }}
+            />
+          </div>
+
           {/* ROW 2 — Action Required */}
           <SectionLabel text="Action Required" />
           <MetricGrid>
@@ -622,7 +978,16 @@ export default function AdminDashboard() {
             />
           </MetricGrid>
 
-          {/* Quick Actions — no emoji, 4-variant buttons */}
+          {/* ── CHART: Scan Heatmap 12 weeks (Chart #17) ── */}
+          {heatmapData.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <ChartCard title="Scan Density — Last 12 Weeks" height={130}>
+                <ScanHeatmap heatmapData={heatmapData} />
+              </ChartCard>
+            </div>
+          )}
+
+          {/* Quick Actions */}
           <div
             style={{
               fontSize: 13,
@@ -704,6 +1069,8 @@ export default function AdminDashboard() {
                 fetchUsers();
                 fetchCommsBadge();
                 fetchTodayStats();
+                fetchScanTrend24h();
+                fetchHeatmap();
               }}
               style={mkBtn("ghost", "sm")}
             >
@@ -713,6 +1080,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── PLATFORM BAR + TODAY CHARTS (only on overview) ── */}
       {tab === "overview" &&
         (() => {
           const platformBarData = [
@@ -848,6 +1216,7 @@ export default function AdminDashboard() {
           );
         })()}
 
+      {/* ── TAB ROUTING ── */}
       {tab === "shipments" && <AdminShipments />}
       {tab === "production" && <AdminProductionModule />}
       {tab === "batches" && (
@@ -982,6 +1351,7 @@ export default function AdminDashboard() {
                           fontFamily: T.fontData,
                           fontWeight: 600,
                           color: T.ink900,
+                          fontVariantNumeric: "tabular-nums",
                         }}
                       >
                         {u.loyalty_points || 0}
