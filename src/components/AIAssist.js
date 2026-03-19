@@ -366,7 +366,6 @@ export default function AIAssist({
       messages,
       checkLimit,
       canUseSonnet,
-      config,
       tabContext,
       tabData,
       logAIUsage,

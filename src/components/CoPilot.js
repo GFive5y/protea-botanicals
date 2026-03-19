@@ -35,8 +35,7 @@ import {
   getContextSuggestions,
 } from "../services/copilotService";
 import LottieCharacter from "./LottieCharacter";
-import Lottie from "lottie-react";
-import chatbotIdle from "../assets/lottie/chatbot-idle.json";
+import AIOrb from "./AIOrb";
 
 // ─── ROUTE → CONTEXT ID MAP ───────────────────────────────────────────────────
 // Maps the current route to the appropriate usePageContext query key.
@@ -326,7 +325,6 @@ export default function CoPilot() {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const headerLottieRef = useRef(null);
 
   // ── Live context from current route ──────────────────────────────────────
   const contextId = getContextId(location.pathname);
@@ -602,7 +600,7 @@ export default function CoPilot() {
                 (e.currentTarget.style.background = "rgba(27,67,50,0.88)")
               }
             >
-              <span style={{ fontSize: "16px" }}>🤖</span>
+              <AIOrb active={loading} size={22} />
               {hasInsights && (
                 <span
                   style={{
@@ -702,25 +700,7 @@ export default function CoPilot() {
         >
           {/* Left: Lottie + title */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                flexShrink: 0,
-                opacity: isOpen ? 1 : 0,
-                transform: isOpen ? "scale(1)" : "scale(0.5)",
-                transition:
-                  "opacity 0.3s ease 0.15s, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s",
-              }}
-            >
-              <Lottie
-                lottieRef={headerLottieRef}
-                animationData={chatbotIdle}
-                loop={true}
-                autoplay={true}
-                style={{ width: 60, height: 60, marginTop: -2, marginLeft: -4 }}
-              />
-            </div>
+            <AIOrb active={loading} size={44} />
             <div>
               <div
                 style={{
