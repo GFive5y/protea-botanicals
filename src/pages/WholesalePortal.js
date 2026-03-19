@@ -146,6 +146,23 @@ export default function WholesalePortal() {
       total: cartTotal,
       status: "pending",
     });
+    // GAP-02: alert admin of new wholesale order
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: "wholesale_order",
+        severity: "info",
+        status: "open",
+        title: `New wholesale order — R${cartTotal.toLocaleString()}`,
+        body: cartItems
+          .map(
+            (p) =>
+              `${p.name} ×${cart[p.id]} (R${(cart[p.id] * p.price).toLocaleString()})`,
+          )
+          .join(" · "),
+        source_table: "wholesale_orders",
+      });
+    } catch (_) {}
     setCart({});
     setSuccess("Order submitted! Our team will be in touch within 24 hours.");
     fetchOrders();
