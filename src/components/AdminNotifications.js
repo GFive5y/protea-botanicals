@@ -1,75 +1,105 @@
-// src/components/AdminNotifications.js
-// v1.0 — March 2026
-// WP9 — Notification Centre
-//
-// Features:
-//   - Notification log (from notification_log table): filter by type/trigger/status
-//   - Stats: sent today, failed, by trigger
-//   - Test send panel: fire any trigger with custom recipient
-//   - Template preview: see SMS/email content per trigger
-//   - BulkSMS setup guide with env var instructions
-//   - Integration hooks guide (where to add notify.xxx calls)
+// src/components/AdminNotifications.js v1.2
+// WP-GUIDE: WorkflowGuide + usePageContext added
+// WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
+// v1.0 — March 2026 · WP9 — Notification Centre
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
+import WorkflowGuide from "./WorkflowGuide";
+import { usePageContext } from "../hooks/usePageContext";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────
+// ─── THEME ────────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
+};
 const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
+  green: T.accent,
+  mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: "#faf9f6",
-  border: "#e0dbd2",
-  muted: "#888",
-  text: "#1a1a1a",
+  cream: T.ink050,
+  border: T.ink150,
+  muted: T.ink400,
+  text: T.ink700,
   white: "#fff",
-  red: "#c0392b",
-  lightRed: "#fdf0ef",
-  orange: "#e67e22",
-  lightOrange: "#fef3e0",
-  blue: "#2c4a6e",
-  lightBlue: "#eaf0f8",
-  lightGreen: "#eafaf1",
+  red: T.danger,
+  lightRed: T.dangerBg,
+  orange: T.warning,
+  lightOrange: T.warningBg,
+  blue: T.info,
+  lightBlue: T.infoBg,
+  lightGreen: T.accentLit,
 };
-const F = {
-  heading: "'Cormorant Garamond', Georgia, serif",
-  body: "'Jost', sans-serif",
-};
+const F = { heading: T.font, body: T.font };
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const inputStyle = {
-  padding: "9px 12px",
-  border: `1px solid ${C.border}`,
-  borderRadius: 2,
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
   fontSize: 13,
-  fontFamily: F.body,
-  background: C.white,
-  color: C.text,
+  fontFamily: T.font,
+  background: "#fff",
+  color: T.ink700,
   outline: "none",
   boxSizing: "border-box",
 };
-const makeBtn = (bg = C.mid, color = C.white, disabled = false) => ({
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "9px 18px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${C.border}` : "none",
-  borderRadius: 2,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
-  letterSpacing: "0.18em",
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
   cursor: disabled ? "not-allowed" : "pointer",
-  fontFamily: F.body,
+  fontFamily: T.font,
+  opacity: disabled ? 0.6 : 1,
+  transition: "opacity 0.15s",
 });
-const sLabel = {
-  fontSize: "9px",
-  letterSpacing: "0.3em",
-  textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: "10px",
-  fontFamily: F.body,
-  fontWeight: 700,
-};
+const fldLabel = (text) => (
+  <div
+    style={{
+      fontSize: 11,
+      color: T.ink400,
+      marginBottom: 5,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      fontFamily: T.font,
+      fontWeight: 600,
+    }}
+  >
+    {text}
+  </div>
+);
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -81,48 +111,47 @@ function fmtDate(d) {
   });
 }
 
-// ── Trigger config ────────────────────────────────────────────────────────
+// ─── TRIGGER CONFIG ───────────────────────────────────────────────────────────
 const TRIGGERS = {
   scan_confirmed: {
     label: "Scan Confirmed",
     icon: "📱",
     to: "Customer",
-    color: C.accent,
+    color: T.accentMid,
   },
   tier_upgrade: {
     label: "Tier Upgrade",
     icon: "⭐",
     to: "Customer",
-    color: C.gold,
+    color: "#b5935a",
   },
   shipment_dispatched: {
     label: "Shipment Dispatched",
     icon: "🚚",
     to: "Retailer",
-    color: C.blue,
+    color: T.info,
   },
   shipment_delivered: {
     label: "Shipment Delivered",
     icon: "✅",
     to: "Retailer",
-    color: C.mid,
+    color: T.success,
   },
   low_stock: {
     label: "Low / Out of Stock",
     icon: "⚠",
     to: "Admin",
-    color: C.orange,
+    color: T.warning,
   },
-  churn_risk: { label: "Churn Risk", icon: "📉", to: "Admin", color: C.red },
+  churn_risk: { label: "Churn Risk", icon: "📉", to: "Admin", color: T.danger },
   new_customer: {
     label: "New Customer",
     icon: "👤",
     to: "Admin",
-    color: C.green,
+    color: T.accent,
   },
 };
 
-// ── SMS preview templates ─────────────────────────────────────────────────
 const SMS_PREVIEWS = {
   scan_confirmed:
     "Protea Botanicals: Product verified ✓ You earned 10 pts! Total: 820 pts. Keep scanning to unlock rewards. Reply STOP to opt out.",
@@ -140,50 +169,72 @@ const SMS_PREVIEWS = {
     "Protea Botanicals: New customer registered — Sarah Connor (+27821234567). Acquisition: qr_scan. Check admin dashboard.",
 };
 
+// ─── BADGES ───────────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = {
-    sent: { bg: C.lightGreen, color: C.accent },
-    failed: { bg: C.lightRed, color: C.red },
-    pending: { bg: C.lightOrange, color: C.orange },
-  }[status] || { bg: "#f0f0f0", color: "#555" };
+    sent: { bg: T.successBg, color: T.success },
+    failed: { bg: T.dangerBg, color: T.danger },
+    pending: { bg: T.warningBg, color: T.warning },
+  }[status] || { bg: T.ink075, color: T.ink400 };
   return (
     <span
       style={{
         fontSize: 10,
         padding: "2px 8px",
-        borderRadius: 2,
+        borderRadius: 20,
         fontWeight: 700,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.07em",
         textTransform: "uppercase",
         background: cfg.bg,
         color: cfg.color,
+        fontFamily: T.font,
       }}
     >
       {status}
     </span>
   );
 }
-
 function TypeBadge({ type }) {
   return (
     <span
       style={{
         fontSize: 10,
         padding: "2px 8px",
-        borderRadius: 2,
+        borderRadius: 20,
         fontWeight: 700,
-        letterSpacing: "0.1em",
+        letterSpacing: "0.07em",
         textTransform: "uppercase",
-        background: type === "sms" ? C.lightBlue : C.lightGreen,
-        color: type === "sms" ? C.blue : C.accent,
+        background: type === "sms" ? T.infoBg : T.accentLit,
+        color: type === "sms" ? T.info : T.accentMid,
+        fontFamily: T.font,
       }}
     >
-      {type === "sms" ? "📱 SMS" : "✉ Email"}
+      {type === "sms" ? "SMS" : "Email"}
     </span>
   );
 }
 
-// ── Test Send Form ────────────────────────────────────────────────────────
+// ─── CODE BLOCK ───────────────────────────────────────────────────────────────
+function CodeBlock({ children }) {
+  return (
+    <pre
+      style={{
+        background: "#1e1e2e",
+        color: "#cdd6f4",
+        padding: 16,
+        borderRadius: 6,
+        fontSize: 12,
+        overflowX: "auto",
+        lineHeight: 1.6,
+        margin: 0,
+      }}
+    >
+      {children}
+    </pre>
+  );
+}
+
+// ─── TEST SEND PANEL ──────────────────────────────────────────────────────────
 function TestSendPanel({ onSent }) {
   const [trigger, setTrigger] = useState("scan_confirmed");
   const [type, setType] = useState("sms");
@@ -191,7 +242,6 @@ function TestSendPanel({ onSent }) {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
-
   const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 
   const handleSend = async () => {
@@ -253,13 +303,26 @@ function TestSendPanel({ onSent }) {
   return (
     <div
       style={{
-        background: C.white,
-        border: `1px solid ${C.border}`,
-        borderRadius: 2,
+        background: "#fff",
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 8,
         padding: 24,
+        boxShadow: T.shadow,
       }}
     >
-      <div style={sLabel}>Test Send</div>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: T.ink400,
+          marginBottom: 16,
+          fontFamily: T.font,
+        }}
+      >
+        Test Send
+      </div>
       <div
         style={{
           display: "grid",
@@ -269,17 +332,7 @@ function TestSendPanel({ onSent }) {
         }}
       >
         <div>
-          <div
-            style={{
-              fontSize: 11,
-              color: C.muted,
-              marginBottom: 5,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Trigger
-          </div>
+          {fldLabel("Trigger")}
           <select
             style={{ ...inputStyle, width: "100%" }}
             value={trigger}
@@ -293,17 +346,7 @@ function TestSendPanel({ onSent }) {
           </select>
         </div>
         <div>
-          <div
-            style={{
-              fontSize: 11,
-              color: C.muted,
-              marginBottom: 5,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Type
-          </div>
+          {fldLabel("Type")}
           <select
             style={{ ...inputStyle, width: "100%" }}
             value={type}
@@ -315,17 +358,7 @@ function TestSendPanel({ onSent }) {
           </select>
         </div>
         <div>
-          <div
-            style={{
-              fontSize: 11,
-              color: C.muted,
-              marginBottom: 5,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Phone (e.g. +27821234567)
-          </div>
+          {fldLabel("Phone (e.g. +27821234567)")}
           <input
             style={{ ...inputStyle, width: "100%" }}
             value={phone}
@@ -334,17 +367,7 @@ function TestSendPanel({ onSent }) {
           />
         </div>
         <div>
-          <div
-            style={{
-              fontSize: 11,
-              color: C.muted,
-              marginBottom: 5,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Email
-          </div>
+          {fldLabel("Email")}
           <input
             style={{ ...inputStyle, width: "100%" }}
             value={email}
@@ -354,27 +377,29 @@ function TestSendPanel({ onSent }) {
         </div>
       </div>
 
-      {/* Preview */}
+      {/* SMS preview */}
       <div
         style={{
           padding: 12,
-          background: C.cream,
-          borderRadius: 2,
+          background: T.ink075,
+          borderRadius: 6,
           marginBottom: 14,
           fontSize: 12,
-          color: C.text,
-          lineHeight: 1.5,
+          color: T.ink700,
+          lineHeight: 1.6,
           fontStyle: "italic",
+          fontFamily: T.font,
         }}
       >
         <span
           style={{
             fontSize: 9,
-            color: C.muted,
+            color: T.ink400,
             textTransform: "uppercase",
-            letterSpacing: "0.1em",
+            letterSpacing: "0.08em",
             display: "block",
             marginBottom: 4,
+            fontStyle: "normal",
           }}
         >
           SMS Preview
@@ -385,9 +410,9 @@ function TestSendPanel({ onSent }) {
       <button
         onClick={handleSend}
         disabled={sending}
-        style={makeBtn(C.green, C.white, sending)}
+        style={makeBtn(T.accent, "#fff", sending)}
       >
-        {sending ? "Sending…" : "🚀 Send Test"}
+        {sending ? "Sending…" : "Send Test"}
       </button>
 
       {result && (
@@ -395,26 +420,28 @@ function TestSendPanel({ onSent }) {
           style={{
             marginTop: 12,
             padding: "10px 14px",
-            borderRadius: 2,
+            borderRadius: 6,
             fontSize: 12,
-            background: result.ok ? C.lightGreen : C.lightRed,
-            color: result.ok ? C.accent : C.red,
+            background: result.ok ? T.successBg : T.dangerBg,
+            color: result.ok ? T.success : T.danger,
             fontWeight: 600,
+            fontFamily: T.font,
           }}
         >
           {result.ok
-            ? "✓ Test notification sent successfully"
-            : `✗ Failed: ${result.error || JSON.stringify(result)}`}
+            ? "Test notification sent successfully"
+            : `Failed: ${result.error || JSON.stringify(result)}`}
         </div>
       )}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminNotifications() {
+  const ctx = usePageContext("notifications", null);
   const [activeTab, setActiveTab] = useState("log");
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -443,23 +470,22 @@ export default function AdminNotifications() {
     fetchLogs();
   }, [fetchLogs]);
 
-  // ── Stats ──────────────────────────────────────────────────────────────
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const sentTotal = logs.filter((l) => l.status === "sent").length;
   const sentToday = logs.filter(
     (l) => l.status === "sent" && new Date(l.created_at) >= today,
   ).length;
   const failedTotal = logs.filter((l) => l.status === "failed").length;
   const smsCount = logs.filter((l) => l.type === "sms").length;
   const emailCount = logs.filter((l) => l.type === "email").length;
-
-  // Trigger breakdown
   const trigCounts = {};
   logs.forEach((l) => {
     trigCounts[l.trigger] = (trigCounts[l.trigger] || 0) + 1;
   });
 
-  // ── Filtered logs ──────────────────────────────────────────────────────
+  // ── Filtered ───────────────────────────────────────────────────────────────
   let displayed = [...logs];
   if (filterType !== "all")
     displayed = displayed.filter((l) => l.type === filterType);
@@ -469,13 +495,74 @@ export default function AdminNotifications() {
     displayed = displayed.filter((l) => l.status === filterStat);
 
   const TABS = [
-    { id: "log", label: "📋 Notification Log" },
-    { id: "templates", label: "📝 Templates" },
-    { id: "setup", label: "⚙ Setup & Integration" },
+    { id: "log", label: "Notification Log" },
+    { id: "templates", label: "Templates" },
+    { id: "setup", label: "Setup & Integration" },
   ];
 
+  // ── Setup step wrapper ─────────────────────────────────────────────────────
+  const SetupStep = ({ n, title, children }) => (
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 8,
+        padding: 24,
+        marginBottom: 16,
+        boxShadow: T.shadow,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
+        }}
+      >
+        <div
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: T.accent,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          {n}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: T.ink400,
+            fontFamily: T.font,
+          }}
+        >
+          {title}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+
   return (
-    <div style={{ fontFamily: F.body, position: "relative" }}>
+    <div style={{ fontFamily: T.font, position: "relative" }}>
+      <WorkflowGuide
+        context={ctx}
+        tabId="notifications"
+        onAction={() => {}}
+        defaultOpen={false}
+      />
+      {/* Toast */}
       {toast && (
         <div
           style={{
@@ -483,13 +570,15 @@ export default function AdminNotifications() {
             bottom: 24,
             left: "50%",
             transform: "translateX(-50%)",
-            background: C.green,
-            color: C.white,
+            background: T.accent,
+            color: "#fff",
             padding: "12px 24px",
-            borderRadius: 2,
+            borderRadius: 6,
             fontSize: 13,
             fontWeight: 600,
             zIndex: 2000,
+            fontFamily: T.font,
+            boxShadow: T.shadowMd,
           }}
         >
           {toast}
@@ -510,74 +599,85 @@ export default function AdminNotifications() {
         <div>
           <h2
             style={{
-              fontFamily: F.heading,
-              color: C.green,
-              fontSize: 24,
-              margin: 0,
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
             Notifications
           </h2>
-          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: T.ink400 }}>
             SMS via BulkSMS · Email framework ready · 6 trigger types
           </div>
         </div>
-        <button onClick={fetchLogs} style={makeBtn("transparent", C.muted)}>
+        <button
+          onClick={fetchLogs}
+          style={{
+            ...makeBtn("transparent", T.ink400),
+            border: `1px solid ${T.ink150}`,
+          }}
+        >
           ↻ Refresh
         </button>
       </div>
 
-      {/* Stats */}
+      {/* ── FLUSH STAT GRID ── */}
       <div
-        style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 8,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          boxShadow: T.shadow,
+          marginBottom: 20,
+        }}
       >
         {[
-          {
-            label: "Total Sent",
-            value: logs.filter((l) => l.status === "sent").length,
-            color: C.green,
-          },
-          { label: "Sent Today", value: sentToday, color: C.accent },
+          { label: "Total Sent", value: sentTotal, color: T.accent },
+          { label: "Sent Today", value: sentToday, color: T.accentMid },
           {
             label: "Failed",
             value: failedTotal,
-            color: failedTotal > 0 ? C.red : C.accent,
+            color: failedTotal > 0 ? T.danger : T.success,
           },
-          { label: "SMS", value: smsCount, color: C.blue },
-          { label: "Email", value: emailCount, color: C.mid },
+          { label: "SMS", value: smsCount, color: T.info },
+          { label: "Email", value: emailCount, color: "#b5935a" },
         ].map((s) => (
           <div
             key={s.label}
             style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderTop: `3px solid ${s.color}`,
-              borderRadius: 2,
-              padding: "14px 18px",
+              background: "#fff",
+              padding: "14px 16px",
               textAlign: "center",
-              flex: 1,
-              minWidth: 100,
             }}
           >
             <div
               style={{
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: 700,
-                letterSpacing: "0.15em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: C.muted,
-                marginBottom: 4,
+                color: T.ink400,
+                marginBottom: 6,
+                fontFamily: T.font,
               }}
             >
               {s.label}
             </div>
             <div
               style={{
-                fontFamily: F.heading,
-                fontSize: 28,
-                fontWeight: 300,
+                fontFamily: T.font,
+                fontSize: 22,
+                fontWeight: 400,
                 color: s.color,
                 lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
               {s.value}
@@ -586,12 +686,12 @@ export default function AdminNotifications() {
         ))}
       </div>
 
-      {/* Sub-tabs */}
+      {/* ── UNDERLINE TABS ── */}
       <div
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `1px solid ${C.border}`,
+          borderBottom: `2px solid ${T.ink150}`,
           marginBottom: 24,
         }}
       >
@@ -605,16 +705,16 @@ export default function AdminNotifications() {
               background: "none",
               borderBottom:
                 activeTab === t.id
-                  ? `2px solid ${C.green}`
+                  ? `2px solid ${T.accent}`
                   : "2px solid transparent",
-              marginBottom: "-1px",
+              marginBottom: -2,
               cursor: "pointer",
-              fontFamily: F.body,
+              fontFamily: T.font,
               fontSize: 11,
               fontWeight: activeTab === t.id ? 700 : 400,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.07em",
               textTransform: "uppercase",
-              color: activeTab === t.id ? C.green : C.muted,
+              color: activeTab === t.id ? T.accent : T.ink400,
             }}
           >
             {t.label}
@@ -635,7 +735,7 @@ export default function AdminNotifications() {
             />
           </div>
 
-          {/* Trigger breakdown */}
+          {/* Trigger breakdown pills */}
           {Object.keys(trigCounts).length > 0 && (
             <div
               style={{
@@ -652,21 +752,32 @@ export default function AdminNotifications() {
                     key={k}
                     style={{
                       padding: "8px 14px",
-                      background: C.white,
-                      border: `1px solid ${C.border}`,
-                      borderLeft: `3px solid ${t?.color || C.muted}`,
-                      borderRadius: 2,
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderLeft: `3px solid ${t?.color || T.ink400}`,
+                      borderRadius: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      boxShadow: T.shadow,
                     }}
                   >
-                    <span style={{ fontSize: 11, color: C.muted }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                      }}
+                    >
                       {t?.icon} {t?.label || k}
                     </span>
                     <span
                       style={{
                         fontSize: 14,
                         fontWeight: 700,
-                        color: t?.color || C.text,
-                        marginLeft: 8,
+                        color: t?.color || T.ink700,
+                        fontFamily: T.font,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {v}
@@ -718,14 +829,28 @@ export default function AdminNotifications() {
               <option value="failed">Failed</option>
               <option value="pending">Pending</option>
             </select>
-            <span style={{ fontSize: 12, color: C.muted, marginLeft: "auto" }}>
+            <span
+              style={{
+                fontSize: 12,
+                color: T.ink400,
+                marginLeft: "auto",
+                fontFamily: T.font,
+              }}
+            >
               {displayed.length} records
             </span>
           </div>
 
           {/* Log table */}
           {loading ? (
-            <div style={{ padding: 40, textAlign: "center", color: C.muted }}>
+            <div
+              style={{
+                padding: 40,
+                textAlign: "center",
+                color: T.ink400,
+                fontFamily: T.font,
+              }}
+            >
               Loading…
             </div>
           ) : displayed.length === 0 ? (
@@ -733,22 +858,25 @@ export default function AdminNotifications() {
               style={{
                 padding: 60,
                 textAlign: "center",
-                border: `1px dashed ${C.border}`,
-                borderRadius: 2,
+                border: `1px dashed ${T.ink150}`,
+                borderRadius: 8,
               }}
             >
               <div style={{ fontSize: 32, marginBottom: 12 }}>🔔</div>
               <div
                 style={{
-                  fontFamily: F.heading,
-                  fontSize: 20,
-                  color: C.green,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: T.accent,
                   marginBottom: 8,
+                  fontFamily: T.font,
                 }}
               >
                 No notifications yet
               </div>
-              <div style={{ fontSize: 13, color: C.muted }}>
+              <div
+                style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}
+              >
                 Use the test send panel above or notifications will appear here
                 as they fire from the system.
               </div>
@@ -756,10 +884,11 @@ export default function AdminNotifications() {
           ) : (
             <div
               style={{
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderRadius: 2,
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 8,
                 overflow: "hidden",
+                boxShadow: T.shadow,
               }}
             >
               <table
@@ -767,10 +896,11 @@ export default function AdminNotifications() {
                   width: "100%",
                   borderCollapse: "collapse",
                   fontSize: 12,
+                  fontFamily: T.font,
                 }}
               >
                 <thead>
-                  <tr style={{ background: C.green }}>
+                  <tr style={{ background: T.accent }}>
                     {[
                       "Date",
                       "Type",
@@ -785,9 +915,10 @@ export default function AdminNotifications() {
                           padding: "10px 12px",
                           textAlign: "left",
                           fontSize: 9,
-                          color: C.white,
-                          letterSpacing: "0.12em",
+                          color: "#fff",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
+                          fontFamily: T.font,
                         }}
                       >
                         {h}
@@ -800,14 +931,14 @@ export default function AdminNotifications() {
                     <tr
                       key={l.id}
                       style={{
-                        background: i % 2 === 0 ? C.white : C.cream,
-                        borderBottom: `1px solid ${C.border}`,
+                        background: i % 2 === 0 ? "#fff" : T.ink050,
+                        borderBottom: `1px solid ${T.ink075}`,
                       }}
                     >
                       <td
                         style={{
                           padding: "10px 12px",
-                          color: C.muted,
+                          color: T.ink400,
                           whiteSpace: "nowrap",
                           fontSize: 11,
                         }}
@@ -818,7 +949,13 @@ export default function AdminNotifications() {
                         <TypeBadge type={l.type} />
                       </td>
                       <td style={{ padding: "10px 12px" }}>
-                        <span style={{ fontSize: 11 }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: T.ink700,
+                            fontFamily: T.font,
+                          }}
+                        >
                           {TRIGGERS[l.trigger]?.icon}{" "}
                           {TRIGGERS[l.trigger]?.label || l.trigger}
                         </span>
@@ -826,7 +963,7 @@ export default function AdminNotifications() {
                       <td
                         style={{
                           padding: "10px 12px",
-                          color: C.muted,
+                          color: T.ink400,
                           fontSize: 11,
                         }}
                       >
@@ -835,7 +972,7 @@ export default function AdminNotifications() {
                       <td
                         style={{
                           padding: "10px 12px",
-                          color: C.muted,
+                          color: T.ink400,
                           fontSize: 11,
                           maxWidth: 240,
                           overflow: "hidden",
@@ -849,7 +986,12 @@ export default function AdminNotifications() {
                         <StatusBadge status={l.status} />
                         {l.error && (
                           <div
-                            style={{ fontSize: 10, color: C.red, marginTop: 2 }}
+                            style={{
+                              fontSize: 10,
+                              color: T.danger,
+                              marginTop: 2,
+                              fontFamily: T.font,
+                            }}
                           >
                             {l.error.slice(0, 40)}
                           </div>
@@ -867,9 +1009,22 @@ export default function AdminNotifications() {
       {/* ══════ TEMPLATES ══════ */}
       {activeTab === "templates" && (
         <div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 20 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: T.ink400,
+              marginBottom: 20,
+              fontFamily: T.font,
+            }}
+          >
             SMS templates are defined in the Edge Function. Edit{" "}
-            <code style={{ background: C.cream, padding: "1px 4px" }}>
+            <code
+              style={{
+                background: T.ink075,
+                padding: "1px 4px",
+                borderRadius: 3,
+              }}
+            >
               supabase/functions/send-notification/index.ts
             </code>{" "}
             → <code>buildSMS()</code> to customise.
@@ -879,11 +1034,12 @@ export default function AdminNotifications() {
               <div
                 key={key}
                 style={{
-                  background: C.white,
-                  border: `1px solid ${C.border}`,
+                  background: "#fff",
+                  border: `1px solid ${T.ink150}`,
                   borderLeft: `4px solid ${t.color}`,
-                  borderRadius: 2,
+                  borderRadius: 8,
                   padding: 20,
+                  boxShadow: T.shadow,
                 }}
               >
                 <div
@@ -896,23 +1052,45 @@ export default function AdminNotifications() {
                 >
                   <span style={{ fontSize: 18 }}>{t.icon}</span>
                   <div>
-                    <div style={{ fontWeight: 700, color: C.text }}>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        color: T.ink900,
+                        fontFamily: T.font,
+                      }}
+                    >
                       {t.label}
                     </div>
-                    <div style={{ fontSize: 11, color: C.muted }}>
-                      Recipient: {t.to} · Key: <code>{key}</code>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      Recipient: {t.to} · Key:{" "}
+                      <code
+                        style={{
+                          background: T.ink075,
+                          padding: "1px 4px",
+                          borderRadius: 3,
+                        }}
+                      >
+                        {key}
+                      </code>
                     </div>
                   </div>
                 </div>
                 <div
                   style={{
                     padding: "10px 14px",
-                    background: C.cream,
-                    borderRadius: 2,
+                    background: T.ink075,
+                    borderRadius: 6,
                     fontSize: 12,
-                    color: C.text,
+                    color: T.ink700,
                     lineHeight: 1.6,
                     fontStyle: "italic",
+                    fontFamily: T.font,
                   }}
                 >
                   {SMS_PREVIEWS[key]}
@@ -926,31 +1104,19 @@ export default function AdminNotifications() {
       {/* ══════ SETUP ══════ */}
       {activeTab === "setup" && (
         <div>
-          {/* Step 1 — SQL */}
-          <div
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: 24,
-              marginBottom: 16,
-            }}
-          >
-            <div style={sLabel}>Step 1 — Run SQL (once)</div>
-            <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+          {/* Step 1 */}
+          <SetupStep n="1" title="Run SQL (once)">
+            <div
+              style={{
+                fontSize: 13,
+                color: T.ink400,
+                marginBottom: 12,
+                fontFamily: T.font,
+              }}
+            >
               Create the notification_log table in Supabase SQL editor:
             </div>
-            <pre
-              style={{
-                background: "#1e1e2e",
-                color: "#cdd6f4",
-                padding: 16,
-                borderRadius: 2,
-                fontSize: 12,
-                overflowX: "auto",
-                lineHeight: 1.6,
-              }}
-            >{`CREATE TABLE notification_log (
+            <CodeBlock>{`CREATE TABLE notification_log (
   id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   type         text NOT NULL,
   trigger      text NOT NULL,
@@ -965,53 +1131,27 @@ export default function AdminNotifications() {
 
 ALTER TABLE notification_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_all" ON notification_log
-  USING (auth.jwt() ->> 'role' IN ('admin','hq'));`}</pre>
-          </div>
+  USING (auth.jwt() ->> 'role' IN ('admin','hq'));`}</CodeBlock>
+          </SetupStep>
 
-          {/* Step 2 — Deploy Edge Function */}
-          <div
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: 24,
-              marginBottom: 16,
-            }}
-          >
-            <div style={sLabel}>Step 2 — Deploy Edge Function</div>
-            <pre
-              style={{
-                background: "#1e1e2e",
-                color: "#cdd6f4",
-                padding: 16,
-                borderRadius: 2,
-                fontSize: 12,
-                overflowX: "auto",
-              }}
-            >{`# Copy index.ts to supabase/functions/send-notification/index.ts
+          {/* Step 2 */}
+          <SetupStep n="2" title="Deploy Edge Function">
+            <CodeBlock>{`# Copy index.ts to supabase/functions/send-notification/index.ts
 # Then deploy:
-supabase functions deploy send-notification --no-verify-jwt`}</pre>
-          </div>
+supabase functions deploy send-notification --no-verify-jwt`}</CodeBlock>
+          </SetupStep>
 
-          {/* Step 3 — Secrets */}
-          <div
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: 24,
-              marginBottom: 16,
-            }}
+          {/* Step 3 */}
+          <SetupStep
+            n="3"
+            title="Add Secrets (Supabase Dashboard → Edge Functions → Secrets)"
           >
-            <div style={sLabel}>
-              Step 3 — Add Secrets (Supabase Dashboard → Edge Functions →
-              Secrets)
-            </div>
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: 13,
+                fontFamily: T.font,
               }}
             >
               <thead>
@@ -1023,10 +1163,10 @@ supabase functions deploy send-notification --no-verify-jwt`}</pre>
                         textAlign: "left",
                         padding: "8px 10px",
                         fontSize: 10,
-                        color: C.muted,
-                        letterSpacing: "0.1em",
+                        color: T.ink400,
+                        letterSpacing: "0.08em",
                         textTransform: "uppercase",
-                        borderBottom: `1px solid ${C.border}`,
+                        borderBottom: `1px solid ${T.ink150}`,
                       }}
                     >
                       {h}
@@ -1050,15 +1190,16 @@ supabase functions deploy send-notification --no-verify-jwt`}</pre>
                   <tr key={name}>
                     <td
                       style={{
-                        padding: "10px",
-                        borderBottom: `1px solid ${C.border}`,
+                        padding: 10,
+                        borderBottom: `1px solid ${T.ink075}`,
                       }}
                     >
                       <code
                         style={{
-                          background: C.cream,
+                          background: T.ink075,
                           padding: "2px 6px",
-                          borderRadius: 2,
+                          borderRadius: 3,
+                          fontSize: 12,
                         }}
                       >
                         {name}
@@ -1066,20 +1207,21 @@ supabase functions deploy send-notification --no-verify-jwt`}</pre>
                     </td>
                     <td
                       style={{
-                        padding: "10px",
-                        borderBottom: `1px solid ${C.border}`,
-                        color: C.muted,
+                        padding: 10,
+                        borderBottom: `1px solid ${T.ink075}`,
+                        color: T.ink400,
                         fontStyle: "italic",
+                        fontSize: 12,
                       }}
                     >
                       {val}
                     </td>
                     <td
                       style={{
-                        padding: "10px",
-                        borderBottom: `1px solid ${C.border}`,
+                        padding: 10,
+                        borderBottom: `1px solid ${T.ink075}`,
                         fontSize: 12,
-                        color: C.muted,
+                        color: T.ink400,
                       }}
                     >
                       {note}
@@ -1088,45 +1230,32 @@ supabase functions deploy send-notification --no-verify-jwt`}</pre>
                 ))}
               </tbody>
             </table>
-          </div>
+          </SetupStep>
 
-          {/* Step 4 — .env */}
-          <div
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: 24,
-              marginBottom: 16,
-            }}
-          >
-            <div style={sLabel}>Step 4 — Add to .env</div>
-            <pre
+          {/* Step 4 */}
+          <SetupStep n="4" title="Add to .env">
+            <CodeBlock>{`REACT_APP_ADMIN_PHONE=+2782xxxxxxx
+REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</CodeBlock>
+          </SetupStep>
+
+          {/* Step 5 */}
+          <SetupStep n="5" title="Wire Triggers into Existing Code">
+            <div
               style={{
-                background: "#1e1e2e",
-                color: "#cdd6f4",
-                padding: 16,
-                borderRadius: 2,
-                fontSize: 12,
+                fontSize: 13,
+                color: T.ink400,
+                marginBottom: 12,
+                fontFamily: T.font,
               }}
-            >{`REACT_APP_ADMIN_PHONE=+2782xxxxxxx
-REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</pre>
-          </div>
-
-          {/* Step 5 — Integration hooks */}
-          <div
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 2,
-              padding: 24,
-              marginBottom: 16,
-            }}
-          >
-            <div style={sLabel}>Step 5 — Wire Triggers into Existing Code</div>
-            <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+            >
               Add{" "}
-              <code style={{ background: C.cream, padding: "1px 4px" }}>
+              <code
+                style={{
+                  background: T.ink075,
+                  padding: "1px 4px",
+                  borderRadius: 3,
+                }}
+              >
                 import {"{ notify }"} from "../services/notificationService"
               </code>{" "}
               then call:
@@ -1150,53 +1279,51 @@ REACT_APP_ADMIN_EMAIL=admin@proteabotanicals.co.za`}</pre>
                 },
                 {
                   file: "src/components/StockControl.js",
-                  where: "After stock movement that drops below reorder_level",
+                  where: "After stock movement drops below reorder_level",
                   code: `await notify.lowStock(\n  { item_name: item.name, quantity: newQty, unit: item.unit, reorder_level: item.reorder_level }\n);`,
                 },
               ].map((h) => (
                 <div
                   key={h.file}
                   style={{
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 2,
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 8,
                     overflow: "hidden",
                   }}
                 >
                   <div
                     style={{
                       padding: "8px 14px",
-                      background: C.cream,
-                      borderBottom: `1px solid ${C.border}`,
+                      background: T.ink075,
+                      borderBottom: `1px solid ${T.ink150}`,
                     }}
                   >
                     <span
-                      style={{ fontSize: 11, fontWeight: 700, color: C.green }}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: T.accent,
+                        fontFamily: T.font,
+                      }}
                     >
                       {h.file}
                     </span>
                     <span
-                      style={{ fontSize: 11, color: C.muted, marginLeft: 8 }}
+                      style={{
+                        fontSize: 11,
+                        color: T.ink400,
+                        marginLeft: 8,
+                        fontFamily: T.font,
+                      }}
                     >
                       — {h.where}
                     </span>
                   </div>
-                  <pre
-                    style={{
-                      background: "#1e1e2e",
-                      color: "#cdd6f4",
-                      padding: 14,
-                      fontSize: 11,
-                      margin: 0,
-                      overflowX: "auto",
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {h.code}
-                  </pre>
+                  <CodeBlock>{h.code}</CodeBlock>
                 </div>
               ))}
             </div>
-          </div>
+          </SetupStep>
         </div>
       )}
     </div>
