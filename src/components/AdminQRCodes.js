@@ -735,15 +735,45 @@ function RegistryTab({ batches }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const domain = window.location.origin;
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "qr_codes",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchCodes = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("qr_codes")
       .select("*, batches(batch_number, product_name, strain)")
       .order("created_at", { ascending: false });
-    if (!error) setCodes(data || []);
+    if (!error) {
+      const fetched = data || [];
+      setCodes(fetched);
+      // GAP-02: alert when active unclaimed pool is critically low
+      const poolAvailable = fetched.filter(
+        (c) => c.is_active && !c.claimed,
+      ).length;
+      if (poolAvailable < 10) {
+        writeAlert(
+          "qr_pool_low",
+          poolAvailable === 0 ? "critical" : "warning",
+          `QR pool ${poolAvailable === 0 ? "exhausted" : "running low"} — ${poolAvailable} active unclaimed code${poolAvailable !== 1 ? "s" : ""} remaining`,
+          "Generate new QR codes in the Generate tab to replenish the pool.",
+        );
+      }
+    }
     setLoading(false);
-  }, []);
+  }, [writeAlert]);
   useEffect(() => {
     fetchCodes();
   }, [fetchCodes]);
