@@ -283,6 +283,30 @@ export default function HQOverview({ onNavigate }) {
     };
   }, [fetchFx]);
 
+  // GAP-02: realtime subscriptions — stock + batches → refresh overview
+  useEffect(() => {
+    const stockSub = supabase
+      .channel("hq-overview-stock")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "inventory_items" },
+        () => fetchStats(),
+      )
+      .subscribe();
+    const batchSub = supabase
+      .channel("hq-overview-batches")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "batches" },
+        () => fetchStats(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(stockSub);
+      supabase.removeChannel(batchSub);
+    };
+  }, [fetchStats]);
+
   const fetchBirthdayStats = useCallback(async () => {
     try {
       const now = new Date();
