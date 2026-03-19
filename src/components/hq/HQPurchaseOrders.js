@@ -425,10 +425,10 @@ export default function HQPurchaseOrders() {
     setPoNotes("");
     setCatFilter("all");
   };
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 4500);
-  };
+    setTimeout(() => setToast(""), 4000);
+  }, []);
 
   const handleCreate = async () => {
     if (!selSupplier || lineItems.length === 0) return;
