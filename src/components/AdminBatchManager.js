@@ -1116,6 +1116,21 @@ export default function AdminBatchManager({
     setTimeout(() => setToast(""), 3000);
   }, []);
 
+  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "batches",
+      });
+    } catch (_) {}
+  }, []);
+
   const fetchBatches = useCallback(async () => {
     setLoading(true);
     try {
@@ -1137,6 +1152,39 @@ export default function AdminBatchManager({
       }
       setStatsMap(map);
       setBatches(batchData || []);
+
+      // GAP-02: fire alerts for expiring batches + missing COA
+      const now = Date.now();
+      const activeFetched = (batchData || []).filter((b) => !b.is_archived);
+      const expiring = activeFetched.filter((b) => {
+        const days = b.expiry_date
+          ? Math.ceil((new Date(b.expiry_date) - now) / 86400000)
+          : null;
+        return days !== null && days <= 30 && days >= 0;
+      });
+      const noCoa = activeFetched.filter((b) => !b.coa_url);
+      if (expiring.length > 0) {
+        writeAlert(
+          "batch_expiry",
+          "warning",
+          `${expiring.length} batch${expiring.length > 1 ? "es" : ""} expiring within 30 days`,
+          expiring
+            .map(
+              (b) =>
+                `${b.batch_number} (${b.product_name}) — expires ${b.expiry_date}`,
+            )
+            .join(" · "),
+        );
+      }
+      if (noCoa.length > 0) {
+        writeAlert(
+          "missing_coa",
+          "info",
+          `${noCoa.length} batch${noCoa.length > 1 ? "es" : ""} missing COA`,
+          noCoa.map((b) => `${b.batch_number} (${b.product_name})`).join(" · "),
+        );
+      }
+
       // Suggest next batch number
       let max = 0;
       for (const b of batchData || []) {
