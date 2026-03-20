@@ -1,8 +1,15 @@
-// src/components/AdminFraudSecurity.js v1.3
+// src/components/AdminFraudSecurity.js v1.4
+// WP-SEC: Migrated from legacy `scans` table to `scan_logs`
+//   - fetchAll now queries scan_logs with correct columns
+//   - detectFraud updated: scan_date → scanned_at, product_id → qr_code_id
+//   - Display: scan_date → scanned_at, product_id → qr_code_id/qr_code
+//   - scan_flagged/flag_reason removed (not in scan_logs) — scan_outcome shown instead
+//   - is_first_scan → scan_outcome === 'points_awarded'
+//   - os column removed (not in scan_logs)
+//   - Auto-flag + manual flag write to user_profiles.anomaly_score instead of legacy scans
 // WP-VIZ: Flagged vs Clean donut + Detection reason bar + Scan trend area
 // WP-GUIDE: WorkflowGuide + usePageContext added
-// WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
-// v1.0 — March 2026 · WP8 — Fraud Detection, Security & POPIA
+// WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -54,48 +61,15 @@ const T = {
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
   shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
 };
-const C = {
-  green: T.accent,
-  mid: T.accentMid,
-  accent: "#52b788",
-  gold: "#b5935a",
-  cream: T.ink050,
-  border: T.ink150,
-  muted: T.ink400,
-  text: T.ink700,
-  white: "#fff",
-  red: T.danger,
-  lightRed: T.dangerBg,
-  orange: T.warning,
-  lightOrange: T.warningBg,
-  blue: T.info,
-  lightBlue: T.infoBg,
-  lightGreen: T.accentLit,
-};
-const F = { heading: T.font, body: T.font };
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function fmtDate(d) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-function distanceKm(lat1, lng1, lat2, lng2) {
-  if (!lat1 || !lat2) return null;
-  const R = 6371,
-    dLat = ((lat2 - lat1) * Math.PI) / 180,
-    dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// Scan outcomes that indicate suspicious activity
+const SUSPICIOUS_OUTCOMES = [
+  "blocked_max_scans",
+  "velocity_flag",
+  "scan_abuse",
+];
+const isSuspicious = (s) => SUSPICIOUS_OUTCOMES.includes(s.scan_outcome);
+const isFirstScan = (s) => s.scan_outcome === "points_awarded";
 
 const inputStyle = {
   padding: "8px 12px",
@@ -123,6 +97,29 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   opacity: disabled ? 0.6 : 1,
   transition: "opacity 0.15s",
 });
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-ZA", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+function distanceKm(lat1, lng1, lat2, lng2) {
+  if (!lat1 || !lat2) return null;
+  const R = 6371,
+    dLat = ((lat2 - lat1) * Math.PI) / 180,
+    dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // ─── FLAG REASON CONFIG ───────────────────────────────────────────────────────
 const FLAG_COLORS = {
@@ -158,7 +155,39 @@ function FlagBadge({ reason }) {
   );
 }
 
+function OutcomeBadge({ outcome }) {
+  const suspicious = SUSPICIOUS_OUTCOMES.includes(outcome);
+  const color = suspicious
+    ? T.danger
+    : outcome === "points_awarded"
+      ? T.success
+      : T.ink400;
+  const bg = suspicious
+    ? T.dangerBg
+    : outcome === "points_awarded"
+      ? T.successBg
+      : T.ink075;
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        padding: "2px 8px",
+        borderRadius: 20,
+        fontWeight: 700,
+        letterSpacing: "0.07em",
+        textTransform: "uppercase",
+        background: bg,
+        color,
+        fontFamily: T.font,
+      }}
+    >
+      {(outcome || "unknown").replace(/_/g, " ")}
+    </span>
+  );
+}
+
 // ─── AUTO-DETECTION ENGINE ────────────────────────────────────────────────────
+// Uses scan_logs columns: scanned_at, qr_code_id, user_id
 function detectFraud(scans) {
   const detections = [];
   const byUser = {};
@@ -169,19 +198,20 @@ function detectFraud(scans) {
   });
   Object.values(byUser).forEach((userScans) => {
     const sorted = [...userScans].sort(
-      (a, b) => new Date(a.scan_date) - new Date(b.scan_date),
+      (a, b) => new Date(a.scanned_at) - new Date(b.scanned_at),
     );
-    // 1. Velocity: same product >3x in 24h
-    const byProduct = {};
+    // 1. Velocity: same QR >3x in 24h
+    const byQr = {};
     sorted.forEach((s) => {
-      if (!byProduct[s.product_id]) byProduct[s.product_id] = [];
-      byProduct[s.product_id].push(s);
+      const key = s.qr_code_id || s.qr_code || "unknown";
+      if (!byQr[key]) byQr[key] = [];
+      byQr[key].push(s);
     });
-    Object.values(byProduct).forEach((ps) => {
+    Object.values(byQr).forEach((ps) => {
       for (let i = 0; i < ps.length; i++) {
         const window = ps.filter(
           (s) =>
-            Math.abs(new Date(s.scan_date) - new Date(ps[i].scan_date)) <
+            Math.abs(new Date(s.scanned_at) - new Date(ps[i].scanned_at)) <
             86400000,
         );
         if (window.length > 3)
@@ -205,7 +235,7 @@ function detectFraud(scans) {
         b.gps_lat || b.ip_lat,
         b.gps_lng || b.ip_lng,
       );
-      const mins = (new Date(b.scan_date) - new Date(a.scan_date)) / 60000;
+      const mins = (new Date(b.scanned_at) - new Date(a.scanned_at)) / 60000;
       if (dist && dist > 500 && mins < 60) {
         if (!detections.find((d) => d.scanId === b.id))
           detections.push({
@@ -219,7 +249,7 @@ function detectFraud(scans) {
     for (let i = 0; i < sorted.length; i++) {
       const window = sorted.filter(
         (s) =>
-          Math.abs(new Date(s.scan_date) - new Date(sorted[i].scan_date)) <
+          Math.abs(new Date(s.scanned_at) - new Date(sorted[i].scanned_at)) <
           3600000,
       );
       if (window.length > 10)
@@ -282,138 +312,6 @@ function Section({ title, children }) {
         {title}
       </div>
       {children}
-    </div>
-  );
-}
-
-// ─── FLAG MODAL ───────────────────────────────────────────────────────────────
-function FlagModal({ scan, onClose, onSave }) {
-  const [reason, setReason] = useState(scan?.flag_reason || "");
-  const [flagged, setFlagged] = useState(scan?.scan_flagged || false);
-  const [saving, setSaving] = useState(false);
-  const handleSave = async () => {
-    setSaving(true);
-    await onSave(scan.id, flagged, reason);
-    setSaving(false);
-    onClose();
-  };
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1500,
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 8,
-          padding: 28,
-          maxWidth: 460,
-          width: "90%",
-          fontFamily: T.font,
-          boxShadow: T.shadowMd,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 600, color: T.ink900 }}>
-            Flag Scan
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: 22,
-              cursor: "pointer",
-              color: T.ink400,
-            }}
-          >
-            ×
-          </button>
-        </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: T.ink400,
-            marginBottom: 16,
-            fontFamily: T.font,
-          }}
-        >
-          Scan ID:{" "}
-          <code style={{ fontSize: 11 }}>{scan?.id?.slice(0, 16)}…</code>
-          <br />
-          Product: <strong>{scan?.product_id?.slice(0, 8)}…</strong> ·{" "}
-          {fmtDate(scan?.scan_date)}
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              cursor: "pointer",
-              fontSize: 13,
-              fontFamily: T.font,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={flagged}
-              onChange={(e) => setFlagged(e.target.checked)}
-              style={{ width: 15, height: 15, cursor: "pointer" }}
-            />
-            Mark as Flagged
-          </label>
-        </div>
-        <div style={{ marginBottom: 20 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: T.ink400,
-              marginBottom: 6,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              fontFamily: T.font,
-            }}
-          >
-            Reason
-          </div>
-          <input
-            style={{ ...inputStyle, width: "100%" }}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. suspicious velocity, manual review…"
-          />
-        </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={onClose}
-            style={{ ...makeBtn("transparent", T.ink400), flex: 1 }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{ ...makeBtn(T.accent, "#fff", saving), flex: 2 }}
-          >
-            {saving ? "Saving…" : "Save Flag"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -499,240 +397,9 @@ function EraseModal({ customer, onClose, onConfirm }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
-export default function AdminFraudSecurity() {
-  const ctx = usePageContext("security", null);
-  const [activeTab, setActiveTab] = useState("fraud");
-  const [scans, setScans] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [detections, setDetections] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [flagModal, setFlagModal] = useState(null);
-  const [eraseModal, setEraseModal] = useState(null);
-  const [toast, setToast] = useState("");
-  const [scanFilter, setScanFilter] = useState("flagged");
-  const [search, setSearch] = useState("");
-  const [running, setRunning] = useState(false);
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 3200);
-  };
-
-  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
-  const writeAlert = useCallback(async (alertType, severity, title, body) => {
-    try {
-      await supabase.from("system_alerts").insert({
-        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
-        alert_type: alertType,
-        severity,
-        status: "open",
-        title,
-        body: body || null,
-        source_table: "scans",
-      });
-    } catch (_) {}
-  }, []);
-
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [scanRes, custRes] = await Promise.all([
-        supabase
-          .from("scans")
-          .select(
-            "id,user_id,product_id,scan_date,source,gps_lat,gps_lng,ip_lat,ip_lng,ip_city,ip_province,ip_country,location_source,device_type,browser,os,is_first_scan,scan_flagged,flag_reason,distance_to_stockist_m",
-          )
-          .order("scan_date", { ascending: false })
-          .limit(500),
-        supabase
-          .from("user_profiles")
-          .select(
-            "id,full_name,phone,email,popia_consented,popia_date,marketing_opt_in,analytics_opt_in,geolocation_consent,date_of_birth,city,province,gender,referral_code,created_at",
-          )
-          .eq("role", "customer"),
-      ]);
-      setScans(scanRes.data || []);
-      setCustomers(custRes.data || []);
-      setDetections(detectFraud(scanRes.data || []));
-    } catch (err) {
-      console.error("FraudSecurity fetch:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
-  // GAP-02: read system_alerts for fraud types
-  const [fraudAlerts, setFraudAlerts] = useState([]);
-  const fetchFraudAlerts = useCallback(async () => {
-    try {
-      const { data } = await supabase
-        .from("system_alerts")
-        .select("id,title,body,severity,status,created_at")
-        .in("alert_type", ["high_anomaly", "account_flagged"])
-        .in("status", ["open", "acknowledged"])
-        .order("created_at", { ascending: false })
-        .limit(5);
-      setFraudAlerts(data || []);
-    } catch (_) {}
-  }, []);
-
-  useEffect(() => {
-    fetchFraudAlerts();
-    const sub = supabase
-      .channel("admin-fraud-alerts")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "system_alerts" },
-        fetchFraudAlerts,
-      )
-      .subscribe();
-    return () => supabase.removeChannel(sub);
-  }, [fetchFraudAlerts]);
-
-  const handleAutoFlag = async () => {
-    setRunning(true);
-    let flagged = 0;
-    for (const det of detections) {
-      const scan = scans.find((s) => s.id === det.scanId);
-      if (scan && !scan.scan_flagged) {
-        const { error } = await supabase
-          .from("scans")
-          .update({ scan_flagged: true, flag_reason: det.reason })
-          .eq("id", det.scanId);
-        if (!error) flagged++;
-      }
-    }
-    setRunning(false);
-    showToast(`${flagged} scans auto-flagged and saved`);
-    if (flagged > 0) {
-      writeAlert(
-        "high_anomaly",
-        "warning",
-        `${flagged} suspicious scan pattern${flagged > 1 ? "s" : ""} auto-flagged`,
-        `Auto-detection run flagged ${flagged} scan${flagged > 1 ? "s" : ""} across ${Object.keys(
-          detections.reduce((a, d) => {
-            a[d.reason] = true;
-            return a;
-          }, {}),
-        ).join(", ")} rules.`,
-      );
-    }
-    fetchAll();
-  };
-
-  const handleSaveFlag = async (scanId, flagged, reason) => {
-    await supabase
-      .from("scans")
-      .update({ scan_flagged: flagged, flag_reason: reason })
-      .eq("id", scanId);
-    if (flagged && reason) {
-      writeAlert(
-        "account_flagged",
-        "warning",
-        `Scan manually flagged — ${reason}`,
-        `Scan ID ${scanId.slice(0, 8)}… flagged by admin. Reason: ${reason}.`,
-      );
-    }
-    showToast(`Scan ${flagged ? "flagged" : "cleared"}`);
-    fetchAll();
-  };
-
-  const handleErase = async (customer) => {
-    await supabase
-      .from("user_profiles")
-      .update({
-        full_name: null,
-        phone: null,
-        date_of_birth: null,
-        city: null,
-        province: null,
-        gender: null,
-        referral_code: null,
-      })
-      .eq("id", customer.id);
-    showToast(
-      `${customer.full_name || "User"} anonymised under POPIA right to erasure`,
-    );
-    fetchAll();
-  };
-
-  const handleExport = (customer) => {
-    const data = JSON.stringify(customer, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `popia-export-${customer.id.slice(0, 8)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(`Data exported for ${customer.full_name || "user"}`);
-  };
-
-  // ── Computed stats ──────────────────────────────────────────────────────────
-  const flaggedScans = scans.filter((s) => s.scan_flagged);
-  const autoDetected = detections.length;
-  const consentedCount = customers.filter((c) => c.popia_consented).length;
-  const noConsentCount = customers.length - consentedCount;
-  const marketingOptIn = customers.filter((c) => c.marketing_opt_in).length;
-
-  const deviceBreakdown = scans.reduce((acc, s) => {
-    const k = s.device_type || "unknown";
-    acc[k] = (acc[k] || 0) + 1;
-    return acc;
-  }, {});
-  const provinceBreakdown = scans.reduce((acc, s) => {
-    const k = s.ip_province || "unknown";
-    acc[k] = (acc[k] || 0) + 1;
-    return acc;
-  }, {});
-  const countryBreakdown = scans.reduce((acc, s) => {
-    const k = s.ip_country || "unknown";
-    acc[k] = (acc[k] || 0) + 1;
-    return acc;
-  }, {});
-
-  // ── Filtered scan list ─────────────────────────────────────────────────────
-  let displayedScans = [...scans];
-  if (scanFilter === "flagged")
-    displayedScans = displayedScans.filter((s) => s.scan_flagged);
-  if (scanFilter === "detected")
-    displayedScans = displayedScans.filter((s) =>
-      detections.find((d) => d.scanId === s.id),
-    );
-  if (scanFilter === "foreign")
-    displayedScans = displayedScans.filter(
-      (s) =>
-        s.ip_country &&
-        s.ip_country !== "ZA" &&
-        s.ip_country !== "South Africa",
-    );
-  if (search) {
-    const q = search.toLowerCase();
-    displayedScans = displayedScans.filter(
-      (s) =>
-        (s.flag_reason || "").toLowerCase().includes(q) ||
-        (s.ip_city || "").toLowerCase().includes(q) ||
-        (s.ip_country || "").toLowerCase().includes(q) ||
-        (s.device_type || "").toLowerCase().includes(q) ||
-        (s.id || "").toLowerCase().includes(q),
-    );
-  }
-
-  const TABS = [
-    { id: "fraud", label: "Fraud Detection" },
-    { id: "audit", label: "Audit Log" },
-    { id: "popia", label: "POPIA Compliance" },
-  ];
-
-  // ── Breakdown bar helper ───────────────────────────────────────────────────
-  const BreakdownBar = ({ entries, color, total }) => (
+// ── Breakdown bar helper ───────────────────────────────────────────────────────
+function BreakdownBar({ entries, color, total }) {
+  return (
     <>
       {entries.map(([k, v]) => (
         <div
@@ -787,6 +454,234 @@ export default function AdminFraudSecurity() {
       )}
     </>
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function AdminFraudSecurity() {
+  const ctx = usePageContext("security", null);
+  const [activeTab, setActiveTab] = useState("fraud");
+  const [scans, setScans] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [detections, setDetections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [eraseModal, setEraseModal] = useState(null);
+  const [toast, setToast] = useState("");
+  const [scanFilter, setScanFilter] = useState("suspicious");
+  const [search, setSearch] = useState("");
+  const [running, setRunning] = useState(false);
+  const [fraudAlerts, setFraudAlerts] = useState([]);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3200);
+  };
+
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "scan_logs",
+      });
+    } catch (_) {}
+  }, []);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [scanRes, custRes] = await Promise.all([
+        supabase
+          .from("scan_logs")
+          .select(
+            "id,user_id,qr_code_id,qr_code,scanned_at,scan_outcome,gps_lat,gps_lng,ip_lat,ip_lng,ip_city,ip_province,ip_country,location_source,device_type,browser,distance_to_stockist_m,points_awarded",
+          )
+          .order("scanned_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("user_profiles")
+          .select(
+            "id,full_name,phone,email,popia_consented,popia_date,marketing_opt_in,analytics_opt_in,geolocation_consent,date_of_birth,city,province,gender,referral_code,created_at,anomaly_score,is_suspended",
+          )
+          .eq("role", "customer"),
+      ]);
+      setScans(scanRes.data || []);
+      setCustomers(custRes.data || []);
+      setDetections(detectFraud(scanRes.data || []));
+    } catch (err) {
+      console.error("FraudSecurity fetch:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const fetchFraudAlerts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("system_alerts")
+        .select("id,title,body,severity,status,created_at")
+        .in("alert_type", [
+          "high_anomaly",
+          "account_flagged",
+          "velocity_flag",
+          "scan_abuse",
+        ])
+        .in("status", ["open", "acknowledged"])
+        .order("created_at", { ascending: false })
+        .limit(5);
+      setFraudAlerts(data || []);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    fetchFraudAlerts();
+    const sub = supabase
+      .channel("admin-fraud-alerts")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "system_alerts" },
+        fetchFraudAlerts,
+      )
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [fetchFraudAlerts]);
+
+  // Auto-flag: increment anomaly_score on detected users
+  const handleAutoFlag = async () => {
+    setRunning(true);
+    let flagged = 0;
+    const flaggedUserIds = new Set(
+      detections
+        .map((d) => scans.find((s) => s.id === d.scanId)?.user_id)
+        .filter(Boolean),
+    );
+    for (const userId of flaggedUserIds) {
+      const { data: prof } = await supabase
+        .from("user_profiles")
+        .select("anomaly_score")
+        .eq("id", userId)
+        .single();
+      const current = prof?.anomaly_score || 0;
+      const newScore = Math.min(current + 20, 100);
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({ anomaly_score: newScore })
+        .eq("id", userId);
+      if (!error) flagged++;
+    }
+    setRunning(false);
+    showToast(
+      `${flagged} account${flagged !== 1 ? "s" : ""} anomaly score incremented`,
+    );
+    if (flagged > 0) {
+      writeAlert(
+        "high_anomaly",
+        "warning",
+        `${flagged} suspicious pattern${flagged > 1 ? "s" : ""} detected`,
+        `Auto-detection flagged ${flagged} account${flagged > 1 ? "s" : ""} across ${[
+          ...new Set(detections.map((d) => d.reason)),
+        ].join(", ")} rules.`,
+      );
+    }
+    fetchAll();
+  };
+
+  const handleErase = async (customer) => {
+    await supabase
+      .from("user_profiles")
+      .update({
+        full_name: null,
+        phone: null,
+        date_of_birth: null,
+        city: null,
+        province: null,
+        gender: null,
+        referral_code: null,
+      })
+      .eq("id", customer.id);
+    showToast(
+      `${customer.full_name || "User"} anonymised under POPIA right to erasure`,
+    );
+    fetchAll();
+  };
+
+  const handleExport = (customer) => {
+    const data = JSON.stringify(customer, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `popia-export-${customer.id.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Data exported for ${customer.full_name || "user"}`);
+  };
+
+  // ── Computed stats ────────────────────────────────────────────────────────
+  const suspiciousScans = scans.filter(isSuspicious);
+  const autoDetected = detections.length;
+  const consentedCount = customers.filter((c) => c.popia_consented).length;
+  const noConsentCount = customers.length - consentedCount;
+  const marketingOptIn = customers.filter((c) => c.marketing_opt_in).length;
+
+  const deviceBreakdown = scans.reduce((acc, s) => {
+    const k = s.device_type || "unknown";
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const provinceBreakdown = scans.reduce((acc, s) => {
+    const k = s.ip_province || "unknown";
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const countryBreakdown = scans.reduce((acc, s) => {
+    const k = s.ip_country || "unknown";
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+
+  // ── Filtered scan list ────────────────────────────────────────────────────
+  let displayedScans = [...scans];
+  if (scanFilter === "suspicious")
+    displayedScans = displayedScans.filter(isSuspicious);
+  if (scanFilter === "detected")
+    displayedScans = displayedScans.filter((s) =>
+      detections.find((d) => d.scanId === s.id),
+    );
+  if (scanFilter === "foreign")
+    displayedScans = displayedScans.filter(
+      (s) =>
+        s.ip_country &&
+        s.ip_country !== "ZA" &&
+        s.ip_country !== "South Africa",
+    );
+  if (search) {
+    const q = search.toLowerCase();
+    displayedScans = displayedScans.filter(
+      (s) =>
+        (s.scan_outcome || "").toLowerCase().includes(q) ||
+        (s.ip_city || "").toLowerCase().includes(q) ||
+        (s.ip_country || "").toLowerCase().includes(q) ||
+        (s.device_type || "").toLowerCase().includes(q) ||
+        (s.qr_code || "").toLowerCase().includes(q) ||
+        (s.id || "").toLowerCase().includes(q),
+    );
+  }
+
+  const TABS = [
+    { id: "fraud", label: "Fraud Detection" },
+    { id: "audit", label: "Audit Log" },
+    { id: "popia", label: "POPIA Compliance" },
+  ];
 
   return (
     <div style={{ fontFamily: T.font, position: "relative" }}>
@@ -796,6 +691,7 @@ export default function AdminFraudSecurity() {
         onAction={() => {}}
         defaultOpen={false}
       />
+
       {/* Toast */}
       {toast && (
         <div
@@ -857,7 +753,7 @@ export default function AdminFraudSecurity() {
         </button>
       </div>
 
-      {/* GAP-02: Fraud alert banners */}
+      {/* Fraud alert banners */}
       {fraudAlerts.map((a) => {
         const sev = {
           critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
@@ -924,7 +820,7 @@ export default function AdminFraudSecurity() {
         );
       })}
 
-      {/* ── FLUSH STAT GRID ── */}
+      {/* Flush stat grid */}
       <div
         style={{
           display: "grid",
@@ -941,9 +837,9 @@ export default function AdminFraudSecurity() {
         {[
           { label: "Total Scans", value: scans.length, color: T.accent },
           {
-            label: "Flagged",
-            value: flaggedScans.length,
-            color: flaggedScans.length > 0 ? T.danger : T.success,
+            label: "Suspicious",
+            value: suspiciousScans.length,
+            color: suspiciousScans.length > 0 ? T.danger : T.success,
           },
           {
             label: "Auto-Detected",
@@ -1001,34 +897,34 @@ export default function AdminFraudSecurity() {
         ))}
       </div>
 
-      {/* ── WP-VIZ CHARTS ── */}
+      {/* WP-VIZ CHARTS */}
       {!loading &&
         scans.length > 0 &&
         (() => {
-          // Chart 1: Flagged vs Clean donut
           const flagDonut = [
-            { name: "Flagged", value: flaggedScans.length, color: T.danger },
+            {
+              name: "Suspicious",
+              value: suspiciousScans.length,
+              color: T.danger,
+            },
             {
               name: "Auto-Detected",
               value: detections.filter(
-                (d) => !scans.find((s) => s.id === d.scanId && s.scan_flagged),
+                (d) =>
+                  !isSuspicious(scans.find((s) => s.id === d.scanId) || {}),
               ).length,
               color: T.warning,
             },
             {
               name: "Clean",
-              value:
-                scans.length -
-                flaggedScans.length -
-                detections.filter(
-                  (d) =>
-                    !scans.find((s) => s.id === d.scanId && s.scan_flagged),
-                ).length,
+              value: Math.max(
+                0,
+                scans.length - suspiciousScans.length - detections.length,
+              ),
               color: T.success,
             },
           ].filter((d) => d.value > 0);
 
-          // Chart 2: Detection reason bar
           const reasonBar = [
             "velocity",
             "travel",
@@ -1039,26 +935,20 @@ export default function AdminFraudSecurity() {
             .map((r) => ({
               name: r.charAt(0).toUpperCase() + r.slice(1),
               detected: detections.filter((d) => d.reason === r).length,
-              flagged: scans.filter(
-                (s) =>
-                  s.scan_flagged &&
-                  (s.flag_reason || "").toLowerCase().includes(r),
-              ).length,
               color: FLAG_COLORS[r]?.color || T.ink400,
             }))
-            .filter((d) => d.detected + d.flagged > 0);
+            .filter((d) => d.detected > 0);
 
-          // Chart 3: Scan trend — last 14 days
           const dayMap = {};
           scans.forEach((s) => {
-            if (!s.scan_date) return;
-            const day = new Date(s.scan_date).toLocaleDateString("en-ZA", {
+            if (!s.scanned_at) return;
+            const day = new Date(s.scanned_at).toLocaleDateString("en-ZA", {
               month: "short",
               day: "numeric",
             });
-            dayMap[day] = dayMap[day] || { date: day, total: 0, flagged: 0 };
+            dayMap[day] = dayMap[day] || { date: day, total: 0, suspicious: 0 };
             dayMap[day].total++;
-            if (s.scan_flagged) dayMap[day].flagged++;
+            if (isSuspicious(s)) dayMap[day].suspicious++;
           });
           const trendData = Object.values(dayMap).slice(-14);
 
@@ -1071,7 +961,6 @@ export default function AdminFraudSecurity() {
                 marginBottom: 24,
               }}
             >
-              {/* Donut — flagged vs clean */}
               <ChartCard title="Scan Health Overview" height={200}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1097,7 +986,6 @@ export default function AdminFraudSecurity() {
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* Bar — detections by reason */}
               <ChartCard title="Detections by Reason" height={200}>
                 {reasonBar.length === 0 ? (
                   <div
@@ -1164,7 +1052,6 @@ export default function AdminFraudSecurity() {
                 )}
               </ChartCard>
 
-              {/* Area — scan trend */}
               <ChartCard title="Scan Activity — Last 14 Days" height={200}>
                 {trendData.length < 2 ? (
                   <div
@@ -1258,7 +1145,9 @@ export default function AdminFraudSecurity() {
                         content={
                           <ChartTooltip
                             formatter={(v, n) =>
-                              n === "Flagged" ? `${v} flagged` : `${v} scans`
+                              n === "Suspicious"
+                                ? `${v} suspicious`
+                                : `${v} scans`
                             }
                           />
                         }
@@ -1275,8 +1164,8 @@ export default function AdminFraudSecurity() {
                       />
                       <Area
                         type="monotone"
-                        dataKey="flagged"
-                        name="Flagged"
+                        dataKey="suspicious"
+                        name="Suspicious"
                         stroke={T.danger}
                         strokeWidth={1.5}
                         fill="url(#fs-flag-grad)"
@@ -1292,7 +1181,7 @@ export default function AdminFraudSecurity() {
           );
         })()}
 
-      {/* ── UNDERLINE TABS ── */}
+      {/* Underline tabs */}
       <div
         style={{
           display: "flex",
@@ -1328,10 +1217,9 @@ export default function AdminFraudSecurity() {
         ))}
       </div>
 
-      {/* ══════ FRAUD DETECTION ══════ */}
+      {/* ══ FRAUD DETECTION ══ */}
       {activeTab === "fraud" && (
         <div>
-          {/* Auto-detect banner */}
           <div
             style={{
               display: "flex",
@@ -1377,12 +1265,11 @@ export default function AdminFraudSecurity() {
                 disabled={running}
                 style={makeBtn(T.danger, "#fff", running)}
               >
-                {running ? "Flagging…" : `Auto-Flag ${autoDetected} Scans`}
+                {running ? "Processing…" : `Flag ${autoDetected} Detected`}
               </button>
             )}
           </div>
 
-          {/* Detection breakdown */}
           {detections.length > 0 && (
             <Section title="Detection Breakdown">
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1436,9 +1323,7 @@ export default function AdminFraudSecurity() {
             </Section>
           )}
 
-          {/* Flagged scan list */}
-          <Section title="Scan Flags">
-            {/* Underline sub-filter */}
+          <Section title="Scan Log">
             <div
               style={{
                 display: "flex",
@@ -1462,7 +1347,10 @@ export default function AdminFraudSecurity() {
                 }}
               >
                 {[
-                  { key: "flagged", label: `Flagged (${flaggedScans.length})` },
+                  {
+                    key: "suspicious",
+                    label: `Suspicious (${suspiciousScans.length})`,
+                  },
                   { key: "detected", label: `Detected (${autoDetected})` },
                   { key: "foreign", label: "Foreign" },
                   { key: "all", label: "All" },
@@ -1524,8 +1412,8 @@ export default function AdminFraudSecurity() {
                   fontFamily: T.font,
                 }}
               >
-                {scanFilter === "flagged"
-                  ? "No flagged scans"
+                {scanFilter === "suspicious"
+                  ? "No suspicious scans"
                   : "No scans found"}
               </div>
             ) : (
@@ -1542,12 +1430,12 @@ export default function AdminFraudSecurity() {
                     <tr>
                       {[
                         "Scan Date",
-                        "Product",
+                        "QR Code",
                         "User",
                         "Location",
                         "Device",
-                        "Flag Reason",
-                        "Status",
+                        "Outcome",
+                        "Detection",
                         "",
                       ].map((h) => (
                         <th
@@ -1587,17 +1475,17 @@ export default function AdminFraudSecurity() {
                               color: T.ink400,
                             }}
                           >
-                            {fmtDate(s.scan_date)}
+                            {fmtDate(s.scanned_at)}
                           </td>
                           <td
                             style={{
                               padding: "9px 10px",
-                              fontSize: 11,
+                              fontSize: 10,
                               color: T.ink700,
                               fontFamily: "monospace",
                             }}
                           >
-                            {s.product_id?.slice(0, 8)}…
+                            {(s.qr_code || s.qr_code_id || "—").slice(0, 16)}…
                           </td>
                           <td
                             style={{
@@ -1630,10 +1518,10 @@ export default function AdminFraudSecurity() {
                             {s.device_type || "—"}
                           </td>
                           <td style={{ padding: "9px 10px" }}>
-                            {s.scan_flagged && (
-                              <FlagBadge reason={s.flag_reason} />
-                            )}
-                            {!s.scan_flagged && det && (
+                            <OutcomeBadge outcome={s.scan_outcome} />
+                          </td>
+                          <td style={{ padding: "9px 10px" }}>
+                            {det ? (
                               <span
                                 style={{
                                   fontSize: 10,
@@ -1649,8 +1537,7 @@ export default function AdminFraudSecurity() {
                               >
                                 ⚡ {det.reason}
                               </span>
-                            )}
-                            {!s.scan_flagged && !det && (
+                            ) : (
                               <span
                                 style={{
                                   fontSize: 11,
@@ -1663,47 +1550,17 @@ export default function AdminFraudSecurity() {
                             )}
                           </td>
                           <td style={{ padding: "9px 10px" }}>
-                            {s.scan_flagged ? (
+                            {s.points_awarded > 0 && (
                               <span
                                 style={{
                                   fontSize: 10,
-                                  padding: "2px 8px",
-                                  background: T.dangerBg,
-                                  color: T.danger,
-                                  fontWeight: 700,
-                                  borderRadius: 20,
+                                  color: T.accentMid,
                                   fontFamily: T.font,
                                 }}
                               >
-                                FLAGGED
-                              </span>
-                            ) : (
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  padding: "2px 8px",
-                                  background: T.successBg,
-                                  color: T.success,
-                                  fontWeight: 700,
-                                  borderRadius: 20,
-                                  fontFamily: T.font,
-                                }}
-                              >
-                                OK
+                                +{s.points_awarded}pts
                               </span>
                             )}
-                          </td>
-                          <td style={{ padding: "9px 10px" }}>
-                            <button
-                              onClick={() => setFlagModal(s)}
-                              style={{
-                                ...makeBtn("transparent", T.accentMid),
-                                fontSize: 9,
-                                padding: "4px 8px",
-                              }}
-                            >
-                              {s.scan_flagged ? "Edit" : "Flag"}
-                            </button>
                           </td>
                         </tr>
                       );
@@ -1716,7 +1573,7 @@ export default function AdminFraudSecurity() {
         </div>
       )}
 
-      {/* ══════ AUDIT LOG ══════ */}
+      {/* ══ AUDIT LOG ══ */}
       {activeTab === "audit" && (
         <div>
           <div
@@ -1775,9 +1632,9 @@ export default function AdminFraudSecurity() {
                         style={{
                           fontSize: 12,
                           fontWeight: 700,
+                          fontVariantNumeric: "tabular-nums",
                           color: foreign ? T.danger : T.accentMid,
                           fontFamily: T.font,
-                          fontVariantNumeric: "tabular-nums",
                         }}
                       >
                         {v}
@@ -1807,15 +1664,13 @@ export default function AdminFraudSecurity() {
                   <tr>
                     {[
                       "Date",
-                      "Product",
-                      "Source",
+                      "QR Code",
+                      "Outcome",
                       "City",
                       "Country",
                       "Device",
-                      "OS",
                       "Browser",
                       "First?",
-                      "Flagged",
                     ].map((h) => (
                       <th
                         key={h}
@@ -1851,19 +1706,20 @@ export default function AdminFraudSecurity() {
                           color: T.ink400,
                         }}
                       >
-                        {fmtDate(s.scan_date)}
+                        {fmtDate(s.scanned_at)}
                       </td>
                       <td
                         style={{
                           padding: "7px 10px",
                           fontFamily: "monospace",
                           color: T.ink700,
+                          fontSize: 10,
                         }}
                       >
-                        {s.product_id?.slice(0, 8)}…
+                        {(s.qr_code || s.qr_code_id || "—").slice(0, 14)}…
                       </td>
-                      <td style={{ padding: "7px 10px", color: T.ink400 }}>
-                        {s.source || "—"}
+                      <td style={{ padding: "7px 10px" }}>
+                        <OutcomeBadge outcome={s.scan_outcome} />
                       </td>
                       <td style={{ padding: "7px 10px", color: T.ink400 }}>
                         {s.ip_city || "—"}
@@ -1883,27 +1739,15 @@ export default function AdminFraudSecurity() {
                         {s.device_type || "—"}
                       </td>
                       <td style={{ padding: "7px 10px", color: T.ink400 }}>
-                        {s.os || "—"}
-                      </td>
-                      <td style={{ padding: "7px 10px", color: T.ink400 }}>
                         {s.browser || "—"}
                       </td>
                       <td style={{ padding: "7px 10px" }}>
-                        {s.is_first_scan ? (
+                        {isFirstScan(s) ? (
                           <span style={{ color: T.success, fontWeight: 700 }}>
                             ✓
                           </span>
                         ) : (
                           <span style={{ color: T.ink300 }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "7px 10px" }}>
-                        {s.scan_flagged ? (
-                          <span style={{ color: T.danger, fontWeight: 700 }}>
-                            ⚠
-                          </span>
-                        ) : (
-                          <span style={{ color: T.success }}>✓</span>
                         )}
                       </td>
                     </tr>
@@ -1915,10 +1759,9 @@ export default function AdminFraudSecurity() {
         </div>
       )}
 
-      {/* ══════ POPIA ══════ */}
+      {/* ══ POPIA ══ */}
       {activeTab === "popia" && (
         <div>
-          {/* POPIA flush stat grid */}
           <div
             style={{
               display: "grid",
@@ -2012,7 +1855,6 @@ export default function AdminFraudSecurity() {
             </div>
           )}
 
-          {/* Consent register table */}
           <Section title="Customer Consent Register">
             <div style={{ overflowX: "auto" }}>
               <table
@@ -2141,7 +1983,6 @@ export default function AdminFraudSecurity() {
             </div>
           </Section>
 
-          {/* POPIA info box */}
           <div
             style={{
               padding: 16,
@@ -2175,27 +2016,18 @@ export default function AdminFraudSecurity() {
               customer as JSON (POPIA §23 — right of access).
               <br />
               <strong>Erase:</strong> Anonymises PII fields while retaining
-              anonymised transaction records for audit integrity (POPIA §24 —
-              right to correction/deletion).
+              anonymised transaction records for audit integrity (POPIA §24).
               <br />
-              <strong>Consent:</strong> POPIA consent is captured at
-              registration. Marketing and analytics opt-ins are separate
-              voluntary consents.
+              <strong>Consent:</strong> POPIA consent captured at registration.
+              Marketing and analytics opt-ins are separate.
               <br />
               <strong>Retention:</strong> Scan and loyalty data without linked
-              PII is retained for business analytics under legitimate interest.
+              PII retained for analytics under legitimate interest.
             </div>
           </div>
         </div>
       )}
 
-      {flagModal && (
-        <FlagModal
-          scan={flagModal}
-          onClose={() => setFlagModal(null)}
-          onSave={handleSaveFlag}
-        />
-      )}
       {eraseModal && (
         <EraseModal
           customer={eraseModal}

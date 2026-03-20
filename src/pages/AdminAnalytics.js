@@ -138,7 +138,7 @@ export default function AdminAnalytics({ tenantId }) {
       monthStart.setDate(monthStart.getDate() - 30);
 
       // WP-R: apply tenant filter if available
-      const applyTenant = (q) => (tenantId ? q.eq("tenant_id", tenantId) : q);
+      const applyTenant = (q) => q; // scan_logs has no tenant_id — RLS handles isolation
 
       const [tot, tod, wk, mo] = await Promise.all([
         applyTenant(
