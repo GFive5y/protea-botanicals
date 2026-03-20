@@ -12,15 +12,11 @@ export default function NavSidebar() {
   const [hrExpanded, setHrExpanded] = useState(false);
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  // Fixed tooltip — escapes overflow:hidden
   const [tooltip, setTooltip] = useState({ visible: false, text: "", y: 0 });
-
-  // Fixed account bubble — escapes overflow:hidden
-  // Stores the circle's bounding rect so bubble anchors correctly
   const [bubbleRect, setBubbleRect] = useState(null);
 
   const acctRef = useRef(null);
+  const navBodyRef = useRef(null);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -28,11 +24,9 @@ export default function NavSidebar() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Close bubble on outside click
   useEffect(() => {
     const handler = (e) => {
       if (acctRef.current && !acctRef.current.contains(e.target)) {
-        // Check the fixed bubble div via data attr
         const bubble = document.getElementById("nav-acct-bubble-fixed");
         if (bubble && bubble.contains(e.target)) return;
         setBubbleOpen(false);
@@ -42,7 +36,6 @@ export default function NavSidebar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Auto-collapse HR sub-tabs when leaving /hr
   useEffect(() => {
     if (!location.pathname.startsWith("/hr")) setHrExpanded(false);
   }, [location.pathname]);
@@ -82,13 +75,9 @@ export default function NavSidebar() {
     [navigate, isMobile],
   );
 
-  // ★ Icon click in compact mode: open sidebar AND navigate
   const handleIconClick = useCallback(
     (path, hasSub, onOpen) => {
-      if (!isOpen) {
-        // Compact mode — open the panel first, then navigate
-        setIsOpen(true);
-      }
+      if (!isOpen) setIsOpen(true);
       hideTip();
       if (hasSub) {
         onOpen && onOpen();
@@ -134,6 +123,25 @@ export default function NavSidebar() {
 
   const { pages, title, subtitle, initials, bubbleName, bubbleRole } = config;
 
+  const groupLabel = (page, i) =>
+    page.group && page.group !== pages[i - 1]?.group && isOpen ? (
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: "0.09em",
+          textTransform: "uppercase",
+          color: "#BBBBBB",
+          padding: "10px 14px 3px",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          userSelect: "none",
+        }}
+      >
+        {page.group}
+      </div>
+    ) : null;
+
   return (
     <nav
       className={`nav-panel${isOpen ? " open" : ""}`}
@@ -170,35 +178,28 @@ export default function NavSidebar() {
       </div>
 
       {/* Nav rows */}
-      <div className="nav-body">
+      <div className="nav-body" id="nav" ref={navBodyRef}>
         {pages.map((page, i) => {
           const active = isActive(page);
 
           if (page.sub) {
             return (
               <React.Fragment key={i}>
-                {page.group && page.group !== pages[i - 1]?.group && isOpen && (
-                  <div
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: "0.09em",
-                      textTransform: "uppercase",
-                      color: "#BBBBBB",
-                      padding: "10px 14px 3px",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      userSelect: "none",
-                    }}
-                  >
-                    {page.group}
-                  </div>
-                )}
+                {groupLabel(page, i)}
                 <div
                   className={`nav-row${active ? " active" : ""}`}
                   onClick={() =>
                     handleIconClick(page.path, true, () => {
-                      setHrExpanded((v) => !v);
+                      setHrExpanded((v) => {
+                        const next = !v;
+                        if (next)
+                          setTimeout(() => {
+                            if (navBodyRef.current)
+                              navBodyRef.current.scrollTop =
+                                navBodyRef.current.scrollHeight;
+                          }, 220);
+                        return next;
+                      });
                     })
                   }
                   onMouseEnter={(e) => showTip(e, page.label)}
@@ -220,7 +221,6 @@ export default function NavSidebar() {
                     ›
                   </span>
                 </div>
-
                 <div
                   className="nav-subs"
                   style={{
@@ -249,23 +249,7 @@ export default function NavSidebar() {
 
           return (
             <React.Fragment key={i}>
-              {page.group && page.group !== pages[i - 1]?.group && isOpen && (
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: "0.09em",
-                    textTransform: "uppercase",
-                    color: "#BBBBBB",
-                    padding: "10px 14px 3px",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    userSelect: "none",
-                  }}
-                >
-                  {page.group}
-                </div>
-              )}
+              {groupLabel(page, i)}
               <div
                 className={`nav-row${active ? " active" : ""}`}
                 onClick={() => handleIconClick(page.path, false)}
@@ -289,7 +273,7 @@ export default function NavSidebar() {
         })}
       </div>
 
-      {/* Account circle — bubble rendered fixed outside the panel */}
+      {/* Account circle */}
       <div className="nav-bottom">
         <div className="nav-acct-wrap">
           <button
@@ -307,7 +291,7 @@ export default function NavSidebar() {
         </div>
       </div>
 
-      {/* FIXED TOOLTIP — position:fixed escapes overflow:hidden */}
+      {/* Fixed tooltip */}
       {tooltip.visible && !isOpen && (
         <div
           style={{
@@ -332,12 +316,9 @@ export default function NavSidebar() {
         </div>
       )}
 
-      {/* ACCOUNT BUBBLE
-          - Panel OPEN  → absolute inside the nav panel, never bleeds into page
-          - Panel CLOSED → position:fixed, bleeds right over page content    */}
+      {/* Account bubble */}
       {bubbleOpen &&
         (isOpen ? (
-          /* ── PANEL OPEN: stays inside nav boundary ── */
           <div
             id="nav-acct-bubble-fixed"
             role="menu"
@@ -413,7 +394,6 @@ export default function NavSidebar() {
             </button>
           </div>
         ) : (
-          /* ── PANEL CLOSED: fixed, bleeds right over page content ── */
           bubbleRect && (
             <div
               id="nav-acct-bubble-fixed"
@@ -431,7 +411,6 @@ export default function NavSidebar() {
                 boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
               }}
             >
-              {/* Tail pointing left toward the circle */}
               <div
                 style={{
                   position: "absolute",
@@ -509,7 +488,7 @@ export default function NavSidebar() {
   );
 }
 
-/* ── Mobile bottom tab bar ── */
+/* Mobile bottom tab bar */
 function MobileBar({ config, onNav, location }) {
   if (!config) return null;
   const primary = config.pages.slice(0, 4);
