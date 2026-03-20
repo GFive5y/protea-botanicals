@@ -1,4 +1,4 @@
-// src/components/StockControl.js v2.1 — WP-THEME-2: Inter font
+// src/components/StockControl.js v2.2 — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
 // v2.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all metric/numeric values
@@ -604,7 +604,8 @@ function OverviewView({ items, movements, orders }) {
     0,
   );
   const totalCost = active.reduce(
-    (s, i) => s + i.quantity_on_hand * i.cost_price,
+    (s, i) =>
+      s + i.quantity_on_hand * (i.weighted_avg_cost ?? i.cost_price ?? 0),
     0,
   );
   const pendingPOs = orders.filter(
@@ -857,6 +858,114 @@ function OverviewView({ items, movements, orders }) {
             </div>
           );
         })()}
+
+      {/* AVCO Variance panel */}
+      {(() => {
+        const drifted = active.filter(
+          (i) =>
+            i.weighted_avg_cost &&
+            i.cost_price &&
+            Math.abs((i.weighted_avg_cost - i.cost_price) / i.cost_price) >
+              0.05,
+        );
+        if (drifted.length === 0) return null;
+        return (
+          <div
+            style={{
+              background: T.warningBg,
+              border: `1px solid ${T.warningBd}`,
+              borderRadius: "6px",
+              padding: "14px 18px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.warning,
+                marginBottom: "10px",
+              }}
+            >
+              Cost Drift — {drifted.length} item{drifted.length > 1 ? "s" : ""}{" "}
+              where real cost differs from recorded cost price by &gt;5%
+            </div>
+            {drifted.map((item) => {
+              const drift =
+                ((item.weighted_avg_cost - item.cost_price) / item.cost_price) *
+                100;
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: `1px solid ${T.warningBd}`,
+                  }}
+                >
+                  <div>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: T.ink900,
+                      }}
+                    >
+                      {item.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: T.ink500,
+                        marginLeft: "8px",
+                        fontFamily: T.fontData,
+                      }}
+                    >
+                      {item.sku}
+                    </span>
+                  </div>
+                  <div
+                    style={{ display: "flex", gap: 16, alignItems: "center" }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: T.ink400,
+                        fontFamily: T.fontData,
+                      }}
+                    >
+                      Recorded: R{(item.cost_price || 0).toFixed(2)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: T.warning,
+                        fontFamily: T.fontData,
+                      }}
+                    >
+                      AVCO: R{item.weighted_avg_cost.toFixed(2)}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: drift > 0 ? T.danger : T.success,
+                        fontFamily: T.fontData,
+                      }}
+                    >
+                      {drift > 0 ? "▲" : "▼"} {Math.abs(drift).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Low stock alert */}
       {lowStock.length > 0 && (
@@ -1180,7 +1289,8 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
               <th style={sTh}>Category</th>
               <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
               <th style={{ ...sTh, textAlign: "right" }}>Reorder</th>
-              <th style={{ ...sTh, textAlign: "right" }}>Cost</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Cost (Flat)</th>
+              <th style={{ ...sTh, textAlign: "right" }}>AVCO</th>
               <th style={{ ...sTh, textAlign: "right" }}>
                 <span
                   style={{
@@ -1293,9 +1403,30 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                         ...sTd,
                         textAlign: "right",
                         fontFamily: T.fontData,
+                        color: T.ink400,
                       }}
                     >
                       R{(item.cost_price || 0).toFixed(2)}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: item.weighted_avg_cost ? 600 : 400,
+                        color: item.weighted_avg_cost
+                          ? Math.abs(
+                              (item.weighted_avg_cost - item.cost_price) /
+                                (item.cost_price || 1),
+                            ) > 0.05
+                            ? T.warning
+                            : T.success
+                          : T.ink400,
+                      }}
+                    >
+                      {item.weighted_avg_cost
+                        ? `R${item.weighted_avg_cost.toFixed(2)}`
+                        : "—"}
                     </td>
                     <td
                       style={{
@@ -1623,6 +1754,11 @@ function ItemHistoryModal({ item, movements, onClose }) {
                     Balance
                   </th>
                   <th style={{ ...sTh, padding: "10px 8px" }}>Reference</th>
+                  <th
+                    style={{ ...sTh, textAlign: "right", padding: "10px 8px" }}
+                  >
+                    Unit Cost
+                  </th>
                   <th style={{ ...sTh, padding: "10px 16px" }}>Notes</th>
                 </tr>
               </thead>
@@ -1711,6 +1847,20 @@ function ItemHistoryModal({ item, movements, onClose }) {
                       }}
                     >
                       {m.reference || "—"}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        padding: "10px 8px",
+                        fontFamily: T.fontData,
+                        fontSize: "11px",
+                        color: m.unit_cost ? T.ink700 : T.ink300,
+                      }}
+                    >
+                      {m.unit_cost
+                        ? `R${parseFloat(m.unit_cost).toFixed(2)}`
+                        : "—"}
                     </td>
                     <td
                       style={{
