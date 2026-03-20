@@ -1,4 +1,4 @@
-// src/components/PlatformBar.js — v1.0
+// src/components/PlatformBar.js — v1.1
 // WP-Z Phase 1: Platform Intelligence Bar
 // Replaces: AlertsBar.js (hq/) + SystemStatusBar.js
 // 40px bar · 4 global icons · live dot · all-clear 4px green hairline
@@ -16,7 +16,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
 
-// ─── T TOKENS ──────────────────────────────────────────────────────────────────
 const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
@@ -43,46 +42,36 @@ const T = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-// ─── SEVERITY CONFIG ───────────────────────────────────────────────────────────
 const SEV = {
   danger: {
     color: T.danger,
     bg: T.dangerBg,
     bd: T.dangerBd,
     pulseCls: "pib-pulse-danger",
-    ringCls: "pib-ring-danger",
   },
   warning: {
     color: T.warning,
     bg: T.warningBg,
     bd: T.warningBd,
     pulseCls: "pib-pulse-warning",
-    ringCls: "pib-ring-warning",
   },
   info: {
     color: T.info,
     bg: T.infoBg,
     bd: T.infoBd,
     pulseCls: "pib-pulse-info",
-    ringCls: null,
   },
 };
 
-// ─── ANIMATIONS ────────────────────────────────────────────────────────────────
-// Keyframe timing ratios mirror LiveFXBar live dot DNA (spec Section 3.2)
 const INJECTED_CSS = `
 @keyframes pib-pulse-danger  { 0%,100%{opacity:1} 50%{opacity:0.2}  }
 @keyframes pib-pulse-warning { 0%,100%{opacity:1} 50%{opacity:0.28} }
 @keyframes pib-pulse-info    { 0%,100%{opacity:1} 50%{opacity:0.38} }
-@keyframes pib-ring-danger   { 0%{transform:scale(1);opacity:0.55} 100%{transform:scale(2.4);opacity:0} }
-@keyframes pib-ring-warning  { 0%{transform:scale(1);opacity:0.45} 100%{transform:scale(2.4);opacity:0} }
 @keyframes pib-slide-in      { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:translateY(0)} }
 @keyframes pib-live          { 0%,100%{opacity:1} 50%{opacity:0.3} }
 .pib-pulse-danger  { animation: pib-pulse-danger  1.1s ease-in-out infinite; }
 .pib-pulse-warning { animation: pib-pulse-warning 1.8s ease-in-out infinite; }
 .pib-pulse-info    { animation: pib-pulse-info    2.4s ease-in-out infinite; }
-.pib-ring-danger   { animation: pib-ring-danger   1.8s ease-out    infinite; }
-.pib-ring-warning  { animation: pib-ring-warning  2.4s ease-out    infinite; }
 .pib-live-dot      { animation: pib-live          1.8s ease-in-out infinite; }
 .pib-panel-in      { animation: pib-slide-in 0.16s ease; }
 .pib-icon-btn:hover { opacity: 0.72 !important; }
@@ -90,16 +79,11 @@ const INJECTED_CSS = `
 .pib-row:hover      { background: #F4F4F3 !important; }
 `;
 
-// ─── ALERT SEVERITY RESOLVER ───────────────────────────────────────────────────
 const ALERT_SEVERITY_MAP = [
-  { key: "critical", match: ["critical", "danger", "error"], sev: "danger" },
-  { key: "warning", match: ["warning", "warn", "caution"], sev: "warning" },
-  { key: "info", match: ["info", "notice", "informational"], sev: "info" },
-  {
-    key: "success",
-    match: ["success", "ok", "resolved", "complete"],
-    sev: "info",
-  },
+  { match: ["critical", "danger", "error"], sev: "danger" },
+  { match: ["warning", "warn", "caution"], sev: "warning" },
+  { match: ["info", "notice", "informational"], sev: "info" },
+  { match: ["success", "ok", "resolved", "complete"], sev: "info" },
 ];
 function resolveAlertSev(severity) {
   if (!severity) return "info";
@@ -108,7 +92,6 @@ function resolveAlertSev(severity) {
   return "info";
 }
 
-// ─── TIME FORMATTER ────────────────────────────────────────────────────────────
 function fmtTime(iso) {
   if (!iso) return "";
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -120,10 +103,6 @@ function fmtTime(iso) {
     month: "short",
   });
 }
-
-// ─── MONOLINE SVG ICONS ────────────────────────────────────────────────────────
-// 20×20 viewBox · 1.5px stroke · linecap round · linejoin round · no fill
-// Quiet: T.ink300 @ 38% opacity. Active: full semantic color, pulsing.
 
 const IconAlert = ({ stroke }) => (
   <svg
@@ -191,8 +170,6 @@ const IconActions = ({ stroke }) => (
   </svg>
 );
 
-// ─── PIB ICON WRAPPER ──────────────────────────────────────────────────────────
-// Renders the icon at quiet or active state with pulse + optional ring
 function PIBIcon({ Icon, severity, active, panelOpen, onClick }) {
   const s = active && severity ? SEV[severity] : null;
   const strokeColor = s ? s.color : T.ink300;
@@ -201,7 +178,6 @@ function PIBIcon({ Icon, severity, active, panelOpen, onClick }) {
       className="pib-icon-btn"
       onClick={active ? onClick : undefined}
       style={{
-        position: "relative",
         width: 36,
         height: 36,
         display: "flex",
@@ -215,24 +191,6 @@ function PIBIcon({ Icon, severity, active, panelOpen, onClick }) {
         flexShrink: 0,
       }}
     >
-      {/* Expanding ring — danger + warning only */}
-      {s?.ringCls && (
-        <span
-          className={s.ringCls}
-          style={{
-            position: "absolute",
-            width: 20,
-            height: 20,
-            borderRadius: "50%",
-            border: `1.5px solid ${strokeColor}`,
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            pointerEvents: "none",
-          }}
-        />
-      )}
-      {/* Icon with pulse */}
       <span
         className={s?.pulseCls || ""}
         style={{ display: "flex", lineHeight: 0 }}
@@ -243,8 +201,6 @@ function PIBIcon({ Icon, severity, active, panelOpen, onClick }) {
   );
 }
 
-// ─── PANEL SHELL ──────────────────────────────────────────────────────────────
-// Shared frame used by all 4 panel types
 function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
   const s = SEV[severity] || SEV.info;
   return (
@@ -267,7 +223,6 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
         overflow: "hidden",
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -344,8 +299,6 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
           </button>
         </div>
       </div>
-
-      {/* Body */}
       <div style={{ overflowY: "auto", flex: 1, scrollbarWidth: "none" }}>
         {children}
       </div>
@@ -353,7 +306,6 @@ function PanelShell({ severity, title, count, onAckAll, onClose, children }) {
   );
 }
 
-// ─── ALERTS PANEL ──────────────────────────────────────────────────────────────
 function AlertsPanel({ alerts, onAckOne, onAckAll, onClose }) {
   const overallSev = alerts.some((a) =>
     ["critical", "danger", "error"].includes((a.severity || "").toLowerCase()),
@@ -366,7 +318,6 @@ function AlertsPanel({ alerts, onAckOne, onAckAll, onClose }) {
         )
       ? "warning"
       : "info";
-
   return (
     <PanelShell
       severity={overallSev}
@@ -480,7 +431,6 @@ function AlertsPanel({ alerts, onAckOne, onAckAll, onClose }) {
   );
 }
 
-// ─── COMMS PANEL ───────────────────────────────────────────────────────────────
 function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
   const sev = unread > 0 || openTickets > 0 ? "warning" : "info";
   return (
@@ -491,7 +441,6 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
       onClose={onClose}
     >
       <div style={{ padding: "16px 16px 14px" }}>
-        {/* Stat row */}
         <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
           <div
             style={{
@@ -564,7 +513,6 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
             </div>
           </div>
         </div>
-
         <div
           style={{
             fontSize: 11,
@@ -581,7 +529,6 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
             unread + openTickets > 0 &&
             " (Cross-tenant aggregate.)"}
         </div>
-
         <button
           onClick={() => {
             onClose();
@@ -608,7 +555,6 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
   );
 }
 
-// ─── FRAUD PANEL ───────────────────────────────────────────────────────────────
 function FraudPanel({ flagged, role, onNavigate, onClose }) {
   return (
     <PanelShell
@@ -634,7 +580,6 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
           {flagged.length} account{flagged.length !== 1 ? "s" : ""} with anomaly
           score &gt; 85 — review immediately.
         </div>
-
         {flagged.slice(0, 8).map((u, i) => (
           <div
             key={u.id}
@@ -692,7 +637,6 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
             </div>
           </div>
         ))}
-
         {flagged.length > 8 && (
           <div
             style={{
@@ -705,7 +649,6 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
             +{flagged.length - 8} more — open Security tab to view all
           </div>
         )}
-
         <button
           onClick={() => {
             onClose();
@@ -733,7 +676,6 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
   );
 }
 
-// ─── ACTIONS PANEL ─────────────────────────────────────────────────────────────
 function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
   const sev = zeroPrice.length > 0 ? "danger" : "warning";
   const total = zeroPrice.length + outOfStock.length;
@@ -745,7 +687,6 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
       onClose={onClose}
     >
       <div style={{ padding: "12px 16px" }}>
-        {/* Zero-price section */}
         {zeroPrice.length > 0 && (
           <div style={{ marginBottom: outOfStock.length > 0 ? 16 : 0 }}>
             <div
@@ -818,8 +759,6 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
             )}
           </div>
         )}
-
-        {/* Out of stock section */}
         {outOfStock.length > 0 && (
           <div>
             <div
@@ -881,8 +820,6 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
             )}
           </div>
         )}
-
-        {/* CTA buttons */}
         <div
           style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}
         >
@@ -938,51 +875,26 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ═══════════════════════════════════════════════════════════════════════════════
-/**
- * PlatformBar v1.0
- *
- * @param {string} role     — "admin" | "hq"  → determines data scope + sticky behaviour
- * @param {string} tenantId — tenant ID for scoped queries (admin role)
- *
- * Admin: sticky top:0 zIndex:89
- * HQ:    inline, not sticky — sits immediately after <LiveFXBar />
- */
 export default function PlatformBar({ role = "admin", tenantId }) {
   const { tenant } = useTenant();
   const navigate = useNavigate();
   const tid = tenantId || tenant?.id;
 
-  // ── Panel state ────────────────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState(null);
   const panelRef = useRef(null);
-
-  // ── Connection ─────────────────────────────────────────────────────────────
   const [connected, setConnected] = useState(false);
-
-  // ── Alerts data ────────────────────────────────────────────────────────────
   const [alerts, setAlerts] = useState([]);
-
-  // ── Comms data ─────────────────────────────────────────────────────────────
   const [unreadMsgs, setUnreadMsgs] = useState(0);
   const [openTickets, setOpenTickets] = useState(0);
-
-  // ── Fraud data ─────────────────────────────────────────────────────────────
   const [flaggedUsers, setFlaggedUsers] = useState([]);
-
-  // ── Actions data ───────────────────────────────────────────────────────────
   const [zeroPrice, setZeroPrice] = useState([]);
   const [outOfStock, setOutOfStock] = useState([]);
 
-  // Interval refs for cleanup
   const commsInterval = useRef(null);
   const fraudInterval = useRef(null);
   const actionsInterval = useRef(null);
   const heartbeatTimer = useRef(null);
 
-  // ── ALERTS: realtime ───────────────────────────────────────────────────────
   const loadAlerts = useCallback(async () => {
     if (!tid) return;
     let q = supabase
@@ -991,7 +903,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
       .is("acknowledged_at", null)
       .order("created_at", { ascending: false })
       .limit(100);
-    // Admin: tenant-scoped. HQ: all tenants via RLS (hq_access=true bypasses RLS).
     if (role === "admin") q = q.eq("tenant_id", tid);
     const { data } = await q;
     setAlerts(data || []);
@@ -1016,22 +927,19 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     return () => supabase.removeChannel(ch);
   }, [tid, role, loadAlerts]);
 
-  // ── COMMS: 60s poll ────────────────────────────────────────────────────────
   const loadComms = useCallback(async () => {
     if (!tid) return;
     try {
       let msgsQ = supabase
         .from("customer_messages")
         .select("id", { count: "exact", head: true })
-        .is("read_at", null); // column is read_at NOT .read (LL-003/DB facts)
+        .is("read_at", null);
       if (role === "admin") msgsQ = msgsQ.eq("tenant_id", tid);
-
       let tixQ = supabase
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
         .not("status", "in", '("closed","resolved")');
       if (role === "admin") tixQ = tixQ.eq("tenant_id", tid);
-
       const [msgsRes, tixRes] = await Promise.allSettled([msgsQ, tixQ]);
       setUnreadMsgs(
         msgsRes?.status === "fulfilled" ? (msgsRes.value?.count ?? 0) : 0,
@@ -1048,7 +956,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     return () => clearInterval(commsInterval.current);
   }, [loadComms]);
 
-  // ── FRAUD: 60s poll · anomaly_score > 85 ──────────────────────────────────
   const loadFraud = useCallback(async () => {
     if (!tid) return;
     try {
@@ -1070,7 +977,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     return () => clearInterval(fraudInterval.current);
   }, [loadFraud]);
 
-  // ── ACTIONS: 5min poll · zero-price + OOS finished products ───────────────
   const loadActions = useCallback(async () => {
     if (!tid) return;
     try {
@@ -1081,7 +987,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
         .lte("sell_price", 0)
         .eq("category", "finished_product");
       if (role === "admin") zpQ = zpQ.eq("tenant_id", tid);
-
       let oosQ = supabase
         .from("inventory_items")
         .select("id,name")
@@ -1089,7 +994,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
         .lte("quantity_on_hand", 0)
         .eq("category", "finished_product");
       if (role === "admin") oosQ = oosQ.eq("tenant_id", tid);
-
       const [zpRes, oosRes] = await Promise.allSettled([zpQ, oosQ]);
       const zp = zpRes?.status === "fulfilled" ? zpRes.value?.data || [] : [];
       const oos =
@@ -1106,7 +1010,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     return () => clearInterval(actionsInterval.current);
   }, [loadActions]);
 
-  // ── Heartbeat: 30s connection probe ───────────────────────────────────────
   useEffect(() => {
     heartbeatTimer.current = setInterval(async () => {
       try {
@@ -1122,32 +1025,22 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     return () => clearInterval(heartbeatTimer.current);
   }, []);
 
-  // ── Outside click → close panel ───────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
+      if (panelRef.current && !panelRef.current.contains(e.target))
         setActivePanel(null);
-      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Navigation helper (used by panels) ───────────────────────────────────
   const handleNavigate = useCallback(
     (path) => {
-      if (path.startsWith("?")) {
-        // Relative: stay on current route, change query
-        const base = window.location.pathname;
-        navigate(base + path);
-      } else {
-        navigate(path);
-      }
+      navigate(path.startsWith("?") ? window.location.pathname + path : path);
     },
     [navigate],
   );
 
-  // ── ACK alerts ────────────────────────────────────────────────────────────
   const ackOne = useCallback(async (id) => {
     await supabase
       .from("system_alerts")
@@ -1172,7 +1065,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     setActivePanel(null);
   }, []);
 
-  // ── Derived severity ──────────────────────────────────────────────────────
   const alertsSev = alerts.some((a) =>
     ["critical", "danger", "error"].includes((a.severity || "").toLowerCase()),
   )
@@ -1180,24 +1072,16 @@ export default function PlatformBar({ role = "admin", tenantId }) {
     : alerts.length > 0
       ? "warning"
       : null;
-
   const commsSev = unreadMsgs > 0 || openTickets > 0 ? "warning" : null;
-
   const fraudSev = flaggedUsers.length > 0 ? "danger" : null;
-
   const actionsSev =
     zeroPrice.length > 0 ? "danger" : outOfStock.length > 0 ? "warning" : null;
-
   const allClear = !alertsSev && !commsSev && !fraudSev && !actionsSev;
-
-  // Admin: sticky. HQ: inline (scrolls with LiveFXBar cluster).
   const isSticky = role === "admin";
 
-  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{INJECTED_CSS}</style>
-
       <div
         ref={panelRef}
         style={{
@@ -1207,7 +1091,6 @@ export default function PlatformBar({ role = "admin", tenantId }) {
           fontFamily: T.font,
         }}
       >
-        {/* ── THE BAR ───────────────────────────────────────────────────── */}
         <div
           style={{
             height: allClear ? 4 : 40,
@@ -1222,95 +1105,72 @@ export default function PlatformBar({ role = "admin", tenantId }) {
           }}
         >
           {!allClear && (
-            <>
-              {/* ── GLOBAL ZONE (left) ─── */}
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 2, flex: 1 }}
+            >
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 2,
-                  flex: 1,
+                  paddingRight: 10,
+                  marginRight: 2,
+                  borderRight: `1px solid ${T.ink150}`,
+                  height: 20,
                 }}
               >
-                {/* Live dot */}
-                <div
+                <span
+                  className={connected ? "pib-live-dot" : ""}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    paddingRight: 10,
-                    marginRight: 2,
-                    borderRight: `1px solid ${T.ink150}`,
-                    height: 20,
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: connected ? T.accentMid : T.ink300,
+                    boxShadow: connected ? `0 0 5px ${T.accentMid}80` : "none",
+                    display: "inline-block",
+                    flexShrink: 0,
                   }}
-                >
-                  <span
-                    className={connected ? "pib-live-dot" : ""}
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: connected ? T.accentMid : T.ink300,
-                      boxShadow: connected
-                        ? `0 0 5px ${T.accentMid}80`
-                        : "none",
-                      display: "inline-block",
-                      flexShrink: 0,
-                    }}
-                  />
-                </div>
-
-                {/* Alerts ⚠ */}
-                <PIBIcon
-                  Icon={IconAlert}
-                  severity={alertsSev}
-                  active={!!alertsSev}
-                  panelOpen={activePanel === "alerts"}
-                  onClick={() =>
-                    setActivePanel((v) => (v === "alerts" ? null : "alerts"))
-                  }
-                />
-
-                {/* Comms ✉ */}
-                <PIBIcon
-                  Icon={IconComms}
-                  severity={commsSev}
-                  active={!!commsSev}
-                  panelOpen={activePanel === "comms"}
-                  onClick={() =>
-                    setActivePanel((v) => (v === "comms" ? null : "comms"))
-                  }
-                />
-
-                {/* Fraud 🛡 */}
-                <PIBIcon
-                  Icon={IconFraud}
-                  severity={fraudSev}
-                  active={!!fraudSev}
-                  panelOpen={activePanel === "fraud"}
-                  onClick={() =>
-                    setActivePanel((v) => (v === "fraud" ? null : "fraud"))
-                  }
-                />
-
-                {/* Actions 🔧 */}
-                <PIBIcon
-                  Icon={IconActions}
-                  severity={actionsSev}
-                  active={!!actionsSev}
-                  panelOpen={activePanel === "actions"}
-                  onClick={() =>
-                    setActivePanel((v) => (v === "actions" ? null : "actions"))
-                  }
                 />
               </div>
-
-              {/* ── PAGE ZONE (right) — EMPTY Phase 1 ───────────────────── */}
-              {/* Phase 2: usePlatformBar().registerPageIcons() populates here */}
-            </>
+              <PIBIcon
+                Icon={IconAlert}
+                severity={alertsSev}
+                active={!!alertsSev}
+                panelOpen={activePanel === "alerts"}
+                onClick={() =>
+                  setActivePanel((v) => (v === "alerts" ? null : "alerts"))
+                }
+              />
+              <PIBIcon
+                Icon={IconComms}
+                severity={commsSev}
+                active={!!commsSev}
+                panelOpen={activePanel === "comms"}
+                onClick={() =>
+                  setActivePanel((v) => (v === "comms" ? null : "comms"))
+                }
+              />
+              <PIBIcon
+                Icon={IconFraud}
+                severity={fraudSev}
+                active={!!fraudSev}
+                panelOpen={activePanel === "fraud"}
+                onClick={() =>
+                  setActivePanel((v) => (v === "fraud" ? null : "fraud"))
+                }
+              />
+              <PIBIcon
+                Icon={IconActions}
+                severity={actionsSev}
+                active={!!actionsSev}
+                panelOpen={activePanel === "actions"}
+                onClick={() =>
+                  setActivePanel((v) => (v === "actions" ? null : "actions"))
+                }
+              />
+            </div>
           )}
         </div>
 
-        {/* ── PANELS ────────────────────────────────────────────────────── */}
         {activePanel === "alerts" && alerts.length > 0 && (
           <AlertsPanel
             alerts={alerts}
