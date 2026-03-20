@@ -3,25 +3,75 @@ import { useLocation } from "react-router-dom";
 import { RoleContext } from "../App";
 import { useTenant } from "../services/tenantService";
 
-// ─── HQ: all 16 HQDashboard tabs ─────────────────────────────────────────────
+// ─── HQ: all 17 HQDashboard tabs — operational flow order ────────────────────
 const HQ_PAGES = [
-  { icon: "⌂", label: "Overview", path: "/hq" },
-  { icon: "⬡", label: "Supply chain", path: "/hq?tab=supply-chain" },
-  { icon: "⬤", label: "Distribution", path: "/hq?tab=distribution" },
-  { icon: "🏪", label: "Shops", path: "/hq?tab=shops" },
-  { icon: "▲", label: "Analytics", path: "/hq?tab=analytics" },
-  { icon: "🏆", label: "Retailer health", path: "/hq?tab=retailer-health" },
-  { icon: "🌍", label: "Suppliers", path: "/hq?tab=suppliers" },
-  { icon: "◈", label: "Procurement", path: "/hq?tab=procurement" },
-  { icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
-  { icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
-  { icon: "≡", label: "P&L", path: "/hq?tab=pl" },
-  { icon: "🔔", label: "Reorder", path: "/hq?tab=reorder" },
-  { icon: "◎", label: "Documents", path: "/hq?tab=documents" },
-  { icon: "⚙", label: "HQ Production", path: "/hq?tab=hq-production" },
-  { icon: "💎", label: "Loyalty", path: "/hq?tab=loyalty" },
-  { icon: "🛡", label: "Fraud", path: "/hq?tab=fraud" },
+  // ── Operations ──────────────────────────────────────────────────────────────
+  { group: "Operations", icon: "⌂", label: "Overview", path: "/hq" },
   {
+    group: "Operations",
+    icon: "⬡",
+    label: "Supply chain",
+    path: "/hq?tab=supply-chain",
+  },
+  {
+    group: "Operations",
+    icon: "🌍",
+    label: "Suppliers",
+    path: "/hq?tab=suppliers",
+  },
+  {
+    group: "Operations",
+    icon: "◈",
+    label: "Procurement",
+    path: "/hq?tab=procurement",
+  },
+  {
+    group: "Operations",
+    icon: "⚙",
+    label: "Production",
+    path: "/hq?tab=hq-production",
+  },
+  {
+    group: "Operations",
+    icon: "⬤",
+    label: "Distribution",
+    path: "/hq?tab=distribution",
+  },
+  // ── Finance ──────────────────────────────────────────────────────────────────
+  { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
+  { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
+  { group: "Finance", icon: "≡", label: "P&L", path: "/hq?tab=pl" },
+  // ── Intelligence ─────────────────────────────────────────────────────────────
+  {
+    group: "Intelligence",
+    icon: "▲",
+    label: "Analytics",
+    path: "/hq?tab=analytics",
+  },
+  {
+    group: "Intelligence",
+    icon: "🏆",
+    label: "Retailer health",
+    path: "/hq?tab=retailer-health",
+  },
+  {
+    group: "Intelligence",
+    icon: "🔔",
+    label: "Reorder",
+    path: "/hq?tab=reorder",
+  },
+  // ── Platform ─────────────────────────────────────────────────────────────────
+  { group: "Platform", icon: "💎", label: "Loyalty", path: "/hq?tab=loyalty" },
+  { group: "Platform", icon: "🛡", label: "Fraud", path: "/hq?tab=fraud" },
+  {
+    group: "Platform",
+    icon: "◎",
+    label: "Documents",
+    path: "/hq?tab=documents",
+  },
+  // ── People ───────────────────────────────────────────────────────────────────
+  {
+    group: "People",
     icon: "♟",
     label: "HR",
     path: "/hr",
@@ -40,24 +90,75 @@ const HQ_PAGES = [
       { label: "Settings", path: "/hr?tab=settings" },
     ],
   },
+  { group: "People", icon: "🏪", label: "Shops", path: "/hq?tab=shops" },
 ];
 
-// ─── Admin: all 13 AdminDashboard tabs ───────────────────────────────────────
+// ─── Admin: all 13 AdminDashboard tabs — grouped operational order ────────────
 const ADMIN_PAGES = [
-  { icon: "⌂", label: "Overview", path: "/admin" },
-  { icon: "🌿", label: "Batches", path: "/admin?tab=batches" },
-  { icon: "🚚", label: "Shipments", path: "/admin?tab=shipments" },
-  { icon: "◈", label: "QR Codes", path: "/admin?tab=qr_codes" },
-  { icon: "👥", label: "Users", path: "/admin?tab=users" },
-  { icon: "◉", label: "Customers", path: "/admin?tab=customers" },
-  { icon: "✉", label: "Comms", path: "/admin?tab=comms" },
-  { icon: "🛡", label: "Security", path: "/admin?tab=security" },
-  { icon: "🔔", label: "Notifications", path: "/admin?tab=notifications" },
-  { icon: "▲", label: "Analytics", path: "/admin?tab=analytics" },
-  { icon: "📦", label: "Stock", path: "/admin?tab=stock" },
-  { icon: "📄", label: "Documents", path: "/admin?tab=documents" },
-  { icon: "⬡", label: "Wholesale", path: "/wholesale" },
+  // ── Operations ──────────────────────────────────────────────────────────────
+  { group: "Operations", icon: "⌂", label: "Overview", path: "/admin" },
   {
+    group: "Operations",
+    icon: "🌿",
+    label: "Batches",
+    path: "/admin?tab=batches",
+  },
+  { group: "Operations", icon: "📦", label: "Stock", path: "/admin?tab=stock" },
+  {
+    group: "Operations",
+    icon: "🚚",
+    label: "Shipments",
+    path: "/admin?tab=shipments",
+  },
+  // ── Customers ────────────────────────────────────────────────────────────────
+  {
+    group: "Customers",
+    icon: "◉",
+    label: "Customers",
+    path: "/admin?tab=customers",
+  },
+  { group: "Customers", icon: "✉", label: "Comms", path: "/admin?tab=comms" },
+  {
+    group: "Customers",
+    icon: "🔔",
+    label: "Notifications",
+    path: "/admin?tab=notifications",
+  },
+  {
+    group: "Customers",
+    icon: "◈",
+    label: "QR Codes",
+    path: "/admin?tab=qr_codes",
+  },
+  // ── Intelligence ─────────────────────────────────────────────────────────────
+  {
+    group: "Intelligence",
+    icon: "▲",
+    label: "Analytics",
+    path: "/admin?tab=analytics",
+  },
+  {
+    group: "Intelligence",
+    icon: "🛡",
+    label: "Security",
+    path: "/admin?tab=security",
+  },
+  {
+    group: "Intelligence",
+    icon: "👥",
+    label: "Users",
+    path: "/admin?tab=users",
+  },
+  // ── Platform ─────────────────────────────────────────────────────────────────
+  {
+    group: "Platform",
+    icon: "📄",
+    label: "Documents",
+    path: "/admin?tab=documents",
+  },
+  { group: "Platform", icon: "⬡", label: "Wholesale", path: "/wholesale" },
+  {
+    group: "Platform",
     icon: "♟",
     label: "HR",
     path: "/hr",
