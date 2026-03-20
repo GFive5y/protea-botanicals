@@ -209,13 +209,9 @@ export default function HQDashboard() {
           {/* v3.8: LiveFXBar — UNTOUCHED, permanent, never in scope */}
           <LiveFXBar />
           {/* WP-Z: PlatformBar — replaces AlertsBar, wired immediately below LiveFXBar */}
-          <PlatformBar
-            role="hq"
-            tenantId={tenant?.id}
-            onNavigate={() => {}}
-          />
+          <PlatformBar role="hq" tenantId={tenant?.id} onNavigate={() => {}} />
 
-          <div style={{position:"fixed",top:0,right:0,background:"red",color:"white",zIndex:99999,padding:"8px 12px",fontSize:14,fontWeight:"bold"}}>ACTIVE: {activeTab}</div>{activeTab === "overview" && (
+          {activeTab === "overview" && (
             <HQOverview onNavigate={handleNavigate} />
           )}
           {activeTab === "supply-chain" && <SupplyChain />}
@@ -238,7 +234,3 @@ export default function HQDashboard() {
     </PlatformBarProvider>
   );
 }
-
-
-
-

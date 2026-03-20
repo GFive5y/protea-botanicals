@@ -351,9 +351,6 @@ function ScanHeatmap({ heatmapData }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
-  useEffect(() => {
-    console.log("TAB CHANGED TO:", tab);
-  }, [tab]);
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
   const [qrInitialBatchId, setQrInitialBatchId] = useState(null);
   const [users, setUsers] = useState([]);
@@ -754,11 +751,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* WP-Z: PlatformBar — Platform Intelligence Bar */}
-        <PlatformBar
-          role="admin"
-          tenantId={tenantId}
-          onNavigate={() => {}}
-        />
+        <PlatformBar role="admin" tenantId={tenantId} onNavigate={() => {}} />
 
         {/* Error — standard danger template */}
         {error && (
@@ -1708,4 +1701,3 @@ export default function AdminDashboard() {
     </PlatformBarProvider>
   );
 }
-
