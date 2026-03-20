@@ -2442,6 +2442,7 @@ function OrdersView({ orders, suppliers, items, onRefresh }) {
           quantity: line.quantity_ordered,
           movement_type: "purchase_in",
           reference: po.po_number,
+          unit_cost: parseFloat(line.unit_cost) || 0,
           notes: `Auto-recorded from PO ${po.po_number}`,
         });
         const item = items.find((i) => i.id === line.item_id);
@@ -3766,4 +3767,3 @@ function SuppliersView({ suppliers, onRefresh }) {
     </div>
   );
 }
-

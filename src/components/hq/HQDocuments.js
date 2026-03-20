@@ -2105,6 +2105,8 @@ export default function HQDocuments({ initialDocId = null }) {
               item_id: itemId,
               quantity: qty,
               movement_type: "purchase_in",
+              unit_cost:
+                parseFloat(data.unit_cost ?? data.unit_price ?? 0) || null,
               reference: selectedDoc.extracted_data?.reference?.number ?? null,
               notes: `Goods received — ${selectedDoc.file_name}`,
               performed_by: user?.id ?? null,

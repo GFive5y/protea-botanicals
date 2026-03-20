@@ -544,6 +544,9 @@ export default function HQPurchaseOrders() {
             .ilike("name", productName)
             .maybeSingle();
           let inventoryItemId = null;
+          const costPrice = parseFloat(
+            item.landed_cost_per_unit_zar || item.unit_cost || 0,
+          );
           if (existing) {
             const newQty = (parseFloat(existing.quantity_on_hand) || 0) + qty;
             await supabase
@@ -560,9 +563,7 @@ export default function HQPurchaseOrders() {
             const invSku = sp?.sku
               ? `IMP-${sp.sku}`
               : `IMP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
-            const costPrice = parseFloat(
-              item.landed_cost_per_unit_zar || item.unit_cost || 0,
-            );
+
             const { data: newItem, error: createErr } = await supabase
               .from("inventory_items")
               .insert({
@@ -600,6 +601,7 @@ export default function HQPurchaseOrders() {
                 item_id: inventoryItemId,
                 quantity: qty,
                 movement_type: "purchase_in",
+                unit_cost: parseFloat(costPrice.toFixed(2)),
                 reference: po.po_number,
                 notes: `Received via PO ${po.po_number} — ${po.suppliers?.name || "supplier"}`,
               });
