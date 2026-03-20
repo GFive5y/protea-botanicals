@@ -36,6 +36,7 @@ import HQDocuments from "../components/hq/HQDocuments";
 import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCommsCenter from "../components/AdminCommsCenter";
 import AdminHRPanel from "../components/AdminHRPanel";
+import AIAssist from "../components/AIAssist";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -757,7 +758,15 @@ export default function AdminDashboard() {
   return (
     <div style={{ fontFamily: T.fontUi }}>
       {/* Header */}
-      <div style={{ marginBottom: 0 }}>
+      <div
+        style={{
+          marginBottom: 0,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <h1
           style={{
             fontFamily: T.fontUi,
@@ -769,6 +778,16 @@ export default function AdminDashboard() {
         >
           Admin Dashboard
         </h1>
+        <AIAssist
+          tabContext="admin-overview"
+          tabData={{}}
+          contextLabel="Admin portal"
+          suggestions={[
+            "What needs my attention right now?",
+            "How many scans happened today?",
+            "Which customers are at risk of churning?",
+          ]}
+        />
       </div>
 
       <SystemStatusBar />
