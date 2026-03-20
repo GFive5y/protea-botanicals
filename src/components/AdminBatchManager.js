@@ -1,6 +1,6 @@
 // src/components/AdminBatchManager.js
 // v1.4 — WP-VIZ: Batch Status Donut + Units Produced HBar + Activation Rate HBar
-// v1.3 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs, no Cormorant/Jost
+// v1.3 — WP-VISUAL: T tokens, Inter font, flush stat grid, underline tabs
 // v1.2 — WP-GUIDE-C++: usePageContext 'batches' wired + WorkflowGuide added
 // v1.1 — WP-I: COA source document link on batch card when coa_document_id is set
 // v1.0 — March 2026
@@ -43,7 +43,6 @@ const T = {
   shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
 };
 
-// Legacy aliases — all C.* references resolve correctly
 const C = {
   green: T.accent,
   mid: T.accentMid,
@@ -64,7 +63,6 @@ const C = {
   purple: "#6c3483",
   lightPurple: "#f5eef8",
 };
-const FONTS = { heading: T.font, body: T.font };
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const inputStyle = {
@@ -271,7 +269,6 @@ function BatchCard({
       onMouseEnter={(e) => (e.currentTarget.style.boxShadow = T.shadowMd)}
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = T.shadow)}
     >
-      {/* Card header */}
       <div
         style={{
           display: "flex",
@@ -307,7 +304,6 @@ function BatchCard({
         <ExpiryBadge expiryDate={batch.expiry_date} />
       </div>
 
-      {/* Attributes */}
       <div
         style={{
           display: "flex",
@@ -324,7 +320,6 @@ function BatchCard({
         {batch.thc_content && <span>· THC {batch.thc_content}%</span>}
       </div>
 
-      {/* Stat grid — flush 4-cell */}
       <div
         style={{
           display: "grid",
@@ -388,7 +383,6 @@ function BatchCard({
         ))}
       </div>
 
-      {/* Activation bar */}
       <div>
         <div
           style={{
@@ -409,7 +403,6 @@ function BatchCard({
         />
       </div>
 
-      {/* Dates */}
       <div
         style={{
           display: "flex",
@@ -423,7 +416,6 @@ function BatchCard({
         <span>Expires: {fmtDate(batch.expiry_date)}</span>
       </div>
 
-      {/* Badges */}
       <div
         style={{
           display: "flex",
@@ -497,7 +489,6 @@ function BatchCard({
         />
       </div>
 
-      {/* Actions */}
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button
           onClick={() => onGoToQR(batch.id)}
@@ -635,7 +626,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
     }
     setSaving(true);
     try {
-      // WP-R: resolve tenant_id so HQProduction can filter correctly
       let tenantId = null;
       try {
         const {
@@ -723,7 +713,6 @@ function BatchForm({ initial, onSave, onCancel, suggestedBatchNumber }) {
         fontFamily: T.font,
       }}
     >
-      {/* Drawer header */}
       <div
         style={{
           background: T.accent,
@@ -1132,7 +1121,7 @@ export default function AdminBatchManager({
     setTimeout(() => setToast(""), 3000);
   }, []);
 
-  // GAP-02: write a system_alert (non-blocking, fire-and-forget)
+  // GAP-02: write a system_alert — feeds PlatformBar global alerts icon
   const writeAlert = useCallback(async (alertType, severity, title, body) => {
     try {
       const { count } = await supabase
@@ -1176,7 +1165,6 @@ export default function AdminBatchManager({
       setStatsMap(map);
       setBatches(batchData || []);
 
-      // GAP-02: fire alerts for expiring batches + missing COA
       const now = Date.now();
       const activeFetched = (batchData || []).filter((b) => !b.is_archived);
       const expiring = activeFetched.filter((b) => {
@@ -1185,7 +1173,8 @@ export default function AdminBatchManager({
           : null;
         return days !== null && days <= 30 && days >= 0;
       });
-      const noCoa = activeFetched.filter((b) => !b.coa_url);
+      const noCoaList = activeFetched.filter((b) => !b.coa_url);
+
       if (expiring.length > 0) {
         writeAlert(
           "batch_expiry",
@@ -1199,16 +1188,17 @@ export default function AdminBatchManager({
             .join(" · "),
         );
       }
-      if (noCoa.length > 0) {
+      if (noCoaList.length > 0) {
         writeAlert(
           "missing_coa",
           "info",
-          `${noCoa.length} batch${noCoa.length > 1 ? "es" : ""} missing COA`,
-          noCoa.map((b) => `${b.batch_number} (${b.product_name})`).join(" · "),
+          `${noCoaList.length} batch${noCoaList.length > 1 ? "es" : ""} missing COA`,
+          noCoaList
+            .map((b) => `${b.batch_number} (${b.product_name})`)
+            .join(" · "),
         );
       }
 
-      // Suggest next batch number
       let max = 0;
       for (const b of batchData || []) {
         const parts = (b.batch_number || "").split("-");
@@ -1223,7 +1213,7 @@ export default function AdminBatchManager({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [writeAlert]);
 
   useEffect(() => {
     fetchBatches();
@@ -1248,6 +1238,16 @@ export default function AdminBatchManager({
     fetchBatches();
   };
 
+  const activeBatches = batches.filter((b) => !b.is_archived).length;
+  const expiringBatches = batches.filter((b) => {
+    const d = daysUntil(b.expiry_date);
+    return !b.is_archived && d !== null && d <= 30;
+  }).length;
+  const totalUnits = batches
+    .filter((b) => !b.is_archived)
+    .reduce((s, b) => s + (b.units_produced || 0), 0);
+  const totalQR = Object.values(statsMap).reduce((s, v) => s + v.qr_count, 0);
+
   const filtered = batches.filter((b) => {
     const q = search.toLowerCase();
     const matchSearch =
@@ -1264,16 +1264,6 @@ export default function AdminBatchManager({
     return true;
   });
 
-  const activeBatches = batches.filter((b) => !b.is_archived).length;
-  const expiringBatches = batches.filter((b) => {
-    const d = daysUntil(b.expiry_date);
-    return !b.is_archived && d !== null && d <= 30;
-  }).length;
-  const totalUnits = batches
-    .filter((b) => !b.is_archived)
-    .reduce((s, b) => s + (b.units_produced || 0), 0);
-  const totalQR = Object.values(statsMap).reduce((s, v) => s + v.qr_count, 0);
-
   const FILTER_TABS = [
     { key: "active", label: "Active" },
     { key: "expiring", label: "Expiring" },
@@ -1283,15 +1273,13 @@ export default function AdminBatchManager({
 
   return (
     <div style={{ fontFamily: T.font, position: "relative" }}>
-      {/* WorkflowGuide — always first */}
       <WorkflowGuide
         context={ctx}
         tabId="batches"
         onAction={() => {}}
-        defaultOpen={true}
+        defaultOpen={false}
       />
 
-      {/* Toast */}
       {toast && (
         <div
           style={{
@@ -1315,7 +1303,6 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -1353,7 +1340,6 @@ export default function AdminBatchManager({
         </button>
       </div>
 
-      {/* ── STAT GRID (flush, no borderTop) ── */}
       <div
         style={{
           display: "grid",
@@ -1419,11 +1405,9 @@ export default function AdminBatchManager({
         ))}
       </div>
 
-      {/* ── WP-VIZ CHARTS ── */}
       {!loading &&
         batches.length > 0 &&
         (() => {
-          // Chart 1: Batch status donut
           const archived = batches.filter((b) => b.is_archived).length;
           const expiring = batches.filter(
             (b) =>
@@ -1443,7 +1427,6 @@ export default function AdminBatchManager({
             { name: "Archived", value: archived, color: T.ink300 },
           ].filter((d) => d.value > 0);
 
-          // Chart 2: Units produced per batch (top 8, horizontal bars)
           const unitsBar = [...batches]
             .filter((b) => !b.is_archived && (b.units_produced || 0) > 0)
             .sort((a, b) => (b.units_produced || 0) - (a.units_produced || 0))
@@ -1454,7 +1437,6 @@ export default function AdminBatchManager({
             }));
           const unitsMax = Math.max(...unitsBar.map((d) => d.units), 1);
 
-          // Chart 3: Activation rate per batch (top 8 by QR count)
           const rateBar = batches
             .filter((b) => !b.is_archived && statsMap[b.id]?.qr_count > 0)
             .map((b) => ({
@@ -1469,9 +1451,8 @@ export default function AdminBatchManager({
             }))
             .sort((a, b) => b.qr - a.qr)
             .slice(0, 8);
-          const showCharts = statusDonut.length > 0;
 
-          if (!showCharts) return null;
+          if (!statusDonut.length) return null;
           return (
             <div
               style={{
@@ -1481,7 +1462,6 @@ export default function AdminBatchManager({
                 marginBottom: 20,
               }}
             >
-              {/* Donut — batch status */}
               <ChartCard title="Batch Status" height={200}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1509,7 +1489,6 @@ export default function AdminBatchManager({
                 </ResponsiveContainer>
               </ChartCard>
 
-              {/* HBar — units produced per batch */}
               <ChartCard title="Units Produced per Batch" height={200}>
                 {unitsBar.length === 0 ? (
                   <div
@@ -1614,7 +1593,6 @@ export default function AdminBatchManager({
                 )}
               </ChartCard>
 
-              {/* HBar — QR activation rate per batch */}
               <ChartCard title="QR Activation Rate" height={200}>
                 {rateBar.length === 0 ? (
                   <div
@@ -1724,42 +1702,6 @@ export default function AdminBatchManager({
           );
         })()}
 
-      {/* Expiring warning */}
-      {expiringBatches > 0 && (
-        <div
-          style={{
-            padding: "12px 16px",
-            background: T.warningBg,
-            border: `1px solid ${T.warningBd}`,
-            borderRadius: 6,
-            marginBottom: 20,
-            fontSize: 13,
-            color: T.warning,
-            fontWeight: 600,
-            fontFamily: T.font,
-          }}
-        >
-          {expiringBatches} batch{expiringBatches > 1 ? "es" : ""} expiring
-          within 30 days — review distribution plan.
-          <button
-            onClick={() => setFilter("expiring")}
-            style={{
-              marginLeft: 12,
-              fontSize: 11,
-              color: T.warning,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              textDecoration: "underline",
-              fontFamily: T.font,
-            }}
-          >
-            View expiring →
-          </button>
-        </div>
-      )}
-
-      {/* Search + filter tabs */}
       <div
         style={{
           display: "flex",
@@ -1775,7 +1717,6 @@ export default function AdminBatchManager({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {/* Underline-only filter tabs */}
         <div
           style={{
             display: "flex",
@@ -1832,7 +1773,6 @@ export default function AdminBatchManager({
         </button>
       </div>
 
-      {/* Card grid */}
       {loading ? (
         <div
           style={{
@@ -1916,7 +1856,6 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Archive confirm modal */}
       {archiveTarget && (
         <div
           style={{
@@ -1987,7 +1926,6 @@ export default function AdminBatchManager({
         </div>
       )}
 
-      {/* Drawer backdrop + form */}
       {showForm && (
         <>
           <div
@@ -2016,3 +1954,6 @@ export default function AdminBatchManager({
     </div>
   );
 }
+
+
+

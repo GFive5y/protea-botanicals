@@ -1,5 +1,5 @@
-// src/pages/HQDashboard.js v4.0
-// Protea Botanicals — HQ Command Centre
+// src/pages/HQDashboard.js v4.1
+// WP-Z: PlatformBar replaces AlertsBar — wired below LiveFXBar
 // ★ v4.0: WP-NAV Sub-B
 //   - useLocation + useEffect: reads ?tab= query param → syncs activeTab
 //   - Header simplified — h1 + "All Tabs Live" badge removed, sidebar provides context
@@ -49,9 +49,12 @@ import HQLoyalty from "../components/hq/HQLoyalty";
 // ── WP-8 ─────────────────────────────────────────────────────────────────────
 import HQFraud from "../components/hq/HQFraud";
 
-// ── WP-X: Live FX Bar ────────────────────────────────────────────────────────
+// ── WP-X: Live FX Bar (untouched — permanent) ────────────────────────────────
 import LiveFXBar from "../components/hq/LiveFXBar";
-import AlertsBar from "../components/hq/AlertsBar";
+
+// ── WP-Z: Platform Intelligence Bar ──────────────────────────────────────────
+import PlatformBar from "../components/PlatformBar";
+import { PlatformBarProvider } from "../contexts/PlatformBarContext";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -119,110 +122,123 @@ export default function HQDashboard() {
   };
 
   return (
-    <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
-      {/* ── Header — simplified, sidebar provides tier/role context ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "20px",
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
-              fontSize: "24px",
-              fontWeight: 300,
-              color: C.primaryDark,
-              margin: "0 0 2px",
-            }}
-          >
-            HQ Command Centre
-          </h1>
-          <p
-            style={{
-              color: C.muted,
-              fontSize: "13px",
-              fontWeight: 300,
-              margin: 0,
-            }}
-          >
-            {tenantName || "Protea Botanicals HQ"} — {allTenants.length} tenant
-            {allTenants.length !== 1 ? "s" : ""} registered
-          </p>
+    <PlatformBarProvider>
+      <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
+        {/* ── Header — simplified, sidebar provides tier/role context ── */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "20px",
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
+                fontSize: "24px",
+                fontWeight: 300,
+                color: C.primaryDark,
+                margin: "0 0 2px",
+              }}
+            >
+              HQ Command Centre
+            </h1>
+            <p
+              style={{
+                color: C.muted,
+                fontSize: "13px",
+                fontWeight: 300,
+                margin: 0,
+              }}
+            >
+              {tenantName || "Protea Botanicals HQ"} — {allTenants.length}{" "}
+              tenant
+              {allTenants.length !== 1 ? "s" : ""} registered
+            </p>
+          </div>
+
+          {/* Tenant Switcher — retained */}
+          {isHQ && allTenants.length > 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase",
+                  color: C.muted,
+                }}
+              >
+                Viewing:
+              </span>
+              <select
+                value={tenant?.id || ""}
+                onChange={(e) => {
+                  const selected = allTenants.find(
+                    (t) => t.id === e.target.value,
+                  );
+                  if (selected) switchTenant(selected);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  border: "1px solid " + C.border,
+                  borderRadius: "2px",
+                  fontFamily: "Jost, sans-serif",
+                  fontSize: "12px",
+                  color: C.text,
+                  background: C.white,
+                  cursor: "pointer",
+                }}
+              >
+                {allTenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
-        {/* Tenant Switcher — retained */}
-        {isHQ && allTenants.length > 1 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span
-              style={{
-                fontSize: "10px",
-                fontWeight: 600,
-                letterSpacing: "0.15em",
-                textTransform: "uppercase",
-                color: C.muted,
-              }}
-            >
-              Viewing:
-            </span>
-            <select
-              value={tenant?.id || ""}
-              onChange={(e) => {
-                const selected = allTenants.find(
-                  (t) => t.id === e.target.value,
-                );
-                if (selected) switchTenant(selected);
-              }}
-              style={{
-                padding: "6px 10px",
-                border: "1px solid " + C.border,
-                borderRadius: "2px",
-                fontFamily: "Jost, sans-serif",
-                fontSize: "12px",
-                color: C.text,
-                background: C.white,
-                cursor: "pointer",
-              }}
-            >
-              {allTenants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.type})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* ★ v4.0: Tab navigation removed — sidebar handles all tab routing */}
+
+        {/* ── Tab Content ── */}
+        <div>
+          {/* v3.8: LiveFXBar — UNTOUCHED, permanent, never in scope */}
+          <LiveFXBar />
+          {/* WP-Z: PlatformBar — replaces AlertsBar, wired immediately below LiveFXBar */}
+          <PlatformBar
+            role="hq"
+            tenantId={tenant?.id}
+            onNavigate={() => {}}
+          />
+
+          <div style={{position:"fixed",top:0,right:0,background:"red",color:"white",zIndex:99999,padding:"8px 12px",fontSize:14,fontWeight:"bold"}}>ACTIVE: {activeTab}</div>{activeTab === "overview" && (
+            <HQOverview onNavigate={handleNavigate} />
+          )}
+          {activeTab === "supply-chain" && <SupplyChain />}
+          {activeTab === "distribution" && <Distribution />}
+          {activeTab === "shops" && <ShopManager />}
+          {activeTab === "analytics" && <HQAnalytics />}
+          {activeTab === "retailer-health" && <RetailerHealth />}
+          {activeTab === "suppliers" && <HQSuppliers />}
+          {activeTab === "procurement" && <HQPurchaseOrders />}
+          {activeTab === "costing" && <HQCogs />}
+          {activeTab === "pricing" && <HQPricing />}
+          {activeTab === "pl" && <HQProfitLoss />}
+          {activeTab === "reorder" && <HQReorderScoring />}
+          {activeTab === "documents" && <HQDocuments />}
+          {activeTab === "hq-production" && <HQProduction />}
+          {activeTab === "loyalty" && <HQLoyalty />}
+          {activeTab === "fraud" && <HQFraud />}
+        </div>
       </div>
-
-      {/* ★ v4.0: Tab navigation removed — sidebar handles all tab routing */}
-
-      {/* ── Tab Content ── */}
-      <div>
-        {/* v3.8: LiveFXBar renders above ALL tab content — persistent across every tab */}
-        <LiveFXBar />
-        {/* WP-X: AlertsBar — dashboard warning lights, invisible until triggered */}
-        <AlertsBar />
-
-        {activeTab === "overview" && <HQOverview onNavigate={handleNavigate} />}
-        {activeTab === "supply-chain" && <SupplyChain />}
-        {activeTab === "distribution" && <Distribution />}
-        {activeTab === "shops" && <ShopManager />}
-        {activeTab === "analytics" && <HQAnalytics />}
-        {activeTab === "retailer-health" && <RetailerHealth />}
-        {activeTab === "suppliers" && <HQSuppliers />}
-        {activeTab === "procurement" && <HQPurchaseOrders />}
-        {activeTab === "costing" && <HQCogs />}
-        {activeTab === "pricing" && <HQPricing />}
-        {activeTab === "pl" && <HQProfitLoss />}
-        {activeTab === "reorder" && <HQReorderScoring />}
-        {activeTab === "documents" && <HQDocuments />}
-        {activeTab === "hq-production" && <HQProduction />}
-        {activeTab === "loyalty" && <HQLoyalty />}
-        {activeTab === "fraud" && <HQFraud />}
-      </div>
-    </div>
+    </PlatformBarProvider>
   );
 }
+
+
+
+

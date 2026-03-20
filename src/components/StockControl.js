@@ -436,74 +436,10 @@ export default function StockControl() {
         context={ctx}
         tabId="admin-stock"
         onAction={() => {}}
-        defaultOpen={true}
+        defaultOpen={false}
       />
 
-      {/* GAP-02: Stock alert banners */}
-      {stockAlerts.map((a) => {
-        const sev = {
-          critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
-          warning: { bg: T.warningBg, bd: T.warningBd, color: T.warning },
-          info: { bg: T.infoBg, bd: T.infoBd, color: T.info },
-        }[a.severity] || { bg: T.ink075, bd: T.ink150, color: T.ink700 };
-        return (
-          <div
-            key={a.id}
-            style={{
-              background: sev.bg,
-              border: `1px solid ${sev.bd}`,
-              borderRadius: 6,
-              padding: "10px 14px",
-              marginBottom: 10,
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: sev.color,
-                  fontFamily: T.fontUi,
-                }}
-              >
-                {a.title}
-              </div>
-              {a.body && (
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: T.ink700,
-                    fontFamily: T.fontUi,
-                    marginTop: 2,
-                  }}
-                >
-                  {a.body}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={async () => {
-                await supabase
-                  .from("system_alerts")
-                  .update({ status: "acknowledged" })
-                  .eq("id", a.id);
-                fetchAlerts();
-              }}
-              style={{
-                ...sBtn("outline"),
-                fontSize: 9,
-                padding: "3px 8px",
-                flexShrink: 0,
-              }}
-            >
-              Ack
-            </button>
-          </div>
-        );
-      })}
+      {/* Alerts handled globally by AlertsBar */}
 
       {/* Sub-tab bar — standard underline style */}
       <div
@@ -3830,3 +3766,4 @@ function SuppliersView({ suppliers, onRefresh }) {
     </div>
   );
 }
+

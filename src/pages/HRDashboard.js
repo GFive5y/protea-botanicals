@@ -1,5 +1,6 @@
-// HRDashboard.js v1.1
-// WP-VIZ: Leave Status Donut + Timesheet Pipeline Bar + Headcount HBar added to HROverview
+// HRDashboard.js v1.2
+// v1.2 — URL sync: useLocation + useEffect added — sidebar navigation now works
+// v1.1 — WP-VIZ: Leave Status Donut + Timesheet Pipeline Bar + Headcount HBar added to HROverview
 // v1.0 — WP-HR-5 · March 2026 · src/pages/HRDashboard.js
 //
 // Route: /hr — role='hr' OR isHQ access
@@ -7,6 +8,7 @@
 // AdminHRPanel = scoped to Admin's team | HRDashboard = full tenant HR access
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import {
   PieChart,
   Pie,
@@ -100,7 +102,7 @@ function TabBtn({ active, label, badge, onClick }) {
         color: active ? T.accent : T.ink400,
         border: "none",
         borderBottom: active
-          ? `2px solid ${T.accent}`
+          ? "2px solid " + T.accent
           : "2px solid transparent",
         borderRadius: 0,
         padding: "10px 16px",
@@ -179,7 +181,6 @@ function HROverview({ tenantId, onNavigate }) {
       const in60Days = new Date(now.getTime() + 60 * 86400000);
       const in14Days = new Date(now.getTime() + 14 * 86400000);
 
-      // Status breakdowns for charts
       const staffByStatus = staff.reduce((acc, s) => {
         const k = s.status || "active";
         acc[k] = (acc[k] || 0) + 1;
@@ -252,13 +253,12 @@ function HROverview({ tenantId, onNavigate }) {
     );
   if (!stats) return null;
 
-  // ── Tiles ──────────────────────────────────────────────────────────────────
   const tiles = [
     {
       icon: "👥",
       label: "Active Staff",
       value: stats.activeStaff,
-      sub: `${stats.totalStaff} total`,
+      sub: stats.totalStaff + " total",
       color: "#2e7d32",
       tab: "staff",
     },
@@ -304,7 +304,6 @@ function HROverview({ tenantId, onNavigate }) {
     },
   ];
 
-  // ── Chart data ─────────────────────────────────────────────────────────────
   const leaveDonut = [
     {
       name: "Pending",
@@ -353,7 +352,6 @@ function HROverview({ tenantId, onNavigate }) {
     .slice(0, 7)
     .map(([dept, count]) => ({ dept, count }));
   const deptMax = Math.max(...deptBar.map((d) => d.count), 1);
-
   const showCharts =
     leaveDonut.length > 0 || tsBar.length > 0 || deptBar.length > 0;
 
@@ -371,7 +369,6 @@ function HROverview({ tenantId, onNavigate }) {
         HR Command Centre
       </h2>
 
-      {/* Tiles grid — unchanged */}
       <div
         style={{
           display: "grid",
@@ -386,7 +383,7 @@ function HROverview({ tenantId, onNavigate }) {
             onClick={() => onNavigate(tile.tab)}
             style={{
               background: C.white,
-              border: `1px solid ${T.ink150}`,
+              border: "1px solid " + T.ink150,
               borderRadius: 6,
               padding: "16px 18px",
               cursor: "pointer",
@@ -443,7 +440,6 @@ function HROverview({ tenantId, onNavigate }) {
         ))}
       </div>
 
-      {/* ── WP-VIZ CHARTS ── */}
       {showCharts && (
         <div
           style={{
@@ -453,7 +449,6 @@ function HROverview({ tenantId, onNavigate }) {
             marginBottom: 28,
           }}
         >
-          {/* Leave status donut */}
           <ChartCard title="Leave Requests by Status" height={200}>
             {leaveDonut.length === 0 ? (
               <div
@@ -489,7 +484,7 @@ function HROverview({ tenantId, onNavigate }) {
                   </Pie>
                   <Tooltip
                     content={
-                      <ChartTooltip formatter={(v) => `${v} requests`} />
+                      <ChartTooltip formatter={(v) => v + " requests"} />
                     }
                   />
                 </PieChart>
@@ -497,7 +492,6 @@ function HROverview({ tenantId, onNavigate }) {
             )}
           </ChartCard>
 
-          {/* Timesheet pipeline bar */}
           <ChartCard title="Timesheet Pipeline" height={200}>
             {tsBar.length === 0 ? (
               <div
@@ -542,7 +536,7 @@ function HROverview({ tenantId, onNavigate }) {
                   />
                   <Tooltip
                     content={
-                      <ChartTooltip formatter={(v) => `${v} timesheets`} />
+                      <ChartTooltip formatter={(v) => v + " timesheets"} />
                     }
                   />
                   <Bar
@@ -561,7 +555,6 @@ function HROverview({ tenantId, onNavigate }) {
             )}
           </ChartCard>
 
-          {/* Headcount by department horizontal bar */}
           <ChartCard title="Headcount by Department" height={200}>
             {deptBar.length === 0 ? (
               <div
@@ -619,7 +612,7 @@ function HROverview({ tenantId, onNavigate }) {
                       <div
                         style={{
                           height: "100%",
-                          width: `${(d.count / deptMax) * 100}%`,
+                          width: (d.count / deptMax) * 100 + "%",
                           background: T.accentMid,
                           borderRadius: 3,
                           transition: "width 0.5s",
@@ -662,7 +655,6 @@ function HROverview({ tenantId, onNavigate }) {
         </div>
       )}
 
-      {/* Quick Actions — unchanged */}
       <div
         style={{
           fontSize: 10,
@@ -723,6 +715,12 @@ function HROverview({ tenantId, onNavigate }) {
 // ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
 export default function HRDashboard() {
   const [tab, setTab] = useState("overview");
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const t = params.get("tab");
+    if (t && TABS.find((x) => x.id === t)) setTab(t);
+  }, [location.search]); // eslint-disable-line
   const { tenantId, loading: tenantLoading } = useTenant();
   const [pendingLeave, setPendingLeave] = useState(0);
   const [pendingTS, setPendingTS] = useState(0);
@@ -799,7 +797,7 @@ export default function HRDashboard() {
       <div
         style={{
           background: C.white,
-          borderBottom: `1px solid ${C.border}`,
+          borderBottom: "1px solid " + C.border,
           display: "flex",
           gap: 0,
           overflowX: "auto",

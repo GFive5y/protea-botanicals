@@ -1,4 +1,5 @@
-// AdminDashboard.js v6.3 — WP-VIZ: User Management charts (role donut, tier bar, points bar)
+// AdminDashboard.js v6.6 — WP-Z: PlatformBar replaces SystemStatusBar + AlertsBar
+// v6.3 — WP-VIZ: User Management charts (role donut, tier bar, points bar)
 // v6.2 — WP-GUIDE: WorkflowGuide added to users tab
 // v6.0 — WP-THEME: Unified design system applied
 // ★ v5.0: WP-NAV Sub-B — URL sync, green banner + tab bar removed
@@ -23,7 +24,8 @@ import { supabase } from "../services/supabaseClient";
 import { ChartCard, ChartTooltip, PipelineStages } from "../components/viz";
 import WorkflowGuide from "../components/WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
-import SystemStatusBar from "../components/SystemStatusBar";
+import PlatformBar from "../components/PlatformBar";
+import { PlatformBarProvider } from "../contexts/PlatformBarContext";
 import AdminAnalytics from "./AdminAnalytics";
 import StockControl from "../components/StockControl";
 import AdminBatchManager from "../components/AdminBatchManager";
@@ -37,7 +39,6 @@ import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCommsCenter from "../components/AdminCommsCenter";
 import AdminHRPanel from "../components/AdminHRPanel";
 import AIAssist from "../components/AIAssist";
-import AlertsBar from "../components/hq/AlertsBar";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -232,7 +233,6 @@ function fmtDate(d) {
 function ScanHeatmap({ heatmapData }) {
   if (!heatmapData || heatmapData.length === 0) return null;
   const maxVal = Math.max(...heatmapData.map((d) => d.count), 1);
-  // 5-stop colour scale: ink075 → accent
   const cellColor = (count) => {
     if (count === 0) return T.ink075;
     const pct = count / maxVal;
@@ -251,7 +251,6 @@ function ScanHeatmap({ heatmapData }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-        {/* Day labels column */}
         <div
           style={{
             display: "flex",
@@ -277,13 +276,11 @@ function ScanHeatmap({ heatmapData }) {
             </div>
           ))}
         </div>
-        {/* Week columns */}
         {weeks.map((week, wi) => (
           <div
             key={wi}
             style={{ display: "flex", flexDirection: "column", gap: 3 }}
           >
-            {/* Week label (Mon of that week) */}
             <div
               style={{
                 fontSize: 8,
@@ -318,7 +315,6 @@ function ScanHeatmap({ heatmapData }) {
           </div>
         ))}
       </div>
-      {/* Legend */}
       <div
         style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8 }}
       >
@@ -355,6 +351,9 @@ function ScanHeatmap({ heatmapData }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
   const [tab, setTab] = useState("overview");
+  useEffect(() => {
+    console.log("TAB CHANGED TO:", tab);
+  }, [tab]);
   const [documentsTargetId, setDocumentsTargetId] = useState(null);
   const [qrInitialBatchId, setQrInitialBatchId] = useState(null);
   const [users, setUsers] = useState([]);
@@ -378,8 +377,8 @@ export default function AdminDashboard() {
   const [tenantId, setTenantId] = useState(null);
 
   // WP-VIZ state
-  const [scanTrend24h, setScanTrend24h] = useState([]); // [{hour, count}] last 24h
-  const [heatmapData, setHeatmapData] = useState([]); // [{date, count}] 84 days
+  const [scanTrend24h, setScanTrend24h] = useState([]);
+  const [heatmapData, setHeatmapData] = useState([]);
   const [pipelineFilter, setPipelineFilter] = useState(null);
 
   const ctx = usePageContext("admin", null);
@@ -413,6 +412,7 @@ export default function AdminDashboard() {
     } catch (_) {}
   }, []);
 
+  // commsBadge — kept: drives Comms quick-action button colour
   const fetchCommsBadge = useCallback(async () => {
     try {
       const [msgRes, tickRes] = await Promise.all([
@@ -519,6 +519,7 @@ export default function AdminDashboard() {
           .select("points")
           .gte("created_at", iso)
           .not("transaction_type", "in", '("SPENT","REDEEMED")'),
+        // fraudAlerts kept: drives Fraud quick-action button colour
         supabase
           .from("user_profiles")
           .select("id", { count: "exact", head: true })
@@ -533,7 +534,6 @@ export default function AdminDashboard() {
     } catch (_) {}
   }, []);
 
-  // WP-VIZ: 24h scan trend (hourly) — Chart #3
   const fetchScanTrend24h = useCallback(async () => {
     try {
       const since = new Date(Date.now() - 24 * 3600000).toISOString();
@@ -558,7 +558,6 @@ export default function AdminDashboard() {
     } catch (_) {}
   }, []);
 
-  // WP-VIZ: 12-week scan heatmap — Chart #17
   const fetchHeatmap = useCallback(async () => {
     try {
       const since = new Date(Date.now() - 84 * 86400000).toISOString();
@@ -567,7 +566,6 @@ export default function AdminDashboard() {
         .select("scanned_at")
         .gte("scanned_at", since);
       const dayMap = {};
-      // Seed all 84 days with 0
       for (let i = 83; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -578,14 +576,12 @@ export default function AdminDashboard() {
         const key = new Date(s.scanned_at).toISOString().split("T")[0];
         if (key in dayMap) dayMap[key]++;
       });
-      // Sort by date, build array aligned to Monday
       const entries = Object.entries(dayMap).sort((a, b) =>
         a[0] > b[0] ? 1 : -1,
       );
-      // Pad to start on Monday
       const firstDate = new Date(entries[0][0]);
-      const dayOfWeek = firstDate.getDay(); // 0=Sun
-      const padDays = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // days before Monday
+      const dayOfWeek = firstDate.getDay();
+      const padDays = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       const padded = [
         ...Array(padDays).fill({ date: "", count: 0 }),
         ...entries.map(([date, count]) => ({ date, count })),
@@ -612,7 +608,7 @@ export default function AdminDashboard() {
     fetchHeatmap,
   ]);
 
-  // Realtime: inbound messages → badge
+  // Realtime: inbound messages → commsBadge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-msgs")
@@ -635,7 +631,7 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [fetchCommsBadge]);
 
-  // Realtime: tickets → badge
+  // Realtime: tickets → commsBadge
   useEffect(() => {
     const sub = supabase
       .channel("admin-dashboard-tickets")
@@ -661,7 +657,7 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(sub);
   }, [computeAnalytics]);
 
-  // Realtime: new scans → refresh 24h trend
+  // Realtime: new scans → 24h trend
   useEffect(() => {
     const sub = supabase
       .channel("admin-scan-trend")
@@ -683,7 +679,6 @@ export default function AdminDashboard() {
     setTab("documents");
   };
 
-  // Pipeline stages for QR flow
   const qrPipelineStages = [
     {
       id: "inStock",
@@ -723,478 +718,437 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div style={{ fontFamily: T.fontUi }}>
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: 0,
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: T.fontUi,
-            fontSize: "22px",
-            fontWeight: 300,
-            color: T.ink900,
-            margin: "0 0 4px",
-          }}
-        >
-          Admin Dashboard
-        </h1>
-        <AIAssist
-          tabContext="admin-overview"
-          tabData={{}}
-          contextLabel="Admin portal"
-          suggestions={[
-            "What needs my attention right now?",
-            "How many scans happened today?",
-            "Which customers are at risk of churning?",
-          ]}
-        />
-      </div>
-
-      <SystemStatusBar />
-      <AlertsBar />
-      <div style={{ marginBottom: "12px" }} />
-
-      {/* Error — standard danger template */}
-      {error && (
+    <PlatformBarProvider>
+      <div style={{ fontFamily: T.fontUi }}>
+        {/* Header */}
         <div
           style={{
-            background: T.dangerBg,
-            border: `1px solid ${T.dangerBd}`,
-            padding: "12px 16px",
-            borderRadius: 6,
-            marginBottom: 20,
-            color: T.danger,
-            fontSize: "13px",
+            marginBottom: 8,
             display: "flex",
-            alignItems: "center",
-            gap: 10,
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
           }}
         >
-          <span style={{ flex: 1 }}>{error}</span>
-          <button
-            onClick={() => setError("")}
+          <h1
             style={{
-              background: "none",
-              border: "none",
-              color: T.danger,
-              cursor: "pointer",
-              fontSize: "16px",
+              fontFamily: T.fontUi,
+              fontSize: "22px",
+              fontWeight: 300,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* ── OVERVIEW ── */}
-      {tab === "overview" && (
-        <div>
-          <WorkflowGuide
-            context={ctx}
-            tabId="admin"
-            onAction={(action) => action.tab && setTab(action.tab)}
-            defaultOpen={false}
+            Admin Dashboard
+          </h1>
+          <AIAssist
+            tabContext="admin-overview"
+            tabData={{}}
+            contextLabel="Admin portal"
+            suggestions={[
+              "What needs my attention right now?",
+              "How many scans happened today?",
+              "Which customers are at risk of churning?",
+            ]}
           />
+        </div>
 
-          {/* Alerts handled globally by AlertsBar component */}
+        {/* WP-Z: PlatformBar — Platform Intelligence Bar */}
+        <PlatformBar
+          role="admin"
+          tenantId={tenantId}
+          onNavigate={() => {}}
+        />
 
-          {/* ROW 1 — Today's Activity */}
-          <SectionLabel text="Today's Activity" />
-          <MetricGrid>
-            <StatCard
-              label="Scans Today"
-              value={scansToday}
-              semantic="success"
-            />
-            <StatCard
-              label="New Customers"
-              value={newCustomers}
-              semantic="info"
-            />
-            <StatCard
-              label="Points Awarded"
-              value={pointsToday.toLocaleString()}
-              semantic={null}
-            />
-            <StatCard
-              label="Active QR Codes"
-              value={analytics.inStock}
-              sub="in stock, unscanned"
-              semantic="info"
-            />
-          </MetricGrid>
+        {/* Error — standard danger template */}
+        {error && (
+          <div
+            style={{
+              background: T.dangerBg,
+              border: `1px solid ${T.dangerBd}`,
+              padding: "12px 16px",
+              borderRadius: 6,
+              marginBottom: 20,
+              marginTop: 12,
+              color: T.danger,
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <span style={{ flex: 1 }}>{error}</span>
+            <button
+              onClick={() => setError("")}
+              style={{
+                background: "none",
+                border: "none",
+                color: T.danger,
+                cursor: "pointer",
+                fontSize: "16px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
-          {/* ── CHART: 24h Scan Activity Area (Chart #3) ── */}
-          {scanTrend24h.length > 0 && (
+        {/* ── OVERVIEW ── */}
+        {tab === "overview" && (
+          <div>
+            <WorkflowGuide
+              context={ctx}
+              tabId="admin"
+              onAction={() => {}}
+              defaultOpen={false}
+            />
+
+            {/* ROW 1 — Today's Activity */}
+            <SectionLabel text="Today's Activity" />
+            <MetricGrid>
+              <StatCard
+                label="Scans Today"
+                value={scansToday}
+                semantic="success"
+              />
+              <StatCard
+                label="New Customers"
+                value={newCustomers}
+                semantic="info"
+              />
+              <StatCard
+                label="Points Awarded"
+                value={pointsToday.toLocaleString()}
+                semantic={null}
+              />
+              <StatCard
+                label="Active QR Codes"
+                value={analytics.inStock}
+                sub="in stock, unscanned"
+                semantic="info"
+              />
+            </MetricGrid>
+
+            {/* CHART: 24h Scan Activity Area */}
+            {scanTrend24h.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <ChartCard title="Scan Activity — Last 24 Hours" height={200}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={scanTrend24h}
+                      margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="admin-scan-grad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={T.accentMid}
+                            stopOpacity={0.2}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={T.accentMid}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="hour"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.fontUi,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={6}
+                        interval={3}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 10,
+                          fontFamily: T.fontUi,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={24}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        content={
+                          <ChartTooltip
+                            formatter={(v) => `${v} scan${v !== 1 ? "s" : ""}`}
+                          />
+                        }
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        name="Scans"
+                        stroke={T.accentMid}
+                        strokeWidth={2}
+                        fill="url(#admin-scan-grad)"
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
+            )}
+
+            {/* CHART: QR + Action Pipeline */}
             <div style={{ marginBottom: 24 }}>
-              <ChartCard title="Scan Activity — Last 24 Hours" height={200}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={scanTrend24h}
-                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="admin-scan-grad"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor={T.accentMid}
-                          stopOpacity={0.2}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor={T.accentMid}
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      horizontal
-                      vertical={false}
-                      stroke={T.ink150}
-                      strokeWidth={0.5}
-                    />
-                    <XAxis
-                      dataKey="hour"
-                      tick={{
-                        fill: T.ink400,
-                        fontSize: 10,
-                        fontFamily: T.fontUi,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                      dy={6}
-                      interval={3}
-                    />
-                    <YAxis
-                      tick={{
-                        fill: T.ink400,
-                        fontSize: 10,
-                        fontFamily: T.fontUi,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={24}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      content={
-                        <ChartTooltip
-                          formatter={(v) => `${v} scan${v !== 1 ? "s" : ""}`}
-                        />
-                      }
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="count"
-                      name="Scans"
-                      stroke={T.accentMid}
-                      strokeWidth={2}
-                      fill="url(#admin-scan-grad)"
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 10,
+                  fontFamily: T.fontUi,
+                }}
+              >
+                Platform Pipeline — click to navigate
+              </div>
+              <PipelineStages
+                stages={qrPipelineStages}
+                selected={pipelineFilter}
+                onSelect={(val) => {
+                  setPipelineFilter(val);
+                  if (val === "comms") setTab("comms");
+                  if (val === "fraud") setTab("security");
+                  if (
+                    val === "claimed" ||
+                    val === "distributed" ||
+                    val === "inStock"
+                  )
+                    setTab("qr_codes");
+                }}
+              />
             </div>
-          )}
 
-          {/* ── CHART: QR + Action Pipeline (Chart #16) ── */}
-          <div style={{ marginBottom: 24 }}>
+            {/* ROW 2 — Action Required */}
+            <SectionLabel text="Action Required" />
+            <MetricGrid>
+              <StatCard
+                label="Comms"
+                value={commsBadge}
+                sub={commsBadge > 0 ? "items need attention" : "all clear"}
+                semantic={commsBadge > 0 ? "danger" : "success"}
+                onClick={() => setTab("comms")}
+              />
+              <StatCard
+                label="QR Claim Rate"
+                value={`${analytics.claimRate}%`}
+                sub={`${analytics.claimed} claimed of ${analytics.total}`}
+                semantic={
+                  parseFloat(analytics.claimRate) < 20 ? "warning" : null
+                }
+              />
+              <StatCard
+                label="Fraud Alerts"
+                value={fraudAlerts}
+                sub={fraudAlerts > 0 ? "accounts flagged" : "no alerts"}
+                semantic={fraudAlerts > 0 ? "danger" : "success"}
+                onClick={() => setTab("security")}
+              />
+              <StatCard
+                label="Total Users"
+                value={analytics.userCount}
+                semantic="info"
+                onClick={() => setTab("users")}
+              />
+            </MetricGrid>
+
+            {/* ROW 3 — Platform Health */}
+            <SectionLabel text="Platform Health" />
+            <MetricGrid>
+              <StatCard
+                label="Points Distributed"
+                value={analytics.totalPointsDistributed.toLocaleString()}
+                semantic={null}
+              />
+              <StatCard
+                label="Active Stockists"
+                value={analytics.activeStockists}
+                semantic="info"
+              />
+              <StatCard
+                label="Avg Time to Claim"
+                value={
+                  analytics.avgTimeToClaim
+                    ? `${analytics.avgTimeToClaim}h`
+                    : "—"
+                }
+                sub="hours from distribution"
+                semantic={null}
+              />
+              <StatCard
+                label="Distributed"
+                value={analytics.distributed}
+                sub="with customer, unclaimed"
+                semantic={null}
+              />
+            </MetricGrid>
+
+            {/* CHART: Scan Heatmap 12 weeks */}
+            {heatmapData.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <ChartCard title="Scan Density — Last 12 Weeks" height={130}>
+                  <ScanHeatmap heatmapData={heatmapData} />
+                </ChartCard>
+              </div>
+            )}
+
+            {/* Quick Actions */}
             <div
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: T.ink400,
-                marginBottom: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                color: T.ink900,
+                marginBottom: 14,
                 fontFamily: T.fontUi,
               }}
             >
-              Platform Pipeline — click to navigate
+              Quick Actions
             </div>
-            <PipelineStages
-              stages={qrPipelineStages}
-              selected={pipelineFilter}
-              onSelect={(val) => {
-                setPipelineFilter(val);
-                if (val === "comms") setTab("comms");
-                if (val === "fraud") setTab("security");
-                if (
-                  val === "claimed" ||
-                  val === "distributed" ||
-                  val === "inStock"
-                )
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setTab("comms")}
+                style={mkBtn(commsBadge > 0 ? "danger" : "ghost", "sm")}
+              >
+                {commsBadge > 0 ? `Comms (${commsBadge})` : "Comms"}
+              </button>
+              <button
+                onClick={() => setTab("shipments")}
+                style={mkBtn("ghost", "sm")}
+              >
+                Shipments
+              </button>
+              <button
+                onClick={() => setTab("production")}
+                style={mkBtn("ghost", "sm")}
+              >
+                Production
+              </button>
+              <button
+                onClick={() => setTab("batches")}
+                style={mkBtn("ghost", "sm")}
+              >
+                Batches
+              </button>
+              <button
+                onClick={() => {
+                  setQrInitialBatchId(null);
                   setTab("qr_codes");
-              }}
-            />
-          </div>
-
-          {/* ROW 2 — Action Required */}
-          <SectionLabel text="Action Required" />
-          <MetricGrid>
-            <StatCard
-              label="Comms"
-              value={commsBadge}
-              sub={commsBadge > 0 ? "items need attention" : "all clear"}
-              semantic={commsBadge > 0 ? "danger" : "success"}
-              onClick={() => setTab("comms")}
-            />
-            <StatCard
-              label="QR Claim Rate"
-              value={`${analytics.claimRate}%`}
-              sub={`${analytics.claimed} claimed of ${analytics.total}`}
-              semantic={parseFloat(analytics.claimRate) < 20 ? "warning" : null}
-            />
-            <StatCard
-              label="Fraud Alerts"
-              value={fraudAlerts}
-              sub={fraudAlerts > 0 ? "accounts flagged" : "no alerts"}
-              semantic={fraudAlerts > 0 ? "danger" : "success"}
-              onClick={() => setTab("security")}
-            />
-            <StatCard
-              label="Total Users"
-              value={analytics.userCount}
-              semantic="info"
-              onClick={() => setTab("users")}
-            />
-          </MetricGrid>
-
-          {/* ROW 3 — Platform Health */}
-          <SectionLabel text="Platform Health" />
-          <MetricGrid>
-            <StatCard
-              label="Points Distributed"
-              value={analytics.totalPointsDistributed.toLocaleString()}
-              semantic={null}
-            />
-            <StatCard
-              label="Active Stockists"
-              value={analytics.activeStockists}
-              semantic="info"
-            />
-            <StatCard
-              label="Avg Time to Claim"
-              value={
-                analytics.avgTimeToClaim ? `${analytics.avgTimeToClaim}h` : "—"
-              }
-              sub="hours from distribution"
-              semantic={null}
-            />
-            <StatCard
-              label="Distributed"
-              value={analytics.distributed}
-              sub="with customer, unclaimed"
-              semantic={null}
-            />
-          </MetricGrid>
-
-          {/* ── CHART: Scan Heatmap 12 weeks (Chart #17) ── */}
-          {heatmapData.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <ChartCard title="Scan Density — Last 12 Weeks" height={130}>
-                <ScanHeatmap heatmapData={heatmapData} />
-              </ChartCard>
+                }}
+                style={mkBtn("secondary", "sm")}
+              >
+                QR Engine
+              </button>
+              <button
+                onClick={() => setTab("stock")}
+                style={mkBtn("ghost", "sm")}
+              >
+                Stock
+              </button>
+              <button
+                onClick={() => setTab("customers")}
+                style={mkBtn("ghost", "sm")}
+              >
+                Customers
+              </button>
+              <button
+                onClick={() => setTab("security")}
+                style={mkBtn(fraudAlerts > 0 ? "danger" : "ghost", "sm")}
+              >
+                {fraudAlerts > 0 ? `Fraud (${fraudAlerts})` : "Fraud"}
+              </button>
+              <button
+                onClick={() => {
+                  setDocumentsTargetId(null);
+                  setTab("documents");
+                }}
+                style={mkBtn("ghost", "sm")}
+              >
+                Documents
+              </button>
+              <button onClick={() => setTab("hr")} style={mkBtn("ghost", "sm")}>
+                HR
+              </button>
+              <button
+                onClick={() => {
+                  computeAnalytics();
+                  fetchUsers();
+                  fetchCommsBadge();
+                  fetchTodayStats();
+                  fetchScanTrend24h();
+                  fetchHeatmap();
+                }}
+                style={mkBtn("ghost", "sm")}
+              >
+                Refresh
+              </button>
             </div>
-          )}
-
-          {/* Quick Actions */}
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: T.ink900,
-              marginBottom: 14,
-              fontFamily: T.fontUi,
-            }}
-          >
-            Quick Actions
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={() => setTab("comms")}
-              style={mkBtn(commsBadge > 0 ? "danger" : "ghost", "sm")}
-            >
-              {commsBadge > 0 ? `Comms (${commsBadge})` : "Comms"}
-            </button>
-            <button
-              onClick={() => setTab("shipments")}
-              style={mkBtn("ghost", "sm")}
-            >
-              Shipments
-            </button>
-            <button
-              onClick={() => setTab("production")}
-              style={mkBtn("ghost", "sm")}
-            >
-              Production
-            </button>
-            <button
-              onClick={() => setTab("batches")}
-              style={mkBtn("ghost", "sm")}
-            >
-              Batches
-            </button>
-            <button
-              onClick={() => {
-                setQrInitialBatchId(null);
-                setTab("qr_codes");
-              }}
-              style={mkBtn("secondary", "sm")}
-            >
-              QR Engine
-            </button>
-            <button
-              onClick={() => setTab("stock")}
-              style={mkBtn("ghost", "sm")}
-            >
-              Stock
-            </button>
-            <button
-              onClick={() => setTab("customers")}
-              style={mkBtn("ghost", "sm")}
-            >
-              Customers
-            </button>
-            <button
-              onClick={() => setTab("security")}
-              style={mkBtn(fraudAlerts > 0 ? "danger" : "ghost", "sm")}
-            >
-              {fraudAlerts > 0 ? `Fraud (${fraudAlerts})` : "Fraud"}
-            </button>
-            <button
-              onClick={() => {
-                setDocumentsTargetId(null);
-                setTab("documents");
-              }}
-              style={mkBtn("ghost", "sm")}
-            >
-              Documents
-            </button>
-            <button onClick={() => setTab("hr")} style={mkBtn("ghost", "sm")}>
-              HR
-            </button>
-            <button
-              onClick={() => {
-                computeAnalytics();
-                fetchUsers();
-                fetchCommsBadge();
-                fetchTodayStats();
-                fetchScanTrend24h();
-                fetchHeatmap();
-              }}
-              style={mkBtn("ghost", "sm")}
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* ── PLATFORM BAR + TODAY CHARTS (only on overview) ── */}
-      {tab === "overview" &&
-        (() => {
-          const platformBarData = [
-            { label: "QR Codes", value: analytics.total, color: T.info },
-            { label: "Claimed", value: analytics.claimed, color: T.success },
-            {
-              label: "Distributed",
-              value: analytics.distributed,
-              color: "#b5935a",
-            },
-            { label: "In Stock", value: analytics.inStock, color: T.accentMid },
-            { label: "Users", value: analytics.userCount, color: T.accent },
-          ].filter((d) => d.value > 0);
+        {/* ── PLATFORM OVERVIEW + TODAY CHARTS (overview only) ── */}
+        {tab === "overview" &&
+          (() => {
+            const platformBarData = [
+              { label: "QR Codes", value: analytics.total, color: T.info },
+              { label: "Claimed", value: analytics.claimed, color: T.success },
+              {
+                label: "Distributed",
+                value: analytics.distributed,
+                color: "#b5935a",
+              },
+              {
+                label: "In Stock",
+                value: analytics.inStock,
+                color: T.accentMid,
+              },
+              { label: "Users", value: analytics.userCount, color: T.accent },
+            ].filter((d) => d.value > 0);
 
-          const activityData = [
-            { metric: "Scans Today", value: scansToday },
-            { metric: "New Customers", value: newCustomers },
-            { metric: "Points Today", value: pointsToday },
-            { metric: "Fraud Alerts", value: fraudAlerts },
-          ].filter((d) => d.value > 0);
+            const activityData = [
+              { metric: "Scans Today", value: scansToday },
+              { metric: "New Customers", value: newCustomers },
+              { metric: "Points Today", value: pointsToday },
+              { metric: "Fraud Alerts", value: fraudAlerts },
+            ].filter((d) => d.value > 0);
 
-          if (platformBarData.length === 0) return null;
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1.4fr 1fr",
-                gap: 20,
-                marginTop: 24,
-              }}
-            >
-              <ChartCard title="Platform Overview" height={220}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={platformBarData}
-                    margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
-                  >
-                    <CartesianGrid
-                      horizontal
-                      vertical={false}
-                      stroke={T.ink150}
-                      strokeWidth={0.5}
-                    />
-                    <XAxis
-                      dataKey="label"
-                      tick={{
-                        fill: T.ink400,
-                        fontSize: 10,
-                        fontFamily: T.fontUi,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                      dy={6}
-                    />
-                    <YAxis
-                      tick={{
-                        fill: T.ink400,
-                        fontSize: 10,
-                        fontFamily: T.fontUi,
-                      }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={36}
-                      allowDecimals={false}
-                    />
-                    <Tooltip content={<ChartTooltip />} />
-                    <Bar
-                      dataKey="value"
-                      name="Count"
-                      isAnimationActive={false}
-                      maxBarSize={40}
-                      radius={[3, 3, 0, 0]}
-                    >
-                      {platformBarData.map((d, i) => (
-                        <Cell key={i} fill={d.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-
-              {activityData.length > 0 && (
-                <ChartCard title="Today's Activity" height={220}>
+            if (platformBarData.length === 0) return null;
+            return (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1.4fr 1fr",
+                  gap: 20,
+                  marginTop: 24,
+                }}
+              >
+                <ChartCard title="Platform Overview" height={220}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={activityData}
-                      layout="vertical"
-                      margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
+                      data={platformBarData}
+                      margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
                     >
                       <CartesianGrid
                         horizontal
@@ -1203,7 +1157,7 @@ export default function AdminDashboard() {
                         strokeWidth={0.5}
                       />
                       <XAxis
-                        type="number"
+                        dataKey="label"
                         tick={{
                           fill: T.ink400,
                           fontSize: 10,
@@ -1211,11 +1165,9 @@ export default function AdminDashboard() {
                         }}
                         axisLine={false}
                         tickLine={false}
-                        allowDecimals={false}
+                        dy={6}
                       />
                       <YAxis
-                        type="category"
-                        dataKey="metric"
                         tick={{
                           fill: T.ink400,
                           fontSize: 10,
@@ -1223,307 +1175,32 @@ export default function AdminDashboard() {
                         }}
                         axisLine={false}
                         tickLine={false}
-                        width={88}
+                        width={36}
+                        allowDecimals={false}
                       />
                       <Tooltip content={<ChartTooltip />} />
                       <Bar
                         dataKey="value"
                         name="Count"
-                        fill={T.accentMid}
                         isAnimationActive={false}
-                        maxBarSize={22}
-                        radius={[0, 3, 3, 0]}
-                      />
+                        maxBarSize={40}
+                        radius={[3, 3, 0, 0]}
+                      >
+                        {platformBarData.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartCard>
-              )}
-            </div>
-          );
-        })()}
 
-      {/* ── TAB ROUTING ── */}
-      {tab === "shipments" && <AdminShipments />}
-      {tab === "production" && <AdminProductionModule />}
-      {tab === "batches" && (
-        <AdminBatchManager
-          onNavigateToQR={handleNavigateToQR}
-          onNavigateToDocuments={handleNavigateToDocuments}
-        />
-      )}
-      {tab === "customers" && <AdminCustomerEngagement />}
-      {tab === "comms" && <AdminCommsCenter />}
-      {tab === "security" && <AdminFraudSecurity />}
-      {tab === "notifications" && <AdminNotifications />}
-      {tab === "qr_codes" && (
-        <AdminQRCodes
-          initialBatchId={qrInitialBatchId}
-          initialTab={qrInitialBatchId ? "generate" : "registry"}
-        />
-      )}
-      {tab === "analytics" && <AdminAnalytics tenantId={tenantId} />}
-      {tab === "stock" && <StockControl />}
-      {tab === "documents" && <HQDocuments initialDocId={documentsTargetId} />}
-      {tab === "hr" && <AdminHRPanel tenantId={tenantId} />}
-
-      {/* USERS */}
-      {tab === "users" && (
-        <div>
-          <WorkflowGuide
-            context={ctx}
-            tabId="admin-users"
-            onAction={() => {}}
-            defaultOpen={false}
-          />
-          <h2
-            style={{
-              fontFamily: T.fontUi,
-              fontSize: "20px",
-              fontWeight: 500,
-              color: T.ink900,
-              marginBottom: "20px",
-            }}
-          >
-            User Management
-          </h2>
-
-          {/* Flush stat grid */}
-          {users.length > 0 &&
-            (() => {
-              const customers = users.filter((u) => u.role === "customer");
-              const admins = users.filter((u) => u.role === "admin");
-              const retailers = users.filter((u) => u.role === "retailer");
-              const totalPts = users.reduce(
-                (s, u) => s + (u.loyalty_points || 0),
-                0,
-              );
-              return (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
-                    gap: "1px",
-                    background: T.ink150,
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    border: `1px solid ${T.ink150}`,
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-                    marginBottom: 20,
-                  }}
-                >
-                  {[
-                    {
-                      label: "Total Users",
-                      value: users.length,
-                      color: T.accent,
-                    },
-                    {
-                      label: "Customers",
-                      value: customers.length,
-                      color: T.accentMid,
-                    },
-                    { label: "Admins", value: admins.length, color: T.warning },
-                    {
-                      label: "Retailers",
-                      value: retailers.length,
-                      color: T.info,
-                    },
-                    {
-                      label: "Total Points",
-                      value: totalPts.toLocaleString(),
-                      color: "#b5935a",
-                    },
-                  ].map((s) => (
-                    <div
-                      key={s.label}
-                      style={{
-                        background: "#fff",
-                        padding: "14px 16px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          color: T.ink400,
-                          marginBottom: 6,
-                          fontFamily: T.fontUi,
-                        }}
-                      >
-                        {s.label}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: T.fontUi,
-                          fontSize: 22,
-                          fontWeight: 400,
-                          color: s.color,
-                          lineHeight: 1,
-                          letterSpacing: "-0.02em",
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {s.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-
-          {/* Charts */}
-          {users.length > 0 &&
-            (() => {
-              // Role donut
-              const roleCounts = users.reduce((acc, u) => {
-                const r = u.role || "customer";
-                acc[r] = (acc[r] || 0) + 1;
-                return acc;
-              }, {});
-              const roleDonut = Object.entries(roleCounts).map(
-                ([role, count]) => ({ name: role, value: count }),
-              );
-              const ROLE_COLORS = {
-                customer: T.accentMid,
-                admin: T.warning,
-                retailer: T.info,
-                hq: T.accent,
-              };
-
-              // Tier distribution bar
-              const TIERS = ["platinum", "gold", "silver", "bronze"];
-              const TIER_COLORS = {
-                platinum: "#7b68ee",
-                gold: "#b5935a",
-                silver: "#8e9ba8",
-                bronze: "#a0674b",
-              };
-              const tierBar = TIERS.map((tier) => ({
-                name: tier.charAt(0).toUpperCase() + tier.slice(1),
-                count: users.filter(
-                  (u) => (u.loyalty_tier || "bronze").toLowerCase() === tier,
-                ).length,
-                color: TIER_COLORS[tier],
-              })).filter((d) => d.count > 0);
-
-              // Top 8 users by points
-              const topPts = [...users]
-                .sort(
-                  (a, b) => (b.loyalty_points || 0) - (a.loyalty_points || 0),
-                )
-                .slice(0, 8)
-                .map((u) => ({
-                  name: (u.email || u.id?.slice(0, 8) || "—")
-                    .split("@")[0]
-                    .slice(0, 12),
-                  points: u.loyalty_points || 0,
-                }));
-
-              return (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr 1fr",
-                    gap: 16,
-                    marginBottom: 20,
-                  }}
-                >
-                  {/* Role donut */}
-                  <ChartCard title="Users by Role" height={200}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={roleDonut}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={75}
-                          paddingAngle={3}
-                          isAnimationActive={false}
-                        >
-                          {roleDonut.map((d, i) => (
-                            <Cell
-                              key={i}
-                              fill={ROLE_COLORS[d.name] || T.ink400}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          content={
-                            <ChartTooltip formatter={(v) => `${v} users`} />
-                          }
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
-
-                  {/* Tier bar */}
-                  <ChartCard title="Loyalty Tier Distribution" height={200}>
+                {activityData.length > 0 && (
+                  <ChartCard title="Today's Activity" height={220}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={tierBar}
-                        margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
-                      >
-                        <CartesianGrid
-                          horizontal
-                          vertical={false}
-                          stroke={T.ink150}
-                          strokeWidth={0.5}
-                        />
-                        <XAxis
-                          dataKey="name"
-                          tick={{
-                            fill: T.ink400,
-                            fontSize: 10,
-                            fontFamily: T.fontUi,
-                          }}
-                          axisLine={false}
-                          tickLine={false}
-                          dy={4}
-                        />
-                        <YAxis
-                          tick={{
-                            fill: T.ink400,
-                            fontSize: 10,
-                            fontFamily: T.fontUi,
-                          }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={24}
-                          allowDecimals={false}
-                        />
-                        <Tooltip
-                          content={
-                            <ChartTooltip formatter={(v) => `${v} users`} />
-                          }
-                        />
-                        <Bar
-                          dataKey="count"
-                          name="Users"
-                          isAnimationActive={false}
-                          maxBarSize={36}
-                          radius={[3, 3, 0, 0]}
-                        >
-                          {tierBar.map((d, i) => (
-                            <Cell key={i} fill={d.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
-
-                  {/* Top points bar */}
-                  <ChartCard title="Top Users by Points" height={200}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={topPts}
-                        margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                        data={activityData}
                         layout="vertical"
+                        margin={{ top: 8, right: 32, bottom: 8, left: 0 }}
                       >
                         <CartesianGrid
                           horizontal
@@ -1535,7 +1212,7 @@ export default function AdminDashboard() {
                           type="number"
                           tick={{
                             fill: T.ink400,
-                            fontSize: 9,
+                            fontSize: 10,
                             fontFamily: T.fontUi,
                           }}
                           axisLine={false}
@@ -1544,164 +1221,491 @@ export default function AdminDashboard() {
                         />
                         <YAxis
                           type="category"
-                          dataKey="name"
+                          dataKey="metric"
                           tick={{
                             fill: T.ink400,
-                            fontSize: 9,
+                            fontSize: 10,
                             fontFamily: T.fontUi,
                           }}
                           axisLine={false}
                           tickLine={false}
-                          width={68}
+                          width={88}
                         />
-                        <Tooltip
-                          content={
-                            <ChartTooltip formatter={(v) => `${v} pts`} />
-                          }
-                        />
+                        <Tooltip content={<ChartTooltip />} />
                         <Bar
-                          dataKey="points"
-                          name="Points"
-                          fill="#b5935a"
+                          dataKey="value"
+                          name="Count"
+                          fill={T.accentMid}
                           isAnimationActive={false}
-                          maxBarSize={14}
+                          maxBarSize={22}
                           radius={[0, 3, 3, 0]}
                         />
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
-                </div>
-              );
-            })()}
+                )}
+              </div>
+            );
+          })()}
 
-          <div style={{ overflowX: "auto" }}>
-            <table
+        {/* ── TAB ROUTING ── */}
+        {tab === "shipments" && <AdminShipments />}
+        {tab === "production" && <AdminProductionModule />}
+        {tab === "batches" && (
+          <AdminBatchManager
+            onNavigateToQR={handleNavigateToQR}
+            onNavigateToDocuments={handleNavigateToDocuments}
+          />
+        )}
+        {tab === "customers" && <AdminCustomerEngagement />}
+        {tab === "comms" && <AdminCommsCenter />}
+        {tab === "security" && <AdminFraudSecurity />}
+        {tab === "notifications" && <AdminNotifications />}
+        {tab === "qr_codes" && (
+          <AdminQRCodes
+            initialBatchId={qrInitialBatchId}
+            initialTab={qrInitialBatchId ? "generate" : "registry"}
+          />
+        )}
+        {tab === "analytics" && <AdminAnalytics tenantId={tenantId} />}
+        {tab === "stock" && <StockControl />}
+        {tab === "documents" && (
+          <HQDocuments initialDocId={documentsTargetId} />
+        )}
+        {tab === "hr" && <AdminHRPanel tenantId={tenantId} />}
+
+        {/* USERS */}
+        {tab === "users" && (
+          <div>
+            <WorkflowGuide
+              context={ctx}
+              tabId="admin-users"
+              onAction={() => {}}
+              defaultOpen={false}
+            />
+            <h2
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                background: "#fff",
-                border: `1px solid ${T.ink150}`,
-                fontSize: "13px",
                 fontFamily: T.fontUi,
+                fontSize: "20px",
+                fontWeight: 500,
+                color: T.ink900,
+                marginBottom: "20px",
               }}
             >
-              <thead>
-                <tr style={{ background: T.accent, color: "#fff" }}>
-                  {["Email / ID", "Role", "Points", "Tier", "Joined"].map(
-                    (h) => (
-                      <th
-                        key={h}
+              User Management
+            </h2>
+
+            {users.length > 0 &&
+              (() => {
+                const customers = users.filter((u) => u.role === "customer");
+                const admins = users.filter((u) => u.role === "admin");
+                const retailers = users.filter((u) => u.role === "retailer");
+                const totalPts = users.reduce(
+                  (s, u) => s + (u.loyalty_points || 0),
+                  0,
+                );
+                return (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
+                      gap: "1px",
+                      background: T.ink150,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      border: `1px solid ${T.ink150}`,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+                      marginBottom: 20,
+                    }}
+                  >
+                    {[
+                      {
+                        label: "Total Users",
+                        value: users.length,
+                        color: T.accent,
+                      },
+                      {
+                        label: "Customers",
+                        value: customers.length,
+                        color: T.accentMid,
+                      },
+                      {
+                        label: "Admins",
+                        value: admins.length,
+                        color: T.warning,
+                      },
+                      {
+                        label: "Retailers",
+                        value: retailers.length,
+                        color: T.info,
+                      },
+                      {
+                        label: "Total Points",
+                        value: totalPts.toLocaleString(),
+                        color: "#b5935a",
+                      },
+                    ].map((s) => (
+                      <div
+                        key={s.label}
                         style={{
-                          padding: "10px 12px",
-                          textAlign: "left",
-                          fontSize: "10px",
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                          fontWeight: 700,
+                          background: "#fff",
+                          padding: "14px 16px",
+                          textAlign: "center",
                         }}
                       >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {users.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: T.ink500,
-                      }}
-                    >
-                      No users found.
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((u, i) => (
-                    <tr
-                      key={u.id}
-                      style={{
-                        borderBottom: `1px solid ${T.ink075}`,
-                        background: i % 2 === 0 ? "#fff" : T.ink050,
-                      }}
-                    >
-                      <td
-                        style={{
-                          padding: "10px 12px",
-                          fontFamily: T.fontData,
-                          fontSize: "11px",
-                          color: T.ink700,
-                        }}
-                      >
-                        {u.email || u.id?.substring(0, 12) + "..."}
-                      </td>
-                      <td style={{ padding: "10px 12px" }}>
-                        <span
+                        <div
                           style={{
-                            background:
-                              u.role === "admin"
-                                ? T.warningBg
-                                : u.role === "retailer"
-                                  ? T.infoBg
-                                  : T.ink075,
-                            color:
-                              u.role === "admin"
-                                ? T.warning
-                                : u.role === "retailer"
-                                  ? T.info
-                                  : T.ink500,
-                            padding: "2px 8px",
-                            borderRadius: 3,
-                            fontSize: "10px",
+                            fontSize: 10,
                             fontWeight: 700,
-                            letterSpacing: "0.1em",
+                            letterSpacing: "0.08em",
                             textTransform: "uppercase",
+                            color: T.ink400,
+                            marginBottom: 6,
+                            fontFamily: T.fontUi,
                           }}
                         >
-                          {u.role || "customer"}
-                        </span>
-                      </td>
+                          {s.label}
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: T.fontUi,
+                            fontSize: 22,
+                            fontWeight: 400,
+                            color: s.color,
+                            lineHeight: 1,
+                            letterSpacing: "-0.02em",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {s.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+            {users.length > 0 &&
+              (() => {
+                const roleCounts = users.reduce((acc, u) => {
+                  const r = u.role || "customer";
+                  acc[r] = (acc[r] || 0) + 1;
+                  return acc;
+                }, {});
+                const roleDonut = Object.entries(roleCounts).map(
+                  ([role, count]) => ({ name: role, value: count }),
+                );
+                const ROLE_COLORS = {
+                  customer: T.accentMid,
+                  admin: T.warning,
+                  retailer: T.info,
+                  hq: T.accent,
+                };
+                const TIERS = ["platinum", "gold", "silver", "bronze"];
+                const TIER_COLORS = {
+                  platinum: "#7b68ee",
+                  gold: "#b5935a",
+                  silver: "#8e9ba8",
+                  bronze: "#a0674b",
+                };
+                const tierBar = TIERS.map((tier) => ({
+                  name: tier.charAt(0).toUpperCase() + tier.slice(1),
+                  count: users.filter(
+                    (u) => (u.loyalty_tier || "bronze").toLowerCase() === tier,
+                  ).length,
+                  color: TIER_COLORS[tier],
+                })).filter((d) => d.count > 0);
+                const topPts = [...users]
+                  .sort(
+                    (a, b) => (b.loyalty_points || 0) - (a.loyalty_points || 0),
+                  )
+                  .slice(0, 8)
+                  .map((u) => ({
+                    name: (u.email || u.id?.slice(0, 8) || "—")
+                      .split("@")[0]
+                      .slice(0, 12),
+                    points: u.loyalty_points || 0,
+                  }));
+
+                return (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr 1fr",
+                      gap: 16,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <ChartCard title="Users by Role" height={200}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={roleDonut}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={75}
+                            paddingAngle={3}
+                            isAnimationActive={false}
+                          >
+                            {roleDonut.map((d, i) => (
+                              <Cell
+                                key={i}
+                                fill={ROLE_COLORS[d.name] || T.ink400}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={
+                              <ChartTooltip formatter={(v) => `${v} users`} />
+                            }
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+
+                    <ChartCard title="Loyalty Tier Distribution" height={200}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={tierBar}
+                          margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                        >
+                          <CartesianGrid
+                            horizontal
+                            vertical={false}
+                            stroke={T.ink150}
+                            strokeWidth={0.5}
+                          />
+                          <XAxis
+                            dataKey="name"
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 10,
+                              fontFamily: T.fontUi,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            dy={4}
+                          />
+                          <YAxis
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 10,
+                              fontFamily: T.fontUi,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={24}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            content={
+                              <ChartTooltip formatter={(v) => `${v} users`} />
+                            }
+                          />
+                          <Bar
+                            dataKey="count"
+                            name="Users"
+                            isAnimationActive={false}
+                            maxBarSize={36}
+                            radius={[3, 3, 0, 0]}
+                          >
+                            {tierBar.map((d, i) => (
+                              <Cell key={i} fill={d.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+
+                    <ChartCard title="Top Users by Points" height={200}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={topPts}
+                          margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+                          layout="vertical"
+                        >
+                          <CartesianGrid
+                            horizontal
+                            vertical={false}
+                            stroke={T.ink150}
+                            strokeWidth={0.5}
+                          />
+                          <XAxis
+                            type="number"
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 9,
+                              fontFamily: T.fontUi,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            allowDecimals={false}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            tick={{
+                              fill: T.ink400,
+                              fontSize: 9,
+                              fontFamily: T.fontUi,
+                            }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={68}
+                          />
+                          <Tooltip
+                            content={
+                              <ChartTooltip formatter={(v) => `${v} pts`} />
+                            }
+                          />
+                          <Bar
+                            dataKey="points"
+                            name="Points"
+                            fill="#b5935a"
+                            isAnimationActive={false}
+                            maxBarSize={14}
+                            radius={[0, 3, 3, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
+                );
+              })()}
+
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  background: "#fff",
+                  border: `1px solid ${T.ink150}`,
+                  fontSize: "13px",
+                  fontFamily: T.fontUi,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: T.accent, color: "#fff" }}>
+                    {["Email / ID", "Role", "Points", "Tier", "Joined"].map(
+                      (h) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: "10px 12px",
+                            textAlign: "left",
+                            fontSize: "10px",
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.length === 0 ? (
+                    <tr>
                       <td
+                        colSpan={5}
                         style={{
-                          padding: "10px 12px",
-                          fontFamily: T.fontData,
-                          fontWeight: 600,
-                          color: T.ink900,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {u.loyalty_points || 0}
-                      </td>
-                      <td
-                        style={{
-                          padding: "10px 12px",
-                          textTransform: "capitalize",
-                          color: T.ink700,
-                        }}
-                      >
-                        {u.loyalty_tier || "bronze"}
-                      </td>
-                      <td
-                        style={{
-                          padding: "10px 12px",
-                          fontSize: "12px",
+                          padding: "40px",
+                          textAlign: "center",
                           color: T.ink500,
                         }}
                       >
-                        {fmtDate(u.created_at)}
+                        No users found.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    users.map((u, i) => (
+                      <tr
+                        key={u.id}
+                        style={{
+                          borderBottom: `1px solid ${T.ink075}`,
+                          background: i % 2 === 0 ? "#fff" : T.ink050,
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontFamily: T.fontData,
+                            fontSize: "11px",
+                            color: T.ink700,
+                          }}
+                        >
+                          {u.email || u.id?.substring(0, 12) + "..."}
+                        </td>
+                        <td style={{ padding: "10px 12px" }}>
+                          <span
+                            style={{
+                              background:
+                                u.role === "admin"
+                                  ? T.warningBg
+                                  : u.role === "retailer"
+                                    ? T.infoBg
+                                    : T.ink075,
+                              color:
+                                u.role === "admin"
+                                  ? T.warning
+                                  : u.role === "retailer"
+                                    ? T.info
+                                    : T.ink500,
+                              padding: "2px 8px",
+                              borderRadius: 3,
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {u.role || "customer"}
+                          </span>
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontFamily: T.fontData,
+                            fontWeight: 600,
+                            color: T.ink900,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {u.loyalty_points || 0}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            textTransform: "capitalize",
+                            color: T.ink700,
+                          }}
+                        >
+                          {u.loyalty_tier || "bronze"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontSize: "12px",
+                            color: T.ink500,
+                          }}
+                        >
+                          {fmtDate(u.created_at)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </PlatformBarProvider>
   );
 }
+

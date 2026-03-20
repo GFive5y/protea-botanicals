@@ -562,12 +562,21 @@ export default function CoPilot() {
               >
                 hide ✕
               </button>
-              <LottieCharacter
-                isOpen={isOpen}
-                isThinking={loading}
-                onClick={() => setIsOpen(true)}
-                size={80}
-              />
+              {role === "customer" || !role ? (
+                <LottieCharacter
+                  isOpen={isOpen}
+                  isThinking={loading}
+                  onClick={() => setIsOpen(true)}
+                  size={80}
+                />
+              ) : (
+                <div
+                  onClick={() => setIsOpen(true)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <AIOrb active={loading} size={56} />
+                </div>
+              )}
             </div>
           ) : (
             <button
