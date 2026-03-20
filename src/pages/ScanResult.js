@@ -1486,6 +1486,40 @@ export default function ScanResult() {
         }
       }
 
+      // WP-SEC: velocity anomaly detection — non-blocking, fire-and-forget
+      if (currentUser && pointsAwardedAmt > 0) {
+        (async () => {
+          try {
+            const windowStart = new Date(Date.now() - 60_000).toISOString();
+            const { count: recentScans } = await supabase
+              .from("scan_logs")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", currentUser.id)
+              .gte("scanned_at", windowStart);
+            if ((recentScans || 0) >= 3) {
+              const { data: prof } = await supabase
+                .from("user_profiles")
+                .select("anomaly_score")
+                .eq("id", currentUser.id)
+                .single();
+              const current = prof?.anomaly_score || 0;
+              const newScore = Math.min(current + 20, 100);
+              await supabase
+                .from("user_profiles")
+                .update({ anomaly_score: newScore })
+                .eq("id", currentUser.id);
+              writeAlert(
+                "velocity_flag",
+                "warning",
+                "Velocity scan detected",
+                `User ${currentUser.id} scanned ${recentScans} times in 60s. Anomaly score: ${newScore}.`,
+                qr.id,
+              );
+            }
+          } catch (_) {}
+        })();
+      }
+
       if (currentUser && deviceInfo?.device === "mobile") {
         setTimeout(() => setShowGpsPrompt(true), 2500);
       }
