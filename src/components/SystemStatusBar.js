@@ -1,3 +1,4 @@
+/* DEPRECATED v91 — absorbed into PlatformBar.js (WP-Z Phase 1) */
 // src/components/SystemStatusBar.js — v1.0
 // Protea Botanicals — WP-X System Intelligence Layer
 // Persistent 36px status bar rendered in AdminDashboard + HQDashboard.

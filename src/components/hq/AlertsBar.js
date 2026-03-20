@@ -1,3 +1,4 @@
+/* DEPRECATED v91 — absorbed into PlatformBar.js (WP-Z Phase 1) */
 // src/components/hq/AlertsBar.js — v1.0
 // Protea Botanicals — WP-X System Intelligence Layer
 // Dashboard warning bar — carbon copy DNA from LiveFXBar.js
