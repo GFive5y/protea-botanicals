@@ -1,1418 +1,2711 @@
-// src/components/hq/HQFraud.js — v1.1
-// WP-GUIDE-C+: usePageContext 'fraud' wired + WorkflowGuide added
-// v1.0 — WP-8: Fraud Detection, Security & POPIA Compliance Dashboard
-// 5 sub-tabs: Flagged Accounts | Scan Velocity | Suspended | Deletion Requests | Audit Log
-// Inline styles only. Fonts: Cormorant Garamond + Jost.
+// src/components/hq/HQFraud.js — v2.0
+// WP-HQF: Full rebuild — T-tokens, Inter font, scan_logs migration, cross-tenant intelligence
+// v2.0 changes from v1.1:
+//   - Full T-token design system (no Cormorant, no Jost)
+//   - New tab structure: Overview · Accounts · Scan Intelligence · POPIA · Audit
+//   - scan_logs replacing legacy scans table for all scan queries
+//   - Cross-tenant scan intelligence — all tenants visible via RLS (hq_access=true)
+//   - Anomaly score leaderboard — top flagged users across all tenants
+//   - Weekly fraud digest — this week vs last week comparison
+//   - Tenant risk table — which tenant has the most suspicious activity
+//   - Velocity + bulk detection engine using scan_logs
+//   - Account suspension with audit_log write
+//   - Deletion requests (POPIA) management
+//   - Full audit log display
+//   - WP-VIZ charts: health donut, detection reason bar, 14-day trend, tenant risk bar
 
 import React, { useState, useEffect, useCallback } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  AreaChart,
+  Area,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { ChartCard, ChartTooltip } from "../viz";
 
-// ─── COLOURS ────────────────────────────────────────────────────────────────
-const C = {
-  bg: "#f9f8f5",
-  card: "#ffffff",
-  border: "#e8e4dc",
-  green: "#2d4a2d",
-  greenPale: "#e8f5e9",
-  greenLight: "#52b788",
-  red: "#c62828",
-  redPale: "#FFEBEE",
-  amber: "#F57F17",
-  amberPale: "#FFF8E1",
-  blue: "#1565C0",
-  bluePale: "#E3F2FD",
-  purple: "#6A1B9A",
-  purplePale: "#F3E5F5",
-  text: "#1a1a1a",
-  textMid: "#4a4a4a",
-  textLight: "#474747",
-  white: "#ffffff",
+// ─── T TOKENS ────────────────────────────────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#474747",
+  ink400: "#6B6B6B",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
 };
-const FD = "'Cormorant Garamond', Georgia, serif";
-const FB = "'Jost', 'Helvetica Neue', Arial, sans-serif";
 
-function SectionCard({ title, subtitle, children, accent, action }) {
-  const ac = accent || C.green;
-  return (
-    <div
-      style={{
-        background: C.card,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
-        marginBottom: 20,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          background: `linear-gradient(135deg, ${ac}10, ${ac}04)`,
-          borderBottom: `1px solid ${C.border}`,
-          padding: "14px 20px",
-          borderLeft: `4px solid ${ac}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily: FD,
-              fontSize: 17,
-              fontWeight: 600,
-              color: C.green,
-            }}
-          >
-            {title}
-          </div>
-          {subtitle && (
-            <div
-              style={{
-                fontFamily: FB,
-                fontSize: 12,
-                color: C.textLight,
-                marginTop: 2,
-              }}
-            >
-              {subtitle}
-            </div>
-          )}
-        </div>
-        {action}
-      </div>
-      <div style={{ padding: "18px 20px" }}>{children}</div>
-    </div>
-  );
-}
-
-function Badge({ label, colour, bg }) {
-  return (
-    <span
-      style={{
-        background: bg || `${colour}20`,
-        color: colour,
-        border: `1px solid ${colour}40`,
-        borderRadius: 20,
-        padding: "2px 10px",
-        fontFamily: FB,
-        fontSize: 11,
-        fontWeight: 700,
-      }}
-    >
-      {label}
-    </span>
-  );
-}
-
-function ActionBtn({ label, colour, onClick, small }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: small ? "5px 12px" : "8px 18px",
-        background: colour || C.green,
-        border: "none",
-        borderRadius: 7,
-        fontFamily: FB,
-        fontSize: small ? 11 : 13,
-        fontWeight: 600,
-        color: C.white,
-        cursor: "pointer",
-        transition: "opacity 0.15s",
-      }}
-      onMouseEnter={(e) => (e.target.style.opacity = "0.85")}
-      onMouseLeave={(e) => (e.target.style.opacity = "1")}
-    >
-      {label}
-    </button>
-  );
-}
-
-function EmptyState({ icon, message }) {
-  return (
-    <div
-      style={{
-        textAlign: "center",
-        padding: "36px 20px",
-        fontFamily: FB,
-        color: C.textLight,
-      }}
-    >
-      <div style={{ fontSize: 36, marginBottom: 10 }}>{icon}</div>
-      <div style={{ fontSize: 13 }}>{message}</div>
-    </div>
-  );
-}
-
-function Toast({ msg, type, onDone }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 3000);
-    return () => clearTimeout(t);
-  }, [onDone]);
-  return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 30,
-        right: 30,
-        zIndex: 9999,
-        background: type === "error" ? C.red : C.green,
-        color: C.white,
-        padding: "13px 20px",
-        borderRadius: 10,
-        fontFamily: FB,
-        fontSize: 14,
-        fontWeight: 500,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-      }}
-    >
-      {type === "error" ? "✗ " : "✓ "}
-      {msg}
-    </div>
-  );
-}
-
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleString("en-ZA", {
     day: "numeric",
     month: "short",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
-function fmtAgo(d) {
+function fmtDateOnly(d) {
   if (!d) return "—";
-  const ms = Date.now() - new Date(d).getTime();
-  const m = Math.floor(ms / 60000),
-    h = Math.floor(ms / 3600000),
-    dy = Math.floor(ms / 86400000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  if (h < 24) return `${h}h ago`;
-  return `${dy}d ago`;
+  return new Date(d).toLocaleDateString("en-ZA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+function distanceKm(lat1, lng1, lat2, lng2) {
+  if (!lat1 || !lat2) return null;
+  const R = 6371,
+    dLat = ((lat2 - lat1) * Math.PI) / 180,
+    dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function writeAuditLog(action, targetType, targetId, details) {
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    await supabase.from("audit_log").insert({
-      admin_id: user?.id || null,
-      action,
-      target_type: targetType,
-      target_id: targetId || null,
-      details: details || null,
+const SUSPICIOUS_OUTCOMES = [
+  "blocked_max_scans",
+  "velocity_flag",
+  "scan_abuse",
+  "blocked_max_scans",
+];
+const isSuspicious = (s) => SUSPICIOUS_OUTCOMES.includes(s.scan_outcome);
+
+const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
+  padding: "8px 16px",
+  backgroundColor: disabled ? "#ccc" : bg,
+  color,
+  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  borderRadius: 4,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.07em",
+  textTransform: "uppercase",
+  cursor: disabled ? "not-allowed" : "pointer",
+  fontFamily: T.font,
+  opacity: disabled ? 0.6 : 1,
+  transition: "opacity 0.15s",
+});
+const inputStyle = {
+  padding: "8px 12px",
+  border: `1px solid ${T.ink150}`,
+  borderRadius: 4,
+  fontSize: 13,
+  fontFamily: T.font,
+  background: "#fff",
+  color: T.ink700,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
+// ─── SEVERITY CONFIG ──────────────────────────────────────────────────────────
+const FLAG_COLORS = {
+  velocity: { bg: T.dangerBg, color: T.danger },
+  travel: { bg: T.warningBg, color: T.warning },
+  bulk: { bg: T.dangerBg, color: T.danger },
+  distance: { bg: T.infoBg, color: T.info },
+  foreign: { bg: "#f5e6fa", color: "#7b2d8b" },
+};
+
+function ScoreBadge({ score }) {
+  const color = score >= 85 ? T.danger : score >= 50 ? T.warning : T.success;
+  const bg = score >= 85 ? T.dangerBg : score >= 50 ? T.warningBg : T.successBg;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 36,
+        padding: "2px 8px",
+        borderRadius: 20,
+        fontSize: 11,
+        fontWeight: 700,
+        background: bg,
+        color,
+        fontFamily: T.font,
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {score ?? 0}
+    </span>
+  );
+}
+
+function OutcomeBadge({ outcome }) {
+  const suspicious = SUSPICIOUS_OUTCOMES.includes(outcome);
+  const color = suspicious
+    ? T.danger
+    : outcome === "points_awarded"
+      ? T.success
+      : T.ink400;
+  const bg = suspicious
+    ? T.dangerBg
+    : outcome === "points_awarded"
+      ? T.successBg
+      : T.ink075;
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        padding: "2px 8px",
+        borderRadius: 20,
+        fontWeight: 700,
+        letterSpacing: "0.07em",
+        textTransform: "uppercase",
+        background: bg,
+        color,
+        fontFamily: T.font,
+      }}
+    >
+      {(outcome || "unknown").replace(/_/g, " ")}
+    </span>
+  );
+}
+
+// ─── AUTO-DETECTION ENGINE ────────────────────────────────────────────────────
+function detectFraud(scans) {
+  const detections = [];
+  const byUser = {};
+  scans.forEach((s) => {
+    if (!s.user_id) return;
+    if (!byUser[s.user_id]) byUser[s.user_id] = [];
+    byUser[s.user_id].push(s);
+  });
+  Object.values(byUser).forEach((userScans) => {
+    const sorted = [...userScans].sort(
+      (a, b) => new Date(a.scanned_at) - new Date(b.scanned_at),
+    );
+    // 1. Velocity: same QR >3x in 24h
+    const byQr = {};
+    sorted.forEach((s) => {
+      const key = s.qr_code_id || s.qr_code || "unknown";
+      if (!byQr[key]) byQr[key] = [];
+      byQr[key].push(s);
     });
-  } catch (err) {
-    console.error("Audit log write error:", err);
-  }
-}
-
-// ─── TAB 1: FLAGGED ACCOUNTS ─────────────────────────────────────────────────
-function TabFlagged({ showToast }) {
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [threshold, setThreshold] = useState(50);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select(
-          "id, full_name, email, anomaly_score, churn_risk, is_suspended, flag_reasons, last_active_at, loyalty_points, total_scans",
-        )
-        .gte("anomaly_score", threshold)
-        .order("anomaly_score", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      setAccounts(data || []);
-    } catch (err) {
-      showToast("Failed to load flagged accounts: " + err.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [threshold, showToast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleSuspend = async (user) => {
-    if (
-      !window.confirm(
-        `Suspend ${user.full_name || user.email}? They will no longer earn loyalty points.`,
-      )
-    )
-      return;
-    try {
-      const reason =
-        window.prompt("Suspension reason (shown in audit log):") ||
-        "Flagged by HQ";
-      const {
-        data: { user: admin },
-      } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({
-          is_suspended: true,
-          suspended_at: new Date().toISOString(),
-          suspended_by: admin?.id,
-          suspension_reason: reason,
-        })
-        .eq("id", user.id);
-      if (error) throw error;
-      await writeAuditLog("SUSPEND_ACCOUNT", "user", user.id, {
-        reason,
-        email: user.email,
-      });
-      showToast(`${user.full_name || user.email} suspended`);
-      load();
-    } catch (err) {
-      showToast("Suspend failed: " + err.message, "error");
-    }
-  };
-
-  const handleReinstate = async (user) => {
-    try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({
-          is_suspended: false,
-          suspended_at: null,
-          suspended_by: null,
-          suspension_reason: null,
-        })
-        .eq("id", user.id);
-      if (error) throw error;
-      await writeAuditLog("REINSTATE_ACCOUNT", "user", user.id, {
-        email: user.email,
-      });
-      showToast(`${user.full_name || user.email} reinstated`);
-      load();
-    } catch (err) {
-      showToast("Reinstate failed: " + err.message, "error");
-    }
-  };
-
-  const handleDismiss = async (user) => {
-    try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({ anomaly_score: 0, flag_reasons: [] })
-        .eq("id", user.id);
-      if (error) throw error;
-      await writeAuditLog("DISMISS_FLAG", "user", user.id, {
-        email: user.email,
-      });
-      showToast("Flag dismissed");
-      load();
-    } catch (err) {
-      showToast("Dismiss failed: " + err.message, "error");
-    }
-  };
-
-  const scoreColour = (s) => (s >= 80 ? C.red : s >= 60 ? C.amber : C.blue);
-
-  return (
-    <div>
-      <SectionCard
-        title="Flagged Accounts"
-        subtitle="Accounts with elevated anomaly scores — review and take action"
-        accent={C.red}
-        action={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontFamily: FB, fontSize: 12, color: C.textLight }}>
-              Min score:
-            </span>
-            <select
-              value={threshold}
-              onChange={(e) => setThreshold(parseInt(e.target.value))}
-              style={{
-                padding: "4px 8px",
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                fontFamily: FB,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              {[30, 50, 70, 90].map((v) => (
-                <option key={v} value={v}>
-                  {v}+
-                </option>
-              ))}
-            </select>
-            <ActionBtn
-              label="↻ Refresh"
-              colour={C.green}
-              onClick={load}
-              small
-            />
-          </div>
-        }
-      >
-        {loading ? (
-          <EmptyState icon="⏳" message="Loading flagged accounts..." />
-        ) : accounts.length === 0 ? (
-          <EmptyState
-            icon="✅"
-            message={`No accounts with anomaly score ≥ ${threshold}. System clean.`}
-          />
-        ) : (
-          accounts.map((acc, i) => (
-            <div
-              key={acc.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 12,
-                padding: "14px 16px",
-                marginBottom: 8,
-                borderRadius: 10,
-                background: acc.is_suspended
-                  ? C.redPale
-                  : i % 2 === 0
-                    ? C.white
-                    : C.bg,
-                border: `1px solid ${acc.is_suspended ? C.red + "40" : C.border}`,
-              }}
-            >
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "50%",
-                  background: scoreColour(acc.anomaly_score),
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: FD,
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: C.white,
-                  }}
-                >
-                  {acc.anomaly_score || 0}
-                </span>
-              </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <div
-                  style={{
-                    fontFamily: FB,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: C.text,
-                    marginBottom: 2,
-                  }}
-                >
-                  {acc.full_name || "Anonymous"}
-                  {acc.is_suspended && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        background: C.red,
-                        color: C.white,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "1px 7px",
-                        borderRadius: 10,
-                      }}
-                    >
-                      SUSPENDED
-                    </span>
-                  )}
-                </div>
-                <div
-                  style={{ fontFamily: FB, fontSize: 12, color: C.textLight }}
-                >
-                  {acc.email}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FB,
-                    fontSize: 11,
-                    color: C.textLight,
-                    marginTop: 2,
-                  }}
-                >
-                  {acc.total_scans || 0} scans · {acc.loyalty_points || 0} pts ·
-                  last active {fmtAgo(acc.last_active_at)}
-                </div>
-                {acc.flag_reasons && acc.flag_reasons.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      flexWrap: "wrap",
-                      marginTop: 6,
-                    }}
-                  >
-                    {acc.flag_reasons.map((r, j) => (
-                      <Badge key={j} label={r} colour={C.red} />
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                {acc.is_suspended ? (
-                  <ActionBtn
-                    label="✓ Reinstate"
-                    colour={C.green}
-                    onClick={() => handleReinstate(acc)}
-                    small
-                  />
-                ) : (
-                  <ActionBtn
-                    label="🚫 Suspend"
-                    colour={C.red}
-                    onClick={() => handleSuspend(acc)}
-                    small
-                  />
-                )}
-                <ActionBtn
-                  label="✕ Dismiss"
-                  colour={C.textLight}
-                  onClick={() => handleDismiss(acc)}
-                  small
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── TAB 2: SCAN VELOCITY ─────────────────────────────────────────────────────
-function TabVelocity({ showToast }) {
-  const [flags, setFlags] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.rpc("get_scan_velocity_flags");
-      if (error) throw error;
-      setFlags(data || []);
-    } catch (err) {
-      showToast("Failed to load velocity data: " + err.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleFlag = async (flag) => {
-    try {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("flag_reasons, anomaly_score")
-        .eq("id", flag.user_id)
-        .maybeSingle();
-      const existing = profile?.flag_reasons || [];
-      const reason = `Rapid scans: ${flag.peak_scans} in 60s`;
-      if (!existing.includes(reason)) {
-        const newScore = Math.min(100, (profile?.anomaly_score || 0) + 30);
-        await supabase
-          .from("user_profiles")
-          .update({
-            flag_reasons: [...existing, reason],
-            anomaly_score: newScore,
-          })
-          .eq("id", flag.user_id);
-        await writeAuditLog("ADD_FLAG", "user", flag.user_id, { reason });
-        showToast("Account flagged and score updated");
-        load();
-      } else {
-        showToast("Already flagged for this reason", "error");
+    Object.values(byQr).forEach((ps) => {
+      for (let i = 0; i < ps.length; i++) {
+        const win = ps.filter(
+          (s) =>
+            Math.abs(new Date(s.scanned_at) - new Date(ps[i].scanned_at)) <
+            86400000,
+        );
+        if (win.length > 3)
+          win.slice(3).forEach((s) => {
+            if (!detections.find((d) => d.scanId === s.id))
+              detections.push({
+                scanId: s.id,
+                userId: s.user_id,
+                reason: "velocity",
+                severity: "high",
+              });
+          });
       }
-    } catch (err) {
-      showToast("Flag failed: " + err.message, "error");
-    }
-  };
-
-  return (
-    <div>
-      <SectionCard
-        title="⚡ Scan Velocity Flags"
-        subtitle="Users with 3+ scans within a 60-second window in the last 7 days"
-        accent={C.amber}
-        action={
-          <ActionBtn label="↻ Refresh" colour={C.green} onClick={load} small />
-        }
-      >
-        {loading ? (
-          <EmptyState icon="⏳" message="Analysing scan patterns..." />
-        ) : flags.length === 0 ? (
-          <EmptyState
-            icon="✅"
-            message="No rapid scan patterns detected in the last 7 days."
-          />
-        ) : (
-          <>
-            <div
-              style={{
-                fontFamily: FB,
-                fontSize: 12,
-                color: C.textLight,
-                marginBottom: 14,
-                padding: "8px 12px",
-                background: C.amberPale,
-                borderRadius: 8,
-                border: `1px solid ${C.amber}30`,
-              }}
-            >
-              ⚠ These users triggered rapid scan detection. This may indicate QR
-              screenshot sharing or automated scanning. Review before flagging —
-              some may be legitimate testers.
-            </div>
-            {flags.map((f, i) => (
-              <div
-                key={f.user_id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 16px",
-                  marginBottom: 8,
-                  borderRadius: 10,
-                  background: i % 2 === 0 ? C.white : C.bg,
-                  border: `1px solid ${C.border}`,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "50%",
-                    background: C.amber,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: FD,
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: C.white,
-                    }}
-                  >
-                    {f.peak_scans}
-                  </span>
-                </div>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div
-                    style={{
-                      fontFamily: FB,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: C.text,
-                    }}
-                  >
-                    {f.display_name}
-                  </div>
-                  <div
-                    style={{ fontFamily: FB, fontSize: 12, color: C.textLight }}
-                  >
-                    {f.user_email}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: FB,
-                      fontSize: 11,
-                      color: C.textLight,
-                      marginTop: 2,
-                    }}
-                  >
-                    Peak: {f.peak_scans} scans in 60s ·{" "}
-                    {fmtDate(f.window_start)}
-                    {f.anomaly_score > 0 && (
-                      <span
-                        style={{ marginLeft: 8, color: C.red, fontWeight: 600 }}
-                      >
-                        Score: {f.anomaly_score}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ActionBtn
-                  label="⚑ Flag Account"
-                  colour={C.amber}
-                  onClick={() => handleFlag(f)}
-                  small
-                />
-              </div>
-            ))}
-          </>
-        )}
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── TAB 3: SUSPENDED ACCOUNTS ────────────────────────────────────────────────
-function TabSuspended({ showToast }) {
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("user_profiles")
-        .select(
-          "id, full_name, email, suspended_at, suspension_reason, anomaly_score, loyalty_points",
-        )
-        .eq("is_suspended", true)
-        .order("suspended_at", { ascending: false });
-      if (error) throw error;
-      setAccounts(data || []);
-    } catch (err) {
-      showToast("Failed to load suspended accounts: " + err.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleReinstate = async (acc) => {
-    if (
-      !window.confirm(
-        `Reinstate ${acc.full_name || acc.email}? They will resume earning loyalty points.`,
-      )
-    )
-      return;
-    try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({
-          is_suspended: false,
-          suspended_at: null,
-          suspended_by: null,
-          suspension_reason: null,
-        })
-        .eq("id", acc.id);
-      if (error) throw error;
-      await writeAuditLog("REINSTATE_ACCOUNT", "user", acc.id, {
-        email: acc.email,
-      });
-      showToast(`${acc.full_name || acc.email} reinstated`);
-      load();
-    } catch (err) {
-      showToast("Reinstate failed: " + err.message, "error");
-    }
-  };
-
-  return (
-    <div>
-      <SectionCard
-        title="🚫 Suspended Accounts"
-        subtitle="These users can scan and browse but earn zero loyalty points"
-        accent={C.red}
-        action={
-          <ActionBtn label="↻ Refresh" colour={C.green} onClick={load} small />
-        }
-      >
-        {loading ? (
-          <EmptyState icon="⏳" message="Loading..." />
-        ) : accounts.length === 0 ? (
-          <EmptyState
-            icon="✅"
-            message="No suspended accounts. All users are in good standing."
-          />
-        ) : (
-          accounts.map((acc) => (
-            <div
-              key={acc.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "14px 16px",
-                marginBottom: 8,
-                borderRadius: 10,
-                background: C.redPale,
-                border: `1px solid ${C.red}30`,
-                flexWrap: "wrap",
-              }}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  background: C.red,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{ color: C.white, fontSize: 18 }}>🚫</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <div
-                  style={{
-                    fontFamily: FB,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: C.text,
-                  }}
-                >
-                  {acc.full_name || "Anonymous"}
-                </div>
-                <div
-                  style={{ fontFamily: FB, fontSize: 12, color: C.textLight }}
-                >
-                  {acc.email}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FB,
-                    fontSize: 11,
-                    color: C.textLight,
-                    marginTop: 2,
-                  }}
-                >
-                  Suspended {fmtAgo(acc.suspended_at)} ·{" "}
-                  {acc.loyalty_points || 0} pts frozen
-                </div>
-                {acc.suspension_reason && (
-                  <div
-                    style={{
-                      fontFamily: FB,
-                      fontSize: 12,
-                      color: C.red,
-                      marginTop: 3,
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Reason: {acc.suspension_reason}
-                  </div>
-                )}
-              </div>
-              <ActionBtn
-                label="✓ Reinstate"
-                colour={C.green}
-                onClick={() => handleReinstate(acc)}
-                small
-              />
-            </div>
-          ))
-        )}
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── TAB 4: DELETION REQUESTS ─────────────────────────────────────────────────
-function TabDeletion({ showToast }) {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("deletion_requests")
-        .select("*, user_profiles(full_name, email)")
-        .order("requested_at", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      setRequests(data || []);
-    } catch (err) {
-      showToast("Failed to load deletion requests: " + err.message, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const handleProcess = async (req, status) => {
-    const notes =
-      status === "approved"
-        ? window.prompt(
-            "Confirmation notes (e.g. data deleted via Supabase dashboard):",
-          ) || "Data deletion processed"
-        : window.prompt("Rejection reason:") || "Request rejected";
-    try {
-      const {
-        data: { user: admin },
-      } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from("deletion_requests")
-        .update({
-          status,
-          processed_at: new Date().toISOString(),
-          processed_by: admin?.id,
-          notes,
-        })
-        .eq("id", req.id);
-      if (error) throw error;
-      await writeAuditLog(
-        status === "approved" ? "APPROVE_DELETION" : "REJECT_DELETION",
-        "user",
-        req.user_id,
-        { notes },
+    });
+    // 2. Impossible travel
+    for (let i = 1; i < sorted.length; i++) {
+      const a = sorted[i - 1],
+        b = sorted[i];
+      const dist = distanceKm(
+        a.gps_lat || a.ip_lat,
+        a.gps_lng || a.ip_lng,
+        b.gps_lat || b.ip_lat,
+        b.gps_lng || b.ip_lng,
       );
-      showToast(`Request ${status}`);
-      load();
-    } catch (err) {
-      showToast("Update failed: " + err.message, "error");
+      const mins = (new Date(b.scanned_at) - new Date(a.scanned_at)) / 60000;
+      if (dist && dist > 500 && mins < 60)
+        if (!detections.find((d) => d.scanId === b.id))
+          detections.push({
+            scanId: b.id,
+            userId: b.user_id,
+            reason: "travel",
+            severity: "critical",
+          });
     }
-  };
+    // 3. Bulk: >10 in 1 hour
+    for (let i = 0; i < sorted.length; i++) {
+      const win = sorted.filter(
+        (s) =>
+          Math.abs(new Date(s.scanned_at) - new Date(sorted[i].scanned_at)) <
+          3600000,
+      );
+      if (win.length > 10)
+        win.slice(10).forEach((s) => {
+          if (!detections.find((d) => d.scanId === s.id))
+            detections.push({
+              scanId: s.id,
+              userId: s.user_id,
+              reason: "bulk",
+              severity: "high",
+            });
+        });
+    }
+  });
+  // 4. Foreign origin
+  scans.forEach((s) => {
+    if (
+      s.ip_country &&
+      s.ip_country !== "ZA" &&
+      s.ip_country !== "South Africa" &&
+      s.ip_country !== ""
+    )
+      if (!detections.find((d) => d.scanId === s.id))
+        detections.push({
+          scanId: s.id,
+          userId: s.user_id,
+          reason: "foreign",
+          severity: "low",
+        });
+  });
+  return detections;
+}
 
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
-
+// ─── SECTION WRAPPER ──────────────────────────────────────────────────────────
+function Section({ title, action, children }) {
   return (
-    <div>
-      <SectionCard
-        title="🗑️ Data Deletion Requests"
-        subtitle="POPIA compliance — requests must be processed within 30 days"
-        accent={C.purple}
-        action={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {pendingCount > 0 && (
-              <Badge label={`${pendingCount} pending`} colour={C.red} />
-            )}
-            <ActionBtn
-              label="↻ Refresh"
-              colour={C.green}
-              onClick={load}
-              small
-            />
-          </div>
-        }
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 8,
+        padding: 24,
+        marginBottom: 20,
+        boxShadow: T.shadow,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 14,
+        }}
       >
-        {loading ? (
-          <EmptyState icon="⏳" message="Loading deletion requests..." />
-        ) : requests.length === 0 ? (
-          <EmptyState icon="✅" message="No deletion requests on record." />
-        ) : (
-          requests.map((req) => {
-            const name = req.user_profiles?.full_name || "Anonymous";
-            const email = req.user_profiles?.email || req.user_id;
-            const isPending = req.status === "pending";
-            const daysAgo = Math.floor(
-              (Date.now() - new Date(req.requested_at)) / 86400000,
-            );
-            const overdue = isPending && daysAgo > 25;
-            return (
-              <div
-                key={req.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
-                  marginBottom: 8,
-                  borderRadius: 10,
-                  background: overdue
-                    ? C.redPale
-                    : isPending
-                      ? C.purplePale
-                      : C.bg,
-                  border: `1px solid ${overdue ? C.red + "40" : isPending ? C.purple + "30" : C.border}`,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 2,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: FB,
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: C.text,
-                      }}
-                    >
-                      {name}
-                    </span>
-                    <Badge
-                      label={req.status.toUpperCase()}
-                      colour={
-                        req.status === "pending"
-                          ? C.amber
-                          : req.status === "approved"
-                            ? C.green
-                            : C.red
-                      }
-                    />
-                    {overdue && <Badge label="OVERDUE" colour={C.red} />}
-                  </div>
-                  <div
-                    style={{ fontFamily: FB, fontSize: 12, color: C.textLight }}
-                  >
-                    {email}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: FB,
-                      fontSize: 11,
-                      color: C.textLight,
-                      marginTop: 2,
-                    }}
-                  >
-                    Requested {fmtDate(req.requested_at)} · {daysAgo} day
-                    {daysAgo !== 1 ? "s" : ""} ago
-                    {req.notes && <span> · {req.notes}</span>}
-                  </div>
-                </div>
-                {isPending && (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <ActionBtn
-                      label="✓ Approve"
-                      colour={C.green}
-                      onClick={() => handleProcess(req, "approved")}
-                      small
-                    />
-                    <ActionBtn
-                      label="✕ Reject"
-                      colour={C.red}
-                      onClick={() => handleProcess(req, "rejected")}
-                      small
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
         <div
           style={{
-            marginTop: 16,
-            padding: "12px 16px",
-            background: C.purplePale,
-            borderRadius: 8,
-            fontFamily: FB,
-            fontSize: 12,
-            color: C.textMid,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: T.ink400,
+            fontFamily: T.font,
+          }}
+        >
+          {title}
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── STAT GRID ────────────────────────────────────────────────────────────────
+function StatGrid({ stats }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
+        gap: "1px",
+        background: T.ink150,
+        borderRadius: 8,
+        overflow: "hidden",
+        border: `1px solid ${T.ink150}`,
+        boxShadow: T.shadow,
+        marginBottom: 20,
+      }}
+    >
+      {stats.map((s) => (
+        <div
+          key={s.label}
+          style={{
+            background: "#fff",
+            padding: "14px 16px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: T.ink400,
+              marginBottom: 6,
+              fontFamily: T.font,
+            }}
+          >
+            {s.label}
+          </div>
+          <div
+            style={{
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 400,
+              color: s.color,
+              lineHeight: 1,
+              letterSpacing: "-0.02em",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {s.value}
+          </div>
+          {s.sub && (
+            <div
+              style={{
+                fontSize: 9,
+                color: T.ink400,
+                marginTop: 4,
+                fontFamily: T.font,
+              }}
+            >
+              {s.sub}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── SUSPEND MODAL ────────────────────────────────────────────────────────────
+function SuspendModal({ user, onClose, onConfirm, adminId }) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false); // eslint-disable-line no-unused-vars
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1500,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 8,
+          padding: 28,
+          maxWidth: 440,
+          width: "90%",
+          fontFamily: T.font,
+          boxShadow: T.shadowMd,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 600,
+            color: T.danger,
+            marginBottom: 12,
+          }}
+        >
+          {user?.is_suspended ? "Reinstate Account" : "Suspend Account"}
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: T.ink700,
+            marginBottom: 16,
             lineHeight: 1.6,
           }}
         >
-          <strong>POPIA obligation:</strong> Data deletion requests must be
-          processed within <strong>30 days</strong>. Approved requests require
-          manual deletion of the user's data from the Supabase Auth dashboard
-          and user_profiles table. After deletion, update the request status to
-          "approved" and add confirmation notes.
+          {user?.is_suspended
+            ? `Reinstate ${user?.full_name || "this user"} — they will regain full scan and earning privileges.`
+            : `Suspend ${user?.full_name || "this user"} — they can still scan and verify products but will earn zero points until reinstated.`}
         </div>
-      </SectionCard>
+        <div style={{ marginBottom: 20 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: T.ink400,
+              marginBottom: 6,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              fontFamily: T.font,
+            }}
+          >
+            Reason (required for audit log)
+          </div>
+          <input
+            style={{ ...inputStyle, width: "100%" }}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. velocity abuse, bulk scanning, manual review…"
+          />
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{ ...makeBtn("transparent", T.ink400), flex: 1 }}
+          >
+            Cancel
+          </button>
+          <button
+            disabled={saving || !reason.trim()}
+            onClick={async () => {
+              setSaving(true);
+              await onConfirm(user, reason);
+              setSaving(false);
+              onClose();
+            }}
+            style={{
+              ...makeBtn(
+                user?.is_suspended ? T.accentMid : T.danger,
+                "#fff",
+                saving || !reason.trim(),
+              ),
+              flex: 2,
+            }}
+          >
+            {saving ? "Saving…" : user?.is_suspended ? "Reinstate" : "Suspend"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── TAB 5: AUDIT LOG ────────────────────────────────────────────────────────
-function TabAuditLog({ showToast }) {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+// ─── ERASE MODAL ─────────────────────────────────────────────────────────────
+function EraseModal({ customer, onClose, onConfirm }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1500,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 8,
+          padding: 28,
+          maxWidth: 440,
+          width: "90%",
+          fontFamily: T.font,
+          boxShadow: T.shadowMd,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 600,
+            color: T.danger,
+            marginBottom: 12,
+          }}
+        >
+          Right to Erasure
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: T.ink700,
+            marginBottom: 20,
+            lineHeight: 1.6,
+          }}
+        >
+          This will anonymise{" "}
+          <strong>{customer?.full_name || "this user"}</strong> by clearing
+          name, phone, DOB, city, province, gender and referral code. Scan and
+          loyalty history is retained for audit but unlinked from personal data.
+          <br />
+          <br />
+          <strong style={{ color: T.danger }}>
+            This action cannot be undone.
+          </strong>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{ ...makeBtn("transparent", T.ink400), flex: 1 }}
+          >
+            Cancel
+          </button>
+          <button
+            disabled={confirming}
+            onClick={async () => {
+              setConfirming(true);
+              await onConfirm(customer);
+              setConfirming(false);
+              onClose();
+            }}
+            style={{ ...makeBtn(T.danger, "#fff", confirming), flex: 2 }}
+          >
+            {confirming ? "Anonymising…" : "Confirm Erasure"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const ACTION_TYPES = [
-    { value: "all", label: "All Actions" },
-    { value: "SUSPEND_ACCOUNT", label: "Suspensions" },
-    { value: "REINSTATE_ACCOUNT", label: "Reinstatements" },
-    { value: "DISMISS_FLAG", label: "Dismissed Flags" },
-    { value: "ADD_FLAG", label: "Added Flags" },
-    { value: "APPROVE_DELETION", label: "Deletion Approvals" },
-    { value: "REJECT_DELETION", label: "Deletion Rejections" },
-  ];
-  const ACTION_COLOURS = {
-    SUSPEND_ACCOUNT: C.red,
-    REINSTATE_ACCOUNT: C.green,
-    DISMISS_FLAG: C.textLight,
-    ADD_FLAG: C.amber,
-    APPROVE_DELETION: C.purple,
-    REJECT_DELETION: C.red,
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function HQFraud() {
+  const ctx = usePageContext("fraud", null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState("");
+
+  // Data
+  const [scans, setScans] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [deletions, setDeletions] = useState([]);
+  const [auditLog, setAuditLog] = useState([]);
+  const [detections, setDetections] = useState([]);
+  const [tenants, setTenants] = useState([]);
+
+  // Modals
+  const [suspendModal, setSuspendModal] = useState(null);
+  const [eraseModal, setEraseModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3200);
   };
 
-  const load = useCallback(async () => {
+  // Write audit log entry
+  const writeAuditLog = useCallback(
+    async (action, targetType, targetId, details) => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        await supabase.from("audit_log").insert({
+          admin_id: user?.id || null,
+          action,
+          target_type: targetType,
+          target_id: targetId,
+          details:
+            typeof details === "string" ? details : JSON.stringify(details),
+        });
+      } catch (_) {}
+    },
+    [],
+  );
+
+  // Write system alert (non-blocking)
+  const writeAlert = useCallback(async (alertType, severity, title, body) => {
+    try {
+      await supabase.from("system_alerts").insert({
+        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        alert_type: alertType,
+        severity,
+        status: "open",
+        title,
+        body: body || null,
+        source_table: "user_profiles",
+      });
+    } catch (_) {}
+  }, []);
+
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from("audit_log")
-        .select("*, user_profiles!fk_audit_log_user_profiles(full_name, email)")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (filter !== "all") query = query.eq("action", filter);
-      const { data, error } = await query;
-      if (error) throw error;
-      setLogs(data || []);
+      const [scanRes, userRes, delRes, auditRes, tenantRes] = await Promise.all(
+        [
+          // scan_logs — cross-tenant, RLS allows hq_access=true to see all
+          supabase
+            .from("scan_logs")
+            .select(
+              "id,user_id,qr_code_id,qr_code,scanned_at,scan_outcome,gps_lat,gps_lng,ip_lat,ip_lng,ip_city,ip_province,ip_country,location_source,device_type,browser,distance_to_stockist_m,points_awarded,batch_id",
+            )
+            .order("scanned_at", { ascending: false })
+            .limit(1000),
+
+          // user_profiles — all customers across tenants
+          supabase
+            .from("user_profiles")
+            .select(
+              "id,full_name,email,phone,role,tenant_id,loyalty_points,loyalty_tier,anomaly_score,is_suspended,popia_consented,popia_date,marketing_opt_in,analytics_opt_in,geolocation_consent,created_at,date_of_birth,city,province,gender,referral_code",
+            )
+            .eq("role", "customer"),
+
+          // deletion_requests
+          supabase
+            .from("deletion_requests")
+            .select(
+              "id,user_id,requested_at,processed_at,processed_by,status,notes",
+            )
+            .order("requested_at", { ascending: false })
+            .limit(100),
+
+          // audit_log
+          supabase
+            .from("audit_log")
+            .select(
+              "id,admin_id,action,target_type,target_id,details,created_at",
+            )
+            .order("created_at", { ascending: false })
+            .limit(200),
+
+          // tenants for cross-tenant risk table
+          supabase.from("tenants").select("id,name,slug").eq("is_active", true),
+        ],
+      );
+
+      const scansData = scanRes.data || [];
+      const usersData = userRes.data || [];
+      const delsData = delRes.data || [];
+      const auditData = auditRes.data || [];
+      const tenantsData = tenantRes.data || [];
+
+      setScans(scansData);
+      setUsers(usersData);
+      setDeletions(delsData);
+      setAuditLog(auditData);
+      setTenants(tenantsData);
+      setDetections(detectFraud(scansData));
     } catch (err) {
-      showToast("Failed to load audit log: " + err.message, "error");
+      console.error("HQFraud fetchAll:", err);
     } finally {
       setLoading(false);
     }
-  }, [filter, showToast]);
+  }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchAll();
+  }, [fetchAll]);
 
-  return (
-    <div>
-      <SectionCard
-        title="📋 Admin Audit Log"
-        subtitle="Every admin action is recorded here — immutable record"
-        accent={C.blue}
-        action={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              style={{
-                padding: "4px 8px",
-                border: `1px solid ${C.border}`,
-                borderRadius: 6,
-                fontFamily: FB,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              {ACTION_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <ActionBtn label="↻" colour={C.green} onClick={load} small />
-          </div>
-        }
-      >
-        {loading ? (
-          <EmptyState icon="⏳" message="Loading audit log..." />
-        ) : logs.length === 0 ? (
-          <EmptyState
-            icon="📋"
-            message="No audit entries yet. Admin actions will appear here."
-          />
-        ) : (
-          <div style={{ fontFamily: FB }}>
-            {logs.map((log, i) => {
-              const adminName =
-                log.user_profiles?.full_name ||
-                log.user_profiles?.email ||
-                "System";
-              const colour = ACTION_COLOURS[log.action] || C.textMid;
-              return (
-                <div
-                  key={log.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 12,
-                    padding: "10px 14px",
-                    marginBottom: 4,
-                    borderRadius: 8,
-                    background: i % 2 === 0 ? C.white : C.bg,
-                    border: `1px solid ${C.border}`,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: colour,
-                      marginTop: 5,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span
-                        style={{ fontSize: 13, fontWeight: 600, color: colour }}
-                      >
-                        {log.action.replace(/_/g, " ")}
-                      </span>
-                      <span style={{ fontSize: 11, color: C.textLight }}>
-                        by {adminName}
-                      </span>
-                      {log.target_type && (
-                        <Badge label={log.target_type} colour={C.blue} />
-                      )}
-                    </div>
-                    {log.details && (
-                      <div
-                        style={{ fontSize: 12, color: C.textMid, marginTop: 2 }}
-                      >
-                        {Object.entries(log.details)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(" · ")}
-                      </div>
-                    )}
-                    <div
-                      style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}
-                    >
-                      {fmtDate(log.created_at)}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </SectionCard>
-    </div>
-  );
-}
+  // ── Actions ───────────────────────────────────────────────────────────────
+  const handleSuspend = async (user, reason) => {
+    setSaving(true);
+    const newState = !user.is_suspended;
+    await supabase
+      .from("user_profiles")
+      .update({ is_suspended: newState })
+      .eq("id", user.id);
+    await writeAuditLog(
+      newState ? "account_suspended" : "account_reinstated",
+      "user",
+      user.id,
+      `${newState ? "Suspended" : "Reinstated"} by HQ. Reason: ${reason}`,
+    );
+    if (newState) {
+      writeAlert(
+        "account_suspended",
+        "warning",
+        `Account suspended — ${user.full_name || user.email || user.id.slice(0, 8)}`,
+        `HQ suspended account. Reason: ${reason}. Anomaly score: ${user.anomaly_score || 0}.`,
+      );
+    }
+    showToast(
+      `${user.full_name || "Account"} ${newState ? "suspended" : "reinstated"}`,
+    );
+    setSaving(false);
+    fetchAll();
+  };
 
-// ═════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT: HQFraud v1.1
-// ═════════════════════════════════════════════════════════════════════════════
-export default function HQFraud() {
-  const [activeTab, setActiveTab] = useState(0);
-  const [toast, setToast] = useState(null);
-  const [counts, setCounts] = useState({
-    flagged: 0,
-    suspended: 0,
-    deletions: 0,
+  const handleProcessDeletion = async (req, approve) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await supabase
+      .from("deletion_requests")
+      .update({
+        status: approve ? "approved" : "rejected",
+        processed_at: new Date().toISOString(),
+        processed_by: user?.id || null,
+      })
+      .eq("id", req.id);
+    if (approve) {
+      await supabase
+        .from("user_profiles")
+        .update({
+          full_name: null,
+          phone: null,
+          date_of_birth: null,
+          city: null,
+          province: null,
+          gender: null,
+          referral_code: null,
+        })
+        .eq("id", req.user_id);
+    }
+    await writeAuditLog(
+      approve ? "popia_erasure_approved" : "popia_erasure_rejected",
+      "user",
+      req.user_id,
+      `Deletion request ${approve ? "approved — PII anonymised" : "rejected"} by HQ`,
+    );
+    showToast(
+      `Deletion request ${approve ? "approved — data anonymised" : "rejected"}`,
+    );
+    fetchAll();
+  };
+
+  const handleErase = async (customer) => {
+    await supabase
+      .from("user_profiles")
+      .update({
+        full_name: null,
+        phone: null,
+        date_of_birth: null,
+        city: null,
+        province: null,
+        gender: null,
+        referral_code: null,
+      })
+      .eq("id", customer.id);
+    await writeAuditLog(
+      "popia_erasure_manual",
+      "user",
+      customer.id,
+      `Manual erasure by HQ under POPIA right to erasure`,
+    );
+    showToast(`${customer.full_name || "User"} anonymised under POPIA`);
+    fetchAll();
+  };
+
+  const handleExport = (customer) => {
+    const data = JSON.stringify(customer, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `popia-export-${customer.id.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    writeAuditLog(
+      "popia_export",
+      "user",
+      customer.id,
+      "Data export under POPIA right of access",
+    );
+    showToast(`Data exported for ${customer.full_name || "user"}`);
+  };
+
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const flaggedUsers = users.filter((u) => (u.anomaly_score || 0) >= 50);
+  const suspendedUsers = users.filter((u) => u.is_suspended);
+  const pendingDels = deletions.filter((d) => d.status === "pending");
+  const suspiciousScans = scans.filter(isSuspicious);
+  const autoDetected = detections.length;
+
+  // Week-over-week scan comparison
+  const now = Date.now();
+  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
+  const thisWeekScans = scans.filter(
+    (s) => new Date(s.scanned_at) > weekAgo,
+  ).length;
+  const lastWeekScans = scans.filter((s) => {
+    const t = new Date(s.scanned_at).getTime();
+    return t > twoWeeksAgo && t <= weekAgo;
+  }).length;
+  const weekTrend =
+    lastWeekScans > 0
+      ? Math.round(((thisWeekScans - lastWeekScans) / lastWeekScans) * 100)
+      : 0;
+
+  const thisWeekSuspicious = scans.filter(
+    (s) => new Date(s.scanned_at) > weekAgo && isSuspicious(s),
+  ).length;
+  const lastWeekSuspicious = scans.filter((s) => {
+    const t = new Date(s.scanned_at).getTime();
+    return t > twoWeeksAgo && t <= weekAgo && isSuspicious(s);
+  }).length;
+
+  // Tenant risk table — cross-tenant suspicious scan counts
+  const tenantRisk = tenants
+    .map((t) => {
+      const tenantUsers = users.filter((u) => u.tenant_id === t.id);
+      const tenantUserIds = new Set(tenantUsers.map((u) => u.id));
+      const tenantScans = scans.filter((s) => tenantUserIds.has(s.user_id));
+      const tenantSuspicious = tenantScans.filter(isSuspicious).length;
+      const highAnomalyUsers = tenantUsers.filter(
+        (u) => (u.anomaly_score || 0) >= 85,
+      ).length;
+      return {
+        id: t.id,
+        name: t.name || t.slug || t.id.slice(0, 8),
+        totalScans: tenantScans.length,
+        suspicious: tenantSuspicious,
+        highAnomaly: highAnomalyUsers,
+        suspendedCount: tenantUsers.filter((u) => u.is_suspended).length,
+        riskScore: tenantSuspicious + highAnomalyUsers * 10,
+      };
+    })
+    .sort((a, b) => b.riskScore - a.riskScore);
+
+  // Top anomaly users leaderboard
+  const anomalyLeaderboard = [...users]
+    .filter((u) => (u.anomaly_score || 0) > 0)
+    .sort((a, b) => (b.anomaly_score || 0) - (a.anomaly_score || 0))
+    .slice(0, 10);
+
+  // Chart data
+  const flagDonut = [
+    {
+      name: "High Risk (85+)",
+      value: users.filter((u) => (u.anomaly_score || 0) >= 85).length,
+      color: T.danger,
+    },
+    {
+      name: "Medium Risk (50–84)",
+      value: users.filter((u) => {
+        const s = u.anomaly_score || 0;
+        return s >= 50 && s < 85;
+      }).length,
+      color: T.warning,
+    },
+    {
+      name: "Suspicious Scans",
+      value: Math.min(suspiciousScans.length, 20),
+      color: "#7b2d8b",
+    },
+    {
+      name: "Clean",
+      value: Math.max(0, users.length - flaggedUsers.length),
+      color: T.success,
+    },
+  ].filter((d) => d.value > 0);
+
+  const reasonBar = ["velocity", "travel", "bulk", "distance", "foreign"]
+    .map((r) => ({
+      name: r.charAt(0).toUpperCase() + r.slice(1),
+      detected: detections.filter((d) => d.reason === r).length,
+      color: FLAG_COLORS[r]?.color || T.ink400,
+    }))
+    .filter((d) => d.detected > 0);
+
+  const dayMap = {};
+  scans.forEach((s) => {
+    if (!s.scanned_at) return;
+    const day = new Date(s.scanned_at).toLocaleDateString("en-ZA", {
+      month: "short",
+      day: "numeric",
+    });
+    dayMap[day] = dayMap[day] || { date: day, total: 0, suspicious: 0 };
+    dayMap[day].total++;
+    if (isSuspicious(s)) dayMap[day].suspicious++;
   });
+  const trendData = Object.values(dayMap).slice(-14);
 
-  // WP-GUIDE-C+: wire 'fraud' context for WorkflowGuide live status
-  const ctx = usePageContext("fraud", null);
-
-  function showToast(msg, type = "success") {
-    setToast({ msg, type });
-  }
-
-  useEffect(() => {
-    const loadCounts = async () => {
-      try {
-        const [flaggedRes, suspendedRes, deletionRes] = await Promise.all([
-          supabase
-            .from("user_profiles")
-            .select("id", { count: "exact", head: true })
-            .gte("anomaly_score", 50),
-          supabase
-            .from("user_profiles")
-            .select("id", { count: "exact", head: true })
-            .eq("is_suspended", true),
-          supabase
-            .from("deletion_requests")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "pending"),
-        ]);
-        setCounts({
-          flagged: flaggedRes.count || 0,
-          suspended: suspendedRes.count || 0,
-          deletions: deletionRes.count || 0,
-        });
-      } catch (_) {}
-    };
-    loadCounts();
-  }, [activeTab]);
+  const tenantBar = tenantRisk.slice(0, 6).map((t) => ({
+    name: t.name.length > 12 ? t.name.slice(0, 12) + "…" : t.name,
+    suspicious: t.suspicious,
+    color:
+      t.suspicious > 10 ? T.danger : t.suspicious > 3 ? T.warning : T.success,
+  }));
 
   const TABS = [
-    { label: "🚨 Flagged", badge: counts.flagged },
-    { label: "⚡ Velocity", badge: 0 },
-    { label: "🚫 Suspended", badge: counts.suspended },
-    { label: "🗑️ Deletions", badge: counts.deletions },
-    { label: "📋 Audit Log", badge: 0 },
+    { id: "overview", label: "Overview" },
+    { id: "accounts", label: "Accounts" },
+    { id: "scans", label: "Scan Intelligence" },
+    { id: "popia", label: "POPIA" },
+    { id: "audit", label: "Audit Log" },
   ];
 
   return (
-    <div style={{ fontFamily: FB, background: C.bg, minHeight: "100%" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@400;500;600;700&display=swap');`}</style>
-
-      {/* WP-GUIDE-C+: WorkflowGuide with live fraud context */}
+    <div style={{ fontFamily: T.font, position: "relative" }}>
       <WorkflowGuide
         context={ctx}
         tabId="fraud"
         onAction={() => {}}
-        defaultOpen={true}
+        defaultOpen={false}
       />
+
+      {/* Toast */}
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: T.accent,
+            color: "#fff",
+            padding: "12px 24px",
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            zIndex: 2000,
+            fontFamily: T.font,
+            boxShadow: T.shadowMd,
+          }}
+        >
+          {toast}
+        </div>
+      )}
 
       {/* Header */}
       <div
         style={{
-          padding: "24px 28px 0",
-          borderBottom: `1px solid ${C.border}`,
-          background: C.white,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
-        <div style={{ marginBottom: 20 }}>
-          <h1
+        <div>
+          <h2
             style={{
-              fontFamily: FD,
-              fontSize: 28,
-              fontWeight: 700,
-              color: C.green,
-              margin: 0,
+              fontFamily: T.font,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
+              margin: "0 0 4px",
             }}
           >
-            🛡️ Fraud & Security Centre
-          </h1>
-          <p
-            style={{
-              fontFamily: FB,
-              fontSize: 13,
-              color: C.textLight,
-              margin: "4px 0 0",
-            }}
-          >
-            Real-time fraud detection, account suspension, POPIA compliance and
-            admin audit trail.
-          </p>
+            Fraud &amp; Security Centre
+          </h2>
+          <div style={{ fontSize: 13, color: T.ink400 }}>
+            Real-time fraud detection · Account suspension · POPIA compliance ·
+            Admin audit trail
+          </div>
         </div>
-        <div
+        <button
+          onClick={fetchAll}
           style={{
-            display: "flex",
-            gap: 12,
-            marginBottom: 20,
-            flexWrap: "wrap",
+            ...makeBtn("transparent", T.ink400),
+            border: `1px solid ${T.ink150}`,
           }}
         >
-          {[
-            {
-              label: "Flagged Accounts",
-              value: counts.flagged,
-              colour: counts.flagged > 0 ? C.red : C.green,
-            },
-            {
-              label: "Suspended",
-              value: counts.suspended,
-              colour: counts.suspended > 0 ? C.red : C.green,
-            },
-            {
-              label: "Pending Deletions",
-              value: counts.deletions,
-              colour: counts.deletions > 0 ? C.amber : C.green,
-            },
-          ].map((s, i) => (
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Global stat grid */}
+      <StatGrid
+        stats={[
+          { label: "Total Scans", value: scans.length, color: T.accent },
+          {
+            label: "Suspicious",
+            value: suspiciousScans.length,
+            color: suspiciousScans.length > 0 ? T.danger : T.success,
+          },
+          {
+            label: "Auto-Detected",
+            value: autoDetected,
+            color: autoDetected > 0 ? T.warning : T.success,
+          },
+          {
+            label: "Flagged Accts",
+            value: flaggedUsers.length,
+            color: flaggedUsers.length > 0 ? T.danger : T.success,
+          },
+          {
+            label: "Suspended",
+            value: suspendedUsers.length,
+            color: suspendedUsers.length > 0 ? T.warning : T.success,
+          },
+          {
+            label: "Pending POPIA",
+            value: pendingDels.length,
+            color: pendingDels.length > 0 ? T.danger : T.success,
+          },
+          {
+            label: "This Week",
+            value: thisWeekScans,
+            color: T.accentMid,
+            sub:
+              weekTrend > 0
+                ? `▲ ${weekTrend}% vs last week`
+                : weekTrend < 0
+                  ? `▼ ${Math.abs(weekTrend)}% vs last week`
+                  : "= flat",
+          },
+        ]}
+      />
+
+      {/* Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          borderBottom: `2px solid ${T.ink150}`,
+          marginBottom: 24,
+        }}
+      >
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            style={{
+              padding: "10px 18px",
+              border: "none",
+              background: "none",
+              borderBottom:
+                activeTab === t.id
+                  ? `2px solid ${T.accent}`
+                  : "2px solid transparent",
+              marginBottom: -2,
+              cursor: "pointer",
+              fontFamily: T.font,
+              fontSize: 11,
+              fontWeight: activeTab === t.id ? 700 : 400,
+              letterSpacing: "0.07em",
+              textTransform: "uppercase",
+              color: activeTab === t.id ? T.accent : T.ink400,
+            }}
+          >
+            {t.label}
+            {t.id === "popia" && pendingDels.length > 0
+              ? ` (${pendingDels.length})`
+              : ""}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ OVERVIEW ══ */}
+      {activeTab === "overview" && (
+        <div>
+          {/* Weekly digest */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 16,
+              marginBottom: 20,
+            }}
+          >
             <div
-              key={i}
               style={{
-                background: C.white,
-                border: `1px solid ${s.colour}25`,
-                borderTop: `3px solid ${s.colour}`,
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
                 borderRadius: 8,
-                padding: "10px 18px",
-                textAlign: "center",
-                minWidth: 120,
+                padding: 20,
+                boxShadow: T.shadow,
               }}
             >
               <div
                 style={{
-                  fontFamily: FD,
-                  fontSize: 24,
+                  fontSize: 10,
                   fontWeight: 700,
-                  color: s.colour,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 12,
+                  fontFamily: T.font,
                 }}
               >
-                {s.value}
+                Weekly Fraud Digest
               </div>
-              <div
-                style={{
-                  fontFamily: FB,
-                  fontSize: 11,
-                  color: C.textLight,
-                  marginTop: 2,
-                }}
-              >
-                {s.label}
-              </div>
+              {[
+                {
+                  label: "Scans this week",
+                  value: thisWeekScans,
+                  prev: lastWeekScans,
+                },
+                {
+                  label: "Suspicious this week",
+                  value: thisWeekSuspicious,
+                  prev: lastWeekSuspicious,
+                },
+                {
+                  label: "New high-risk accounts",
+                  value: users.filter((u) => (u.anomaly_score || 0) >= 85)
+                    .length,
+                  prev: null,
+                },
+              ].map((row) => {
+                const delta = row.prev !== null ? row.value - row.prev : null;
+                const up = delta > 0;
+                return (
+                  <div
+                    key={row.label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 0",
+                      borderBottom: `1px solid ${T.ink075}`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: T.ink700,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      {row.label}
+                    </span>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: T.ink900,
+                          fontVariantNumeric: "tabular-nums",
+                          fontFamily: T.font,
+                        }}
+                      >
+                        {row.value}
+                      </span>
+                      {delta !== null && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                            borderRadius: 10,
+                            background: up ? T.dangerBg : T.successBg,
+                            color: up ? T.danger : T.success,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {up ? "▲" : "▼"} {Math.abs(delta)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 0, overflowX: "auto" }}>
-          {TABS.map((tab, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveTab(i)}
+
+            {/* Tenant risk table */}
+            <div
               style={{
-                padding: "10px 18px",
-                background: "none",
-                border: "none",
-                borderBottom:
-                  activeTab === i
-                    ? `3px solid ${C.red}`
-                    : "3px solid transparent",
-                fontFamily: FB,
-                fontSize: 13,
-                fontWeight: activeTab === i ? 600 : 400,
-                color: activeTab === i ? C.red : C.textMid,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.15s",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 8,
+                padding: 20,
+                boxShadow: T.shadow,
               }}
             >
-              {tab.label}
-              {tab.badge > 0 && (
-                <span
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 12,
+                  fontFamily: T.font,
+                }}
+              >
+                Tenant Risk Overview
+              </div>
+              {tenantRisk.length === 0 ? (
+                <div
+                  style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}
+                >
+                  No tenant data
+                </div>
+              ) : (
+                tenantRisk.slice(0, 5).map((t) => (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 0",
+                      borderBottom: `1px solid ${T.ink075}`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: T.ink700,
+                        fontFamily: T.font,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                    <div
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
+                    >
+                      {t.suspicious > 0 && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            padding: "1px 6px",
+                            borderRadius: 10,
+                            fontWeight: 700,
+                            background:
+                              t.suspicious > 10 ? T.dangerBg : T.warningBg,
+                            color: t.suspicious > 10 ? T.danger : T.warning,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {t.suspicious} suspicious
+                        </span>
+                      )}
+                      {t.highAnomaly > 0 && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            padding: "1px 6px",
+                            borderRadius: 10,
+                            fontWeight: 700,
+                            background: T.dangerBg,
+                            color: T.danger,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {t.highAnomaly} high-risk
+                        </span>
+                      )}
+                      {t.suspicious === 0 && t.highAnomaly === 0 && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: T.success,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          ✓ Clean
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Charts */}
+          {!loading && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                gap: 16,
+                marginBottom: 20,
+              }}
+            >
+              <ChartCard title="Account Risk Profile" height={200}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={flagDonut}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {flagDonut.map((d, i) => (
+                        <Cell key={i} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={<ChartTooltip formatter={(v) => `${v} users`} />}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Detections by Reason" height={200}>
+                {reasonBar.length === 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 13,
+                      color: T.success,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    ✓ No detections
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={reasonBar}
+                      margin={{ top: 8, right: 4, bottom: 8, left: 0 }}
+                    >
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 9,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={4}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 9,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={20}
+                        allowDecimals={false}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar
+                        dataKey="detected"
+                        name="Detected"
+                        isAnimationActive={false}
+                        maxBarSize={24}
+                        radius={[3, 3, 0, 0]}
+                      >
+                        {reasonBar.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+
+              <ChartCard title="14-Day Scan Trend" height={200}>
+                {trendData.length < 2 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 12,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No data
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={trendData}
+                      margin={{ top: 8, right: 4, bottom: 8, left: 0 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="hqf-grad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={T.accentMid}
+                            stopOpacity={0.15}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={T.accentMid}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                        <linearGradient
+                          id="hqf-s-grad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={T.danger}
+                            stopOpacity={0.2}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={T.danger}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 8,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={4}
+                        interval="preserveStartEnd"
+                        maxRotation={0}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 8,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={20}
+                        allowDecimals={false}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        name="Total"
+                        stroke={T.accentMid}
+                        strokeWidth={2}
+                        fill="url(#hqf-grad)"
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="suspicious"
+                        name="Suspicious"
+                        stroke={T.danger}
+                        strokeWidth={1.5}
+                        fill="url(#hqf-s-grad)"
+                        dot={false}
+                        isAnimationActive={false}
+                        strokeDasharray="4 3"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+
+              <ChartCard title="Suspicious by Tenant" height={200}>
+                {tenantBar.length === 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      fontSize: 12,
+                      color: T.ink400,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No tenant data
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={tenantBar}
+                      margin={{ top: 8, right: 4, bottom: 8, left: 0 }}
+                    >
+                      <CartesianGrid
+                        horizontal
+                        vertical={false}
+                        stroke={T.ink150}
+                        strokeWidth={0.5}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 8,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        dy={4}
+                      />
+                      <YAxis
+                        tick={{
+                          fill: T.ink400,
+                          fontSize: 8,
+                          fontFamily: T.font,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={20}
+                        allowDecimals={false}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar
+                        dataKey="suspicious"
+                        name="Suspicious Scans"
+                        isAnimationActive={false}
+                        maxBarSize={24}
+                        radius={[3, 3, 0, 0]}
+                      >
+                        {tenantBar.map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </ChartCard>
+            </div>
+          )}
+
+          {/* Anomaly leaderboard */}
+          {anomalyLeaderboard.length > 0 && (
+            <Section title="Anomaly Score Leaderboard — Top Risk Accounts">
+              <div style={{ overflowX: "auto" }}>
+                <table
                   style={{
-                    background: C.red,
-                    color: C.white,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "1px 6px",
-                    borderRadius: 10,
-                    lineHeight: "14px",
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12,
+                    fontFamily: T.font,
                   }}
                 >
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          ))}
+                  <thead>
+                    <tr>
+                      {[
+                        "User",
+                        "Email",
+                        "Tier",
+                        "Anomaly Score",
+                        "Status",
+                        "",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: "7px 12px",
+                            textAlign: "left",
+                            fontSize: 9,
+                            color: T.ink400,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            borderBottom: `1px solid ${T.ink150}`,
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {anomalyLeaderboard.map((u, i) => (
+                      <tr
+                        key={u.id}
+                        style={{
+                          background: i % 2 === 0 ? "#fff" : T.ink050,
+                          borderBottom: `1px solid ${T.ink075}`,
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            fontWeight: 600,
+                            color: T.ink900,
+                          }}
+                        >
+                          {u.full_name || "—"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            color: T.ink400,
+                            fontSize: 11,
+                          }}
+                        >
+                          {u.email || "—"}
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: "2px 8px",
+                              borderRadius: 10,
+                              background: T.ink075,
+                              color: T.ink700,
+                              fontWeight: 600,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            {u.loyalty_tier || "Bronze"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <ScoreBadge score={u.anomaly_score || 0} />
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          {u.is_suspended ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                                background: T.warningBg,
+                                color: T.warning,
+                                fontWeight: 700,
+                                fontFamily: T.font,
+                              }}
+                            >
+                              SUSPENDED
+                            </span>
+                          ) : (u.anomaly_score || 0) >= 85 ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                                background: T.dangerBg,
+                                color: T.danger,
+                                fontWeight: 700,
+                                fontFamily: T.font,
+                              }}
+                            >
+                              HIGH RISK
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                                background: T.warningBg,
+                                color: T.warning,
+                                fontWeight: 700,
+                                fontFamily: T.font,
+                              }}
+                            >
+                              FLAGGED
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <button
+                            onClick={() => setSuspendModal(u)}
+                            style={{
+                              ...makeBtn(
+                                u.is_suspended ? T.accentMid : T.danger,
+                                "#fff",
+                              ),
+                              fontSize: 9,
+                              padding: "4px 10px",
+                            }}
+                          >
+                            {u.is_suspended ? "Reinstate" : "Suspend"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
         </div>
-      </div>
+      )}
 
-      <div style={{ padding: "24px 28px", maxWidth: 900 }}>
-        {activeTab === 0 && <TabFlagged showToast={showToast} />}
-        {activeTab === 1 && <TabVelocity showToast={showToast} />}
-        {activeTab === 2 && <TabSuspended showToast={showToast} />}
-        {activeTab === 3 && <TabDeletion showToast={showToast} />}
-        {activeTab === 4 && <TabAuditLog showToast={showToast} />}
-      </div>
+      {/* ══ ACCOUNTS ══ */}
+      {activeTab === "accounts" && (
+        <div>
+          <StatGrid
+            stats={[
+              {
+                label: "Flagged (50+)",
+                value: flaggedUsers.length,
+                color: flaggedUsers.length > 0 ? T.danger : T.success,
+              },
+              {
+                label: "High Risk (85+)",
+                value: users.filter((u) => (u.anomaly_score || 0) >= 85).length,
+                color: T.danger,
+              },
+              {
+                label: "Suspended",
+                value: suspendedUsers.length,
+                color: suspendedUsers.length > 0 ? T.warning : T.success,
+              },
+              {
+                label: "Total Customers",
+                value: users.length,
+                color: T.accent,
+              },
+            ]}
+          />
 
-      {toast && (
-        <Toast
-          msg={toast.msg}
-          type={toast.type}
-          onDone={() => setToast(null)}
+          <Section
+            title="Flagged Accounts"
+            action={
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span
+                  style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                >
+                  Min score:
+                </span>
+                <select
+                  style={{ ...inputStyle, padding: "4px 8px", fontSize: 11 }}
+                  defaultValue="50"
+                >
+                  {["50", "70", "85"].map((v) => (
+                    <option key={v} value={v}>
+                      {v}+
+                    </option>
+                  ))}
+                </select>
+              </div>
+            }
+          >
+            {loading ? (
+              <div
+                style={{ padding: 40, textAlign: "center", color: T.ink400 }}
+              >
+                Loading…
+              </div>
+            ) : flaggedUsers.length === 0 ? (
+              <div style={{ padding: 40, textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                <div
+                  style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}
+                >
+                  No accounts with anomaly score ≥ 50. System clean.
+                </div>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {[
+                        "User",
+                        "Email",
+                        "Anomaly Score",
+                        "Loyalty",
+                        "Suspended",
+                        "Last Activity",
+                        "",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: "7px 12px",
+                            textAlign: "left",
+                            fontSize: 9,
+                            color: T.ink400,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            borderBottom: `1px solid ${T.ink150}`,
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {flaggedUsers.map((u, i) => (
+                      <tr
+                        key={u.id}
+                        style={{
+                          background: i % 2 === 0 ? "#fff" : T.ink050,
+                          borderBottom: `1px solid ${T.ink075}`,
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            fontWeight: 600,
+                            color: T.ink900,
+                          }}
+                        >
+                          {u.full_name || "Anonymous"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            color: T.ink400,
+                            fontSize: 11,
+                          }}
+                        >
+                          {u.email || "—"}
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <ScoreBadge score={u.anomaly_score || 0} />
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: "2px 8px",
+                              borderRadius: 10,
+                              background: T.ink075,
+                              color: T.ink700,
+                              fontWeight: 600,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            {u.loyalty_tier || "Bronze"} ·{" "}
+                            {u.loyalty_points || 0}pts
+                          </span>
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          {u.is_suspended ? (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: T.warning,
+                                fontWeight: 700,
+                              }}
+                            >
+                              YES
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: T.success }}>
+                              No
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            fontSize: 11,
+                            color: T.ink400,
+                          }}
+                        >
+                          {fmtDate(u.created_at)}
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <button
+                            onClick={() => setSuspendModal(u)}
+                            style={{
+                              ...makeBtn(
+                                u.is_suspended ? T.accentMid : T.danger,
+                                "#fff",
+                              ),
+                              fontSize: 9,
+                              padding: "4px 10px",
+                            }}
+                          >
+                            {u.is_suspended ? "Reinstate" : "Suspend"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+
+          {suspendedUsers.length > 0 && (
+            <Section title={`Suspended Accounts (${suspendedUsers.length})`}>
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {["User", "Email", "Anomaly Score", ""].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: "7px 12px",
+                            textAlign: "left",
+                            fontSize: 9,
+                            color: T.ink400,
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                            borderBottom: `1px solid ${T.ink150}`,
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suspendedUsers.map((u, i) => (
+                      <tr
+                        key={u.id}
+                        style={{
+                          background: i % 2 === 0 ? "#fff" : T.ink050,
+                          borderBottom: `1px solid ${T.ink075}`,
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            fontWeight: 600,
+                            color: T.ink900,
+                          }}
+                        >
+                          {u.full_name || "Anonymous"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "9px 12px",
+                            color: T.ink400,
+                            fontSize: 11,
+                          }}
+                        >
+                          {u.email || "—"}
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <ScoreBadge score={u.anomaly_score || 0} />
+                        </td>
+                        <td style={{ padding: "9px 12px" }}>
+                          <button
+                            onClick={() => setSuspendModal(u)}
+                            style={{
+                              ...makeBtn(T.accentMid, "#fff"),
+                              fontSize: 9,
+                              padding: "4px 10px",
+                            }}
+                          >
+                            Reinstate
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+        </div>
+      )}
+
+      {/* ══ SCAN INTELLIGENCE ══ */}
+      {activeTab === "scans" && (
+        <div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 18px",
+              background: autoDetected > 0 ? T.dangerBg : T.successBg,
+              border: `1px solid ${autoDetected > 0 ? T.dangerBd : T.successBd}`,
+              borderRadius: 8,
+              marginBottom: 20,
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: autoDetected > 0 ? T.danger : T.success,
+                  fontFamily: T.font,
+                }}
+              >
+                {autoDetected > 0
+                  ? `${autoDetected} suspicious pattern${autoDetected > 1 ? "s" : ""} detected across all tenants`
+                  : "No suspicious patterns detected — all tenants clean"}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: T.ink400,
+                  marginTop: 2,
+                  fontFamily: T.font,
+                }}
+              >
+                Detection rules: velocity abuse · impossible travel · bulk
+                scanning · distance anomaly · foreign origin
+              </div>
+            </div>
+          </div>
+
+          {detections.length > 0 && (
+            <Section title="Detection Breakdown">
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {["velocity", "travel", "bulk", "distance", "foreign"].map(
+                  (reason) => {
+                    const count = detections.filter(
+                      (d) => d.reason === reason,
+                    ).length;
+                    if (count === 0) return null;
+                    const cfg = FLAG_COLORS[reason] || {
+                      bg: T.ink075,
+                      color: T.ink400,
+                    };
+                    return (
+                      <div
+                        key={reason}
+                        style={{
+                          padding: "12px 16px",
+                          background: cfg.bg,
+                          borderRadius: 8,
+                          textAlign: "center",
+                          minWidth: 100,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 9,
+                            color: cfg.color,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            fontWeight: 700,
+                            marginBottom: 4,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {reason}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 24,
+                            fontWeight: 400,
+                            color: cfg.color,
+                            fontFamily: T.font,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {count}
+                        </div>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </Section>
+          )}
+
+          <Section
+            title={`Recent Scan Log — Last ${Math.min(scans.length, 200)} Scans`}
+          >
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 11,
+                  fontFamily: T.font,
+                }}
+              >
+                <thead>
+                  <tr>
+                    {[
+                      "Date",
+                      "QR Code",
+                      "User",
+                      "Outcome",
+                      "Location",
+                      "Device",
+                      "Detection",
+                      "Pts",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "7px 10px",
+                          textAlign: "left",
+                          fontSize: 9,
+                          color: T.ink400,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          borderBottom: `1px solid ${T.ink150}`,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {scans.slice(0, 200).map((s, i) => {
+                    const det = detections.find((d) => d.scanId === s.id);
+                    return (
+                      <tr
+                        key={s.id}
+                        style={{
+                          background: i % 2 === 0 ? "#fff" : T.ink050,
+                          borderBottom: `1px solid ${T.ink075}`,
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "7px 10px",
+                            whiteSpace: "nowrap",
+                            color: T.ink400,
+                          }}
+                        >
+                          {fmtDate(s.scanned_at)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "7px 10px",
+                            fontFamily: "monospace",
+                            color: T.ink700,
+                            fontSize: 10,
+                          }}
+                        >
+                          {(s.qr_code || s.qr_code_id || "—").slice(0, 14)}…
+                        </td>
+                        <td
+                          style={{
+                            padding: "7px 10px",
+                            fontFamily: "monospace",
+                            color: T.ink400,
+                            fontSize: 10,
+                          }}
+                        >
+                          {s.user_id?.slice(0, 8) || "anon"}
+                        </td>
+                        <td style={{ padding: "7px 10px" }}>
+                          <OutcomeBadge outcome={s.scan_outcome} />
+                        </td>
+                        <td
+                          style={{
+                            padding: "7px 10px",
+                            color: T.ink400,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.ip_city || "—"}
+                          {s.ip_country ? ` · ${s.ip_country}` : ""}
+                        </td>
+                        <td style={{ padding: "7px 10px", color: T.ink400 }}>
+                          {s.device_type || "—"}
+                        </td>
+                        <td style={{ padding: "7px 10px" }}>
+                          {det ? (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                padding: "2px 6px",
+                                borderRadius: 10,
+                                background: T.warningBg,
+                                color: T.warning,
+                                fontWeight: 700,
+                                fontFamily: T.font,
+                              }}
+                            >
+                              ⚡ {det.reason}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: T.success }}>
+                              Clean
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          style={{
+                            padding: "7px 10px",
+                            color:
+                              s.points_awarded > 0 ? T.accentMid : T.ink300,
+                            fontSize: 10,
+                          }}
+                        >
+                          {s.points_awarded > 0 ? `+${s.points_awarded}` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+        </div>
+      )}
+
+      {/* ══ POPIA ══ */}
+      {activeTab === "popia" && (
+        <div>
+          <StatGrid
+            stats={[
+              {
+                label: "POPIA Consented",
+                value: users.filter((u) => u.popia_consented).length,
+                color: T.success,
+              },
+              {
+                label: "No Consent",
+                value: users.filter((u) => !u.popia_consented).length,
+                color: T.danger,
+              },
+              {
+                label: "Mktg Opt-in",
+                value: users.filter((u) => u.marketing_opt_in).length,
+                color: T.info,
+              },
+              {
+                label: "Pending Requests",
+                value: pendingDels.length,
+                color: pendingDels.length > 0 ? T.danger : T.success,
+              },
+              {
+                label: "Processed",
+                value: deletions.filter((d) => d.status !== "pending").length,
+                color: T.accentMid,
+              },
+            ]}
+          />
+
+          {pendingDels.length > 0 && (
+            <Section
+              title={`Deletion Requests — ${pendingDels.length} Pending (POPIA 30-Day Requirement)`}
+            >
+              {pendingDels.map((req, i) => {
+                const user = users.find((u) => u.id === req.user_id);
+                return (
+                  <div
+                    key={req.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 0",
+                      borderBottom:
+                        i < pendingDels.length - 1
+                          ? `1px solid ${T.ink150}`
+                          : "none",
+                      flexWrap: "wrap",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: T.ink900,
+                          fontFamily: T.font,
+                        }}
+                      >
+                        {user?.full_name || req.user_id.slice(0, 8)} ·{" "}
+                        {user?.email || "—"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: T.ink400,
+                          marginTop: 2,
+                          fontFamily: T.font,
+                        }}
+                      >
+                        Requested {fmtDate(req.requested_at)}
+                        {req.notes && ` · "${req.notes}"`}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => handleProcessDeletion(req, true)}
+                        style={{
+                          ...makeBtn(T.danger, "#fff"),
+                          fontSize: 9,
+                          padding: "5px 12px",
+                        }}
+                      >
+                        Approve &amp; Erase
+                      </button>
+                      <button
+                        onClick={() => handleProcessDeletion(req, false)}
+                        style={{
+                          ...makeBtn("transparent", T.ink400),
+                          fontSize: 9,
+                          padding: "5px 12px",
+                          border: `1px solid ${T.ink150}`,
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </Section>
+          )}
+
+          <Section title="Customer Consent Register">
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 12,
+                  fontFamily: T.font,
+                }}
+              >
+                <thead>
+                  <tr>
+                    {[
+                      "Customer",
+                      "POPIA",
+                      "Marketing",
+                      "Analytics",
+                      "Geo",
+                      "Consent Date",
+                      "Actions",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "7px 12px",
+                          textAlign: "left",
+                          fontSize: 9,
+                          color: T.ink400,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          borderBottom: `1px solid ${T.ink150}`,
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u, i) => (
+                    <tr
+                      key={u.id}
+                      style={{
+                        background: i % 2 === 0 ? "#fff" : T.ink050,
+                        borderBottom: `1px solid ${T.ink075}`,
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "9px 12px",
+                          fontWeight: 600,
+                          color: T.ink900,
+                        }}
+                      >
+                        {u.full_name || "Anonymous"}
+                      </td>
+                      {[
+                        u.popia_consented,
+                        u.marketing_opt_in,
+                        u.analytics_opt_in,
+                        u.geolocation_consent,
+                      ].map((v, j) => (
+                        <td key={j} style={{ padding: "9px 12px" }}>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              color: v ? T.success : T.danger,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {v ? "✓" : "✗"}
+                          </span>
+                        </td>
+                      ))}
+                      <td
+                        style={{
+                          padding: "9px 12px",
+                          fontSize: 11,
+                          color: T.ink400,
+                        }}
+                      >
+                        {u.popia_date ? fmtDateOnly(u.popia_date) : "—"}
+                      </td>
+                      <td style={{ padding: "9px 12px" }}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => handleExport(u)}
+                            style={{
+                              ...makeBtn(T.info, "#fff"),
+                              fontSize: 9,
+                              padding: "4px 8px",
+                            }}
+                          >
+                            Export
+                          </button>
+                          <button
+                            onClick={() => setEraseModal(u)}
+                            style={{
+                              ...makeBtn(T.danger, "#fff"),
+                              fontSize: 9,
+                              padding: "4px 8px",
+                            }}
+                          >
+                            Erase
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {users.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        style={{
+                          padding: 40,
+                          textAlign: "center",
+                          color: T.ink400,
+                        }}
+                      >
+                        No customers found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+
+          <div
+            style={{
+              padding: 16,
+              background: T.infoBg,
+              border: `1px solid ${T.infoBd}`,
+              borderRadius: 8,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: T.info,
+                marginBottom: 8,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                fontFamily: T.font,
+              }}
+            >
+              POPIA Compliance Notes
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: T.ink700,
+                lineHeight: 1.7,
+                fontFamily: T.font,
+              }}
+            >
+              <strong>Export:</strong> Downloads all personal data as JSON
+              (POPIA §23 — right of access).
+              <br />
+              <strong>Erase:</strong> Anonymises PII fields, retains anonymised
+              records for audit (POPIA §24).
+              <br />
+              <strong>Deletion requests:</strong> Must be processed within 30
+              days of receipt.
+              <br />
+              <strong>Audit:</strong> All POPIA actions are written to the audit
+              log with timestamp and admin ID.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ AUDIT LOG ══ */}
+      {activeTab === "audit" && (
+        <div>
+          <Section
+            title={`Admin Audit Log — Last ${Math.min(auditLog.length, 200)} Actions`}
+          >
+            {loading ? (
+              <div
+                style={{ padding: 40, textAlign: "center", color: T.ink400 }}
+              >
+                Loading…
+              </div>
+            ) : auditLog.length === 0 ? (
+              <div
+                style={{
+                  padding: 40,
+                  textAlign: "center",
+                  color: T.ink400,
+                  fontFamily: T.font,
+                }}
+              >
+                No audit entries yet
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 11,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {["Date", "Admin", "Action", "Target", "Details"].map(
+                        (h) => (
+                          <th
+                            key={h}
+                            style={{
+                              padding: "7px 12px",
+                              textAlign: "left",
+                              fontSize: 9,
+                              color: T.ink400,
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              borderBottom: `1px solid ${T.ink150}`,
+                            }}
+                          >
+                            {h}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLog.slice(0, 200).map((entry, i) => {
+                      const actionColor = entry.action?.includes("suspend")
+                        ? T.warning
+                        : entry.action?.includes("erase") ||
+                            entry.action?.includes("delete")
+                          ? T.danger
+                          : T.accentMid;
+                      return (
+                        <tr
+                          key={entry.id}
+                          style={{
+                            background: i % 2 === 0 ? "#fff" : T.ink050,
+                            borderBottom: `1px solid ${T.ink075}`,
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              whiteSpace: "nowrap",
+                              color: T.ink400,
+                              fontSize: 10,
+                            }}
+                          >
+                            {fmtDate(entry.created_at)}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              color: T.ink400,
+                              fontFamily: "monospace",
+                              fontSize: 10,
+                            }}
+                          >
+                            {entry.admin_id?.slice(0, 8) || "system"}…
+                          </td>
+                          <td style={{ padding: "8px 12px" }}>
+                            <span
+                              style={{
+                                fontSize: 9,
+                                padding: "2px 8px",
+                                borderRadius: 10,
+                                background: actionColor + "20",
+                                color: actionColor,
+                                fontWeight: 700,
+                                letterSpacing: "0.07em",
+                                textTransform: "uppercase",
+                                fontFamily: T.font,
+                              }}
+                            >
+                              {(entry.action || "—").replace(/_/g, " ")}
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              color: T.ink400,
+                              fontSize: 10,
+                            }}
+                          >
+                            {entry.target_type || "—"}{" "}
+                            {entry.target_id
+                              ? `· ${entry.target_id.slice(0, 8)}…`
+                              : ""}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              color: T.ink500,
+                              fontSize: 11,
+                              maxWidth: 300,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {typeof entry.details === "object"
+                              ? JSON.stringify(entry.details)
+                              : entry.details || "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+        </div>
+      )}
+
+      {/* Modals */}
+      {suspendModal && (
+        <SuspendModal
+          user={suspendModal}
+          onClose={() => setSuspendModal(null)}
+          onConfirm={handleSuspend}
+        />
+      )}
+      {eraseModal && (
+        <EraseModal
+          customer={eraseModal}
+          onClose={() => setEraseModal(null)}
+          onConfirm={handleErase}
         />
       )}
     </div>
