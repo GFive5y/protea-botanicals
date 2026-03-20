@@ -1613,7 +1613,7 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
   const [redirectUrl, setRedirectUrl] = useState("/shop");
   const [redirectDelay, setRedirectDelay] = useState("3000");
   const [expiresAt, setExpiresAt] = useState("");
-  const [maxScans, setMaxScans] = useState("");
+  const [maxScans, setMaxScans] = useState("1");
   const [domain, setDomain] = useState(
     window.location.origin || "http://localhost:3000",
   );
