@@ -238,18 +238,18 @@ export default function CheckoutPage() {
           await supabase
             .from("inventory_items")
             .update({ quantity_on_hand: (invItem.quantity_on_hand || 0) - qty })
-            .eq("id", item.inventory_item_id);
-          await supabase
-            .from("stock_movements")
-            .insert({
-              id: crypto.randomUUID(),
-              item_id: item.inventory_item_id,
-              quantity: -qty,
-              movement_type: "sale_out",
-              reference: result.order_ref,
-              notes: `Customer order ${result.order_ref}: ${qty} × ${item.name}`,
-              tenant_id: HQ_TENANT_ID,
-            });
+            .eq("id", item.inventory_item_id)
+            .gte("quantity_on_hand", qty);
+          await supabase.from("stock_movements").insert({
+            id: crypto.randomUUID(),
+            item_id: item.inventory_item_id,
+            quantity: -qty,
+            movement_type: "sale_out",
+            unit_cost: item.price || 0,
+            reference: result.order_ref,
+            notes: `Customer order ${result.order_ref}: ${qty} × ${item.name}`,
+            tenant_id: HQ_TENANT_ID,
+          });
         } catch (_) {}
       }
 
