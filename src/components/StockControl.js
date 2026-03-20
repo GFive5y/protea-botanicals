@@ -280,6 +280,13 @@ export default function StockControl() {
   // GAP-02: write a system_alert (non-blocking, fire-and-forget)
   const writeAlert = useCallback(async (alertType, severity, title, body) => {
     try {
+      const { count } = await supabase
+        .from("system_alerts")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", "43b34c33-6864-4f02-98dd-df1d340475c3")
+        .eq("alert_type", alertType)
+        .is("acknowledged_at", null);
+      if (count > 0) return;
       await supabase.from("system_alerts").insert({
         tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
         alert_type: alertType,
