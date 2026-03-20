@@ -1223,11 +1223,7 @@ export default function ScanResult() {
               basePoints * multiplier * campaignMult,
             );
 
-            if (
-              action.one_time &&
-              qr.claimed &&
-              qr.claimed_by === currentUser.id
-            ) {
+            if (action.one_time && qr.claimed) {
               pointsWasSkipped = true;
               pointsWasSkipReason = "already_claimed";
               setCustomMessages((prev) => [
