@@ -756,9 +756,13 @@ function RegistryTab({ batches }) {
       .from("qr_codes")
       .select("*, batches(batch_number, product_name, strain)")
       .order("created_at", { ascending: false });
+    const { count: scanLogsCount } = await supabase
+      .from("scan_logs")
+      .select("id", { count: "exact", head: true });
     if (!error) {
       const fetched = data || [];
       setCodes(fetched);
+      setScanLogsTotal(scanLogsCount || 0);
       // GAP-02: alert when active unclaimed pool is critically low
       const poolAvailable = fetched.filter(
         (c) => c.is_active && !c.claimed,
