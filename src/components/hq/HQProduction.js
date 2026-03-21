@@ -2804,6 +2804,7 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
               label: f.label,
               category: f.category || (f.is_vape ? "vape" : "other"),
               is_vape: !!f.is_vape,
+              is_cannabis: !!f.is_cannabis,
               distillate_ml: parseFloat(f.distillate_ml) || 0,
               chambers: parseInt(f.chambers) || 1,
               terpene_pct: parseInt(f.terpene_pct) || 10,
@@ -2865,6 +2866,8 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
     formatCatalogue[defaultFormatKey] ||
     FORMAT_CATALOGUE["vape_1ml"];
   const isVape = fmt.is_vape;
+  const isCannabis =
+    fmt.is_cannabis !== undefined ? !!fmt.is_cannabis : fmt.is_vape;
   const planned = parseInt(form.planned_units) || 0;
   const fillMlPerChamber = fmt.custom_fill
     ? parseFloat(form.custom_fill_ml) || 0
@@ -3295,21 +3298,23 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
               ({fillMlPerChamber}ml × {chambers} chambers)
             </div>
           )}
-          <div>
-            {fLabel(isVape ? "Strain *" : "Strain (optional)")}
-            <select
-              style={sSelect}
-              value={form.strain}
-              onChange={(e) => set("strain", e.target.value)}
-            >
-              <option value="">— Select Strain —</option>
-              {strainOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isCannabis && (
+            <div>
+              {fLabel(isVape ? "Strain *" : "Strain (optional)")}
+              <select
+                style={sSelect}
+                value={form.strain}
+                onChange={(e) => set("strain", e.target.value)}
+              >
+                <option value="">— Select Strain —</option>
+                {strainOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {!isVape && (
             <div>
               {fLabel("Product Name *", "e.g. CBD Gummy Bear 25mg")}
