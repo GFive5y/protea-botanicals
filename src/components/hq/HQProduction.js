@@ -3141,6 +3141,7 @@ function NewRunPanel({
           status: "active",
           lifecycle_status: "active",
           is_archived: false,
+          tenant_id: hqTenantId || null,
         })
         .select()
         .single();
