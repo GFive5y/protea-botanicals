@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
+import InfoTooltip from "../components/InfoTooltip";
 import {
   AreaChart,
   Area,
@@ -972,7 +973,13 @@ export default function AdminDashboard() {
             <SectionLabel text="Platform Health" />
             <MetricGrid>
               <StatCard
-                label="Points Distributed"
+                label={
+                  <span
+                    style={{ display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    Points Distributed <InfoTooltip id="points-distributed" />
+                  </span>
+                }
                 value={analytics.totalPointsDistributed.toLocaleString()}
                 semantic={null}
               />
