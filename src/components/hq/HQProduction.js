@@ -1249,6 +1249,7 @@ export default function HQProduction() {
               batches={batches}
               runs={runs}
               items={items}
+              productFormats={productFormats}
               onNavNewRun={() => setSubTab("new-run")}
               onRefresh={fetchAll}
             />
@@ -1944,7 +1945,14 @@ function OverviewPanel({
 }
 
 // ─── Batches Panel ────────────────────────────────────────────────────────────
-function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
+function BatchesPanel({
+  batches,
+  runs,
+  items,
+  productFormats,
+  onNavNewRun,
+  onRefresh,
+}) {
   const [filter, setFilter] = useState("all");
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -1977,6 +1985,13 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
     if (qty <= threshold) return "low_stock";
     return b.lifecycle_status || "active";
   };
+  const getBatchIsCannabis = (b) => {
+    if (productFormats && productFormats.length > 0) {
+      const fmt = productFormats.find((f) => f.format_short === b.product_type);
+      if (fmt) return !!fmt.is_cannabis;
+    }
+    return !!b.strain; // fallback: strain present = cannabis
+  };
 
   const depletedCount = batches.filter(
     (b) => getEffectiveLifecycle(b) === "depleted",
@@ -2005,6 +2020,8 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
       expiry_date: b.expiry_date || "",
       lab_certified: b.lab_certified || false,
       low_stock_threshold: b.low_stock_threshold ?? 10,
+      section_21_number: b.section_21_number || "",
+      cannabinoid_profile: b.cannabinoid_profile || "",
     });
   };
 
@@ -2022,6 +2039,8 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
           expiry_date: editForm.expiry_date || null,
           lab_certified: editForm.lab_certified,
           low_stock_threshold: parseInt(editForm.low_stock_threshold) || 10,
+          section_21_number: editForm.section_21_number || null,
+          cannabinoid_profile: editForm.cannabinoid_profile || null,
         })
         .eq("id", b.id);
       if (error) throw error;
@@ -2687,6 +2706,67 @@ function BatchesPanel({ batches, runs, items, onNavNewRun, onRefresh }) {
                           />
                         </div>
                       </div>
+                      {getBatchIsCannabis(b) && (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: "12px",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <div>
+                            <label
+                              style={{
+                                fontSize: "10px",
+                                color: T.ink500,
+                                display: "block",
+                                marginBottom: "3px",
+                                fontFamily: T.fontUi,
+                              }}
+                            >
+                              Section 21 Number
+                            </label>
+                            <input
+                              style={sInput}
+                              type="text"
+                              placeholder="e.g. S21/..."
+                              value={editForm.section_21_number}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  section_21_number: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label
+                              style={{
+                                fontSize: "10px",
+                                color: T.ink500,
+                                display: "block",
+                                marginBottom: "3px",
+                                fontFamily: T.fontUi,
+                              }}
+                            >
+                              Cannabinoid Profile
+                            </label>
+                            <input
+                              style={sInput}
+                              type="text"
+                              placeholder="e.g. THC 85%, CBD 2%"
+                              value={editForm.cannabinoid_profile}
+                              onChange={(e) =>
+                                setEditForm((p) => ({
+                                  ...p,
+                                  cannabinoid_profile: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
                       <div
                         style={{
                           display: "flex",
