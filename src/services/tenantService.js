@@ -36,6 +36,7 @@ export function TenantProvider({ children }) {
   const [isHQ, setIsHQ] = useState(false);
   const [allTenants, setAllTenants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tenantConfig, setTenantConfig] = useState({});
 
   // ★ v1.1: Track whether we've already loaded tenant data.
   // Prevents reloading on every SIGNED_IN event (Supabase fires this repeatedly).
@@ -52,6 +53,7 @@ export function TenantProvider({ children }) {
         setTenant(null);
         setIsHQ(false);
         setAllTenants([]);
+        setTenantConfig({});
         setLoading(false);
         return;
       }
@@ -85,6 +87,19 @@ export function TenantProvider({ children }) {
         } else {
           setTenant(tenantData);
           console.log("[TenantService] Active tenant:", tenantData.name);
+        }
+        // v1.2: Load tenant_config feature flags (independent — never blocks login)
+        try {
+          const { data: cfgData } = await supabase
+            .from("tenant_config")
+            .select(
+              "feature_hq,feature_ai_basic,feature_ai_full,feature_medical,feature_white_label,feature_wholesale,feature_hr,ai_queries_daily,staff_seats,tier",
+            )
+            .eq("tenant_id", profile.tenant_id)
+            .single();
+          setTenantConfig(cfgData || {});
+        } catch (_) {
+          setTenantConfig({});
         }
       }
 
@@ -176,6 +191,7 @@ export function TenantProvider({ children }) {
     switchTenant,
     loading,
     reload: loadTenant,
+    tenantConfig,
   };
 
   return (
