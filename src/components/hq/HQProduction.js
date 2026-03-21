@@ -3013,7 +3013,11 @@ function NewRunPanel({
     const needed = +(parseFloat(line.quantity_per_unit || 0) * planned).toFixed(
       3,
     );
-    const avail = parseFloat(selItem?.quantity_on_hand || 0);
+    const avail = Math.max(
+      0,
+      parseFloat(selItem?.quantity_on_hand || 0) -
+        parseFloat(selItem?.reserved_qty || 0),
+    );
     const cost =
       parseFloat(selItem?.weighted_avg_cost || selItem?.cost_price || 0) *
       needed;
@@ -3048,9 +3052,21 @@ function NewRunPanel({
   const selDist = distItems.find((i) => i.id === form.distillate_item_id);
   const selTerp = terpItems.find((i) => i.id === form.terpene_item_id);
   const selHw = hwItems.find((i) => i.id === form.hardware_item_id);
-  const distAvail = parseFloat(selDist?.quantity_on_hand || 0);
-  const terpAvail = parseFloat(selTerp?.quantity_on_hand || 0);
-  const hwAvail = parseFloat(selHw?.quantity_on_hand || 0);
+  const distAvail = Math.max(
+    0,
+    parseFloat(selDist?.quantity_on_hand || 0) -
+      parseFloat(selDist?.reserved_qty || 0),
+  );
+  const terpAvail = Math.max(
+    0,
+    parseFloat(selTerp?.quantity_on_hand || 0) -
+      parseFloat(selTerp?.reserved_qty || 0),
+  );
+  const hwAvail = Math.max(
+    0,
+    parseFloat(selHw?.quantity_on_hand || 0) -
+      parseFloat(selHw?.reserved_qty || 0),
+  );
   const vapeMatsOk =
     !isVape ||
     (form.distillate_item_id &&
