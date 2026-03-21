@@ -725,6 +725,7 @@ function DetailPanel({
 function RegistryTab({ batches }) {
   const [codes, setCodes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [scanLogsTotal, setScanLogsTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -788,7 +789,7 @@ function RegistryTab({ batches }) {
     unsigned: codes.filter((c) => !c.hmac_signed).length,
     claimed: codes.filter((c) => c.claimed).length,
     available: codes.filter((c) => !c.claimed && c.is_active).length,
-    scans: codes.reduce((s, c) => s + (c.scan_count || 0), 0),
+    scans: scanLogsTotal,
     active: codes.filter((c) => c.is_active).length,
     paused: codes.filter((c) => !c.is_active).length,
     expired: codes.filter(
