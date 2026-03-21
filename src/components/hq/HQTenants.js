@@ -724,10 +724,10 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
         })
         .eq("id", tenantId);
       if (tenantErr) throw tenantErr;
-      if (error) throw error;
       setEditing(false);
-      showToast("Feature flags saved.");
+      showToast("Feature flags saved. Refreshing context...");
       onSaved();
+      setTimeout(() => window.location.reload(), 800);
     } catch (err) {
       showToast("Save failed: " + err.message, "error");
     } finally {
