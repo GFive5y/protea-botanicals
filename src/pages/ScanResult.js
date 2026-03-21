@@ -953,6 +953,7 @@ export default function ScanResult() {
   const writeLoyaltyTransaction = useCallback(
     async ({
       userId,
+      tenantId,
       points,
       balanceAfter,
       qrCodeStr,
@@ -975,6 +976,7 @@ export default function ScanResult() {
           multiplier_applied: multiplierApplied || 1.0,
           tier_at_time: tierAtTime || "Bronze",
           channel: "qr_scan",
+          tenant_id: tenantId || null,
         });
       } catch (err) {
         console.error("writeLoyaltyTransaction error:", err);
@@ -1415,10 +1417,11 @@ export default function ScanResult() {
         const currentPts = profile?.loyalty_points || 0;
         await writeLoyaltyTransaction({
           userId: currentUser.id,
+          tenantId: qr.tenant_id || profile?.tenant_id || null,
           points: pointsAwardedAmt,
           balanceAfter: currentPts + pointsAwardedAmt,
           qrCodeStr: qrCode,
-          description: `Scanned ${productLabel}${campaign ? ` (${campaign.multiplier}× campaign)` : ""}`,
+          description: `Scanned ${productLabel}${campaign ? ` (${campaign.multiplier}├ù campaign)` : ""}`,
           scanLogId: logId,
           multiplierApplied: tierMultiplierUsed * campaignMult,
           tierAtTime: tierLabelUsed,
