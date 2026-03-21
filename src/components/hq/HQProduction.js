@@ -25,6 +25,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
@@ -885,6 +886,7 @@ function SetPricePanel({ items, onRefresh }) {
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const ctx = usePageContext("hq-production", null);
+  const { tenantConfig } = useTenant();
   const [items, setItems] = useState([]);
   const [runs, setRuns] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -1259,6 +1261,7 @@ export default function HQProduction() {
               runs={runs}
               items={items}
               productFormats={productFormats}
+              tenantConfig={tenantConfig}
               onNavNewRun={() => setSubTab("new-run")}
               onRefresh={fetchAll}
             />
@@ -1960,6 +1963,7 @@ function BatchesPanel({
   runs,
   items,
   productFormats,
+  tenantConfig,
   onNavNewRun,
   onRefresh,
 }) {
@@ -2716,67 +2720,68 @@ function BatchesPanel({
                           />
                         </div>
                       </div>
-                      {getBatchIsCannabis(b) && (
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "12px",
-                            marginBottom: "12px",
-                          }}
-                        >
-                          <div>
-                            <label
-                              style={{
-                                fontSize: "10px",
-                                color: T.ink500,
-                                display: "block",
-                                marginBottom: "3px",
-                                fontFamily: T.fontUi,
-                              }}
-                            >
-                              Section 21 Number
-                            </label>
-                            <input
-                              style={sInput}
-                              type="text"
-                              placeholder="e.g. S21/..."
-                              value={editForm.section_21_number}
-                              onChange={(e) =>
-                                setEditForm((p) => ({
-                                  ...p,
-                                  section_21_number: e.target.value,
-                                }))
-                              }
-                            />
+                      {getBatchIsCannabis(b) &&
+                        tenantConfig?.feature_medical !== false && (
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: "12px",
+                              marginBottom: "12px",
+                            }}
+                          >
+                            <div>
+                              <label
+                                style={{
+                                  fontSize: "10px",
+                                  color: T.ink500,
+                                  display: "block",
+                                  marginBottom: "3px",
+                                  fontFamily: T.fontUi,
+                                }}
+                              >
+                                Section 21 Number
+                              </label>
+                              <input
+                                style={sInput}
+                                type="text"
+                                placeholder="e.g. S21/..."
+                                value={editForm.section_21_number}
+                                onChange={(e) =>
+                                  setEditForm((p) => ({
+                                    ...p,
+                                    section_21_number: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label
+                                style={{
+                                  fontSize: "10px",
+                                  color: T.ink500,
+                                  display: "block",
+                                  marginBottom: "3px",
+                                  fontFamily: T.fontUi,
+                                }}
+                              >
+                                Cannabinoid Profile
+                              </label>
+                              <input
+                                style={sInput}
+                                type="text"
+                                placeholder="e.g. THC 85%, CBD 2%"
+                                value={editForm.cannabinoid_profile}
+                                onChange={(e) =>
+                                  setEditForm((p) => ({
+                                    ...p,
+                                    cannabinoid_profile: e.target.value,
+                                  }))
+                                }
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label
-                              style={{
-                                fontSize: "10px",
-                                color: T.ink500,
-                                display: "block",
-                                marginBottom: "3px",
-                                fontFamily: T.fontUi,
-                              }}
-                            >
-                              Cannabinoid Profile
-                            </label>
-                            <input
-                              style={sInput}
-                              type="text"
-                              placeholder="e.g. THC 85%, CBD 2%"
-                              value={editForm.cannabinoid_profile}
-                              onChange={(e) =>
-                                setEditForm((p) => ({
-                                  ...p,
-                                  cannabinoid_profile: e.target.value,
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
+                        )}
                       <div
                         style={{
                           display: "flex",
