@@ -231,10 +231,18 @@ export default function CheckoutPage() {
         try {
           const { data: invItem } = await supabase
             .from("inventory_items")
-            .select("quantity_on_hand")
+            .select("quantity_on_hand, reserved_qty")
             .eq("id", item.inventory_item_id)
             .single();
           if (!invItem) continue;
+          const availQty =
+            (invItem.quantity_on_hand || 0) - (invItem.reserved_qty || 0);
+          if (availQty < qty) {
+            console.warn(
+              `Checkout oversell guard: ${item.name} — available: ${availQty}, requested: ${qty}`,
+            );
+            continue;
+          }
           await supabase
             .from("inventory_items")
             .update({ quantity_on_hand: (invItem.quantity_on_hand || 0) - qty })
