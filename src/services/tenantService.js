@@ -78,7 +78,7 @@ export function TenantProvider({ children }) {
       if (profile?.tenant_id) {
         const { data: tenantData, error: tenantError } = await supabase
           .from("tenants")
-          .select("*")
+          .select("*,industry_profile")
           .eq("id", profile.tenant_id)
           .single();
 
@@ -192,6 +192,7 @@ export function TenantProvider({ children }) {
     loading,
     reload: loadTenant,
     tenantConfig,
+    industryProfile: tenant?.industry_profile || "cannabis_retail",
   };
 
   return (
