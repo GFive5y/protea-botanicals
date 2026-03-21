@@ -63,7 +63,18 @@ const HQ_PAGES = [
   },
   // ── Platform ─────────────────────────────────────────────────────────────────
   { group: "Platform", icon: "ðŸ¢", label: "Tenants", path: "/hq?tab=tenants" },
-  { group: "Platform", icon: "⚕️", label: "Medical", path: "/hq?tab=medical" },
+  {
+    group: "Platform",
+    icon: "âš•ï¸",
+    label: "Medical",
+    path: "/hq?tab=medical",
+  },
+  {
+    group: "Platform",
+    icon: "🏭",
+    label: "Wholesale Orders",
+    path: "/hq?tab=wholesale-orders",
+  },
   { group: "Platform", icon: "💎", label: "Loyalty", path: "/hq?tab=loyalty" },
   { group: "Platform", icon: "🛡", label: "Fraud", path: "/hq?tab=fraud" },
   {
