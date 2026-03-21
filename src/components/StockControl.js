@@ -182,6 +182,11 @@ const CATEGORY_COLORS = {
   service: T.info,
 };
 const UNIT_LABELS = { pcs: "pcs", ml: "ml", g: "g", bottles: "bottles" };
+const availQty = (item) =>
+  Math.max(
+    0,
+    parseFloat(item.quantity_on_hand || 0) - parseFloat(item.reserved_qty || 0),
+  );
 const MOVEMENT_LABELS = {
   purchase_in: "Purchase In",
   sale_out: "Sale Out",
@@ -627,16 +632,19 @@ function StatCard({ label, value, sub, semantic }) {
 function OverviewView({ items, movements, orders }) {
   const active = items.filter((i) => i.is_active);
   const lowStock = active.filter(
-    (i) => i.quantity_on_hand <= i.reorder_level && i.reorder_level > 0,
+    (i) =>
+      availQty(i) <= parseFloat(i.reorder_level || 0) &&
+      parseFloat(i.reorder_level || 0) > 0 &&
+      availQty(i) > 0,
   );
-  const outOfStock = active.filter((i) => i.quantity_on_hand <= 0);
-  const totalValue = active.reduce(
-    (s, i) => s + i.quantity_on_hand * i.sell_price,
+  const outOfStock = active.filter((i) => availQty(i) <= 0);
+  const totalReserved = active.reduce(
+    (s, i) => s + parseFloat(i.reserved_qty || 0),
     0,
   );
+  const totalValue = active.reduce((s, i) => s + availQty(i) * i.sell_price, 0);
   const totalCost = active.reduce(
-    (s, i) =>
-      s + i.quantity_on_hand * (i.weighted_avg_cost ?? i.cost_price ?? 0),
+    (s, i) => s + availQty(i) * (i.weighted_avg_cost ?? i.cost_price ?? 0),
     0,
   );
   const pendingPOs = orders.filter(
@@ -705,6 +713,11 @@ function OverviewView({ items, movements, orders }) {
             label: "Live in Shop",
             value: liveCount,
             semantic: liveCount > 0 ? "success" : null,
+          },
+          {
+            label: "Reserved",
+            value: Math.floor(totalReserved),
+            semantic: totalReserved > 0 ? "warning" : null,
           },
         ].map((s, i) => {
           const colors = {
@@ -1486,6 +1499,7 @@ function ItemsView({
               <th style={sTh}>Name</th>
               <th style={sTh}>Category</th>
               <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Available</th>
               <th style={{ ...sTh, textAlign: "right" }}>Reorder</th>
               <th style={{ ...sTh, textAlign: "right" }}>Max Stock</th>
               <th style={{ ...sTh, textAlign: "right" }}>Reserved</th>
