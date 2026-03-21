@@ -1593,13 +1593,40 @@ function ItemsView({
                         textAlign: "right",
                         fontFamily: T.fontData,
                         fontWeight: 600,
-                        color: isOut ? T.danger : isLow ? T.warning : T.ink900,
+                        color: T.ink500,
+                        fontSize: "11px",
                       }}
                     >
                       {item.quantity_on_hand} {UNIT_LABELS[item.unit]}
-                      {isOut && (
-                        <span style={{ marginLeft: "4px", fontSize: "10px" }}>
-                          !
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 700,
+                        color:
+                          availQty(item) <= 0
+                            ? T.danger
+                            : parseFloat(item.reserved_qty || 0) > 0
+                              ? T.warning
+                              : T.success,
+                      }}
+                    >
+                      {availQty(item).toFixed(0)} {UNIT_LABELS[item.unit]}
+                      {parseFloat(item.reserved_qty || 0) > 0 && (
+                        <span
+                          style={{
+                            marginLeft: "6px",
+                            fontSize: "9px",
+                            padding: "1px 5px",
+                            borderRadius: "3px",
+                            background: T.warningBg,
+                            color: T.warning,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {Math.floor(parseFloat(item.reserved_qty))} held
                         </span>
                       )}
                     </td>
