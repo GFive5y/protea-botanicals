@@ -41,6 +41,7 @@ import HQPricing from "../components/hq/HQPricing";
 import HQProfitLoss from "../components/hq/HQProfitLoss";
 import HQReorderScoring from "../components/hq/HQReorderScoring";
 import HQDocuments from "../components/hq/HQDocuments";
+import HQMedical from "../components/hq/HQMedical";
 import HQProduction from "../components/hq/HQProduction";
 
 // ── WP-O ─────────────────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ const TABS = [
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
   { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
   { id: "invoices", label: "Invoices", icon: "🧾", ready: true },
+  { id: "tenants", label: "Tenants", icon: "🏢", ready: true },
   { id: "hq-production", label: "Production", icon: "⚗️", ready: true },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   // Finance
@@ -100,6 +102,7 @@ const TABS = [
     alert: true,
   },
   { id: "documents", label: "Documents", icon: "📄", ready: true },
+  { id: "medical", label: "Medical", ready: true },
   // People
   { id: "shops", label: "Shops", icon: "🏪", ready: true },
 ];
@@ -231,6 +234,7 @@ export default function HQDashboard() {
           {activeTab === "pl" && <HQProfitLoss />}
           {activeTab === "reorder" && <HQReorderScoring />}
           {activeTab === "documents" && <HQDocuments />}
+          {activeTab === "medical" && <HQMedical />}
           {activeTab === "hq-production" && <HQProduction />}
           {activeTab === "loyalty" && <HQLoyalty />}
           {activeTab === "fraud" && <HQFraud />}
