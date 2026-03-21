@@ -21,6 +21,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
+import { useTenant } from "../services/tenantService";
+import {
+  INDUSTRY_PROFILES,
+  CANNABIS_ONLY_CATEGORIES,
+} from "../constants/industryProfiles";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
