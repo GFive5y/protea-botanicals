@@ -153,12 +153,28 @@ const CATEGORY_LABELS = {
   raw_material: "Raw Material",
   terpene: "Terpene",
   hardware: "Hardware",
+  packaging: "Packaging",
+  concentrate: "Concentrate",
+  flower: "Flower",
+  edible: "Edible",
+  topical: "Topical",
+  medical_consumable: "Medical Consumable",
+  accessory: "Accessory",
+  service: "Service",
 };
 const CATEGORY_COLORS = {
   finished_product: T.success,
   raw_material: T.info,
   terpene: T.accentMid,
   hardware: "#92400E",
+  packaging: T.ink500,
+  concentrate: T.accentMid,
+  flower: "#166534",
+  edible: "#b5935a",
+  topical: "#7e22ce",
+  medical_consumable: T.danger,
+  accessory: T.ink400,
+  service: T.info,
 };
 const UNIT_LABELS = { pcs: "pcs", ml: "ml", g: "g", bottles: "bottles" };
 const MOVEMENT_LABELS = {
@@ -613,6 +629,18 @@ function OverviewView({ items, movements, orders }) {
       !["received", "cancelled", "complete"].includes(o.po_status || o.status),
   );
   const liveCount = active.filter(isLiveInShop).length;
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const deadStock = active.filter(
+    (i) =>
+      parseFloat(i.quantity_on_hand || 0) > 0 &&
+      i.last_movement_at &&
+      new Date(i.last_movement_at) < sixtyDaysAgo,
+  );
+  const overstockItems = active.filter(
+    (i) =>
+      parseFloat(i.max_stock_level || 0) > 0 &&
+      parseFloat(i.quantity_on_hand || 0) > parseFloat(i.max_stock_level || 0),
+  );
   const catBreak = {};
   active.forEach((i) => {
     if (!catBreak[i.category]) catBreak[i.category] = { count: 0, value: 0 };
@@ -1094,6 +1122,152 @@ function OverviewView({ items, movements, orders }) {
         </div>
       </div>
 
+      {deadStock.length > 0 && (
+        <div
+          style={{
+            ...sCard,
+            border: `1px solid ${T.warningBd}`,
+            borderLeft: `3px solid ${T.warning}`,
+          }}
+        >
+          <div style={{ ...sLabel, color: T.warning, marginBottom: 10 }}>
+            Dead Stock — No Movement 60+ Days ({deadStock.length} item
+            {deadStock.length > 1 ? "s" : ""})
+          </div>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "12px",
+              fontFamily: T.fontUi,
+              marginTop: 10,
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={sTh}>Item</th>
+                <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
+                <th style={sTh}>Last Movement</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Tied-up Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deadStock.map((i) => {
+                const daysIdle = Math.floor(
+                  (Date.now() - new Date(i.last_movement_at)) / 86400000,
+                );
+                const val =
+                  parseFloat(i.quantity_on_hand || 0) *
+                  parseFloat(i.weighted_avg_cost || i.cost_price || 0);
+                return (
+                  <tr key={i.id}>
+                    <td style={{ ...sTd, fontWeight: 500 }}>{i.name}</td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {Math.floor(parseFloat(i.quantity_on_hand || 0))} {i.unit}
+                    </td>
+                    <td style={{ ...sTd, color: T.warning }}>
+                      {daysIdle} days ago
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                      }}
+                    >
+                      R{val.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {overstockItems.length > 0 && (
+        <div
+          style={{
+            ...sCard,
+            border: `1px solid ${T.infoBd}`,
+            borderLeft: `3px solid ${T.info}`,
+          }}
+        >
+          <div style={{ ...sLabel, color: T.info, marginBottom: 10 }}>
+            Overstock — Exceeds Max Level ({overstockItems.length} item
+            {overstockItems.length > 1 ? "s" : ""})
+          </div>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "12px",
+              fontFamily: T.fontUi,
+              marginTop: 10,
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={sTh}>Item</th>
+                <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Max Level</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Excess</th>
+              </tr>
+            </thead>
+            <tbody>
+              {overstockItems.map((i) => {
+                const excess =
+                  parseFloat(i.quantity_on_hand || 0) -
+                  parseFloat(i.max_stock_level || 0);
+                return (
+                  <tr key={i.id}>
+                    <td style={{ ...sTd, fontWeight: 500 }}>{i.name}</td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {Math.floor(parseFloat(i.quantity_on_hand || 0))} {i.unit}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        color: T.ink500,
+                      }}
+                    >
+                      {Math.floor(parseFloat(i.max_stock_level || 0))}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        color: T.info,
+                        fontWeight: 600,
+                      }}
+                    >
+                      +{Math.floor(excess)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Recent movements */}
       <div style={sCard}>
         <div style={sLabel}>Recent Stock Movements</div>
@@ -1289,6 +1463,9 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
               <th style={sTh}>Category</th>
               <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
               <th style={{ ...sTh, textAlign: "right" }}>Reorder</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Max Stock</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Reserved</th>
+              <th style={sTh}>Last Moved</th>
               <th style={{ ...sTh, textAlign: "right" }}>Cost (Flat)</th>
               <th style={{ ...sTh, textAlign: "right" }}>AVCO</th>
               <th style={{ ...sTh, textAlign: "right" }}>
@@ -1391,12 +1568,52 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
                     <td
                       style={{
                         ...sTd,
-                        textAlign: "right",
                         fontFamily: T.fontData,
+                        fontSize: "11px",
                         color: T.ink500,
                       }}
                     >
                       {item.reorder_level}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontSize: "11px",
+                        color: T.ink500,
+                      }}
+                    >
+                      {item.max_stock_level
+                        ? Math.floor(parseFloat(item.max_stock_level))
+                        : "—"}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontSize: "11px",
+                        color:
+                          parseFloat(item.reserved_qty || 0) > 0
+                            ? T.warning
+                            : T.ink400,
+                      }}
+                    >
+                      {Math.floor(parseFloat(item.reserved_qty || 0))}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        fontSize: "11px",
+                        color: T.ink500,
+                      }}
+                    >
+                      {item.last_movement_at
+                        ? new Date(item.last_movement_at).toLocaleDateString(
+                            "en-ZA",
+                          )
+                        : "—"}
                     </td>
                     <td
                       style={{
