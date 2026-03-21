@@ -126,6 +126,22 @@ export const TOOLTIP_CONTENT = {
   },
 
   // ── LOYALTY ENGINE ─────────────────────────────────────────────────────────
+  "points-distributed": {
+    title: "What is Points Distributed?",
+    body: "The total point value of QR codes that have been physically scanned and claimed by customers. This measures QR code engagement — how many points customers have unlocked through product scans. It does not include points earned from purchases or bonuses.",
+  },
+  "points-issued": {
+    title: "What is Points Issued?",
+    body: "The total points recorded across all loyalty transactions — including QR scans, online purchases, streak bonuses, and referrals. This is the complete audit trail total. Customer balances shown in their profiles are the operational figure used for tier calculations.",
+  },
+  "points-distributed": {
+    title: "What is Points Distributed?",
+    body: "The total point value of QR codes physically scanned and claimed by customers. Measures QR engagement only — does not include points from purchases or bonuses.",
+  },
+  "points-issued": {
+    title: "What is Points Issued?",
+    body: "Total points recorded across all loyalty transactions — QR scans, purchases, streak bonuses, and referrals combined. Customer profile balances are used for tier calculations.",
+  },
   "loyalty-schema": {
     title: "What is a loyalty schema?",
     body: "A schema is a complete set of loyalty programme settings — how many points customers earn, what the tier thresholds are, and how much points are worth when redeemed. You can switch between Conservative (low cost), Standard (balanced), and Aggressive (high reward) in one click.",
