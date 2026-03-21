@@ -64,7 +64,6 @@ const HQ_PAGES = [
   // ── Platform ─────────────────────────────────────────────────────────────────
   { group: "Platform", icon: "🏢", label: "Tenants", path: "/hq?tab=tenants" },
   { group: "Platform", icon: "💎", label: "Loyalty", path: "/hq?tab=loyalty" },
-  { group: "Platform", icon: "💎", label: "Loyalty", path: "/hq?tab=loyalty" },
   { group: "Platform", icon: "🛡", label: "Fraud", path: "/hq?tab=fraud" },
   {
     group: "Platform",
