@@ -1,10 +1,12 @@
 // src/components/hq/HQTenants.js
 // WP-GEN Session 5: Tenant management UI
+// WP-IND Session 1: industry_profile selector added
 // Tables: tenants, tenant_config, tenant_usage_log
 // Edge Function: create-admin-user (must be deployed separately)
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { INDUSTRY_PROFILES } from "../../constants/industryProfiles";
 
 const T = {
   ink900: "#0D0D0D",
@@ -257,6 +259,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
     admin_password: "",
     city: "",
     province: "",
+    industry_profile: "cannabis_retail",
   });
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(1); // 1=details, 2=confirm, 3=done
@@ -285,6 +288,7 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
           type: form.type,
           tier: form.tier,
           is_active: true,
+          industry_profile: form.industry_profile || "cannabis_retail",
           location_city: form.city || null,
           location_province: form.province || null,
         })
@@ -522,6 +526,33 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
                   </select>
                 </div>
                 <div>
+                  <label style={{ ...sLabel, marginBottom: 4 }}>
+                    Industry Profile
+                  </label>
+                  <select
+                    style={sSelect}
+                    value={form.industry_profile}
+                    onChange={(e) => set("industry_profile", e.target.value)}
+                  >
+                    {Object.entries(INDUSTRY_PROFILES).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.icon} {v.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: T.ink500,
+                      fontFamily: T.font,
+                      margin: "4px 0 0",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {INDUSTRY_PROFILES[form.industry_profile]?.description}
+                  </p>
+                </div>
+                <div>
                   <label style={{ ...sLabel, marginBottom: 4 }}>City</label>
                   <input
                     style={sInput}
@@ -658,9 +689,12 @@ function AddTenantModal({ onClose, onSaved, showToast }) {
 }
 
 // ── Feature flag editor panel ─────────────────────────────────────────────────
-function FlagEditor({ tenantId, config, onSaved, showToast }) {
+function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
   const [editing, setEditing] = useState(false);
-  const [flags, setFlags] = useState({ ...config });
+  const [flags, setFlags] = useState({
+    ...config,
+    industry_profile: industryProfile,
+  });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -681,6 +715,13 @@ function FlagEditor({ tenantId, config, onSaved, showToast }) {
           tier: flags.tier,
         })
         .eq("tenant_id", tenantId);
+      // Also update industry_profile on the tenants table
+      await supabase
+        .from("tenants")
+        .update({
+          industry_profile: flags.industry_profile || "cannabis_retail",
+        })
+        .eq("id", tenantId);
       if (error) throw error;
       setEditing(false);
       showToast("Feature flags saved.");
@@ -767,6 +808,24 @@ function FlagEditor({ tenantId, config, onSaved, showToast }) {
         >
           <div style={{ ...sLabel, marginBottom: 12 }}>
             Edit Feature Flags & Limits
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ ...sLabel, marginBottom: 4 }}>
+              Industry Profile (HQ only)
+            </label>
+            <select
+              style={sSelect}
+              value={flags.industry_profile || "cannabis_retail"}
+              onChange={(e) =>
+                setFlags((p) => ({ ...p, industry_profile: e.target.value }))
+              }
+            >
+              {Object.entries(INDUSTRY_PROFILES).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.icon} {v.label} — {v.description}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Tier quick-set */}
@@ -1221,6 +1280,25 @@ export default function HQTenants() {
                         {tenant.name}
                       </div>
                       <TierBadge tier={tenant.tier} />
+                      {tenant.industry_profile && (
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            padding: "2px 8px",
+                            borderRadius: "3px",
+                            background: T.infoBg,
+                            color: T.info,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            fontWeight: 700,
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {INDUSTRY_PROFILES[tenant.industry_profile]?.icon}{" "}
+                          {INDUSTRY_PROFILES[tenant.industry_profile]?.label ||
+                            tenant.industry_profile}
+                        </span>
+                      )}
                       {tenant.is_active === false && (
                         <span
                           style={{
@@ -1417,6 +1495,9 @@ export default function HQTenants() {
                       <FlagEditor
                         tenantId={tenant.id}
                         config={cfg}
+                        industryProfile={
+                          tenant.industry_profile || "cannabis_retail"
+                        }
                         onSaved={fetchAll}
                         showToast={showToast}
                       />
