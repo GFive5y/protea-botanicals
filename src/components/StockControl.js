@@ -1,4 +1,4 @@
-// src/components/StockControl.js v2.2 — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
+// src/components/StockControl.js v2.3 — WP-IND Session 2: category filter by industry profile — WP-STK Phase 2: AVCO + cost drift + unit_cost in history
 // v2.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all metric/numeric values
@@ -287,6 +287,15 @@ export default function StockControl() {
   const [items, setItems] = useState([]);
   const [stockAlerts, setStockAlerts] = useState([]);
   const ctx = usePageContext("admin-stock", null);
+  const { industryProfile } = useTenant();
+  const profile =
+    INDUSTRY_PROFILES[industryProfile] || INDUSTRY_PROFILES.cannabis_retail;
+  const visibleCategories =
+    profile.inventoryCategories === "non_cannabis"
+      ? Object.keys(CATEGORY_LABELS).filter(
+          (k) => !CANNABIS_ONLY_CATEGORIES.includes(k),
+        )
+      : Object.keys(CATEGORY_LABELS);
   const [movements, setMovements] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -521,6 +530,7 @@ export default function StockControl() {
               items={items}
               suppliers={suppliers}
               movements={movements}
+              visibleCategories={visibleCategories}
               onRefresh={fetchAll}
             />
           )}
@@ -1333,7 +1343,13 @@ function OverviewView({ items, movements, orders }) {
 }
 
 // ─── Items ────────────────────────────────────────────────────────────────────
-function ItemsView({ items, suppliers, movements, onRefresh }) {
+function ItemsView({
+  items,
+  suppliers,
+  movements,
+  visibleCategories,
+  onRefresh,
+}) {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -1423,11 +1439,13 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
           style={{ ...sSelect, width: "180px" }}
         >
           <option value="all">All Categories</option>
-          {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
+          {Object.entries(CATEGORY_LABELS)
+            .filter(([k]) => visibleCategories.includes(k))
+            .map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
         </select>
         <div style={{ flex: 1 }} />
         <button
@@ -1445,6 +1463,7 @@ function ItemsView({ items, suppliers, movements, onRefresh }) {
         <ItemForm
           item={editItem}
           suppliers={suppliers}
+          visibleCategories={visibleCategories}
           onSave={handleSave}
           onCancel={() => {
             setShowForm(false);
@@ -2132,7 +2151,14 @@ function ItemHistoryModal({ item, movements, onClose }) {
 }
 
 // ─── Item Form ────────────────────────────────────────────────────────────────
-function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
+function ItemForm({
+  item,
+  suppliers,
+  visibleCategories,
+  onSave,
+  onCancel,
+  saving,
+}) {
   const [form, setForm] = useState({
     sku: item?.sku || "",
     name: item?.name || "",
@@ -2225,11 +2251,13 @@ function ItemForm({ item, suppliers, onSave, onCancel, saving }) {
             value={form.category}
             onChange={(e) => set("category", e.target.value)}
           >
-            {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
+            {Object.entries(CATEGORY_LABELS)
+              .filter(([k]) => visibleCategories.includes(k))
+              .map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
           </select>
         </div>
         <div>
