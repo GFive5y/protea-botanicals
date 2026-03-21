@@ -25,6 +25,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { showCannabisField } from "../../constants/industryProfiles";
 import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
@@ -886,7 +887,7 @@ function SetPricePanel({ items, onRefresh }) {
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const ctx = usePageContext("hq-production", null);
-  const { tenantConfig } = useTenant();
+  const { tenantConfig, industryProfile } = useTenant();
   const [items, setItems] = useState([]);
   const [runs, setRuns] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -2720,7 +2721,10 @@ function BatchesPanel({
                           />
                         </div>
                       </div>
-                      {getBatchIsCannabis(b) &&
+                      {showCannabisField(
+                        industryProfile,
+                        getBatchIsCannabis(b),
+                      ) &&
                         tenantConfig?.feature_medical !== false && (
                           <div
                             style={{
@@ -3472,7 +3476,7 @@ function NewRunPanel({
               ({fillMlPerChamber}ml × {chambers} chambers)
             </div>
           )}
-          {isCannabis && (
+          {showCannabisField(industryProfile, isCannabis) && (
             <div>
               {fLabel(isVape ? "Strain *" : "Strain (optional)")}
               <select
