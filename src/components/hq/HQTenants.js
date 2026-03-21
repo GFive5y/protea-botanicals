@@ -715,13 +715,15 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
           tier: flags.tier,
         })
         .eq("tenant_id", tenantId);
+      if (error) throw error;
       // Also update industry_profile on the tenants table
-      await supabase
+      const { error: tenantErr } = await supabase
         .from("tenants")
         .update({
           industry_profile: flags.industry_profile || "cannabis_retail",
         })
         .eq("id", tenantId);
+      if (tenantErr) throw tenantErr;
       if (error) throw error;
       setEditing(false);
       showToast("Feature flags saved.");
