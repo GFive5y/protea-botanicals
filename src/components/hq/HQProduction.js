@@ -891,6 +891,7 @@ export default function HQProduction() {
   const [partners, setPartners] = useState([]);
   const [productFormats, setProductFormats] = useState([]);
   const [productStrains, setProductStrains] = useState([]);
+  const [formatBom, setFormatBom] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -926,34 +927,41 @@ export default function HQProduction() {
       // Apply tenant filter if resolved — falls back to all batches for pure HQ role
       if (hqTenantId) batchQuery.eq("tenant_id", hqTenantId);
 
-      const [itemsR, runsR, partnersR, formatsR, strainsR] = await Promise.all([
-        supabase
-          .from("inventory_items")
-          .select("*")
-          .eq("is_active", true)
-          .order("name"),
-        supabase
-          .from("production_runs")
-          .select(
-            `id,batch_id,run_number,status,planned_units,actual_units,started_at,completed_at,notes,created_at,batches(batch_number,product_name,strain,product_type,volume),production_run_inputs(id,run_id,item_id,quantity_planned,quantity_actual,notes,inventory_items(name,sku,unit,category))`,
-          )
-          .order("created_at", { ascending: false })
-          .limit(100),
-        supabase
-          .from("wholesale_partners")
-          .select("id,business_name,contact_name")
-          .order("business_name"),
-        supabase
-          .from("product_formats")
-          .select("*")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true }),
-        supabase
-          .from("product_strains")
-          .select("*")
-          .eq("is_active", true)
-          .order("name", { ascending: true }),
-      ]);
+      const [itemsR, runsR, partnersR, formatsR, strainsR, bomR] =
+        await Promise.all([
+          supabase
+            .from("inventory_items")
+            .select("*")
+            .eq("is_active", true)
+            .order("name"),
+          supabase
+            .from("production_runs")
+            .select(
+              `id,batch_id,run_number,status,planned_units,actual_units,started_at,completed_at,notes,created_at,batches(batch_number,product_name,strain,product_type,volume),production_run_inputs(id,run_id,item_id,quantity_planned,quantity_actual,notes,inventory_items(name,sku,unit,category))`,
+            )
+            .order("created_at", { ascending: false })
+            .limit(100),
+          supabase
+            .from("wholesale_partners")
+            .select("id,business_name,contact_name")
+            .order("business_name"),
+          supabase
+            .from("product_formats")
+            .select("*")
+            .eq("is_active", true)
+            .order("sort_order", { ascending: true }),
+          supabase
+            .from("product_strains")
+            .select("*")
+            .eq("is_active", true)
+            .order("name", { ascending: true }),
+          supabase
+            .from("product_format_bom")
+            .select(
+              "id,format_id,inventory_item_id,material_type,quantity_per_unit,unit,notes,sort_order,inventory_items(id,name,sku,unit,quantity_on_hand,cost_price,weighted_avg_cost,category)",
+            )
+            .order("sort_order", { ascending: true }),
+        ]);
       const batchesR = await batchQuery;
       if (itemsR.error) throw itemsR.error;
       if (runsR.error) throw runsR.error;
@@ -964,6 +972,7 @@ export default function HQProduction() {
       setPartners(partnersR.data || []);
       setProductFormats(formatsR.data || []);
       setProductStrains(strainsR.data || []);
+      setFormatBom(bomR.data || []);
     } catch (err) {
       console.error("[HQProduction] Fetch error:", err);
       setError(err.message);
@@ -1259,6 +1268,7 @@ export default function HQProduction() {
               items={items}
               productFormats={productFormats}
               productStrains={productStrains}
+              formatBom={formatBom}
               onComplete={() => {
                 fetchAll();
                 setSubTab("history");
@@ -2873,7 +2883,13 @@ function BatchesPanel({
 }
 
 // ─── New Run Panel ────────────────────────────────────────────────────────────
-function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
+function NewRunPanel({
+  items,
+  productFormats,
+  productStrains,
+  formatBom,
+  onComplete,
+}) {
   // ── Build format catalogue + groups from live DB; fall back to hardcoded if empty ──
   const formatCatalogue =
     productFormats.length > 0
@@ -2932,12 +2948,20 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
     terpene_pct_override: "",
     custom_fill_ml: "",
     product_name_override: "",
+    bom_selections: {},
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [completedRun, setCompletedRun] = useState(null);
   const set = (k, v) => {
     setForm((p) => ({ ...p, [k]: v }));
+    setConfirmed(false);
+  };
+  const setBomSel = (lineId, itemId) => {
+    setForm((p) => ({
+      ...p,
+      bom_selections: { ...p.bom_selections, [lineId]: itemId },
+    }));
     setConfirmed(false);
   };
 
@@ -2948,6 +2972,12 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
   const isVape = fmt.is_vape;
   const isCannabis =
     fmt.is_cannabis !== undefined ? !!fmt.is_cannabis : fmt.is_vape;
+  const fmtRecord = productFormats.find((f) => f.key === form.format_key);
+  const activeBom =
+    !isVape && fmtRecord && formatBom
+      ? formatBom.filter((b) => b.format_id === fmtRecord.id)
+      : [];
+  const hasBom = activeBom.length > 0;
   const planned = parseInt(form.planned_units) || 0;
   const fillMlPerChamber = fmt.custom_fill
     ? parseFloat(form.custom_fill_ml) || 0
@@ -2964,6 +2994,39 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
     ? +(planned * distMlPerUnit * terpRatio).toFixed(3)
     : 0;
   const hwNeeded = isVape ? planned : 0;
+  const bomLineData = activeBom.map((line) => {
+    const selItemId = form.bom_selections[line.id] || "";
+    const selItem = items.find((i) => i.id === selItemId);
+    const needed = +(parseFloat(line.quantity_per_unit || 0) * planned).toFixed(
+      3,
+    );
+    const avail = parseFloat(selItem?.quantity_on_hand || 0);
+    const cost =
+      parseFloat(selItem?.weighted_avg_cost || selItem?.cost_price || 0) *
+      needed;
+    const candidateItems = items.filter((i) => {
+      if (line.material_type === "distillate")
+        return i.category === "raw_material" && i.unit === "ml";
+      if (line.material_type === "terpene") return i.category === "terpene";
+      if (line.material_type === "hardware") return i.category === "hardware";
+      if (line.material_type === "packaging") return i.category === "packaging";
+      return i.is_active !== false;
+    });
+    return {
+      line,
+      selItemId,
+      selItem,
+      needed,
+      avail,
+      ok: !!selItemId && avail >= needed,
+      cost,
+      candidateItems,
+    };
+  });
+  const bomMatsOk = hasBom
+    ? planned > 0 && bomLineData.every((bl) => bl.ok)
+    : true;
+  const bomTotalCost = bomLineData.reduce((s, bl) => s + bl.cost, 0);
   const distItems = items.filter(
     (i) => i.category === "raw_material" && i.unit === "ml",
   );
@@ -2985,7 +3048,7 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
       hwAvail >= hwNeeded &&
       distMlPerUnit > 0);
   const hasName = form.strain || form.product_name_override;
-  const canRun = planned > 0 && vapeMatsOk && hasName;
+  const canRun = planned > 0 && (hasBom ? bomMatsOk : vapeMatsOk) && hasName;
   const distCost = selDist
     ? parseFloat(selDist.cost_price || 0) * distNeeded
     : 0;
@@ -2993,7 +3056,7 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
     ? parseFloat(selTerp.cost_price || 0) * terpNeeded
     : 0;
   const hwCost = selHw ? parseFloat(selHw.cost_price || 0) * hwNeeded : 0;
-  const totalCost = distCost + terpCost + hwCost;
+  const totalCost = hasBom ? bomTotalCost : distCost + terpCost + hwCost;
   const costPerUnit = planned > 0 ? (totalCost / planned).toFixed(2) : 0;
   const finalActual = parseInt(form.actual_units) || planned;
   const yieldPct = calcYield(finalActual, planned);
@@ -3127,6 +3190,32 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
           .from("inventory_items")
           .update({ quantity_on_hand: hwAvail - hwNeeded })
           .eq("id", form.hardware_item_id);
+      }
+      if (hasBom && !isVape && bomLineData.length > 0) {
+        await supabase.from("production_run_inputs").insert(
+          bomLineData.map((bl) => ({
+            run_id: run.id,
+            item_id: bl.selItemId,
+            quantity_planned: bl.needed,
+            quantity_actual: bl.needed,
+            notes: bl.line.notes || bl.line.material_type,
+          })),
+        );
+        for (const bl of bomLineData) {
+          if (!bl.selItemId) continue;
+          await supabase.from("stock_movements").insert({
+            item_id: bl.selItemId,
+            quantity: -bl.needed,
+            movement_type: "production_out",
+            reference: runNumber,
+            notes: `Run ${runNumber}: ${bl.selItem?.name || bl.line.material_type}`,
+          });
+          const curAvail = parseFloat(bl.selItem?.quantity_on_hand || 0);
+          await supabase
+            .from("inventory_items")
+            .update({ quantity_on_hand: Math.max(0, curAvail - bl.needed) })
+            .eq("id", bl.selItemId);
+        }
       }
       const existingFin = items.find(
         (i) => i.category === "finished_product" && i.name === finishedName,
@@ -3525,7 +3614,74 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
         </div>
       )}
 
-      {!isVape && planned > 0 && (
+      {hasBom && planned > 0 && (
+        <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
+          <div style={{ ...sLabel, marginBottom: "16px" }}>
+            Step 2 — Bill of Materials
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
+              gap: "12px",
+            }}
+          >
+            {bomLineData.map(
+              ({
+                line,
+                selItemId,
+                selItem,
+                needed,
+                avail,
+                ok,
+                candidateItems,
+              }) => (
+                <div key={line.id}>
+                  {fLabel(
+                    `${line.notes || line.material_type} *`,
+                    needed > 0 && planned > 0
+                      ? `${needed.toFixed(3)} ${line.unit} needed`
+                      : null,
+                  )}
+                  <select
+                    style={{
+                      ...sSelect,
+                      borderColor: selItemId && !ok ? T.danger : T.ink150,
+                    }}
+                    value={selItemId}
+                    onChange={(e) => setBomSel(line.id, e.target.value)}
+                  >
+                    <option value="">— Select —</option>
+                    {candidateItems.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} (
+                        {parseFloat(i.quantity_on_hand || 0).toFixed(2)}{" "}
+                        {i.unit})
+                      </option>
+                    ))}
+                  </select>
+                  {selItemId && !ok && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: T.danger,
+                        margin: "4px 0 0",
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      Need {needed.toFixed(3)}
+                      {line.unit} — only {avail.toFixed(2)}
+                      {line.unit} available
+                    </p>
+                  )}
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      )}
+
+      {!isVape && !hasBom && planned > 0 && (
         <div
           style={{
             ...sCard,
@@ -3712,7 +3868,18 @@ function NewRunPanel({ items, productFormats, productStrains, onComplete }) {
                   lineHeight: "1.9",
                 }}
               >
-                {isVape && (
+                {hasBom &&
+                  bomLineData.map((bl) => (
+                    <li key={bl.line.id}>
+                      Deduct{" "}
+                      <strong>
+                        {bl.needed.toFixed(3)}
+                        {bl.line.unit}
+                      </strong>{" "}
+                      from {bl.selItem?.name || bl.line.material_type}
+                    </li>
+                  ))}
+                {isVape && !hasBom && (
                   <>
                     <li>
                       Deduct <strong>{distNeeded}ml</strong> from{" "}
