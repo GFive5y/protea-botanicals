@@ -48,6 +48,7 @@ import HQLoyalty from "../components/hq/HQLoyalty";
 
 // ── WP-8 ─────────────────────────────────────────────────────────────────────
 import HQFraud from "../components/hq/HQFraud";
+import HQInvoices from "../components/hq/HQInvoices";
 
 // ── WP-X: Live FX Bar (untouched — permanent) ────────────────────────────────
 import LiveFXBar from "../components/hq/LiveFXBar";
@@ -77,7 +78,8 @@ const TABS = [
   { id: "supply-chain", label: "Supply Chain", icon: "📦", ready: true },
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
   { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
-  { id: "hq-production", label: "Production", icon: "⚙️", ready: true },
+  { id: "invoices", label: "Invoices", icon: "🧾", ready: true },
+  { id: "hq-production", label: "Production", icon: "⚗️", ready: true },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   // Finance
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
@@ -221,6 +223,7 @@ export default function HQDashboard() {
           {activeTab === "retailer-health" && <RetailerHealth />}
           {activeTab === "suppliers" && <HQSuppliers />}
           {activeTab === "procurement" && <HQPurchaseOrders />}
+          {activeTab === "invoices" && <HQInvoices />}
           {activeTab === "costing" && <HQCogs />}
           {activeTab === "pricing" && <HQPricing />}
           {activeTab === "pl" && <HQProfitLoss />}
