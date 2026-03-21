@@ -145,8 +145,8 @@ export function SystemHealthProvider({ children }) {
           .eq("role", "customer"),
         supabase
           .from("loyalty_transactions")
-          .select("points_earned")
-          .eq("transaction_type", "earn"),
+          .select("points")
+          .or("transaction_type.eq.earned,transaction_type.eq.EARNED"),
       ]);
 
       // ── Inventory ──────────────────────────────────────────────────────
