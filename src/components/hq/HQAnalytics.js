@@ -1001,7 +1001,11 @@ function OverviewAnalytics({ data }) {
         />
         <KPI label="Customers" value={customers} semantic={null} />
         <KPI
-          label="Points Issued"
+          label={
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              Points Issued <InfoTooltip id="points-issued" />
+            </span>
+          }
           value={totalPoints.toLocaleString()}
           semantic={null}
         />
