@@ -1263,6 +1263,7 @@ export default function HQProduction() {
               items={items}
               productFormats={productFormats}
               tenantConfig={tenantConfig}
+              industryProfile={industryProfile}
               onNavNewRun={() => setSubTab("new-run")}
               onRefresh={fetchAll}
             />
@@ -1273,6 +1274,7 @@ export default function HQProduction() {
               productFormats={productFormats}
               productStrains={productStrains}
               formatBom={formatBom}
+              industryProfile={industryProfile}
               onComplete={() => {
                 fetchAll();
                 setSubTab("history");
@@ -1965,6 +1967,7 @@ function BatchesPanel({
   items,
   productFormats,
   tenantConfig,
+  industryProfile,
   onNavNewRun,
   onRefresh,
 }) {
@@ -2897,6 +2900,7 @@ function NewRunPanel({
   productFormats,
   productStrains,
   formatBom,
+  industryProfile,
   onComplete,
 }) {
   // ── Build format catalogue + groups from live DB; fall back to hardcoded if empty ──
