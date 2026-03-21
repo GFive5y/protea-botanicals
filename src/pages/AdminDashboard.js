@@ -826,7 +826,7 @@ export default function AdminDashboard() {
             {scanTrend24h.length > 0 && (
               <div style={{ marginBottom: 24 }}>
                 <ChartCard title="Scan Activity — Last 24 Hours" height={200}>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={240}>
                     <AreaChart
                       data={scanTrend24h}
                       margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
@@ -1138,7 +1138,7 @@ export default function AdminDashboard() {
                 }}
               >
                 <ChartCard title="Platform Overview" height={220}>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={240}>
                     <BarChart
                       data={platformBarData}
                       margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
@@ -1189,7 +1189,7 @@ export default function AdminDashboard() {
 
                 {activityData.length > 0 && (
                   <ChartCard title="Today's Activity" height={220}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={240}>
                       <BarChart
                         data={activityData}
                         layout="vertical"
@@ -1430,7 +1430,7 @@ export default function AdminDashboard() {
                     }}
                   >
                     <ChartCard title="Users by Role" height={200}>
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height={240}>
                         <PieChart>
                           <Pie
                             data={roleDonut}
@@ -1460,7 +1460,7 @@ export default function AdminDashboard() {
                     </ChartCard>
 
                     <ChartCard title="Loyalty Tier Distribution" height={200}>
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height={240}>
                         <BarChart
                           data={tierBar}
                           margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
@@ -1514,7 +1514,7 @@ export default function AdminDashboard() {
                     </ChartCard>
 
                     <ChartCard title="Top Users by Points" height={200}>
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height={240}>
                         <BarChart
                           data={topPts}
                           margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
