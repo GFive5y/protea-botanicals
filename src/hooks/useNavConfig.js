@@ -62,7 +62,8 @@ const HQ_PAGES = [
     path: "/hq?tab=reorder",
   },
   // ── Platform ─────────────────────────────────────────────────────────────────
-  { group: "Platform", icon: "🏢", label: "Tenants", path: "/hq?tab=tenants" },
+  { group: "Platform", icon: "ðŸ¢", label: "Tenants", path: "/hq?tab=tenants" },
+  { group: "Platform", icon: "⚕️", label: "Medical", path: "/hq?tab=medical" },
   { group: "Platform", icon: "💎", label: "Loyalty", path: "/hq?tab=loyalty" },
   { group: "Platform", icon: "🛡", label: "Fraud", path: "/hq?tab=fraud" },
   {
