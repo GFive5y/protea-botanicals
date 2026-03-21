@@ -49,6 +49,7 @@ import HQLoyalty from "../components/hq/HQLoyalty";
 // ── WP-8 ─────────────────────────────────────────────────────────────────────
 import HQFraud from "../components/hq/HQFraud";
 import HQInvoices from "../components/hq/HQInvoices";
+import HQTenants from "../components/hq/HQTenants";
 
 // ── WP-X: Live FX Bar (untouched — permanent) ────────────────────────────────
 import LiveFXBar from "../components/hq/LiveFXBar";
@@ -224,6 +225,7 @@ export default function HQDashboard() {
           {activeTab === "suppliers" && <HQSuppliers />}
           {activeTab === "procurement" && <HQPurchaseOrders />}
           {activeTab === "invoices" && <HQInvoices />}
+          {activeTab === "tenants" && <HQTenants />}
           {activeTab === "costing" && <HQCogs />}
           {activeTab === "pricing" && <HQPricing />}
           {activeTab === "pl" && <HQProfitLoss />}
