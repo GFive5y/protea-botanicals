@@ -2289,6 +2289,61 @@ export default function HQDocuments({ initialDocId = null }) {
         } else if (action === "create_batch") {
           const { error } = await supabase.from(table).insert(data);
           if (error) throw error;
+        } else if (action === "create_inventory_item") {
+          const invData = {
+            sku:
+              data.sku ||
+              `IMP-${(data.name || "ITEM")
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "-")
+                .slice(0, 20)}`,
+            name: data.name,
+            category: data.category || "finished_product",
+            unit: data.unit || "pcs",
+            quantity_on_hand: Number(data.quantity_on_hand ?? 0),
+            cost_price: parseFloat(data.cost_price ?? 0),
+            sell_price: 0,
+            is_active: true,
+            supplier_id: data.supplier_id || docSupplierId || null,
+            description:
+              data.description ||
+              `Imported from ${selectedDoc.supplier_name || "supplier"} via ${extraction.reference?.number || selectedDoc.file_name}`,
+          };
+          const { data: newItem, error: invErr } = await supabase
+            .from("inventory_items")
+            .insert(invData)
+            .select("id,name,sku")
+            .single();
+          if (invErr) throw invErr;
+          update._createdItemId = newItem.id;
+        } else if (action === "create_stock_movement") {
+          const pairedCreate = toApply.find(
+            (u) => u.action === "create_inventory_item" && u._createdItemId,
+          );
+          const itemId = pairedCreate?._createdItemId ?? record_id;
+          if (!itemId)
+            throw new Error(
+              "create_stock_movement: no item_id - ensure create_inventory_item runs first",
+            );
+          const qty = Number(data.quantity ?? 0);
+          if (qty <= 0)
+            throw new Error(
+              `create_stock_movement: quantity must be > 0 (got ${data.quantity})`,
+            );
+          const { error: movErr } = await supabase
+            .from("stock_movements")
+            .insert({
+              item_id: itemId,
+              quantity: qty,
+              movement_type: data.movement_type || "purchase_in",
+              unit_cost: parseFloat(data.unit_cost ?? 0) || null,
+              reference: data.reference ?? extraction.reference?.number ?? null,
+              notes:
+                data.notes ||
+                `Received via ${extraction.reference?.number || selectedDoc.file_name}`,
+              performed_by: user?.id ?? null,
+            });
+          if (movErr) throw movErr;
         } else if (record_id) {
           const { error } = await supabase
             .from(table)
