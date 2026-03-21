@@ -1823,7 +1823,7 @@ function MarginGauge({ value, color }) {
     <svg
       viewBox="0 0 200 200"
       width="100%"
-      height="100%"
+      height={240}
       style={{ display: "block" }}
     >
       <path
