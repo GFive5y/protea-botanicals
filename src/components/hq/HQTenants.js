@@ -86,22 +86,6 @@ const sLabel = {
   fontFamily: T.font,
   fontWeight: 700,
 };
-const sTh = {
-  textAlign: "left",
-  padding: "10px 12px",
-  fontSize: "9px",
-  letterSpacing: "0.15em",
-  textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
-  fontWeight: 700,
-};
-const sTd = {
-  padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink075}`,
-  color: T.ink700,
-  verticalAlign: "top",
-};
 
 // ── Tier definitions ──────────────────────────────────────────────────────────
 const TIERS = {
