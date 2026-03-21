@@ -194,7 +194,7 @@ export default function HQAnalytics() {
           const r = await supabase
             .from("inventory_items")
             .select(
-              "id,name,sku,category,unit,quantity_on_hand,reorder_level,cost_price,sell_price,is_active,supplier_id",
+              "id,name,sku,category,unit,quantity_on_hand,reorder_level,cost_price,weighted_avg_cost,sell_price,is_active,supplier_id",
             );
           return r.data || [];
         })
@@ -687,7 +687,9 @@ function OverviewAnalytics({ data }) {
     0,
   );
   const stockCost = finishedInv.reduce(
-    (s, i) => s + (i.quantity_on_hand || 0) * (i.cost_price || 0),
+    (s, i) =>
+      s +
+      (i.quantity_on_hand || 0) * (i.weighted_avg_cost ?? i.cost_price ?? 0),
     0,
   );
   const potentialMargin =
@@ -1564,7 +1566,8 @@ function SupplyChainAnalytics({ data }) {
     if (!categories[cat]) categories[cat] = { count: 0, value: 0, cost: 0 };
     categories[cat].count++;
     categories[cat].value += (i.quantity_on_hand || 0) * (i.sell_price || 0);
-    categories[cat].cost += (i.quantity_on_hand || 0) * (i.cost_price || 0);
+    categories[cat].cost +=
+      (i.quantity_on_hand || 0) * (i.weighted_avg_cost ?? i.cost_price ?? 0);
   });
   const poStatuses = {};
   pos.forEach((p) => {
