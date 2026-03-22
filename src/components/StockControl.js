@@ -31,6 +31,7 @@ import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
 import { ChartCard, ChartTooltip, InlineProgressBar } from "./viz";
 import StockItemModal from "./StockItemModal";
+import StockAIAnalysis from "./hq/StockAIAnalysis";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -543,6 +544,7 @@ export default function StockControl() {
               suppliers={suppliers}
               movements={movements}
               visibleCategories={visibleCategories}
+              industryProfile={industryProfile}
               onRefresh={fetchAll}
             />
           )}
@@ -1368,6 +1370,7 @@ function ItemsView({
   suppliers,
   movements,
   visibleCategories,
+  industryProfile,
   onRefresh,
 }) {
   const [filter, setFilter] = useState("all");
@@ -1376,7 +1379,15 @@ function ItemsView({
   const [editItem, setEditItem] = useState(null);
   const [saving, setSaving] = useState(false);
   const [historyItem, setHistoryItem] = useState(null);
+  const [expandedItemId, setExpandedItemId] = useState(null);
+  const [aiItem, setAiItem] = useState(null);
   const docSourceMap = buildDocSourceMap(movements);
+  const isCannabis = [
+    "cannabis_retail",
+    "cannabis_dispensary",
+    "mixed_retail",
+  ].includes(industryProfile);
+  const isFoodBev = industryProfile === "food_beverage";
 
   const filtered = items.filter((i) => {
     if (filter !== "all" && i.category !== filter) return false;
@@ -1549,240 +1560,297 @@ function ItemsView({
                 const isOut = item.quantity_on_hand <= 0;
                 const live = isLiveInShop(item);
                 return (
-                  <tr key={item.id}>
-                    <td
-                      style={{
-                        ...sTd,
-                        fontFamily: T.fontData,
-                        fontSize: "11px",
-                        color: T.ink500,
-                      }}
-                    >
-                      {item.sku}
-                    </td>
-                    <td style={{ ...sTd, fontWeight: 500 }}>
-                      <div
+                  <React.Fragment key={item.id}>
+                    <tr>
+                      <td
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                          flexWrap: "wrap",
+                          ...sTd,
+                          fontFamily: T.fontData,
+                          fontSize: "11px",
+                          color: T.ink500,
                         }}
                       >
-                        {item.name}
-                        {live && <LiveShopBadge />}
-                      </div>
-                    </td>
-                    <td style={sTd}>
-                      <span
-                        style={{
-                          fontSize: "9px",
-                          padding: "2px 8px",
-                          borderRadius: "3px",
-                          background: T.ink075,
-                          color: CATEGORY_COLORS[item.category] || T.ink500,
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {CATEGORY_LABELS[item.category]}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        fontWeight: 600,
-                        color: T.ink500,
-                        fontSize: "11px",
-                      }}
-                    >
-                      {item.quantity_on_hand} {UNIT_LABELS[item.unit]}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        fontWeight: 700,
-                        color:
-                          availQty(item) <= 0
-                            ? T.danger
-                            : parseFloat(item.reserved_qty || 0) > 0
-                              ? T.warning
-                              : T.success,
-                      }}
-                    >
-                      {availQty(item).toFixed(0)} {UNIT_LABELS[item.unit]}
-                      {parseFloat(item.reserved_qty || 0) > 0 && (
+                        {item.sku}
+                      </td>
+                      <td style={{ ...sTd, fontWeight: 500 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {item.name}
+                          {live && <LiveShopBadge />}
+                        </div>
+                      </td>
+                      <td style={sTd}>
                         <span
                           style={{
-                            marginLeft: "6px",
                             fontSize: "9px",
-                            padding: "1px 5px",
+                            padding: "2px 8px",
                             borderRadius: "3px",
-                            background: T.warningBg,
-                            color: T.warning,
+                            background: T.ink075,
+                            color: CATEGORY_COLORS[item.category] || T.ink500,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
                             fontWeight: 700,
                           }}
                         >
-                          {Math.floor(parseFloat(item.reserved_qty))} held
+                          {CATEGORY_LABELS[item.category]}
                         </span>
-                      )}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        fontFamily: T.fontData,
-                        fontSize: "11px",
-                        color: T.ink500,
-                      }}
-                    >
-                      {item.reorder_level}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        fontSize: "11px",
-                        color: T.ink500,
-                      }}
-                    >
-                      {item.max_stock_level
-                        ? Math.floor(parseFloat(item.max_stock_level))
-                        : "—"}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        fontSize: "11px",
-                        color:
-                          parseFloat(item.reserved_qty || 0) > 0
-                            ? T.warning
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontWeight: 600,
+                          color: T.ink500,
+                          fontSize: "11px",
+                        }}
+                      >
+                        {item.quantity_on_hand} {UNIT_LABELS[item.unit]}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontWeight: 700,
+                          color:
+                            availQty(item) <= 0
+                              ? T.danger
+                              : parseFloat(item.reserved_qty || 0) > 0
+                                ? T.warning
+                                : T.success,
+                        }}
+                      >
+                        {availQty(item).toFixed(0)} {UNIT_LABELS[item.unit]}
+                        {parseFloat(item.reserved_qty || 0) > 0 && (
+                          <span
+                            style={{
+                              marginLeft: "6px",
+                              fontSize: "9px",
+                              padding: "1px 5px",
+                              borderRadius: "3px",
+                              background: T.warningBg,
+                              color: T.warning,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {Math.floor(parseFloat(item.reserved_qty))} held
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontFamily: T.fontData,
+                          fontSize: "11px",
+                          color: T.ink500,
+                        }}
+                      >
+                        {item.reorder_level}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontSize: "11px",
+                          color: T.ink500,
+                        }}
+                      >
+                        {item.max_stock_level
+                          ? Math.floor(parseFloat(item.max_stock_level))
+                          : "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontSize: "11px",
+                          color:
+                            parseFloat(item.reserved_qty || 0) > 0
+                              ? T.warning
+                              : T.ink400,
+                        }}
+                      >
+                        {Math.floor(parseFloat(item.reserved_qty || 0))}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontSize: "11px",
+                          color: T.ink500,
+                        }}
+                      >
+                        {item.last_movement_at
+                          ? new Date(item.last_movement_at).toLocaleDateString(
+                              "en-ZA",
+                            )
+                          : "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          color: T.ink400,
+                        }}
+                      >
+                        R{(item.cost_price || 0).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontWeight: item.weighted_avg_cost ? 600 : 400,
+                          color: item.weighted_avg_cost
+                            ? Math.abs(
+                                (item.weighted_avg_cost - item.cost_price) /
+                                  (item.cost_price || 1),
+                              ) > 0.05
+                              ? T.warning
+                              : T.success
                             : T.ink400,
-                      }}
-                    >
-                      {Math.floor(parseFloat(item.reserved_qty || 0))}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        fontSize: "11px",
-                        color: T.ink500,
-                      }}
-                    >
-                      {item.last_movement_at
-                        ? new Date(item.last_movement_at).toLocaleDateString(
-                            "en-ZA",
-                          )
-                        : "—"}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        color: T.ink400,
-                      }}
-                    >
-                      R{(item.cost_price || 0).toFixed(2)}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        fontWeight: item.weighted_avg_cost ? 600 : 400,
-                        color: item.weighted_avg_cost
-                          ? Math.abs(
-                              (item.weighted_avg_cost - item.cost_price) /
-                                (item.cost_price || 1),
-                            ) > 0.05
-                            ? T.warning
-                            : T.success
-                          : T.ink400,
-                      }}
-                    >
-                      {item.weighted_avg_cost
-                        ? `R${item.weighted_avg_cost.toFixed(2)}`
-                        : "—"}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        fontWeight: 500,
-                      }}
-                    >
-                      R{(item.sell_price || 0).toFixed(2)}
-                    </td>
-                    <td
-                      style={{
-                        ...sTd,
-                        textAlign: "right",
-                        fontFamily: T.fontData,
-                        color: margin(item) ? T.success : T.ink400,
-                      }}
-                    >
-                      {margin(item) ? `${margin(item)}%` : "—"}
-                    </td>
-                    <td style={{ ...sTd, fontSize: "12px", color: T.ink500 }}>
-                      {item.suppliers?.name || "—"}
-                    </td>
-                    <td style={sTd}>
-                      <DocumentSourceBadge
-                        movement={docSourceMap[item.id] || null}
-                      />
-                    </td>
-                    <td style={sTd}>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        <button
-                          onClick={() => setHistoryItem(item)}
+                        }}
+                      >
+                        {item.weighted_avg_cost
+                          ? `R${item.weighted_avg_cost.toFixed(2)}`
+                          : "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontWeight: 500,
+                        }}
+                      >
+                        R{(item.sell_price || 0).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          color: margin(item) ? T.success : T.ink400,
+                        }}
+                      >
+                        {margin(item) ? `${margin(item)}%` : "—"}
+                      </td>
+                      <td style={{ ...sTd, fontSize: "12px", color: T.ink500 }}>
+                        {item.suppliers?.name || "—"}
+                      </td>
+                      <td style={sTd}>
+                        <DocumentSourceBadge
+                          movement={docSourceMap[item.id] || null}
+                        />
+                      </td>
+                      <td style={sTd}>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() =>
+                              setExpandedItemId(
+                                expandedItemId === item.id ? null : item.id,
+                              )
+                            }
+                            style={{
+                              ...sBtn("outline"),
+                              padding: "4px 10px",
+                              fontSize: "9px",
+                              color:
+                                expandedItemId === item.id
+                                  ? T.accent
+                                  : T.ink500,
+                              borderColor:
+                                expandedItemId === item.id
+                                  ? T.accentBd
+                                  : T.ink150,
+                              background:
+                                expandedItemId === item.id
+                                  ? T.accentLit
+                                  : "transparent",
+                            }}
+                            title="Expand details"
+                          >
+                            {expandedItemId === item.id ? "▲" : "▼"}
+                          </button>
+                          <button
+                            onClick={() => setHistoryItem(item)}
+                            style={{
+                              ...sBtn("outline"),
+                              padding: "4px 10px",
+                              fontSize: "9px",
+                              color: T.info,
+                              borderColor: T.infoBd,
+                            }}
+                            title="View history"
+                          >
+                            Log
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditItem(item);
+                              setShowForm(true);
+                            }}
+                            style={{
+                              ...sBtn("outline"),
+                              padding: "4px 10px",
+                              fontSize: "9px",
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeactivate(item)}
+                            style={{
+                              ...sBtn("outline"),
+                              padding: "4px 10px",
+                              fontSize: "9px",
+                              color: T.danger,
+                              borderColor: T.dangerBd,
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedItemId === item.id && (
+                      <tr key={`${item.id}-exp`}>
+                        <td
+                          colSpan="17"
                           style={{
-                            ...sBtn("outline"),
-                            padding: "4px 10px",
-                            fontSize: "9px",
-                            color: T.info,
-                            borderColor: T.infoBd,
-                          }}
-                          title="View history"
-                        >
-                          Log
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditItem(item);
-                            setShowForm(true);
-                          }}
-                          style={{
-                            ...sBtn("outline"),
-                            padding: "4px 10px",
-                            fontSize: "9px",
+                            padding: 0,
+                            borderBottom: `2px solid ${T.accentBd}`,
                           }}
                         >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeactivate(item)}
-                          style={{
-                            ...sBtn("outline"),
-                            padding: "4px 10px",
-                            fontSize: "9px",
-                            color: T.danger,
-                            borderColor: T.dangerBd,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          <StockItemExpandedCard
+                            item={item}
+                            movements={movements.filter(
+                              (m) => m.item_id === item.id,
+                            )}
+                            industryProfile={industryProfile}
+                            isCannabis={isCannabis}
+                            isFoodBev={isFoodBev}
+                            onEdit={() => {
+                              setEditItem(item);
+                              setShowForm(true);
+                              setExpandedItemId(null);
+                            }}
+                            onHistory={() => setHistoryItem(item)}
+                            onAI={() => setAiItem(item)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
@@ -1817,6 +1885,459 @@ function ItemsView({
           onClose={() => setHistoryItem(null)}
         />
       )}
+      {aiItem && (
+        <StockAIAnalysis
+          item={aiItem}
+          industryProfile={industryProfile}
+          movements={movements.filter((m) => m.item_id === aiItem.id)}
+          onClose={() => setAiItem(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Stock Item Expanded Card ─────────────────────────────────────────────────
+function StockItemExpandedCard({
+  item,
+  movements,
+  industryProfile,
+  isCannabis,
+  isFoodBev,
+  onEdit,
+  onHistory,
+  onAI,
+}) {
+  const recent = [...(movements || [])]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 5);
+  const availQtyVal = Math.max(
+    0,
+    parseFloat(item.quantity_on_hand || 0) - parseFloat(item.reserved_qty || 0),
+  );
+  const margin =
+    item.sell_price && item.cost_price
+      ? (((item.sell_price - item.cost_price) / item.sell_price) * 100).toFixed(
+          1,
+        )
+      : null;
+  const allergens = item.allergen_flags
+    ? Object.entries(item.allergen_flags)
+        .filter(([, v]) => v)
+        .map(([k]) => k)
+    : [];
+  const daysToExpiry = item.expiry_date
+    ? Math.ceil((new Date(item.expiry_date) - new Date()) / 86400000)
+    : null;
+
+  const MOVEMENT_TYPE_LABELS = {
+    purchase_in: "Purchase In",
+    sale_out: "Sale Out",
+    production_out: "Production Out",
+    production_in: "Production In",
+    adjustment: "Adjustment",
+    waste: "Waste",
+  };
+
+  return (
+    <div
+      style={{
+        padding: "20px 24px",
+        background: T.accentLit,
+        borderTop: `1px solid ${T.accentBd}`,
+        fontFamily: T.fontUi,
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        {/* Core metrics */}
+        <div
+          style={{
+            background: "#fff",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
+            padding: "14px 16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink400,
+              marginBottom: 10,
+            }}
+          >
+            Stock Position
+          </div>
+          {[
+            [
+              "On Hand",
+              `${parseFloat(item.quantity_on_hand || 0).toFixed(2)} ${item.unit}`,
+              item.quantity_on_hand <= 0 ? T.danger : T.success,
+            ],
+            [
+              "Reserved",
+              `${parseFloat(item.reserved_qty || 0).toFixed(0)} ${item.unit}`,
+              parseFloat(item.reserved_qty || 0) > 0 ? T.warning : T.ink400,
+            ],
+            [
+              "Available",
+              `${availQtyVal.toFixed(2)} ${item.unit}`,
+              availQtyVal <= 0 ? T.danger : T.success,
+            ],
+            [
+              "Reorder At",
+              item.reorder_level ? `${item.reorder_level} ${item.unit}` : "—",
+              T.ink400,
+            ],
+            [
+              "Max Stock",
+              item.max_stock_level
+                ? `${item.max_stock_level} ${item.unit}`
+                : "—",
+              T.ink400,
+            ],
+          ].map(([label, value, color]) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "4px 0",
+                borderBottom: `1px solid ${T.ink075}`,
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: T.ink500 }}>{label}</span>
+              <span style={{ fontFamily: T.fontData, fontWeight: 600, color }}>
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Pricing + profile-specific */}
+        <div
+          style={{
+            background: "#fff",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
+            padding: "14px 16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink400,
+              marginBottom: 10,
+            }}
+          >
+            {isFoodBev ? "Product Details" : "Pricing"}
+          </div>
+          {[
+            [
+              "Cost (AVCO)",
+              item.weighted_avg_cost
+                ? `R${parseFloat(item.weighted_avg_cost).toFixed(2)}`
+                : item.cost_price
+                  ? `R${parseFloat(item.cost_price).toFixed(2)}`
+                  : "—",
+              T.ink700,
+            ],
+            [
+              "Sell Price",
+              item.sell_price
+                ? `R${parseFloat(item.sell_price).toFixed(2)}`
+                : "—",
+              item.sell_price > 0 ? T.ink700 : T.danger,
+            ],
+            [
+              "Margin",
+              margin ? `${margin}%` : "—",
+              margin
+                ? parseFloat(margin) >= 35
+                  ? T.success
+                  : parseFloat(margin) >= 20
+                    ? T.warning
+                    : T.danger
+                : T.ink400,
+            ],
+            ...(isFoodBev
+              ? [
+                  [
+                    "Expiry",
+                    item.expiry_date
+                      ? new Date(item.expiry_date).toLocaleDateString("en-ZA")
+                      : "—",
+                    daysToExpiry !== null
+                      ? daysToExpiry < 0
+                        ? T.danger
+                        : daysToExpiry < 30
+                          ? T.warning
+                          : T.success
+                      : T.ink400,
+                  ],
+                  [
+                    "Days Left",
+                    daysToExpiry !== null ? `${daysToExpiry} days` : "—",
+                    daysToExpiry !== null
+                      ? daysToExpiry < 0
+                        ? T.danger
+                        : daysToExpiry < 30
+                          ? T.warning
+                          : T.success
+                      : T.ink400,
+                  ],
+                  [
+                    "Shelf Life",
+                    item.shelf_life_days ? `${item.shelf_life_days} days` : "—",
+                    T.ink400,
+                  ],
+                ]
+              : []),
+            ...(isCannabis && item.medium_type
+              ? [
+                  [
+                    "Medium Type",
+                    item.medium_type.replace(/_/g, " "),
+                    T.accentMid,
+                  ],
+                ]
+              : []),
+          ].map(([label, value, color]) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "4px 0",
+                borderBottom: `1px solid ${T.ink075}`,
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: T.ink500 }}>{label}</span>
+              <span style={{ fontFamily: T.fontData, fontWeight: 600, color }}>
+                {value}
+              </span>
+            </div>
+          ))}
+          {isFoodBev && allergens.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: T.warning,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                ⚠ Allergens
+              </div>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {allergens.map((a) => (
+                  <span
+                    key={a}
+                    style={{
+                      fontSize: 9,
+                      padding: "2px 6px",
+                      borderRadius: 3,
+                      background: T.warningBg,
+                      color: T.warning,
+                      border: `1px solid ${T.warningBd}`,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    {a}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Recent movements */}
+        <div
+          style={{
+            background: "#fff",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
+            padding: "14px 16px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink400,
+              marginBottom: 10,
+            }}
+          >
+            Recent Movements
+          </div>
+          {recent.length === 0 ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: T.ink300,
+                textAlign: "center",
+                padding: "16px 0",
+              }}
+            >
+              No movements yet
+            </div>
+          ) : (
+            recent.map((m, i) => (
+              <div
+                key={m.id || i}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "4px 0",
+                  borderBottom: `1px solid ${T.ink075}`,
+                  fontSize: 11,
+                }}
+              >
+                <div>
+                  <div style={{ color: T.ink700, fontWeight: 500 }}>
+                    {MOVEMENT_TYPE_LABELS[m.movement_type] || m.movement_type}
+                  </div>
+                  <div style={{ color: T.ink400, fontSize: 10 }}>
+                    {m.created_at
+                      ? new Date(m.created_at).toLocaleDateString("en-ZA")
+                      : "—"}
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontFamily: T.fontData,
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: parseFloat(m.quantity) >= 0 ? T.success : T.danger,
+                  }}
+                >
+                  {parseFloat(m.quantity) >= 0 ? "+" : ""}
+                  {parseFloat(m.quantity).toFixed(2)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Storage + action buttons */}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        {item.storage_instructions && (
+          <div
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              background: T.infoBg,
+              border: `1px solid ${T.infoBd}`,
+              borderRadius: 6,
+              fontSize: 11,
+              color: T.info,
+            }}
+          >
+            <strong>Storage:</strong> {item.storage_instructions}
+          </div>
+        )}
+        {item.ingredients_notes && (
+          <div
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              background: "#E8F5E9",
+              border: "1px solid #A5D6A7",
+              borderRadius: 6,
+              fontSize: 11,
+              color: "#2E7D32",
+            }}
+          >
+            <strong>Ingredients:</strong> {item.ingredients_notes}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+          <button
+            onClick={onHistory}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 4,
+              border: `1px solid ${T.infoBd}`,
+              background: T.infoBg,
+              color: T.info,
+              cursor: "pointer",
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: T.fontUi,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            Full History
+          </button>
+          <button
+            onClick={onEdit}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 4,
+              border: `1px solid ${T.accentBd}`,
+              background: T.accentLit,
+              color: T.accentMid,
+              cursor: "pointer",
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: T.fontUi,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            Edit Item
+          </button>
+          <button
+            onClick={onAI}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 4,
+              border: "none",
+              background: T.accent,
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: T.fontUi,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            ✦ AI Analyse
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
