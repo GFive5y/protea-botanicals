@@ -33,6 +33,12 @@ const HQ_PAGES = [
   },
   {
     group: "Operations",
+    icon: "=",
+    label: "HQ Stock",
+    path: "/hq?tab=hq-stock",
+  },
+  {
+    group: "Operations",
     icon: "⬤",
     label: "Distribution",
     path: "/hq?tab=distribution",

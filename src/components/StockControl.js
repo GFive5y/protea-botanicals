@@ -342,6 +342,7 @@ export default function StockControl() {
         supabase
           .from("inventory_items")
           .select("*, suppliers(name)")
+          .in("category", ["finished_product", "accessory"])
           .order("name"),
         supabase
           .from("stock_movements")
