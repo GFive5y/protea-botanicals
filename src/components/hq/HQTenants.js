@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { INDUSTRY_PROFILES } from "../../constants/industryProfiles";
+import TenantSetupWizard from "./TenantSetupWizard";
 
 const T = {
   ink900: "#0D0D0D",
@@ -1086,7 +1087,7 @@ export default function HQTenants() {
   return (
     <div style={{ fontFamily: T.font, display: "grid", gap: "20px" }}>
       {showAdd && (
-        <AddTenantModal
+        <TenantSetupWizard
           onClose={() => setShowAdd(false)}
           onSaved={fetchAll}
           showToast={showToast}
