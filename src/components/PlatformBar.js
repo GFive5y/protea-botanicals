@@ -1,14 +1,18 @@
-// src/components/PlatformBar.js — v1.1
+// src/components/PlatformBar.js — v1.2
 // WP-Z Phase 1: Platform Intelligence Bar
+// WP-BIB Session 11: Profile-adaptive actions panel
+//   - ActionsPanel labels adapt per industryProfile
+//   - food_beverage: expiry check (7-day window) + "check supplier" language
+//   - general_retail: simplified labels
+//   - cannabis_retail: unchanged
 // Replaces: AlertsBar.js (hq/) + SystemStatusBar.js
 // 40px bar · 4 global icons · live dot · all-clear 4px green hairline
 // Admin: position sticky, top 0, zIndex 89
 // HQ:    inline (not sticky) — sits immediately after LiveFXBar
 //
 // RULES (do not violate):
-//   - Font: Inter only — never Jost, never Outfit (LL per SYSTEM.md)
+//   - Font: Inter only — never Jost, never Outfit
 //   - onNavigate is NOT a prop on this component — never add setTab/setActiveTab (LL-041)
-//   - PlatformBarContext.usePlatformBar() drives Phase 2 page icons — do not add page icons here
 //   - AlertsBar.js and SystemStatusBar.js are DEPRECATED — this replaces both
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -532,7 +536,7 @@ function CommsPanel({ unread, openTickets, role, onNavigate, onClose }) {
         <button
           onClick={() => {
             onClose();
-            onNavigate(role === "hq" ? "/admin?tab=comms" : "?tab=comms");
+            onNavigate(role === "hq" ? "/hq?tab=comms" : "?tab=comms");
           }}
           style={{
             fontSize: 10,
@@ -676,9 +680,22 @@ function FraudPanel({ flagged, role, onNavigate, onClose }) {
   );
 }
 
-function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
+// ── v1.2: Profile-adaptive Actions Panel ─────────────────────────────────────
+function ActionsPanel({
+  zeroPrice,
+  outOfStock,
+  expiringItems = [],
+  role,
+  onNavigate,
+  onClose,
+  industryProfile,
+}) {
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral =
+    industryProfile === "general_retail" || industryProfile === "mixed_retail";
   const sev = zeroPrice.length > 0 ? "danger" : "warning";
-  const total = zeroPrice.length + outOfStock.length;
+  const total = zeroPrice.length + outOfStock.length + expiringItems.length;
+
   return (
     <PanelShell
       severity={sev}
@@ -687,8 +704,14 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
       onClose={onClose}
     >
       <div style={{ padding: "12px 16px" }}>
+        {/* Zero price items */}
         {zeroPrice.length > 0 && (
-          <div style={{ marginBottom: outOfStock.length > 0 ? 16 : 0 }}>
+          <div
+            style={{
+              marginBottom:
+                outOfStock.length > 0 || expiringItems.length > 0 ? 16 : 0,
+            }}
+          >
             <div
               style={{
                 fontSize: 9,
@@ -700,7 +723,12 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
                 fontFamily: T.font,
               }}
             >
-              No sell price — invisible to customers ({zeroPrice.length})
+              {isFoodBev
+                ? "No sell price — invisible to customers"
+                : isGeneral
+                  ? "No sell price set"
+                  : "No sell price — invisible to customers"}{" "}
+              ({zeroPrice.length})
             </div>
             {zeroPrice.slice(0, 6).map((item, i) => (
               <div
@@ -759,8 +787,10 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
             )}
           </div>
         )}
+
+        {/* Out of stock items */}
         {outOfStock.length > 0 && (
-          <div>
+          <div style={{ marginBottom: expiringItems.length > 0 ? 16 : 0 }}>
             <div
               style={{
                 fontSize: 9,
@@ -772,7 +802,8 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
                 fontFamily: T.font,
               }}
             >
-              Out of stock ({outOfStock.length})
+              {isFoodBev ? "Out of stock — check supplier" : "Out of stock"} (
+              {outOfStock.length})
             </div>
             {outOfStock.slice(0, 6).map((item, i) => (
               <div
@@ -820,6 +851,67 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
             )}
           </div>
         )}
+
+        {/* Expiring items — food_beverage only */}
+        {isFoodBev && expiringItems.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.09em",
+                textTransform: "uppercase",
+                color: T.warning,
+                marginBottom: 8,
+                fontFamily: T.font,
+              }}
+            >
+              Expiring within 7 days ({expiringItems.length})
+            </div>
+            {expiringItems.slice(0, 6).map((item, i) => (
+              <div
+                key={item.id}
+                className="pib-row"
+                style={{
+                  padding: "5px 0",
+                  borderBottom:
+                    i < Math.min(expiringItems.length, 6) - 1
+                      ? `0.5px solid ${T.ink150}`
+                      : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: T.warning,
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{ fontSize: 12, color: T.ink700, fontFamily: T.font }}
+                >
+                  {item.name}
+                </span>
+                <span
+                  style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}
+                >
+                  ·{" "}
+                  {new Date(item.expiry_date).toLocaleDateString("en-ZA", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Action buttons */}
         <div
           style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}
         >
@@ -869,6 +961,29 @@ function ActionsPanel({ zeroPrice, outOfStock, role, onNavigate, onClose }) {
               → Restock
             </button>
           )}
+          {isFoodBev && expiringItems.length > 0 && (
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate(role === "hq" ? "/hq?tab=hq-stock" : "?tab=items");
+              }}
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                padding: "5px 14px",
+                border: `1px solid ${T.warningBd}`,
+                borderRadius: 4,
+                background: T.warningBg,
+                color: T.warning,
+                cursor: "pointer",
+                fontFamily: T.font,
+              }}
+            >
+              → Review expiry
+            </button>
+          )}
         </div>
       </div>
     </PanelShell>
@@ -879,6 +994,8 @@ export default function PlatformBar({ role = "admin", tenantId }) {
   const { tenant } = useTenant();
   const navigate = useNavigate();
   const tid = tenantId || tenant?.id;
+  const industryProfile = tenant?.industry_profile || "cannabis_retail";
+  const isFoodBevPlatform = industryProfile === "food_beverage";
 
   const [activePanel, setActivePanel] = useState(null);
   const panelRef = useRef(null);
@@ -889,6 +1006,7 @@ export default function PlatformBar({ role = "admin", tenantId }) {
   const [flaggedUsers, setFlaggedUsers] = useState([]);
   const [zeroPrice, setZeroPrice] = useState([]);
   const [outOfStock, setOutOfStock] = useState([]);
+  const [expiringItems, setExpiringItems] = useState([]);
 
   const commsInterval = useRef(null);
   const fraudInterval = useRef(null);
@@ -1001,8 +1119,24 @@ export default function PlatformBar({ role = "admin", tenantId }) {
       const zpIds = new Set(zp.map((i) => i.id));
       setZeroPrice(zp);
       setOutOfStock(oos.filter((i) => !zpIds.has(i.id)));
+      // Expiry check — food_beverage profile only
+      if (isFoodBevPlatform) {
+        const threshold = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0];
+        let expQ = supabase
+          .from("inventory_items")
+          .select("id,name,expiry_date")
+          .eq("is_active", true)
+          .not("expiry_date", "is", null)
+          .lte("expiry_date", threshold)
+          .gt("quantity_on_hand", 0);
+        if (role === "admin") expQ = expQ.eq("tenant_id", tid);
+        const expRes = await expQ;
+        setExpiringItems(expRes.data || []);
+      }
     } catch (_) {}
-  }, [tid, role]);
+  }, [tid, role, isFoodBevPlatform]);
 
   useEffect(() => {
     loadActions();
@@ -1075,7 +1209,11 @@ export default function PlatformBar({ role = "admin", tenantId }) {
   const commsSev = unreadMsgs > 0 || openTickets > 0 ? "warning" : null;
   const fraudSev = flaggedUsers.length > 0 ? "danger" : null;
   const actionsSev =
-    zeroPrice.length > 0 ? "danger" : outOfStock.length > 0 ? "warning" : null;
+    zeroPrice.length > 0
+      ? "danger"
+      : outOfStock.length > 0 || expiringItems.length > 0
+        ? "warning"
+        : null;
   const allClear = !alertsSev && !commsSev && !fraudSev && !actionsSev;
   const isSticky = role === "admin";
 
@@ -1197,13 +1335,17 @@ export default function PlatformBar({ role = "admin", tenantId }) {
           />
         )}
         {activePanel === "actions" &&
-          (zeroPrice.length > 0 || outOfStock.length > 0) && (
+          (zeroPrice.length > 0 ||
+            outOfStock.length > 0 ||
+            expiringItems.length > 0) && (
             <ActionsPanel
               zeroPrice={zeroPrice}
               outOfStock={outOfStock}
+              expiringItems={expiringItems}
               role={role}
               onNavigate={handleNavigate}
               onClose={() => setActivePanel(null)}
+              industryProfile={industryProfile}
             />
           )}
       </div>
