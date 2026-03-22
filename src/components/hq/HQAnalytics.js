@@ -211,7 +211,7 @@ export default function HQAnalytics() {
         const r = await supabase
           .from("purchase_orders")
           .select(
-            "id,po_number,supplier_id,po_status,status,subtotal,currency,order_date,received_date,created_at,purchase_order_items(*)",
+            "id,po_number,supplier_id,po_status,status,subtotal,currency,landed_cost_zar,usd_zar_rate,order_date,received_date,created_at,purchase_order_items(*)",
           );
         return r.data || [];
       });
@@ -1583,7 +1583,8 @@ function SupplyChainAnalytics({ data }) {
     .filter((p) => ["received", "complete"].includes(p.po_status))
     .forEach((p) => {
       supplierSpend[p.supplier_id || "unknown"] =
-        (supplierSpend[p.supplier_id || "unknown"] || 0) + (p.subtotal || 0);
+        (supplierSpend[p.supplier_id || "unknown"] || 0) +
+        (parseFloat(p.landed_cost_zar) || parseFloat(p.subtotal) * 16 || 0);
     });
   const supplierSpendList = Object.entries(supplierSpend)
     .map(([id, total]) => ({
