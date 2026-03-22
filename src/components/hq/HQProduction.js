@@ -887,7 +887,7 @@ function SetPricePanel({ items, onRefresh }) {
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const ctx = usePageContext("hq-production", null);
-  const { tenantConfig, industryProfile } = useTenant();
+  const { tenantId, tenantConfig, industryProfile } = useTenant();
   const [items, setItems] = useState([]);
   const [runs, setRuns] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -2903,6 +2903,7 @@ function NewRunPanel({
   industryProfile,
   onComplete,
 }) {
+  const { tenantId } = useTenant();
   // ── Build format catalogue + groups from live DB; fall back to hardcoded if empty ──
   const formatCatalogue =
     productFormats.length > 0
@@ -3141,7 +3142,7 @@ function NewRunPanel({
           status: "active",
           lifecycle_status: "active",
           is_archived: false,
-          tenant_id: hqTenantId || null,
+          tenant_id: tenantId || null,
         })
         .select()
         .single();
