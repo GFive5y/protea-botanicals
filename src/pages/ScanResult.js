@@ -1,27 +1,25 @@
-// src/pages/ScanResult.js v4.7
-// Protea Botanicals — WP-T: Regulatory batch provenance on scan result
-// v4.7 changes from v4.6:
-//   - batches select extended: lab_certified, expiry_date, thc_content, cbd_content, lab_name
-//   - ProductCard now shows: Lab Certified badge, Expiry date, THC/CBD %, lab name
-//   - Expiry warning shown if batch expires within 90 days
-// v4.6 changes from v4.5:
-//   - After fetching profile, checks is_suspended flag
-//   - Suspended users: scan is logged (outcome: suspended_blocked),
-//     points are NOT awarded, SuspendedCard shown instead of points card
-//   - All other v4.5 logic — campaigns, survey, streak — unchanged
-
+// src/pages/ScanResult.js v4.8
+// WP-BIB Session 8: Profile-adaptive QR scan result page
+// v4.8 changes from v4.7:
+//   - useTenant() wired — reads industryProfile from live tenant row
+//   - qr_codes query extended to join inventory_items (requires qr_codes.inventory_item_id UUID col)
+//   - FoodProductCard: allergens, ingredients, expiry, storage — reads live inventory_items fields
+//   - GeneralProductCard: name, SKU, category, price, description — reads live inventory_items fields
+//   - Profile-adaptive render: food_beverage→FoodProductCard, general/mixed→GeneralProductCard, cannabis→ProductCard (unchanged)
+//   - cannabis_retail / cannabis_dispensary: fully unchanged — ProductCard renders batch data as before
+// v4.7: lab_certified, expiry_date, thc_content, cbd_content, lab_name on batches
+// v4.6: is_suspended flag check — SuspendedCard shown, points blocked
+// v4.5: double_points_campaigns, CampaignBanner, BannerDisplay, SurveyWidget, streak bonus
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
+import { useTenant } from "../services/tenantService";
 import ClientHeader from "../components/ClientHeader";
 import SurveyWidget from "../components/SurveyWidget";
-
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
   "https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1";
-
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');`;
-
 const DEFAULT_LOYALTY_CONFIG = {
   pts_streak_bonus: 200,
   streak_interval: 5,
@@ -36,7 +34,6 @@ const DEFAULT_LOYALTY_CONFIG = {
   redemption_value_zar: 0.1,
   breakage_rate: 0.3,
 };
-
 function getTierLabel(pts, cfg) {
   if (pts >= cfg.threshold_platinum) return "Platinum";
   if (pts >= cfg.threshold_gold) return "Gold";
@@ -63,7 +60,6 @@ function getTierColor(tier) {
     }[tier] || "#52b788"
   );
 }
-
 const C = {
   green: "#1b4332",
   mid: "#2d6a4f",
@@ -82,7 +78,6 @@ const C = {
   lightGreen: "#eafaf1",
   lightRed: "#fdf0ef",
 };
-
 function detectDevice() {
   const ua = navigator.userAgent || "";
   const device = /Mobile|Android|iPhone|iPad|iPod/i.test(ua)
@@ -137,7 +132,6 @@ function requestGps() {
     );
   });
 }
-
 const pill = (bg, color) => ({
   display: "inline-block",
   background: bg,
@@ -175,17 +169,16 @@ const card = (extra = {}) => ({
   marginBottom: 12,
   ...extra,
 });
-
 const QR_TYPE_LABELS = {
   product_insert: { icon: "📦", label: "Product Insert" },
-  packaging_exterior: { icon: "🌐", label: "Exterior Packaging" },
+  packaging_exterior: { icon: "🌿", label: "Exterior Packaging" },
   promotional: { icon: "📣", label: "Promotional" },
   event: { icon: "🎪", label: "Event" },
   wearable: { icon: "👕", label: "Wearable / Merch" },
-  retail_display: { icon: "🏪", label: "Retail Display" },
+  retail_display: { icon: "🪧", label: "Retail Display" },
 };
 
-// ── v4.6: Suspended Account Card ─────────────────────────────────────────────
+// ── v4.6: Suspended Account Card ──────────────────────────────────────────────
 function SuspendedCard({ navigate }) {
   return (
     <div
@@ -238,7 +231,7 @@ function SuspendedCard({ navigate }) {
   );
 }
 
-// ── v4.5: Campaign Banner ─────────────────────────────────────────────────────
+// ── v4.5: Campaign Banner ──────────────────────────────────────────────────────
 function CampaignBanner({ campaign }) {
   if (!campaign) return null;
   const mult = parseFloat(campaign.multiplier) || 2;
@@ -265,7 +258,7 @@ function CampaignBanner({ campaign }) {
             marginBottom: 2,
           }}
         >
-          {mult}× Points Active — {campaign.name}
+          {mult}× Points Active – {campaign.name}
         </div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
           All points earned today are multiplied ×{mult}. Ends{" "}
@@ -341,6 +334,272 @@ function BannerDisplay({ banner }) {
   );
 }
 
+// ── v4.8: Food & Beverage product card — reads live inventory_items ────────────
+function FoodProductCard({ item }) {
+  if (!item) return null;
+  const allergens = item.allergen_flags
+    ? Object.entries(item.allergen_flags)
+        .filter(([, v]) => v)
+        .map(([k]) => k)
+    : [];
+  const daysToExpiry = item.expiry_date
+    ? Math.ceil((new Date(item.expiry_date) - new Date()) / 86400000)
+    : null;
+  const isExpired = daysToExpiry !== null && daysToExpiry < 0;
+  const expiryWarning =
+    daysToExpiry !== null && daysToExpiry <= 30 && !isExpired;
+  return (
+    <div style={card({ borderLeft: `3px solid ${C.accent}` })}>
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.3em",
+          textTransform: "uppercase",
+          color: C.accent,
+          marginBottom: 8,
+          fontWeight: 600,
+        }}
+      >
+        Verified Product
+      </div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 20,
+          fontWeight: 600,
+          color: C.green,
+          marginBottom: 4,
+        }}
+      >
+        {item.name}
+      </div>
+      {item.sku && (
+        <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
+          SKU: {item.sku}
+        </div>
+      )}
+      <div
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}
+      >
+        <span style={pill(C.lightGreen, C.success)}>✓ Authentic</span>
+        {item.sell_price > 0 && (
+          <span style={pill(C.cream, C.blue)}>
+            R{parseFloat(item.sell_price).toFixed(2)}
+          </span>
+        )}
+        {item.shelf_life_days && (
+          <span style={pill(C.cream, C.muted)}>
+            {item.shelf_life_days} day shelf life
+          </span>
+        )}
+      </div>
+      {allergens.length > 0 && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: "10px 12px",
+            background: "#fff8e7",
+            border: "1px solid #f0c36d",
+            borderRadius: 2,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "#b5935a",
+              fontWeight: 700,
+              marginBottom: 6,
+            }}
+          >
+            ⚠ Contains Allergens
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {allergens.map((a) => (
+              <span
+                key={a}
+                style={{
+                  ...pill("#fff3cd", "#856404"),
+                  fontSize: 9,
+                  padding: "3px 8px",
+                }}
+              >
+                {a.replace(/_/g, " ")}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {item.expiry_date && (
+        <div
+          style={{
+            fontSize: 12,
+            marginBottom: 10,
+            padding: "6px 10px",
+            borderRadius: 2,
+            background: isExpired
+              ? "#fdf0ef"
+              : expiryWarning
+                ? "#fff3e8"
+                : "#f0faf5",
+            color: isExpired ? C.error : expiryWarning ? C.warning : C.success,
+            border: `1px solid ${isExpired ? "#c0392b40" : expiryWarning ? "#e67e2240" : "#52b78840"}`,
+          }}
+        >
+          {isExpired
+            ? "⚠ Batch expired"
+            : expiryWarning
+              ? `⚠ Expires in ${daysToExpiry} days — ${new Date(item.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`
+              : `✓ Best before ${new Date(item.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`}
+        </div>
+      )}
+      {item.ingredients_notes && (
+        <div
+          style={{
+            fontSize: 12,
+            color: C.muted,
+            marginBottom: 10,
+            padding: "8px 10px",
+            background: C.warm,
+            borderRadius: 2,
+            lineHeight: 1.6,
+          }}
+        >
+          <strong
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              display: "block",
+              marginBottom: 4,
+              color: C.muted,
+            }}
+          >
+            Ingredients
+          </strong>
+          {item.ingredients_notes}
+        </div>
+      )}
+      {item.storage_instructions && (
+        <div
+          style={{
+            fontSize: 12,
+            color: C.blue,
+            padding: "8px 10px",
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: 2,
+          }}
+        >
+          <strong
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              display: "block",
+              marginBottom: 4,
+            }}
+          >
+            Storage
+          </strong>
+          {item.storage_instructions}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── v4.8: General / Mixed retail product card — reads live inventory_items ─────
+function GeneralProductCard({ item }) {
+  if (!item) return null;
+  return (
+    <div style={card({ borderLeft: `3px solid ${C.accent}` })}>
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.3em",
+          textTransform: "uppercase",
+          color: C.accent,
+          marginBottom: 8,
+          fontWeight: 600,
+        }}
+      >
+        Verified Product
+      </div>
+      <div
+        style={{
+          fontFamily: "Cormorant Garamond, serif",
+          fontSize: 20,
+          fontWeight: 600,
+          color: C.green,
+          marginBottom: 4,
+        }}
+      >
+        {item.name}
+      </div>
+      {item.sku && (
+        <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
+          SKU: {item.sku}
+        </div>
+      )}
+      <div
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}
+      >
+        <span style={pill(C.lightGreen, C.success)}>✓ Authentic</span>
+        {item.category && (
+          <span style={pill(C.cream, C.blue)}>
+            {item.category.replace(/_/g, " ")}
+          </span>
+        )}
+        {item.sell_price > 0 && (
+          <span style={pill(C.cream, C.muted)}>
+            R{parseFloat(item.sell_price).toFixed(2)}
+          </span>
+        )}
+      </div>
+      {item.description && (
+        <div
+          style={{
+            fontSize: 13,
+            color: C.muted,
+            lineHeight: 1.6,
+            marginBottom: 10,
+          }}
+        >
+          {item.description}
+        </div>
+      )}
+      {item.storage_instructions && (
+        <div
+          style={{
+            fontSize: 12,
+            color: C.blue,
+            padding: "8px 10px",
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: 2,
+          }}
+        >
+          <strong
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              display: "block",
+              marginBottom: 4,
+            }}
+          >
+            Storage
+          </strong>
+          {item.storage_instructions}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Cannabis product card — unchanged from v4.7 ────────────────────────────────
 function ProductCard({ batch, showCoa }) {
   if (!batch) return null;
 
@@ -848,12 +1107,14 @@ function GpsConsentBanner({ onAllow, onDeny }) {
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 export default function ScanResult() {
   const { qrCode } = useParams();
   const navigate = useNavigate();
+  const { industryProfile } = useTenant();
+  const [inventoryItem, setInventoryItem] = useState(null);
 
   const [phase, setPhase] = useState("loading");
   const [guardType, setGuardType] = useState("error");
@@ -1062,7 +1323,7 @@ export default function ScanResult() {
       const { data: qrRows, error: qrErr } = await supabase
         .from("qr_codes")
         .select(
-          "*, batches(batch_number, product_name, strain, volume, coa_document_id, lab_certified, lab_name, expiry_date, thc_content, cbd_content)",
+          "*, batches(batch_number, product_name, strain, volume, coa_document_id, lab_certified, lab_name, expiry_date, thc_content, cbd_content), inventory_items(id, name, sku, category, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, medium_type, expiry_date, description)",
         )
         .eq("qr_code", qrCode)
         .limit(1);
@@ -1080,6 +1341,7 @@ export default function ScanResult() {
 
       const qr = qrRows[0];
       setQrRecord(qr);
+      if (qr.inventory_items) setInventoryItem(qr.inventory_items);
 
       if (!qr.is_active) {
         await writeScanLog({
@@ -1421,7 +1683,7 @@ export default function ScanResult() {
           points: pointsAwardedAmt,
           balanceAfter: currentPts + pointsAwardedAmt,
           qrCodeStr: qrCode,
-          description: `Scanned ${productLabel}${campaign ? ` (${campaign.multiplier}├ù campaign)` : ""}`,
+          description: `Scanned ${productLabel}${campaign ? ` (${campaign.multiplier}× campaign)` : ""}`,
           scanLogId: logId,
           multiplierApplied: tierMultiplierUsed * campaignMult,
           tierAtTime: tierLabelUsed,
@@ -1570,10 +1832,10 @@ export default function ScanResult() {
 
   const typeInfo = qrRecord
     ? QR_TYPE_LABELS[qrRecord.qr_type] || {
-        icon: "🔍",
+        icon: "📱",
         label: qrRecord.qr_type,
       }
-    : { icon: "🔍", label: "QR Code" };
+    : { icon: "📱", label: "QR Code" };
 
   return (
     <>
@@ -1599,7 +1861,7 @@ export default function ScanResult() {
         >
           {phase === "loading" && (
             <div style={{ textAlign: "center", padding: "60px 0" }}>
-              <div style={{ fontSize: 36, marginBottom: 16 }}>🔍</div>
+              <div style={{ fontSize: 36, marginBottom: 16 }}>📱</div>
               <div
                 style={{ fontSize: 14, color: C.muted, letterSpacing: "0.1em" }}
               >
@@ -1775,11 +2037,24 @@ export default function ScanResult() {
                   <BannerDisplay banner={banner} />
                 </div>
               )}
-              {showProduct && qrRecord?.batches && (
+
+              {/* v4.8: Profile-adaptive product card */}
+              {showProduct && (qrRecord?.batches || inventoryItem) && (
                 <div className="sr-card" style={{ animationDelay: "0.15s" }}>
-                  <ProductCard batch={qrRecord.batches} showCoa={showCoa} />
+                  {industryProfile === "food_beverage" && inventoryItem ? (
+                    <FoodProductCard item={inventoryItem} />
+                  ) : (industryProfile === "general_retail" ||
+                      industryProfile === "mixed_retail") &&
+                    inventoryItem ? (
+                    <GeneralProductCard item={inventoryItem} />
+                  ) : inventoryItem && !qrRecord?.batches ? (
+                    <GeneralProductCard item={inventoryItem} />
+                  ) : (
+                    <ProductCard batch={qrRecord.batches} showCoa={showCoa} />
+                  )}
                 </div>
               )}
+
               {eventCheckins.map((ec, i) => (
                 <div
                   key={i}
@@ -1809,7 +2084,6 @@ export default function ScanResult() {
                   />
                 </div>
               )}
-
               <div
                 className="sr-card"
                 style={{
