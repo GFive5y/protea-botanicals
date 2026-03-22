@@ -884,6 +884,957 @@ function SetPricePanel({ items, onRefresh }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
+// ─── WP-BIB Session 2: INSERT THIS BLOCK immediately before the line:
+// export default function HQProduction() {
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HQ_TENANT_ID_PROD = "43b34c33-6864-4f02-98dd-df1d340475c3";
+
+// Profile-adaptive material type options for BOM editor
+const BOM_MATERIAL_TYPES = {
+  cannabis_retail: [
+    "distillate",
+    "concentrate",
+    "terpene",
+    "hardware",
+    "packaging",
+    "flower",
+    "other",
+  ],
+  cannabis_dispensary: [
+    "distillate",
+    "concentrate",
+    "terpene",
+    "hardware",
+    "packaging",
+    "flower",
+    "other",
+  ],
+  food_beverage: [
+    "ingredient",
+    "flavouring",
+    "packaging",
+    "equipment",
+    "other",
+  ],
+  general_retail: ["raw_material", "packaging", "equipment", "other"],
+  mixed_retail: [
+    "distillate",
+    "concentrate",
+    "terpene",
+    "ingredient",
+    "hardware",
+    "packaging",
+    "equipment",
+    "other",
+  ],
+};
+
+const FORMAT_CATEGORIES = [
+  "Vape",
+  "Edible",
+  "Beverage",
+  "Food",
+  "Apparel",
+  "Service",
+  "Other",
+];
+const YIELD_UNITS = ["pcs", "L", "kg", "g", "ml"];
+
+// ─── FORMAT CREATOR PANEL ────────────────────────────────────────────────────
+
+function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
+  // RULE 0G: useTenant() called inside this sub-component
+  const { tenantId } = useTenant();
+  const isCannabis = [
+    "cannabis_retail",
+    "cannabis_dispensary",
+    "mixed_retail",
+  ].includes(industryProfile);
+
+  const emptyForm = {
+    name: "",
+    format_key: "",
+    category: "Other",
+    is_cannabis: false,
+    is_vape: false,
+    chambers: 1,
+    distillate_ml: 0,
+    terpene_pct: 10,
+    yield_unit: "pcs",
+    shelf_life_days: "",
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const autoKey = (name) =>
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 40);
+
+  const set = (k, v) =>
+    setForm((f) => {
+      const next = { ...f, [k]: v };
+      if (k === "name" && !f._keyEdited) next.format_key = autoKey(v);
+      return next;
+    });
+
+  const handleKeyEdit = (v) =>
+    setForm((f) => ({ ...f, format_key: v, _keyEdited: true }));
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      setMsg({ type: "error", text: "Format name is required." });
+      return;
+    }
+    if (!form.format_key.trim()) {
+      setMsg({ type: "error", text: "Format key is required." });
+      return;
+    }
+    setSaving(true);
+    setMsg(null);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        format_key: form.format_key.trim(),
+        category: form.category,
+        is_cannabis: form.is_cannabis,
+        is_vape: form.is_vape,
+        chambers: form.is_vape ? Number(form.chambers) : 1,
+        distillate_ml: form.is_vape ? Number(form.distillate_ml) : 0,
+        terpene_pct: form.is_vape ? Number(form.terpene_pct) : 0,
+        yield_unit: form.yield_unit,
+        shelf_life_days:
+          form.shelf_life_days !== "" ? Number(form.shelf_life_days) : null,
+        is_active: true,
+        sort_order: productFormats.length + 1,
+        tenant_id: tenantId || HQ_TENANT_ID_PROD, // RULE 0F
+      };
+      const { error } = await supabase.from("product_formats").insert(payload);
+      if (error) throw error;
+      setMsg({ type: "success", text: `Format "${form.name}" created.` });
+      setForm(emptyForm);
+      onRefresh();
+    } catch (err) {
+      setMsg({ type: "error", text: err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sInput = {
+    width: "100%",
+    padding: "7px 10px",
+    fontSize: "12px",
+    fontFamily: T.fontUi,
+    border: `1px solid ${T.ink150}`,
+    borderRadius: "3px",
+    color: T.ink700,
+    background: "#fff",
+    boxSizing: "border-box",
+  };
+  const sLabel = {
+    fontSize: "10px",
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: T.ink400,
+    marginBottom: "4px",
+    display: "block",
+  };
+  const sField = { marginBottom: "14px" };
+  const sBadge = {
+    fontSize: "10px",
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    borderRadius: "2px",
+    padding: "1px 6px",
+  };
+  const sToggle = (on) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    color: on ? T.accent : T.ink400,
+    cursor: "pointer",
+    fontFamily: T.fontUi,
+  });
+
+  return (
+    <div style={{ maxWidth: "860px" }}>
+      <p style={{ fontSize: "12px", color: T.ink400, marginBottom: "20px" }}>
+        Create new product formats without Supabase dashboard access. New
+        formats appear immediately in the Production Run selector.
+      </p>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "24px",
+          alignItems: "start",
+        }}
+      >
+        {/* ── Create form ── */}
+        <div style={{ ...sCard, padding: "18px 20px" }}>
+          <div
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: T.ink700,
+              marginBottom: "16px",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            New Format
+          </div>
+
+          <div style={sField}>
+            <label style={sLabel}>Format Name</label>
+            <input
+              style={sInput}
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder="e.g. Bob's Lemonade 500ml"
+            />
+          </div>
+
+          <div style={sField}>
+            <label style={sLabel}>
+              Format Key{" "}
+              <span style={{ color: T.ink300, fontWeight: 400 }}>
+                (auto-generated, editable)
+              </span>
+            </label>
+            <input
+              style={sInput}
+              value={form.format_key}
+              onChange={(e) => handleKeyEdit(e.target.value)}
+              placeholder="e.g. bobs-lem-500"
+            />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "12px",
+            }}
+          >
+            <div style={sField}>
+              <label style={sLabel}>Category</label>
+              <select
+                style={sInput}
+                value={form.category}
+                onChange={(e) => set("category", e.target.value)}
+              >
+                {FORMAT_CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div style={sField}>
+              <label style={sLabel}>Yield Unit</label>
+              <select
+                style={sInput}
+                value={form.yield_unit}
+                onChange={(e) => set("yield_unit", e.target.value)}
+              >
+                {YIELD_UNITS.map((u) => (
+                  <option key={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {isCannabis && (
+            <div style={{ display: "flex", gap: "20px", marginBottom: "14px" }}>
+              <label style={sToggle(form.is_cannabis)}>
+                <input
+                  type="checkbox"
+                  checked={form.is_cannabis}
+                  onChange={(e) => set("is_cannabis", e.target.checked)}
+                />
+                Is Cannabis
+              </label>
+              <label style={sToggle(form.is_vape)}>
+                <input
+                  type="checkbox"
+                  checked={form.is_vape}
+                  onChange={(e) => set("is_vape", e.target.checked)}
+                />
+                Is Vape
+              </label>
+            </div>
+          )}
+
+          {form.is_vape && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: "10px",
+              }}
+            >
+              <div style={sField}>
+                <label style={sLabel}>Chambers</label>
+                <input
+                  style={sInput}
+                  type="number"
+                  min="1"
+                  max="4"
+                  value={form.chambers}
+                  onChange={(e) => set("chambers", e.target.value)}
+                />
+              </div>
+              <div style={sField}>
+                <label style={sLabel}>Distillate ml/unit</label>
+                <input
+                  style={sInput}
+                  type="number"
+                  step="0.1"
+                  value={form.distillate_ml}
+                  onChange={(e) => set("distillate_ml", e.target.value)}
+                />
+              </div>
+              <div style={sField}>
+                <label style={sLabel}>Terpene %</label>
+                <input
+                  style={sInput}
+                  type="number"
+                  step="1"
+                  value={form.terpene_pct}
+                  onChange={(e) => set("terpene_pct", e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={sField}>
+            <label style={sLabel}>
+              Shelf Life (days){" "}
+              <span style={{ color: T.ink300, fontWeight: 400 }}>
+                — optional
+              </span>
+            </label>
+            <input
+              style={sInput}
+              type="number"
+              value={form.shelf_life_days}
+              onChange={(e) => set("shelf_life_days", e.target.value)}
+              placeholder="Leave blank if not applicable"
+            />
+          </div>
+
+          {msg && (
+            <div
+              style={{
+                padding: "8px 12px",
+                borderRadius: "3px",
+                fontSize: "12px",
+                marginBottom: "12px",
+                background: msg.type === "error" ? T.dangerBg : T.successBg,
+                border: `1px solid ${msg.type === "error" ? T.dangerBd : T.successBd}`,
+                color: msg.type === "error" ? T.danger : T.success,
+              }}
+            >
+              {msg.text}
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              ...sBtn("accent"),
+              width: "100%",
+              justifyContent: "center",
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "Saving..." : "Save Format"}
+          </button>
+        </div>
+
+        {/* ── Existing formats list ── */}
+        <div>
+          <div
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink300,
+              marginBottom: "10px",
+            }}
+          >
+            {productFormats.length} Existing Format
+            {productFormats.length !== 1 ? "s" : ""}
+          </div>
+          {productFormats.length === 0 ? (
+            <p style={{ fontSize: "12px", color: T.ink300 }}>
+              No formats in database yet.
+            </p>
+          ) : (
+            productFormats.map((f) => (
+              <div
+                key={f.id}
+                style={{ ...sCard, marginBottom: "6px", padding: "10px 14px" }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "8px",
+                  }}
+                >
+                  <div>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: T.ink700,
+                      }}
+                    >
+                      {f.name}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: T.ink300,
+                        fontFamily: T.fontMono,
+                        marginLeft: "8px",
+                      }}
+                    >
+                      {f.format_key}
+                    </span>
+                  </div>
+                  <div
+                    style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}
+                  >
+                    {f.is_cannabis && (
+                      <span
+                        style={{
+                          ...sBadge,
+                          background: T.accentLit,
+                          color: T.accentMid,
+                          border: `1px solid ${T.accentBd}`,
+                        }}
+                      >
+                        cannabis
+                      </span>
+                    )}
+                    {f.is_vape && (
+                      <span
+                        style={{
+                          ...sBadge,
+                          background: T.infoBg,
+                          color: T.info,
+                          border: `1px solid ${T.infoBd}`,
+                        }}
+                      >
+                        vape
+                      </span>
+                    )}
+                    {f.chambers > 1 && (
+                      <span
+                        style={{
+                          ...sBadge,
+                          background: T.ink075,
+                          color: T.ink500,
+                          border: `1px solid ${T.ink150}`,
+                        }}
+                      >
+                        {f.chambers}ch
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: T.ink400,
+                    marginTop: "4px",
+                  }}
+                >
+                  {f.category} · yield: {f.yield_unit}
+                  {f.distillate_ml > 0 && ` · ${f.distillate_ml}ml distillate`}
+                  {f.shelf_life_days && ` · ${f.shelf_life_days}d shelf life`}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── BOM EDITOR PANEL ────────────────────────────────────────────────────────
+
+function BOMEditorPanel({
+  productFormats,
+  formatBom,
+  items,
+  industryProfile,
+  onRefresh,
+}) {
+  // RULE 0G: useTenant() called inside this sub-component
+  const { tenantId } = useTenant();
+
+  const [selectedFormatId, setSelectedFormatId] = useState(
+    productFormats[0]?.id || "",
+  );
+  const [showAdd, setShowAdd] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const matTypes =
+    BOM_MATERIAL_TYPES[industryProfile] || BOM_MATERIAL_TYPES.general_retail;
+  const isFoodBev = industryProfile === "food_beverage";
+  const matLabel = isFoodBev ? "Ingredient" : "Material";
+
+  const emptyLine = {
+    material_type: matTypes[0],
+    inventory_item_id: "",
+    quantity_per_unit: "",
+    unit: "ml",
+    notes: "",
+  };
+  const [lineForm, setLineForm] = useState(emptyLine);
+
+  const selectedFormat = productFormats.find((f) => f.id === selectedFormatId);
+  const bomForFormat = formatBom.filter(
+    (b) => b.format_id === selectedFormatId,
+  );
+
+  // Items filtered by selected material_type
+  const CAT_MAP = {
+    distillate: ["raw_material", "concentrate"],
+    concentrate: ["raw_material", "concentrate"],
+    terpene: ["terpene"],
+    hardware: ["hardware"],
+    packaging: ["packaging"],
+    flower: ["flower"],
+    ingredient: ["raw_material"],
+    flavouring: ["terpene"],
+    equipment: ["equipment"],
+    raw_material: ["raw_material"],
+    other: [
+      "raw_material",
+      "concentrate",
+      "terpene",
+      "hardware",
+      "packaging",
+      "equipment",
+      "finished_product",
+      "accessory",
+      "other",
+    ],
+  };
+  const filteredItems = items.filter((i) => {
+    const cats = CAT_MAP[lineForm.material_type] || [];
+    return cats.includes(i.category);
+  });
+
+  const setLine = (k, v) => setLineForm((f) => ({ ...f, [k]: v }));
+
+  const handleAddLine = async () => {
+    if (!lineForm.inventory_item_id) {
+      setMsg({ type: "error", text: "Select an inventory item." });
+      return;
+    }
+    if (!lineForm.quantity_per_unit || isNaN(lineForm.quantity_per_unit)) {
+      setMsg({ type: "error", text: "Enter a valid quantity." });
+      return;
+    }
+    setSaving(true);
+    setMsg(null);
+    try {
+      const payload = {
+        format_id: selectedFormatId,
+        inventory_item_id: lineForm.inventory_item_id,
+        material_type: lineForm.material_type,
+        quantity_per_unit: Number(lineForm.quantity_per_unit),
+        unit: lineForm.unit,
+        notes: lineForm.notes || null,
+        sort_order: bomForFormat.length + 1,
+        tenant_id: tenantId || HQ_TENANT_ID_PROD, // RULE 0F
+      };
+      const { error } = await supabase
+        .from("product_format_bom")
+        .insert(payload);
+      if (error) throw error;
+      setMsg({ type: "success", text: `${matLabel} line added.` });
+      setLineForm(emptyLine);
+      setShowAdd(false);
+      onRefresh();
+    } catch (err) {
+      setMsg({ type: "error", text: err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (bomId) => {
+    if (!window.confirm("Remove this BOM line?")) return;
+    setDeleting(bomId);
+    try {
+      const { error } = await supabase
+        .from("product_format_bom")
+        .delete()
+        .eq("id", bomId);
+      if (error) throw error;
+      onRefresh();
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const sInput = {
+    width: "100%",
+    padding: "7px 10px",
+    fontSize: "12px",
+    fontFamily: T.fontUi,
+    border: `1px solid ${T.ink150}`,
+    borderRadius: "3px",
+    color: T.ink700,
+    background: "#fff",
+    boxSizing: "border-box",
+  };
+  const sLabelSm = {
+    fontSize: "10px",
+    fontWeight: 600,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: T.ink400,
+    marginBottom: "4px",
+    display: "block",
+  };
+
+  return (
+    <div style={{ maxWidth: "860px" }}>
+      <p style={{ fontSize: "12px", color: T.ink400, marginBottom: "20px" }}>
+        Define the materials consumed per finished unit for each product format.
+        Used by Production Run to calculate stock deductions and validate
+        available stock.
+      </p>
+
+      {/* Format selector */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "20px",
+        }}
+      >
+        <label
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            color: T.ink500,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          BOM for:
+        </label>
+        <select
+          value={selectedFormatId}
+          onChange={(e) => {
+            setSelectedFormatId(e.target.value);
+            setShowAdd(false);
+            setMsg(null);
+          }}
+          style={{ ...sInput, width: "280px" }}
+        >
+          {productFormats.length === 0 && (
+            <option value="">No formats yet — create one in Formats tab</option>
+          )}
+          {productFormats.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+        {selectedFormat && (
+          <span style={{ fontSize: "11px", color: T.ink300 }}>
+            {selectedFormat.is_vape
+              ? `Vape · ${selectedFormat.chambers} chamber${selectedFormat.chambers > 1 ? "s" : ""}`
+              : selectedFormat.category}
+          </span>
+        )}
+      </div>
+
+      {/* BOM lines */}
+      {!selectedFormatId ? null : (
+        <>
+          {/* Header */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 2fr 80px 80px 1fr 60px",
+              gap: "8px",
+              padding: "6px 10px",
+              background: T.ink075,
+              borderRadius: "3px 3px 0 0",
+              border: `1px solid ${T.ink150}`,
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: T.ink400,
+            }}
+          >
+            <span>{matLabel} Type</span>
+            <span>Item</span>
+            <span>Qty/Unit</span>
+            <span>Unit</span>
+            <span>Notes</span>
+            <span></span>
+          </div>
+
+          {bomForFormat.length === 0 && (
+            <div
+              style={{
+                padding: "16px 10px",
+                border: `1px solid ${T.ink150}`,
+                borderTop: "none",
+                fontSize: "12px",
+                color: T.ink300,
+                textAlign: "center",
+              }}
+            >
+              No BOM lines yet for this format. Add one below.
+            </div>
+          )}
+
+          {bomForFormat.map((b, idx) => (
+            <div
+              key={b.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 2fr 80px 80px 1fr 60px",
+                gap: "8px",
+                padding: "8px 10px",
+                background: idx % 2 === 0 ? "#fff" : T.ink050,
+                border: `1px solid ${T.ink150}`,
+                borderTop: "none",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: T.ink600,
+                  textTransform: "capitalize",
+                }}
+              >
+                {(b.material_type || "").replace(/_/g, " ")}
+              </span>
+              <span style={{ fontSize: "11px", color: T.ink700 }}>
+                {b.inventory_items?.name || "—"}
+                {b.inventory_items?.quantity_on_hand != null && (
+                  <span style={{ color: T.ink300, marginLeft: "6px" }}>
+                    ({b.inventory_items.quantity_on_hand}{" "}
+                    {b.inventory_items.unit} avail)
+                  </span>
+                )}
+              </span>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontFamily: T.fontMono,
+                  color: T.ink700,
+                }}
+              >
+                {b.quantity_per_unit}
+              </span>
+              <span style={{ fontSize: "11px", color: T.ink400 }}>
+                {b.unit}
+              </span>
+              <span style={{ fontSize: "11px", color: T.ink300 }}>
+                {b.notes || "—"}
+              </span>
+              <button
+                onClick={() => handleDelete(b.id)}
+                disabled={deleting === b.id}
+                style={{
+                  fontSize: "11px",
+                  padding: "3px 8px",
+                  border: `1px solid ${T.dangerBd}`,
+                  borderRadius: "2px",
+                  background: T.dangerBg,
+                  color: T.danger,
+                  cursor: "pointer",
+                  opacity: deleting === b.id ? 0.5 : 1,
+                }}
+              >
+                {deleting === b.id ? "..." : "Remove"}
+              </button>
+            </div>
+          ))}
+
+          {/* Add line */}
+          {!showAdd ? (
+            <div
+              style={{
+                padding: "10px",
+                border: `1px solid ${T.ink150}`,
+                borderTop: "none",
+                borderRadius: "0 0 3px 3px",
+              }}
+            >
+              <button
+                onClick={() => setShowAdd(true)}
+                style={{ ...sBtn("default"), fontSize: "11px" }}
+              >
+                + Add {matLabel} Line
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "14px",
+                border: `1px solid ${T.ink150}`,
+                borderTop: "none",
+                borderRadius: "0 0 3px 3px",
+                background: T.ink050,
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                  gap: "10px",
+                  marginBottom: "10px",
+                }}
+              >
+                <div>
+                  <label style={sLabelSm}>{matLabel} Type</label>
+                  <select
+                    style={sInput}
+                    value={lineForm.material_type}
+                    onChange={(e) => {
+                      setLine("material_type", e.target.value);
+                      setLine("inventory_item_id", "");
+                    }}
+                  >
+                    {matTypes.map((m) => (
+                      <option key={m} value={m}>
+                        {m.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={sLabelSm}>Inventory Item</label>
+                  <select
+                    style={sInput}
+                    value={lineForm.inventory_item_id}
+                    onChange={(e) =>
+                      setLine("inventory_item_id", e.target.value)
+                    }
+                  >
+                    <option value="">— select item —</option>
+                    {filteredItems.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} ({i.quantity_on_hand} {i.unit})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={sLabelSm}>Qty per finished unit</label>
+                  <input
+                    style={sInput}
+                    type="number"
+                    step="0.01"
+                    value={lineForm.quantity_per_unit}
+                    onChange={(e) =>
+                      setLine("quantity_per_unit", e.target.value)
+                    }
+                    placeholder="e.g. 1.0"
+                  />
+                </div>
+                <div>
+                  <label style={sLabelSm}>Unit</label>
+                  <select
+                    style={sInput}
+                    value={lineForm.unit}
+                    onChange={(e) => setLine("unit", e.target.value)}
+                  >
+                    {["ml", "g", "pcs", "kg", "L"].map((u) => (
+                      <option key={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginBottom: "10px" }}>
+                <label style={sLabelSm}>Notes (optional)</label>
+                <input
+                  style={sInput}
+                  value={lineForm.notes}
+                  onChange={(e) => setLine("notes", e.target.value)}
+                  placeholder="e.g. Chamber 1 only"
+                />
+              </div>
+              {msg && (
+                <div
+                  style={{
+                    padding: "7px 10px",
+                    borderRadius: "3px",
+                    fontSize: "12px",
+                    marginBottom: "10px",
+                    background: msg.type === "error" ? T.dangerBg : T.successBg,
+                    border: `1px solid ${msg.type === "error" ? T.dangerBd : T.successBd}`,
+                    color: msg.type === "error" ? T.danger : T.success,
+                  }}
+                >
+                  {msg.text}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={handleAddLine}
+                  disabled={saving}
+                  style={{ ...sBtn("accent"), opacity: saving ? 0.6 : 1 }}
+                >
+                  {saving ? "Adding..." : `Add ${matLabel} Line`}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAdd(false);
+                    setMsg(null);
+                    setLineForm(emptyLine);
+                  }}
+                  style={sBtn("default")}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── END WP-BIB Session 2 INSERT ─────────────────────────────────────────────
+
 export default function HQProduction() {
   const [subTab, setSubTab] = useState("overview");
   const ctx = usePageContext("hq-production", null);
