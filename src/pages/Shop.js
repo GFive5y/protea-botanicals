@@ -27,6 +27,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
 import ClientHeader from "../components/ClientHeader";
+import { useTenant } from "../services/tenantService";
 
 // ── Distillate COA ────────────────────────────────────────────────────────────
 const DISTILLATE_COA = {
@@ -901,6 +902,47 @@ const DEFAULT_STRAIN = {
   tagline: "Premium Cannabis Product.",
   effects: [],
 };
+
+function buildFoodProduct(item) {
+  const allergens = item.allergen_flags
+    ? Object.entries(item.allergen_flags)
+        .filter(([, v]) => v)
+        .map(([k]) => k)
+    : [];
+  const daysToExpiry = item.expiry_date
+    ? Math.ceil((new Date(item.expiry_date) - new Date()) / 86400000)
+    : null;
+  return {
+    id: item.id,
+    inventory_item_id: item.id,
+    name: item.name,
+    sku: item.sku,
+    category: item.category,
+    price: parseFloat(item.sell_price) || 0,
+    quantity_on_hand: item.quantity_on_hand,
+    allergens,
+    ingredients_notes: item.ingredients_notes || null,
+    shelf_life_days: item.shelf_life_days || null,
+    storage_instructions: item.storage_instructions || null,
+    expiry_date: item.expiry_date || null,
+    daysToExpiry,
+    description: item.description || null,
+  };
+}
+
+function buildGeneralProduct(item) {
+  return {
+    id: item.id,
+    inventory_item_id: item.id,
+    name: item.name,
+    sku: item.sku,
+    category: item.category,
+    price: parseFloat(item.sell_price) || 0,
+    quantity_on_hand: item.quantity_on_hand,
+    description: item.description || null,
+    storage_instructions: item.storage_instructions || null,
+  };
+}
 
 function buildProductFromInventory(item) {
   const lowerName = item.name.toLowerCase();
@@ -2112,6 +2154,11 @@ function StrainModal({ strain, product, onClose, onAddToCart }) {
 export default function Shop() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { industryProfile } = useTenant();
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral =
+    industryProfile === "general_retail" || industryProfile === "mixed_retail";
+
   const [filter, setFilter] = useState("all");
   const [cartToast, setCartToast] = useState(null);
   const [selectedStrain, setSelectedStrain] = useState(null);
@@ -2207,7 +2254,7 @@ export default function Shop() {
         const { data, error } = await supabase
           .from("inventory_items")
           .select(
-            "id, name, sku, category, unit, quantity_on_hand, cost_price, sell_price",
+            "id, name, sku, category, unit, quantity_on_hand, cost_price, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, expiry_date, description",
           )
           .eq("category", "finished_product")
           .eq("is_active", true)
@@ -2218,7 +2265,16 @@ export default function Shop() {
           setLiveProducts([]);
           return;
         }
-        setLiveProducts((data || []).map(buildProductFromInventory));
+        setLiveProducts(
+          (data || []).map(
+            industryProfile === "food_beverage"
+              ? buildFoodProduct
+              : industryProfile === "general_retail" ||
+                  industryProfile === "mixed_retail"
+                ? buildGeneralProduct
+                : buildProductFromInventory,
+          ),
+        );
       } catch (err) {
         console.error("[Shop] Fetch error:", err);
         setLiveProducts([]);
@@ -2227,7 +2283,7 @@ export default function Shop() {
       }
     };
     fetchProducts();
-  }, []);
+  }, [industryProfile]);
 
   const handleAddToCart = (product) => {
     addToCart(product);
@@ -2427,7 +2483,11 @@ export default function Shop() {
               maxWidth: 600,
             }}
           >
-            Premium cannabis vapes · 18 Eybna terpene strains · Lab verified
+            {isFoodBev
+              ? "Fresh ingredients · Allergen-aware · Traceable sourcing"
+              : isGeneral
+                ? "Quality products · Verified stock · Fast delivery"
+                : "Premium cannabis vapes · 18 Eybna terpene strains · Lab verified"}
           </p>
           <div
             className="shop-stats-row"
@@ -2492,7 +2552,18 @@ export default function Shop() {
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {FILTER_OPTIONS.map((f) => (
+          {(isFoodBev
+            ? [
+                { key: "all", label: "All Products" },
+                { key: "coming-soon", label: "Coming Soon" },
+              ]
+            : isGeneral
+              ? [
+                  { key: "all", label: "All Products" },
+                  { key: "coming-soon", label: "Coming Soon" },
+                ]
+              : FILTER_OPTIONS
+          ).map((f) => (
             <button
               key={f.key}
               className={`shop-filter-btn${filter === f.key ? " active" : ""}`}
@@ -2592,15 +2663,29 @@ export default function Shop() {
                     marginBottom: 48,
                   }}
                 >
-                  {filteredVapes.map((product) => (
-                    <VapeCard
-                      key={product.id}
-                      product={product}
-                      navigate={navigate}
-                      onAddToCart={handleAddToCart}
-                      onViewProfile={handleViewProfile}
-                    />
-                  ))}
+                  {filteredVapes.map((product) =>
+                    isFoodBev ? (
+                      <FoodShopCard
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                      />
+                    ) : isGeneral ? (
+                      <GeneralShopCard
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                      />
+                    ) : (
+                      <VapeCard
+                        key={product.id}
+                        product={product}
+                        navigate={navigate}
+                        onAddToCart={handleAddToCart}
+                        onViewProfile={handleViewProfile}
+                      />
+                    ),
+                  )}
                 </div>
               </>
             )}
@@ -2926,6 +3011,359 @@ export default function Shop() {
 }
 
 // ── VapeCard ──────────────────────────────────────────────────────────────────
+function FoodShopCard({ product, onAddToCart }) {
+  const allergens = product.allergens || [];
+  const isExpired = product.daysToExpiry !== null && product.daysToExpiry < 0;
+  const expiryWarning =
+    product.daysToExpiry !== null && product.daysToExpiry <= 30 && !isExpired;
+  return (
+    <div className="shop-card">
+      <div
+        style={{
+          height: 6,
+          background: "linear-gradient(to right, #52b788, #2d6a4f)",
+        }}
+      />
+      <div style={{ padding: "20px 24px 24px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 14,
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          <span
+            className="shop-format-badge"
+            style={{
+              background: "rgba(82,183,136,0.08)",
+              color: "#52b788",
+              border: "1px solid rgba(82,183,136,0.2)",
+            }}
+          >
+            {product.category ? product.category.replace(/_/g, " ") : "Product"}
+          </span>
+          {product.shelf_life_days && (
+            <span
+              className="shop-format-badge"
+              style={{
+                background: "rgba(181,147,90,0.08)",
+                color: "#b5935a",
+                border: "1px solid rgba(181,147,90,0.2)",
+              }}
+            >
+              {product.shelf_life_days} day shelf life
+            </span>
+          )}
+        </div>
+        <h3
+          className="shop-font"
+          style={{
+            fontSize: 22,
+            fontWeight: 400,
+            color: "#1a1a1a",
+            margin: "0 0 4px",
+            lineHeight: 1.2,
+          }}
+        >
+          {product.name}
+        </h3>
+        {product.sku && (
+          <p
+            className="body-font"
+            style={{
+              fontSize: 11,
+              color: "#aaa",
+              margin: "0 0 12px",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            SKU: {product.sku}
+          </p>
+        )}
+        {allergens.length > 0 && (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: "8px 10px",
+              background: "#fff8e7",
+              border: "1px solid #f0c36d",
+              borderRadius: 2,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: "#b5935a",
+                fontWeight: 700,
+                marginBottom: 5,
+              }}
+            >
+              Contains Allergens
+            </div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {allergens.map((a) => (
+                <span
+                  key={a}
+                  className="shop-effect-tag"
+                  style={{
+                    background: "#fff3cd",
+                    color: "#856404",
+                    border: "1px solid #ffc10740",
+                    fontSize: 9,
+                  }}
+                >
+                  {a.replace(/_/g, " ")}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {product.expiry_date && (
+          <div
+            style={{
+              marginBottom: 12,
+              fontSize: 11,
+              padding: "5px 8px",
+              borderRadius: 2,
+              background: isExpired
+                ? "#fdf0ef"
+                : expiryWarning
+                  ? "#fff3e8"
+                  : "#f0faf5",
+              color: isExpired
+                ? "#c0392b"
+                : expiryWarning
+                  ? "#e67e22"
+                  : "#2d6a4f",
+              border: `1px solid ${isExpired ? "#c0392b30" : expiryWarning ? "#e67e2230" : "#52b78830"}`,
+            }}
+          >
+            {isExpired
+              ? "Expired"
+              : expiryWarning
+                ? `Expires in ${product.daysToExpiry} days`
+                : `Best before ${new Date(product.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}`}
+          </div>
+        )}
+        {product.description && (
+          <p
+            className="body-font"
+            style={{
+              fontSize: 12,
+              color: "#888",
+              fontWeight: 300,
+              lineHeight: 1.6,
+              margin: "0 0 14px",
+            }}
+          >
+            {product.description}
+          </p>
+        )}
+        {product.ingredients_notes && (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "8px 10px",
+              background: "#f4f0e8",
+              borderRadius: 2,
+              fontSize: 12,
+              color: "#666",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                display: "block",
+                marginBottom: 3,
+                color: "#888",
+              }}
+            >
+              Ingredients
+            </strong>
+            {product.ingredients_notes}
+          </div>
+        )}
+        {product.storage_instructions && (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "8px 10px",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: 2,
+              fontSize: 11,
+              color: "#1e3a5f",
+            }}
+          >
+            <strong
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                display: "block",
+                marginBottom: 3,
+              }}
+            >
+              Storage
+            </strong>
+            {product.storage_instructions}
+          </div>
+        )}
+        <div style={{ height: 1, background: "#f0ebe0", marginBottom: 16 }} />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <span
+            className="shop-font"
+            style={{ fontSize: 26, fontWeight: 400, color: "#b5935a" }}
+          >
+            R{product.price.toLocaleString()}
+          </span>
+          <button
+            className="shop-btn"
+            style={{ padding: "8px 18px", fontSize: 10 }}
+            onClick={() => onAddToCart(product)}
+          >
+            Add to Cart
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeneralShopCard({ product, onAddToCart }) {
+  return (
+    <div className="shop-card">
+      <div
+        style={{
+          height: 6,
+          background: "linear-gradient(to right, #1b4332, #2d6a4f)",
+        }}
+      />
+      <div style={{ padding: "20px 24px 24px" }}>
+        <div style={{ marginBottom: 14 }}>
+          <span
+            className="shop-format-badge"
+            style={{
+              background: "rgba(27,67,50,0.06)",
+              color: "#1b4332",
+              border: "1px solid rgba(27,67,50,0.15)",
+            }}
+          >
+            {product.category ? product.category.replace(/_/g, " ") : "Product"}
+          </span>
+        </div>
+        <h3
+          className="shop-font"
+          style={{
+            fontSize: 22,
+            fontWeight: 400,
+            color: "#1a1a1a",
+            margin: "0 0 4px",
+            lineHeight: 1.2,
+          }}
+        >
+          {product.name}
+        </h3>
+        {product.sku && (
+          <p
+            className="body-font"
+            style={{
+              fontSize: 11,
+              color: "#aaa",
+              margin: "0 0 12px",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            SKU: {product.sku}
+          </p>
+        )}
+        {product.description && (
+          <p
+            className="body-font"
+            style={{
+              fontSize: 12,
+              color: "#888",
+              fontWeight: 300,
+              lineHeight: 1.6,
+              margin: "0 0 14px",
+            }}
+          >
+            {product.description}
+          </p>
+        )}
+        {product.storage_instructions && (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "8px 10px",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: 2,
+              fontSize: 11,
+              color: "#1e3a5f",
+            }}
+          >
+            <strong
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                display: "block",
+                marginBottom: 3,
+              }}
+            >
+              Storage
+            </strong>
+            {product.storage_instructions}
+          </div>
+        )}
+        <div style={{ height: 1, background: "#f0ebe0", marginBottom: 16 }} />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <span
+            className="shop-font"
+            style={{ fontSize: 26, fontWeight: 400, color: "#b5935a" }}
+          >
+            R{product.price.toLocaleString()}
+          </span>
+          <button
+            className="shop-btn"
+            style={{ padding: "8px 18px", fontSize: 10 }}
+            onClick={() => onAddToCart(product)}
+          >
+            Add to Cart
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VapeCard({ product, navigate, onAddToCart, onViewProfile }) {
   const s = product.strain;
   const is2ml = product.format.includes("2ml");
