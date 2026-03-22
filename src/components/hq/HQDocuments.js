@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 
@@ -693,6 +694,9 @@ function ReviewPanel({
   const [rejectReason, setRejectReason] = useState("");
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [supplierCreated, setSupplierCreated] = useState(false);
+  // WP-BIB S5: per-line category + medium_type overrides
+  const [catOverrides, setCatOverrides] = useState({});
+  const [medOverrides, setMedOverrides] = useState({});
 
   const extraction = doc.extracted_data || {};
   const lineItems = extraction.line_items || [];
@@ -1002,6 +1006,93 @@ function ReviewPanel({
                     <span style={{ color: T.warning }}>⚠ unmatched</span>
                   )}
                 </div>
+                {/* WP-BIB S5: per-line category + medium_type override */}
+                {!isShippingLine(item.description) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      marginTop: 5,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <select
+                      value={
+                        catOverrides[i] || item.category_guess || "raw_material"
+                      }
+                      onChange={(e) =>
+                        setCatOverrides((p) => ({ ...p, [i]: e.target.value }))
+                      }
+                      style={{
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        borderRadius: 3,
+                        border: `1px solid ${T.ink150}`,
+                        fontFamily: T.font,
+                        background: catOverrides[i] ? T.accentLit : "#fff",
+                        color: catOverrides[i] ? T.accentMid : T.ink500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {[
+                        "raw_material",
+                        "terpene",
+                        "hardware",
+                        "packaging",
+                        "finished_product",
+                        "concentrate",
+                        "flower",
+                        "ingredient",
+                        "equipment",
+                        "accessory",
+                        "other",
+                      ].map((c) => (
+                        <option key={c} value={c}>
+                          {c.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                    {["raw_material", "concentrate", "ingredient"].includes(
+                      catOverrides[i] || item.category_guess || "",
+                    ) && (
+                      <select
+                        value={medOverrides[i] || ""}
+                        onChange={(e) =>
+                          setMedOverrides((p) => ({
+                            ...p,
+                            [i]: e.target.value,
+                          }))
+                        }
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          border: `1px solid ${T.ink150}`,
+                          fontFamily: T.font,
+                          background: medOverrides[i] ? T.accentLit : "#fff",
+                          color: medOverrides[i] ? T.accentMid : T.ink500,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="">med type…</option>
+                        {[
+                          "distillate",
+                          "live_resin",
+                          "live_rosin",
+                          "co2_oil",
+                          "concentrate",
+                          "rosin",
+                          "bho",
+                          "other",
+                        ].map((m) => (
+                          <option key={m} value={m}>
+                            {m.replace(/_/g, " ")}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1373,7 +1464,13 @@ function ReviewPanel({
           ) : (
             <div style={{ display: "flex", gap: 8 }}>
               <button
-                onClick={() => onConfirm(Array.from(checkedUpdates))}
+                onClick={() =>
+                  onConfirm(
+                    Array.from(checkedUpdates),
+                    catOverrides,
+                    medOverrides,
+                  )
+                }
                 disabled={confirming}
                 style={{
                   flex: 2,
@@ -1681,6 +1778,8 @@ export default function HQDocuments({ initialDocId = null }) {
 
   // WP-GUIDE-C+: wire 'documents' context for WorkflowGuide live status
   const ctx = usePageContext("documents", null);
+  // RULE 0G: useTenant() called inside this component
+  const { tenantId, industryProfile } = useTenant();
 
   const selectedDoc = documents.find((d) => d.id === selectedDocId) || null;
 
@@ -1806,6 +1905,7 @@ export default function HQDocuments({ initialDocId = null }) {
             file_name: file.name,
             file_size_kb: Math.round(file.size / 1024),
             document_type_hint: detectedHint || null,
+            industry_profile: industryProfile || "cannabis_retail",
             context: freshContext,
           },
         },
@@ -2000,7 +2100,11 @@ export default function HQDocuments({ initialDocId = null }) {
     await fetchDocuments();
   };
 
-  const handleConfirm = async (checkedIndices) => {
+  const handleConfirm = async (
+    checkedIndices,
+    catOverrides = {},
+    medOverrides = {},
+  ) => {
     if (!selectedDoc || checkedIndices.length === 0) return;
     setConfirming(true);
     setConfirmError("");
@@ -2290,6 +2394,20 @@ export default function HQDocuments({ initialDocId = null }) {
           const { error } = await supabase.from(table).insert(data);
           if (error) throw error;
         } else if (action === "create_inventory_item") {
+          // WP-BIB S5: apply per-line category + medium_type overrides
+          const lineIdx = extraction.line_items?.findIndex((li) =>
+            (li.description || "")
+              .toLowerCase()
+              .includes((data.name || "").toLowerCase().slice(0, 15)),
+          );
+          const overriddenCat =
+            lineIdx >= 0 && catOverrides[lineIdx]
+              ? catOverrides[lineIdx]
+              : data.category || "raw_material";
+          const overriddenMedType =
+            lineIdx >= 0 && medOverrides[lineIdx]
+              ? medOverrides[lineIdx]
+              : data.medium_type || null;
           const invData = {
             sku:
               data.sku ||
@@ -2298,16 +2416,18 @@ export default function HQDocuments({ initialDocId = null }) {
                 .replace(/[^A-Z0-9]/g, "-")
                 .slice(0, 20)}`,
             name: data.name,
-            category: data.category || "finished_product",
+            category: overriddenCat,
             unit: data.unit || "pcs",
             quantity_on_hand: Number(data.quantity_on_hand ?? 0),
             cost_price: parseFloat(data.cost_price ?? 0),
             sell_price: 0,
             is_active: true,
             supplier_id: data.supplier_id || docSupplierId || null,
+            medium_type: overriddenMedType,
             description:
               data.description ||
               `Imported from ${selectedDoc.supplier_name || "supplier"} via ${extraction.reference?.number || selectedDoc.file_name}`,
+            tenant_id: tenantId || selectedDoc.tenant_id || null,
           };
           const { data: newItem, error: invErr } = await supabase
             .from("inventory_items")
@@ -2316,6 +2436,11 @@ export default function HQDocuments({ initialDocId = null }) {
             .single();
           if (invErr) throw invErr;
           update._createdItemId = newItem.id;
+          // WP-BIB S5: write linked_document_ids back to inventory item
+          await supabase
+            .from("inventory_items")
+            .update({ linked_document_ids: [selectedDoc.id] })
+            .eq("id", newItem.id);
         } else if (action === "create_stock_movement") {
           const pairedCreate = toApply.find(
             (u) => u.action === "create_inventory_item" && u._createdItemId,
