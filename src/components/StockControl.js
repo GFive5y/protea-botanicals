@@ -30,6 +30,7 @@ import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
 import { ChartCard, ChartTooltip, InlineProgressBar } from "./viz";
+import StockItemModal from "./StockItemModal";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -1479,7 +1480,7 @@ function ItemsView({
       </div>
 
       {showForm && (
-        <ItemForm
+        <StockItemModal
           item={editItem}
           suppliers={suppliers}
           visibleCategories={visibleCategories}
