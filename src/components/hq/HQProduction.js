@@ -1872,7 +1872,7 @@ export default function HQProduction() {
       const batchQuery = supabase
         .from("batches")
         .select(
-          "id,batch_number,product_name,product_type,strain,volume,status,lifecycle_status,inventory_item_id,low_stock_threshold,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id",
+          "id,batch_number,product_name,product_type,strain,volume,status,lifecycle_status,inventory_item_id,low_stock_threshold,production_date,expiry_date,units_produced,thc_content,cbd_content,lab_certified,is_archived,tenant_id,cannabinoid_profile,section_21_number",
         )
         .eq("is_archived", false)
         .order("production_date", { ascending: false })
@@ -3051,24 +3051,58 @@ function BatchesPanel({
   };
 
   const handleDeleteBatch = async (b) => {
-    const linkedRun = runs.find((r) => r.batch_id === b.id);
-    if (linkedRun) {
-      showToast(
-        "Cannot delete — this batch has a linked production run. Delete the run first from the History tab, or Archive this batch instead.",
-        "error",
-      );
-      setDeleting(null);
-      return;
-    }
     setSaving(true);
     try {
-      const { error } = await supabase.from("batches").delete().eq("id", b.id);
-      if (error) throw error;
+      const linkedRun = runs.find((r) => r.batch_id === b.id);
+      if (linkedRun) {
+        // Reverse all stock movements from this run
+        const { data: mvs } = await supabase
+          .from("stock_movements")
+          .select("id,item_id,quantity,movement_type")
+          .eq("reference", linkedRun.run_number);
+        if (mvs?.length > 0) {
+          for (const mv of mvs) {
+            const rev = -mv.quantity;
+            await supabase.from("stock_movements").insert({
+              item_id: mv.item_id,
+              quantity: rev,
+              movement_type: "adjustment",
+              reference: `VOID-${linkedRun.run_number}`,
+              notes: `Void: batch ${b.batch_number} cancelled`,
+              tenant_id: b.tenant_id || null,
+            });
+            const { data: item } = await supabase
+              .from("inventory_items")
+              .select("quantity_on_hand")
+              .eq("id", mv.item_id)
+              .single();
+            if (item) {
+              await supabase
+                .from("inventory_items")
+                .update({
+                  quantity_on_hand: Math.max(
+                    0,
+                    parseFloat(item.quantity_on_hand || 0) + rev,
+                  ),
+                })
+                .eq("id", mv.item_id);
+            }
+          }
+        }
+        // Delete run inputs + run
+        await supabase
+          .from("production_run_inputs")
+          .delete()
+          .eq("run_id", linkedRun.id);
+        await supabase.from("production_runs").delete().eq("id", linkedRun.id);
+      }
+      // Delete batch
+      await supabase.from("batches").delete().eq("id", b.id);
       setDeleting(null);
       onRefresh();
-      showToast(`Batch ${b.batch_number} deleted.`);
+      showToast(`Batch ${b.batch_number} voided. Stock reversed.`);
     } catch (err) {
-      showToast("Delete failed: " + err.message, "error");
+      showToast("Void failed: " + err.message, "error");
     } finally {
       setSaving(false);
     }
@@ -3337,7 +3371,36 @@ function BatchesPanel({
                     >
                       {b.product_type || <span>empty</span>}
                     </div>
-                    <div style={sTd}>{b.strain || "—"}</div>
+                    <div style={sTd}>
+                      {(() => {
+                        const cp = b.cannabinoid_profile;
+                        if (cp && typeof cp === "object" && cp.chamber_1) {
+                          return (
+                            <div
+                              style={{ fontSize: "10px", lineHeight: "1.6" }}
+                            >
+                              {Object.entries(cp).map(([k, v]) => (
+                                <div key={k} style={{ color: T.accentMid }}>
+                                  <span
+                                    style={{
+                                      color: T.ink400,
+                                      textTransform: "uppercase",
+                                      fontSize: "9px",
+                                    }}
+                                  >
+                                    {k.replace("_", " ")}:{" "}
+                                  </span>
+                                  {v.terpene
+                                    ? `${v.terpene.split(" - ")[0]} ${v.terpene_pct ? v.terpene_pct + "%" : ""}`
+                                    : v.strain || v.medium || "—"}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return b.strain || "—";
+                      })()}
+                    </div>
                     <div
                       style={{
                         ...sTd,
@@ -3472,10 +3535,14 @@ function BatchesPanel({
                           ▣
                         </button>
                       )}
-                      {!linkedRun && deleting !== b.id && (
+                      {deleting !== b.id && (
                         <button
                           onClick={() => setDeleting(b.id)}
-                          title="Delete batch"
+                          title={
+                            linkedRun
+                              ? "Void batch + reverse stock"
+                              : "Delete batch"
+                          }
                           style={{
                             ...sBtn("outline"),
                             padding: "3px 8px",
@@ -3484,7 +3551,7 @@ function BatchesPanel({
                             borderColor: T.dangerBd,
                           }}
                         >
-                          ✕
+                          {linkedRun ? "Void" : "✕"}
                         </button>
                       )}
                       {deleting === b.id && (
@@ -3498,7 +3565,11 @@ function BatchesPanel({
                               fontSize: "9px",
                             }}
                           >
-                            {saving ? "..." : "Delete"}
+                            {saving
+                              ? "..."
+                              : linkedRun
+                                ? "Confirm Void"
+                                : "Delete"}
                           </button>
                           <button
                             onClick={() => setDeleting(null)}
@@ -3883,7 +3954,7 @@ function NewRunPanel({
           productFormats.forEach((f) => {
             const g =
               f.group_label ||
-              (f.is_vape ? "── Vape ──" : "── Other Products ──");
+              (f.is_vape ? "-- Vape --" : "-- Other Products --");
             if (!seen.has(g)) seen.set(g, []);
             seen.get(g).push(f.key);
           });
@@ -3914,6 +3985,8 @@ function NewRunPanel({
     custom_fill_ml: "",
     product_name_override: "",
     bom_selections: {},
+    lot_number: "", // WP-BIB S3: food_beverage lot number
+    expiry_date: "", // WP-BIB S3: food_beverage expiry date (mandatory)
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -4019,17 +4092,84 @@ function NewRunPanel({
     parseFloat(selHw?.quantity_on_hand || 0) -
       parseFloat(selHw?.reserved_qty || 0),
   );
+
+  // ── WP-BIB S3: Multi-chamber computed values ──────────────────────────────
+  const isMultiChamber = isVape && chambers > 1;
+  const isFoodBev = industryProfile === "food_beverage";
+
+  const chamberData = isMultiChamber
+    ? Array.from({ length: chambers }, (_, ci) => {
+        const mediumId = form.bom_selections[`ch_${ci}_medium`] || "";
+        const terpeneId = form.bom_selections[`ch_${ci}_terpene`] || "";
+        const chStrain = form.bom_selections[`ch_${ci}_strain`] || "";
+        const medItem = distItems.find((i) => i.id === mediumId);
+        const cTerpItem = terpItems.find((i) => i.id === terpeneId);
+        const cMedAvail = Math.max(
+          0,
+          parseFloat(medItem?.quantity_on_hand || 0) -
+            parseFloat(medItem?.reserved_qty || 0),
+        );
+        const cTerpAvail = Math.max(
+          0,
+          parseFloat(cTerpItem?.quantity_on_hand || 0) -
+            parseFloat(cTerpItem?.reserved_qty || 0),
+        );
+        const cMedNeeded = +(fillMlPerChamber * planned).toFixed(2);
+        const chTerpPct =
+          parseFloat(form.bom_selections[`ch_${ci}_terpPct`]) || terpPct;
+        const chTerpRatio = chTerpPct / 100;
+        const cTerpNeeded = +(fillMlPerChamber * chTerpRatio * planned).toFixed(
+          3,
+        );
+        return {
+          ci,
+          mediumId,
+          terpeneId,
+          chStrain,
+          medItem,
+          cTerpItem,
+          cMedAvail,
+          cTerpAvail,
+          cMedNeeded,
+          cTerpNeeded,
+          medOk: !!mediumId && cMedAvail >= cMedNeeded,
+          terpOk: !!terpeneId && cTerpAvail >= cTerpNeeded,
+        };
+      })
+    : [];
+
+  const hwSelId = isMultiChamber ? form.bom_selections["hw"] || "" : "";
+  const hwSelItem = hwItems.find((i) => i.id === hwSelId);
+  const hwSelAvail = Math.max(
+    0,
+    parseFloat(hwSelItem?.quantity_on_hand || 0) -
+      parseFloat(hwSelItem?.reserved_qty || 0),
+  );
+  const multiChamberMatsOk =
+    isMultiChamber &&
+    planned > 0 &&
+    chamberData.every((c) => c.medOk && c.terpOk) &&
+    !!hwSelId &&
+    hwSelAvail >= planned;
+  // ──────────────────────────────────────────────────────────────────────────
+
   const vapeMatsOk =
     !isVape ||
-    (form.distillate_item_id &&
-      distAvail >= distNeeded &&
-      form.terpene_item_id &&
-      terpAvail >= terpNeeded &&
-      form.hardware_item_id &&
-      hwAvail >= hwNeeded &&
-      distMlPerUnit > 0);
-  const hasName = form.strain || form.product_name_override;
-  const canRun = planned > 0 && (hasBom ? bomMatsOk : vapeMatsOk) && hasName;
+    (isMultiChamber
+      ? multiChamberMatsOk
+      : form.distillate_item_id &&
+        distAvail >= distNeeded &&
+        form.terpene_item_id &&
+        terpAvail >= terpNeeded &&
+        form.hardware_item_id &&
+        hwAvail >= hwNeeded &&
+        distMlPerUnit > 0);
+  const multiChamberName = isMultiChamber ? fmt.format_short : "";
+  const hasName = form.strain || form.product_name_override || multiChamberName;
+  const foodBevOk =
+    !isFoodBev || isVape || (!!form.lot_number && !!form.expiry_date);
+  const canRun =
+    planned > 0 && (hasBom ? bomMatsOk : vapeMatsOk) && hasName && foodBevOk;
   const distCost = selDist
     ? parseFloat(selDist.cost_price || 0) * distNeeded
     : 0;
@@ -4037,7 +4177,25 @@ function NewRunPanel({
     ? parseFloat(selTerp.cost_price || 0) * terpNeeded
     : 0;
   const hwCost = selHw ? parseFloat(selHw.cost_price || 0) * hwNeeded : 0;
-  const totalCost = hasBom ? bomTotalCost : distCost + terpCost + hwCost;
+  const multiChamberCost = isMultiChamber
+    ? chamberData.reduce((sum, ch) => {
+        const mCost =
+          parseFloat(
+            ch.medItem?.weighted_avg_cost || ch.medItem?.cost_price || 0,
+          ) * ch.cMedNeeded;
+        const tCost =
+          parseFloat(
+            ch.cTerpItem?.weighted_avg_cost || ch.cTerpItem?.cost_price || 0,
+          ) * ch.cTerpNeeded;
+        return sum + mCost + tCost;
+      }, 0) +
+      parseFloat(hwSelItem?.cost_price || 0) * planned
+    : 0;
+  const totalCost = hasBom
+    ? bomTotalCost
+    : isMultiChamber
+      ? multiChamberCost
+      : distCost + terpCost + hwCost;
   const costPerUnit = planned > 0 ? (totalCost / planned).toFixed(2) : 0;
   const finalActual = parseInt(form.actual_units) || planned;
   const yieldPct = calcYield(finalActual, planned);
@@ -4093,6 +4251,7 @@ function NewRunPanel({
           status: "active",
           lifecycle_status: "active",
           is_archived: false,
+          expiry_date: isFoodBev ? form.expiry_date || null : null,
           tenant_id: tenantId || null,
         })
         .select()
@@ -4108,12 +4267,17 @@ function NewRunPanel({
           actual_units: finalActual,
           started_at: now,
           completed_at: now,
-          notes: form.notes || null,
+          notes:
+            isFoodBev && form.lot_number
+              ? `Lot: ${form.lot_number}${form.notes ? " | " + form.notes : ""}`
+              : form.notes || null,
         })
         .select()
         .single();
       if (runErr) throw runErr;
-      if (isVape) {
+
+      // ── Single-chamber vape deductions (unchanged) ──
+      if (isVape && !isMultiChamber) {
         await supabase.from("production_run_inputs").insert([
           {
             run_id: run.id,
@@ -4173,6 +4337,95 @@ function NewRunPanel({
           .update({ quantity_on_hand: hwAvail - hwNeeded })
           .eq("id", form.hardware_item_id);
       }
+
+      // ── WP-BIB S3: Multi-chamber vape deductions ──
+      if (isVape && isMultiChamber) {
+        const runInputs = [];
+        const movements = [];
+        // Track qty updates per item — same item may appear in multiple chambers
+        const qtyUpdates = {};
+        for (const ch of chamberData) {
+          runInputs.push(
+            {
+              run_id: run.id,
+              item_id: ch.mediumId,
+              quantity_planned: ch.cMedNeeded,
+              quantity_actual: ch.cMedNeeded,
+              notes: `Chamber ${ch.ci + 1} medium`,
+            },
+            {
+              run_id: run.id,
+              item_id: ch.terpeneId,
+              quantity_planned: ch.cTerpNeeded,
+              quantity_actual: ch.cTerpNeeded,
+              notes: `Chamber ${ch.ci + 1} terpene`,
+            },
+          );
+          movements.push(
+            {
+              item_id: ch.mediumId,
+              quantity: -ch.cMedNeeded,
+              movement_type: "production_out",
+              reference: runNumber,
+              notes: `Run ${runNumber}: Ch${ch.ci + 1} ${ch.medItem?.name || "medium"}`,
+            },
+            {
+              item_id: ch.terpeneId,
+              quantity: -ch.cTerpNeeded,
+              movement_type: "production_out",
+              reference: runNumber,
+              notes: `Run ${runNumber}: Ch${ch.ci + 1} ${ch.cTerpItem?.name || "terpene"}`,
+            },
+          );
+          qtyUpdates[ch.mediumId] =
+            (qtyUpdates[ch.mediumId] ?? ch.cMedAvail) - ch.cMedNeeded;
+          qtyUpdates[ch.terpeneId] =
+            (qtyUpdates[ch.terpeneId] ?? ch.cTerpAvail) - ch.cTerpNeeded;
+        }
+        // Hardware — shared across all chambers
+        runInputs.push({
+          run_id: run.id,
+          item_id: hwSelId,
+          quantity_planned: planned,
+          quantity_actual: planned,
+          notes: "Hardware (all chambers)",
+        });
+        movements.push({
+          item_id: hwSelId,
+          quantity: -planned,
+          movement_type: "production_out",
+          reference: runNumber,
+          notes: `Run ${runNumber}: hardware`,
+        });
+        qtyUpdates[hwSelId] = hwSelAvail - planned;
+
+        await supabase.from("production_run_inputs").insert(runInputs);
+        await supabase.from("stock_movements").insert(movements);
+        for (const [itemId, newQty] of Object.entries(qtyUpdates)) {
+          await supabase
+            .from("inventory_items")
+            .update({ quantity_on_hand: Math.max(0, newQty) })
+            .eq("id", itemId);
+        }
+
+        // Store per-chamber cannabinoid profile on batch
+        const cannabinoidProfile = {};
+        for (const ch of chamberData) {
+          cannabinoidProfile[`chamber_${ch.ci + 1}`] = {
+            strain: ch.chStrain || null,
+            medium: ch.medItem?.name || null,
+            medium_type: ch.medItem?.medium_type || null,
+            terpene: ch.cTerpItem?.name || null,
+            terpene_pct:
+              parseFloat(form.bom_selections[`ch_${ch.ci}_terpPct`]) || terpPct,
+          };
+        }
+        await supabase
+          .from("batches")
+          .update({ cannabinoid_profile: cannabinoidProfile })
+          .eq("id", batch.id);
+      }
+
       if (hasBom && !isVape && bomLineData.length > 0) {
         await supabase.from("production_run_inputs").insert(
           bomLineData.map((bl) => ({
@@ -4218,6 +4471,7 @@ function NewRunPanel({
             sell_price: 0,
             is_active: true,
             description: `Produced via run ${runNumber}`,
+            shelf_life_days: isFoodBev && form.expiry_date ? null : null,
           })
           .select()
           .single();
@@ -4324,7 +4578,7 @@ function NewRunPanel({
                   marginBottom: 6,
                 }}
               >
-                Sell price not set — product not yet visible in shop
+                Sell price not set -- product not yet visible in shop
               </div>
               <div
                 style={{
@@ -4334,8 +4588,8 @@ function NewRunPanel({
                   lineHeight: 1.6,
                 }}
               >
-                Go to <strong>HQ → Pricing</strong> and set a sell_price &gt; R0
-                for {completedRun.finishedName}.
+                Go to <strong>HQ &rarr; Pricing</strong> and set a sell_price
+                &gt; R0 for {completedRun.finishedName}.
               </div>
             </div>
           )}
@@ -4370,7 +4624,7 @@ function NewRunPanel({
               }}
               style={sBtn()}
             >
-              Done — View History
+              Done -- View History
             </button>
             <button
               onClick={() => setCompletedRun(null)}
@@ -4386,9 +4640,10 @@ function NewRunPanel({
 
   return (
     <div style={{ display: "grid", gap: "20px", maxWidth: "820px" }}>
+      {/* ── STEP 1: Define Run ── */}
       <div style={{ ...sCard, borderLeft: `3px solid ${T.accent}` }}>
         <div style={{ ...sLabel, marginBottom: "16px" }}>
-          Step 1 — Define Run
+          Step 1 -- Define Run
         </div>
         <div
           style={{
@@ -4429,7 +4684,7 @@ function NewRunPanel({
               />
             </div>
           )}
-          {fmt.chambers > 1 && (
+          {isVape && chambers > 1 && (
             <div
               style={{
                 padding: "10px 14px",
@@ -4442,30 +4697,31 @@ function NewRunPanel({
                 alignItems: "center",
               }}
             >
-              Triple Chamber:{" "}
+              {chambers}-Chamber:{" "}
               <strong style={{ margin: "0 4px" }}>
                 {distMlPerUnit.toFixed(2)}ml distillate/unit
               </strong>{" "}
-              ({fillMlPerChamber}ml × {chambers} chambers)
+              ({fillMlPerChamber}ml &times; {chambers} chambers)
             </div>
           )}
-          {showCannabisField(industryProfile, isCannabis) && (
-            <div>
-              {fLabel(isVape ? "Strain *" : "Strain (optional)")}
-              <select
-                style={sSelect}
-                value={form.strain}
-                onChange={(e) => set("strain", e.target.value)}
-              >
-                <option value="">— Select Strain —</option>
-                {strainOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {showCannabisField(industryProfile, isCannabis) &&
+            !isMultiChamber && (
+              <div>
+                {fLabel(isVape ? "Strain *" : "Strain (optional)")}
+                <select
+                  style={sSelect}
+                  value={form.strain}
+                  onChange={(e) => set("strain", e.target.value)}
+                >
+                  <option value="">-- Select Strain --</option>
+                  {strainOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           {!isVape && (
             <div>
               {fLabel("Product Name *", "e.g. CBD Gummy Bear 25mg")}
@@ -4489,19 +4745,64 @@ function NewRunPanel({
               onChange={(e) => set("planned_units", e.target.value)}
             />
           </div>
-          {isVape && (
+          {isVape && !isMultiChamber && (
             <div>
-              {fLabel("Terpene %", `default ${fmt.terpene_pct}% · range 3–15%`)}
-              <input
-                style={sInput}
-                type="number"
-                step="0.1"
-                min="3"
-                max="15"
-                placeholder={`${fmt.terpene_pct} (default)`}
-                value={form.terpene_pct_override}
-                onChange={(e) => set("terpene_pct_override", e.target.value)}
-              />
+              {fLabel("Terpene %", `default ${fmt.terpene_pct}%`)}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "6px",
+                  flexWrap: "wrap",
+                  marginBottom: "6px",
+                }}
+              >
+                {[3, 5, 7, 10].map((pct) => {
+                  const active =
+                    parseFloat(form.terpene_pct_override) === pct ||
+                    (!form.terpene_pct_override && fmt.terpene_pct === pct);
+                  return (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => set("terpene_pct_override", String(pct))}
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontFamily: T.fontUi,
+                        fontWeight: 700,
+                        border: `1px solid ${active ? T.accentBd : T.ink150}`,
+                        background: active ? T.accentLit : T.ink075,
+                        color: active ? T.accentMid : T.ink500,
+                      }}
+                    >
+                      {pct}%
+                    </button>
+                  );
+                })}
+                <input
+                  style={{
+                    ...sInput,
+                    width: "70px",
+                    fontSize: "12px",
+                    padding: "5px 8px",
+                  }}
+                  type="number"
+                  step="0.1"
+                  min="1"
+                  max="20"
+                  placeholder="custom"
+                  value={
+                    [3, 5, 7, 10].includes(
+                      parseFloat(form.terpene_pct_override),
+                    )
+                      ? ""
+                      : form.terpene_pct_override
+                  }
+                  onChange={(e) => set("terpene_pct_override", e.target.value)}
+                />
+              </div>
               {terpNeeded > 0 && planned > 0 && (
                 <p
                   style={{
@@ -4511,95 +4812,376 @@ function NewRunPanel({
                     fontFamily: T.fontUi,
                   }}
                 >
-                  = {terpNeeded.toFixed(3)}ml terpene for {planned} unit
+                  {terpPct}% = {terpNeeded.toFixed(3)}ml for {planned} unit
                   {planned !== 1 ? "s" : ""}
                 </p>
               )}
             </div>
           )}
+          {/* WP-BIB S3: Food & beverage lot + expiry fields */}
+          {isFoodBev && !isVape && (
+            <>
+              <div>
+                {fLabel("Lot Number *")}
+                <input
+                  style={sInput}
+                  placeholder="e.g. BB-2026-032"
+                  value={form.lot_number}
+                  onChange={(e) => set("lot_number", e.target.value)}
+                />
+              </div>
+              <div>
+                {fLabel("Expiry Date *")}
+                <input
+                  style={sInput}
+                  type="date"
+                  value={form.expiry_date}
+                  onChange={(e) => set("expiry_date", e.target.value)}
+                />
+                {!form.expiry_date && planned > 0 && (
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: T.danger,
+                      margin: "4px 0 0",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    Mandatory for food & beverage
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
+      {/* ── STEP 2: Select Materials ── */}
       {isVape && (
         <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
-            Step 2 — Select Materials
+            Step 2 -- Select Materials
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "12px",
-            }}
-          >
+
+          {/* Single-chamber: original 3-column layout (unchanged) */}
+          {!isMultiChamber && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: "12px",
+              }}
+            >
+              <div>
+                {fLabel("Distillate *")}
+                <select
+                  style={sSelect}
+                  value={form.distillate_item_id}
+                  onChange={(e) => set("distillate_item_id", e.target.value)}
+                >
+                  <option value="">-- Select --</option>
+                  {distItems.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(1)}
+                      ml)
+                    </option>
+                  ))}
+                </select>
+                {distItems.length === 0 && (
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: T.danger,
+                      margin: "4px 0 0",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    Add distillate via Supply Chain first
+                  </p>
+                )}
+              </div>
+              <div>
+                {fLabel("Terpene *")}
+                <select
+                  style={sSelect}
+                  value={form.terpene_item_id}
+                  onChange={(e) => set("terpene_item_id", e.target.value)}
+                >
+                  <option value="">-- Select --</option>
+                  {terpItems.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(2)}
+                      ml)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                {fLabel("Hardware *")}
+                <select
+                  style={sSelect}
+                  value={form.hardware_item_id}
+                  onChange={(e) => set("hardware_item_id", e.target.value)}
+                >
+                  <option value="">-- Select --</option>
+                  {hwItems.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} (
+                      {Math.floor(parseFloat(i.quantity_on_hand || 0))} pcs)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* WP-BIB S3: Multi-chamber per-chamber selectors */}
+          {isMultiChamber && (
             <div>
-              {fLabel("Distillate *")}
-              <select
-                style={sSelect}
-                value={form.distillate_item_id}
-                onChange={(e) => set("distillate_item_id", e.target.value)}
-              >
-                <option value="">— Select —</option>
-                {distItems.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(1)}
-                    ml)
-                  </option>
-                ))}
-              </select>
-              {distItems.length === 0 && (
-                <p
+              {chamberData.map((ch) => (
+                <div
+                  key={ch.ci}
                   style={{
-                    fontSize: "11px",
-                    color: T.danger,
-                    margin: "4px 0 0",
-                    fontFamily: T.fontUi,
+                    marginBottom: "14px",
+                    paddingBottom: "12px",
+                    borderBottom:
+                      ch.ci < chambers - 1 ? `1px solid ${T.ink150}` : "none",
                   }}
                 >
-                  Add distillate via Supply Chain first
-                </p>
-              )}
-            </div>
-            <div>
-              {fLabel("Terpene *")}
-              <select
-                style={sSelect}
-                value={form.terpene_item_id}
-                onChange={(e) => set("terpene_item_id", e.target.value)}
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: T.accentMid,
+                      marginBottom: "10px",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    Chamber {ch.ci + 1}
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: showCannabisField(
+                        industryProfile,
+                        isCannabis,
+                      )
+                        ? "1fr 1fr 1fr"
+                        : "1fr 1fr",
+                      gap: "10px",
+                    }}
+                  >
+                    <div>
+                      {fLabel(
+                        "Medium *",
+                        ch.cMedNeeded ? `${ch.cMedNeeded}ml needed` : null,
+                      )}
+                      <select
+                        style={{
+                          ...sSelect,
+                          borderColor:
+                            ch.mediumId && !ch.medOk ? T.danger : T.ink150,
+                        }}
+                        value={ch.mediumId}
+                        onChange={(e) =>
+                          setBomSel(`ch_${ch.ci}_medium`, e.target.value)
+                        }
+                      >
+                        <option value="">-- Select --</option>
+                        {distItems.map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name} (
+                            {parseFloat(i.quantity_on_hand || 0).toFixed(1)}ml)
+                          </option>
+                        ))}
+                      </select>
+                      {ch.mediumId && !ch.medOk && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: T.danger,
+                            margin: "4px 0 0",
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          Need {ch.cMedNeeded}ml -- only{" "}
+                          {ch.cMedAvail.toFixed(2)}ml available
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      {fLabel(
+                        "Terpene *",
+                        ch.cTerpNeeded ? `${ch.cTerpNeeded}ml needed` : null,
+                      )}
+                      <select
+                        style={{
+                          ...sSelect,
+                          borderColor:
+                            ch.terpeneId && !ch.terpOk ? T.danger : T.ink150,
+                        }}
+                        value={ch.terpeneId}
+                        onChange={(e) =>
+                          setBomSel(`ch_${ch.ci}_terpene`, e.target.value)
+                        }
+                      >
+                        <option value="">-- Select --</option>
+                        {terpItems.map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name} (
+                            {parseFloat(i.quantity_on_hand || 0).toFixed(2)}ml)
+                          </option>
+                        ))}
+                      </select>
+                      {ch.terpeneId && !ch.terpOk && (
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: T.danger,
+                            margin: "4px 0 0",
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          Need {ch.cTerpNeeded}ml -- only{" "}
+                          {ch.cTerpAvail.toFixed(3)}ml available
+                        </p>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "4px",
+                          flexWrap: "wrap",
+                          marginTop: "6px",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            color: T.ink400,
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          Terp %:
+                        </span>
+                        {[3, 5, 7, 10].map((pct) => {
+                          const stored = parseFloat(
+                            form.bom_selections[`ch_${ch.ci}_terpPct`],
+                          );
+                          const active =
+                            stored === pct || (!stored && terpPct === pct);
+                          return (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() =>
+                                setBomSel(`ch_${ch.ci}_terpPct`, String(pct))
+                              }
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: "3px",
+                                cursor: "pointer",
+                                fontSize: "11px",
+                                fontFamily: T.fontUi,
+                                fontWeight: 700,
+                                border: `1px solid ${active ? T.accentBd : T.ink150}`,
+                                background: active ? T.accentLit : T.ink075,
+                                color: active ? T.accentMid : T.ink500,
+                              }}
+                            >
+                              {pct}%
+                            </button>
+                          );
+                        })}
+                        {ch.cTerpNeeded > 0 && planned > 0 && (
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              color: T.accentMid,
+                              fontFamily: T.fontUi,
+                              marginLeft: "4px",
+                            }}
+                          >
+                            = {ch.cTerpNeeded}ml
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {showCannabisField(industryProfile, isCannabis) && (
+                      <div>
+                        {fLabel("Strain")}
+                        <select
+                          style={sSelect}
+                          value={ch.chStrain}
+                          onChange={(e) =>
+                            setBomSel(`ch_${ch.ci}_strain`, e.target.value)
+                          }
+                        >
+                          <option value="">-- Select --</option>
+                          {strainOptions.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {/* Hardware — shared across all chambers */}
+              <div
+                style={{
+                  marginTop: "6px",
+                  paddingTop: "12px",
+                  borderTop: `1px solid ${T.ink150}`,
+                }}
               >
-                <option value="">— Select —</option>
-                {terpItems.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} ({parseFloat(i.quantity_on_hand || 0).toFixed(2)}
-                    ml)
-                  </option>
-                ))}
-              </select>
+                {fLabel(
+                  "Hardware *",
+                  `${planned > 0 ? planned : "?"} pcs needed -- shared all chambers`,
+                )}
+                <select
+                  style={{
+                    ...sSelect,
+                    borderColor:
+                      hwSelId && hwSelAvail < planned ? T.danger : T.ink150,
+                  }}
+                  value={hwSelId}
+                  onChange={(e) => setBomSel("hw", e.target.value)}
+                >
+                  <option value="">-- Select hardware --</option>
+                  {hwItems.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} (
+                      {Math.floor(parseFloat(i.quantity_on_hand || 0))} pcs)
+                    </option>
+                  ))}
+                </select>
+                {hwSelId && hwSelAvail < planned && (
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: T.danger,
+                      margin: "4px 0 0",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    Need {planned} pcs -- only {hwSelAvail} available
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              {fLabel("Hardware *")}
-              <select
-                style={sSelect}
-                value={form.hardware_item_id}
-                onChange={(e) => set("hardware_item_id", e.target.value)}
-              >
-                <option value="">— Select —</option>
-                {hwItems.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} ({Math.floor(parseFloat(i.quantity_on_hand || 0))}{" "}
-                    pcs)
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
       {hasBom && planned > 0 && (
         <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
-            Step 2 — Bill of Materials
+            Step 2 -- Bill of Materials
           </div>
           <div
             style={{
@@ -4633,7 +5215,7 @@ function NewRunPanel({
                     value={selItemId}
                     onChange={(e) => setBomSel(line.id, e.target.value)}
                   >
-                    <option value="">— Select —</option>
+                    <option value="">-- Select --</option>
                     {candidateItems.map((i) => (
                       <option key={i.id} value={i.id}>
                         {i.name} (
@@ -4652,7 +5234,7 @@ function NewRunPanel({
                       }}
                     >
                       Need {needed.toFixed(3)}
-                      {line.unit} — only {avail.toFixed(2)}
+                      {line.unit} -- only {avail.toFixed(2)}
                       {line.unit} available
                     </p>
                   )}
@@ -4672,7 +5254,9 @@ function NewRunPanel({
           }}
         >
           <div style={{ ...sLabel, color: T.warning, marginBottom: "8px" }}>
-            Non-Vape Run — Units Only
+            {isFoodBev
+              ? "Recipe Production -- Units Only"
+              : "Non-Vape Run -- Units Only"}
           </div>
           <p
             style={{
@@ -4686,11 +5270,121 @@ function NewRunPanel({
             No material BOM for this format. The run will create a batch record
             and add <strong>{planned} units</strong> of{" "}
             <strong>{finishedName || "product"}</strong> to finished stock.
+            {isFoodBev &&
+              " Add a BOM via Production > Bill of Materials to enable ingredient deductions."}
           </p>
         </div>
       )}
 
-      {isVape &&
+      {/* ── STEP 3: Multi-chamber BOM summary ── */}
+      {isMultiChamber &&
+        planned > 0 &&
+        chamberData.some((c) => c.mediumId || c.terpeneId) && (
+          <div
+            style={{
+              ...sCard,
+              borderLeft: `3px solid ${multiChamberMatsOk ? T.success : T.warning}`,
+              background: multiChamberMatsOk ? T.successBg : T.warningBg,
+            }}
+          >
+            <div
+              style={{
+                ...sLabel,
+                color: multiChamberMatsOk ? T.success : T.warning,
+                marginBottom: "16px",
+              }}
+            >
+              Step 3 -- Multi-Chamber Materials --{" "}
+              {multiChamberMatsOk
+                ? "All chambers ready"
+                : "Complete all chambers to continue"}
+            </div>
+            {chamberData.map((ch) => (
+              <div key={ch.ci} style={{ marginBottom: "10px" }}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: T.accentMid,
+                    marginBottom: "6px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  Chamber {ch.ci + 1}
+                  {ch.chStrain && ` -- ${ch.chStrain}`}
+                </div>
+                <StockGauge
+                  label={`Medium: ${ch.medItem?.name || "--"}`}
+                  available={ch.cMedAvail}
+                  needed={ch.cMedNeeded}
+                  unit="ml"
+                  color={T.info}
+                />
+                <StockGauge
+                  label={`Terpene: ${ch.cTerpItem?.name || "--"}`}
+                  available={ch.cTerpAvail}
+                  needed={ch.cTerpNeeded}
+                  unit="ml"
+                  color={T.accentMid}
+                />
+              </div>
+            ))}
+            <StockGauge
+              label={`Hardware: ${hwSelItem?.name || "--"} (all chambers)`}
+              available={hwSelAvail}
+              needed={planned}
+              unit=" pcs"
+              color="#b5935a"
+            />
+            <div
+              style={{
+                borderTop: `1px solid ${T.ink150}`,
+                paddingTop: "14px",
+                marginTop: "8px",
+                display: "flex",
+                gap: "32px",
+                flexWrap: "wrap",
+              }}
+            >
+              {[
+                ["Output", `${planned} x ${finishedName || "--"}`, T.success],
+                ["Chambers", String(chambers), T.info],
+                ["Run Number", runNumber, T.ink500],
+              ].map(([lbl, val, color]) => (
+                <div key={lbl}>
+                  <div
+                    style={{
+                      fontSize: "9px",
+                      letterSpacing: "0.2em",
+                      textTransform: "uppercase",
+                      color: T.ink400,
+                      marginBottom: "4px",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    {lbl}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: lbl === "Run Number" ? "13px" : "18px",
+                      fontWeight: 600,
+                      fontFamily: T.fontData,
+                      color,
+                    }}
+                  >
+                    {val}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      {/* ── STEP 3 (single-chamber): Stock gauges ── */}
+      {!isMultiChamber &&
+        isVape &&
         planned > 0 &&
         form.distillate_item_id &&
         form.terpene_item_id &&
@@ -4710,10 +5404,10 @@ function NewRunPanel({
                 marginBottom: "16px",
               }}
             >
-              Step 3 — Bill of Materials{" "}
+              Step 3 -- Bill of Materials{" "}
               {canRun
-                ? "— All materials available"
-                : "— Insufficient materials"}
+                ? "-- All materials available"
+                : "-- Insufficient materials"}
             </div>
             <StockGauge
               label="Distillate"
@@ -4723,14 +5417,14 @@ function NewRunPanel({
               color={T.info}
             />
             <StockGauge
-              label={`Terpene (${selTerp?.name || "—"})`}
+              label={`Terpene (${selTerp?.name || "--"})`}
               available={terpAvail}
               needed={terpNeeded}
               unit="ml"
               color={T.accentMid}
             />
             <StockGauge
-              label={`Hardware (${selHw?.name || "—"})`}
+              label={`Hardware (${selHw?.name || "--"})`}
               available={hwAvail}
               needed={hwNeeded}
               unit=" pcs"
@@ -4747,7 +5441,7 @@ function NewRunPanel({
               }}
             >
               {[
-                ["Output", `${planned} × ${finishedName || "—"}`, T.success],
+                ["Output", `${planned} x ${finishedName || "--"}`, T.success],
                 ["Dist / Unit", `${distMlPerUnit.toFixed(2)}ml`, T.info],
                 ["Cost / Unit", `R${costPerUnit}`, "#b5935a"],
                 ["Total Material Cost", `R${totalCost.toFixed(2)}`, T.info],
@@ -4770,8 +5464,7 @@ function NewRunPanel({
                     style={{
                       fontSize: lbl === "Run Number" ? "13px" : "18px",
                       fontWeight: 600,
-                      fontFamily:
-                        lbl === "Run Number" ? T.fontData : T.fontData,
+                      fontFamily: T.fontData,
                       color,
                     }}
                   >
@@ -4783,10 +5476,11 @@ function NewRunPanel({
           </div>
         )}
 
+      {/* ── Confirm & Log ── */}
       {canRun && (
         <div style={{ ...sCard, borderLeft: `3px solid #b5935a` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
-            Step {isVape ? "4" : "3"} — Confirm & Log
+            Step {isVape ? "4" : "3"} -- Confirm & Log
           </div>
           <div
             style={{
@@ -4816,7 +5510,7 @@ function NewRunPanel({
                     fontFamily: T.fontUi,
                   }}
                 >
-                  Yield {yieldPct}% — below 95% threshold
+                  Yield {yieldPct}% -- below 95% threshold
                 </p>
               )}
             </div>
@@ -4861,7 +5555,30 @@ function NewRunPanel({
                       from {bl.selItem?.name || bl.line.material_type}
                     </li>
                   ))}
-                {isVape && !hasBom && (
+                {isVape &&
+                  !hasBom &&
+                  isMultiChamber &&
+                  chamberData.map((ch) => (
+                    <React.Fragment key={ch.ci}>
+                      <li>
+                        Ch{ch.ci + 1}: Deduct <strong>{ch.cMedNeeded}ml</strong>{" "}
+                        from {ch.medItem?.name || "medium"}
+                        {ch.chStrain ? ` (${ch.chStrain})` : ""}
+                      </li>
+                      <li>
+                        Ch{ch.ci + 1}: Deduct{" "}
+                        <strong>{ch.cTerpNeeded}ml</strong> from{" "}
+                        {ch.cTerpItem?.name || "terpene"}
+                      </li>
+                    </React.Fragment>
+                  ))}
+                {isVape && !hasBom && isMultiChamber && hwSelItem && (
+                  <li>
+                    Deduct <strong>{planned} pcs</strong> hardware from{" "}
+                    {hwSelItem.name}
+                  </li>
+                )}
+                {isVape && !hasBom && !isMultiChamber && (
                   <>
                     <li>
                       Deduct <strong>{distNeeded}ml</strong> from{" "}
@@ -4881,6 +5598,19 @@ function NewRunPanel({
                   finished stock
                 </li>
                 <li>Create batch record + production run log</li>
+                {isFoodBev && form.lot_number && (
+                  <li>
+                    Record lot number: <strong>{form.lot_number}</strong>
+                  </li>
+                )}
+                {isFoodBev && form.expiry_date && (
+                  <li>
+                    Set expiry date: <strong>{form.expiry_date}</strong>
+                  </li>
+                )}
+                {isMultiChamber && (
+                  <li>Store per-chamber cannabinoid profile on batch record</li>
+                )}
                 <li>
                   Link batch to inventory item (enables live stock tracking)
                 </li>
@@ -4890,7 +5620,7 @@ function NewRunPanel({
           <div style={{ display: "flex", gap: "10px" }}>
             {!confirmed ? (
               <button onClick={() => setConfirmed(true)} style={sBtn()}>
-                Review & Confirm →
+                Review & Confirm &rarr;
               </button>
             ) : (
               <>
@@ -4898,7 +5628,7 @@ function NewRunPanel({
                   onClick={() => setConfirmed(false)}
                   style={sBtn("outline")}
                 >
-                  ← Back
+                  &larr; Back
                 </button>
                 <button
                   onClick={handleConfirm}
