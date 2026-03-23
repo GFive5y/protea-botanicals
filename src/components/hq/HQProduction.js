@@ -2205,6 +2205,7 @@ export default function HQProduction() {
               lowStock={lowStock}
               onNavBatches={() => setSubTab("batches")}
               onNavNewRun={() => setSubTab("new-run")}
+              industryProfile={industryProfile}
             />
           )}
           {subTab === "batches" && (
@@ -2259,6 +2260,7 @@ function OverviewPanel({
   lowStock,
   onNavBatches,
   onNavNewRun,
+  industryProfile,
 }) {
   const distillate = items.filter(
     (i) => i.category === "raw_material" && i.unit === "ml",
@@ -2729,12 +2731,26 @@ function OverviewPanel({
               <tr>
                 <th style={sTh}>Batch #</th>
                 <th style={sTh}>Product</th>
-                <th style={sTh}>Strain</th>
+                {!["food_beverage", "general_retail"].includes(
+                  industryProfile,
+                ) && <th style={sTh}>Strain</th>}
+                {industryProfile === "food_beverage" && (
+                  <th style={sTh}>Lot #</th>
+                )}
+                {industryProfile === "food_beverage" && (
+                  <th style={sTh}>Expiry</th>
+                )}
+                {industryProfile === "food_beverage" && (
+                  <th style={{ ...sTh, textAlign: "right" }}>Yield %</th>
+                )}
+                {industryProfile === "food_beverage" && <th style={sTh}>QC</th>}
                 <th style={{ ...sTh, textAlign: "right" }}>Units</th>
                 <th style={sTh}>Date</th>
                 <th style={sTh}>Stock</th>
                 <th style={sTh}>Status</th>
-                <th style={sTh}>Lab</th>
+                {!["food_beverage", "general_retail"].includes(
+                  industryProfile,
+                ) && <th style={sTh}>Lab</th>}
               </tr>
             </thead>
             <tbody>
@@ -2764,7 +2780,52 @@ function OverviewPanel({
                     <td style={{ ...sTd, fontWeight: 500 }}>
                       {b.product_name || "—"}
                     </td>
-                    <td style={sTd}>{b.strain || "—"}</td>
+                    {!["food_beverage", "general_retail"].includes(
+                      industryProfile,
+                    ) && <td style={sTd}>{b.strain || "—"}</td>}
+                    {industryProfile === "food_beverage" && (
+                      <td style={sTd}>{b.batch_lot_number || "—"}</td>
+                    )}
+                    {industryProfile === "food_beverage" && (
+                      <td style={sTd}>
+                        {b.expiry_date
+                          ? new Date(b.expiry_date).toLocaleDateString("en-ZA")
+                          : "—"}
+                      </td>
+                    )}
+                    {industryProfile === "food_beverage" && (
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          color:
+                            b.yield_pct < 85
+                              ? T.warning
+                              : b.yield_pct >= 95
+                                ? T.success
+                                : T.ink700,
+                        }}
+                      >
+                        {b.yield_pct
+                          ? `${parseFloat(b.yield_pct).toFixed(1)}%`
+                          : "—"}
+                      </td>
+                    )}
+                    {industryProfile === "food_beverage" && (
+                      <td style={sTd}>
+                        {b.qc_passed === true ? (
+                          <span style={{ color: T.success, fontWeight: 600 }}>
+                            Pass
+                          </span>
+                        ) : b.qc_passed === false ? (
+                          <span style={{ color: T.danger, fontWeight: 600 }}>
+                            Fail
+                          </span>
+                        ) : (
+                          <span style={{ color: T.ink400 }}>—</span>
+                        )}
+                      </td>
+                    )}
                     <td
                       style={{
                         ...sTd,
@@ -3951,7 +4012,14 @@ function NewRunPanel({
     productFormats.length > 0
       ? (() => {
           const seen = new Map();
-          productFormats.forEach((f) => {
+          // WP-PROD-MASTER: filter formats by profile
+          const visibleFormats = productFormats.filter((f) => {
+            if (industryProfile === "food_beverage")
+              return !f.is_cannabis && !f.is_vape;
+            if (industryProfile === "general_retail") return !f.is_cannabis;
+            return true; // cannabis profiles see all
+          });
+          visibleFormats.forEach((f) => {
             const g =
               f.group_label ||
               (f.is_vape ? "-- Vape --" : "-- Other Products --");
@@ -3972,6 +4040,15 @@ function NewRunPanel({
 
   const defaultFormatKey = formatGroups[0]?.keys[0] || "vape_1ml";
 
+  // WP-PROD-MASTER: reset format_key when profile changes or formats load
+  useEffect(() => {
+    const firstKey = formatGroups[0]?.keys[0];
+    if (firstKey && firstKey !== form.format_key) {
+      set("format_key", firstKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [industryProfile, productFormats.length]);
+
   const [form, setForm] = useState({
     strain: "",
     format_key: "vape_1ml",
@@ -3987,6 +4064,38 @@ function NewRunPanel({
     bom_selections: {},
     lot_number: "", // WP-BIB S3: food_beverage lot number
     expiry_date: "", // WP-BIB S3: food_beverage expiry date (mandatory)
+    // WP-PROD-MASTER: food_beverage extended fields
+    recipe_name: "",
+    recipe_version: "",
+    storage_instructions: "",
+    temperature_zone: "Ambient",
+    allergen_flags: {
+      gluten: false,
+      crustaceans: false,
+      eggs: false,
+      fish: false,
+      peanuts: false,
+      soybeans: false,
+      milk: false,
+      nuts: false,
+      celery: false,
+      mustard: false,
+      sesame: false,
+      sulphites: false,
+      lupin: false,
+      molluscs: false,
+    },
+    allergens_declared: false,
+    qc_passed: null,
+    quality_checks: [],
+    fsca_cert_number: "",
+    haccp_ref: "",
+    yield_pct: "",
+    // WP-PROD-MASTER: general_retail receive fields
+    receive_supplier_id: "",
+    receive_po_ref: "",
+    receive_date: new Date().toISOString().split("T")[0],
+    unit_cost_receive: "", // AVCO_PLACEHOLDER: wire to AVCO engine in future session
   });
   const [saving, setSaving] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -4096,6 +4205,12 @@ function NewRunPanel({
   // ── WP-BIB S3: Multi-chamber computed values ──────────────────────────────
   const isMultiChamber = isVape && chambers > 1;
   const isFoodBev = industryProfile === "food_beverage";
+  const isGeneralRetail = industryProfile === "general_retail";
+  const isCannabisProfile = [
+    "cannabis_retail",
+    "cannabis_dispensary",
+    "mixed_retail",
+  ].includes(industryProfile);
 
   const chamberData = isMultiChamber
     ? Array.from({ length: chambers }, (_, ci) => {
@@ -4167,7 +4282,12 @@ function NewRunPanel({
   const multiChamberName = isMultiChamber ? fmt.format_short : "";
   const hasName = form.strain || form.product_name_override || multiChamberName;
   const foodBevOk =
-    !isFoodBev || isVape || (!!form.lot_number && !!form.expiry_date);
+    !isFoodBev ||
+    isVape ||
+    (!!form.lot_number &&
+      !!form.expiry_date &&
+      form.allergens_declared &&
+      form.qc_passed !== null);
   const canRun =
     planned > 0 && (hasBom ? bomMatsOk : vapeMatsOk) && hasName && foodBevOk;
   const distCost = selDist
@@ -4252,6 +4372,27 @@ function NewRunPanel({
           lifecycle_status: "active",
           is_archived: false,
           expiry_date: isFoodBev ? form.expiry_date || null : null,
+          // WP-PROD-MASTER: extended fields
+          recipe_name: isFoodBev ? form.recipe_name || null : null,
+          recipe_version: isFoodBev ? form.recipe_version || null : null,
+          storage_instructions: isFoodBev
+            ? form.storage_instructions || null
+            : null,
+          temperature_zone: isFoodBev ? form.temperature_zone || null : null,
+          allergen_flags: isFoodBev ? form.allergen_flags : {},
+          qc_passed: isFoodBev ? form.qc_passed : null,
+          quality_checks: isFoodBev ? form.quality_checks : [],
+          fsca_cert_number: isFoodBev ? form.fsca_cert_number || null : null,
+          haccp_ref: isFoodBev ? form.haccp_ref || null : null,
+          yield_pct: form.yield_pct ? parseFloat(form.yield_pct) : null,
+          batch_lot_number:
+            isFoodBev || isGeneralRetail ? form.lot_number || null : null,
+          receive_supplier_id: isGeneralRetail
+            ? form.receive_supplier_id || null
+            : null,
+          receive_po_ref: isGeneralRetail ? form.receive_po_ref || null : null,
+          receive_date: isGeneralRetail ? form.receive_date || null : null,
+          industry_profile_snapshot: industryProfile,
           tenant_id: tenantId || null,
         })
         .select()
@@ -4478,25 +4619,45 @@ function NewRunPanel({
         if (niErr) throw niErr;
         finId = ni.id;
       }
-      await supabase.from("stock_movements").insert({
-        item_id: finId,
-        quantity: finalActual,
-        movement_type: "production_in",
-        reference: runNumber,
-        notes: `Batch ${runNumber}: ${finishedName}`,
-      });
-      const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
-      await supabase
-        .from("inventory_items")
-        .update({
-          quantity_on_hand: curQty + finalActual,
-          ...(isVape ? { cost_price: parseFloat(costPerUnit) || 0 } : {}),
-        })
-        .eq("id", finId);
+      // WP-PROD-MASTER OP10: block stock movement if food QC failed
+      const qcBlocked = isFoodBev && form.qc_passed === false;
+      if (!qcBlocked) {
+        await supabase.from("stock_movements").insert({
+          item_id: finId,
+          quantity: finalActual,
+          movement_type: "production_in",
+          reference: runNumber,
+          notes: `Batch ${runNumber}: ${finishedName}`,
+        });
+        const curQty = parseFloat(existingFin?.quantity_on_hand || 0);
+        await supabase
+          .from("inventory_items")
+          .update({
+            quantity_on_hand: curQty + finalActual,
+            ...(isVape ? { cost_price: parseFloat(costPerUnit) || 0 } : {}),
+          })
+          .eq("id", finId);
+      }
       await supabase
         .from("batches")
-        .update({ inventory_item_id: finId, lifecycle_status: "active" })
+        .update({
+          inventory_item_id: finId,
+          lifecycle_status: qcBlocked ? "qc_failed" : "active",
+        })
         .eq("id", batch.id);
+      // WP-PROD-MASTER OP11: yield < 85% fires PlatformBar alert for food_beverage
+      const foodYieldPct =
+        isFoodBev && form.yield_pct ? parseFloat(form.yield_pct) : null;
+      if (isFoodBev && foodYieldPct !== null && foodYieldPct < 85) {
+        await supabase.from("system_alerts").insert({
+          alert_type: "yield_low",
+          severity: "warning",
+          message: `Recipe run ${runNumber} — batch yield ${foodYieldPct.toFixed(1)}% is below 85%. Review production notes and recipe.`,
+          reference_id: runNumber,
+          tenant_id: tenantId || null,
+          is_acknowledged: false,
+        });
+      }
       setCompletedRun({
         runNumber,
         finishedName,
@@ -4819,8 +4980,109 @@ function NewRunPanel({
             </div>
           )}
           {/* WP-BIB S3: Food & beverage lot + expiry fields */}
+          {/* WP-PROD-MASTER: General Retail Receive Form */}
+          {isGeneralRetail && (
+            <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: T.info,
+                  fontFamily: T.fontUi,
+                  marginBottom: "16px",
+                }}
+              >
+                Receive Details
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "14px",
+                }}
+              >
+                <div>
+                  {fLabel("Date Received *")}
+                  <input
+                    style={sInput}
+                    type="date"
+                    value={form.receive_date}
+                    onChange={(e) => set("receive_date", e.target.value)}
+                  />
+                </div>
+                <div>
+                  {fLabel("PO / Invoice Reference")}
+                  <input
+                    style={sInput}
+                    placeholder="e.g. PO-2026-0142"
+                    value={form.receive_po_ref}
+                    onChange={(e) => set("receive_po_ref", e.target.value)}
+                  />
+                </div>
+                <div>
+                  {fLabel("Supplier Lot / Batch Ref")}
+                  <input
+                    style={sInput}
+                    placeholder="e.g. SUP-LOT-0042"
+                    value={form.lot_number}
+                    onChange={(e) => set("lot_number", e.target.value)}
+                  />
+                </div>
+                <div>
+                  {fLabel("Expiry Date (if applicable)")}
+                  <input
+                    style={sInput}
+                    type="date"
+                    value={form.expiry_date}
+                    onChange={(e) => set("expiry_date", e.target.value)}
+                  />
+                </div>
+                <div>
+                  {fLabel("Unit Cost ZAR")}
+                  <input
+                    style={sInput}
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.unit_cost_receive}
+                    onChange={(e) => set("unit_cost_receive", e.target.value)}
+                  />
+                  <p
+                    style={{
+                      fontSize: "10px",
+                      color: T.ink400,
+                      margin: "3px 0 0",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    // AVCO_PLACEHOLDER — wire in future session
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {isFoodBev && !isVape && (
             <>
+              <div>
+                {fLabel("Recipe Name")}
+                <input
+                  style={sInput}
+                  placeholder="e.g. Classic Cold Brew Coffee"
+                  value={form.recipe_name}
+                  onChange={(e) => set("recipe_name", e.target.value)}
+                />
+              </div>
+              <div>
+                {fLabel("Recipe Version")}
+                <input
+                  style={sInput}
+                  placeholder="e.g. v1.2"
+                  value={form.recipe_version}
+                  onChange={(e) => set("recipe_version", e.target.value)}
+                />
+              </div>
               <div>
                 {fLabel("Lot Number *")}
                 <input
@@ -4851,13 +5113,288 @@ function NewRunPanel({
                   </p>
                 )}
               </div>
+              {/* WP-PROD-MASTER: temperature zone + yield */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  {fLabel("Temperature Zone")}
+                  <select
+                    style={sInput}
+                    value={form.temperature_zone}
+                    onChange={(e) => set("temperature_zone", e.target.value)}
+                  >
+                    <option value="Ambient">Ambient</option>
+                    <option value="Refrigerated">Refrigerated (2-8°C)</option>
+                    <option value="Frozen">Frozen (-18°C)</option>
+                  </select>
+                </div>
+                <div>
+                  {fLabel("Actual Yield %")}
+                  <input
+                    style={sInput}
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="200"
+                    placeholder="e.g. 94.5"
+                    value={form.yield_pct}
+                    onChange={(e) => set("yield_pct", e.target.value)}
+                  />
+                  {form.yield_pct && parseFloat(form.yield_pct) < 85 && (
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: T.warning,
+                        margin: "4px 0 0",
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      Below 85% — add a deviation note
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div>
+                {fLabel("Storage Instructions")}
+                <input
+                  style={sInput}
+                  placeholder="e.g. Keep refrigerated, consume within 3 days"
+                  value={form.storage_instructions}
+                  onChange={(e) => set("storage_instructions", e.target.value)}
+                />
+              </div>
+              {/* WP-PROD-MASTER: 14-allergen declaration — SA R638 mandatory */}
+              <div
+                style={{
+                  background: T.warningBg,
+                  border: `1px solid ${T.warningBd}`,
+                  borderRadius: "4px",
+                  padding: "14px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: T.warning,
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    Allergen Declaration * (SA R638)
+                  </div>
+                  {form.allergens_declared ? (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        color: T.success,
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      Declared ✓
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        color: T.danger,
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      Not yet declared
+                    </span>
+                  )}
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "8px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  {Object.keys(form.allergen_flags).map((allergen) => (
+                    <label
+                      key={allergen}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "12px",
+                        fontFamily: T.fontUi,
+                        color: form.allergen_flags[allergen]
+                          ? T.danger
+                          : T.ink500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.allergen_flags[allergen]}
+                        onChange={(e) =>
+                          set("allergen_flags", {
+                            ...form.allergen_flags,
+                            [allergen]: e.target.checked,
+                          })
+                        }
+                      />
+                      {allergen.charAt(0).toUpperCase() + allergen.slice(1)}
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={() => set("allergens_declared", true)}
+                  style={{
+                    fontSize: "11px",
+                    padding: "5px 12px",
+                    background: form.allergens_declared
+                      ? T.successBg
+                      : T.ink075,
+                    border: `1px solid ${form.allergens_declared ? T.successBd : T.ink200}`,
+                    borderRadius: "3px",
+                    color: form.allergens_declared ? T.success : T.ink500,
+                    cursor: "pointer",
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  {form.allergens_declared
+                    ? "Declaration confirmed ✓"
+                    : "Confirm allergen declaration"}
+                </button>
+              </div>
+              {/* WP-PROD-MASTER: QC passed toggle */}
+              <div
+                style={{
+                  background: T.ink050,
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: "4px",
+                  padding: "14px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: T.ink500,
+                    fontFamily: T.fontUi,
+                    marginBottom: "10px",
+                  }}
+                >
+                  Quality Control *
+                </div>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onClick={() => set("qc_passed", true)}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      border: `2px solid ${form.qc_passed === true ? T.successBd : T.ink200}`,
+                      borderRadius: "3px",
+                      background:
+                        form.qc_passed === true ? T.successBg : "#fff",
+                      color: form.qc_passed === true ? T.success : T.ink500,
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    QC Passed ✓
+                  </button>
+                  <button
+                    onClick={() => set("qc_passed", false)}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      border: `2px solid ${form.qc_passed === false ? T.dangerBd : T.ink200}`,
+                      borderRadius: "3px",
+                      background:
+                        form.qc_passed === false ? T.dangerBg : "#fff",
+                      color: form.qc_passed === false ? T.danger : T.ink500,
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    QC Failed ✗
+                  </button>
+                </div>
+                {form.qc_passed === false && (
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: T.danger,
+                      margin: "8px 0 0",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    Failed batch recorded — no stock movement created.
+                  </p>
+                )}
+                {form.qc_passed === null && planned > 0 && (
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: T.danger,
+                      margin: "8px 0 0",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    QC status mandatory before confirming.
+                  </p>
+                )}
+              </div>
+              {/* WP-PROD-MASTER: optional compliance fields */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  {fLabel("FSCA Certificate # (optional)")}
+                  <input
+                    style={sInput}
+                    placeholder="e.g. FSCA-2026-0123"
+                    value={form.fsca_cert_number}
+                    onChange={(e) => set("fsca_cert_number", e.target.value)}
+                  />
+                </div>
+                <div>
+                  {fLabel("HACCP Reference (optional)")}
+                  <input
+                    style={sInput}
+                    placeholder="e.g. CCP-2026-03"
+                    value={form.haccp_ref}
+                    onChange={(e) => set("haccp_ref", e.target.value)}
+                  />
+                </div>
+              </div>
             </>
           )}
         </div>
       </div>
 
       {/* ── STEP 2: Select Materials ── */}
-      {isVape && (
+      {isVape && !isFoodBev && !isGeneralRetail && (
         <div style={{ ...sCard, borderLeft: `3px solid ${T.info}` }}>
           <div style={{ ...sLabel, marginBottom: "16px" }}>
             Step 2 -- Select Materials
