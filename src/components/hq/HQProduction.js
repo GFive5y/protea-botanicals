@@ -1891,7 +1891,7 @@ export default function HQProduction() {
           supabase
             .from("production_runs")
             .select(
-              `id,batch_id,run_number,status,planned_units,actual_units,started_at,completed_at,notes,created_at,batches(batch_number,product_name,strain,product_type,volume),production_run_inputs(id,run_id,item_id,quantity_planned,quantity_actual,notes,inventory_items(name,sku,unit,category))`,
+              `id,batch_id,run_number,status,planned_units,actual_units,started_at,completed_at,notes,created_at,recipe_name,recipe_version,batch_lot_number,expiry_date,temperature_zone,yield_pct,qc_passed,allergen_flags,fsca_cert_number,haccp_ref,storage_instructions,industry_profile_snapshot,batches(batch_number,product_name,strain,product_type,volume),production_run_inputs(id,run_id,item_id,quantity_planned,quantity_actual,notes,inventory_items(name,sku,unit,category))`,
             )
             .order("created_at", { ascending: false })
             .limit(100),
@@ -2234,7 +2234,11 @@ export default function HQProduction() {
             />
           )}
           {subTab === "history" && (
-            <HistoryPanel runs={runs} onRefresh={fetchAll} />
+            <HistoryPanel
+              runs={runs}
+              onRefresh={fetchAll}
+              industryProfile={industryProfile}
+            />
           )}
           {subTab === "allocate" && (
             <AllocatePanel
@@ -4372,7 +4376,26 @@ function NewRunPanel({
           lifecycle_status: "active",
           is_archived: false,
           expiry_date: isFoodBev ? form.expiry_date || null : null,
-          // WP-PROD-MASTER: extended fields
+          tenant_id: tenantId || null,
+        })
+        .select()
+        .single();
+      if (batchErr) throw batchErr;
+      const { data: run, error: runErr } = await supabase
+        .from("production_runs")
+        .insert({
+          batch_id: batch.id,
+          run_number: runNumber,
+          status: "completed",
+          planned_units: planned,
+          actual_units: finalActual,
+          started_at: now,
+          completed_at: now,
+          notes:
+            isFoodBev && form.lot_number
+              ? `Lot: ${form.lot_number}${form.notes ? " | " + form.notes : ""}`
+              : form.notes || null,
+          // WP-PROD-MASTER: food + general fields on production_runs
           recipe_name: isFoodBev ? form.recipe_name || null : null,
           recipe_version: isFoodBev ? form.recipe_version || null : null,
           storage_instructions: isFoodBev
@@ -4393,25 +4416,6 @@ function NewRunPanel({
           receive_po_ref: isGeneralRetail ? form.receive_po_ref || null : null,
           receive_date: isGeneralRetail ? form.receive_date || null : null,
           industry_profile_snapshot: industryProfile,
-          tenant_id: tenantId || null,
-        })
-        .select()
-        .single();
-      if (batchErr) throw batchErr;
-      const { data: run, error: runErr } = await supabase
-        .from("production_runs")
-        .insert({
-          batch_id: batch.id,
-          run_number: runNumber,
-          status: "completed",
-          planned_units: planned,
-          actual_units: finalActual,
-          started_at: now,
-          completed_at: now,
-          notes:
-            isFoodBev && form.lot_number
-              ? `Lot: ${form.lot_number}${form.notes ? " | " + form.notes : ""}`
-              : form.notes || null,
         })
         .select()
         .single();
@@ -6188,7 +6192,7 @@ function NewRunPanel({
 }
 
 // ─── History Panel ────────────────────────────────────────────────────────────
-function HistoryPanel({ runs, onRefresh }) {
+function HistoryPanel({ runs, onRefresh, industryProfile }) {
   const [expanded, setExpanded] = useState(null);
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -6842,6 +6846,269 @@ function HistoryPanel({ runs, onRefresh }) {
                       >
                         {run.notes}
                       </p>
+                    )}
+                    {/* WP-PROD-MASTER: food_beverage detail panel */}
+                    {industryProfile === "food_beverage" && !isEditing && (
+                      <div
+                        style={{
+                          marginTop: "14px",
+                          display: "grid",
+                          gap: "10px",
+                        }}
+                      >
+                        {/* Recipe + Lot strip */}
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "24px",
+                            flexWrap: "wrap",
+                            padding: "12px 14px",
+                            background: T.ink075,
+                            borderRadius: "4px",
+                            border: `1px solid ${T.ink150}`,
+                          }}
+                        >
+                          {[
+                            ["Recipe", run.recipe_name || "—"],
+                            ["Version", run.recipe_version || "—"],
+                            ["Lot #", run.batch_lot_number || "—"],
+                            [
+                              "Expiry",
+                              run.expiry_date
+                                ? new Date(run.expiry_date).toLocaleDateString(
+                                    "en-ZA",
+                                  )
+                                : "—",
+                            ],
+                            ["Temp Zone", run.temperature_zone || "—"],
+                            [
+                              "Yield %",
+                              run.yield_pct
+                                ? `${parseFloat(run.yield_pct).toFixed(1)}%`
+                                : "—",
+                            ],
+                          ].map(([lbl, val]) => (
+                            <div key={lbl}>
+                              <div
+                                style={{
+                                  fontSize: "9px",
+                                  letterSpacing: "0.15em",
+                                  textTransform: "uppercase",
+                                  color: T.ink400,
+                                  fontFamily: T.fontUi,
+                                  fontWeight: 700,
+                                  marginBottom: "3px",
+                                }}
+                              >
+                                {lbl}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "13px",
+                                  fontFamily: T.fontData,
+                                  color: T.ink900,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {val}
+                              </div>
+                            </div>
+                          ))}
+                          {/* QC badge */}
+                          <div>
+                            <div
+                              style={{
+                                fontSize: "9px",
+                                letterSpacing: "0.15em",
+                                textTransform: "uppercase",
+                                color: T.ink400,
+                                fontFamily: T.fontUi,
+                                fontWeight: 700,
+                                marginBottom: "3px",
+                              }}
+                            >
+                              QC
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                padding: "2px 10px",
+                                borderRadius: "3px",
+                                fontWeight: 700,
+                                fontFamily: T.fontUi,
+                                background:
+                                  run.qc_passed === true
+                                    ? T.successBg
+                                    : run.qc_passed === false
+                                      ? T.dangerBg
+                                      : T.ink075,
+                                color:
+                                  run.qc_passed === true
+                                    ? T.success
+                                    : run.qc_passed === false
+                                      ? T.danger
+                                      : T.ink400,
+                                border: `1px solid ${run.qc_passed === true ? T.successBd : run.qc_passed === false ? T.dangerBd : T.ink150}`,
+                              }}
+                            >
+                              {run.qc_passed === true
+                                ? "Passed ✓"
+                                : run.qc_passed === false
+                                  ? "Failed ✗"
+                                  : "Not set"}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Allergen summary */}
+                        {run.allergen_flags &&
+                          Object.values(run.allergen_flags).some(Boolean) && (
+                            <div
+                              style={{
+                                padding: "10px 14px",
+                                background: T.warningBg,
+                                border: `1px solid ${T.warningBd}`,
+                                borderRadius: "4px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: "9px",
+                                  letterSpacing: "0.15em",
+                                  textTransform: "uppercase",
+                                  color: T.warning,
+                                  fontFamily: T.fontUi,
+                                  fontWeight: 700,
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                Contains Allergens (SA R638)
+                              </div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "6px",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                {Object.entries(run.allergen_flags)
+                                  .filter(([, v]) => v)
+                                  .map(([allergen]) => (
+                                    <span
+                                      key={allergen}
+                                      style={{
+                                        fontSize: "10px",
+                                        padding: "2px 8px",
+                                        borderRadius: "3px",
+                                        background: T.dangerBg,
+                                        color: T.danger,
+                                        border: `1px solid ${T.dangerBd}`,
+                                        fontWeight: 600,
+                                        fontFamily: T.fontUi,
+                                        textTransform: "capitalize",
+                                      }}
+                                    >
+                                      {allergen}
+                                    </span>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        {/* FSCA + HACCP */}
+                        {(run.fsca_cert_number ||
+                          run.haccp_ref ||
+                          run.storage_instructions) && (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "24px",
+                              flexWrap: "wrap",
+                              padding: "10px 14px",
+                              background: T.infoBg,
+                              border: `1px solid ${T.infoBd}`,
+                              borderRadius: "4px",
+                            }}
+                          >
+                            {run.fsca_cert_number && (
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "9px",
+                                    letterSpacing: "0.15em",
+                                    textTransform: "uppercase",
+                                    color: T.info,
+                                    fontFamily: T.fontUi,
+                                    fontWeight: 700,
+                                    marginBottom: "3px",
+                                  }}
+                                >
+                                  FSCA Cert #
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontFamily: T.fontData,
+                                    color: T.ink700,
+                                  }}
+                                >
+                                  {run.fsca_cert_number}
+                                </div>
+                              </div>
+                            )}
+                            {run.haccp_ref && (
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "9px",
+                                    letterSpacing: "0.15em",
+                                    textTransform: "uppercase",
+                                    color: T.info,
+                                    fontFamily: T.fontUi,
+                                    fontWeight: 700,
+                                    marginBottom: "3px",
+                                  }}
+                                >
+                                  HACCP Ref
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontFamily: T.fontData,
+                                    color: T.ink700,
+                                  }}
+                                >
+                                  {run.haccp_ref}
+                                </div>
+                              </div>
+                            )}
+                            {run.storage_instructions && (
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "9px",
+                                    letterSpacing: "0.15em",
+                                    textTransform: "uppercase",
+                                    color: T.info,
+                                    fontFamily: T.fontUi,
+                                    fontWeight: 700,
+                                    marginBottom: "3px",
+                                  }}
+                                >
+                                  Storage
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontFamily: T.fontUi,
+                                    color: T.ink700,
+                                  }}
+                                >
+                                  {run.storage_instructions}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
