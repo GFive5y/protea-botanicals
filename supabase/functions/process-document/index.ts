@@ -1,4 +1,10 @@
 // supabase/functions/process-document/index.ts
+// v1.8 — WP-FIN S0: lump-sum invoice cost allocation (fixes BUG-038 terpene AVCO=0)
+//   allocateLumpSumCosts() runs after Claude parse — detects invoices with missing
+//   per-line pricing, allocates implied unit cost from total, patches receive_delivery_item
+//   proposed_updates with unit_cost + unit_cost_zar so AVCO engine gets real values.
+//   industry_profile now passed to buildSystemPrompt for context-aware extraction.
+//   usd_zar_rate now included in openPurchaseOrders context for accurate FX allocation.
 // v1.7 — WP-IND Session 3: add create_inventory_item + create_stock_movement for general supplier invoices
 // v1.6 — WP-I Extended: Delivery Note -> Auto-receive inventory
 // NEW: existing_inventory + open_purchase_orders passed in context
@@ -21,13 +27,119 @@ const JSON_HEADERS = {
   "Content-Type": "application/json",
 };
 
+// ── WP-FIN S0: Lump-sum invoice cost allocation ───────────────────────────────
+// Detects invoices where some or all line items have no unit_price.
+// Allocates implied unit cost: (total - explicit lines) / unpriced quantity.
+// Patches line_items and receive_delivery_item proposed_updates with:
+//   unit_cost (USD), unit_cost_zar (ZAR at PO-locked FX rate), allocated_cost: true
+// Confidence on allocated lines capped at 0.75 (amber dot in review screen).
+function allocateLumpSumCosts(
+  ext: Record<string, unknown>,
+  pos: Array<Record<string, unknown>>,
+): Record<string, unknown> {
+  const lineItems = (ext.line_items as Array<Record<string, unknown>>) || [];
+  const updates =
+    (ext.proposed_updates as Array<Record<string, unknown>>) || [];
+  const totalAmount = Number(ext.total_amount ?? 0);
+  if (!totalAmount || lineItems.length === 0) return ext;
+
+  // Detect lump-sum: any line item missing unit_price or unit_price === 0
+  const unpricedLines = lineItems.filter(
+    (l) => !l.unit_price || Number(l.unit_price) === 0,
+  );
+  if (unpricedLines.length === 0) return ext; // All lines have prices — no allocation needed
+
+  // Sum explicit costs (lines that DO have pricing)
+  const explicitTotal = lineItems
+    .filter((l) => l.unit_price && Number(l.unit_price) > 0)
+    .reduce((s, l) => s + Number(l.unit_price) * Number(l.quantity ?? 1), 0);
+  const remainingTotal = totalAmount - explicitTotal;
+  const unpricedQty = unpricedLines.reduce(
+    (s, l) => s + Number(l.quantity ?? 1),
+    0,
+  );
+  if (unpricedQty <= 0 || remainingTotal <= 0) return ext;
+  const impliedUnitPrice = remainingTotal / unpricedQty;
+
+  // Resolve FX rate: prefer PO-locked rate, then extraction, then fallback 18.5
+  const matchedPO = pos.find(
+    (po) =>
+      po.supplier_id ===
+        (ext.supplier as Record<string, unknown>)?.matched_id ||
+      po.po_number === (ext.reference as Record<string, unknown>)?.number,
+  );
+  const fxRate = Number(
+    matchedPO?.usd_zar_rate ?? ext.usd_zar_rate ?? ext.fx_rate ?? 18.5,
+  );
+  const impliedUnitPriceZar = Math.round(impliedUnitPrice * fxRate * 100) / 100;
+
+  // Apply implied price to all unpriced line items
+  const patchedLines = lineItems.map((l) => {
+    if (!l.unit_price || Number(l.unit_price) === 0) {
+      return {
+        ...l,
+        unit_price: impliedUnitPrice,
+        unit_cost: impliedUnitPrice,
+        unit_cost_zar: impliedUnitPriceZar,
+        allocated_cost: true,
+        confidence: Math.min(Number(l.confidence ?? 0.9), 0.75),
+      };
+    }
+    return l;
+  });
+
+  // Patch unit_cost on receive_delivery_item proposed_updates that have no cost
+  const patchedUpdates = updates.map((u) => {
+    if (u.action !== "receive_delivery_item") return u;
+    const uData = (u.data as Record<string, unknown>) || {};
+    const existingCost = Number(uData.unit_cost ?? uData.unit_price ?? 0);
+    if (existingCost > 0) return u; // Already has a cost — do not override
+    return {
+      ...u,
+      confidence: 0.75,
+      data: {
+        ...uData,
+        unit_cost: impliedUnitPrice,
+        unit_cost_zar: impliedUnitPriceZar,
+        allocated_cost: true,
+      },
+    };
+  });
+
+  const allExplicitCount = lineItems.length - unpricedLines.length;
+  const allocationNote =
+    `Lump-sum invoice detected. Implied unit cost: ${ext.currency ?? "USD"} ` +
+    `${impliedUnitPrice.toFixed(4)} (total ${ext.currency ?? "USD"} ${totalAmount.toFixed(2)} ` +
+    `less ${allExplicitCount} explicit line(s) = ${ext.currency ?? "USD"} ${remainingTotal.toFixed(2)} ` +
+    `/ ${unpricedQty} unpriced units). ZAR: R${impliedUnitPriceZar.toFixed(2)} at ` +
+    `R${fxRate.toFixed(4)}/USD. Verify against supplier pricing schedule.`;
+
+  return {
+    ...ext,
+    line_items: patchedLines,
+    proposed_updates: patchedUpdates,
+    lump_sum_invoice: true,
+    extraction_notes: [ext.extraction_notes, allocationNote]
+      .filter(Boolean)
+      .join(" | "),
+  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildSystemPrompt(
   existingSuppliers: unknown[],
   existingProducts: unknown[],
   existingInventory: unknown[],
   openPurchaseOrders: unknown[],
+  industryProfile: string,
 ): string {
-  return `You are a document extraction engine for Protea Botanicals, a cannabis extract company in South Africa.
+  const industryContext =
+    industryProfile === "food_beverage"
+      ? "food & beverage producer (ingredients, packaging, equipment)"
+      : industryProfile === "general_retail"
+        ? "general retail business (finished goods, accessories, packaging)"
+        : "cannabis extract company (terpenes, hardware, distillate, packaging)";
+  return `You are a document extraction engine for a ${industryContext} in South Africa.
 Extract ALL structured data from business documents and propose specific database updates.
 You MUST respond with ONLY valid JSON - no markdown, no code fences, no explanation, no preamble.
 
@@ -386,6 +498,7 @@ serve(async (req) => {
       }),
     );
     // v1.6 - open POs for delivery note PO matching
+    // v1.8 - usd_zar_rate included for accurate lump-sum FX allocation
     const openPurchaseOrders = (context.open_purchase_orders || []).map(
       (po: Record<string, unknown>) => ({
         id: po.id,
@@ -393,7 +506,12 @@ serve(async (req) => {
         supplier_id: po.supplier_id,
         po_status: po.po_status,
         expected_arrival: po.expected_arrival,
+        usd_zar_rate: po.usd_zar_rate ?? null,
       }),
+    );
+
+    const industryProfile = String(
+      body.industry_profile || context.industry_profile || "cannabis_retail",
     );
 
     const isPdf = mime_type === "application/pdf";
@@ -450,6 +568,7 @@ CRITICAL REMINDERS:
           existingProducts,
           existingInventory,
           openPurchaseOrders,
+          industryProfile,
         ),
         messages: [{ role: "user", content: userContent }],
       }),
@@ -476,6 +595,9 @@ CRITICAL REMINDERS:
         `Claude returned non-JSON response: ${rawText.substring(0, 300)}`,
       );
     }
+
+    // WP-FIN S0: run lump-sum cost allocation if needed (module-level function)
+    extraction = allocateLumpSumCosts(extraction, openPurchaseOrders);
 
     const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
