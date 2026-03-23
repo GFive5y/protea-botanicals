@@ -2307,6 +2307,20 @@ export default function HQCogs() {
                                           >
                                             {fmtZar(row.hwBaseZar)} unit +{" "}
                                             {fmtZar(row.hwShippingZar)} ship
+                                            {qty > 1 && (
+                                              <span
+                                                style={{
+                                                  color: T.ink400,
+                                                  marginLeft: 4,
+                                                }}
+                                              >
+                                                (×{qty.toLocaleString()} ={" "}
+                                                {fmtZar(
+                                                  row.hwShippingZar * qty,
+                                                )}{" "}
+                                                ship)
+                                              </span>
+                                            )}
                                           </div>
                                         )}
                                       {row.key === "hardware" &&
