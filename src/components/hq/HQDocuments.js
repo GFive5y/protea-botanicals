@@ -990,12 +990,29 @@ function ReviewPanel({
                     gap: 10,
                     marginTop: 2,
                     color: T.ink400,
+                    flexWrap: "wrap",
                   }}
                 >
                   <span>Qty: {item.quantity}</span>
                   {item.unit_price != null && (
                     <span>
                       {extraction.currency} {Number(item.unit_price).toFixed(3)}
+                    </span>
+                  )}
+                  {item.allocated_cost && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        padding: "1px 6px",
+                        borderRadius: 3,
+                        background: T.warningBg,
+                        color: T.warning,
+                        fontWeight: 700,
+                        fontFamily: T.font,
+                        border: `1px solid ${T.warningBd}`,
+                      }}
+                    >
+                      ⚡ allocated
                     </span>
                   )}
                   {item.matched_product_id ? (
@@ -2203,16 +2220,28 @@ export default function HQDocuments({ initialDocId = null }) {
             .update({ quantity_on_hand: newQty })
             .eq("id", itemId);
           if (updErr) throw updErr;
+          const unitCostRaw =
+            parseFloat(data.unit_cost ?? data.unit_price ?? 0) || null;
+          const unitCostZar = data.unit_cost_zar
+            ? parseFloat(data.unit_cost_zar)
+            : unitCostRaw
+              ? Math.round(unitCostRaw * fxRate * 100) / 100
+              : null;
+          if (!unitCostRaw) {
+            console.warn(
+              `[handleConfirm] receive_delivery_item for item ${itemId} has unit_cost=0 — AVCO will not update correctly. Review the invoice for pricing.`,
+            );
+          }
           const { error: movErr } = await supabase
             .from("stock_movements")
             .insert({
               item_id: itemId,
               quantity: qty,
               movement_type: "purchase_in",
-              unit_cost:
-                parseFloat(data.unit_cost ?? data.unit_price ?? 0) || null,
+              unit_cost: unitCostRaw,
+              unit_cost_zar: unitCostZar,
               reference: selectedDoc.extracted_data?.reference?.number ?? null,
-              notes: `Goods received — ${selectedDoc.file_name}`,
+              notes: `Goods received — ${selectedDoc.file_name}${data.allocated_cost ? " (cost allocated from invoice total)" : ""}`,
               performed_by: user?.id ?? null,
               tenant_id: selectedDoc.tenant_id ?? null,
             });
