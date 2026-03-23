@@ -1391,6 +1391,19 @@ function BOMEditorPanel({
   const [selectedFormatId, setSelectedFormatId] = useState(
     productFormats[0]?.id || "",
   );
+  useEffect(() => {
+    if (productFormats.length > 0) {
+      const firstFood = productFormats.find(
+        (f) => !f.is_cannabis && !f.is_vape,
+      );
+      const firstAny = productFormats[0]?.id;
+      const target =
+        industryProfile === "food_beverage"
+          ? firstFood?.id || firstAny
+          : firstAny;
+      if (target) setSelectedFormatId(target);
+    }
+  }, [productFormats.length, industryProfile]); // eslint-disable-line
   const [showAdd, setShowAdd] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -1564,7 +1577,7 @@ function BOMEditorPanel({
           )}
           {productFormats.map((f) => (
             <option key={f.id} value={f.id}>
-              {f.name}
+              {f.label || f.name || f.key}
             </option>
           ))}
         </select>
@@ -1945,6 +1958,8 @@ export default function HQProduction() {
     { id: "new-run", label: "New Production Run" },
     { id: "history", label: "History" },
     { id: "allocate", label: "Allocate Stock" },
+    { id: "formats", label: "Formats" },
+    { id: "bom", label: "BOM Editor" },
     { id: "audit", label: "Audit Export" },
   ];
 
@@ -2245,6 +2260,22 @@ export default function HQProduction() {
               items={items}
               partners={partners}
               batches={batches}
+              onRefresh={fetchAll}
+            />
+          )}
+          {subTab === "formats" && (
+            <FormatCreatorPanel
+              productFormats={productFormats}
+              industryProfile={industryProfile}
+              onRefresh={fetchAll}
+            />
+          )}
+          {subTab === "bom" && (
+            <BOMEditorPanel
+              productFormats={productFormats}
+              formatBom={formatBom}
+              items={items}
+              industryProfile={industryProfile}
               onRefresh={fetchAll}
             />
           )}
@@ -4329,6 +4360,16 @@ function NewRunPanel({
       ? multiChamberCost
       : distCost + terpCost + hwCost;
   const costPerUnit = planned > 0 ? (totalCost / planned).toFixed(2) : 0;
+  const foodWastePct =
+    isFoodBev && form.yield_pct && planned > 0
+      ? Math.max(0, 100 - parseFloat(form.yield_pct)).toFixed(1)
+      : isFoodBev && form.actual_units && planned > 0
+        ? Math.max(
+            0,
+            ((planned - (parseInt(form.actual_units) || planned)) / planned) *
+              100,
+          ).toFixed(1)
+        : null;
   const finalActual = parseInt(form.actual_units) || planned;
   const yieldPct = calcYield(finalActual, planned);
   const yieldFlagged = yieldPct !== null && yieldPct < 95;
@@ -5791,6 +5832,204 @@ function NewRunPanel({
               ),
             )}
           </div>
+        </div>
+      )}
+
+      {/* WP-PROD-MASTER: Recipe Cost Calculator — food_beverage with BOM */}
+      {isFoodBev && hasBom && planned > 0 && (
+        <div
+          style={{
+            ...sCard,
+            borderLeft: `3px solid ${T.accentMid}`,
+            background: T.accentLit,
+          }}
+        >
+          <div style={{ ...sLabel, color: T.accentMid, marginBottom: "16px" }}>
+            Recipe Cost Calculator
+          </div>
+          {/* Per-ingredient cost breakdown */}
+          <div style={{ marginBottom: "16px" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "12px",
+                fontFamily: T.fontUi,
+              }}
+            >
+              <thead>
+                <tr>
+                  {[
+                    "Ingredient",
+                    "Qty Needed",
+                    "AVCO Cost/Unit",
+                    "Line Cost",
+                    "% of Total",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{ ...sTh, fontSize: "9px", padding: "6px 10px" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bomLineData.map((bl, idx) => {
+                  const avco = parseFloat(
+                    bl.selItem?.weighted_avg_cost ||
+                      bl.selItem?.cost_price ||
+                      0,
+                  );
+                  const pct =
+                    bomTotalCost > 0
+                      ? ((bl.cost / bomTotalCost) * 100).toFixed(1)
+                      : "—";
+                  return (
+                    <tr
+                      key={idx}
+                      style={{ background: idx % 2 === 0 ? "#fff" : T.ink050 }}
+                    >
+                      <td
+                        style={{ ...sTd, padding: "6px 10px", fontWeight: 500 }}
+                      >
+                        {bl.selItem?.name || bl.line.material_type || "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "6px 10px",
+                          fontFamily: T.fontData,
+                        }}
+                      >
+                        {bl.needed.toFixed(3)} {bl.line.unit}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "6px 10px",
+                          fontFamily: T.fontData,
+                          color: avco > 0 ? T.ink700 : T.warning,
+                        }}
+                      >
+                        {avco > 0 ? `R${avco.toFixed(4)}` : "No AVCO"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "6px 10px",
+                          fontFamily: T.fontData,
+                          fontWeight: 600,
+                          color: T.accentMid,
+                        }}
+                      >
+                        {bl.cost > 0 ? `R${bl.cost.toFixed(2)}` : "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          padding: "6px 10px",
+                          fontFamily: T.fontData,
+                          color: T.ink500,
+                        }}
+                      >
+                        {pct}
+                        {pct !== "—" ? "%" : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Summary KPI strip */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gap: "1px",
+              background: T.ink150,
+              borderRadius: "4px",
+              overflow: "hidden",
+              border: `1px solid ${T.ink150}`,
+            }}
+          >
+            {[
+              [
+                "Total Ingredient Cost",
+                bomTotalCost > 0 ? `R${bomTotalCost.toFixed(2)}` : "—",
+                bomTotalCost > 0 ? T.accentMid : T.warning,
+              ],
+              [
+                "Cost Per Unit",
+                bomTotalCost > 0 && planned > 0 ? `R${costPerUnit}` : "—",
+                T.accentMid,
+              ],
+              ["Units Planned", String(planned), T.ink700],
+              [
+                "Waste %",
+                foodWastePct !== null ? `${foodWastePct}%` : "Enter yield %",
+                foodWastePct !== null
+                  ? parseFloat(foodWastePct) > 15
+                    ? T.danger
+                    : parseFloat(foodWastePct) > 5
+                      ? T.warning
+                      : T.success
+                  : T.ink400,
+              ],
+            ].map(([lbl, val, color]) => (
+              <div
+                key={lbl}
+                style={{ background: "#fff", padding: "12px 14px" }}
+              >
+                <div
+                  style={{
+                    fontSize: "9px",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    fontFamily: T.fontUi,
+                    fontWeight: 700,
+                    marginBottom: "4px",
+                  }}
+                >
+                  {lbl}
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontData,
+                    fontSize: "18px",
+                    fontWeight: 400,
+                    color,
+                    lineHeight: 1,
+                  }}
+                >
+                  {val}
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* AVCO warning if any ingredient has no cost */}
+          {bomLineData.some(
+            (bl) => !bl.selItem?.weighted_avg_cost && !bl.selItem?.cost_price,
+          ) && (
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "8px 12px",
+                background: T.warningBg,
+                border: `1px solid ${T.warningBd}`,
+                borderRadius: "4px",
+                fontSize: "11px",
+                color: T.warning,
+                fontFamily: T.fontUi,
+              }}
+            >
+              Some ingredients have no AVCO cost set — cost calculation is
+              incomplete. Receive stock via a PO to set unit costs.
+            </div>
+          )}
         </div>
       )}
 
