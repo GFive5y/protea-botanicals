@@ -1452,10 +1452,18 @@ function BOMEditorPanel({
       "other",
     ],
   };
-  const filteredItems = items.filter((i) => {
-    const cats = CAT_MAP[lineForm.material_type] || [];
-    return cats.includes(i.category);
-  });
+  // WP-PROD-MASTER Session C: FEFO — First Expiry First Out sort
+  const filteredItems = items
+    .filter((i) => {
+      const cats = CAT_MAP[lineForm.material_type] || [];
+      return cats.includes(i.category);
+    })
+    .sort((a, b) => {
+      if (!a.expiry_date && !b.expiry_date) return 0;
+      if (!a.expiry_date) return 1;
+      if (!b.expiry_date) return -1;
+      return new Date(a.expiry_date) - new Date(b.expiry_date);
+    });
 
   const setLine = (k, v) => setLineForm((f) => ({ ...f, [k]: v }));
 
@@ -1762,11 +1770,22 @@ function BOMEditorPanel({
                     }
                   >
                     <option value="">— select item —</option>
-                    {filteredItems.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name} ({i.quantity_on_hand} {i.unit})
-                      </option>
-                    ))}
+                    {filteredItems.map((i) => {
+                      const daysToExpiry = i.expiry_date
+                        ? Math.ceil(
+                            (new Date(i.expiry_date) - Date.now()) / 86400000,
+                          )
+                        : null;
+                      const fefoTag =
+                        daysToExpiry !== null && daysToExpiry <= 60
+                          ? ` [exp ${daysToExpiry}d]`
+                          : "";
+                      return (
+                        <option key={i.id} value={i.id}>
+                          {i.name} ({i.quantity_on_hand} {i.unit}){fefoTag}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div>
@@ -3327,6 +3346,128 @@ function BatchesPanel({
         })}
       </div>
 
+      {/* KPI stat strip — WP-PROD-MASTER Session C */}
+      {(() => {
+        const now = new Date();
+        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString()
+          .split("T")[0];
+        const todayStr = now.toISOString().split("T")[0];
+        const in30 = new Date(now.getTime() + 30 * 86400000)
+          .toISOString()
+          .split("T")[0];
+        const batchesMTD = batches.filter(
+          (b) => b.production_date >= firstOfMonth,
+        ).length;
+        const yieldRuns = runs.filter(
+          (r) => r.yield_pct !== null && r.yield_pct !== undefined,
+        );
+        const avgYield =
+          yieldRuns.length > 0
+            ? yieldRuns.reduce((s, r) => s + parseFloat(r.yield_pct), 0) /
+              yieldRuns.length
+            : null;
+        const avgWaste = avgYield !== null ? 100 - avgYield : null;
+        const expiringSoon = batches.filter(
+          (b) =>
+            !b.is_archived &&
+            b.expiry_date &&
+            b.expiry_date >= todayStr &&
+            b.expiry_date <= in30,
+        ).length;
+        const kpis = [
+          {
+            label: "Batches MTD",
+            fmt: String(batchesMTD),
+            semantic: null,
+          },
+          {
+            label: "Avg Yield %",
+            fmt: avgYield !== null ? `${avgYield.toFixed(1)}%` : "\u2014",
+            semantic:
+              avgYield === null
+                ? null
+                : avgYield >= 90
+                  ? "success"
+                  : avgYield >= 80
+                    ? "warning"
+                    : "danger",
+          },
+          {
+            label: "Avg Waste %",
+            fmt: avgWaste !== null ? `${avgWaste.toFixed(1)}%` : "\u2014",
+            semantic:
+              avgWaste === null
+                ? null
+                : avgWaste <= 10
+                  ? "success"
+                  : avgWaste <= 20
+                    ? "warning"
+                    : "danger",
+          },
+          {
+            label: "Expiring \u226430d",
+            fmt: String(expiringSoon),
+            semantic: expiringSoon > 0 ? "danger" : "success",
+          },
+        ];
+        return (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
+              gap: "1px",
+              background: T.ink150,
+              borderRadius: "6px",
+              overflow: "hidden",
+              border: `1px solid ${T.ink150}`,
+              boxShadow: T.shadow,
+            }}
+          >
+            {kpis.map((k) => {
+              const col = k.semantic
+                ? {
+                    success: T.success,
+                    warning: T.warning,
+                    danger: T.danger,
+                  }[k.semantic]
+                : T.ink900;
+              return (
+                <div
+                  key={k.label}
+                  style={{ background: "#fff", padding: "14px 16px" }}
+                >
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: T.ink400,
+                      marginBottom: "6px",
+                      fontFamily: T.fontUi,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {k.label}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: T.fontData,
+                      fontSize: "22px",
+                      fontWeight: 400,
+                      color: col,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {k.fmt}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Filter bar */}
       <div
         style={{
@@ -4688,6 +4829,14 @@ function NewRunPanel({
           .update({
             quantity_on_hand: curQty + finalActual,
             ...(isVape ? { cost_price: parseFloat(costPerUnit) || 0 } : {}),
+            // WP-PROD-MASTER Session C: write AVCO cost to finished product on food BOM runs
+            ...(isFoodBev && bomTotalCost > 0 && finalActual > 0
+              ? {
+                  weighted_avg_cost: parseFloat(
+                    (bomTotalCost / finalActual).toFixed(4),
+                  ),
+                }
+              : {}),
           })
           .eq("id", finId);
       }
@@ -6452,6 +6601,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
+  // WP-PROD-MASTER Session C — recipe version history expand state
+  const [showVerHist, setShowVerHist] = useState({});
 
   const openEdit = (run) => {
     setEditing(run.id);
@@ -7206,6 +7357,115 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             </span>
                           </div>
                         </div>
+                        {/* Recipe version history — WP-PROD-MASTER Session C */}
+                        {run.recipe_name &&
+                          (() => {
+                            const sameRecipe = runs
+                              .filter(
+                                (r) =>
+                                  r.recipe_name === run.recipe_name &&
+                                  r.id !== run.id,
+                              )
+                              .sort(
+                                (a, b) =>
+                                  new Date(b.created_at) -
+                                  new Date(a.created_at),
+                              );
+                            if (sameRecipe.length === 0) return null;
+                            return (
+                              <div style={{ marginTop: "10px" }}>
+                                <button
+                                  onClick={() =>
+                                    setShowVerHist((p) => ({
+                                      ...p,
+                                      [run.id]: !p[run.id],
+                                    }))
+                                  }
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    padding: 0,
+                                    cursor: "pointer",
+                                    fontSize: "11px",
+                                    fontFamily: T.fontUi,
+                                    fontWeight: 700,
+                                    color: T.accent,
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  {showVerHist[run.id]
+                                    ? "\u25b2 Hide"
+                                    : "\u25bc Show"}{" "}
+                                  Version History ({sameRecipe.length})
+                                </button>
+                                {showVerHist[run.id] && (
+                                  <div
+                                    style={{
+                                      marginTop: "8px",
+                                      border: `1px solid ${T.ink150}`,
+                                      borderRadius: "4px",
+                                      overflow: "hidden",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                                        padding: "6px 10px",
+                                        background: T.ink075,
+                                        fontSize: "9px",
+                                        fontWeight: 700,
+                                        letterSpacing: "0.1em",
+                                        textTransform: "uppercase",
+                                        color: T.ink400,
+                                        fontFamily: T.fontUi,
+                                      }}
+                                    >
+                                      <span>Version</span>
+                                      <span>Lot #</span>
+                                      <span>Yield %</span>
+                                      <span>Date</span>
+                                    </div>
+                                    {sameRecipe.map((r) => (
+                                      <div
+                                        key={r.id}
+                                        style={{
+                                          display: "grid",
+                                          gridTemplateColumns:
+                                            "1fr 1fr 1fr 1fr",
+                                          padding: "8px 10px",
+                                          borderTop: `1px solid ${T.ink150}`,
+                                          fontSize: "12px",
+                                          fontFamily: T.fontData,
+                                          color: T.ink700,
+                                        }}
+                                      >
+                                        <span>
+                                          {r.recipe_version || "\u2014"}
+                                        </span>
+                                        <span>
+                                          {r.batch_lot_number || "\u2014"}
+                                        </span>
+                                        <span>
+                                          {r.yield_pct
+                                            ? `${parseFloat(r.yield_pct).toFixed(1)}%`
+                                            : "\u2014"}
+                                        </span>
+                                        <span>
+                                          {r.created_at
+                                            ? new Date(
+                                                r.created_at,
+                                              ).toLocaleDateString("en-ZA")
+                                            : "\u2014"}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         {/* Allergen summary */}
                         {run.allergen_flags &&
                           Object.values(run.allergen_flags).some(Boolean) && (
