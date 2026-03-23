@@ -22,6 +22,7 @@ import { supabase } from "../services/supabaseClient";
 import WorkflowGuide from "../components/WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../components/viz";
+import { useTenant } from "../services/tenantService";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -114,7 +115,15 @@ const sTd = {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 export default function AdminAnalytics({ tenantId }) {
   const ctx = usePageContext("admin-analytics", null);
+  const { tenant } = useTenant();
+  const industryProfile = tenant?.industry_profile || "cannabis_retail";
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral = industryProfile === "general_retail";
+  const isCannabis =
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary";
   const [loading, setLoading] = useState(true);
+  const [expiringCount, setExpiringCount] = useState(0);
   const [data, setData] = useState({
     totalScans: 0,
     todayScans: 0,
@@ -262,6 +271,24 @@ export default function AdminAnalytics({ tenantId }) {
     };
   }, [fetchAnalytics, tenantId]);
 
+  useEffect(() => {
+    if (!isFoodBev) return;
+    const fetchExpiry = async () => {
+      const sevenDays = new Date();
+      sevenDays.setDate(sevenDays.getDate() + 7);
+      const { count } = await supabase
+        .from("inventory_items")
+        .select("*", { count: "exact", head: true })
+        .not("expiry_date", "is", null)
+        .lte("expiry_date", sevenDays.toISOString())
+        .gte("expiry_date", new Date().toISOString())
+        .gt("quantity_on_hand", 0)
+        .eq("is_active", true);
+      setExpiringCount(count || 0);
+    };
+    fetchExpiry();
+  }, [isFoodBev]);
+
   if (loading)
     return (
       <div
@@ -318,11 +345,12 @@ export default function AdminAnalytics({ tenantId }) {
               margin: "0 0 4px",
             }}
           >
-            Scan Analytics
+            {isFoodBev ? "Engagement Analytics" : "Scan Analytics"}
           </h2>
           <div style={{ fontSize: 13, color: T.ink400 }}>
-            Live scan intelligence · QR type breakdown · Geo distribution ·
-            Outcome tracking
+            {isFoodBev
+              ? "Live engagement · QR scan breakdown · Geo distribution · Outcome tracking"
+              : "Live scan intelligence · QR type breakdown · Geo distribution · Outcome tracking"}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -433,6 +461,42 @@ export default function AdminAnalytics({ tenantId }) {
             </div>
           </div>
         ))}
+        {isFoodBev && (
+          <div
+            style={{
+              background: expiringCount > 0 ? T.warningBg : "#fff",
+              padding: "16px 18px",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: expiringCount > 0 ? T.warning : T.ink400,
+                marginBottom: 6,
+                fontFamily: T.font,
+              }}
+            >
+              Expiring 7d
+            </div>
+            <div
+              style={{
+                fontFamily: T.font,
+                fontSize: 24,
+                fontWeight: 400,
+                color: expiringCount > 0 ? T.warning : T.success,
+                lineHeight: 1,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {expiringCount}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── WP-VIZ CHARTS ── */}

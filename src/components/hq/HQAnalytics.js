@@ -25,6 +25,7 @@ import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
 import { ChartCard, ChartTooltip } from "../viz";
 import GeoAnalyticsDashboard from "./GeoAnalyticsDashboard";
+import { useTenant } from "../../services/tenantService";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -161,6 +162,13 @@ const CATEGORY_COLORS = {
 
 export default function HQAnalytics() {
   const ctx = usePageContext("hq-analytics", null);
+  const { tenant } = useTenant();
+  const industryProfile = tenant?.industry_profile || "cannabis_retail";
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral = industryProfile === "general_retail";
+  const isCannabis =
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary";
 
   const [subTab, setSubTab] = useState("overview");
   const [data, setData] = useState(null);
@@ -394,10 +402,16 @@ export default function HQAnalytics() {
 
   const SUB_TABS = [
     { id: "overview", label: "Overview" },
-    { id: "supply", label: "Supply Chain" },
-    { id: "production", label: "Production" },
+    { id: "supply", label: isFoodBev ? "Procurement & Stock" : "Supply Chain" },
+    {
+      id: "production",
+      label: isFoodBev ? "Recipes" : isGeneral ? "Fulfilment" : "Production",
+    },
     { id: "distribution", label: "Distribution" },
-    { id: "scans", label: "Scans & Loyalty" },
+    {
+      id: "scans",
+      label: isCannabis ? "Scans & Loyalty" : "Scans & Engagement",
+    },
     { id: "geo", label: "Geo & Intelligence" },
   ];
 
@@ -634,11 +648,30 @@ export default function HQAnalytics() {
         </div>
       ) : data ? (
         <>
-          {subTab === "overview" && <OverviewAnalytics data={data} />}
-          {subTab === "supply" && <SupplyChainAnalytics data={data} />}
-          {subTab === "production" && <ProductionAnalytics data={data} />}
-          {subTab === "distribution" && <DistributionAnalytics data={data} />}
-          {subTab === "scans" && <ScansAnalytics data={data} />}
+          {subTab === "overview" && (
+            <OverviewAnalytics data={data} industryProfile={industryProfile} />
+          )}
+          {subTab === "supply" && (
+            <SupplyChainAnalytics
+              data={data}
+              industryProfile={industryProfile}
+            />
+          )}
+          {subTab === "production" && (
+            <ProductionAnalytics
+              data={data}
+              industryProfile={industryProfile}
+            />
+          )}
+          {subTab === "distribution" && (
+            <DistributionAnalytics
+              data={data}
+              industryProfile={industryProfile}
+            />
+          )}
+          {subTab === "scans" && (
+            <ScansAnalytics data={data} industryProfile={industryProfile} />
+          )}
           {subTab === "geo" && <GeoAnalyticsDashboard />}
         </>
       ) : null}
@@ -673,7 +706,12 @@ export default function HQAnalytics() {
 }
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
-function OverviewAnalytics({ data }) {
+function OverviewAnalytics({ data, industryProfile }) {
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral = industryProfile === "general_retail";
+  const isCannabis =
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary";
   const inv = data.inventory;
   const runs = data.productionRuns;
   const shipments = data.shipments;
@@ -777,6 +815,24 @@ function OverviewAnalytics({ data }) {
     alerts.push({
       sem: "danger",
       msg: `${overdue.length} shipment${overdue.length > 1 ? "s" : ""} overdue`,
+    });
+
+  // Food expiry check — 7-day window, food_beverage profile only
+  const expiringItems = isFoodBev
+    ? inv.filter((i) => {
+        if (!i.expiry_date) return false;
+        const exp = new Date(i.expiry_date);
+        return (
+          exp > now &&
+          exp <= new Date(now.getTime() + 7 * 86400000) &&
+          (i.quantity_on_hand || 0) > 0
+        );
+      })
+    : [];
+  if (expiringItems.length > 0)
+    alerts.push({
+      sem: "warning",
+      msg: `${expiringItems.length} item${expiringItems.length > 1 ? "s" : ""} expiring within 7 days`,
     });
 
   const semC = {
@@ -1448,7 +1504,7 @@ function OverviewAnalytics({ data }) {
             ]}
           />
           <PipelineCard
-            stage="Produce"
+            stage={isFoodBev ? "Recipes" : isGeneral ? "Fulfil" : "Produce"}
             color="#b5935a"
             items={[
               { label: "Active", value: activeRuns.length },
@@ -1561,7 +1617,9 @@ function OverviewAnalytics({ data }) {
 }
 
 // ─── Supply Chain ─────────────────────────────────────────────────────────────
-function SupplyChainAnalytics({ data }) {
+function SupplyChainAnalytics({ data, industryProfile }) {
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral = industryProfile === "general_retail";
   const inv = data.inventory;
   const pos = data.purchaseOrders;
   const categories = {};
@@ -1948,7 +2006,9 @@ function SupplyChainAnalytics({ data }) {
 }
 
 // ─── Production ───────────────────────────────────────────────────────────────
-function ProductionAnalytics({ data }) {
+function ProductionAnalytics({ data, industryProfile }) {
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral = industryProfile === "general_retail";
   const runs = data.productionRuns;
   const batches = data.batches;
   const completed = runs.filter((r) => r.status === "completed");
@@ -2028,7 +2088,13 @@ function ProductionAnalytics({ data }) {
       </div>
       {enriched.length > 0 && (
         <div style={sCard}>
-          <div style={sLabel}>All Production Runs</div>
+          <div style={sLabel}>
+            {isFoodBev
+              ? "All Recipe Runs"
+              : isGeneral
+                ? "All Fulfilment Runs"
+                : "All Production Runs"}
+          </div>
           <table
             style={{
               width: "100%",
@@ -2358,7 +2424,11 @@ function DistributionAnalytics({ data }) {
 }
 
 // ─── Scans & Loyalty ─────────────────────────────────────────────────────────
-function ScansAnalytics({ data }) {
+function ScansAnalytics({ data, industryProfile }) {
+  const isCannabis =
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary";
+  const isFoodBev = industryProfile === "food_beverage";
   const scans = data.scans;
   const orders = data.orders || [];
   const now = new Date();
@@ -2442,7 +2512,11 @@ function ScansAnalytics({ data }) {
       {/* ── CHART #14: Funnel ── */}
       {scans.length > 0 && (
         <div style={{ ...sCard }}>
-          <div style={sLabel}>Conversion Funnel — Scan → Points → Order</div>
+          <div style={sLabel}>
+            {isCannabis
+              ? "Conversion Funnel — Scan → Points → Order"
+              : "Engagement Funnel — Scan → Points → Order"}
+          </div>
           <div
             style={{
               marginTop: 16,
