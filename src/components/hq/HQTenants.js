@@ -697,7 +697,9 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
     industry_profile: industryProfile,
   });
   const [saving, setSaving] = useState(false);
-
+  useEffect(() => {
+    setFlags((f) => ({ ...f, industry_profile: industryProfile }));
+  }, [industryProfile]);
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -725,6 +727,22 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
         })
         .eq("id", tenantId);
       if (tenantErr) throw tenantErr;
+      // RLS blocks return no error but 0 rows — detect silently
+      const { data: tenantCheck } = await supabase
+        .from("tenants")
+        .select("industry_profile")
+        .eq("id", tenantId)
+        .single();
+      if (
+        tenantCheck &&
+        tenantCheck.industry_profile !==
+          (flags.industry_profile || "cannabis_retail")
+      ) {
+        console.warn(
+          "[FlagEditor] industry_profile UPDATE silently failed — RLS may be blocking. Current value:",
+          tenantCheck.industry_profile,
+        );
+      }
       setEditing(false);
       showToast("Feature flags saved. Refreshing context...");
       onSaved();
@@ -946,7 +964,7 @@ function FlagEditor({ tenantId, config, industryProfile, onSaved, showToast }) {
             <button
               onClick={() => {
                 setEditing(false);
-                setFlags({ ...config });
+                setFlags({ ...config, industry_profile: industryProfile });
               }}
               style={sBtn("outline")}
             >
@@ -983,7 +1001,7 @@ export default function HQTenants() {
         supabase
           .from("tenants")
           .select(
-            "id,name,slug,type,tier,is_active,created_at,location_city,location_province,health_score,activation_rate,monthly_unit_avg",
+            "id,name,slug,type,tier,is_active,created_at,location_city,location_province,health_score,activation_rate,monthly_unit_avg,industry_profile",
           )
           .order("created_at", { ascending: true }),
         supabase
