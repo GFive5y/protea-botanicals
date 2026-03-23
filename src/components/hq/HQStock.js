@@ -81,6 +81,38 @@ const PANEL_CATS = {
   p3: ["hardware", "packaging", "equipment"],
   p4: ["finished_product"],
 };
+const PANEL_CATS_BY_PROFILE = {
+  cannabis_retail: {
+    p1: ["raw_material", "concentrate", "flower"],
+    p2: ["terpene"],
+    p3: ["hardware", "packaging", "equipment"],
+    p4: ["finished_product"],
+  },
+  cannabis_dispensary: {
+    p1: ["raw_material", "concentrate", "flower"],
+    p2: ["terpene"],
+    p3: ["hardware", "packaging", "equipment"],
+    p4: ["finished_product"],
+  },
+  food_beverage: {
+    p1: ["raw_material"],
+    p2: ["terpene", "accessory"],
+    p3: ["packaging", "equipment"],
+    p4: ["finished_product"],
+  },
+  general_retail: {
+    p1: ["raw_material", "accessory"],
+    p2: ["other"],
+    p3: ["packaging", "equipment", "hardware"],
+    p4: ["finished_product"],
+  },
+  mixed_retail: {
+    p1: ["raw_material", "concentrate", "flower"],
+    p2: ["terpene", "accessory"],
+    p3: ["hardware", "packaging", "equipment"],
+    p4: ["finished_product"],
+  },
+};
 
 // Profiles where cannabis-specific fields (medium_type badge) are shown
 const CANNABIS_PROFILES = [
@@ -171,8 +203,11 @@ export default function HQStock() {
 
   const togglePanel = (key) => setOpenPanels((p) => ({ ...p, [key]: !p[key] }));
 
+  const cats =
+    PANEL_CATS_BY_PROFILE[industryProfile] ||
+    PANEL_CATS_BY_PROFILE.cannabis_retail;
   const panelItems = (key) =>
-    items.filter((i) => PANEL_CATS[key].includes(i.category));
+    items.filter((i) => cats[key].includes(i.category));
 
   const isLow = (item) =>
     item.reorder_level != null &&
