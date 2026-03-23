@@ -31,6 +31,7 @@ import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
+import { useTenant } from "../../services/tenantService";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -748,6 +749,13 @@ export default function HQPricing() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
   const ctx = usePageContext("pricing", null);
+  const { tenant } = useTenant();
+  const industryProfile = tenant?.industry_profile || "cannabis_retail";
+  const isFoodBev = industryProfile === "food_beverage";
+  const isGeneral = industryProfile === "general_retail";
+  const isCannabis =
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary";
 
   const [recipes, setRecipes] = useState([]);
   const [supplierProducts, setSupplierProducts] = useState([]);
@@ -1338,7 +1346,12 @@ export default function HQPricing() {
                               fontWeight: 700,
                             }}
                           >
-                            {selected.lab_tests.length} lab test
+                            {selected.lab_tests.length}{" "}
+                            {isFoodBev
+                              ? "quality test"
+                              : isGeneral
+                                ? "compliance test"
+                                : "lab test"}
                             {selected.lab_tests.length > 1 ? "s" : ""} ÷{" "}
                             {selected.batch_size || 1} units
                           </span>
@@ -1549,7 +1562,11 @@ export default function HQPricing() {
                         flexShrink: 0,
                       }}
                     >
-                      Batch P&L — how many units?
+                      {isFoodBev
+                        ? "Recipe Run P&L — how many units?"
+                        : isGeneral
+                          ? "Order P&L — how many units?"
+                          : "Batch P&L — how many units?"}
                     </div>
                     <input
                       type="number"
