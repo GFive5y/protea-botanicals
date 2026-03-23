@@ -21,8 +21,8 @@ const T = {
   faint: "#f4f0ea",
   red: "#dc2626",
   amber: "#f59e0b",
-  font: "'Jost', sans-serif",
-  serif: "'Cormorant Garamond', Georgia, serif",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  serif: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
 // ── SA Province colour map ─────────────────────────────────────────────────
@@ -545,7 +545,7 @@ export default function GeoAnalyticsDashboard() {
   return (
     <div style={{ fontFamily: T.font }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Jost:wght@300;400;500;600&display=swap');
+        
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         .geo-tab-btn { background:none; border:none; cursor:pointer; padding:8px 14px; font-family:${T.font}; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; transition:all 0.2s; border-bottom: 2px solid transparent; }
         .geo-tab-btn:hover { color: ${T.green}; }
