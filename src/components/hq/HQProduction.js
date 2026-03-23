@@ -3366,7 +3366,11 @@ function BatchesPanel({
                 "BATCH #",
                 "PRODUCT",
                 "TYPE",
-                "STRAIN",
+                ...(!["food_beverage", "general_retail"].includes(
+                  industryProfile,
+                )
+                  ? ["STRAIN"]
+                  : []),
                 "UNITS",
                 "STOCK",
                 "PROD DATE",
@@ -3436,36 +3440,40 @@ function BatchesPanel({
                     >
                       {b.product_type || <span>empty</span>}
                     </div>
-                    <div style={sTd}>
-                      {(() => {
-                        const cp = b.cannabinoid_profile;
-                        if (cp && typeof cp === "object" && cp.chamber_1) {
-                          return (
-                            <div
-                              style={{ fontSize: "10px", lineHeight: "1.6" }}
-                            >
-                              {Object.entries(cp).map(([k, v]) => (
-                                <div key={k} style={{ color: T.accentMid }}>
-                                  <span
-                                    style={{
-                                      color: T.ink400,
-                                      textTransform: "uppercase",
-                                      fontSize: "9px",
-                                    }}
-                                  >
-                                    {k.replace("_", " ")}:{" "}
-                                  </span>
-                                  {v.terpene
-                                    ? `${v.terpene.split(" - ")[0]} ${v.terpene_pct ? v.terpene_pct + "%" : ""}`
-                                    : v.strain || v.medium || "—"}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return b.strain || "—";
-                      })()}
-                    </div>
+                    {!["food_beverage", "general_retail"].includes(
+                      industryProfile,
+                    ) && (
+                      <div style={sTd}>
+                        {(() => {
+                          const cp = b.cannabinoid_profile;
+                          if (cp && typeof cp === "object" && cp.chamber_1) {
+                            return (
+                              <div
+                                style={{ fontSize: "10px", lineHeight: "1.6" }}
+                              >
+                                {Object.entries(cp).map(([k, v]) => (
+                                  <div key={k} style={{ color: T.accentMid }}>
+                                    <span
+                                      style={{
+                                        color: T.ink400,
+                                        textTransform: "uppercase",
+                                        fontSize: "9px",
+                                      }}
+                                    >
+                                      {k.replace("_", " ")}:{" "}
+                                    </span>
+                                    {v.terpene
+                                      ? `${v.terpene.split(" - ")[0]} ${v.terpene_pct ? v.terpene_pct + "%" : ""}`
+                                      : v.strain || v.medium || "—"}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return b.strain || "—";
+                        })()}
+                      </div>
+                    )}
                     <div
                       style={{
                         ...sTd,
