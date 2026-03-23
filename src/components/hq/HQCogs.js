@@ -409,6 +409,9 @@ function LandedCostCalc({ usdZar, onApply }) {
   const freightZAR = freightUSD * usdZar;
   const unitsN = parseFloat(units) || 0;
   const perUnitZAR = unitsN > 0 ? freightZAR / unitsN : null;
+  useEffect(() => {
+    if (perUnitZAR !== null && perUnitZAR > 0) onApply(perUnitZAR.toFixed(4));
+  }, [perUnitZAR]); // eslint-disable-line react-hooks/exhaustive-deps
   const s = { ...sInput, fontSize: 12 };
   return (
     <div style={{ marginTop: 10 }}>
