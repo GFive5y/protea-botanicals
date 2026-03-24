@@ -601,6 +601,37 @@ CRITICAL REMINDERS:
 
     const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // WP-FIN S0 / LL-084: Duplicate invoice guard — check before logging
+    const refNumber = (extraction.reference as Record<string, unknown>)
+      ?.number as string | null;
+    const supplierId = (extraction.supplier as Record<string, unknown>)
+      ?.matched_id as string | null;
+    if (refNumber && supplierId) {
+      const { data: existingConfirmed } = await db
+        .from("document_log")
+        .select("id, file_name, confirmed_at")
+        .eq("status", "confirmed")
+        .eq("supplier_id", supplierId)
+        .filter("extracted_data->reference->>number", "eq", refNumber)
+        .limit(1);
+      if (existingConfirmed && existingConfirmed.length > 0) {
+        const dup = existingConfirmed[0];
+        const dupDate = new Date(dup.confirmed_at).toLocaleDateString("en-ZA");
+        const dupWarning =
+          `⚠ DUPLICATE INVOICE DETECTED: Reference "${refNumber}" was already ` +
+          `confirmed on ${dupDate} (file: ${dup.file_name}). ` +
+          `Do NOT confirm any stock movement actions — this will create duplicate inventory entries. ` +
+          `If corrections are needed, re-open the original confirmed document.`;
+        (extraction.warnings as string[]).push(dupWarning);
+        extraction.potential_duplicate = true;
+        extraction.confidence = Math.min(
+          Number(extraction.confidence ?? 1),
+          0.4,
+        );
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const { data: logEntry, error: logErr } = await db
       .from("document_log")
       .insert({

@@ -2134,6 +2134,37 @@ export default function HQDocuments({ initialDocId = null }) {
     const toApply = checkedIndices
       .map((i) => proposedUpdates[i])
       .filter(Boolean);
+
+    // LL-084: Dedup gate — block stock movements if same reference already confirmed
+    const STOCK_ACTIONS = new Set([
+      "receive_delivery_item",
+      "create_stock_movement",
+      "create_inventory_item",
+    ]);
+    const hasStockActions = toApply.some((u) => STOCK_ACTIONS.has(u.action));
+    const docRef = extraction.reference?.number;
+    if (hasStockActions && docRef) {
+      const { data: existingConfirmed } = await supabase
+        .from("document_log")
+        .select("id, file_name, confirmed_at")
+        .eq("status", "confirmed")
+        .neq("id", selectedDoc.id)
+        .filter("extracted_data->reference->>number", "eq", docRef)
+        .limit(1);
+      if (existingConfirmed && existingConfirmed.length > 0) {
+        const dup = existingConfirmed[0];
+        const dupDate = new Date(dup.confirmed_at).toLocaleDateString("en-ZA");
+        setConfirmError(
+          `Duplicate blocked: reference "${docRef}" was already confirmed on ` +
+            `${dupDate} (${dup.file_name}). Confirming again creates duplicate ` +
+            `stock movements. Re-open the original document if corrections are needed.`,
+        );
+        setConfirming(false);
+        return;
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const appliedUpdates = [];
     const failedUpdates = [];
     const fxRate = extraction.usd_zar_rate || extraction.fx_rate || 18.5;
