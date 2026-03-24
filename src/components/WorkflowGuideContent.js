@@ -765,3 +765,27 @@ export const GUIDE_ADMIN_DOCUMENTS = {
     "Upload and link COA before generating QR codes — scan result page shows COA data from the linked document.",
   ],
 };
+
+export const GUIDE_HQ_TRANSFERS = {
+  tabId: "hq-transfers",
+  title: "HQ → Shop Transfer Orders",
+  description:
+    "Distribute stock from HQ warehouse to shop tenants. Both sides get a full stock movement audit trail. Enables the Vape King multi-store distribution model.",
+  steps: [
+    "Select the destination store from the dropdown — all active shop tenants are listed.",
+    "Add line items from HQ inventory. Quantity is capped at available stock (on hand minus reservations).",
+    "Create the draft order, review the lines, then click Ship. HQ stock deducts immediately.",
+    "When the store confirms physical receipt, click Mark Received — shop stock increases and a transfer_in movement is written on their side.",
+  ],
+  warnings: [
+    "Shipping deducts HQ stock immediately — cannot be undone without cancelling the transfer.",
+    "Cancelling an in-transit order auto-reverses the HQ stock deduction and writes a reversal movement.",
+    "Items auto-created in the store on receipt have sell_price = 0 — set price via Admin Stock.",
+  ],
+  dataFlow: [
+    "HQ inventory_items → stock_transfers header + stock_transfer_items lines",
+    "Ship: inventory_items.quantity_on_hand-- (HQ) + stock_movements transfer_out",
+    "Receive: inventory_items.quantity_on_hand++ (shop) + stock_movements transfer_in",
+  ],
+  tips: [
+    "Use the Notes field to document the purpose: 'Weekly replenis
