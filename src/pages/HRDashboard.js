@@ -23,7 +23,6 @@ import {
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
-import SystemStatusBar from "../components/SystemStatusBar";
 import HRStaffDirectory from "../components/hq/HRStaffDirectory";
 import HRLeave from "../components/hq/HRLeave";
 import HRTimesheets from "../components/hq/HRTimesheets";
@@ -793,8 +792,6 @@ export default function HRDashboard() {
           Staff · Leave · Timesheets · Contracts · Payroll
         </p>
       </div>
-
-      <SystemStatusBar />
 
       <div
         style={{
