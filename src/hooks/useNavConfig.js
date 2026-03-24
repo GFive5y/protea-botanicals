@@ -74,6 +74,12 @@ const HQ_PAGES = [
     label: "Food Safety",
     path: "/hq?tab=hq-food-safety",
   },
+  {
+    group: "Food & Beverage",
+    icon: "🏷️",
+    label: "Nutrition Labels",
+    path: "/hq?tab=hq-nutrition",
+  },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
   { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
