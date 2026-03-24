@@ -445,3 +445,60 @@
 .nav-mobile-label {
   font-size: 10px;
 }
+
+/* ─────────────────────────────────────────────
+   WP-AI-UNIFIED: ProteaAI third panel
+   ───────────────────────────────────────────── */
+
+/* ── ProteaAI slide-out panel ── */
+.ai-pane {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--strip-w);
+  width: 0;
+  background: #ffffff;
+  border-right: 0.5px solid rgba(0, 0, 0, 0.1);
+  z-index: 28;
+  overflow: hidden;
+  transition:
+    width var(--nav-transition),
+    left var(--nav-transition);
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+}
+.ai-pane.nav-open {
+  left: calc(var(--strip-w) + var(--panel-w));
+}
+.ai-pane.open {
+  width: 320px;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.07);
+}
+
+/* ── ProteaAI toggle button (above account circle) ── */
+.nav-ai-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #1a3d2b;
+  border: none;
+  color: #ffffff;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition:
+    background 0.12s,
+    box-shadow 0.12s;
+  flex-shrink: 0;
+}
+.nav-ai-btn:hover {
+  background: #2d6a4f;
+}
+.nav-ai-btn.active {
+  background: #2d6a4f;
+  box-shadow: 0 0 0 3px #a7d9b8;
+}

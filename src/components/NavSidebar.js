@@ -1,6 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useContext,
+} from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useNavConfig } from "../hooks/useNavConfig";
+import { RoleContext } from "../App";
+import { useTenant } from "../services/tenantService";
+import ProteaAI from "./ProteaAI";
 import "./NavSidebar.css";
 
 export default function NavSidebar() {
@@ -8,7 +17,12 @@ export default function NavSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // WP-AI-UNIFIED: role + tenant for ProteaAI
+  const { role } = useContext(RoleContext);
+  const { tenant, tenantName, isHQ } = useTenant();
+
   const [isOpen, setIsOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [hrExpanded, setHrExpanded] = useState(false);
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -70,6 +84,7 @@ export default function NavSidebar() {
     (path) => {
       navigate(path);
       if (isMobile) setIsOpen(false);
+      setAiOpen(false);
       setTooltip((t) => ({ ...t, visible: false }));
     },
     [navigate, isMobile],
@@ -143,73 +158,124 @@ export default function NavSidebar() {
     ) : null;
 
   return (
-    <nav
-      className={`nav-panel${isOpen ? " open" : ""}`}
-      aria-label="Main navigation"
-      style={{ position: "relative" }}
-    >
-      {/* Header */}
-      <div className="nav-header">
-        <button
-          className="nav-burger"
-          onClick={togglePanel}
-          style={{
-            opacity: isOpen ? 0 : 1,
-            pointerEvents: isOpen ? "none" : "auto",
-          }}
-          onMouseEnter={(e) => showTip(e, "Open navigation")}
-          onMouseLeave={hideTip}
-          aria-label="Open navigation"
-          tabIndex={isOpen ? -1 : 0}
-        >
-          <span className="nav-burger-icon">☰</span>
-        </button>
-        <div className="nav-title-wrap">
-          <div className="nav-title">{title}</div>
-          <div className="nav-subtitle">{subtitle}</div>
+    <>
+      <nav
+        className={`nav-panel${isOpen ? " open" : ""}`}
+        aria-label="Main navigation"
+        style={{ position: "relative" }}
+      >
+        {/* Header */}
+        <div className="nav-header">
+          <button
+            className="nav-burger"
+            onClick={togglePanel}
+            style={{
+              opacity: isOpen ? 0 : 1,
+              pointerEvents: isOpen ? "none" : "auto",
+            }}
+            onMouseEnter={(e) => showTip(e, "Open navigation")}
+            onMouseLeave={hideTip}
+            aria-label="Open navigation"
+            tabIndex={isOpen ? -1 : 0}
+          >
+            <span className="nav-burger-icon">☰</span>
+          </button>
+          <div className="nav-title-wrap">
+            <div className="nav-title">{title}</div>
+            <div className="nav-subtitle">{subtitle}</div>
+          </div>
+          <button
+            className="nav-close-btn"
+            onClick={togglePanel}
+            aria-label="Close navigation"
+          >
+            ✕
+          </button>
         </div>
-        <button
-          className="nav-close-btn"
-          onClick={togglePanel}
-          aria-label="Close navigation"
-        >
-          ✕
-        </button>
-      </div>
 
-      {/* Nav rows */}
-      <div className="nav-body" id="nav" ref={navBodyRef}>
-        {pages.map((page, i) => {
-          const active = isActive(page);
+        {/* Nav rows */}
+        <div className="nav-body" id="nav" ref={navBodyRef}>
+          {pages.map((page, i) => {
+            const active = isActive(page);
 
-          if (page.sub) {
+            if (page.sub) {
+              return (
+                <React.Fragment key={i}>
+                  {groupLabel(page, i)}
+                  <div
+                    className={`nav-row${active ? " active" : ""}`}
+                    onClick={() =>
+                      handleIconClick(page.path, true, () => {
+                        setHrExpanded((v) => {
+                          const next = !v;
+                          if (next)
+                            setTimeout(() => {
+                              if (navBodyRef.current)
+                                navBodyRef.current.scrollTop =
+                                  navBodyRef.current.scrollHeight;
+                            }, 220);
+                          return next;
+                        });
+                      })
+                    }
+                    onMouseEnter={(e) => showTip(e, page.label)}
+                    onMouseLeave={hideTip}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && setHrExpanded((v) => !v)
+                    }
+                    aria-expanded={hrExpanded}
+                  >
+                    <div className="nav-icon-zone">
+                      <div className="nav-pill">
+                        <span className="nav-icon">{page.icon}</span>
+                      </div>
+                    </div>
+                    <span className="nav-label">{page.label}</span>
+                    <span className={`nav-chev${hrExpanded ? " open" : ""}`}>
+                      ›
+                    </span>
+                  </div>
+                  <div
+                    className="nav-subs"
+                    style={{
+                      height: hrExpanded ? page.sub.length * 30 + "px" : "0px",
+                    }}
+                    aria-hidden={!hrExpanded}
+                  >
+                    {page.sub.map((sub, si) => (
+                      <div
+                        key={si}
+                        className={`nav-sub-item${isSubActive(sub) ? " active" : ""}`}
+                        onClick={() => handleNav(sub.path)}
+                        role="button"
+                        tabIndex={hrExpanded ? 0 : -1}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleNav(sub.path)
+                        }
+                      >
+                        {sub.label}
+                      </div>
+                    ))}
+                  </div>
+                </React.Fragment>
+              );
+            }
+
             return (
               <React.Fragment key={i}>
                 {groupLabel(page, i)}
                 <div
                   className={`nav-row${active ? " active" : ""}`}
-                  onClick={() =>
-                    handleIconClick(page.path, true, () => {
-                      setHrExpanded((v) => {
-                        const next = !v;
-                        if (next)
-                          setTimeout(() => {
-                            if (navBodyRef.current)
-                              navBodyRef.current.scrollTop =
-                                navBodyRef.current.scrollHeight;
-                          }, 220);
-                        return next;
-                      });
-                    })
-                  }
+                  onClick={() => handleIconClick(page.path, false)}
                   onMouseEnter={(e) => showTip(e, page.label)}
                   onMouseLeave={hideTip}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) =>
-                    e.key === "Enter" && setHrExpanded((v) => !v)
+                    e.key === "Enter" && handleIconClick(page.path, false)
                   }
-                  aria-expanded={hrExpanded}
                 >
                   <div className="nav-icon-zone">
                     <div className="nav-pill">
@@ -217,213 +283,86 @@ export default function NavSidebar() {
                     </div>
                   </div>
                   <span className="nav-label">{page.label}</span>
-                  <span className={`nav-chev${hrExpanded ? " open" : ""}`}>
-                    ›
-                  </span>
-                </div>
-                <div
-                  className="nav-subs"
-                  style={{
-                    height: hrExpanded ? page.sub.length * 30 + "px" : "0px",
-                  }}
-                  aria-hidden={!hrExpanded}
-                >
-                  {page.sub.map((sub, si) => (
-                    <div
-                      key={si}
-                      className={`nav-sub-item${isSubActive(sub) ? " active" : ""}`}
-                      onClick={() => handleNav(sub.path)}
-                      role="button"
-                      tabIndex={hrExpanded ? 0 : -1}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && handleNav(sub.path)
-                      }
-                    >
-                      {sub.label}
-                    </div>
-                  ))}
                 </div>
               </React.Fragment>
             );
-          }
+          })}
+        </div>
 
-          return (
-            <React.Fragment key={i}>
-              {groupLabel(page, i)}
-              <div
-                className={`nav-row${active ? " active" : ""}`}
-                onClick={() => handleIconClick(page.path, false)}
-                onMouseEnter={(e) => showTip(e, page.label)}
-                onMouseLeave={hideTip}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && handleIconClick(page.path, false)
-                }
-              >
-                <div className="nav-icon-zone">
-                  <div className="nav-pill">
-                    <span className="nav-icon">{page.icon}</span>
-                  </div>
-                </div>
-                <span className="nav-label">{page.label}</span>
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      {/* Account circle */}
-      <div className="nav-bottom">
-        <div className="nav-acct-wrap">
+        {/* Bottom — ProteaAI button + account circle */}
+        <div className="nav-bottom">
+          {/* ── WP-AI-UNIFIED: ProteaAI toggle button ── */}
           <button
-            ref={acctRef}
-            className={`nav-acct-circle${bubbleOpen ? " active" : ""}`}
-            onClick={toggleBubble}
-            onMouseEnter={(e) => showTip(e, bubbleName)}
+            className={`nav-ai-btn${aiOpen ? " active" : ""}`}
+            onClick={() => setAiOpen((v) => !v)}
+            onMouseEnter={(e) => showTip(e, "ProteaAI")}
             onMouseLeave={hideTip}
-            aria-label="Account menu"
-            aria-haspopup="true"
-            aria-expanded={bubbleOpen}
+            aria-label="ProteaAI assistant"
+            aria-pressed={aiOpen}
           >
-            {initials}
+            ✦
           </button>
-        </div>
-      </div>
 
-      {/* Fixed tooltip */}
-      {tooltip.visible && !isOpen && (
-        <div
-          style={{
-            position: "fixed",
-            left: 60,
-            top: tooltip.y,
-            transform: "translateY(-50%)",
-            background: "#ffffff",
-            border: "0.5px solid rgba(0,0,0,0.15)",
-            borderRadius: 6,
-            padding: "4px 10px",
-            fontSize: 12,
-            color: "#111",
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            zIndex: 9999,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-          }}
-          aria-hidden="true"
-        >
-          {tooltip.text}
-        </div>
-      )}
-
-      {/* Account bubble */}
-      {bubbleOpen &&
-        (isOpen ? (
-          <div
-            id="nav-acct-bubble-fixed"
-            role="menu"
-            style={{
-              position: "absolute",
-              bottom: 70,
-              left: 8,
-              right: 8,
-              background: "#fff",
-              border: "0.5px solid rgba(0,0,0,0.15)",
-              borderRadius: 10,
-              padding: 12,
-              zIndex: 200,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: "#111",
-                marginBottom: 1,
-              }}
-            >
-              {bubbleName}
-            </div>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>
-              {bubbleRole}
-            </div>
-            <div
-              style={{
-                height: "0.5px",
-                background: "rgba(0,0,0,0.08)",
-                margin: "4px 0",
-              }}
-            />
+          <div className="nav-acct-wrap">
             <button
-              className="nav-bubble-row"
-              role="menuitem"
-              onClick={() => {
-                setBubbleOpen(false);
-                handleNav("/account");
-              }}
+              ref={acctRef}
+              className={`nav-acct-circle${bubbleOpen ? " active" : ""}`}
+              onClick={toggleBubble}
+              onMouseEnter={(e) => showTip(e, bubbleName)}
+              onMouseLeave={hideTip}
+              aria-label="Account menu"
+              aria-haspopup="true"
+              aria-expanded={bubbleOpen}
             >
-              ⚙ Settings
-            </button>
-            <button
-              className="nav-bubble-row"
-              role="menuitem"
-              onClick={() => {
-                setBubbleOpen(false);
-                handleNav("/account");
-              }}
-            >
-              ◎ My profile
-            </button>
-            <div
-              style={{
-                height: "0.5px",
-                background: "rgba(0,0,0,0.08)",
-                margin: "4px 0",
-              }}
-            />
-            <button
-              className="nav-bubble-row danger"
-              role="menuitem"
-              onClick={() => {
-                setBubbleOpen(false);
-                handleNav("/account?action=logout");
-              }}
-            >
-              ↩ Log out
+              {initials}
             </button>
           </div>
-        ) : (
-          bubbleRect && (
+        </div>
+
+        {/* Fixed tooltip */}
+        {tooltip.visible && !isOpen && (
+          <div
+            style={{
+              position: "fixed",
+              left: 60,
+              top: tooltip.y,
+              transform: "translateY(-50%)",
+              background: "#ffffff",
+              border: "0.5px solid rgba(0,0,0,0.15)",
+              borderRadius: 6,
+              padding: "4px 10px",
+              fontSize: 12,
+              color: "#111",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              zIndex: 9999,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+            }}
+            aria-hidden="true"
+          >
+            {tooltip.text}
+          </div>
+        )}
+
+        {/* Account bubble */}
+        {bubbleOpen &&
+          (isOpen ? (
             <div
               id="nav-acct-bubble-fixed"
               role="menu"
               style={{
-                position: "fixed",
-                bottom: window.innerHeight - bubbleRect.top + 8,
-                left: bubbleRect.right + 8,
+                position: "absolute",
+                bottom: 70,
+                left: 8,
+                right: 8,
                 background: "#fff",
                 border: "0.5px solid rgba(0,0,0,0.15)",
                 borderRadius: 10,
                 padding: 12,
-                width: 200,
-                zIndex: 10000,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+                zIndex: 200,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
               }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  left: -5,
-                  top: "50%",
-                  transform: "translateY(-50%) rotate(45deg)",
-                  width: 8,
-                  height: 8,
-                  background: "#fff",
-                  borderLeft: "0.5px solid rgba(0,0,0,0.12)",
-                  borderBottom: "0.5px solid rgba(0,0,0,0.12)",
-                }}
-              />
               <div
                 style={{
                   fontSize: 13,
@@ -482,9 +421,110 @@ export default function NavSidebar() {
                 ↩ Log out
               </button>
             </div>
-          )
-        ))}
-    </nav>
+          ) : (
+            bubbleRect && (
+              <div
+                id="nav-acct-bubble-fixed"
+                role="menu"
+                style={{
+                  position: "fixed",
+                  bottom: window.innerHeight - bubbleRect.top + 8,
+                  left: bubbleRect.right + 8,
+                  background: "#fff",
+                  border: "0.5px solid rgba(0,0,0,0.15)",
+                  borderRadius: 10,
+                  padding: 12,
+                  width: 200,
+                  zIndex: 10000,
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    left: -5,
+                    top: "50%",
+                    transform: "translateY(-50%) rotate(45deg)",
+                    width: 8,
+                    height: 8,
+                    background: "#fff",
+                    borderLeft: "0.5px solid rgba(0,0,0,0.12)",
+                    borderBottom: "0.5px solid rgba(0,0,0,0.12)",
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "#111",
+                    marginBottom: 1,
+                  }}
+                >
+                  {bubbleName}
+                </div>
+                <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>
+                  {bubbleRole}
+                </div>
+                <div
+                  style={{
+                    height: "0.5px",
+                    background: "rgba(0,0,0,0.08)",
+                    margin: "4px 0",
+                  }}
+                />
+                <button
+                  className="nav-bubble-row"
+                  role="menuitem"
+                  onClick={() => {
+                    setBubbleOpen(false);
+                    handleNav("/account");
+                  }}
+                >
+                  ⚙ Settings
+                </button>
+                <button
+                  className="nav-bubble-row"
+                  role="menuitem"
+                  onClick={() => {
+                    setBubbleOpen(false);
+                    handleNav("/account");
+                  }}
+                >
+                  ◎ My profile
+                </button>
+                <div
+                  style={{
+                    height: "0.5px",
+                    background: "rgba(0,0,0,0.08)",
+                    margin: "4px 0",
+                  }}
+                />
+                <button
+                  className="nav-bubble-row danger"
+                  role="menuitem"
+                  onClick={() => {
+                    setBubbleOpen(false);
+                    handleNav("/account?action=logout");
+                  }}
+                >
+                  ↩ Log out
+                </button>
+              </div>
+            )
+          ))}
+      </nav>
+
+      {/* ── WP-AI-UNIFIED: ProteaAI third panel ── */}
+      <ProteaAI
+        isOpen={aiOpen}
+        onClose={() => setAiOpen(false)}
+        navExpanded={isOpen}
+        tenantId={tenant?.id}
+        role={role}
+        isHQ={isHQ}
+        tenantName={tenantName}
+      />
+    </>
   );
 }
 
