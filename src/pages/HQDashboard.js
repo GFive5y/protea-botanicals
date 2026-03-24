@@ -52,6 +52,7 @@ import HQHaccp from "../components/hq/HQHaccp";
 import HQFoodSafety from "../components/hq/HQFoodSafety";
 import HQNutritionLabel from "../components/hq/HQNutritionLabel";
 import HQColdChain from "../components/hq/HQColdChain";
+import HQRecall from "../components/hq/HQRecall";
 
 // ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
@@ -100,6 +101,7 @@ const TABS = [
   { id: "hq-food-safety", label: "Food Safety", icon: "=", ready: true },
   { id: "hq-nutrition", label: "Nutrition Labels", icon: "=", ready: true },
   { id: "hq-cold-chain", label: "Cold Chain", icon: "=", ready: true },
+  { id: "hq-recall", label: "Recall & Trace", icon: "=", ready: true },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   // Finance
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
@@ -263,6 +265,7 @@ export default function HQDashboard() {
           {activeTab === "hq-food-safety" && <HQFoodSafety />}
           {activeTab === "hq-nutrition" && <HQNutritionLabel />}
           {activeTab === "hq-cold-chain" && <HQColdChain />}
+          {activeTab === "hq-recall" && <HQRecall />}
           {activeTab === "loyalty" && <HQLoyalty />}
           {activeTab === "fraud" && <HQFraud />}
         </div>

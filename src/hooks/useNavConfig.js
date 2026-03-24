@@ -86,6 +86,12 @@ const HQ_PAGES = [
     label: "Cold Chain",
     path: "/hq?tab=hq-cold-chain",
   },
+  {
+    group: "Food & Beverage",
+    icon: "🔍",
+    label: "Recall & Trace",
+    path: "/hq?tab=hq-recall",
+  },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
   { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
