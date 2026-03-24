@@ -58,6 +58,12 @@ const HQ_PAGES = [
   },
   {
     group: "Food & Beverage",
+    icon: "📖",
+    label: "Recipes",
+    path: "/hq?tab=hq-recipes",
+  },
+  {
+    group: "Food & Beverage",
     icon: "🛡️",
     label: "HACCP",
     path: "/hq?tab=hq-haccp",
