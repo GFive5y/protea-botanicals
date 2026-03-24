@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { RoleContext } from "../App";
 import { useTenant } from "../services/tenantService";
 
-// ─── HQ: all 17 HQDashboard tabs — operational flow order ────────────────────
+// ─── HQ: all HQDashboard tabs — operational flow order ───────────────────────
 const HQ_PAGES = [
   // ── Operations ──────────────────────────────────────────────────────────────
   { group: "Operations", icon: "⌂", label: "Overview", path: "/hq" },
@@ -48,6 +48,19 @@ const HQ_PAGES = [
     icon: "⬤",
     label: "Distribution",
     path: "/hq?tab=distribution",
+  },
+  // ── Food & Beverage ──────────────────────────────────────────────────────────
+  {
+    group: "Food & Beverage",
+    icon: "🍃",
+    label: "Ingredients",
+    path: "/hq?tab=hq-ingredients",
+  },
+  {
+    group: "Food & Beverage",
+    icon: "📖",
+    label: "Recipes",
+    path: "/hq?tab=hq-recipes",
   },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
