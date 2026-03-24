@@ -1,9 +1,11 @@
-// src/components/StockItemModal.js v1.0 — WP-BIB Session 4
+// src/components/StockItemModal.js v1.1 — WP-STOCK-PRO S3
 // Category-adaptive stock item add/edit modal
 // Replaces ItemForm inline panel in StockControl.js
 // Profile-aware: cannabis / food_beverage / general_retail / mixed_retail
-// Writes all 6 new nullable columns: medium_type, allergen_flags,
-//   shelf_life_days, ingredients_notes, storage_instructions, supplier_id
+// BIB S1 columns: medium_type, allergen_flags, shelf_life_days,
+//   ingredients_notes, storage_instructions, supplier_id
+// S3 columns: temperature_zone, batch_lot_number, country_of_origin, reorder_qty
+// ALLERGEN_FLAGS: 14 keys (SA R638 compliant). UNIT_OPTIONS: 13 units.
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -85,20 +87,45 @@ const MEDIUM_TYPES = [
   { value: "other", label: "Other" },
 ];
 
+// SA R638 + EU 1169/2011 — 14 mandatory allergens
+// Keys match production_runs.allergen_flags (WP-PROD-MASTER Session A)
 const ALLERGEN_FLAGS = [
   { key: "gluten", label: "Gluten" },
-  { key: "dairy", label: "Dairy" },
-  { key: "nuts", label: "Nuts" },
-  { key: "peanuts", label: "Peanuts" },
-  { key: "soy", label: "Soy" },
+  { key: "crustaceans", label: "Crustaceans" },
   { key: "eggs", label: "Eggs" },
   { key: "fish", label: "Fish" },
-  { key: "shellfish", label: "Shellfish" },
+  { key: "peanuts", label: "Peanuts" },
+  { key: "soybeans", label: "Soybeans" },
+  { key: "milk", label: "Milk / Dairy" },
+  { key: "nuts", label: "Tree Nuts" },
+  { key: "celery", label: "Celery" },
+  { key: "mustard", label: "Mustard" },
   { key: "sesame", label: "Sesame" },
   { key: "sulphites", label: "Sulphites" },
+  { key: "lupin", label: "Lupin" },
+  { key: "molluscs", label: "Molluscs" },
 ];
 
-const UNIT_OPTIONS = ["pcs", "ml", "g", "kg", "L", "bottles"];
+const UNIT_OPTIONS = [
+  // Universal
+  "pcs",
+  "ea",
+  // Liquid
+  "ml",
+  "L",
+  "bottles",
+  // Weight
+  "g",
+  "kg",
+  // Retail / textile
+  "m",
+  "set",
+  "roll",
+  "box",
+  // Food service
+  "por",
+  "tray",
+];
 
 const CATEGORY_LABELS = {
   finished_product: "Finished Product",
@@ -258,6 +285,11 @@ export default function StockItemModal({
     ingredients_notes: item?.ingredients_notes || "",
     storage_instructions: item?.storage_instructions || "",
     allergen_flags: parseAllergens(item?.allergen_flags),
+    // S3 food fields
+    temperature_zone: item?.temperature_zone || "",
+    batch_lot_number: item?.batch_lot_number || "",
+    country_of_origin: item?.country_of_origin || "",
+    reorder_qty: item?.reorder_qty ?? "",
     // Compatible formats for hardware (stored in description as fallback)
     compatible_formats: item?.compatible_formats || [],
     is_active: item?.is_active !== false,
@@ -304,6 +336,15 @@ export default function StockItemModal({
     Boolean,
   ).length;
 
+  // Generates R638 declaration text for label copy
+  const generateAllergenText = () => {
+    const present = ALLERGEN_FLAGS.filter(
+      (a) => form.allergen_flags[a.key],
+    ).map((a) => a.label);
+    if (present.length === 0) return "No allergens declared.";
+    return `Contains: ${present.join(", ")}.`;
+  };
+
   const handleSubmit = () => {
     if (!form.sku.trim() || !form.name.trim()) {
       setToast({ type: "error", text: "SKU and Name are required." });
@@ -345,6 +386,12 @@ export default function StockItemModal({
       ingredients_notes: form.ingredients_notes || null,
       storage_instructions: form.storage_instructions || null,
       allergen_flags: Object.keys(allergenOut).length > 0 ? allergenOut : null,
+      // S3 columns
+      temperature_zone: form.temperature_zone || null,
+      batch_lot_number: form.batch_lot_number || null,
+      country_of_origin: form.country_of_origin || null,
+      reorder_qty:
+        form.reorder_qty !== "" ? parseFloat(form.reorder_qty) : null,
     };
 
     // RULE 0F — tenant_id on INSERT only (not UPDATE — let existing value persist)
@@ -811,7 +858,7 @@ export default function StockItemModal({
             </>
           )}
 
-          {/* ── SECTION: Food & Beverage specific ── */}
+          {/* ── SECTION: Food & Beverage specific (S3) ── */}
           {(isFoodBev || (isRawMaterial && !isCannabis)) && (
             <>
               <SectionHead
@@ -821,6 +868,60 @@ export default function StockItemModal({
                 border="#A5D6A7"
               />
 
+              {/* Temperature zone + reorder qty */}
+              <Grid2>
+                <Field>
+                  <Lbl>Temperature Zone</Lbl>
+                  <select
+                    style={sSelect}
+                    value={form.temperature_zone}
+                    onChange={(e) => set("temperature_zone", e.target.value)}
+                  >
+                    <option value="">— Not specified —</option>
+                    <option value="ambient">Ambient (room temp)</option>
+                    <option value="refrigerated">Refrigerated (2–8°C)</option>
+                    <option value="frozen">Frozen (−18°C or below)</option>
+                  </select>
+                </Field>
+                <Field>
+                  <Lbl note="standard order qty (MOQ)">Reorder Qty</Lbl>
+                  <input
+                    style={sInput}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.reorder_qty}
+                    onChange={(e) => set("reorder_qty", e.target.value)}
+                    placeholder={`e.g. 25 ${form.unit || ""}`}
+                  />
+                </Field>
+              </Grid2>
+
+              {/* Supplier lot + country of origin */}
+              <Grid2>
+                <Field>
+                  <Lbl note="supplier's delivery lot ref">
+                    Batch / Lot Number
+                  </Lbl>
+                  <input
+                    style={sInput}
+                    value={form.batch_lot_number}
+                    onChange={(e) => set("batch_lot_number", e.target.value)}
+                    placeholder="e.g. LOT-2026-0312-A"
+                  />
+                </Field>
+                <Field>
+                  <Lbl note="import compliance">Country of Origin</Lbl>
+                  <input
+                    style={sInput}
+                    value={form.country_of_origin}
+                    onChange={(e) => set("country_of_origin", e.target.value)}
+                    placeholder="e.g. South Africa"
+                  />
+                </Field>
+              </Grid2>
+
+              {/* Ingredients notes */}
               <Field>
                 <Lbl>Ingredients Notes</Lbl>
                 <textarea
@@ -831,31 +932,80 @@ export default function StockItemModal({
                 />
               </Field>
 
+              {/* Allergen Declaration — 14 SA R638 toggles */}
               <Field>
-                <Lbl>
-                  Allergens
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <Lbl>
+                    Allergen Declaration
+                    {allergenCount > 0 && (
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          background: T.warningBg,
+                          color: T.warning,
+                          border: `1px solid ${T.warningBd}`,
+                          borderRadius: 3,
+                          fontSize: "9px",
+                          padding: "1px 6px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {allergenCount} flagged
+                      </span>
+                    )}
+                  </Lbl>
                   {allergenCount > 0 && (
-                    <span
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const txt = generateAllergenText();
+                        navigator.clipboard
+                          .writeText(txt)
+                          .then(() =>
+                            setToast({
+                              type: "success",
+                              text: "Allergen declaration text copied to clipboard.",
+                            }),
+                          )
+                          .catch(() =>
+                            setToast({
+                              type: "error",
+                              text: `Declaration: ${txt}`,
+                            }),
+                          );
+                      }}
                       style={{
-                        marginLeft: 8,
-                        background: T.warningBg,
+                        fontSize: "10px",
+                        fontFamily: T.fontUi,
+                        fontWeight: 600,
                         color: T.warning,
+                        background: T.warningBg,
                         border: `1px solid ${T.warningBd}`,
-                        borderRadius: 3,
-                        fontSize: "9px",
-                        padding: "1px 6px",
-                        fontWeight: 700,
+                        borderRadius: "3px",
+                        padding: "3px 10px",
+                        cursor: "pointer",
+                        letterSpacing: "0.04em",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {allergenCount} flagged
-                    </span>
+                      Copy Label Text
+                    </button>
                   )}
-                </Lbl>
+                </div>
+
+                {/* 14-toggle grid */}
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns:
-                      "repeat(auto-fill, minmax(120px, 1fr))",
+                      "repeat(auto-fill, minmax(130px, 1fr))",
                     gap: "8px",
                     padding: "12px",
                     background: allergenCount > 0 ? T.warningBg : T.ink075,
@@ -889,6 +1039,22 @@ export default function StockItemModal({
                     </label>
                   ))}
                 </div>
+
+                {/* Live declaration preview */}
+                {allergenCount > 0 && (
+                  <p
+                    style={{
+                      fontSize: "11px",
+                      color: T.warning,
+                      margin: "8px 0 0",
+                      fontFamily: T.fontUi,
+                      fontStyle: "italic",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {generateAllergenText()}
+                  </p>
+                )}
               </Field>
             </>
           )}
