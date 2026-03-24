@@ -1018,7 +1018,7 @@ export default function HQRecipeEngine() {
       const [recipeRes, ingRes] = await Promise.all([
         supabase
           .from("food_recipes")
-          .select("*, food_recipe_lines(*)")
+          .select("*")
           .eq("tenant_id", tenantId) // RULE 0F
           .order("updated_at", { ascending: false }),
         supabase
@@ -1031,7 +1031,24 @@ export default function HQRecipeEngine() {
       ]);
       if (recipeRes.error) throw recipeRes.error;
       if (ingRes.error) throw ingRes.error;
-      setRecipes(recipeRes.data || []);
+      // Fetch lines separately — attach to recipes
+      const recipeIds = (recipeRes.data || []).map((r) => r.id);
+      let linesMap = {};
+      if (recipeIds.length > 0) {
+        const { data: linesData } = await supabase
+          .from("food_recipe_lines")
+          .select("*")
+          .in("recipe_id", recipeIds);
+        (linesData || []).forEach((l) => {
+          if (!linesMap[l.recipe_id]) linesMap[l.recipe_id] = [];
+          linesMap[l.recipe_id].push(l);
+        });
+      }
+      const recipesWithLines = (recipeRes.data || []).map((r) => ({
+        ...r,
+        food_recipe_lines: linesMap[r.id] || [],
+      }));
+      setRecipes(recipesWithLines);
       setIngredients(ingRes.data || []);
     } catch (err) {
       showToast("Failed to load recipes: " + err.message, "error");
@@ -1045,7 +1062,12 @@ export default function HQRecipeEngine() {
   }, [fetchAll]);
 
   // ── Save recipe ──────────────────────────────────────────────────────────
-  async function handleSave({ lines, changeNotes, ...recipeData }) {
+  async function handleSave({
+    lines,
+    changeNotes,
+    food_recipe_lines,
+    ...recipeData
+  }) {
     setSaving(true);
     try {
       const user = (await supabase.auth.getUser()).data?.user;
