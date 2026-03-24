@@ -3221,7 +3221,7 @@ export default function HQFoodIngredients() {
         const batch = SEED_INGREDIENTS.slice(i, i + BATCH).map((ing) => ({
           ...ing,
           is_seeded: true,
-          tenant_id: null, // platform-level seed has no tenant
+          tenant_id: tenantId, // RULE 0F — use HQ tenant for seed
         }));
         const { error } = await supabase
           .from("food_ingredients")
