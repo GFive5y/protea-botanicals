@@ -58,9 +58,9 @@ const HQ_PAGES = [
   },
   {
     group: "Food & Beverage",
-    icon: "📖",
-    label: "Recipes",
-    path: "/hq?tab=hq-recipes",
+    icon: "🛡️",
+    label: "HACCP",
+    path: "/hq?tab=hq-haccp",
   },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
