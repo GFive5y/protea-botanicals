@@ -39,6 +39,12 @@ const HQ_PAGES = [
   },
   {
     group: "Operations",
+    icon: "=",
+    label: "Transfers",
+    path: "/hq?tab=hq-transfers",
+  },
+  {
+    group: "Operations",
     icon: "⬤",
     label: "Distribution",
     path: "/hq?tab=distribution",
