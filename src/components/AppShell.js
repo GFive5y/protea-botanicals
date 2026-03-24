@@ -1,9 +1,11 @@
+// src/components/AppShell.js — WP-NAV v1.3
+// WP-AI-UNIFIED: DevErrorCapture wraps children for dev mode error capture
 import React from "react";
 import NavSidebar from "../components/NavSidebar";
+import DevErrorCapture from "../components/DevErrorCapture";
 import "./AppShell.css";
-
 /**
- * AppShell — WP-NAV v1.2
+ * AppShell — WP-NAV v1.3
  *
  * Wraps every authenticated route. Renders NavSidebar on the left,
  * page content on the right with consistent padding + cream background.
@@ -28,7 +30,7 @@ export default function AppShell({ children, maxWidth = 1400 }) {
             minHeight: "100%",
           }}
         >
-          {children}
+          <DevErrorCapture>{children}</DevErrorCapture>
         </div>
       </main>
     </div>
