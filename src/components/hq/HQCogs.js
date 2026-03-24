@@ -230,6 +230,7 @@ const blankRecipe = () => ({
   hardware_item_id: "",
   hardware_qty: 1,
   shipping_alloc_zar: 0,
+  shipping_alloc_usd: 0,
   terpene_item_id: "",
   terpene_qty_ul: 67,
   distillate_input_id: "",
@@ -376,7 +377,7 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
         parseFloat(hw.unit_price_usd) *
         usdZar
       : 0,
-    hwShippingZar: parseFloat(recipe.shipping_alloc_zar || 0),
+    hwShippingZar: parseFloat(recipe.shipping_alloc_usd || 0) * usdZar,
     hwName: hw?.name || null,
     hwMoq: hw?.moq || null,
     tpName: tp?.name || null,
@@ -410,7 +411,8 @@ function LandedCostCalc({ usdZar, onApply }) {
   const unitsN = parseFloat(units) || 0;
   const perUnitZAR = unitsN > 0 ? freightZAR / unitsN : null;
   useEffect(() => {
-    if (perUnitZAR !== null && perUnitZAR > 0) onApply(perUnitZAR.toFixed(4));
+    if (perUnitZAR !== null && perUnitZAR > 0)
+      onApply((perUnitZAR / usdZar).toFixed(6));
   }, [perUnitZAR]); // eslint-disable-line react-hooks/exhaustive-deps
   const s = { ...sInput, fontSize: 12 };
   return (
@@ -603,7 +605,7 @@ function LandedCostCalc({ usdZar, onApply }) {
                   </div>
                   <button
                     onClick={() => {
-                      onApply(perUnitZAR.toFixed(4));
+                      onApply((perUnitZAR / usdZar).toFixed(6));
                       setOpen(false);
                     }}
                     style={{
@@ -1199,6 +1201,7 @@ export default function HQCogs() {
       hardware_item_id: recipe.hardware_item_id || "",
       hardware_qty: recipe.hardware_qty ?? 1,
       shipping_alloc_zar: recipe.shipping_alloc_zar ?? 0,
+      shipping_alloc_usd: recipe.shipping_alloc_usd ?? 0,
       terpene_item_id: recipe.terpene_item_id || "",
       terpene_qty_ul:
         recipe.terpene_qty_ul != null
@@ -1265,6 +1268,7 @@ export default function HQCogs() {
         hardware_item_id: form.hardware_item_id || null,
         hardware_qty: parseFloat(form.hardware_qty) || 1,
         shipping_alloc_zar: parseFloat(form.shipping_alloc_zar) || 0,
+        shipping_alloc_usd: parseFloat(form.shipping_alloc_usd) || 0,
         terpene_item_id: form.terpene_item_id || null,
         terpene_qty_ul: parseFloat(form.terpene_qty_ul) || null,
         distillate_input_id: form.distillate_input_id || null,
@@ -2914,7 +2918,9 @@ export default function HQCogs() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={form.shipping_alloc_zar}
+                      value={(
+                        parseFloat(form.shipping_alloc_usd || 0) * usdZar
+                      ).toFixed(4)}
                       onChange={(e) =>
                         setF("shipping_alloc_zar", e.target.value)
                       }
@@ -2949,13 +2955,14 @@ export default function HQCogs() {
                             parseFloat(form.hardware_qty || 1),
                         )}{" "}
                         × R{usdZar.toFixed(4)} + R
-                        {fmt(form.shipping_alloc_zar || 0)} shipping)
+                        {fmt(parseFloat(form.shipping_alloc_usd || 0) * usdZar)}{" "}
+                        shipping)
                       </div>
                     );
                   })()}
                 <LandedCostCalc
                   usdZar={usdZar}
-                  onApply={(val) => setF("shipping_alloc_zar", val)}
+                  onApply={(val) => setF("shipping_alloc_usd", val)}
                 />
               </div>
 
