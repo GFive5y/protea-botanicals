@@ -741,11 +741,11 @@ export default function ProteaAI({
   tenantName,
 }) {
   const location = useLocation();
-  const tenantConfig = useTenantConfig(tenantId);
-  const aiUsage = useAIUsage(tenantId);
+  const { canUseSonnet: cfgSonnet, dailyLimit } = useTenantConfig();
+  const canUseSonnet = cfgSonnet ?? true;
+  const aiUsage = useAIUsage(dailyLimit ?? 999);
   const remaining = aiUsage?.remaining ?? 999;
-  const logUsage = aiUsage?.logUsage ?? (() => {});
-  const canUseSonnet = tenantConfig?.feature_ai_full ?? true;
+  const logUsage = aiUsage?.logAIUsage ?? (() => {});
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [panel, setPanel] = useState("chat");
@@ -1310,9 +1310,7 @@ export default function ProteaAI({
               <span
                 style={{ fontFamily: T.font, fontSize: 10, color: T.ink500 }}
               >
-                {ctxKeys.length > 0
-                  ? `Live: ${ctxKeys.join(", ")}`
-                  : "Base context loaded"}
+                {`${tab} · ${ctxKeys.length > 0 ? ctxKeys.join(", ") : "loading..."}`}
               </span>
             </>
           )}
