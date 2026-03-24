@@ -80,6 +80,12 @@ const HQ_PAGES = [
     label: "Nutrition Labels",
     path: "/hq?tab=hq-nutrition",
   },
+  {
+    group: "Food & Beverage",
+    icon: "🌡️",
+    label: "Cold Chain",
+    path: "/hq?tab=hq-cold-chain",
+  },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
   { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
