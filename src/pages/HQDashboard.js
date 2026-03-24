@@ -46,7 +46,6 @@ import HQWholesaleOrders from "../components/hq/HQWholesaleOrders";
 import HQProduction from "../components/hq/HQProduction";
 import HQStock from "../components/hq/HQStock";
 import HQTransfer from "../components/hq/HQTransfer";
-import HQTransfer from "../components/hq/HQTransfer";
 
 // ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
