@@ -27,3 +27,6 @@ src-BACKUP-24-Feb-2026/
 
 src - v5.1.backup/
 src-BACKUP-24-Feb-2026/
+
+temp_*.txt
+fix_*.py
