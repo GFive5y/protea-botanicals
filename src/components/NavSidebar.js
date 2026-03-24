@@ -84,7 +84,7 @@ export default function NavSidebar() {
     (path) => {
       navigate(path);
       if (isMobile) setIsOpen(false);
-      setAiOpen(false);
+
       setTooltip((t) => ({ ...t, visible: false }));
     },
     [navigate, isMobile],
