@@ -1971,14 +1971,32 @@ export default function HQProduction() {
     fetchAll();
   }, [fetchAll]);
 
+  // WP-PROD-MASTER Session D: profile-adaptive tab labels + BOM hidden for general_retail
+  const isFoodBevMain = industryProfile === "food_beverage";
+  const isGeneralRetailMain = industryProfile === "general_retail";
+  const isMixedRetailMain = industryProfile === "mixed_retail";
   const SUB_TABS = [
     { id: "overview", label: "Overview" },
-    { id: "batches", label: "Batches" },
-    { id: "new-run", label: "New Production Run" },
+    {
+      id: "batches",
+      label: isFoodBevMain
+        ? "Recipe Runs"
+        : isGeneralRetailMain
+          ? "Receive History"
+          : "Batches",
+    },
+    {
+      id: "new-run",
+      label: isFoodBevMain
+        ? "Start Recipe Run"
+        : isGeneralRetailMain
+          ? "Receive Stock"
+          : "New Production Run",
+    },
     { id: "history", label: "History" },
     { id: "allocate", label: "Allocate Stock" },
     { id: "formats", label: "Formats" },
-    { id: "bom", label: "BOM Editor" },
+    ...(!isGeneralRetailMain ? [{ id: "bom", label: "BOM Editor" }] : []),
     { id: "audit", label: "Audit Export" },
   ];
 
@@ -2071,7 +2089,11 @@ export default function HQProduction() {
                 onClick={() => setSubTab("new-run")}
                 style={{ ...sBtn("danger"), whiteSpace: "nowrap" }}
               >
-                New Production Run
+                {isFoodBevMain
+                  ? "Start Recipe Run"
+                  : isGeneralRetailMain
+                    ? "Receive Stock"
+                    : "New Production Run"}
               </button>
             </div>
           )}
@@ -2128,7 +2150,11 @@ export default function HQProduction() {
                 onClick={() => setSubTab("new-run")}
                 style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
               >
-                Plan Production
+                {isFoodBevMain
+                  ? "Start Recipe Run"
+                  : isGeneralRetailMain
+                    ? "Receive Stock"
+                    : "Plan Production"}
               </button>
             </div>
           )}
@@ -2360,7 +2386,7 @@ function OverviewPanel({
       ? (yieldsArr.reduce((s, y) => s + y, 0) / yieldsArr.length).toFixed(1)
       : null;
 
-  const metrics = [
+  const cannabisMetrics = [
     {
       label: "Active Batches",
       value: activeBatches.length,
@@ -2406,11 +2432,269 @@ function OverviewPanel({
     },
     {
       label: "Avg Yield",
-      value: avgYield ? `${avgYield}%` : "—",
+      value: avgYield ? `${avgYield}%` : "\u2014",
       sub: "all runs",
       semantic: avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
     },
   ];
+  const foodMetrics = [
+    {
+      label: "Recipe Runs MTD",
+      value: monthRuns.length,
+      sub: `${monthUnits} units`,
+      semantic: "info",
+      click: onNavBatches,
+    },
+    {
+      label: "Active Batches",
+      value: activeBatches.length,
+      sub: `${batches.length} total`,
+      semantic: "success",
+    },
+    {
+      label: "QC Pass Rate",
+      value: qcPassRate !== null ? `${qcPassRate}%` : "\u2014",
+      sub: `${qcAssessed.length} assessed`,
+      semantic:
+        qcPassRate === null
+          ? null
+          : parseFloat(qcPassRate) >= 98
+            ? "success"
+            : parseFloat(qcPassRate) >= 90
+              ? "warning"
+              : "danger",
+    },
+    {
+      label: "Expiring 7d",
+      value: expiring7d,
+      sub: "batches",
+      semantic: expiring7d > 0 ? "danger" : "success",
+    },
+    {
+      label: "Avg Cost/Unit",
+      value: avgCostPerUnit !== null ? `R${avgCostPerUnit}` : "\u2014",
+      sub: "from confirmed runs",
+      semantic: null,
+    },
+    {
+      label: "Avg Yield",
+      value: avgYield ? `${avgYield}%` : "\u2014",
+      sub: "all runs",
+      semantic: avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
+    },
+    {
+      label: "Finished Stock",
+      value: totalFin.toLocaleString(),
+      sub: "units ready",
+      semantic: depleted.length > 0 ? "danger" : "success",
+    },
+  ];
+  const generalMetrics = [
+    {
+      label: "Receives MTD",
+      value: monthRuns.length,
+      sub: `${monthUnits} units`,
+      semantic: "info",
+      click: onNavBatches,
+    },
+    {
+      label: "Active Products",
+      value: activeBatches.length,
+      sub: `${batches.length} total`,
+      semantic: "success",
+    },
+    {
+      label: "Finished Stock",
+      value: totalFin.toLocaleString(),
+      sub: "units ready",
+      semantic: depleted.length > 0 ? "danger" : "success",
+    },
+    {
+      label: "Expiring 7d",
+      value: expiring7d,
+      sub: "items",
+      semantic: expiring7d > 0 ? "danger" : "success",
+    },
+    {
+      label: "Avg Yield",
+      value: avgYield ? `${avgYield}%` : "\u2014",
+      sub: "all runs",
+      semantic: avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
+    },
+  ];
+  // WP-PROD-MASTER Session D: profile-adaptive overview KPIs (D7)
+  const todayOv = new Date().toISOString().split("T")[0];
+  const in7Ov = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+  const expiring7d = batches.filter(
+    (b) =>
+      !b.is_archived &&
+      b.expiry_date &&
+      b.expiry_date >= todayOv &&
+      b.expiry_date <= in7Ov,
+  ).length;
+  const qcAssessed = runs.filter(
+    (r) => r.qc_passed !== null && r.qc_passed !== undefined,
+  );
+  const qcPassRate =
+    qcAssessed.length > 0
+      ? (
+          (qcAssessed.filter((r) => r.qc_passed === true).length /
+            qcAssessed.length) *
+          100
+        ).toFixed(0)
+      : null;
+  const costRuns = runs.filter(
+    (r) => r.cost_per_unit && parseFloat(r.cost_per_unit) > 0,
+  );
+  const avgCostPerUnit =
+    costRuns.length > 0
+      ? (
+          costRuns.reduce((s, r) => s + parseFloat(r.cost_per_unit), 0) /
+          costRuns.length
+        ).toFixed(2)
+      : null;
+  const foodOverviewMetrics = [
+    {
+      label: "Recipe Runs MTD",
+      value: monthRuns.length,
+      sub: `${monthUnits} units`,
+      semantic: "info",
+      click: onNavBatches,
+    },
+    {
+      label: "Active Batches",
+      value: activeBatches.length,
+      sub: `${batches.length} total`,
+      semantic: "success",
+    },
+    {
+      label: "QC Pass Rate",
+      value: qcPassRate !== null ? `${qcPassRate}%` : "\u2014",
+      sub: `${qcAssessed.length} assessed`,
+      semantic:
+        qcPassRate === null
+          ? null
+          : parseFloat(qcPassRate) >= 98
+            ? "success"
+            : parseFloat(qcPassRate) >= 90
+              ? "warning"
+              : "danger",
+    },
+    {
+      label: "Expiring 7d",
+      value: expiring7d,
+      sub: "batches",
+      semantic: expiring7d > 0 ? "danger" : "success",
+    },
+    {
+      label: "Avg Cost/Unit",
+      value: avgCostPerUnit !== null ? `R${avgCostPerUnit}` : "\u2014",
+      sub: "confirmed runs",
+      semantic: null,
+    },
+    {
+      label: "Avg Yield",
+      value: avgYield ? `${avgYield}%` : "\u2014",
+      sub: "all runs",
+      semantic: avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
+    },
+    {
+      label: "Finished Stock",
+      value: totalFin.toLocaleString(),
+      sub: "units ready",
+      semantic: depleted.length > 0 ? "danger" : "success",
+    },
+  ];
+  const generalOverviewMetrics = [
+    {
+      label: "Receives MTD",
+      value: monthRuns.length,
+      sub: `${monthUnits} units`,
+      semantic: "info",
+      click: onNavBatches,
+    },
+    {
+      label: "Active Products",
+      value: activeBatches.length,
+      sub: `${batches.length} total`,
+      semantic: "success",
+    },
+    {
+      label: "Finished Stock",
+      value: totalFin.toLocaleString(),
+      sub: "units ready",
+      semantic: depleted.length > 0 ? "danger" : "success",
+    },
+    {
+      label: "Expiring 7d",
+      value: expiring7d,
+      sub: "items",
+      semantic: expiring7d > 0 ? "danger" : "success",
+    },
+    {
+      label: "Avg Yield",
+      value: avgYield ? `${avgYield}%` : "\u2014",
+      sub: "all runs",
+      semantic: avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
+    },
+  ];
+  const metrics =
+    industryProfile === "food_beverage"
+      ? foodOverviewMetrics
+      : industryProfile === "general_retail"
+        ? generalOverviewMetrics
+        : [
+            {
+              label: "Active Batches",
+              value: activeBatches.length,
+              sub: `${batches.length} total`,
+              semantic: "success",
+              click: onNavBatches,
+            },
+            {
+              label: "Distillate",
+              value: `${totalDist.toFixed(1)}ml`,
+              sub: `${distillate.length} SKU`,
+              semantic: "info",
+            },
+            {
+              label: "Terpenes",
+              value: `${totalTerp.toFixed(2)}ml`,
+              sub: `${terpenes.length} strains`,
+              semantic: "info",
+            },
+            {
+              label: "Hardware",
+              value: totalHw.toLocaleString(),
+              sub: `${hardware.length} types`,
+              semantic: null,
+            },
+            {
+              label: "Finished Stock",
+              value: totalFin.toLocaleString(),
+              sub: "units ready",
+              semantic: depleted.length > 0 ? "danger" : "success",
+            },
+            {
+              label: "1ml Capacity",
+              value: cap1ml.toLocaleString(),
+              sub: "carts possible",
+              semantic: "success",
+            },
+            {
+              label: "Runs (Month)",
+              value: monthRuns.length,
+              sub: `${monthUnits} units`,
+              semantic: "info",
+            },
+            {
+              label: "Avg Yield",
+              value: avgYield ? `${avgYield}%` : "—",
+              sub: "all runs",
+              semantic:
+                avgYield && parseFloat(avgYield) >= 95 ? "success" : "warning",
+            },
+          ];
   const semC = {
     success: T.success,
     warning: T.warning,
@@ -2428,7 +2712,13 @@ function OverviewPanel({
           background: T.accentLit,
         }}
       >
-        <div style={{ ...sLabel, marginBottom: 10 }}>Production Pipeline</div>
+        <div style={{ ...sLabel, marginBottom: 10 }}>
+          {industryProfile === "food_beverage"
+            ? "Recipe Production Pipeline"
+            : industryProfile === "general_retail"
+              ? "Stock Receiving Flow"
+              : "Production Pipeline"}
+        </div>
         <div
           style={{
             display: "flex",
@@ -2447,8 +2737,18 @@ function OverviewPanel({
             { step: "→", label: "", desc: "", color: T.ink300 },
             {
               step: "2",
-              label: "New Production Run",
-              desc: "Select batch + materials → confirm",
+              label:
+                industryProfile === "food_beverage"
+                  ? "Start Recipe Run"
+                  : industryProfile === "general_retail"
+                    ? "Receive Stock"
+                    : "New Production Run",
+              desc:
+                industryProfile === "food_beverage"
+                  ? "Select recipe + ingredients — confirm run"
+                  : industryProfile === "general_retail"
+                    ? "Log received goods against PO or supplier"
+                    : "Select batch + materials — confirm",
               color: T.accentMid,
             },
             { step: "→", label: "", desc: "", color: T.ink300 },
@@ -3601,7 +3901,57 @@ function BatchesPanel({
                       {b.batch_number}
                     </div>
                     <div style={{ ...sTd, fontWeight: 500 }}>
-                      {b.product_name || "—"}
+                      {b.product_name || "\u2014"}
+                      {/* WP-PROD-MASTER Session D: mixed retail type badge (Q4) */}
+                      {industryProfile === "mixed_retail" &&
+                        linkedRun?.industry_profile_snapshot && (
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "9px",
+                              fontWeight: 700,
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              marginTop: "3px",
+                              padding: "1px 6px",
+                              borderRadius: "3px",
+                              fontFamily: T.fontUi,
+                              background:
+                                linkedRun.industry_profile_snapshot ===
+                                "food_beverage"
+                                  ? T.infoBg
+                                  : linkedRun.industry_profile_snapshot ===
+                                      "general_retail"
+                                    ? T.ink075
+                                    : T.accentLit,
+                              color:
+                                linkedRun.industry_profile_snapshot ===
+                                "food_beverage"
+                                  ? T.info
+                                  : linkedRun.industry_profile_snapshot ===
+                                      "general_retail"
+                                    ? T.ink400
+                                    : T.accentMid,
+                              border: `1px solid ${
+                                linkedRun.industry_profile_snapshot ===
+                                "food_beverage"
+                                  ? T.infoBd
+                                  : linkedRun.industry_profile_snapshot ===
+                                      "general_retail"
+                                    ? T.ink150
+                                    : T.accentBd
+                              }`,
+                            }}
+                          >
+                            {linkedRun.industry_profile_snapshot ===
+                            "food_beverage"
+                              ? "Recipe"
+                              : linkedRun.industry_profile_snapshot ===
+                                  "general_retail"
+                                ? "Receiving"
+                                : "Manufacturing"}
+                          </span>
+                        )}
                     </div>
                     <div
                       style={{
@@ -3689,7 +4039,44 @@ function BatchesPanel({
                     <div style={{ ...sTd, color: T.ink500, fontSize: "11px" }}>
                       {b.expiry_date
                         ? new Date(b.expiry_date).toLocaleDateString("en-ZA")
-                        : "—"}
+                        : "\u2014"}
+                      {/* WP-PROD-MASTER Session D: temperature zone badge (D6) */}
+                      {industryProfile === "food_beverage" &&
+                        linkedRun?.temperature_zone && (
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "9px",
+                              fontWeight: 700,
+                              letterSpacing: "0.06em",
+                              textTransform: "uppercase",
+                              marginTop: "3px",
+                              padding: "1px 5px",
+                              borderRadius: "3px",
+                              fontFamily: T.fontUi,
+                              background:
+                                linkedRun.temperature_zone === "Frozen"
+                                  ? "#e0f0ff"
+                                  : linkedRun.temperature_zone ===
+                                      "Refrigerated"
+                                    ? "#e8f5e9"
+                                    : T.ink075,
+                              color:
+                                linkedRun.temperature_zone === "Frozen"
+                                  ? "#1565c0"
+                                  : linkedRun.temperature_zone ===
+                                      "Refrigerated"
+                                    ? "#2e7d32"
+                                    : T.ink400,
+                            }}
+                          >
+                            {linkedRun.temperature_zone === "Frozen"
+                              ? "FRZ"
+                              : linkedRun.temperature_zone === "Refrigerated"
+                                ? "REF"
+                                : "AMB"}
+                          </span>
+                        )}
                     </div>
                     <div style={sTd}>
                       {b.lab_certified ? (
@@ -6753,8 +7140,11 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
           }}
         >
           <p style={{ fontFamily: T.fontUi, fontSize: "14px" }}>
-            No production runs yet. Use "New Production Run" to log your first
-            batch.
+            {industryProfile === "food_beverage"
+              ? `No recipe runs yet. Use "Start Recipe Run" to log your first batch.`
+              : industryProfile === "general_retail"
+                ? `No receives yet. Use "Receive Stock" to log your first shipment.`
+                : `No production runs yet. Use "New Production Run" to log your first batch.`}
           </p>
         </div>
       ) : (
