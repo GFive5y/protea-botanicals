@@ -207,6 +207,57 @@ export default function HQFoodSafety() {
       if (ingRes.error) throw ingRes.error;
       setDocs(docRes.data || []);
       setIngredients(ingRes.data || []);
+
+      // ── Write cert expiry alerts to system_alerts (PlatformBar integration) ──
+      const allDocs = docRes.data || [];
+      const expiredDocs = allDocs.filter(
+        (d) =>
+          daysUntil(d.cert_expiry_date) !== null &&
+          daysUntil(d.cert_expiry_date) < 0,
+      );
+      const expiring7 = allDocs.filter((d) => {
+        const x = daysUntil(d.cert_expiry_date);
+        return x !== null && x >= 0 && x <= 7;
+      });
+      const expiring30 = allDocs.filter((d) => {
+        const x = daysUntil(d.cert_expiry_date);
+        return x !== null && x > 7 && x <= 30;
+      });
+
+      // Delete stale food safety cert alerts first
+      await supabase
+        .from("system_alerts")
+        .delete()
+        .eq("tenant_id", tenantId)
+        .eq("alert_type", "food_cert_expiry");
+
+      // Re-insert fresh alerts
+      const alertsToInsert = [
+        ...expiredDocs.map((d) => ({
+          tenant_id: tenantId,
+          alert_type: "food_cert_expiry",
+          severity: "critical",
+          message: `EXPIRED: ${d.document_name} — expired ${fmtDate(d.cert_expiry_date)}. Renew immediately.`,
+          created_at: new Date().toISOString(),
+        })),
+        ...expiring7.map((d) => ({
+          tenant_id: tenantId,
+          alert_type: "food_cert_expiry",
+          severity: "warning",
+          message: `Expiring in ${daysUntil(d.cert_expiry_date)} days: ${d.document_name} — expires ${fmtDate(d.cert_expiry_date)}.`,
+          created_at: new Date().toISOString(),
+        })),
+        ...expiring30.map((d) => ({
+          tenant_id: tenantId,
+          alert_type: "food_cert_expiry",
+          severity: "info",
+          message: `Expiring in ${daysUntil(d.cert_expiry_date)} days: ${d.document_name} — expires ${fmtDate(d.cert_expiry_date)}.`,
+          created_at: new Date().toISOString(),
+        })),
+      ];
+      if (alertsToInsert.length > 0) {
+        await supabase.from("system_alerts").insert(alertsToInsert);
+      }
     } catch (err) {
       showToast("Load failed: " + err.message, "error");
     } finally {

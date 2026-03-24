@@ -1568,12 +1568,24 @@ export default function HQRecipeEngine() {
                         </button>
                         {recipe.status === "approved" && (
                           <button
-                            onClick={() =>
-                              showToast(
-                                "Production form integration coming in WP-FNB S3",
-                                "success",
-                              )
-                            }
+                            onClick={() => {
+                              sessionStorage.setItem(
+                                "fnb_start_batch",
+                                JSON.stringify({
+                                  recipe_id: recipe.id,
+                                  recipe_name: recipe.name,
+                                  recipe_version: recipe.version,
+                                  yield_quantity: recipe.yield_quantity,
+                                  yield_unit: recipe.yield_unit,
+                                  allergen_flags: recipe.allergen_flags,
+                                  shelf_life_days: recipe.shelf_life_days,
+                                  temperature_zone: recipe.temperature_zone,
+                                  storage_instructions:
+                                    recipe.storage_instructions,
+                                }),
+                              );
+                              window.location.href = "/hq?tab=hq-production";
+                            }}
                             style={{
                               padding: "7px 14px",
                               background: C.accent,
@@ -1734,6 +1746,24 @@ export default function HQRecipeEngine() {
                 </button>
                 {viewingRecipe.status === "approved" && (
                   <button
+                    onClick={() => {
+                      sessionStorage.setItem(
+                        "fnb_start_batch",
+                        JSON.stringify({
+                          recipe_id: viewingRecipe.id,
+                          recipe_name: viewingRecipe.name,
+                          recipe_version: viewingRecipe.version,
+                          yield_quantity: viewingRecipe.yield_quantity,
+                          yield_unit: viewingRecipe.yield_unit,
+                          allergen_flags: viewingRecipe.allergen_flags,
+                          shelf_life_days: viewingRecipe.shelf_life_days,
+                          temperature_zone: viewingRecipe.temperature_zone,
+                          storage_instructions:
+                            viewingRecipe.storage_instructions,
+                        }),
+                      );
+                      window.location.href = "/hq?tab=hq-production";
+                    }}
                     style={{
                       padding: "8px 16px",
                       background: C.accent,
