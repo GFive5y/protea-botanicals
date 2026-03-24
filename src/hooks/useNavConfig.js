@@ -68,6 +68,12 @@ const HQ_PAGES = [
     label: "HACCP",
     path: "/hq?tab=hq-haccp",
   },
+  {
+    group: "Food & Beverage",
+    icon: "📋",
+    label: "Food Safety",
+    path: "/hq?tab=hq-food-safety",
+  },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
   { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
