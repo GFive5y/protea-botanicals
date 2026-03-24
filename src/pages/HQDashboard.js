@@ -48,6 +48,7 @@ import HQStock from "../components/hq/HQStock";
 import HQTransfer from "../components/hq/HQTransfer";
 import HQFoodIngredients from "../components/hq/HQFoodIngredients";
 import HQRecipeEngine from "../components/hq/HQRecipeEngine";
+import HQHaccp from "../components/hq/HQHaccp";
 
 // ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
@@ -92,6 +93,7 @@ const TABS = [
   { id: "hq-transfers", label: "Transfers", icon: "=", ready: true },
   { id: "hq-ingredients", label: "Ingredients", icon: "=", ready: true },
   { id: "hq-recipes", label: "Recipes", icon: "=", ready: true },
+  { id: "hq-haccp", label: "HACCP", icon: "=", ready: true },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   // Finance
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
@@ -251,6 +253,7 @@ export default function HQDashboard() {
           {activeTab === "hq-transfers" && <HQTransfer />}
           {activeTab === "hq-ingredients" && <HQFoodIngredients />}
           {activeTab === "hq-recipes" && <HQRecipeEngine />}
+          {activeTab === "hq-haccp" && <HQHaccp />}
           {activeTab === "loyalty" && <HQLoyalty />}
           {activeTab === "fraud" && <HQFraud />}
         </div>
