@@ -204,6 +204,9 @@ function roleLabel(role, isHQ) {
 }
 
 function getSuggested(role, tab, isHQ, panel) {
+  const t = tab.toLowerCase();
+
+  // ── Dev panel — always codebase questions ──────────────────────────────────
   if (isHQ && panel === "dev")
     return [
       "How do I add a new tab to HQDashboard?",
@@ -211,18 +214,276 @@ function getSuggested(role, tab, isHQ, panel) {
       "Which LL rule applies to food_recipe_lines?",
       "Why might a component be re-rendering too often?",
       "What is the correct pattern for a new Edge Function?",
+      "What files would I touch to add a new F&B tab?",
     ];
-  if (isHQ && panel === "query")
+
+  // ── Query panel — tab-specific DB queries ──────────────────────────────────
+  if (isHQ && panel === "query") {
+    // Costing
+    if (t.includes("cost"))
+      return [
+        "Show me all COGS recipes with cost per unit",
+        "Which inventory items have no weighted_avg_cost set?",
+        "Show me the last 10 stock movements with unit cost",
+        "Which items have the highest weighted average cost?",
+        "Show me purchase order items received this month",
+      ];
+    // Pricing
+    if (t.includes("pric"))
+      return [
+        "Show me all active inventory items with sell price",
+        "Which items have a sell price of zero?",
+        "Show me items where sell price is below cost",
+        "Show me the 10 highest priced items",
+      ];
+    // P&L
+    if (t.includes("p&l") || t.includes("profit"))
+      return [
+        "Show me orders placed this month",
+        "Show me the last 20 loyalty transactions",
+        "Show me all expenses this month",
+        "Show me invoices marked as paid this month",
+      ];
+    // Production
+    if (t.includes("production"))
+      return [
+        "Show me the last 10 production runs",
+        "Show me production runs with yield below 80%",
+        "Which production runs are still in progress?",
+        "Show me production runs from this week",
+        "Which production runs have no actual units recorded?",
+      ];
+    // Stock / HQ Stock
+    if (t.includes("stock"))
+      return [
+        "Which inventory items are below reorder level?",
+        "Show me items with zero on hand quantity",
+        "Show me the last 10 stock movements",
+        "Which items have not moved in 60 days?",
+        "Show me all reserved stock items",
+      ];
+    // Transfers
+    if (t.includes("transfer"))
+      return [
+        "Show me all stock transfers in transit",
+        "Show me transfers created this month",
+        "Which transfers have not been received?",
+        "Show me cancelled transfers",
+      ];
+    // Supply chain / Procurement / Purchase orders
+    if (
+      t.includes("supply") ||
+      t.includes("procurement") ||
+      t.includes("purchase")
+    )
+      return [
+        "Show me open purchase orders",
+        "Show me purchase orders received this month",
+        "Which purchase orders are overdue?",
+        "Show me the last 10 purchase order items",
+        "Show me purchase orders by supplier",
+      ];
+    // Suppliers
+    if (t.includes("supplier"))
+      return [
+        "Show me all active suppliers",
+        "Show me suppliers with no recent purchase orders",
+        "Show me suppliers added this year",
+      ];
+    // Invoices
+    if (t.includes("invoice"))
+      return [
+        "Show me unpaid invoices",
+        "Show me invoices overdue for payment",
+        "Show me the last 10 invoices",
+        "Show me invoices above R10000",
+      ];
+    // Ingredients
+    if (t.includes("ingredient"))
+      return [
+        "Show me ingredients with no allergen data",
+        "Show me ingredients with HACCP risk level high",
+        "Show me the 10 most expensive ingredients",
+        "Show me ingredients expiring within 30 days",
+        "Which ingredients have no nutritional data?",
+      ];
+    // Recipes
+    if (t.includes("recipe"))
+      return [
+        "Show me all approved food recipes",
+        "Which recipes have no BOM lines?",
+        "Show me recipes with cost per unit above R50",
+        "Show me draft recipes not yet approved",
+        "Show me recipe versions created this month",
+      ];
+    // HACCP
+    if (t.includes("haccp"))
+      return [
+        "Show me HACCP log entries that failed today",
+        "Show me open non-conformances",
+        "Show me critical severity non-conformances",
+        "Show me HACCP control points with high hazard risk",
+        "Show me the last 20 HACCP log entries",
+      ];
+    // Food Safety
+    if (t.includes("food safety") || t.includes("safety"))
+      return [
+        "Show me food safety documents expiring within 30 days",
+        "Show me expired food safety certificates",
+        "Show me all FSCA certificate documents",
+      ];
+    // Cold Chain
+    if (t.includes("cold"))
+      return [
+        "Show me temperature breach logs from this week",
+        "Show me critical cold chain breaches",
+        "Show me all cold chain monitoring locations",
+        "Show me temperature logs from the last 24 hours",
+      ];
+    // Recall
+    if (t.includes("recall"))
+      return [
+        "Show me open recall events",
+        "Show me mock drill recall events",
+        "Show me recalls initiated this year",
+        "Show me Class 1 severity recalls",
+      ];
+    // Food Intelligence
+    if (t.includes("intelligence"))
+      return [
+        "Show me approved recipes with cost per unit",
+        "Show me HACCP logs that failed this month",
+        "Show me cold chain breaches this month",
+        "Show me open recall events",
+        "Show me pending leave requests",
+      ];
+    // Nutrition Labels
+    if (t.includes("nutrition"))
+      return [
+        "Show me food recipes with allergen flags",
+        "Show me recipes missing nutrition data",
+        "Show me approved recipes with yield information",
+      ];
+    // Loyalty
+    if (t.includes("loyalty"))
+      return [
+        "Show me loyalty transactions from today",
+        "Show me the top 10 customers by loyalty points",
+        "Show me customers on the Gold tier",
+        "Show me redemption transactions this month",
+        "Show me customers with anomaly score above 70",
+      ];
+    // Analytics / Retailer Health
+    if (t.includes("analytics") || t.includes("retailer"))
+      return [
+        "Show me scan logs from today",
+        "Show me the top 10 most scanned QR codes",
+        "Show me new user profiles created this week",
+        "Show me suspended accounts",
+      ];
+    // Fraud
+    if (t.includes("fraud"))
+      return [
+        "Show me accounts with anomaly score above 70",
+        "Show me suspended user accounts",
+        "Show me unacknowledged system alerts",
+        "Show me velocity breach scan logs",
+      ];
+    // Documents
+    if (t.includes("document"))
+      return [
+        "Show me documents uploaded this month",
+        "Show me documents pending review",
+        "Show me food safety documents",
+        "Show me invoice documents",
+      ];
+    // Tenants
+    if (t.includes("tenant"))
+      return [
+        "Show me all active tenants",
+        "Show me tenants on Enterprise tier",
+        "Show me tenants created this year",
+        "Show me tenant config feature flags",
+      ];
+    // Reorder
+    if (t.includes("reorder"))
+      return [
+        "Which inventory items are below reorder level?",
+        "Show me items with zero on hand quantity",
+        "Show me items with reorder quantity set",
+        "Which active items have no reorder level configured?",
+      ];
+    // Medical
+    if (t.includes("medical"))
+      return [
+        "Show me active medical prescriptions",
+        "Show me prescriptions expiring this month",
+        "Show me patients registered this year",
+      ];
+    // HR
+    if (t.includes("hr") || t.includes("staff") || t.includes("leave"))
+      return [
+        "Show me pending leave requests",
+        "Show me timesheets awaiting approval",
+        "Show me staff contracts expiring within 60 days",
+        "Show me staff on probation",
+        "Show me open disciplinary cases",
+      ];
+    // Overview / default HQ query
     return [
+      "Show me open system alerts",
       "Show me the last 10 production runs",
       "Which inventory items are below reorder level?",
-      "Show me open system alerts",
-      "Which food recipes are approved?",
-      "Show me the last 5 stock movements",
-      "Which leave requests are pending?",
+      "Show me loyalty transactions from today",
+      "Show me pending leave requests",
+      "Show me unacknowledged system alerts",
     ];
-  const t = tab.toLowerCase();
+  }
+
+  // ── Chat panel — tab-specific operational questions ────────────────────────
   if (isHQ) {
+    if (t.includes("cost"))
+      return [
+        "Which SKU has the highest cost per unit?",
+        "Why is my COGS increasing?",
+        "What is my average landed cost this month?",
+        "Which ingredients are driving up my recipe cost?",
+      ];
+    if (t.includes("pric"))
+      return [
+        "Which products have the best gross margin?",
+        "Are any items priced below cost?",
+        "What is my average margin across all SKUs?",
+        "Which products should I reprice?",
+      ];
+    if (t.includes("p&l") || t.includes("profit"))
+      return [
+        "What is my gross margin this month?",
+        "How does this month compare to last month?",
+        "What is driving my COGS up?",
+        "What is my revenue month to date?",
+      ];
+    if (t.includes("production"))
+      return [
+        "Which batches are running today?",
+        "What can I produce with current stock?",
+        "Are any batches close to expiry?",
+        "What is my average batch yield this month?",
+      ];
+    if (t.includes("stock"))
+      return [
+        "Which items are below reorder level?",
+        "What is my total stock value?",
+        "Are there any critical stock alerts?",
+        "Which items have not moved in 60 days?",
+      ];
+    if (t.includes("supply") || t.includes("procurement"))
+      return [
+        "Which purchase orders are overdue?",
+        "What is my total open PO value?",
+        "Which supplier has the most open orders?",
+        "What is my average lead time?",
+      ];
     if (t.includes("food") || t.includes("intelligence"))
       return [
         "What is my overall food compliance score?",
@@ -230,42 +491,90 @@ function getSuggested(role, tab, isHQ, panel) {
         "Do I have any open HACCP non-conformances?",
         "What is my recall readiness score?",
       ];
-    if (t.includes("production"))
+    if (t.includes("haccp"))
       return [
-        "Which batches are running today?",
-        "What can I produce with current stock?",
-        "Are any batches close to expiry?",
-        "What is my average batch yield?",
+        "What is my HACCP pass rate this month?",
+        "Are there any open non-conformances?",
+        "Which CCPs have had the most deviations?",
+        "Do I need to run a template load?",
       ];
-    if (t.includes("stock"))
+    if (t.includes("cold"))
       return [
-        "Which items are below reorder level?",
-        "What is my total stock value?",
-        "Are there any critical stock alerts?",
+        "Are there any active temperature breaches?",
+        "Which locations have the most breaches?",
+        "What is my overall cold chain health?",
+        "Which batches were affected by recent breaches?",
+      ];
+    if (t.includes("recall"))
+      return [
+        "What is my recall readiness score?",
+        "When was my last mock drill?",
+        "Are there any active recalls?",
+        "How do I trace a batch lot forward?",
+      ];
+    if (t.includes("loyalty"))
+      return [
+        "How many customers are in each loyalty tier?",
+        "What is the average points balance?",
+        "Which customers are at risk of churning?",
+        "How many points were issued this month?",
+      ];
+    if (t.includes("fraud"))
+      return [
+        "Are there any high-risk accounts flagged?",
+        "How many accounts are suspended?",
+        "Which accounts had velocity breaches today?",
+        "What is the current anomaly score threshold?",
+      ];
+    if (t.includes("analytic") || t.includes("retailer"))
+      return [
+        "Which retailer is underperforming this month?",
+        "What is my scan rate trend this week?",
+        "Which product has the highest QR claim rate?",
+        "Where are most of my scans coming from?",
+      ];
+    if (t.includes("invoice"))
+      return [
+        "How many invoices are unpaid?",
+        "What is my total outstanding invoice value?",
+        "Which invoices are overdue?",
+        "What is my average payment turnaround?",
+      ];
+    if (t.includes("hr") || t.includes("staff"))
+      return [
+        "How many leave requests are pending approval?",
+        "Which timesheets need to be approved?",
+        "Are any contracts expiring soon?",
+        "Who has been absent this week?",
       ];
     return [
       "Give me a summary of today's operations",
       "What needs my attention right now?",
-      "Are there any active alerts?",
+      "Are there any active alerts I should know about?",
       "What is my revenue month to date?",
     ];
   }
+
+  // ── Non-HQ roles ───────────────────────────────────────────────────────────
   if (role === "admin")
     return [
       "How many customers scanned today?",
       "Which stock items are running low?",
-      "Are there any unread messages?",
+      "Are there any unread customer messages?",
+      "What are my top selling products this month?",
     ];
   if (role === "hr")
     return [
       "How many leave requests are pending?",
       "Which timesheets need approval?",
       "Are any contracts expiring soon?",
+      "Who has been absent this week?",
     ];
   if (role === "staff")
     return [
       "How many leave days do I have left?",
       "Do I have any pending timesheets?",
+      "Are there any messages for me?",
       "How do I submit a leave request?",
     ];
   return ["What can you help me with?", "Show me what's happening today"];
