@@ -185,7 +185,7 @@ function calcCogsTotal(recipe, supplierProducts, localInputs, usdZar) {
     ? parseFloat(recipe.hardware_qty || 1) *
         parseFloat(hw.unit_price_usd) *
         usdZar +
-      parseFloat(recipe.shipping_alloc_zar || 0)
+      parseFloat(recipe.shipping_alloc_usd || 0) * usdZar
     : 0;
   let tpCost = 0,
     diCost = 0;
