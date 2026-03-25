@@ -1,19 +1,12 @@
-// src/components/hq/HQProfitLoss.js v2.6 — WP-VIZ: Recharts waterfall chart
+// src/components/hq/HQProfitLoss.js v3.0 — WP-FIN S1: Expense Engine
+// v3.0: DB-backed OPEX from expenses table · CAPEX memo line · quarter + custom date range
+// v2.6 — WP-VIZ: wfCalc() helper + WaterfallChart (ComposedChart) above HTML detail
 // v2.5 — WP-THEME-2: Inter font + InfoTooltip + Toast
 // v2.4 — WP-GUIDE-C: usePageContext 'pl' wired + WorkflowGuide added
-// Protea Botanicals · Phase 2 · March 2026
-//
-// v2.6 — WP-VIZ: wfCalc() helper + WaterfallChart (ComposedChart) above HTML detail
-// v2.4 — WP-GUIDE-C: wire usePageContext('pl') context + WorkflowGuide at top of render
-// v2.3 — WP-R Phase 6: realtime subscription for revenue tiles (orders table).
-//         Any INSERT/UPDATE/DELETE on orders triggers fetchAll automatically.
-// v2.2 — COGS methodology fix: Cost of Goods SOLD not Cost of Goods PURCHASED.
-// v2.1 — CRITICAL FIX: Use landed_cost_zar directly instead of subtotal × rate.
-// v2.0 — WP-Q Live Data Integration fixes:
-//   ★ CRITICAL FIX: orders.total_amount → orders.total
-//   ★ orders status filter excludes both 'cancelled' AND 'failed'
-//   ★ Loyalty programme cost added as P&L line
-//   ★ Last-updated timestamp + manual refresh button
+// v2.3 — WP-R Phase 6: realtime subscription for revenue tiles
+// v2.2 — COGS methodology fix
+// v2.1 — CRITICAL FIX: Use landed_cost_zar directly
+// v2.0 — WP-Q Live Data Integration fixes
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -35,10 +28,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import { ChartCard, ChartTooltip } from "../viz";
 import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
+import ExpenseManager from "./ExpenseManager";
 import { T } from "../../theme";
 
 // ─── FX Hook ──────────────────────────────────────────────────────────────────
@@ -171,29 +166,56 @@ const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 const pctColour = (pct) =>
   pct >= 35 ? "#2E7D32" : pct >= 20 ? "#E65100" : "#c62828";
 
+// ─── WP-FIN S1: Periods — quarters + custom added ────────────────────────────
 const PERIODS = [
   { id: "30d", label: "Last 30 days" },
   { id: "90d", label: "Last 90 days" },
   { id: "mtd", label: "This month" },
+  { id: "q1", label: "Q1 (Jan–Mar)" },
+  { id: "q2", label: "Q2 (Apr–Jun)" },
+  { id: "q3", label: "Q3 (Jul–Sep)" },
+  { id: "q4", label: "Q4 (Oct–Dec)" },
   { id: "ytd", label: "This year" },
   { id: "all", label: "All time" },
+  { id: "custom", label: "Custom range" },
 ];
 
-function periodStart(period) {
+function periodStart(period, customFrom) {
   const now = new Date();
+  const yr = now.getFullYear();
   if (period === "30d") return new Date(now - 30 * 86400000).toISOString();
   if (period === "90d") return new Date(now - 90 * 86400000).toISOString();
-  if (period === "mtd")
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  if (period === "ytd") return new Date(now.getFullYear(), 0, 1).toISOString();
+  if (period === "mtd") return new Date(yr, now.getMonth(), 1).toISOString();
+  if (period === "q1") return new Date(yr, 0, 1).toISOString();
+  if (period === "q2") return new Date(yr, 3, 1).toISOString();
+  if (period === "q3") return new Date(yr, 6, 1).toISOString();
+  if (period === "q4") return new Date(yr, 9, 1).toISOString();
+  if (period === "ytd") return new Date(yr, 0, 1).toISOString();
+  if (period === "custom" && customFrom)
+    return new Date(customFrom).toISOString();
   return null;
 }
 
-function periodFilter(dateStr, period) {
+function periodEnd(period, customTo) {
+  const now = new Date();
+  const yr = now.getFullYear();
+  if (period === "q1") return new Date(yr, 3, 0, 23, 59, 59).toISOString();
+  if (period === "q2") return new Date(yr, 6, 0, 23, 59, 59).toISOString();
+  if (period === "q3") return new Date(yr, 9, 0, 23, 59, 59).toISOString();
+  if (period === "q4") return new Date(yr, 12, 0, 23, 59, 59).toISOString();
+  if (period === "custom" && customTo)
+    return new Date(customTo + "T23:59:59").toISOString();
+  return null;
+}
+
+function periodFilter(dateStr, period, customFrom, customTo) {
   if (!dateStr) return false;
-  const start = periodStart(period);
-  if (!start) return true;
-  return new Date(dateStr) >= new Date(start);
+  const start = periodStart(period, customFrom);
+  const end = periodEnd(period, customTo);
+  const d = new Date(dateStr);
+  if (start && d < new Date(start)) return false;
+  if (end && d > new Date(end)) return false;
+  return true;
 }
 
 // ─── Chart constants ──────────────────────────────────────────────────────────
@@ -213,12 +235,7 @@ const CC = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-// ─── Waterfall helper (Chart #7) ─────────────────────────────────────────────
-/**
- * wfCalc — transforms flat P&L steps into Recharts ComposedChart waterfall data.
- * Each step gets: offset (invisible spacer), display (visible bar), value (signed).
- * type: 'total' = starts from zero (accent), 'positive' = success, 'negative' = danger.
- */
+// ─── Waterfall helper ─────────────────────────────────────────────────────────
 function wfCalc(steps) {
   let running = 0;
   return steps.map((s) => {
@@ -246,7 +263,7 @@ function wfCalc(steps) {
   });
 }
 
-// ─── Waterfall Chart Component (Chart #7) ────────────────────────────────────
+// ─── Waterfall Chart ──────────────────────────────────────────────────────────
 function WaterfallChart({
   revenue,
   totalCogs,
@@ -255,7 +272,6 @@ function WaterfallChart({
   netProfit,
 }) {
   if (revenue === 0) return null;
-
   const steps = wfCalc([
     { label: "Revenue", value: revenue, type: "total" },
     { label: "COGS", value: -Math.abs(totalCogs), type: "negative" },
@@ -263,34 +279,28 @@ function WaterfallChart({
     { label: "OpEx", value: -Math.abs(totalOpexIncLoyalty), type: "negative" },
     { label: "Net Profit", value: netProfit, type: "total" },
   ]);
-
   const barColour = (entry) => {
     if (entry.type === "total") return entry.value >= 0 ? CC.accent : CC.danger;
     if (entry.type === "negative") return CC.danger;
     return CC.success;
   };
-
-  // Custom bar that colours each cell individually
   const CustomBar = (props) => {
     const { x, y, width, height, index } = props;
     if (!height || height <= 0) return null;
-    const fill = barColour(steps[index]);
     return (
       <rect
         x={x}
         y={y}
         width={width}
         height={height}
-        fill={fill}
+        fill={barColour(steps[index])}
         rx={3}
         ry={3}
       />
     );
   };
-
   const zarFmt = (v) =>
     `R${Math.abs(v).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
@@ -326,14 +336,12 @@ function WaterfallChart({
           }
         />
         <ReferenceLine y={0} stroke={CC.ink150} strokeWidth={1} />
-        {/* Invisible spacer bar — creates the floating effect */}
         <Bar
           dataKey="offset"
           stackId="wf"
           fill="transparent"
           isAnimationActive={false}
         />
-        {/* Visible value bar */}
         <Bar
           dataKey="display"
           stackId="wf"
@@ -413,7 +421,6 @@ function PLMarginGauge({ value, label, color }) {
   );
 }
 
-// ─── Waterfall Row (HTML detail) ──────────────────────────────────────────────
 function WRow({
   label,
   value,
@@ -536,6 +543,8 @@ function DataBadge({ label, ok, count }) {
 export default function HQProfitLoss() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
+  const { tenant } = useTenant();
+  const tenantId = tenant?.id;
 
   const ctx = usePageContext("pl", null);
 
@@ -551,19 +560,37 @@ export default function HQProfitLoss() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [dataErrors, setDataErrors] = useState({});
 
+  // ── WP-FIN S1: new state ──────────────────────────────────────────────────
   const [period, setPeriod] = useState("30d");
-  const [opexItems, setOpexItems] = useState([
-    { id: 1, label: "Shipping out to stores", amount: "" },
-    { id: 2, label: "Other overheads", amount: "" },
-  ]);
-  const [newOpexLabel, setNewOpexLabel] = useState("");
-  const [newOpexAmount, setNewOpexAmount] = useState("");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [expenses, setExpenses] = useState([]);
+  const [showExpMgr, setShowExpMgr] = useState(false);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
+
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  // ── WP-FIN S1: fetch expenses from DB ────────────────────────────────────
+  const fetchExpenses = useCallback(async () => {
+    if (!tenantId) return;
+    try {
+      let q = supabase.from("expenses").select("*").eq("tenant_id", tenantId);
+      const start = periodStart(period, customFrom);
+      const end = periodEnd(period, customTo);
+      if (start) q = q.gte("expense_date", start.slice(0, 10));
+      if (end) q = q.lte("expense_date", end.slice(0, 10));
+      const { data } = await q;
+      setExpenses(data || []);
+    } catch (_) {}
+  }, [tenantId, period, customFrom, customTo]);
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -612,7 +639,7 @@ export default function HQProfitLoss() {
     fetchAll();
   }, [fetchAll]);
 
-  // v2.3: WP-R Phase 6 — realtime revenue tiles
+  // v2.3: realtime revenue tiles
   useEffect(() => {
     const sub = supabase
       .channel("hq-pl-orders")
@@ -625,25 +652,17 @@ export default function HQProfitLoss() {
     return () => supabase.removeChannel(sub);
   }, [fetchAll]);
 
-  const addOpex = () => {
-    if (!newOpexLabel.trim()) return;
-    setOpexItems((prev) => [
-      ...prev,
-      { id: Date.now(), label: newOpexLabel.trim(), amount: newOpexAmount },
-    ]);
-    setNewOpexLabel("");
-    setNewOpexAmount("");
-  };
-  const removeOpex = (id) =>
-    setOpexItems((prev) => prev.filter((i) => i.id !== id));
-  const totalOpex = opexItems.reduce(
-    (s, i) => s + (parseFloat(i.amount) || 0),
-    0,
-  );
+  // ── WP-FIN S1: OPEX + CAPEX from expenses table ───────────────────────────
+  const totalOpex = expenses
+    .filter((e) => ["opex", "wages", "tax", "other"].includes(e.category))
+    .reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
+  const totalCapex = expenses
+    .filter((e) => e.category === "capex")
+    .reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
 
-  // ── P&L Calculations ──────────────────────────────────────────────────
+  // ── P&L Calculations ──────────────────────────────────────────────────────
   const filteredOrders = orders.filter((o) =>
-    periodFilter(o.created_at, period),
+    periodFilter(o.created_at, period, customFrom, customTo),
   );
   const websiteRevenue = filteredOrders.reduce(
     (s, o) => s + (parseFloat(o.total) || 0),
@@ -655,7 +674,7 @@ export default function HQProfitLoss() {
   );
 
   const filteredPOs = purchaseOrders.filter((po) =>
-    periodFilter(po.order_date, period),
+    periodFilter(po.order_date, period, customFrom, customTo),
   );
   const completedPOs = filteredPOs.filter(
     (po) => parseFloat(po.landed_cost_zar) > 0,
@@ -714,7 +733,7 @@ export default function HQProfitLoss() {
 
   const filteredLoyaltyEarned = loyaltyTxns.filter(
     (t) =>
-      periodFilter(t.created_at, period) &&
+      periodFilter(t.created_at, period, customFrom, customTo) &&
       [
         "EARNED",
         "earned",
@@ -800,7 +819,6 @@ export default function HQProfitLoss() {
 
   return (
     <div style={{ fontFamily: T.font.ui, color: "#333" }}>
-      {/* WP-GUIDE-C: WorkflowGuide with live pl context */}
       <WorkflowGuide
         context={ctx}
         tabId="pl"
@@ -874,6 +892,8 @@ export default function HQProfitLoss() {
             </div>
             <InfoTooltip id="pl-fx-rate" />
           </div>
+
+          {/* WP-FIN S1: period selector with quarters + custom */}
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
@@ -891,6 +911,25 @@ export default function HQProfitLoss() {
               </option>
             ))}
           </select>
+
+          {/* Custom date pickers */}
+          {period === "custom" && (
+            <>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                style={{ ...inputStyle, width: 140 }}
+              />
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                style={{ ...inputStyle, width: 140 }}
+              />
+            </>
+          )}
+
           <button
             onClick={fetchAll}
             disabled={loading}
@@ -969,6 +1008,7 @@ export default function HQProfitLoss() {
           ok={!dataErrors.loyalty}
           count={filteredLoyaltyEarned.length}
         />
+        <DataBadge label="Expenses" ok={true} count={expenses.length} />
         {hasDataErrors && (
           <div
             style={{
@@ -993,7 +1033,7 @@ export default function HQProfitLoss() {
         </div>
       ) : (
         <>
-          {/* ── WATERFALL CHART (Chart #7) ── */}
+          {/* Waterfall Chart */}
           {websiteRevenue > 0 && (
             <div style={{ marginBottom: 24 }}>
               <ChartCard title="P&L Waterfall" height={280}>
@@ -1016,7 +1056,7 @@ export default function HQProfitLoss() {
               alignItems: "start",
             }}
           >
-            {/* LEFT: HTML WATERFALL DETAIL */}
+            {/* LEFT: P&L WATERFALL DETAIL */}
             <div>
               <div style={card}>
                 <SectionHeader icon="💰" label="Revenue" />
@@ -1029,7 +1069,7 @@ export default function HQProfitLoss() {
                 />
                 <WRow
                   label="Wholesale / store sales"
-                  sub="Not yet tracked — add wholesale invoices to orders table or enter manually below"
+                  sub="Not yet tracked — wired in WP-FIN S4"
                   value={0}
                   indent={1}
                   dim
@@ -1124,6 +1164,8 @@ export default function HQProfitLoss() {
                 />
 
                 <SectionHeader icon="⚙️" label="Operating Costs" />
+
+                {/* Loyalty cost */}
                 <div
                   style={{
                     display: "flex",
@@ -1157,93 +1199,82 @@ export default function HQProfitLoss() {
                   <div style={{ width: 24 }} />
                 </div>
 
-                {opexItems.map((item) => (
+                {/* WP-FIN S1: DB-backed expenses list */}
+                {expenses
+                  .filter((e) =>
+                    ["opex", "wages", "tax", "other"].includes(e.category),
+                  )
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "8px 16px 8px 36px",
+                      }}
+                    >
+                      <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
+                        {item.description}
+                        {item.subcategory && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "#aaa",
+                              marginLeft: 6,
+                            }}
+                          >
+                            ({item.subcategory})
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "#aaa",
+                          minWidth: 60,
+                          textAlign: "right",
+                        }}
+                      >
+                        {item.expense_date?.slice(0, 7)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: "#c62828",
+                          minWidth: 100,
+                          textAlign: "right",
+                        }}
+                      >
+                        −{fmtZar(item.amount_zar)}
+                      </span>
+                      <div style={{ width: 24 }} />
+                    </div>
+                  ))}
+                {expenses.filter((e) =>
+                  ["opex", "wages", "tax", "other"].includes(e.category),
+                ).length === 0 && (
                   <div
-                    key={item.id}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "8px 16px 8px 36px",
+                      padding: "10px 36px",
+                      fontSize: 12,
+                      color: "#bbb",
+                      fontStyle: "italic",
                     }}
                   >
-                    <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
-                      {item.label}
-                    </span>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
-                    >
-                      <span style={{ fontSize: 13, color: "#888" }}>R</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="100"
-                        value={item.amount}
-                        onChange={(e) =>
-                          setOpexItems((prev) =>
-                            prev.map((i) =>
-                              i.id === item.id
-                                ? { ...i, amount: e.target.value }
-                                : i,
-                            ),
-                          )
-                        }
-                        placeholder="0"
-                        style={{ ...inputStyle, width: 120 }}
-                      />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: "#c62828",
-                        minWidth: 100,
-                        textAlign: "right",
-                      }}
-                    >
-                      {item.amount ? `−${fmtZar(item.amount, true)}` : "—"}
-                    </span>
-                    <button
-                      onClick={() => removeOpex(item.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#ddd",
-                        fontSize: 16,
-                      }}
-                    >
-                      ✕
-                    </button>
+                    No OPEX expenses for this period — add via Manage Expenses.
                   </div>
-                ))}
+                )}
 
+                {/* Manage Expenses button */}
                 <div
                   style={{
-                    display: "flex",
-                    gap: 8,
                     padding: "10px 16px 10px 36px",
                     borderTop: "1px dashed #f0ede8",
                   }}
                 >
-                  <input
-                    type="text"
-                    value={newOpexLabel}
-                    onChange={(e) => setNewOpexLabel(e.target.value)}
-                    placeholder="Add cost item…"
-                    style={{ ...inputStyle, flex: 2 }}
-                    onKeyDown={(e) => e.key === "Enter" && addOpex()}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={newOpexAmount}
-                    onChange={(e) => setNewOpexAmount(e.target.value)}
-                    placeholder="Amount"
-                    style={{ ...inputStyle, width: 110 }}
-                    onKeyDown={(e) => e.key === "Enter" && addOpex()}
-                  />
                   <button
-                    onClick={addOpex}
+                    onClick={() => setShowExpMgr(true)}
                     style={{
                       padding: "8px 14px",
                       borderRadius: 8,
@@ -1256,9 +1287,10 @@ export default function HQProfitLoss() {
                       fontWeight: 600,
                     }}
                   >
-                    + Add
+                    + Manage Expenses
                   </button>
                 </div>
+
                 <WRow
                   label="Total OpEx (incl. loyalty)"
                   value={totalOpexIncLoyalty}
@@ -1372,6 +1404,50 @@ export default function HQProfitLoss() {
                   )}
                 </div>
               </div>
+
+              {/* WP-FIN S1: CAPEX memo card */}
+              {totalCapex > 0 && (
+                <div style={card}>
+                  <SectionHeader icon="🏗️" label="Capital Expenditure (Memo)" />
+                  {expenses
+                    .filter((e) => e.category === "capex")
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "8px 16px 8px 36px",
+                        }}
+                      >
+                        <span style={{ flex: 2, fontSize: 13, color: "#555" }}>
+                          {item.description}
+                        </span>
+                        <span style={{ fontSize: 11, color: "#aaa" }}>
+                          {item.expense_date}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            color: "#E65100",
+                            minWidth: 100,
+                            textAlign: "right",
+                          }}
+                        >
+                          {fmtZar(item.amount_zar)}
+                        </span>
+                      </div>
+                    ))}
+                  <WRow
+                    label="Total CAPEX this period"
+                    value={totalCapex}
+                    bold
+                    highlight="orange"
+                    sub="Memo only — not deducted from Net Profit (Option A). Amortisation in WP-FIN S6."
+                  />
+                </div>
+              )}
             </div>
 
             {/* RIGHT: INTEL PANELS */}
@@ -2116,6 +2192,19 @@ export default function HQProfitLoss() {
             </div>
           </div>
         </>
+      )}
+
+      {/* WP-FIN S1: ExpenseManager modal */}
+      {showExpMgr && (
+        <ExpenseManager
+          onClose={() => setShowExpMgr(false)}
+          onSaved={() => {
+            fetchExpenses();
+            fetchAll();
+          }}
+          periodStart={periodStart(period, customFrom)?.slice(0, 10)}
+          periodEnd={periodEnd(period, customTo)?.slice(0, 10)}
+        />
       )}
 
       {toast && (
