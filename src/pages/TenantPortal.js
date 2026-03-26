@@ -1,5 +1,5 @@
-// src/pages/TenantPortal.js — v2.0 SmartBar
-// Waterfall-aligned sidebar: Procurement → Production → Distribution → Sales → Intelligence → People
+// src/pages/TenantPortal.js — v2.1 SmartBar
+// Manufacturer/Distributor model: Procurement → Production → Distribution → Sales → Intelligence → People
 // Collapsible sections · Role-adaptive · Cannabis/Nicotine/General profiles
 // DO NOT MODIFY HQDashboard.js — this is a separate file.
 
@@ -23,7 +23,6 @@ import HQStock from "../components/hq/HQStock";
 import HQCogs from "../components/hq/HQCogs";
 import HQWholesaleOrders from "../components/hq/HQWholesaleOrders";
 import HQTransfer from "../components/hq/HQTransfer";
-import Distribution from "../components/hq/Distribution";
 import RetailerHealth from "../components/hq/RetailerHealth";
 import HQPricing from "../components/hq/HQPricing";
 import HQLoyalty from "../components/hq/HQLoyalty";
@@ -32,7 +31,6 @@ import HQAnalytics from "../components/hq/HQAnalytics";
 import HQReorderScoring from "../components/hq/HQReorderScoring";
 import HQInvoices from "../components/hq/HQInvoices";
 import HRStaffDirectory from "../components/hq/HRStaffDirectory";
-import ShopManager from "../components/hq/ShopManager";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
@@ -50,9 +48,9 @@ const T = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-// ── Waterfall sections ────────────────────────────────────────────────────
-// 7 stages matching the vape business workflow.
-// Every cannabis + nicotine operator follows this exact flow.
+// ── Waterfall — Manufacturer/Distributor model ────────────────────────────
+// Buy → Make → Distribute → Sell → Understand → People
+// No duplicates. No retail-specific tabs. Pure vape brand model.
 
 const WATERFALL = [
   {
@@ -88,11 +86,6 @@ const WATERFALL = [
         desc: "Import POs · landed cost · FX",
       },
       {
-        id: "supply-chain",
-        label: "Supply Chain",
-        desc: "Pipeline overview · lead times",
-      },
-      {
         id: "documents",
         label: "Documents",
         desc: "Upload invoice → auto-process",
@@ -112,7 +105,11 @@ const WATERFALL = [
         desc: "New batch · BOM · yield · COA",
       },
       { id: "stock", label: "Stock", desc: "Inventory · movements · AVCO" },
-      { id: "costing", label: "Costing", desc: "Recipe COGS · per-SKU cost" },
+      {
+        id: "supply-chain",
+        label: "Material Pipeline",
+        desc: "What is available to produce with",
+      },
     ],
   },
   {
@@ -128,6 +125,11 @@ const WATERFALL = [
         desc: "B2B orders · reserve · ship",
       },
       {
+        id: "invoices",
+        label: "Invoices",
+        desc: "Tax invoices · payment tracking · aged debtors",
+      },
+      {
         id: "retailer-health",
         label: "Retailer Health",
         desc: "Dispensary performance · sell-through",
@@ -135,12 +137,7 @@ const WATERFALL = [
       {
         id: "transfers",
         label: "Transfers",
-        desc: "HQ → store stock movements",
-      },
-      {
-        id: "distribution",
-        label: "Distribution",
-        desc: "Shipments · fulfilment",
+        desc: "Stock movements between locations",
       },
     ],
   },
@@ -172,6 +169,11 @@ const WATERFALL = [
     tabs: [
       { id: "pl", label: "P&L", desc: "Live profit & loss · actual COGS · FX" },
       {
+        id: "costing",
+        label: "Costing",
+        desc: "Recipe COGS · per-SKU margin · FX impact",
+      },
+      {
         id: "analytics",
         label: "Analytics",
         desc: "Scans · geo · acquisition · churn",
@@ -180,11 +182,6 @@ const WATERFALL = [
         id: "reorder",
         label: "Reorder",
         desc: "Stock alerts · procurement triggers",
-      },
-      {
-        id: "invoices",
-        label: "Invoices",
-        desc: "Invoice list · payment recording",
       },
     ],
   },
@@ -200,7 +197,6 @@ const WATERFALL = [
         label: "Staff",
         desc: "Directory · profiles · timesheets",
       },
-      { id: "shops", label: "Shops", desc: "Store management" },
     ],
   },
 ];
@@ -268,32 +264,28 @@ function renderTab(tabId) {
       return <HQProduction />;
     case "stock":
       return <HQStock />;
-    case "costing":
-      return <HQCogs />;
     case "wholesale-orders":
       return <HQWholesaleOrders />;
+    case "invoices":
+      return <HQInvoices />;
     case "retailer-health":
       return <RetailerHealth />;
     case "transfers":
       return <HQTransfer />;
-    case "distribution":
-      return <Distribution />;
     case "pricing":
       return <HQPricing />;
     case "loyalty":
       return <HQLoyalty />;
     case "pl":
       return <HQProfitLoss />;
+    case "costing":
+      return <HQCogs />;
     case "analytics":
       return <HQAnalytics />;
     case "reorder":
       return <HQReorderScoring />;
-    case "invoices":
-      return <HQInvoices />;
     case "staff":
       return <HRStaffDirectory />;
-    case "shops":
-      return <ShopManager />;
     default:
       return (
         <div
@@ -329,12 +321,10 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
   const [open, setOpen] = useState(
     defaultOpen || section.alwaysOpen || isActiveSection,
   );
-
   const effectiveOpen = open || isActiveSection;
 
   return (
     <div>
-      {/* Section header */}
       {!section.alwaysOpen && (
         <button
           onClick={() => setOpen((o) => !o)}
@@ -379,7 +369,6 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
         </button>
       )}
 
-      {/* Section tabs */}
       {effectiveOpen && (
         <div style={{ paddingBottom: section.alwaysOpen ? 0 : 4 }}>
           {section.tabs.map((tab) => {
@@ -397,7 +386,6 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
                     ? "9px 16px"
                     : "7px 16px 7px 36px",
                   background: active ? T.accentLit : "transparent",
-                  borderLeft: `3px solid ${active ? section.color : "transparent"}`,
                   border: "none",
                   borderLeftStyle: "solid",
                   borderLeftWidth: 3,
@@ -445,7 +433,6 @@ export default function TenantPortal() {
     [setSearchParams],
   );
 
-  // Role — owner sees all. Future: derive from user_profiles.role
   const role = "owner";
   const visibleSectionIds = ROLE_SECTIONS[role] || ROLE_SECTIONS.owner;
   const visibleSections = WATERFALL.filter((s) =>
@@ -485,7 +472,6 @@ export default function TenantPortal() {
               overflowY: "auto",
             }}
           >
-            {/* Tenant header */}
             <div
               style={{
                 padding: "18px 16px 14px",
@@ -542,7 +528,6 @@ export default function TenantPortal() {
               )}
             </div>
 
-            {/* Nav sections */}
             <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
               {visibleSections.map((section, i) => (
                 <SidebarSection
@@ -555,7 +540,6 @@ export default function TenantPortal() {
               ))}
             </div>
 
-            {/* Footer */}
             <div
               style={{
                 padding: "10px 16px 14px",
@@ -577,7 +561,6 @@ export default function TenantPortal() {
               flexDirection: "column",
             }}
           >
-            {/* Top bar — breadcrumb */}
             <div
               style={{
                 background: "#fff",
@@ -614,7 +597,6 @@ export default function TenantPortal() {
               </div>
             </div>
 
-            {/* Platform bar + FX */}
             <LiveFXBar />
             <PlatformBar
               role="tenant"
@@ -622,7 +604,6 @@ export default function TenantPortal() {
               onNavigate={() => {}}
             />
 
-            {/* Tab content */}
             <div
               style={{
                 flex: 1,
