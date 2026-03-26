@@ -31,6 +31,7 @@ import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import { ChartCard, ChartTooltip } from "../viz";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -286,7 +287,7 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
     ? parseFloat(recipe.hardware_qty || 1) *
         parseFloat(hw.unit_price_usd) *
         usdZar +
-      parseFloat(recipe.shipping_alloc_zar || 0)
+      parseFloat(recipe.shipping_alloc_usd || 0) * usdZar
     : 0;
   let tpCost = 0,
     diCost = 0,
@@ -2650,6 +2651,7 @@ export default function HQCogs() {
                   >
                     {[
                       ["Hardware", previewBreakdown.hardware],
+                      ["Shipping", previewBreakdown.hwShippingZar],
                       ["Terpene", previewBreakdown.terpene],
                       ["Distillate", previewBreakdown.distillate],
                       ["Packaging", previewBreakdown.packaging],
@@ -2939,7 +2941,7 @@ export default function HQCogs() {
                       parseFloat(form.hardware_qty || 1) *
                         parseFloat(hw.unit_price_usd) *
                         usdZar +
-                      parseFloat(form.shipping_alloc_zar || 0);
+                      parseFloat(form.shipping_alloc_usd || 0) * usdZar;
                     return (
                       <div
                         style={{
