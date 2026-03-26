@@ -620,9 +620,7 @@ export default function HQProfitLoss() {
         .maybeSingle(),
       supabase
         .from("stock_movements")
-        .select(
-          "item_id, quantity, unit_cost, unit_cost_zar, movement_type, created_at",
-        )
+        .select("item_id, quantity, unit_cost, movement_type, created_at")
         .eq("movement_type", "production_out"),
     ]);
     if (r1.error) errors.orders = r1.error.message;
@@ -688,7 +686,7 @@ export default function HQProfitLoss() {
   const hasActualCogs = filteredProductionMovements.length > 0;
   const actualCogs = hasActualCogs
     ? filteredProductionMovements.reduce((s, m) => {
-        const unitCost = parseFloat(m.unit_cost_zar ?? m.unit_cost ?? 0) || 0;
+        const unitCost = parseFloat(m.unit_cost ?? 0) || 0;
         return s + Math.abs(parseFloat(m.quantity) || 0) * unitCost;
       }, 0)
     : null;
