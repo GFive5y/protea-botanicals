@@ -1,4 +1,5 @@
-// AdminDashboard.js v6.6 — WP-Z: PlatformBar replaces SystemStatusBar + AlertsBar
+// AdminDashboard.js v6.7 — WP-AI-UNIFIED: AIAssist removed (ProteaAI in NavSidebar)
+// v6.6 — WP-Z: PlatformBar replaces SystemStatusBar + AlertsBar
 // v6.3 — WP-VIZ: User Management charts (role donut, tier bar, points bar)
 // v6.2 — WP-GUIDE: WorkflowGuide added to users tab
 // v6.0 — WP-THEME: Unified design system applied
@@ -39,7 +40,6 @@ import HQDocuments from "../components/hq/HQDocuments";
 import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCommsCenter from "../components/AdminCommsCenter";
 import AdminHRPanel from "../components/AdminHRPanel";
-import AIAssist from "../components/AIAssist";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -739,16 +739,6 @@ export default function AdminDashboard() {
           >
             Admin Dashboard
           </h1>
-          <AIAssist
-            tabContext="admin-overview"
-            tabData={{}}
-            contextLabel="Admin portal"
-            suggestions={[
-              "What needs my attention right now?",
-              "How many scans happened today?",
-              "Which customers are at risk of churning?",
-            ]}
-          />
         </div>
 
         {/* WP-Z: PlatformBar — Platform Intelligence Bar */}

@@ -92,6 +92,12 @@ const HQ_PAGES = [
     label: "Recall & Trace",
     path: "/hq?tab=hq-recall",
   },
+  {
+    group: "Food & Beverage",
+    icon: "📊",
+    label: "Food Intelligence",
+    path: "/hq?tab=hq-food-intelligence",
+  },
   // ── Finance ──────────────────────────────────────────────────────────────────
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
   { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },

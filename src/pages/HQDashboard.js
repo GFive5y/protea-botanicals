@@ -1,4 +1,5 @@
-// src/pages/HQDashboard.js v4.1
+// src/pages/HQDashboard.js v4.2
+// WP-FNB S8: HQFoodIntelligence tab added
 // WP-Z: PlatformBar replaces AlertsBar — wired below LiveFXBar
 // ★ v4.0: WP-NAV Sub-B
 //   - useLocation + useEffect: reads ?tab= query param → syncs activeTab
@@ -53,6 +54,7 @@ import HQFoodSafety from "../components/hq/HQFoodSafety";
 import HQNutritionLabel from "../components/hq/HQNutritionLabel";
 import HQColdChain from "../components/hq/HQColdChain";
 import HQRecall from "../components/hq/HQRecall";
+import HQFoodIntelligence from "../components/hq/HQFoodIntelligence";
 
 // ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
@@ -102,6 +104,12 @@ const TABS = [
   { id: "hq-nutrition", label: "Nutrition Labels", icon: "=", ready: true },
   { id: "hq-cold-chain", label: "Cold Chain", icon: "=", ready: true },
   { id: "hq-recall", label: "Recall & Trace", icon: "=", ready: true },
+  {
+    id: "hq-food-intelligence",
+    label: "Food Intelligence",
+    icon: "=",
+    ready: true,
+  },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
   // Finance
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
@@ -266,6 +274,9 @@ export default function HQDashboard() {
           {activeTab === "hq-nutrition" && <HQNutritionLabel />}
           {activeTab === "hq-cold-chain" && <HQColdChain />}
           {activeTab === "hq-recall" && <HQRecall />}
+          {activeTab === "hq-food-intelligence" && (
+            <HQFoodIntelligence tenantId={tenant?.id} role="hq" />
+          )}
           {activeTab === "loyalty" && <HQLoyalty />}
           {activeTab === "fraud" && <HQFraud />}
         </div>

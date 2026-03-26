@@ -1,4 +1,5 @@
-// src/App.js — Protea Botanicals v6.1
+// src/App.js — Protea Botanicals v6.2
+// WP-AI-UNIFIED: CoPilot removed — ProteaAI in NavSidebar replaces it
 // ─────────────────────────────────────────────────────────────────────────────
 // ★ v6.1 CHANGELOG (WP-NAV background fix):
 //   1. ADD: maxWidth={1200} to /admin + /admin/qr AppShell
@@ -66,7 +67,6 @@ import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccess from "./pages/OrderSuccess";
 
 import AdminQrGenerator from "./pages/AdminQrGenerator";
-import CoPilot from "./components/CoPilot";
 import HQDashboard from "./pages/HQDashboard";
 import HRDashboard from "./pages/HRDashboard"; // ★ v4.0
 import StaffPortal from "./pages/StaffPortal"; // ★ v5.0
@@ -1096,7 +1096,6 @@ export default function App() {
               <Route path="/404" element={<NotFound />} />
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>
-            <CoPilot />
           </BrowserRouter>
         </TenantProvider>
       </CartProvider>
