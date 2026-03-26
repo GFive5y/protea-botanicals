@@ -1,146 +1,234 @@
-// src/pages/TenantPortal.js — WP-TENANT Session 3
-// v1.0 — Tenant management portal (Tier 1 — non-operator management access)
-// Renders the same HQ tab components but:
-//   - Scoped to the logged-in user's tenant_id (RLS enforces this)
-//   - Platform section hidden (no Tenants, no Fraud, no SaaS billing)
-//   - Food & Bev hidden for cannabis_retail industry profile
-//   - Header shows tenant brand name, not "HQ Command Centre"
-//   - "← HQ" back button for operator users (is_operator = true)
-//
+// src/pages/TenantPortal.js — v2.0 SmartBar
+// Waterfall-aligned sidebar: Procurement → Production → Distribution → Sales → Intelligence → People
+// Collapsible sections · Role-adaptive · Cannabis/Nicotine/General profiles
 // DO NOT MODIFY HQDashboard.js — this is a separate file.
-// Tab components are reused unchanged — RLS scopes their data automatically.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
-
-// ── Shared components ─────────────────────────────────────────────────────
-import AppShell from "../components/AppShell";
-import NavSidebar from "../components/NavSidebar";
+import PlatformBar from "../components/PlatformBar";
 import ProteaAI from "../components/ProteaAI";
 import DevErrorCapture from "../components/DevErrorCapture";
-import PlatformBar from "../components/PlatformBar";
+import { PlatformBarProvider } from "../contexts/PlatformBarContext";
+import LiveFXBar from "../components/hq/LiveFXBar";
 
-// ── HQ Tab components (reused — RLS scopes data to tenant automatically) ─
+// ── Tab components ────────────────────────────────────────────────────────
 import HQOverview from "../components/hq/HQOverview";
-import HQSupplyChain from "../components/hq/SupplyChain";
+import SupplyChain from "../components/hq/SupplyChain";
 import HQSuppliers from "../components/hq/HQSuppliers";
 import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
+import HQDocuments from "../components/hq/HQDocuments";
 import HQProduction from "../components/hq/HQProduction";
 import HQStock from "../components/hq/HQStock";
+import HQCogs from "../components/hq/HQCogs";
+import HQWholesaleOrders from "../components/hq/HQWholesaleOrders";
 import HQTransfer from "../components/hq/HQTransfer";
 import Distribution from "../components/hq/Distribution";
+import RetailerHealth from "../components/hq/RetailerHealth";
 import HQPricing from "../components/hq/HQPricing";
-import HQCogs from "../components/hq/HQCogs";
-import HQProfitLoss from "../components/hq/HQProfitLoss";
-import HQInvoices from "../components/hq/HQInvoices";
-import HQDocuments from "../components/hq/HQDocuments";
-import HQAnalytics from "../components/hq/HQAnalytics";
-import HQRetailerHealth from "../components/hq/RetailerHealth";
-import HQReorderScoring from "../components/hq/HQReorderScoring";
-import HQWholesaleOrders from "../components/hq/HQWholesaleOrders";
 import HQLoyalty from "../components/hq/HQLoyalty";
+import HQProfitLoss from "../components/hq/HQProfitLoss";
+import HQAnalytics from "../components/hq/HQAnalytics";
+import HQReorderScoring from "../components/hq/HQReorderScoring";
+import HQInvoices from "../components/hq/HQInvoices";
 import HRStaffDirectory from "../components/hq/HRStaffDirectory";
 import ShopManager from "../components/hq/ShopManager";
 
-// ── Theme ─────────────────────────────────────────────────────────────────
+// ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
+  bg: "#FAFAF9",
+  sidebar: "#ffffff",
+  border: "#ECEAE6",
   accent: "#1A3D2B",
   accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
   ink900: "#0D0D0D",
+  ink500: "#474747",
   ink400: "#6B6B6B",
+  ink300: "#999999",
   ink150: "#E2E2E2",
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-// ── Tab definitions per industry profile ─────────────────────────────────
-// cannabis_retail: full cannabis stack, no food & bev, no platform admin
-// food_beverage:   food stack — handled in HQDashboard (operator builds for them)
-// general_retail:  basic ops stack
+// ── Waterfall sections ────────────────────────────────────────────────────
+// 7 stages matching the vape business workflow.
+// Every cannabis + nicotine operator follows this exact flow.
 
-const CANNABIS_TABS = [
-  // OPERATIONS
-  { id: "overview", label: "Overview", section: "OPERATIONS", icon: "○" },
+const WATERFALL = [
   {
-    id: "supply-chain",
-    label: "Supply chain",
-    section: "OPERATIONS",
-    icon: "◇",
+    id: "home",
+    label: "Home",
+    emoji: "🏠",
+    color: "#1A3D2B",
+    alwaysOpen: true,
+    roles: ["owner", "manager", "staff", "production"],
+    tabs: [
+      {
+        id: "overview",
+        label: "Dashboard",
+        desc: "Live KPIs · alerts · quick actions",
+      },
+    ],
   },
-  { id: "suppliers", label: "Suppliers", section: "OPERATIONS", icon: "○" },
-  { id: "procurement", label: "Procurement", section: "OPERATIONS", icon: "◇" },
-  { id: "production", label: "Production", section: "OPERATIONS", icon: "○" },
-  { id: "stock", label: "HQ Stock", section: "OPERATIONS", icon: "≡" },
-  { id: "transfers", label: "Transfers", section: "OPERATIONS", icon: "≡" },
+  {
+    id: "procurement",
+    label: "Procurement",
+    emoji: "🛒",
+    color: "#1E3A5F",
+    roles: ["owner", "manager"],
+    tabs: [
+      {
+        id: "suppliers",
+        label: "Suppliers",
+        desc: "Eybna · Steamups · China hardware",
+      },
+      {
+        id: "procurement",
+        label: "Purchase Orders",
+        desc: "Import POs · landed cost · FX",
+      },
+      {
+        id: "supply-chain",
+        label: "Supply Chain",
+        desc: "Pipeline overview · lead times",
+      },
+      {
+        id: "documents",
+        label: "Documents",
+        desc: "Upload invoice → auto-process",
+      },
+    ],
+  },
+  {
+    id: "production",
+    label: "Production",
+    emoji: "⚗️",
+    color: "#5B21B6",
+    roles: ["owner", "manager", "production"],
+    tabs: [
+      {
+        id: "hq-production",
+        label: "Production Runs",
+        desc: "New batch · BOM · yield · COA",
+      },
+      { id: "stock", label: "Stock", desc: "Inventory · movements · AVCO" },
+      { id: "costing", label: "Costing", desc: "Recipe COGS · per-SKU cost" },
+    ],
+  },
   {
     id: "distribution",
     label: "Distribution",
-    section: "OPERATIONS",
-    icon: "●",
+    emoji: "🚚",
+    color: "#92400E",
+    roles: ["owner", "manager"],
+    tabs: [
+      {
+        id: "wholesale-orders",
+        label: "Wholesale Orders",
+        desc: "B2B orders · reserve · ship",
+      },
+      {
+        id: "retailer-health",
+        label: "Retailer Health",
+        desc: "Dispensary performance · sell-through",
+      },
+      {
+        id: "transfers",
+        label: "Transfers",
+        desc: "HQ → store stock movements",
+      },
+      {
+        id: "distribution",
+        label: "Distribution",
+        desc: "Shipments · fulfilment",
+      },
+    ],
   },
-  // FINANCE
-  { id: "pricing", label: "Pricing", section: "FINANCE", icon: "●" },
-  { id: "costing", label: "Costing", section: "FINANCE", icon: "⊞" },
-  { id: "pl", label: "P&L", section: "FINANCE", icon: "≡" },
-  { id: "invoices", label: "Invoices", section: "FINANCE", icon: "⊟" },
-  { id: "documents", label: "Documents", section: "FINANCE", icon: "≡" },
-  // INTELLIGENCE
-  { id: "analytics", label: "Analytics", section: "INTELLIGENCE", icon: "▲" },
   {
-    id: "retailer-health",
-    label: "Retailer health",
-    section: "INTELLIGENCE",
-    icon: "⊕",
+    id: "sales",
+    label: "Sales",
+    emoji: "💻",
+    color: "#065F46",
+    roles: ["owner", "manager", "staff"],
+    tabs: [
+      {
+        id: "pricing",
+        label: "Pricing",
+        desc: "Channel prices · margins · scenarios",
+      },
+      {
+        id: "loyalty",
+        label: "Loyalty",
+        desc: "Points · tiers · campaigns · referrals",
+      },
+    ],
   },
-  { id: "reorder", label: "Reorder", section: "INTELLIGENCE", icon: "○" },
-  // PLATFORM (tenant-level only — no Tenants/Fraud/Medical)
   {
-    id: "wholesale-orders",
-    label: "Wholesale Orders",
-    section: "PLATFORM",
-    icon: "⊞",
+    id: "intelligence",
+    label: "Intelligence",
+    emoji: "📊",
+    color: "#991B1B",
+    roles: ["owner"],
+    tabs: [
+      { id: "pl", label: "P&L", desc: "Live profit & loss · actual COGS · FX" },
+      {
+        id: "analytics",
+        label: "Analytics",
+        desc: "Scans · geo · acquisition · churn",
+      },
+      {
+        id: "reorder",
+        label: "Reorder",
+        desc: "Stock alerts · procurement triggers",
+      },
+      {
+        id: "invoices",
+        label: "Invoices",
+        desc: "Invoice list · payment recording",
+      },
+    ],
   },
-  { id: "loyalty", label: "Loyalty", section: "PLATFORM", icon: "◆" },
-  // PEOPLE
-  { id: "hr", label: "HR", section: "PEOPLE", icon: "○" },
-  { id: "shops", label: "Shops", section: "PEOPLE", icon: "○" },
+  {
+    id: "people",
+    label: "People",
+    emoji: "👥",
+    color: "#374151",
+    roles: ["owner", "manager"],
+    tabs: [
+      {
+        id: "staff",
+        label: "Staff",
+        desc: "Directory · profiles · timesheets",
+      },
+      { id: "shops", label: "Shops", desc: "Store management" },
+    ],
+  },
 ];
 
-const GENERAL_TABS = [
-  { id: "overview", label: "Overview", section: "OPERATIONS", icon: "○" },
-  {
-    id: "supply-chain",
-    label: "Supply chain",
-    section: "OPERATIONS",
-    icon: "◇",
-  },
-  { id: "suppliers", label: "Suppliers", section: "OPERATIONS", icon: "○" },
-  { id: "procurement", label: "Procurement", section: "OPERATIONS", icon: "◇" },
-  { id: "stock", label: "HQ Stock", section: "OPERATIONS", icon: "≡" },
-  {
-    id: "distribution",
-    label: "Distribution",
-    section: "OPERATIONS",
-    icon: "●",
-  },
-  { id: "pricing", label: "Pricing", section: "FINANCE", icon: "●" },
-  { id: "costing", label: "Costing", section: "FINANCE", icon: "⊞" },
-  { id: "pl", label: "P&L", section: "FINANCE", icon: "≡" },
-  { id: "invoices", label: "Invoices", section: "FINANCE", icon: "⊟" },
-  { id: "documents", label: "Documents", section: "FINANCE", icon: "≡" },
-  { id: "analytics", label: "Analytics", section: "INTELLIGENCE", icon: "▲" },
-  { id: "loyalty", label: "Loyalty", section: "PLATFORM", icon: "◆" },
-  { id: "hr", label: "HR", section: "PEOPLE", icon: "○" },
-  { id: "shops", label: "Shops", section: "PEOPLE", icon: "○" },
-];
+// Role → visible sections
+const ROLE_SECTIONS = {
+  owner: [
+    "home",
+    "procurement",
+    "production",
+    "distribution",
+    "sales",
+    "intelligence",
+    "people",
+  ],
+  manager: [
+    "home",
+    "procurement",
+    "production",
+    "distribution",
+    "sales",
+    "people",
+  ],
+  production: ["home", "production"],
+  staff: ["home", "sales"],
+};
 
-function getTabsForProfile(profile) {
-  if (profile === "cannabis_retail" || profile === "cannabis_dispensary")
-    return CANNABIS_TABS;
-  return GENERAL_TABS;
-}
-
-// ── Industry profile badge ────────────────────────────────────────────────
+// Profile badge config
 const PROFILE_BADGE = {
   cannabis_retail: {
     label: "Cannabis Retail",
@@ -152,72 +240,203 @@ const PROFILE_BADGE = {
     color: "#166534",
     bg: "#F0FDF4",
   },
+  nicotine_retail: {
+    label: "Nicotine Retail",
+    color: "#1E3A5F",
+    bg: "#EFF6FF",
+  },
   food_beverage: { label: "Food & Beverage", color: "#92400E", bg: "#FFFBEB" },
-  general_retail: { label: "General Retail", color: "#1E3A5F", bg: "#EFF6FF" },
+  general_retail: { label: "General Retail", color: "#374151", bg: "#F9FAFB" },
   mixed_retail: { label: "Mixed Retail", color: "#6B21A8", bg: "#FAF5FF" },
+  operator: { label: "Operator", color: "#991B1B", bg: "#FEF2F2" },
 };
 
 // ── Tab renderer ──────────────────────────────────────────────────────────
-function renderTab(tabId, tenantId) {
+function renderTab(tabId) {
   switch (tabId) {
     case "overview":
       return <HQOverview />;
-    case "supply-chain":
-      return <HQSupplyChain />;
     case "suppliers":
       return <HQSuppliers />;
     case "procurement":
       return <HQPurchaseOrders />;
-    case "production":
+    case "supply-chain":
+      return <SupplyChain />;
+    case "documents":
+      return <HQDocuments />;
+    case "hq-production":
       return <HQProduction />;
     case "stock":
       return <HQStock />;
+    case "costing":
+      return <HQCogs />;
+    case "wholesale-orders":
+      return <HQWholesaleOrders />;
+    case "retailer-health":
+      return <RetailerHealth />;
     case "transfers":
       return <HQTransfer />;
     case "distribution":
       return <Distribution />;
     case "pricing":
       return <HQPricing />;
-    case "costing":
-      return <HQCogs />;
-    case "pl":
-      return <HQProfitLoss />;
-    case "invoices":
-      return <HQInvoices />;
-    case "documents":
-      return <HQDocuments />;
-    case "analytics":
-      return <HQAnalytics />;
-    case "retailer-health":
-      return <HQRetailerHealth tenantId={tenantId} />;
-    case "reorder":
-      return <HQReorderScoring />;
-    case "wholesale-orders":
-      return <HQWholesaleOrders />;
     case "loyalty":
       return <HQLoyalty />;
-    case "hr":
+    case "pl":
+      return <HQProfitLoss />;
+    case "analytics":
+      return <HQAnalytics />;
+    case "reorder":
+      return <HQReorderScoring />;
+    case "invoices":
+      return <HQInvoices />;
+    case "staff":
       return <HRStaffDirectory />;
     case "shops":
       return <ShopManager />;
     default:
       return (
-        <div style={{ padding: 40, color: T.ink400, fontFamily: T.font }}>
-          Tab not found: {tabId}
+        <div
+          style={{
+            padding: 64,
+            textAlign: "center",
+            color: T.ink400,
+            fontFamily: T.font,
+          }}
+        >
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🔧</div>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: T.ink500,
+              marginBottom: 6,
+            }}
+          >
+            {tabId} — coming soon
+          </div>
+          <div style={{ fontSize: 13, color: T.ink400 }}>
+            This module is in development.
+          </div>
         </div>
       );
   }
 }
 
-// ── Main component ────────────────────────────────────────────────────────
+// ── Sidebar section ───────────────────────────────────────────────────────
+function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
+  const isActiveSection = section.tabs.some((t) => t.id === activeTab);
+  const [open, setOpen] = useState(
+    defaultOpen || section.alwaysOpen || isActiveSection,
+  );
+
+  const effectiveOpen = open || isActiveSection;
+
+  return (
+    <div>
+      {/* Section header */}
+      {!section.alwaysOpen && (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 16px",
+            background: isActiveSection ? `${section.color}12` : "transparent",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: T.font,
+            textAlign: "left",
+            marginTop: 2,
+          }}
+        >
+          <span style={{ fontSize: 13 }}>{section.emoji}</span>
+          <span
+            style={{
+              flex: 1,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: isActiveSection ? section.color : T.ink400,
+            }}
+          >
+            {section.label}
+          </span>
+          <span
+            style={{
+              fontSize: 8,
+              color: T.ink300,
+              transform: effectiveOpen ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+              display: "inline-block",
+            }}
+          >
+            ▶
+          </span>
+        </button>
+      )}
+
+      {/* Section tabs */}
+      {effectiveOpen && (
+        <div style={{ paddingBottom: section.alwaysOpen ? 0 : 4 }}>
+          {section.tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onSelect(tab.id)}
+                title={tab.desc}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  padding: section.alwaysOpen
+                    ? "9px 16px"
+                    : "7px 16px 7px 36px",
+                  background: active ? T.accentLit : "transparent",
+                  borderLeft: `3px solid ${active ? section.color : "transparent"}`,
+                  border: "none",
+                  borderLeftStyle: "solid",
+                  borderLeftWidth: 3,
+                  borderLeftColor: active ? section.color : "transparent",
+                  cursor: "pointer",
+                  fontFamily: T.font,
+                  textAlign: "left",
+                }}
+              >
+                {section.alwaysOpen && (
+                  <span style={{ marginRight: 8, fontSize: 13 }}>
+                    {section.emoji}
+                  </span>
+                )}
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 400,
+                    color: active ? section.color : T.ink500,
+                  }}
+                >
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────
 export default function TenantPortal() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenant, tenantId, industryProfile, isOperator } = useTenant();
 
-  const tabs = getTabsForProfile(industryProfile);
-  const defaultTab = tabs[0]?.id || "overview";
-  const activeTab = searchParams.get("tab") || defaultTab;
+  const activeTab = searchParams.get("tab") || "overview";
 
   const setActiveTab = useCallback(
     (tabId) => {
@@ -226,182 +445,201 @@ export default function TenantPortal() {
     [setSearchParams],
   );
 
-  // Ensure active tab is valid for this profile
-  useEffect(() => {
-    const validIds = tabs.map((t) => t.id);
-    if (!validIds.includes(activeTab)) {
-      setActiveTab(defaultTab);
-    }
-  }, [activeTab, tabs, defaultTab, setActiveTab]);
+  // Role — owner sees all. Future: derive from user_profiles.role
+  const role = "owner";
+  const visibleSectionIds = ROLE_SECTIONS[role] || ROLE_SECTIONS.owner;
+  const visibleSections = WATERFALL.filter((s) =>
+    visibleSectionIds.includes(s.id),
+  );
 
   const profileBadge =
     PROFILE_BADGE[industryProfile] || PROFILE_BADGE.general_retail;
+  const tenantName = tenant?.name || "My Business";
 
-  // Group tabs by section for sidebar rendering
-  const sections = tabs.reduce((acc, tab) => {
-    if (!acc[tab.section]) acc[tab.section] = [];
-    acc[tab.section].push(tab);
-    return acc;
-  }, {});
-
-  const tenantName = tenant?.name || "Tenant Portal";
+  const activeSection = WATERFALL.find((s) =>
+    s.tabs.some((t) => t.id === activeTab),
+  );
+  const activeTabDef = activeSection?.tabs.find((t) => t.id === activeTab);
 
   return (
     <DevErrorCapture>
-      <div
-        style={{
-          display: "flex",
-          height: "100vh",
-          overflow: "hidden",
-          fontFamily: T.font,
-        }}
-      >
-        {/* ── Sidebar ────────────────────────────────────────────────── */}
+      <PlatformBarProvider>
         <div
           style={{
-            width: 220,
-            minWidth: 220,
-            background: "#fff",
-            borderRight: `1px solid ${T.ink150}`,
             display: "flex",
-            flexDirection: "column",
-            overflowY: "auto",
+            height: "100vh",
+            overflow: "hidden",
+            fontFamily: T.font,
+            background: T.bg,
           }}
         >
-          {/* Tenant header */}
+          {/* ── SIDEBAR ─────────────────────────────────────────── */}
           <div
             style={{
-              padding: "20px 16px 12px",
-              borderBottom: `1px solid ${T.ink150}`,
+              width: 220,
+              minWidth: 220,
+              background: T.sidebar,
+              borderRight: `1px solid ${T.border}`,
+              display: "flex",
+              flexDirection: "column",
+              overflowY: "auto",
             }}
           >
+            {/* Tenant header */}
             <div
               style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: T.accent,
-                fontFamily: T.font,
-                marginBottom: 4,
+                padding: "18px 16px 14px",
+                borderBottom: `1px solid ${T.border}`,
               }}
             >
-              {tenantName}
-            </div>
-            <div
-              style={{
-                display: "inline-block",
-                fontSize: 9,
-                fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: 20,
-                background: profileBadge.bg,
-                color: profileBadge.color,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              {profileBadge.label}
-            </div>
-            {isOperator && (
-              <button
-                onClick={() => navigate("/hq")}
+              <div
                 style={{
-                  display: "block",
-                  marginTop: 10,
-                  fontSize: 10,
-                  color: T.ink400,
-                  background: "transparent",
-                  border: `1px solid ${T.ink150}`,
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  cursor: "pointer",
-                  fontFamily: T.font,
-                  width: "100%",
-                  textAlign: "left",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: T.accent,
+                  marginBottom: 6,
+                  lineHeight: 1.3,
                 }}
               >
-                ← HQ Operator View
-              </button>
-            )}
-          </div>
-
-          {/* Nav sections */}
-          <div style={{ flex: 1, padding: "8px 0" }}>
-            {Object.entries(sections).map(([section, sectionTabs]) => (
-              <div key={section}>
-                <div
+                {tenantName}
+              </div>
+              <div
+                style={{
+                  display: "inline-block",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 20,
+                  background: profileBadge.bg,
+                  color: profileBadge.color,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {profileBadge.label}
+              </div>
+              {isOperator && (
+                <button
+                  onClick={() => navigate("/hq")}
                   style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 10,
+                    fontSize: 11,
                     color: T.ink400,
-                    padding: "12px 16px 4px",
+                    background: "transparent",
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 6,
+                    padding: "5px 10px",
+                    cursor: "pointer",
+                    fontFamily: T.font,
+                    width: "100%",
                   }}
                 >
-                  {section}
-                </div>
-                {sectionTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      width: "100%",
-                      padding: "8px 16px",
-                      background:
-                        activeTab === tab.id ? "#E8F5EE" : "transparent",
-                      borderLeft:
-                        activeTab === tab.id
-                          ? `3px solid ${T.accentMid}`
-                          : "3px solid transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontFamily: T.font,
-                      fontSize: 13,
-                      fontWeight: activeTab === tab.id ? 600 : 400,
-                      color: activeTab === tab.id ? T.accent : "#444",
-                      textAlign: "left",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    <span style={{ fontSize: 11, opacity: 0.6, minWidth: 14 }}>
-                      {tab.icon}
-                    </span>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
+                  ← HQ Operator View
+                </button>
+              )}
+            </div>
 
-          {/* ProteaAI button */}
-          <div
-            style={{ padding: "12px 16px", borderTop: `1px solid ${T.ink150}` }}
-          >
-            <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
-              Tenant ID: {tenantId?.slice(0, 8)}…
+            {/* Nav sections */}
+            <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
+              {visibleSections.map((section, i) => (
+                <SidebarSection
+                  key={section.id}
+                  section={section}
+                  activeTab={activeTab}
+                  onSelect={setActiveTab}
+                  defaultOpen={i <= 1}
+                />
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "10px 16px 14px",
+                borderTop: `1px solid ${T.border}`,
+                fontSize: 10,
+                color: T.ink300,
+              }}
+            >
+              {tenantId?.slice(0, 8)}…
             </div>
           </div>
-        </div>
 
-        {/* ── Main content ───────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowY: "auto", background: "#FAFAF9" }}>
-          {/* Platform bar */}
-          <PlatformBar tenantId={tenantId} />
-
-          {/* Content */}
+          {/* ── MAIN CONTENT ──────────────────────────────────── */}
           <div
-            style={{ padding: "24px 32px", maxWidth: 1400, margin: "0 auto" }}
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+            }}
           >
-            {renderTab(activeTab, tenantId)}
-          </div>
-        </div>
+            {/* Top bar — breadcrumb */}
+            <div
+              style={{
+                background: "#fff",
+                borderBottom: `1px solid ${T.border}`,
+                padding: "0 28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                height: 48,
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {activeSection && (
+                  <>
+                    <span style={{ fontSize: 12, color: T.ink300 }}>
+                      {activeSection.emoji} {activeSection.label}
+                    </span>
+                    <span style={{ color: T.ink150 }}>›</span>
+                  </>
+                )}
+                <span
+                  style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}
+                >
+                  {activeTabDef?.label || activeTab}
+                </span>
+                {activeTabDef?.desc && (
+                  <span
+                    style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}
+                  >
+                    · {activeTabDef.desc}
+                  </span>
+                )}
+              </div>
+            </div>
 
-        {/* ProteaAI floating */}
-        <ProteaAI />
-      </div>
+            {/* Platform bar + FX */}
+            <LiveFXBar />
+            <PlatformBar
+              role="tenant"
+              tenantId={tenantId}
+              onNavigate={() => {}}
+            />
+
+            {/* Tab content */}
+            <div
+              style={{
+                flex: 1,
+                padding: "24px 28px",
+                maxWidth: 1400,
+                width: "100%",
+                margin: "0 auto",
+                boxSizing: "border-box",
+              }}
+            >
+              {renderTab(activeTab)}
+            </div>
+          </div>
+
+          <ProteaAI />
+        </div>
+      </PlatformBarProvider>
     </DevErrorCapture>
   );
 }
