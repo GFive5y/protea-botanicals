@@ -68,6 +68,7 @@ import OrderSuccess from "./pages/OrderSuccess";
 
 import AdminQrGenerator from "./pages/AdminQrGenerator";
 import HQDashboard from "./pages/HQDashboard";
+import TenantPortal from "./pages/TenantPortal";
 import HRDashboard from "./pages/HRDashboard"; // ★ v4.0
 import StaffPortal from "./pages/StaffPortal"; // ★ v5.0
 import ShopDashboard from "./pages/ShopDashboard";
@@ -1045,6 +1046,16 @@ export default function App() {
                       </RequireRole>
                     </RequireAuth>
                   </AppShell>
+                }
+              />
+
+              {/* WP-TENANT S3: Tenant management portal */}
+              <Route
+                path="/tenant-portal/*"
+                element={
+                  <RequireAuth>
+                    <TenantPortal />
+                  </RequireAuth>
                 }
               />
 
