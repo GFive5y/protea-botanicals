@@ -1,6 +1,7 @@
 // src/components/hq/HQInvoices.js
 // WP-GEN Session 4: Invoice management UI
-// Tables: invoices, invoice_line_items
+// + Aged Debtors panel — per-dispensary 0/30/60/90+ day buckets
+// Tables: invoices, invoice_line_items, wholesale_partners
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -69,7 +70,6 @@ const sInput = {
   width: "100%",
   boxSizing: "border-box",
 };
-const sSelect = { ...sInput, cursor: "pointer" };
 const sLabel = {
   fontSize: "10px",
   letterSpacing: "0.1em",
@@ -138,16 +138,16 @@ function isOverdue(inv) {
   if (!inv.due_date) return false;
   return new Date(inv.due_date) < new Date();
 }
-// Normalise mixed column names (auto-generated vs manual invoices)
+// Normalise to actual invoices table columns
 function norm(inv) {
   return {
     ...inv,
-    _number: inv.invoice_number || inv.reference || inv.id?.slice(0, 8),
-    _date: inv.invoice_date || inv.issued_date,
-    _subtotal: parseFloat(inv.subtotal || inv.subtotal_zar || 0),
-    _vat: parseFloat(inv.vat_amount || inv.vat_zar || 0),
-    _total: parseFloat(inv.total_amount || inv.total_zar || 0),
-    _partner: inv.customer_id || inv.supplier_id,
+    _number: inv.invoice_number || inv.id?.slice(0, 8),
+    _date: inv.invoice_date,
+    _subtotal: parseFloat(inv.subtotal || 0),
+    _vat: parseFloat(inv.vat_amount || 0),
+    _total: parseFloat(inv.total_amount || 0),
+    _partner: inv.supplier_id,
   };
 }
 function daysOverdue(inv) {
@@ -182,14 +182,13 @@ export default function HQInvoices() {
         supabase
           .from("invoices")
           .select(
-            "id,invoice_number,reference,invoice_type,po_id,supplier_id,customer_id,invoice_date,issued_date,due_date,currency,subtotal,subtotal_zar,vat_amount,vat_zar,total_amount,total_zar,status,payment_date,payment_reference,notes",
+            "id,invoice_number,invoice_type,po_id,supplier_id,invoice_date,due_date,currency,subtotal,vat_amount,total_amount,status,payment_date,payment_reference,notes",
           )
           .order("created_at", { ascending: false })
           .limit(200),
         supabase.from("wholesale_partners").select("id,business_name"),
       ]);
       if (invR.error) throw invR.error;
-      // Mark overdue client-side
       const data = (invR.data || []).map((inv) => ({
         ...inv,
         status: isOverdue(inv) ? "overdue" : inv.status,
@@ -281,8 +280,8 @@ export default function HQInvoices() {
   const totalPaidMonth = invoices
     .filter((i) => {
       if (i.status !== "paid" || !i.payment_date) return false;
-      const d = new Date(i.payment_date);
-      const now = new Date();
+      const d = new Date(i.payment_date),
+        now = new Date();
       return (
         d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
       );
@@ -366,6 +365,28 @@ export default function HQInvoices() {
       </div>
     );
 
+  // ── Aged Debtors calculation ──────────────────────────────────────────────
+  const outstanding = invoices
+    .map(norm)
+    .filter((i) => !["paid", "cancelled"].includes(i.status) && i._total > 0);
+  const byPartner = {};
+  outstanding.forEach((inv) => {
+    const pid = inv._partner || "unknown";
+    const name =
+      suppliers.find((s) => s.id === pid)?.business_name || "Unknown";
+    if (!byPartner[pid])
+      byPartner[pid] = { name, buckets: [0, 0, 0, 0], total: 0 };
+    const days = daysOverdue(inv);
+    const amt = inv._total;
+    byPartner[pid].total += amt;
+    if (days <= 0) byPartner[pid].buckets[0] += amt;
+    else if (days <= 30) byPartner[pid].buckets[1] += amt;
+    else if (days <= 60) byPartner[pid].buckets[2] += amt;
+    else byPartner[pid].buckets[3] += amt;
+  });
+  const agedPartners = Object.values(byPartner);
+  const grandTotal = agedPartners.reduce((s, p) => s + p.total, 0);
+
   return (
     <div style={{ fontFamily: T.font, display: "grid", gap: "20px" }}>
       {toast && (
@@ -386,7 +407,7 @@ export default function HQInvoices() {
         </div>
       )}
 
-      {/* Metric strip */}
+      {/* ── Metric strip ── */}
       <div
         style={{
           display: "grid",
@@ -451,7 +472,7 @@ export default function HQInvoices() {
         ))}
       </div>
 
-      {/* Overdue alert */}
+      {/* ── Overdue alert ── */}
       {overdueCount > 0 && (
         <div
           style={{
@@ -477,217 +498,141 @@ export default function HQInvoices() {
         </div>
       )}
 
-      {/* ── AGED DEBTORS PANEL ── */}
-      {(() => {
-        const outstanding = invoices
-          .map(norm)
-          .filter(
-            (i) => !["paid", "cancelled"].includes(i.status) && i._total > 0,
-          );
-        if (outstanding.length === 0) return null;
-
-        // Group by partner
-        const byPartner = {};
-        outstanding.forEach((inv) => {
-          const pid = inv._partner || "unknown";
-          const name =
-            suppliers.find((s) => s.id === pid)?.business_name || "Unknown";
-          if (!byPartner[pid])
-            byPartner[pid] = { name, buckets: [0, 0, 0, 0], total: 0 };
-          const days = daysOverdue(inv);
-          const amt = inv._total;
-          byPartner[pid].total += amt;
-          if (days <= 0)
-            byPartner[pid].buckets[0] += amt; // current
-          else if (days <= 30)
-            byPartner[pid].buckets[1] += amt; // 0-30
-          else if (days <= 60)
-            byPartner[pid].buckets[2] += amt; // 31-60
-          else if (days <= 90) byPartner[pid].buckets[3] += amt; // 61-90+
-        });
-
-        const partners = Object.values(byPartner);
-        const grandTotal = partners.reduce((s, p) => s + p.total, 0);
-
-        return (
+      {/* ── Aged Debtors Panel ── */}
+      {agedPartners.length > 0 && (
+        <div
+          style={{
+            ...sCard,
+            border: `1px solid ${T.dangerBd}`,
+            borderLeft: `4px solid ${T.danger}`,
+          }}
+        >
           <div
             style={{
-              ...sCard,
-              border: `1px solid ${T.dangerBd}`,
-              borderLeft: `4px solid ${T.danger}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    color: T.danger,
-                    fontFamily: T.font,
-                  }}
-                >
-                  Aged Debtors
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: T.ink500,
-                    marginTop: 3,
-                    fontFamily: T.font,
-                  }}
-                >
-                  Outstanding balances by dispensary
-                </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.danger,
+                  fontFamily: T.font,
+                }}
+              >
+                Aged Debtors
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: T.ink400,
-                    fontFamily: T.font,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.1em",
-                  }}
-                >
-                  Total Outstanding
-                </div>
-                <div
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: T.danger,
-                    fontFamily: T.font,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {fmt(grandTotal)}
-                </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: T.ink500,
+                  marginTop: 3,
+                  fontFamily: T.font,
+                }}
+              >
+                Outstanding balances by dispensary
               </div>
             </div>
-
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 12,
-                fontFamily: T.font,
-              }}
-            >
-              <thead>
-                <tr style={{ background: T.ink075 }}>
-                  {[
-                    "Dispensary",
-                    "Current",
-                    "1–30 days",
-                    "31–60 days",
-                    "60+ days",
-                    "Total",
-                  ].map((h, i) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "8px 12px",
-                        fontSize: 9,
-                        letterSpacing: "0.12em",
-                        textTransform: "uppercase",
-                        color: T.ink400,
-                        fontWeight: 700,
-                        textAlign: i === 0 ? "left" : "right",
-                        borderBottom: `2px solid ${T.ink150}`,
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {partners.map((p, i) => (
-                  <tr
-                    key={i}
-                    style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
+            <div style={{ textAlign: "right" }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: T.ink400,
+                  fontFamily: T.font,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                Total Outstanding
+              </div>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: T.danger,
+                  fontFamily: T.font,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {fmt(grandTotal)}
+              </div>
+            </div>
+          </div>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: 12,
+              fontFamily: T.font,
+            }}
+          >
+            <thead>
+              <tr style={{ background: T.ink075 }}>
+                {[
+                  "Dispensary",
+                  "Current",
+                  "1–30 days",
+                  "31–60 days",
+                  "60+ days",
+                  "Total",
+                ].map((h, i) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: "8px 12px",
+                      fontSize: 9,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: T.ink400,
+                      fontWeight: 700,
+                      textAlign: i === 0 ? "left" : "right",
+                      borderBottom: `2px solid ${T.ink150}`,
+                    }}
                   >
-                    <td
-                      style={{
-                        padding: "10px 12px",
-                        fontWeight: 600,
-                        color: T.ink900,
-                      }}
-                    >
-                      {p.name}
-                    </td>
-                    {p.buckets.map((b, bi) => (
-                      <td
-                        key={bi}
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "right",
-                          fontVariantNumeric: "tabular-nums",
-                          color:
-                            b > 0
-                              ? bi >= 2
-                                ? T.danger
-                                : bi === 1
-                                  ? T.warning
-                                  : T.ink700
-                              : T.ink300,
-                        }}
-                      >
-                        {b > 0 ? fmt(b) : "—"}
-                      </td>
-                    ))}
-                    <td
-                      style={{
-                        padding: "10px 12px",
-                        textAlign: "right",
-                        fontWeight: 700,
-                        color: T.accent,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {fmt(p.total)}
-                    </td>
-                  </tr>
+                    {h}
+                  </th>
                 ))}
-              </tbody>
-              <tfoot>
+              </tr>
+            </thead>
+            <tbody>
+              {agedPartners.map((p, i) => (
                 <tr
-                  style={{
-                    background: T.accentLit,
-                    borderTop: `2px solid ${T.accentBd}`,
-                  }}
+                  key={i}
+                  style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
                 >
                   <td
                     style={{
                       padding: "10px 12px",
-                      fontWeight: 700,
-                      color: T.accent,
+                      fontWeight: 600,
+                      color: T.ink900,
                     }}
                   >
-                    TOTAL
+                    {p.name}
                   </td>
-                  {[0, 1, 2, 3].map((bi) => (
+                  {p.buckets.map((b, bi) => (
                     <td
                       key={bi}
                       style={{
                         padding: "10px 12px",
                         textAlign: "right",
-                        fontWeight: 700,
                         fontVariantNumeric: "tabular-nums",
-                        color: T.accent,
+                        color:
+                          b > 0
+                            ? bi >= 2
+                              ? T.danger
+                              : bi === 1
+                                ? T.warning
+                                : T.ink700
+                            : T.ink300,
                       }}
                     >
-                      {fmt(partners.reduce((s, p) => s + p.buckets[bi], 0))}
+                      {b > 0 ? fmt(b) : "—"}
                     </td>
                   ))}
                   <td
@@ -695,20 +640,63 @@ export default function HQInvoices() {
                       padding: "10px 12px",
                       textAlign: "right",
                       fontWeight: 700,
-                      color: T.danger,
+                      color: T.accent,
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {fmt(grandTotal)}
+                    {fmt(p.total)}
                   </td>
                 </tr>
-              </tfoot>
-            </table>
-          </div>
-        );
-      })()}
+              ))}
+            </tbody>
+            <tfoot>
+              <tr
+                style={{
+                  background: T.accentLit,
+                  borderTop: `2px solid ${T.accentBd}`,
+                }}
+              >
+                <td
+                  style={{
+                    padding: "10px 12px",
+                    fontWeight: 700,
+                    color: T.accent,
+                  }}
+                >
+                  TOTAL
+                </td>
+                {[0, 1, 2, 3].map((bi) => (
+                  <td
+                    key={bi}
+                    style={{
+                      padding: "10px 12px",
+                      textAlign: "right",
+                      fontWeight: 700,
+                      fontVariantNumeric: "tabular-nums",
+                      color: T.accent,
+                    }}
+                  >
+                    {fmt(agedPartners.reduce((s, p) => s + p.buckets[bi], 0))}
+                  </td>
+                ))}
+                <td
+                  style={{
+                    padding: "10px 12px",
+                    textAlign: "right",
+                    fontWeight: 700,
+                    color: T.danger,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {fmt(grandTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
 
-      {/* Filter bar */}
+      {/* ── Filter bar ── */}
       <div
         style={{
           display: "flex",
@@ -751,7 +739,7 @@ export default function HQInvoices() {
         </button>
       </div>
 
-      {/* Invoice list */}
+      {/* ── Invoice list ── */}
       <div style={sCard}>
         {filtered.length === 0 ? (
           <div
@@ -775,19 +763,20 @@ export default function HQInvoices() {
               <tr>
                 <th style={sTh}>Invoice #</th>
                 <th style={sTh}>Type</th>
-                <th style={sTh}>Supplier</th>
+                <th style={sTh}>Partner</th>
                 <th style={sTh}>Invoice Date</th>
                 <th style={sTh}>Due Date</th>
                 <th style={{ ...sTh, textAlign: "right" }}>Subtotal</th>
                 <th style={{ ...sTh, textAlign: "right" }}>VAT</th>
                 <th style={{ ...sTh, textAlign: "right" }}>Total</th>
                 <th style={sTh}>Status</th>
-                <th style={sTh}>PO Link</th>
+                <th style={sTh}>PO</th>
                 <th style={sTh}></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((inv) => {
+                const n = norm(inv);
                 const isOpen = expanded === inv.id;
                 const isPaying = paying === inv.id;
                 const lines = lineItems[inv.id] || [];
@@ -810,7 +799,7 @@ export default function HQInvoices() {
                           color: T.accent,
                         }}
                       >
-                        {norm(inv)._number}
+                        {n._number}
                       </td>
                       <td
                         style={{
@@ -822,7 +811,7 @@ export default function HQInvoices() {
                       >
                         {inv.invoice_type || "—"}
                       </td>
-                      <td style={sTd}>{supName(norm(inv)._partner)}</td>
+                      <td style={sTd}>{supName(n._partner)}</td>
                       <td style={{ ...sTd, color: T.ink500, fontSize: "11px" }}>
                         {fmtDate(inv.invoice_date)}
                       </td>
@@ -835,6 +824,17 @@ export default function HQInvoices() {
                         }}
                       >
                         {fmtDate(inv.due_date)}
+                        {inv.status === "overdue" && (
+                          <div
+                            style={{
+                              fontSize: 9,
+                              color: T.danger,
+                              marginTop: 2,
+                            }}
+                          >
+                            {daysOverdue(inv)}d overdue
+                          </div>
+                        )}
                       </td>
                       <td
                         style={{
@@ -844,7 +844,7 @@ export default function HQInvoices() {
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {fmt(norm(inv)._subtotal)}
+                        {fmt(n._subtotal)}
                       </td>
                       <td
                         style={{
@@ -855,7 +855,7 @@ export default function HQInvoices() {
                           color: T.ink500,
                         }}
                       >
-                        {fmt(norm(inv)._vat)}
+                        {fmt(n._vat)}
                       </td>
                       <td
                         style={{
@@ -866,7 +866,7 @@ export default function HQInvoices() {
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {fmt(norm(inv)._total)}
+                        {fmt(n._total)}
                       </td>
                       <td style={sTd}>
                         <StatusBadge status={inv.status} />
@@ -934,7 +934,6 @@ export default function HQInvoices() {
                       </td>
                     </tr>
 
-                    {/* Payment recording inline row */}
                     {isPaying && (
                       <tr>
                         <td
@@ -972,7 +971,7 @@ export default function HQInvoices() {
                               >
                                 {saving
                                   ? "Saving..."
-                                  : `Mark Paid — ${fmt(inv.total_amount)}`}
+                                  : `Mark Paid — ${fmt(n._total)}`}
                               </button>
                               <button
                                 onClick={() => {
@@ -1004,7 +1003,6 @@ export default function HQInvoices() {
                       </tr>
                     )}
 
-                    {/* Line items detail */}
                     {isOpen && (
                       <tr>
                         <td
@@ -1047,91 +1045,30 @@ export default function HQInvoices() {
                               >
                                 <thead>
                                   <tr>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                      }}
-                                    >
-                                      Description
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                      }}
-                                    >
-                                      SKU
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                        textAlign: "right",
-                                      }}
-                                    >
-                                      Qty
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                        textAlign: "right",
-                                      }}
-                                    >
-                                      Unit Price
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                        textAlign: "right",
-                                      }}
-                                    >
-                                      Disc %
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                        textAlign: "right",
-                                      }}
-                                    >
-                                      Line Total
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                      }}
-                                    >
-                                      VAT
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                      }}
-                                    >
-                                      Batch Ref
-                                    </th>
-                                    <th
-                                      style={{
-                                        ...sTh,
-                                        fontSize: "9px",
-                                        padding: "6px 10px",
-                                      }}
-                                    >
-                                      Licence #
-                                    </th>
+                                    {[
+                                      "Description",
+                                      "SKU",
+                                      "Qty",
+                                      "Unit Price",
+                                      "Disc %",
+                                      "Line Total",
+                                      "VAT",
+                                      "Batch Ref",
+                                      "Licence #",
+                                    ].map((h, i) => (
+                                      <th
+                                        key={h}
+                                        style={{
+                                          ...sTh,
+                                          fontSize: "9px",
+                                          padding: "6px 10px",
+                                          textAlign:
+                                            i >= 2 && i <= 5 ? "right" : "left",
+                                        }}
+                                      >
+                                        {h}
+                                      </th>
+                                    ))}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1154,7 +1091,6 @@ export default function HQInvoices() {
                                           padding: "8px 10px",
                                           fontSize: "10px",
                                           color: T.ink500,
-                                          fontFamily: T.font,
                                         }}
                                       >
                                         {l.inventory_items?.sku || "—"}
@@ -1164,7 +1100,6 @@ export default function HQInvoices() {
                                           ...sTd,
                                           padding: "8px 10px",
                                           textAlign: "right",
-                                          fontFamily: T.font,
                                           fontVariantNumeric: "tabular-nums",
                                         }}
                                       >
@@ -1175,7 +1110,6 @@ export default function HQInvoices() {
                                           ...sTd,
                                           padding: "8px 10px",
                                           textAlign: "right",
-                                          fontFamily: T.font,
                                           fontVariantNumeric: "tabular-nums",
                                         }}
                                       >
@@ -1198,7 +1132,6 @@ export default function HQInvoices() {
                                           ...sTd,
                                           padding: "8px 10px",
                                           textAlign: "right",
-                                          fontFamily: T.font,
                                           fontWeight: 600,
                                           fontVariantNumeric: "tabular-nums",
                                         }}
@@ -1263,7 +1196,6 @@ export default function HQInvoices() {
                                         padding: "8px 10px",
                                         fontSize: "10px",
                                         color: T.ink500,
-                                        fontFamily: T.font,
                                         textAlign: "right",
                                         fontWeight: 600,
                                       }}
@@ -1274,13 +1206,12 @@ export default function HQInvoices() {
                                       style={{
                                         padding: "8px 10px",
                                         textAlign: "right",
-                                        fontFamily: T.font,
                                         fontWeight: 700,
                                         fontVariantNumeric: "tabular-nums",
                                         color: T.accent,
                                       }}
                                     >
-                                      {fmt(inv.total_amount)}
+                                      {fmt(n._total)}
                                     </td>
                                     <td
                                       colSpan={3}
