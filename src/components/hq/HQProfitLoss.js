@@ -566,6 +566,7 @@ export default function HQProfitLoss() {
   const [customTo, setCustomTo] = useState("");
   const [expenses, setExpenses] = useState([]);
   const [showExpMgr, setShowExpMgr] = useState(false);
+  const [productionMovements, setProductionMovements] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
 
@@ -595,7 +596,7 @@ export default function HQProfitLoss() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const errors = {};
-    const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
+    const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await Promise.all([
       supabase
         .from("orders")
         .select("id, created_at, total, status, items_count, currency")
@@ -617,6 +618,12 @@ export default function HQProfitLoss() {
         .from("loyalty_config")
         .select("redemption_value_zar, breakage_rate")
         .maybeSingle(),
+      supabase
+        .from("stock_movements")
+        .select(
+          "item_id, quantity, unit_cost, unit_cost_zar, movement_type, created_at",
+        )
+        .eq("movement_type", "production_out"),
     ]);
     if (r1.error) errors.orders = r1.error.message;
     if (r2.error) errors.pos = r2.error.message;
@@ -630,6 +637,7 @@ export default function HQProfitLoss() {
     setPricing(r6.data || []);
     setLoyaltyTxns(r7.data || []);
     setLoyaltyConfig(r8.data || null);
+    setProductionMovements(r9.data || []);
     setDataErrors(errors);
     setLastUpdated(new Date());
     setLoading(false);
@@ -672,6 +680,18 @@ export default function HQProfitLoss() {
     (s, o) => s + (parseInt(o.items_count) || 1),
     0,
   );
+
+  // WP-FIN S2: actual COGS from stock_movements production_out × AVCO
+  const filteredProductionMovements = productionMovements.filter((m) =>
+    periodFilter(m.created_at, period, customFrom, customTo),
+  );
+  const hasActualCogs = filteredProductionMovements.length > 0;
+  const actualCogs = hasActualCogs
+    ? filteredProductionMovements.reduce((s, m) => {
+        const unitCost = parseFloat(m.unit_cost_zar ?? m.unit_cost ?? 0) || 0;
+        return s + Math.abs(parseFloat(m.quantity) || 0) * unitCost;
+      }, 0)
+    : null;
 
   const filteredPOs = purchaseOrders.filter((po) =>
     periodFilter(po.order_date, period, customFrom, customTo),
@@ -722,7 +742,8 @@ export default function HQProfitLoss() {
   const importCogsSold = avgImportCogsPerUnit * totalUnitsSold;
   const localCogsTotal = avgLocalCogsPerUnit * totalUnitsSold;
   const importCogsHardware = importCogsSold;
-  const totalCogs = avgFullCogsPerUnit * totalUnitsSold;
+  const totalCogs =
+    actualCogs !== null ? actualCogs : avgFullCogsPerUnit * totalUnitsSold;
   const grossProfit = websiteRevenue - totalCogs;
   const grossMarginPct =
     websiteRevenue > 0 ? (grossProfit / websiteRevenue) * 100 : 0;
@@ -1083,11 +1104,17 @@ export default function HQProfitLoss() {
 
                 <SectionHeader icon="📦" label="Cost of Goods Sold" />
                 <WRow
-                  label="Imported hardware & terpenes (recipe cost)"
+                  label={
+                    hasActualCogs
+                      ? "Cost of goods produced (actual — stock movements × AVCO)"
+                      : "Imported hardware & terpenes (recipe cost estimate)"
+                  }
                   sub={
-                    avgImportCogsPerUnit > 0
-                      ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
-                      : "⚠ Set hardware & terpene prices in HQ → Suppliers"
+                    hasActualCogs
+                      ? `${filteredProductionMovements.length} production movement${filteredProductionMovements.length !== 1 ? "s" : ""} · AVCO weighted average cost · actual material usage`
+                      : avgImportCogsPerUnit > 0
+                        ? `R${fmt(avgImportCogsPerUnit)} avg import/unit × ${totalUnitsSold} units sold · from ${recipesWithCogs.length} active recipe${recipesWithCogs.length !== 1 ? "s" : ""}${incompletePOs.length > 0 ? ` · ⚠ ${incompletePOs.length} incomplete PO${incompletePOs.length !== 1 ? "s" : ""} excluded` : ""}`
+                        : "⚠ Set hardware & terpene prices in HQ → Suppliers"
                   }
                   value={importCogsHardware}
                   indent={1}
