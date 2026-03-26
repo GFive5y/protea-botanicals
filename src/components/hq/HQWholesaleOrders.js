@@ -172,7 +172,7 @@ const availQty = (item) =>
     parseFloat(item.quantity_on_hand || 0) - parseFloat(item.reserved_qty || 0),
   );
 
-// ── INVOICE MODAL ─────────────────────────────────────────────────────────────
+// ── INVOICE MODAL v2.0 — SAGE-style ──────────────────────────────────────────
 function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
   const printRef = useRef();
   const invNumber = `INV-${order.po_number?.replace("WHO-", "") || order.id?.slice(0, 8).toUpperCase()}`;
@@ -186,8 +186,19 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
     { day: "numeric", month: "long", year: "numeric" },
   );
   const subtotal = parseFloat(order.subtotal || 0);
-  const vat = subtotal * 0.15;
-  const total = subtotal + vat;
+  const vatAmt = subtotal * 0.15;
+  const total = subtotal + vatAmt;
+
+  const BRAND = {
+    name: tenantName || "Pure Premium THC Vapes",
+    email: "Pure@Pure.co.za",
+    bank: "Pure Bank",
+    account: "TBC",
+    branch: "TBC",
+    accType: "Current",
+    vat: "VAT No. TBC",
+    address: "South Africa",
+  };
 
   const handlePrint = () => {
     const content = printRef.current.innerHTML;
@@ -195,16 +206,35 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
     win.document.write(`
       <html><head><title>${invNumber}</title>
       <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #111; font-size: 13px; }
-        .page { max-width: 760px; margin: 0 auto; padding: 48px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 8px 10px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #666; border-bottom: 2px solid #1A3D2B; }
-        td { padding: 10px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
-        .num { text-align: right; font-variant-numeric: tabular-nums; }
-        .total-row td { font-weight: 700; border-top: 2px solid #1A3D2B; border-bottom: none; font-size: 15px; }
-        .meta { font-size: 11px; color: #888; margin-top: 3px; }
-        @media print { body { -webkit-print-color-adjust: exact; } }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111;font-size:13px;background:#fff;}
+        .page{max-width:794px;margin:0 auto;padding:48px;}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:24px;border-bottom:3px solid #1A3D2B;}
+        .brand-name{font-size:22px;font-weight:700;color:#1A3D2B;letter-spacing:-0.02em;}
+        .inv-title{font-size:28px;font-weight:300;color:#1A3D2B;text-align:right;letter-spacing:-0.02em;}
+        .inv-meta{font-size:12px;color:#666;text-align:right;margin-top:6px;line-height:1.8;}
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;}
+        .box{background:#f8f8f6;border-radius:6px;padding:16px 18px;}
+        .box-title{font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#888;margin-bottom:10px;}
+        .box-name{font-size:15px;font-weight:700;color:#111;margin-bottom:4px;}
+        .box-detail{font-size:12px;color:#555;line-height:1.7;}
+        .accent-box{background:#e8f5ee;border-left:3px solid #1A3D2B;}
+        table{width:100%;border-collapse:collapse;margin-bottom:24px;}
+        thead tr{background:#1A3D2B;}
+        thead th{color:#fff;padding:10px 12px;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;text-align:left;font-weight:600;}
+        thead th.r{text-align:right;}
+        tbody tr:nth-child(even){background:#f8f8f6;}
+        td{padding:11px 12px;border-bottom:1px solid #eee;font-size:13px;color:#333;vertical-align:middle;}
+        td.r{text-align:right;font-variant-numeric:tabular-nums;}
+        td.name{font-weight:500;color:#111;}
+        td.sku{font-size:10px;color:#999;display:block;margin-top:2px;}
+        .totals{display:flex;justify-content:flex-end;margin-bottom:32px;}
+        .totals-box{width:280px;}
+        .tot-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:13px;color:#555;}
+        .tot-row.final{border-bottom:none;border-top:2px solid #1A3D2B;padding-top:12px;font-size:16px;font-weight:700;color:#1A3D2B;}
+        .notes{background:#f8f8f6;border-radius:6px;padding:14px 16px;font-size:12px;color:#666;line-height:1.7;margin-bottom:24px;}
+        .footer{text-align:center;font-size:11px;color:#aaa;padding-top:20px;border-top:1px solid #eee;}
+        @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
       </style></head>
       <body><div class="page">${content}</div></body></html>
     `);
@@ -216,6 +246,40 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
     }, 400);
   };
 
+  const handleEmail = () => {
+    const subject = encodeURIComponent(`Invoice ${invNumber} — ${BRAND.name}`);
+    const body = encodeURIComponent(
+      `Dear ${partner?.contact_name || partner?.business_name || ""},\n\nPlease find attached invoice ${invNumber} for R${total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}.\n\nPayment due: ${dueDate}\nReference: ${invNumber}\n\nBank: ${BRAND.bank}\nAccount: ${BRAND.account}\n\nThank you for your business.\n\n${BRAND.name}`,
+    );
+    window.open(
+      `mailto:${partner?.email || ""}?subject=${subject}&body=${body}`,
+    );
+  };
+
+  const toolbarBtn = (onClick, icon, label, color = T.accent) => (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "8px 16px",
+        background: color,
+        color: "#fff",
+        border: "none",
+        borderRadius: 4,
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        cursor: "pointer",
+        fontFamily: T.fontUi,
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{icon}</span> {label}
+    </button>
+  );
+
   return (
     <>
       <div
@@ -223,7 +287,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.55)",
+          background: "rgba(0,0,0,0.6)",
           zIndex: 2000,
         }}
       />
@@ -235,120 +299,163 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
           transform: "translate(-50%,-50%)",
           background: "#fff",
           borderRadius: 8,
-          width: 780,
-          maxWidth: "95vw",
-          maxHeight: "90vh",
+          width: 860,
+          maxWidth: "96vw",
+          maxHeight: "93vh",
           overflowY: "auto",
           zIndex: 2001,
-          boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.25)",
         }}
       >
-        {/* Modal toolbar */}
+        {/* ── Toolbar ── */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "14px 24px",
-            borderBottom: `1px solid ${T.ink150}`,
+            padding: "12px 24px",
+            background: T.accent,
             position: "sticky",
             top: 0,
-            background: "#fff",
-            zIndex: 1,
+            zIndex: 10,
           }}
         >
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: T.accent,
-              fontFamily: T.fontUi,
-            }}
-          >
-            {invNumber}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={handlePrint}
-              style={{ ...sBtn(), fontSize: 10, padding: "7px 16px" }}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "rgba(255,255,255,0.6)",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
             >
-              🖨 Print / Save PDF
-            </button>
+              Tax Invoice
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+              {invNumber}
+            </div>
+            <div
+              style={{
+                fontSize: 9,
+                padding: "2px 8px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
+              {order.po_status || "draft"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {toolbarBtn(handlePrint, "🖨", "Print", "#2D6A4F")}
+            {toolbarBtn(handlePrint, "💾", "Save PDF", "#1E3A5F")}
+            {toolbarBtn(handleEmail, "📧", "Email", "#92400E")}
             <button
               onClick={onClose}
-              style={{ ...sBtn("outline"), fontSize: 10, padding: "7px 14px" }}
+              style={{
+                padding: "8px 14px",
+                background: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: T.fontUi,
+              }}
             >
-              Close
+              ✕ Close
             </button>
           </div>
         </div>
 
-        {/* Invoice content */}
-        <div ref={printRef} style={{ padding: "40px 48px" }}>
+        {/* ── Invoice content ── */}
+        <div
+          ref={printRef}
+          style={{ padding: "40px 48px", background: "#fff" }}
+        >
           {/* Header */}
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
-              marginBottom: 40,
+              alignItems: "flex-start",
+              marginBottom: 36,
+              paddingBottom: 24,
+              borderBottom: "3px solid #1A3D2B",
             }}
           >
             <div>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: T.accent,
+                  letterSpacing: "-0.02em",
+                  marginBottom: 4,
+                }}
+              >
+                {BRAND.name}
+              </div>
+              <div style={{ fontSize: 12, color: T.ink500, lineHeight: 1.8 }}>
+                <div>{BRAND.email}</div>
+                <div>{BRAND.address}</div>
+                <div style={{ color: T.ink400 }}>{BRAND.vat}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
               <div
                 style={{
                   fontSize: 28,
                   fontWeight: 300,
                   color: T.accent,
                   letterSpacing: "-0.02em",
-                  marginBottom: 4,
+                  marginBottom: 8,
                 }}
               >
                 TAX INVOICE
               </div>
-              <div style={{ fontSize: 13, color: T.ink500 }}>{tenantName}</div>
-              <div style={{ fontSize: 11, color: T.ink300, marginTop: 4 }}>
-                VAT Reg: (add VAT number)
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: T.ink900,
-                  marginBottom: 6,
-                }}
-              >
-                {invNumber}
-              </div>
-              <div style={{ fontSize: 12, color: T.ink500 }}>
-                Issue date: <strong>{issueDate}</strong>
-              </div>
-              <div style={{ fontSize: 12, color: T.ink500 }}>
-                Due date:{" "}
-                <strong style={{ color: T.warning }}>{dueDate}</strong>
-              </div>
-              <div style={{ fontSize: 12, color: T.ink500, marginTop: 4 }}>
-                Order ref: <strong>{order.po_number}</strong>
+              <div style={{ fontSize: 13, color: T.ink500, lineHeight: 1.9 }}>
+                <div>
+                  <span style={{ color: T.ink300 }}>Invoice No: </span>
+                  <strong style={{ color: T.ink900 }}>{invNumber}</strong>
+                </div>
+                <div>
+                  <span style={{ color: T.ink300 }}>Order Ref: </span>
+                  <strong style={{ color: T.ink900 }}>{order.po_number}</strong>
+                </div>
+                <div>
+                  <span style={{ color: T.ink300 }}>Issue Date: </span>
+                  <strong style={{ color: T.ink900 }}>{issueDate}</strong>
+                </div>
+                <div>
+                  <span style={{ color: T.ink300 }}>Due Date: </span>
+                  <strong style={{ color: "#92400E" }}>{dueDate}</strong>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Bill to */}
+          {/* Bill To + Payment */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: 32,
-              marginBottom: 36,
+              gap: 20,
+              marginBottom: 32,
             }}
           >
             <div
               style={{
                 background: T.accentLit,
                 border: `1px solid ${T.accentBd}`,
+                borderLeft: `4px solid ${T.accent}`,
                 borderRadius: 6,
-                padding: "16px 18px",
+                padding: "18px 20px",
               }}
             >
               <div
@@ -358,16 +465,23 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
                   color: T.accentMid,
-                  marginBottom: 8,
+                  marginBottom: 10,
                 }}
               >
                 Bill To
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: T.ink900 }}>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: T.ink900,
+                  marginBottom: 6,
+                }}
+              >
                 {partner?.business_name || "—"}
               </div>
               {partner?.contact_name && (
-                <div style={{ fontSize: 12, color: T.ink500, marginTop: 3 }}>
+                <div style={{ fontSize: 12, color: T.ink500 }}>
                   {partner.contact_name}
                 </div>
               )}
@@ -386,8 +500,9 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               style={{
                 background: T.ink075,
                 border: `1px solid ${T.ink150}`,
+                borderLeft: `4px solid ${T.ink300}`,
                 borderRadius: 6,
-                padding: "16px 18px",
+                padding: "18px 20px",
               }}
             >
               <div
@@ -397,30 +512,46 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
                   color: T.ink400,
-                  marginBottom: 8,
+                  marginBottom: 10,
                 }}
               >
                 Payment Details
               </div>
-              <div style={{ fontSize: 12, color: T.ink500, lineHeight: 1.8 }}>
-                <div>
-                  Bank:{" "}
-                  <strong style={{ color: T.ink900 }}>
-                    FNB / Standard Bank
-                  </strong>
+              <div style={{ fontSize: 12, color: T.ink500, lineHeight: 1.9 }}>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span style={{ color: T.ink400 }}>Bank</span>
+                  <strong style={{ color: T.ink900 }}>{BRAND.bank}</strong>
                 </div>
-                <div>
-                  Account:{" "}
-                  <strong style={{ color: T.ink900 }}>
-                    Add account number
-                  </strong>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span style={{ color: T.ink400 }}>Account</span>
+                  <strong style={{ color: T.ink900 }}>{BRAND.account}</strong>
                 </div>
-                <div>
-                  Branch:{" "}
-                  <strong style={{ color: T.ink900 }}>Add branch code</strong>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span style={{ color: T.ink400 }}>Branch</span>
+                  <strong style={{ color: T.ink900 }}>{BRAND.branch}</strong>
                 </div>
-                <div>
-                  Reference:{" "}
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span style={{ color: T.ink400 }}>Type</span>
+                  <strong style={{ color: T.ink900 }}>{BRAND.accType}</strong>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginTop: 6,
+                    paddingTop: 6,
+                    borderTop: `1px solid ${T.ink150}`,
+                  }}
+                >
+                  <span style={{ color: T.ink400 }}>Reference</span>
                   <strong style={{ color: T.accent }}>{invNumber}</strong>
                 </div>
               </div>
@@ -433,66 +564,36 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               width: "100%",
               borderCollapse: "collapse",
               marginBottom: 24,
+              borderRadius: 6,
+              overflow: "hidden",
             }}
           >
             <thead>
-              <tr>
-                <th
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    fontSize: 9,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: T.ink400,
-                    borderBottom: `2px solid ${T.accent}`,
-                    fontFamily: T.fontUi,
-                  }}
-                >
-                  Product
-                </th>
-                <th
-                  style={{
-                    textAlign: "right",
-                    padding: "10px 12px",
-                    fontSize: 9,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: T.ink400,
-                    borderBottom: `2px solid ${T.accent}`,
-                    fontFamily: T.fontUi,
-                  }}
-                >
-                  Qty
-                </th>
-                <th
-                  style={{
-                    textAlign: "right",
-                    padding: "10px 12px",
-                    fontSize: 9,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: T.ink400,
-                    borderBottom: `2px solid ${T.accent}`,
-                    fontFamily: T.fontUi,
-                  }}
-                >
-                  Unit Price
-                </th>
-                <th
-                  style={{
-                    textAlign: "right",
-                    padding: "10px 12px",
-                    fontSize: 9,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: T.ink400,
-                    borderBottom: `2px solid ${T.accent}`,
-                    fontFamily: T.fontUi,
-                  }}
-                >
-                  Line Total
-                </th>
+              <tr style={{ background: T.accent }}>
+                {[
+                  "#",
+                  "Product / Description",
+                  "Qty",
+                  "Unit Price",
+                  "VAT",
+                  "Line Total",
+                ].map((h, i) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: "11px 12px",
+                      fontSize: 9,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: "#fff",
+                      fontWeight: 600,
+                      textAlign: i >= 2 ? "right" : "left",
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -500,7 +601,9 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                 const item = items.find((it) => it.id === line.item_id);
                 const qty = parseFloat(line.quantity_ordered || 0);
                 const price = parseFloat(line.unit_cost || 0);
-                const lineTotal = qty * price;
+                const lineEx = qty * price;
+                const lineVat = lineEx * 0.15;
+                const lineTotal = lineEx + lineVat;
                 return (
                   <tr
                     key={line.id || i}
@@ -510,13 +613,29 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                       style={{
                         padding: "12px 12px",
                         borderBottom: `1px solid ${T.ink150}`,
-                        fontSize: 13,
-                        color: T.ink900,
+                        fontSize: 12,
+                        color: T.ink400,
                         fontFamily: T.fontUi,
-                        fontWeight: 500,
                       }}
                     >
-                      {item?.name || "—"}
+                      {i + 1}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${T.ink150}`,
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: T.ink900,
+                        }}
+                      >
+                        {item?.name || "—"}
+                      </div>
                       {item?.sku && (
                         <div
                           style={{
@@ -536,6 +655,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                         fontSize: 13,
                         color: T.ink700,
                         textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
                         fontFamily: T.fontUi,
                       }}
                     >
@@ -548,6 +668,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                         fontSize: 13,
                         color: T.ink700,
                         textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
                         fontFamily: T.fontUi,
                       }}
                     >
@@ -560,11 +681,24 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                       style={{
                         padding: "12px 12px",
                         borderBottom: `1px solid ${T.ink150}`,
-                        fontSize: 13,
-                        color: T.ink900,
+                        fontSize: 12,
+                        color: T.ink400,
                         textAlign: "right",
                         fontFamily: T.fontUi,
-                        fontWeight: 600,
+                      }}
+                    >
+                      15%
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${T.ink150}`,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: T.ink900,
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                        fontFamily: T.fontUi,
                       }}
                     >
                       R
@@ -579,29 +713,39 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
           </table>
 
           {/* Totals */}
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <div style={{ width: 280 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: 28,
+            }}
+          >
+            <div
+              style={{
+                width: 300,
+                background: T.ink075,
+                borderRadius: 6,
+                padding: "16px 20px",
+                border: `1px solid ${T.ink150}`,
+              }}
+            >
               {[
-                {
-                  label: "Subtotal (excl. VAT)",
-                  value: subtotal,
-                  color: T.ink700,
-                },
-                { label: "VAT (15%)", value: vat, color: T.ink500 },
+                { label: "Subtotal (excl. VAT)", value: subtotal, bold: false },
+                { label: "VAT @ 15%", value: vatAmt, bold: false },
               ].map((row) => (
                 <div
                   key={row.label}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    padding: "8px 0",
+                    padding: "7px 0",
                     borderBottom: `1px solid ${T.ink150}`,
                   }}
                 >
                   <span
                     style={{
                       fontSize: 13,
-                      color: row.color,
+                      color: T.ink500,
                       fontFamily: T.fontUi,
                     }}
                   >
@@ -610,9 +754,9 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                   <span
                     style={{
                       fontSize: 13,
-                      color: row.color,
-                      fontFamily: T.fontUi,
+                      color: T.ink700,
                       fontVariantNumeric: "tabular-nums",
+                      fontFamily: T.fontUi,
                     }}
                   >
                     R
@@ -626,7 +770,8 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  padding: "14px 0 0",
+                  paddingTop: 12,
+                  marginTop: 4,
                 }}
               >
                 <span
@@ -641,42 +786,64 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                 </span>
                 <span
                   style={{
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: 700,
                     color: T.accent,
-                    fontFamily: T.fontUi,
                     fontVariantNumeric: "tabular-nums",
+                    fontFamily: T.fontUi,
                   }}
                 >
                   R{total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 11,
-                  color: T.ink300,
-                  fontFamily: T.fontUi,
-                }}
-              >
-                Payment due within 30 days · Reference: {invNumber}
-              </div>
             </div>
+          </div>
+
+          {/* Notes */}
+          <div
+            style={{
+              background: T.ink075,
+              borderRadius: 6,
+              padding: "14px 18px",
+              marginBottom: 28,
+              fontSize: 12,
+              color: T.ink500,
+              lineHeight: 1.7,
+              fontFamily: T.fontUi,
+              border: `1px solid ${T.ink150}`,
+            }}
+          >
+            <strong style={{ color: T.ink700 }}>Terms & Notes:</strong> Payment
+            due within 30 days of invoice date. Please use{" "}
+            <strong style={{ color: T.accent }}>{invNumber}</strong> as your
+            payment reference. Goods remain the property of {BRAND.name} until
+            payment is received in full.
           </div>
 
           {/* Footer */}
           <div
             style={{
-              marginTop: 48,
+              textAlign: "center",
               paddingTop: 20,
-              borderTop: `1px solid ${T.ink150}`,
+              borderTop: `2px solid ${T.accentLit}`,
               fontSize: 11,
               color: T.ink300,
-              textAlign: "center",
               fontFamily: T.fontUi,
+              lineHeight: 1.8,
             }}
           >
-            {tenantName} · Thank you for your business
+            <div
+              style={{ fontWeight: 700, color: T.accentMid, marginBottom: 2 }}
+            >
+              {BRAND.name}
+            </div>
+            <div>
+              {BRAND.email} · {BRAND.vat}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 10, color: T.ink150 }}>
+              Generated by Pure Premium ERP ·{" "}
+              {new Date().toLocaleDateString("en-ZA")}
+            </div>
           </div>
         </div>
       </div>
