@@ -567,6 +567,8 @@ export default function HQProfitLoss() {
   const [expenses, setExpenses] = useState([]);
   const [showExpMgr, setShowExpMgr] = useState(false);
   const [productionMovements, setProductionMovements] = useState([]);
+  const [wholesaleMovements, setWholesaleMovements] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
 
@@ -596,7 +598,7 @@ export default function HQProfitLoss() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const errors = {};
-    const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await Promise.all([
+    const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await Promise.all([
       supabase
         .from("orders")
         .select("id, created_at, total, status, items_count, currency")
@@ -622,6 +624,14 @@ export default function HQProfitLoss() {
         .from("stock_movements")
         .select("item_id, quantity, unit_cost, movement_type, created_at")
         .eq("movement_type", "production_out"),
+      supabase
+        .from("stock_movements")
+        .select("item_id, quantity, created_at")
+        .eq("movement_type", "sale_out"),
+      supabase
+        .from("inventory_items")
+        .select("id, sell_price, name")
+        .eq("is_active", true),
     ]);
     if (r1.error) errors.orders = r1.error.message;
     if (r2.error) errors.pos = r2.error.message;
@@ -636,6 +646,8 @@ export default function HQProfitLoss() {
     setLoyaltyTxns(r7.data || []);
     setLoyaltyConfig(r8.data || null);
     setProductionMovements(r9.data || []);
+    setWholesaleMovements(r10.data || []);
+    setInventoryItems(r11.data || []);
     setDataErrors(errors);
     setLastUpdated(new Date());
     setLoading(false);
@@ -678,6 +690,17 @@ export default function HQProfitLoss() {
     (s, o) => s + (parseInt(o.items_count) || 1),
     0,
   );
+
+  // WP-FIN S4: wholesale revenue from sale_out movements × sell_price
+  const filteredWholesaleMovements = wholesaleMovements.filter((m) =>
+    periodFilter(m.created_at, period, customFrom, customTo),
+  );
+  const wholesaleRevenue = filteredWholesaleMovements.reduce((s, m) => {
+    const item = inventoryItems.find((i) => i.id === m.item_id);
+    const price = parseFloat(item?.sell_price || 0);
+    return s + Math.abs(parseFloat(m.quantity) || 0) * price;
+  }, 0);
+  const totalRevenue = websiteRevenue + wholesaleRevenue;
 
   // WP-FIN S2: actual COGS from stock_movements production_out × AVCO
   const filteredProductionMovements = productionMovements.filter((m) =>
@@ -742,9 +765,9 @@ export default function HQProfitLoss() {
   const importCogsHardware = importCogsSold;
   const totalCogs =
     actualCogs !== null ? actualCogs : avgFullCogsPerUnit * totalUnitsSold;
-  const grossProfit = websiteRevenue - totalCogs;
+  const grossProfit = totalRevenue - totalCogs;
   const grossMarginPct =
-    websiteRevenue > 0 ? (grossProfit / websiteRevenue) * 100 : 0;
+    totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
   const redemptionValue = loyaltyConfig?.redemption_value_zar ?? 0.1;
   const breakageRate = loyaltyConfig?.breakage_rate ?? 0.3;
@@ -769,8 +792,7 @@ export default function HQProfitLoss() {
   const loyaltyCost = earnedPoints * costPerPointIssued;
   const totalOpexIncLoyalty = totalOpex + loyaltyCost;
   const netProfit = grossProfit - totalOpexIncLoyalty;
-  const netMarginPct =
-    websiteRevenue > 0 ? (netProfit / websiteRevenue) * 100 : 0;
+  const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
   const bestSkuMargin = (() => {
     let best = null;
@@ -817,7 +839,7 @@ export default function HQProfitLoss() {
     usdZar > 0 ? importCogsSold * (scenarioRate / usdZar) : importCogsSold;
   const scenarioGross = websiteRevenue - scenarioImportCogs - localCogsTotal;
   const scenarioGrossMargin =
-    websiteRevenue > 0 ? (scenarioGross / websiteRevenue) * 100 : 0;
+    totalRevenue > 0 ? (scenarioGross / totalRevenue) * 100 : 0;
   const hasDataErrors = Object.keys(dataErrors).length > 0;
 
   const card = {
@@ -1027,6 +1049,11 @@ export default function HQProfitLoss() {
           ok={!dataErrors.loyalty}
           count={filteredLoyaltyEarned.length}
         />
+        <DataBadge
+          label="Wholesale"
+          ok={true}
+          count={filteredWholesaleMovements.length}
+        />
         <DataBadge label="Expenses" ok={true} count={expenses.length} />
         {hasDataErrors && (
           <div
@@ -1088,16 +1115,21 @@ export default function HQProfitLoss() {
                 />
                 <WRow
                   label="Wholesale / store sales"
-                  sub="Not yet tracked — wired in WP-FIN S4"
-                  value={0}
+                  sub={
+                    filteredWholesaleMovements.length > 0
+                      ? `${filteredWholesaleMovements.length} shipment movement${filteredWholesaleMovements.length !== 1 ? "s" : ""} · sale_out × sell price`
+                      : "No wholesale shipments this period"
+                  }
+                  value={wholesaleRevenue}
                   indent={1}
-                  dim
+                  highlight={wholesaleRevenue > 0 ? "green" : undefined}
+                  dim={wholesaleRevenue === 0}
                 />
                 <WRow
                   label="Total Revenue"
-                  value={websiteRevenue}
+                  value={totalRevenue}
                   bold
-                  highlight={websiteRevenue > 0 ? "green" : undefined}
+                  highlight={totalRevenue > 0 ? "green" : undefined}
                 />
 
                 <SectionHeader icon="📦" label="Cost of Goods Sold" />
@@ -1862,8 +1894,8 @@ export default function HQProfitLoss() {
                       ["Est. Programme Cost", fmtZar(loyaltyCost), "#c62828"],
                       [
                         "Cost/Revenue %",
-                        websiteRevenue > 0
-                          ? `${fmt((loyaltyCost / websiteRevenue) * 100)}%`
+                        totalRevenue > 0
+                          ? `${fmt((loyaltyCost / totalRevenue) * 100)}%`
                           : "—",
                         "#E65100",
                       ],
