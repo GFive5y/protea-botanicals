@@ -1,459 +1,829 @@
-// supabase/functions/ai-copilot/index.ts
-// Protea Botanicals — AI Co-Pilot Edge Function
-// Version: v1.1
-// ★ v1.1: Added tools-only mode — works WITHOUT API keys.
-//   Tool results returned directly with smart formatting.
-//   AI providers (Grok/Claude) used only when keys are available.
-//
-// Deploy:  npx supabase functions deploy ai-copilot --no-verify-jwt
-// Secrets: npx supabase secrets set XAI_API_KEY=xxx ANTHROPIC_API_KEY=xxx
+// supabase/functions/process-document/index.ts
+// v1.9 — WP-FIN S3: Expense document detection + create_expense action
+//   classifyExpenseDocument() runs after Claude parse — detects CAPEX/OPEX invoices,
+//   service bills, payment confirmations for non-stock items. Adds create_expense
+//   to proposed_updates with correct category, amount_zar, fx conversion.
+//   Handles: Takealot lab equipment invoices, Labotec quotations, AliPay freight,
+//   general service invoices (rent, utilities, marketing, accounting).
+// v1.8 — WP-FIN S0: lump-sum invoice cost allocation (fixes BUG-038 terpene AVCO=0)
+// v1.7 — WP-IND Session 3: add create_inventory_item + create_stock_movement
+// v1.6 — WP-I Extended: Delivery Note -> Auto-receive inventory
+// Deploy: npx supabase functions deploy process-document --no-verify-jwt
 
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.97.0';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ─── CORS headers ────────────────────────────────────────────────────────
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info, apikey',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// ─── Supabase client for tool execution ──────────────────────────────────
-function getSupabaseClient() {
-  return createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const JSON_HEADERS = {
+  ...CORS_HEADERS,
+  "Content-Type": "application/json",
+};
+
+// ── WP-FIN S0: Lump-sum invoice cost allocation ───────────────────────────────
+function allocateLumpSumCosts(
+  ext: Record<string, unknown>,
+  pos: Array<Record<string, unknown>>,
+): Record<string, unknown> {
+  const lineItems = (ext.line_items as Array<Record<string, unknown>>) || [];
+  const updates =
+    (ext.proposed_updates as Array<Record<string, unknown>>) || [];
+  const totalAmount = Number(ext.total_amount ?? 0);
+  if (!totalAmount || lineItems.length === 0) return ext;
+
+  const unpricedLines = lineItems.filter(
+    (l) => !l.unit_price || Number(l.unit_price) === 0,
   );
-}
+  if (unpricedLines.length === 0) return ext;
 
-// ─── File Registry (from Handover v10.0) ─────────────────────────────────
-const FILE_REGISTRY: Record<string, { version: string; lock: string; purpose: string; key: string }> = {
-  'App.js':                 { version: 'v3.5', lock: '🔒 LOCKED', purpose: 'Root component, routing, RequireAuth/RequireRole guards, RoleContext, CoPilot overlay', key: 'Routes, guards, context providers' },
-  'Account.js':             { version: 'v5.5', lock: '🔒 LOCKED', purpose: 'Login/Register with role-based redirect + smart returnUrl', key: 'signInWithPassword, role redirect logic' },
-  'supabaseClient.js':      { version: 'v5.1', lock: '🔒 LOCKED', purpose: 'Supabase client singleton + LockManager no-op', key: 'createClient(), supabase export' },
-  'scanService.js':         { version: 'v5.1', lock: '🔒 LOCKED', purpose: 'QR scan processing — validate, award points, record scan', key: 'processScan(), awardLoyaltyPoints()' },
-  'ScanResult.js':          { version: 'v5.1', lock: '🔒 LOCKED', purpose: 'Post-scan UI with celebration modal + product info', key: 'Animated result display' },
-  'Landing.js':             { version: 'v5.2', lock: '🔒 LOCKED', purpose: 'Public landing page with auth detection + header visibility fix', key: 'Hero, features, CTA' },
-  'tokens.js':              { version: 'v2',   lock: '🔒 LOCKED', purpose: 'Design system tokens — colors, fonts, spacing, radii', key: 'All style constants' },
-  'PageShell.js':           { version: 'v1.0', lock: '🔒 LOCKED', purpose: 'Shared layout wrapper — max-width 1200px, padding, background', key: 'Layout container' },
-  'AdminDashboard.js':      { version: 'v3.5', lock: '🔒 LOCKED', purpose: '5-tab admin panel: Overview, Users, Products, Scans, Smart QR', key: 'Tab system, bulk QR, smart QR link' },
-  'WholesalePortal.js':     { version: 'v1.1', lock: '🔒 LOCKED', purpose: 'Wholesale partner dashboard with PageShell integration', key: 'Order form, partner info' },
-  'Redeem.js':              { version: 'v1.1', lock: '🔒 LOCKED', purpose: 'Loyalty point redemption with PageShell', key: 'Voucher display, redeem flow' },
-  'Shop.js':                { version: 'v2.3', lock: '🔒 LOCKED', purpose: '36 vape products (18 strains × 2 formats) + 6 Coming Soon', key: 'Product grid, R800/R1600 pricing' },
-  'ProductVerification.js': { version: 'v2.2', lock: '🔒 LOCKED', purpose: '18 Eybna strain profiles with terpene data + COA links', key: 'Strain lookup, terpene display' },
-  'AdminQrGenerator.js':    { version: 'v1.0', lock: '🔒 LOCKED', purpose: 'Smart QR generator — 4 types: product, promo, loyalty, custom', key: 'QR type selector, URL builder, download' },
-  'CoPilot.js':             { version: 'v1.0', lock: '🔓 OPEN',   purpose: 'AI Co-Pilot floating chat widget', key: 'Chat UI, provider toggle, message handling' },
-  'copilotService.js':      { version: 'v1.0', lock: '🔓 OPEN',   purpose: 'Client service layer for Co-Pilot Edge Function', key: 'sendMessage(), checkBackendHealth()' },
-  'AgeGate.js':             { version: 'v1.0', lock: '🔓 OPEN',   purpose: '4-step age verification modal (not yet integrated)', key: 'Modal flow, age check' },
-  'PromoBanner.js':         { version: 'v1.0', lock: '🔓 OPEN',   purpose: 'Animated promotional banner (not yet integrated)', key: 'Banner animation, dismiss' },
-  'Loyalty.js':             { version: 'v5.0', lock: '🔓 OPEN',   purpose: 'Loyalty dashboard — points, history, rewards', key: 'Points display, transaction history' },
-  'QrCode.js':              { version: 'v1',   lock: '🔓 OPEN',   purpose: 'QR code display component using qrcode.react', key: 'QRCodeSVG render' },
-};
+  const explicitTotal = lineItems
+    .filter((l) => l.unit_price && Number(l.unit_price) > 0)
+    .reduce((s, l) => s + Number(l.unit_price) * Number(l.quantity ?? 1), 0);
+  const remainingTotal = totalAmount - explicitTotal;
+  const unpricedQty = unpricedLines.reduce(
+    (s, l) => s + Number(l.quantity ?? 1),
+    0,
+  );
+  if (unpricedQty <= 0 || remainingTotal <= 0) return ext;
+  const impliedUnitPrice = remainingTotal / unpricedQty;
 
-// ─── Route Registry (from App.js v3.5) ───────────────────────────────────
-const ROUTE_TABLE = [
-  { path: '/',              component: 'Landing.js',             guards: 'None (public)',            layout: 'No NavBar', purpose: 'Public landing page' },
-  { path: '/account',       component: 'Account.js',            guards: 'None (public)',            layout: 'NavBar + PageShell', purpose: 'Login/Register' },
-  { path: '/scan/:qrCode',  component: 'ScanResult.js',         guards: 'None (public)',            layout: 'Standalone', purpose: 'QR scan processing' },
-  { path: '/verify/:id',    component: 'ProductVerification.js', guards: 'None (public)',           layout: 'NavBar',    purpose: 'Public product/COA verification' },
-  { path: '/shop',          component: 'Shop.js',               guards: 'None (public)',            layout: 'NavBar',    purpose: 'Product catalog (36 vapes)' },
-  { path: '/cart',          component: 'CartPage.js',           guards: 'None (public)',            layout: 'NavBar',    purpose: 'Shopping cart' },
-  { path: '/loyalty',       component: 'Loyalty.js',            guards: 'RequireAuth',              layout: 'NavBar + PageShell', purpose: 'Loyalty dashboard' },
-  { path: '/redeem',        component: 'Redeem.js',             guards: 'RequireAuth',              layout: 'NavBar + PageShell', purpose: 'Redeem loyalty points' },
-  { path: '/checkout',      component: 'CheckoutPage.js',       guards: 'RequireAuth',              layout: 'NavBar + PageShell', purpose: 'Payment checkout' },
-  { path: '/order-success', component: 'OrderSuccess.js',       guards: 'None',                     layout: 'NavBar + PageShell', purpose: 'Order confirmation' },
-  { path: '/wholesale',     component: 'WholesalePortal.js',    guards: 'RequireAuth + RequireRole(retailer)', layout: 'NavBar + PageShell', purpose: 'Wholesale partner portal' },
-  { path: '/admin',         component: 'AdminDashboard.js',     guards: 'RequireAuth + RequireRole(admin)',    layout: 'NavBar + PageShell(1200)', purpose: 'Admin dashboard (5 tabs)' },
-  { path: '/admin/qr',      component: 'AdminQrGenerator.js',   guards: 'RequireAuth + RequireRole(admin)',    layout: 'NavBar + PageShell(1200)', purpose: 'Smart QR generator' },
-  { path: '*',              component: 'NotFound.js',           guards: 'None',                     layout: 'NavBar',    purpose: '404 page' },
-];
+  const matchedPO = pos.find(
+    (po) =>
+      po.supplier_id ===
+        (ext.supplier as Record<string, unknown>)?.matched_id ||
+      po.po_number === (ext.reference as Record<string, unknown>)?.number,
+  );
+  const fxRate = Number(
+    matchedPO?.usd_zar_rate ?? ext.usd_zar_rate ?? ext.fx_rate ?? 18.5,
+  );
+  const impliedUnitPriceZar = Math.round(impliedUnitPrice * fxRate * 100) / 100;
 
-// ─── Lessons Learned ─────────────────────────────────────────────────────
-const LESSONS_LEARNED = [
-  { id: 'LL-006', lesson: 'onAuthStateChange is unreliable for redirect — use redirect after signInWithPassword response instead' },
-  { id: 'LL-011', lesson: 'Supabase v2.x ignores lock:false parameter — LockManager is a no-op' },
-  { id: 'LL-012', lesson: 'RequireAuth must check loading && !role before redirect to avoid flash' },
-  { id: 'LL-014', lesson: 'DB role values must match code exactly (customer, retailer, admin)' },
-  { id: 'LL-015', lesson: 'Password gates are redundant when RequireRole guards are in place' },
-  { id: 'LL-016', lesson: 'Always diff against the ACTUAL file version, not the handover description' },
-  { id: 'LL-017', lesson: 'Two QR tools are complementary: Bulk Generator creates DB records, Smart Generator creates URLs' },
-];
-
-// ─── Tool Execution ──────────────────────────────────────────────────────
-async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
-  const supabase = getSupabaseClient();
-
-  switch (name) {
-    case 'get_system_health': {
-      const tables = ['batches', 'products', 'scans', 'user_profiles', 'loyalty_transactions', 'redemptions'];
-      const counts: Record<string, number | string> = {};
-      for (const table of tables) {
-        const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
-        counts[table] = error ? `Error: ${error.message}` : (count ?? 0);
-      }
-      return JSON.stringify({ status: 'connected', project: 'uvicrqapgzcdvozxrreo', tables: counts }, null, 2);
+  const patchedLines = lineItems.map((l) => {
+    if (!l.unit_price || Number(l.unit_price) === 0) {
+      return {
+        ...l,
+        unit_price: impliedUnitPrice,
+        unit_cost: impliedUnitPrice,
+        unit_cost_zar: impliedUnitPriceZar,
+        allocated_cost: true,
+        confidence: Math.min(Number(l.confidence ?? 0.9), 0.75),
+      };
     }
+    return l;
+  });
 
-    case 'query_supabase': {
-      const table = args.table as string;
-      const select = (args.select as string) || '*';
-      const filters = (args.filters as Record<string, unknown>) || {};
-      const order = args.order as string | undefined;
-      const limit = Math.min((args.limit as number) || 20, 100);
-
-      const ALLOWED = ['batches', 'products', 'scans', 'user_profiles', 'loyalty_transactions', 'redemptions', 'wholesale_partners', 'orders', 'order_items', 'inventory'];
-      if (!ALLOWED.includes(table)) {
-        return JSON.stringify({ error: `Table "${table}" not in allowlist. Allowed: ${ALLOWED.join(', ')}` });
-      }
-
-      let query = supabase.from(table).select(select).limit(limit);
-      for (const [key, val] of Object.entries(filters)) {
-        query = query.eq(key, val);
-      }
-      if (order) {
-        query = query.order(order, { ascending: false });
-      }
-
-      const { data, error } = await query;
-      if (error) return JSON.stringify({ error: error.message });
-      return JSON.stringify({ table, rowCount: data?.length ?? 0, data }, null, 2);
-    }
-
-    case 'explain_file': {
-      const name = args.name as string;
-      const key = name.endsWith('.js') ? name : `${name}.js`;
-      const info = FILE_REGISTRY[key];
-      if (!info) {
-        return JSON.stringify({ error: `File "${name}" not found. Known files: ${Object.keys(FILE_REGISTRY).join(', ')}` });
-      }
-      return JSON.stringify({ file: key, ...info }, null, 2);
-    }
-
-    case 'decode_error': {
-      const trace = args.trace as string;
-      const hints: string[] = [];
-      if (trace.includes('onAuthStateChange')) hints.push(LESSONS_LEARNED[0].lesson);
-      if (trace.includes('lock') || trace.includes('Lock')) hints.push(LESSONS_LEARNED[1].lesson);
-      if (trace.includes('RequireAuth') || trace.includes('redirect')) hints.push(LESSONS_LEARNED[2].lesson);
-      if (trace.includes('role')) hints.push(LESSONS_LEARNED[3].lesson);
-      return JSON.stringify({
-        trace: trace.substring(0, 500),
-        matchedLessons: hints.length > 0 ? hints : ['No direct match — check console for full stack trace.'],
-        allLessons: LESSONS_LEARNED,
-      }, null, 2);
-    }
-
-    case 'list_routes': {
-      return JSON.stringify({ routeCount: ROUTE_TABLE.length, routes: ROUTE_TABLE }, null, 2);
-    }
-
-    case 'list_files': {
-      const files = Object.entries(FILE_REGISTRY).map(([name, info]) => ({
-        file: name,
-        version: info.version,
-        lock: info.lock,
-        purpose: info.purpose,
-      }));
-      return JSON.stringify({ fileCount: files.length, files }, null, 2);
-    }
-
-    case 'help': {
-      return JSON.stringify({
-        commands: [
-          { command: 'system health', description: 'Check Supabase connection + table row counts' },
-          { command: 'list routes', description: 'Show all routes with guards and layouts' },
-          { command: 'list files', description: 'Show all project files with version and lock status' },
-          { command: 'explain <file>', description: 'Get details about a specific file (e.g. "explain App.js")' },
-          { command: 'show <table>', description: 'Query a Supabase table (e.g. "show products", "show user_profiles")' },
-          { command: 'count <table>', description: 'Count rows in a table' },
-          { command: '<error text>', description: 'Paste an error to get diagnosis + matching Lessons Learned' },
-        ],
-        tip: 'AI summarization available when Grok/Claude API keys are configured.',
-      }, null, 2);
-    }
-
-    default:
-      return JSON.stringify({ error: `Unknown tool: ${name}` });
-  }
-}
-
-// ─── Smart formatting for tools-only mode ────────────────────────────────
-function formatToolResult(name: string, resultJson: string): string {
-  try {
-    const data = JSON.parse(resultJson);
-
-    switch (name) {
-      case 'get_system_health': {
-        let msg = `✅ Supabase connected (${data.project})\n\n📊 Table row counts:\n`;
-        for (const [table, count] of Object.entries(data.tables)) {
-          msg += `  • ${table}: ${count} rows\n`;
-        }
-        return msg;
-      }
-
-      case 'list_routes': {
-        let msg = `🗺 ${data.routeCount} routes:\n\n`;
-        for (const r of data.routes) {
-          msg += `  ${r.path}\n    → ${r.component} | ${r.guards} | ${r.layout}\n\n`;
-        }
-        return msg;
-      }
-
-      case 'list_files': {
-        let msg = `📁 ${data.fileCount} project files:\n\n`;
-        for (const f of data.files) {
-          msg += `  ${f.lock} ${f.file} (${f.version})\n    ${f.purpose}\n\n`;
-        }
-        return msg;
-      }
-
-      case 'explain_file': {
-        if (data.error) return `❌ ${data.error}`;
-        return `📄 ${data.file} (${data.version}) ${data.lock}\n\nPurpose: ${data.purpose}\nKey: ${data.key}`;
-      }
-
-      case 'query_supabase': {
-        if (data.error) return `❌ Query error: ${data.error}`;
-        let msg = `📋 ${data.table}: ${data.rowCount} rows returned\n\n`;
-        if (data.data && data.data.length > 0) {
-          // Show first 5 rows formatted
-          const rows = data.data.slice(0, 5);
-          for (const row of rows) {
-            const summary = Object.entries(row)
-              .slice(0, 5)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(' | ');
-            msg += `  • ${summary}\n`;
-          }
-          if (data.rowCount > 5) msg += `\n  ... and ${data.rowCount - 5} more`;
-        } else {
-          msg += '  (no rows)';
-        }
-        return msg;
-      }
-
-      case 'decode_error': {
-        let msg = `🔍 Error analysis:\n\n`;
-        if (data.matchedLessons.length > 0) {
-          msg += `Matching Lessons Learned:\n`;
-          for (const lesson of data.matchedLessons) {
-            msg += `  ⚡ ${lesson}\n`;
-          }
-        }
-        return msg;
-      }
-
-      case 'help': {
-        let msg = `🤖 Co-Pilot Commands:\n\n`;
-        for (const cmd of data.commands) {
-          msg += `  "${cmd.command}"\n    → ${cmd.description}\n\n`;
-        }
-        msg += `\n${data.tip}`;
-        return msg;
-      }
-
-      default:
-        return resultJson;
-    }
-  } catch {
-    return resultJson;
-  }
-}
-
-// ─── AI Provider Calls ───────────────────────────────────────────────────
-
-async function callGrok(systemPrompt: string, messages: Array<{ role: string; content: string }>) {
-  const apiKey = Deno.env.get('XAI_API_KEY');
-  if (!apiKey) return null; // No key = skip
-
-  try {
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+  const patchedUpdates = updates.map((u) => {
+    if (u.action !== "receive_delivery_item") return u;
+    const uData = (u.data as Record<string, unknown>) || {};
+    const existingCost = Number(uData.unit_cost ?? uData.unit_price ?? 0);
+    if (existingCost > 0) return u;
+    return {
+      ...u,
+      confidence: 0.75,
+      data: {
+        ...uData,
+        unit_cost: impliedUnitPrice,
+        unit_cost_zar: impliedUnitPriceZar,
+        allocated_cost: true,
       },
-      body: JSON.stringify({
-        model: 'grok-3-fast',
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        temperature: 0.3,
-        max_tokens: 2000,
-      }),
-    });
+    };
+  });
 
-    if (!response.ok) return null; // API error = fall back to tools-only
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || null;
-  } catch {
-    return null; // Network error = fall back to tools-only
-  }
+  const allExplicitCount = lineItems.length - unpricedLines.length;
+  const allocationNote =
+    `Lump-sum invoice detected. Implied unit cost: ${ext.currency ?? "USD"} ` +
+    `${impliedUnitPrice.toFixed(4)} (total ${totalAmount.toFixed(2)} ` +
+    `less ${allExplicitCount} explicit lines = ${remainingTotal.toFixed(2)} ` +
+    `/ ${unpricedQty} unpriced units). ZAR: R${impliedUnitPriceZar.toFixed(2)} at ` +
+    `R${fxRate.toFixed(4)}/USD.`;
+
+  return {
+    ...ext,
+    line_items: patchedLines,
+    proposed_updates: patchedUpdates,
+    lump_sum_invoice: true,
+    extraction_notes: [ext.extraction_notes, allocationNote]
+      .filter(Boolean)
+      .join(" | "),
+  };
 }
 
-async function callClaude(systemPrompt: string, messages: Array<{ role: string; content: string }>) {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) return null;
+// ── WP-FIN S3: Expense document classifier ────────────────────────────────────
+// Detects non-stock invoices and adds create_expense to proposed_updates.
+// Runs AFTER Claude parse and lump-sum allocation.
+//
+// CAPEX keywords: lab equipment, machinery, hardware assets, tools
+// OPEX keywords: services, freight, rent, utilities, subscriptions, professional fees
+//
+// Does NOT create expense if:
+//   - Document already has receive_delivery_item (it's a stock invoice)
+//   - proposed_updates already contains create_expense (Claude already classified it)
+//   - No total_amount extracted
+function classifyExpenseDocument(
+  ext: Record<string, unknown>,
+  usdZarRate: number,
+): Record<string, unknown> {
+  const updates =
+    (ext.proposed_updates as Array<Record<string, unknown>>) || [];
+  const docType = String(ext.document_type || "unknown").toLowerCase();
+  const totalAmount = Number(ext.total_amount ?? 0);
 
-  try {
-    const anthropicMessages = messages.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    }));
+  // Skip if no amount or already has expense action
+  if (!totalAmount) return ext;
+  if (updates.some((u) => u.action === "create_expense")) return ext;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        system: systemPrompt,
-        messages: anthropicMessages,
-        max_tokens: 2000,
-        temperature: 0.3,
-      }),
-    });
+  // Skip if this is a stock-receiving document
+  const hasStockActions = updates.some((u) =>
+    ["receive_delivery_item", "create_inventory_item"].includes(
+      String(u.action),
+    ),
+  );
+  if (hasStockActions) return ext;
 
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.content?.[0]?.text || null;
-  } catch {
-    return null;
+  // Skip if it's a PO for stock items (has create_purchase_order with items that have supplier_product_id)
+  const poAction = updates.find((u) => u.action === "create_purchase_order");
+  if (poAction) {
+    const poData = (poAction.data as Record<string, unknown>) || {};
+    const items = (poData.items as Array<Record<string, unknown>>) || [];
+    // If PO has supplier products (terpenes, hardware) — it's a stock PO, not an expense
+    if (items.length > 0 && items.some((i) => i.supplier_product_id))
+      return ext;
   }
+
+  // ── Classify expense type from line items + document content ──────────────
+  const lineItems = (ext.line_items as Array<Record<string, unknown>>) || [];
+  const allText = [
+    ...lineItems.map((l) => String(l.description || l.name || "")),
+    String(ext.extraction_notes || ""),
+    String((ext.supplier as Record<string, unknown>)?.name || ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // CAPEX indicators — lab equipment, machinery, tools, assets
+  const capexKeywords = [
+    "stirrer",
+    "hot plate",
+    "pipette",
+    "beaker",
+    "flask",
+    "centrifuge",
+    "microscope",
+    "balance",
+    "scale",
+    "filtration",
+    "extraction equipment",
+    "lab equipment",
+    "laboratory equipment",
+    "heating",
+    "cooling",
+    "pump",
+    "reactor",
+    "rotary evaporator",
+    "spectrophotometer",
+    "ph meter",
+    "autoclave",
+    "incubator",
+    "refrigerator",
+    "freezer",
+    "oven",
+    "magnetic",
+    "heating block",
+    "distillation",
+    "vacuum pump",
+    "computer",
+    "laptop",
+    "printer",
+    "scanner",
+    "camera",
+    "server",
+    "vehicle",
+    "machinery",
+    "equipment",
+    "apparatus",
+    "instrument",
+    "tool",
+    "fixture",
+    "furniture",
+    "shelving",
+    "racking",
+    "storage unit",
+    "air conditioner",
+    "generator",
+    "solar",
+    "inverter",
+    "ups",
+  ];
+
+  // OPEX indicators — services, running costs
+  const opexKeywords = [
+    "freight",
+    "logistics",
+    "shipping",
+    "courier",
+    "transport",
+    "delivery fee",
+    "rent",
+    "rental",
+    "lease",
+    "utilities",
+    "electricity",
+    "water",
+    "internet",
+    "hosting",
+    "subscription",
+    "software",
+    "licence",
+    "license",
+    "saas",
+    "accounting",
+    "audit",
+    "legal",
+    "attorney",
+    "consulting",
+    "marketing",
+    "advertising",
+    "printing",
+    "cleaning",
+    "security",
+    "insurance",
+    "bank charges",
+    "transaction fee",
+    "payment processing",
+    "travel",
+    "accommodation",
+    "fuel",
+    "国际物流",
+    "物流",
+    "freight",
+    "logistic",
+    "shenzhen",
+  ];
+
+  let category = "opex";
+  let subcategory = "Other";
+
+  // Score capex vs opex
+  const capexScore = capexKeywords.filter((k) => allText.includes(k)).length;
+  const opexScore = opexKeywords.filter((k) => allText.includes(k)).length;
+
+  if (capexScore > opexScore || capexScore > 0) {
+    category = "capex";
+    subcategory = "Equipment";
+    if (
+      allText.includes("computer") ||
+      allText.includes("laptop") ||
+      allText.includes("server")
+    )
+      subcategory = "Computer hardware";
+    else if (allText.includes("vehicle")) subcategory = "Vehicles";
+    else if (allText.includes("furniture") || allText.includes("shelving"))
+      subcategory = "Furniture";
+  } else {
+    category = "opex";
+    if (
+      opexKeywords.filter(
+        (k) =>
+          [
+            "freight",
+            "logistics",
+            "shipping",
+            "courier",
+            "transport",
+            "物流",
+            "shenzhen",
+          ].includes(k) && allText.includes(k),
+      ).length > 0
+    )
+      subcategory = "Shipping";
+    else if (allText.includes("rent") || allText.includes("lease"))
+      subcategory = "Rent";
+    else if (
+      allText.includes("electricity") ||
+      allText.includes("water") ||
+      allText.includes("utilities")
+    )
+      subcategory = "Utilities";
+    else if (
+      allText.includes("internet") ||
+      allText.includes("hosting") ||
+      allText.includes("subscription")
+    )
+      subcategory = "Software subscriptions";
+    else if (
+      allText.includes("accounting") ||
+      allText.includes("audit") ||
+      allText.includes("legal")
+    )
+      subcategory = "Accounting";
+    else if (allText.includes("marketing") || allText.includes("advertising"))
+      subcategory = "Marketing";
+    else if (allText.includes("insurance")) subcategory = "Insurance";
+    else if (
+      allText.includes("freight") ||
+      allText.includes("shipping") ||
+      allText.includes("transport")
+    )
+      subcategory = "Shipping";
+  }
+
+  // Convert to ZAR
+  const currency = String(ext.currency || "ZAR").toUpperCase();
+  let amountZar = totalAmount;
+  let amountForeign: number | null = null;
+  let fxRateUsed: number | null = null;
+
+  if (currency === "USD") {
+    amountForeign = totalAmount;
+    fxRateUsed = usdZarRate;
+    amountZar = Math.round(totalAmount * usdZarRate * 100) / 100;
+  } else if (currency === "EUR") {
+    amountForeign = totalAmount;
+    fxRateUsed = usdZarRate * 1.08; // rough EUR/ZAR
+    amountZar = Math.round(totalAmount * fxRateUsed * 100) / 100;
+  } else if (currency === "CNY") {
+    amountForeign = totalAmount;
+    fxRateUsed = usdZarRate / 7.2; // rough CNY/ZAR
+    amountZar = Math.round(totalAmount * fxRateUsed * 100) / 100;
+  }
+
+  // Build description from line items or supplier name
+  let description =
+    lineItems.length > 0
+      ? lineItems
+          .map((l) => String(l.description || l.name || ""))
+          .filter(Boolean)
+          .join(", ")
+          .slice(0, 200)
+      : String((ext.supplier as Record<string, unknown>)?.name || "Expense");
+
+  if (!description || description.length < 3) {
+    description = `${category === "capex" ? "Equipment purchase" : "Business expense"} — ${String((ext.supplier as Record<string, unknown>)?.name || "supplier")}`;
+  }
+
+  const expenseDate = String(
+    (ext.reference as Record<string, unknown>)?.date ||
+      new Date().toISOString().slice(0, 10),
+  );
+
+  const expenseAction: Record<string, unknown> = {
+    action: "create_expense",
+    table: "expenses",
+    record_id: null,
+    description: `Create ${category} expense: ${description.slice(0, 80)}`,
+    data: {
+      expense_date: expenseDate,
+      category: category,
+      subcategory: subcategory,
+      description: description,
+      amount_zar: amountZar,
+      currency: currency,
+      amount_foreign: amountForeign,
+      fx_rate: fxRateUsed,
+      supplier_id:
+        (ext.supplier as Record<string, unknown>)?.matched_id || null,
+    },
+    confidence: Math.min(Number(ext.confidence ?? 0.8), 0.85),
+  };
+
+  // Note added to extraction
+  const expenseNote = `Expense detected: ${category.toUpperCase()} — ${description.slice(0, 60)} — R${amountZar.toFixed(2)}${currency !== "ZAR" ? ` (${currency} ${totalAmount})` : ""}`;
+
+  return {
+    ...ext,
+    proposed_updates: [...updates, expenseAction],
+    expense_detected: true,
+    expense_category: category,
+    extraction_notes: [ext.extraction_notes, expenseNote]
+      .filter(Boolean)
+      .join(" | "),
+  };
 }
 
-// ─── Main Handler ────────────────────────────────────────────────────────
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
-  }
+// ── System prompt ─────────────────────────────────────────────────────────────
+function buildSystemPrompt(
+  existingSuppliers: unknown[],
+  existingProducts: unknown[],
+  existingInventory: unknown[],
+  openPurchaseOrders: unknown[],
+  industryProfile: string,
+): string {
+  const industryContext =
+    industryProfile === "food_beverage"
+      ? "food & beverage producer (ingredients, packaging, equipment)"
+      : industryProfile === "general_retail"
+        ? "general retail business (finished goods, accessories, packaging)"
+        : "cannabis extract company (terpenes, hardware, distillate, packaging)";
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    });
+  return `You are a document extraction engine for a ${industryContext} in South Africa.
+Extract ALL structured data from business documents and propose specific database updates.
+You MUST respond with ONLY valid JSON - no markdown, no code fences, no explanation, no preamble.
+
+DOCUMENT TYPES (detect from content):
+invoice | quote | proof_of_payment | delivery_note | coa | price_list | stock_sheet | contract | unknown
+
+EXISTING SUPPLIERS IN SYSTEM:
+${JSON.stringify(existingSuppliers, null, 2)}
+
+EXISTING PRODUCTS/SKUs IN SYSTEM (${existingProducts.length} products already in database):
+${JSON.stringify(existingProducts, null, 2)}
+
+EXISTING INVENTORY ITEMS (use for delivery_note item matching):
+${JSON.stringify(existingInventory, null, 2)}
+
+OPEN PURCHASE ORDERS (use for delivery_note PO matching):
+${JSON.stringify(openPurchaseOrders, null, 2)}
+
+RESPOND EXACTLY in this JSON structure:
+{
+  "document_type": "invoice",
+  "confidence": 0.94,
+  "supplier": { "name": "supplier name", "matched_id": "uuid or null", "confidence": 0.97 },
+  "reference": { "number": "INV-001", "date": "2026-03-01", "due_date": null, "confidence": 0.99 },
+  "currency": "ZAR",
+  "total_amount": 1750.00,
+  "line_items": [],
+  "proposed_updates": [],
+  "unknown_items": [],
+  "warnings": [],
+  "extraction_notes": "brief note"
+}
+
+=======================================================
+MANDATORY RULE - proposed_updates MUST NEVER BE EMPTY
+=======================================================
+If the document contains ANY line items, suppliers, payments, or quantities,
+you MUST produce at least one proposed_update.
+
+=======================================================
+EXPENSE DOCUMENT DETECTION — WP-FIN S3
+=======================================================
+When the document is an invoice or payment for NON-STOCK items
+(equipment, services, rent, utilities, freight, professional fees),
+propose create_expense action.
+
+CAPEX (capital expenditure — assets owned by the business):
+  - Lab equipment: stirrers, pipettes, beakers, centrifuges, balances
+  - Machinery: extraction equipment, pumps, reactors, filtration units
+  - Electronics: computers, servers, printers, cameras
+  - Furniture, shelving, racking, storage units
+  - Vehicles, air conditioners, generators, solar/inverter systems
+
+OPEX (operating expenses — recurring business costs):
+  - Freight, logistics, shipping, courier, transport fees
+  - Rent, lease, utilities, electricity, water, internet
+  - Software subscriptions, hosting, SaaS tools
+  - Accounting, legal, consulting, marketing, advertising
+  - Insurance, bank charges, travel, cleaning, security
+
+RULE: If the invoice contains BOTH stock items (terpenes, hardware) AND
+  expense items (freight charge on same invoice), create BOTH:
+  create_purchase_order (for stock) AND create_expense (for freight separately).
+
+RULE: Payment confirmations (Stripe, AliPay, bank transfer screenshots) for
+  non-stock payments → create_expense. For stock payments → skip (PO flow handles it).
+
+=======================================================
+create_expense EXAMPLE:
+=======================================================
+{
+  "action": "create_expense",
+  "table": "expenses",
+  "record_id": null,
+  "description": "Create capex expense: SH-2 Magnetic Stirrer Hot Plate R1750.00",
+  "data": {
+    "expense_date": "2026-02-09",
+    "category": "capex",
+    "subcategory": "Equipment",
+    "description": "SH-2 Magnetic Stirrer Hot Plate with Stand (Heating & Stirring) — Takealot",
+    "amount_zar": 1750.00,
+    "currency": "ZAR",
+    "amount_foreign": null,
+    "fx_rate": null,
+    "supplier_id": "uuid-if-matched-else-null"
+  },
+  "confidence": 0.92
+}
+
+create_expense for foreign currency (AliPay/Stripe freight):
+{
+  "action": "create_expense",
+  "table": "expenses",
+  "record_id": null,
+  "description": "Create opex expense: Freight — Shenzhen logistics CNY 742.63",
+  "data": {
+    "expense_date": "2026-02-03",
+    "category": "opex",
+    "subcategory": "Shipping",
+    "description": "International freight — 深圳市东方鸿国际物流有限公司",
+    "amount_zar": 1543.00,
+    "currency": "CNY",
+    "amount_foreign": 742.63,
+    "fx_rate": 2.078,
+    "supplier_id": null
+  },
+  "confidence": 0.80
+}
+
+=======================================================
+FOR EVERY DOCUMENT TYPE:
+=======================================================
+
+INVOICE / QUOTE — STOCK ITEMS (terpenes, hardware, raw materials):
+  1. create_purchase_order
+  2. update_product_price (matched products, price > 0)
+  3. create_supplier_product (unmatched products)
+
+INVOICE / QUOTE — EXPENSE ITEMS (equipment, services, freight):
+  1. create_expense (category: capex or opex based on item type)
+
+INVOICE — MIXED (stock + freight charge on same invoice):
+  1. create_purchase_order (for stock items)
+  2. create_expense (for freight/delivery charge line)
+
+PROOF OF PAYMENT:
+  - For stock payment: update_po_payment on purchase_orders
+  - For non-stock payment: create_expense
+
+DELIVERY NOTE:
+  - receive_delivery_item per matched inventory item
+  - update_po_status if matching PO found
+
+COA / LAB REPORT:
+  - update_batch_coa on batches
+
+=======================================================
+PRODUCT MATCHING RULES
+=======================================================
+STEP 1 — Search existing_products by name similarity.
+STEP 2 — If MATCHED: update_product_price (not free sample). No create_supplier_product.
+STEP 3 — If NOT MATCHED: create_supplier_product.
+
+=======================================================
+GENERAL RETAIL — create_inventory_item + create_stock_movement
+=======================================================
+For non-cannabis supplier invoices where no PO exists and items not in inventory:
+  create_inventory_item + create_stock_movement as a PAIR per new SKU.
+
+=======================================================
+SUPPLIER MATCHING
+=======================================================
+Match suppliers by name similarity to EXISTING SUPPLIERS list.
+Non-English documents: translate extracted data to English.
+Currencies: R/ZAR = ZAR, $ = USD, ¥/CNY = CNY, € = EUR.
+
+EXAMPLES:
+create_purchase_order — same as before (invoice/quote for stock items)
+receive_delivery_item — same as before (delivery note)
+update_po_status — same as before (delivery note)
+update_product_price — same as before (matched product, price > 0)
+create_supplier_product — same as before (unmatched product)
+create_inventory_item + create_stock_movement — same as before (general retail)
+
+supplier_products.category must be: hardware OR terpene (lowercase, no plural)`;
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
   }
 
   try {
     const body = await req.json();
-    const { message, provider = 'grok', history = [] } = body;
+    const {
+      file_base64,
+      mime_type,
+      file_url = "",
+      file_name = "document",
+      file_size_kb = null,
+      document_type_hint = null,
+      context = {},
+    } = body;
 
-    // Health check
-    if (message === '__health_check__') {
-      return new Response(JSON.stringify({ status: 'ok', provider, timestamp: new Date().toISOString() }), {
-        status: 200,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      });
+    if (!file_base64 || !mime_type) {
+      return new Response(
+        JSON.stringify({ error: "file_base64 and mime_type are required" }),
+        { status: 400, headers: JSON_HEADERS },
+      );
     }
 
-    // ── Step 1: Match tools ──────────────────────────────────────────
-    const toolCalls: Array<{ name: string; args: string; result: string }> = [];
-    const lowerMsg = message.toLowerCase().trim();
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
-    // Help
-    if (lowerMsg === 'help' || lowerMsg === '?' || lowerMsg === 'commands') {
-      const result = await executeTool('help', {});
-      toolCalls.push({ name: 'help', args: '', result });
-    }
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get(
+      "SUPABASE_SERVICE_ROLE_KEY",
+    )!;
 
-    // System health
-    if (lowerMsg.includes('health') || lowerMsg.includes('status') || lowerMsg.includes('connection') || lowerMsg.includes('ping')) {
-      const result = await executeTool('get_system_health', {});
-      toolCalls.push({ name: 'get_system_health', args: '', result });
-    }
+    const existingSuppliers = (context.existing_suppliers || []).map(
+      (s: Record<string, unknown>) => ({
+        id: s.id,
+        name: s.name,
+        country: s.country,
+        currency: s.currency,
+      }),
+    );
+    const existingProducts = (context.existing_products || []).map(
+      (p: Record<string, unknown>) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        category: p.category,
+        unit_price_usd: p.unit_price_usd,
+        supplier_id: p.supplier_id,
+      }),
+    );
+    const existingInventory = (context.existing_inventory || []).map(
+      (i: Record<string, unknown>) => ({
+        id: i.id,
+        name: i.name,
+        sku: i.sku,
+        category: i.category,
+        quantity_on_hand: i.quantity_on_hand,
+      }),
+    );
+    const openPurchaseOrders = (context.open_purchase_orders || []).map(
+      (po: Record<string, unknown>) => ({
+        id: po.id,
+        po_number: po.po_number,
+        supplier_id: po.supplier_id,
+        po_status: po.po_status,
+        expected_arrival: po.expected_arrival,
+        usd_zar_rate: po.usd_zar_rate ?? null,
+      }),
+    );
 
-    // Routes
-    if (lowerMsg.includes('route') || lowerMsg.includes('routes') || lowerMsg.includes('url') || lowerMsg.includes('pages')) {
-      const result = await executeTool('list_routes', {});
-      toolCalls.push({ name: 'list_routes', args: '', result });
-    }
+    const industryProfile = String(
+      body.industry_profile || context.industry_profile || "cannabis_retail",
+    );
 
-    // Files
-    if (lowerMsg === 'list files' || lowerMsg === 'files' || lowerMsg.includes('file registry') || lowerMsg.includes('all files')) {
-      const result = await executeTool('list_files', {});
-      toolCalls.push({ name: 'list_files', args: '', result });
-    }
+    // Live FX rate for expense ZAR conversion (fallback 18.5)
+    const usdZarRate = Number(context.usd_zar_rate ?? 18.5);
 
-    // Query table
-    const tableMatch = lowerMsg.match(/(?:query|show|list|count|how many|check|get)\s+(batches|products|scans|user_profiles|loyalty_transactions|redemptions|wholesale_partners|orders|order_items|inventory)/);
-    if (tableMatch) {
-      const result = await executeTool('query_supabase', { table: tableMatch[1], limit: 10 });
-      toolCalls.push({ name: 'query_supabase', args: tableMatch[1], result });
-    }
+    const isPdf = mime_type === "application/pdf";
+    const documentBlock = isPdf
+      ? {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: file_base64,
+          },
+        }
+      : {
+          type: "image",
+          source: { type: "base64", media_type: mime_type, data: file_base64 },
+        };
 
-    // Explain file
-    const fileMatch = lowerMsg.match(/(?:explain|what does|tell me about|describe|info on|what is)\s+(\w+\.?j?s?)/);
-    if (fileMatch && !['the', 'this', 'that', 'my', 'a', 'an'].includes(fileMatch[1])) {
-      const fileName = fileMatch[1].endsWith('.js') ? fileMatch[1] : `${fileMatch[1]}.js`;
-      const result = await executeTool('explain_file', { name: fileName });
-      toolCalls.push({ name: 'explain_file', args: fileName, result });
-    }
+    const userContent = [
+      documentBlock,
+      {
+        type: "text",
+        text: `Extract all data from this ${document_type_hint ? document_type_hint + " " : ""}document and return the JSON as specified.
 
-    // Error decode
-    if ((lowerMsg.includes('error') || lowerMsg.includes('failed') || lowerMsg.includes('crash') || lowerMsg.includes('bug')) && message.length > 30) {
-      const result = await executeTool('decode_error', { trace: message });
-      toolCalls.push({ name: 'decode_error', args: 'trace', result });
-    }
-
-    // No tool matched — show help
-    if (toolCalls.length === 0) {
-      const result = await executeTool('help', {});
-      toolCalls.push({ name: 'help', args: '', result });
-    }
-
-    // ── Step 2: Try AI provider (graceful fallback) ──────────────────
-    const toolResultsStr = toolCalls.map((tc) => `[${tc.name}]: ${tc.result}`).join('\n\n');
-
-    const systemPrompt = `You are the Protea Botanicals Co-Pilot. React 18 CRA + Supabase v2.97.0. v10.0 status. Be concise.\n\n--- TOOL RESULTS ---\n${toolResultsStr}\n--- END ---\n\nSummarize the tool results clearly for the developer.`;
-
-    const conversationMessages = [
-      ...history.slice(-10).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
-      { role: 'user', content: message },
+CRITICAL REMINDERS:
+1. proposed_updates MUST NOT be empty if there are any line items or actionable data.
+2. For stock invoices/quotes: ALWAYS create create_purchase_order.
+3. For expense invoices (equipment, services, freight, rent): propose create_expense.
+4. For MIXED invoices (stock + freight charge): create BOTH create_purchase_order AND create_expense.
+5. Payment confirmations (Stripe, AliPay, bank transfer) for non-stock → create_expense.
+6. For delivery notes: use receive_delivery_item + update_po_status.
+7. For COA/lab reports: use update_batch_coa.
+8. For general retail invoices (no PO): use create_inventory_item + create_stock_movement pairs.
+9. Detect currency correctly: R/ZAR=ZAR, $=USD, ¥=CNY, €=EUR.
+10. Non-English documents (Chinese, etc.): translate extracted data to English.`,
+      },
     ];
 
-    let answer: string | null = null;
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "pdfs-2024-09-25,output-128k-2025-02-19",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 32000,
+        system: buildSystemPrompt(
+          existingSuppliers,
+          existingProducts,
+          existingInventory,
+          openPurchaseOrders,
+          industryProfile,
+        ),
+        messages: [{ role: "user", content: userContent }],
+      }),
+    });
 
-    if (provider === 'claude') {
-      answer = await callClaude(systemPrompt, conversationMessages);
-    } else {
-      answer = await callGrok(systemPrompt, conversationMessages);
+    if (!claudeRes.ok) {
+      const errText = await claudeRes.text();
+      throw new Error(`Anthropic API error ${claudeRes.status}: ${errText}`);
     }
 
-    // ── Step 3: Fallback to formatted tool results ───────────────────
-    if (!answer) {
-      // No AI available — format tool results directly
-      answer = toolCalls
-        .map((tc) => formatToolResult(tc.name, tc.result))
-        .join('\n─────────────────\n');
-      answer += '\n\n💡 Tip: Add API keys for AI-powered summaries (see COPILOT_SETUP.md)';
+    const claudeData = await claudeRes.json();
+    const rawText: string = claudeData.content?.[0]?.text || "";
+
+    let extraction: Record<string, unknown>;
+    try {
+      const cleaned = rawText
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      extraction = JSON.parse(cleaned);
+    } catch {
+      throw new Error(
+        `Claude returned non-JSON response: ${rawText.substring(0, 300)}`,
+      );
     }
+
+    // WP-FIN S0: lump-sum cost allocation
+    extraction = allocateLumpSumCosts(extraction, openPurchaseOrders);
+
+    // WP-FIN S3: expense document classification
+    extraction = classifyExpenseDocument(extraction, usdZarRate);
+
+    const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // LL-084: Duplicate invoice guard
+    const refNumber = (extraction.reference as Record<string, unknown>)
+      ?.number as string | null;
+    const supplierId = (extraction.supplier as Record<string, unknown>)
+      ?.matched_id as string | null;
+    if (refNumber && supplierId) {
+      const { data: existingConfirmed } = await db
+        .from("document_log")
+        .select("id, file_name, confirmed_at")
+        .eq("status", "confirmed")
+        .eq("supplier_id", supplierId)
+        .filter("extracted_data->reference->>number", "eq", refNumber)
+        .limit(1);
+      if (existingConfirmed && existingConfirmed.length > 0) {
+        const dup = existingConfirmed[0];
+        const dupDate = new Date(dup.confirmed_at).toLocaleDateString("en-ZA");
+        const dupWarning =
+          `⚠ DUPLICATE INVOICE DETECTED: Reference "${refNumber}" was already ` +
+          `confirmed on ${dupDate} (file: ${dup.file_name}). ` +
+          `Do NOT confirm any stock movement actions — this will create duplicate inventory entries.`;
+        (extraction.warnings as string[]).push(dupWarning);
+        extraction.potential_duplicate = true;
+        extraction.confidence = Math.min(
+          Number(extraction.confidence ?? 1),
+          0.4,
+        );
+      }
+    }
+
+    const { data: logEntry, error: logErr } = await db
+      .from("document_log")
+      .insert({
+        document_type: String(extraction.document_type || "unknown"),
+        file_url: file_url,
+        file_name: file_name,
+        file_size_kb: file_size_kb,
+        supplier_name:
+          ((extraction.supplier as Record<string, unknown>)?.name as
+            | string
+            | null) ?? null,
+        supplier_id:
+          ((extraction.supplier as Record<string, unknown>)?.matched_id as
+            | string
+            | null) ?? null,
+        extracted_data: extraction,
+        confidence_score:
+          typeof extraction.confidence === "number"
+            ? extraction.confidence
+            : null,
+        status: "pending_review",
+      })
+      .select()
+      .single();
+
+    if (logErr)
+      throw new Error(`Failed to log to document_log: ${logErr.message}`);
 
     return new Response(
       JSON.stringify({
-        answer,
-        provider: answer ? provider : 'tools-only',
-        toolCalls: toolCalls.map((tc) => ({ name: tc.name, args: tc.args })),
-        timestamp: new Date().toISOString(),
+        success: true,
+        document_log_id: logEntry.id,
+        extraction,
       }),
-      {
-        status: 200,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      }
+      { headers: JSON_HEADERS },
     );
-  } catch (error) {
-    console.error('[ai-copilot] Error:', error);
-    return new Response(
-      JSON.stringify({
-        error: error.message || 'Internal server error',
-        answer: `⚠ Co-Pilot error: ${error.message}. Check Edge Function logs.`,
-        toolCalls: [],
-      }),
-      {
-        status: 500,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      }
-    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[process-document] Error:", message);
+    return new Response(JSON.stringify({ success: false, error: message }), {
+      status: 500,
+      headers: JSON_HEADERS,
+    });
   }
 });

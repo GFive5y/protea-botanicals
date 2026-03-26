@@ -1834,13 +1834,7 @@ export default function HQDocuments({ initialDocId = null }) {
   }, [initialDocId, documents]);
 
   const fetchFreshContext = async () => {
-    const fxRes = await supabase
-      .from("fx_rates")
-      .select("usd_zar")
-      .order("fetched_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const cachedUsdZar = fxRes.data?.usd_zar || 18.5;
+    const cachedUsdZar = 18.5;
 
     const [{ data: sups }, { data: prods }, { data: invs }, { data: pos }] =
       await Promise.all([
