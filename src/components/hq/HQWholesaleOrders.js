@@ -6,7 +6,7 @@
 // Tables: purchase_orders (direction=outbound), purchase_order_items,
 //         wholesale_partners, inventory_items, stock_reservations
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 
@@ -171,6 +171,518 @@ const availQty = (item) =>
     0,
     parseFloat(item.quantity_on_hand || 0) - parseFloat(item.reserved_qty || 0),
   );
+
+// ── INVOICE MODAL ─────────────────────────────────────────────────────────────
+function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
+  const printRef = useRef();
+  const invNumber = `INV-${order.po_number?.replace("WHO-", "") || order.id?.slice(0, 8).toUpperCase()}`;
+  const issueDate = new Date().toLocaleDateString("en-ZA", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const dueDate = new Date(Date.now() + 30 * 86400000).toLocaleDateString(
+    "en-ZA",
+    { day: "numeric", month: "long", year: "numeric" },
+  );
+  const subtotal = parseFloat(order.subtotal || 0);
+  const vat = subtotal * 0.15;
+  const total = subtotal + vat;
+
+  const handlePrint = () => {
+    const content = printRef.current.innerHTML;
+    const win = window.open("", "_blank");
+    win.document.write(`
+      <html><head><title>${invNumber}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #111; font-size: 13px; }
+        .page { max-width: 760px; margin: 0 auto; padding: 48px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 8px 10px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #666; border-bottom: 2px solid #1A3D2B; }
+        td { padding: 10px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .total-row td { font-weight: 700; border-top: 2px solid #1A3D2B; border-bottom: none; font-size: 15px; }
+        .meta { font-size: 11px; color: #888; margin-top: 3px; }
+        @media print { body { -webkit-print-color-adjust: exact; } }
+      </style></head>
+      <body><div class="page">${content}</div></body></html>
+    `);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 400);
+  };
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.55)",
+          zIndex: 2000,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%,-50%)",
+          background: "#fff",
+          borderRadius: 8,
+          width: 780,
+          maxWidth: "95vw",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          zIndex: 2001,
+          boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+        }}
+      >
+        {/* Modal toolbar */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "14px 24px",
+            borderBottom: `1px solid ${T.ink150}`,
+            position: "sticky",
+            top: 0,
+            background: "#fff",
+            zIndex: 1,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: T.accent,
+              fontFamily: T.fontUi,
+            }}
+          >
+            {invNumber}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={handlePrint}
+              style={{ ...sBtn(), fontSize: 10, padding: "7px 16px" }}
+            >
+              🖨 Print / Save PDF
+            </button>
+            <button
+              onClick={onClose}
+              style={{ ...sBtn("outline"), fontSize: 10, padding: "7px 14px" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* Invoice content */}
+        <div ref={printRef} style={{ padding: "40px 48px" }}>
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 40,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 300,
+                  color: T.accent,
+                  letterSpacing: "-0.02em",
+                  marginBottom: 4,
+                }}
+              >
+                TAX INVOICE
+              </div>
+              <div style={{ fontSize: 13, color: T.ink500 }}>{tenantName}</div>
+              <div style={{ fontSize: 11, color: T.ink300, marginTop: 4 }}>
+                VAT Reg: (add VAT number)
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: T.ink900,
+                  marginBottom: 6,
+                }}
+              >
+                {invNumber}
+              </div>
+              <div style={{ fontSize: 12, color: T.ink500 }}>
+                Issue date: <strong>{issueDate}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: T.ink500 }}>
+                Due date:{" "}
+                <strong style={{ color: T.warning }}>{dueDate}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: T.ink500, marginTop: 4 }}>
+                Order ref: <strong>{order.po_number}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Bill to */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 32,
+              marginBottom: 36,
+            }}
+          >
+            <div
+              style={{
+                background: T.accentLit,
+                border: `1px solid ${T.accentBd}`,
+                borderRadius: 6,
+                padding: "16px 18px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: T.accentMid,
+                  marginBottom: 8,
+                }}
+              >
+                Bill To
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: T.ink900 }}>
+                {partner?.business_name || "—"}
+              </div>
+              {partner?.contact_name && (
+                <div style={{ fontSize: 12, color: T.ink500, marginTop: 3 }}>
+                  {partner.contact_name}
+                </div>
+              )}
+              {partner?.email && (
+                <div style={{ fontSize: 12, color: T.ink500 }}>
+                  {partner.email}
+                </div>
+              )}
+              {partner?.phone && (
+                <div style={{ fontSize: 12, color: T.ink500 }}>
+                  {partner.phone}
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                background: T.ink075,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 6,
+                padding: "16px 18px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 8,
+                }}
+              >
+                Payment Details
+              </div>
+              <div style={{ fontSize: 12, color: T.ink500, lineHeight: 1.8 }}>
+                <div>
+                  Bank:{" "}
+                  <strong style={{ color: T.ink900 }}>
+                    FNB / Standard Bank
+                  </strong>
+                </div>
+                <div>
+                  Account:{" "}
+                  <strong style={{ color: T.ink900 }}>
+                    Add account number
+                  </strong>
+                </div>
+                <div>
+                  Branch:{" "}
+                  <strong style={{ color: T.ink900 }}>Add branch code</strong>
+                </div>
+                <div>
+                  Reference:{" "}
+                  <strong style={{ color: T.accent }}>{invNumber}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Line items table */}
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              marginBottom: 24,
+            }}
+          >
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    fontSize: 9,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    borderBottom: `2px solid ${T.accent}`,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  Product
+                </th>
+                <th
+                  style={{
+                    textAlign: "right",
+                    padding: "10px 12px",
+                    fontSize: 9,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    borderBottom: `2px solid ${T.accent}`,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  Qty
+                </th>
+                <th
+                  style={{
+                    textAlign: "right",
+                    padding: "10px 12px",
+                    fontSize: 9,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    borderBottom: `2px solid ${T.accent}`,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  Unit Price
+                </th>
+                <th
+                  style={{
+                    textAlign: "right",
+                    padding: "10px 12px",
+                    fontSize: 9,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    borderBottom: `2px solid ${T.accent}`,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  Line Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, i) => {
+                const item = items.find((it) => it.id === line.item_id);
+                const qty = parseFloat(line.quantity_ordered || 0);
+                const price = parseFloat(line.unit_cost || 0);
+                const lineTotal = qty * price;
+                return (
+                  <tr
+                    key={line.id || i}
+                    style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
+                  >
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${T.ink150}`,
+                        fontSize: 13,
+                        color: T.ink900,
+                        fontFamily: T.fontUi,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {item?.name || "—"}
+                      {item?.sku && (
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: T.ink300,
+                            marginTop: 2,
+                          }}
+                        >
+                          SKU: {item.sku}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${T.ink150}`,
+                        fontSize: 13,
+                        color: T.ink700,
+                        textAlign: "right",
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      {qty}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${T.ink150}`,
+                        fontSize: 13,
+                        color: T.ink700,
+                        textAlign: "right",
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      R
+                      {price.toLocaleString("en-ZA", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${T.ink150}`,
+                        fontSize: 13,
+                        color: T.ink900,
+                        textAlign: "right",
+                        fontFamily: T.fontUi,
+                        fontWeight: 600,
+                      }}
+                    >
+                      R
+                      {lineTotal.toLocaleString("en-ZA", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ width: 280 }}>
+              {[
+                {
+                  label: "Subtotal (excl. VAT)",
+                  value: subtotal,
+                  color: T.ink700,
+                },
+                { label: "VAT (15%)", value: vat, color: T.ink500 },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "8px 0",
+                    borderBottom: `1px solid ${T.ink150}`,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: row.color,
+                      fontFamily: T.fontUi,
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: row.color,
+                      fontFamily: T.fontUi,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    R
+                    {row.value.toLocaleString("en-ZA", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              ))}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "14px 0 0",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: T.accent,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  TOTAL DUE
+                </span>
+                <span
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: T.accent,
+                    fontFamily: T.fontUi,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  R{total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: T.ink300,
+                  fontFamily: T.fontUi,
+                }}
+              >
+                Payment due within 30 days · Reference: {invNumber}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
+            style={{
+              marginTop: 48,
+              paddingTop: 20,
+              borderTop: `1px solid ${T.ink150}`,
+              fontSize: 11,
+              color: T.ink300,
+              textAlign: "center",
+              fontFamily: T.fontUi,
+            }}
+          >
+            {tenantName} · Thank you for your business
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 // ── CREATE ORDER FORM ─────────────────────────────────────────────────────────
 function CreateOrderForm({ partners, items, onSaved, onCancel }) {
@@ -494,10 +1006,50 @@ function CreateOrderForm({ partners, items, onSaved, onCancel }) {
 }
 
 // ── ORDER CARD ────────────────────────────────────────────────────────────────
-function OrderCard({ order, partners, items, onRefresh, tenantId }) {
+function OrderCard({
+  order,
+  partners,
+  items,
+  onRefresh,
+  tenantId,
+  tenantName,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [working, setWorking] = useState(false);
   const [toast, setToast] = useState(null);
+  const [showInvoice, setShowInvoice] = useState(false);
+
+  const generateInvoiceRecord = async (
+    orderId,
+    poNumber,
+    subtotal,
+    partnerId,
+  ) => {
+    try {
+      const invNumber = `INV-${poNumber?.replace("WHO-", "") || orderId?.slice(0, 8).toUpperCase()}`;
+      const dueDate = new Date(Date.now() + 30 * 86400000)
+        .toISOString()
+        .split("T")[0];
+      await supabase.from("invoices").upsert(
+        {
+          reference: invNumber,
+          po_id: orderId,
+          customer_id: partnerId,
+          subtotal_zar: subtotal,
+          vat_zar: subtotal * 0.15,
+          total_zar: subtotal * 1.15,
+          status: "pending",
+          due_date: dueDate,
+          tenant_id: tenantId,
+          issued_date: new Date().toISOString().split("T")[0],
+          notes: `Auto-generated from wholesale order ${poNumber}`,
+        },
+        { onConflict: "reference" },
+      );
+    } catch (err) {
+      console.warn("[Invoice] auto-generate failed:", err.message);
+    }
+  };
 
   const partner = partners.find((p) => p.id === order.customer_id);
   const lines = order.purchase_order_items || [];
@@ -609,7 +1161,15 @@ function OrderCard({ order, partners, items, onRefresh, tenantId }) {
         .update({ po_status: "shipped", status: "shipped" })
         .eq("id", order.id);
 
-      showToast(`Order ${order.po_number} shipped. Stock deducted.`);
+      // Auto-generate invoice record
+      await generateInvoiceRecord(
+        order.id,
+        order.po_number,
+        subtotal,
+        order.customer_id,
+      );
+
+      showToast(`Order ${order.po_number} shipped. Invoice generated.`);
       onRefresh();
     } catch (err) {
       showToast("Ship failed: " + err.message, "error");
@@ -805,12 +1365,36 @@ function OrderCard({ order, partners, items, onRefresh, tenantId }) {
               Mark Delivered
             </button>
           )}
+          {["shipped", "delivered", "confirmed"].includes(status) && (
+            <button
+              onClick={() => setShowInvoice(true)}
+              style={{
+                ...sBtn("outline"),
+                padding: "6px 12px",
+                fontSize: "9px",
+                borderColor: T.accentBd,
+                color: T.accentMid,
+              }}
+            >
+              📄 Invoice
+            </button>
+          )}
           <button
             onClick={() => setExpanded((p) => !p)}
             style={{ ...sBtn("outline"), padding: "6px 12px", fontSize: "9px" }}
           >
             {expanded ? "▲ Hide" : "▼ Lines"}
           </button>
+          {showInvoice && (
+            <InvoiceModal
+              order={order}
+              partner={partner}
+              lines={lines}
+              items={items}
+              tenantName={tenantName || "Pure Premium THC Vapes"}
+              onClose={() => setShowInvoice(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -960,7 +1544,7 @@ export default function HQWholesaleOrders() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [filterStatus, setFilterStatus] = useState("active");
-  const { tenantId } = useTenant();
+  const { tenantId, tenant } = useTenant();
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -1220,6 +1804,7 @@ export default function HQWholesaleOrders() {
               items={items}
               onRefresh={fetchAll}
               tenantId={tenantId}
+              tenantName={tenant?.name}
             />
           ))}
         </div>
