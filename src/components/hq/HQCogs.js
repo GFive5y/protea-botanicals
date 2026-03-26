@@ -1113,6 +1113,8 @@ function ChambersEditor({
 export default function HQCogs() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
+  const { tenant } = useTenant();
+  const tenantId = tenant?.id;
   const ctx = usePageContext("costing", null);
 
   const [recipes, setRecipes] = useState([]);
@@ -1263,6 +1265,7 @@ export default function HQCogs() {
     setSaving(true);
     try {
       const payload = {
+        tenant_id: tenantId,
         product_name: form.product_name.trim(),
         sku: form.sku.trim() || null,
         batch_size: parseInt(form.batch_size) || 50,
