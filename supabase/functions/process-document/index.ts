@@ -1,680 +1,459 @@
-// supabase/functions/process-document/index.ts
-// v1.8 — WP-FIN S0: lump-sum invoice cost allocation (fixes BUG-038 terpene AVCO=0)
-//   allocateLumpSumCosts() runs after Claude parse — detects invoices with missing
-//   per-line pricing, allocates implied unit cost from total, patches receive_delivery_item
-//   proposed_updates with unit_cost + unit_cost_zar so AVCO engine gets real values.
-//   industry_profile now passed to buildSystemPrompt for context-aware extraction.
-//   usd_zar_rate now included in openPurchaseOrders context for accurate FX allocation.
-// v1.7 — WP-IND Session 3: add create_inventory_item + create_stock_movement for general supplier invoices
-// v1.6 — WP-I Extended: Delivery Note -> Auto-receive inventory
-// NEW: existing_inventory + open_purchase_orders passed in context
-// NEW: receive_delivery_item action (inventory_items qty increment + stock_movements audit)
-// NEW: update_po_status action (purchase_orders po_status -> received)
-// Deploy: npx supabase functions deploy process-document --no-verify-jwt
+// supabase/functions/ai-copilot/index.ts
+// Protea Botanicals — AI Co-Pilot Edge Function
+// Version: v1.1
+// ★ v1.1: Added tools-only mode — works WITHOUT API keys.
+//   Tool results returned directly with smart formatting.
+//   AI providers (Grok/Claude) used only when keys are available.
+//
+// Deploy:  npx supabase functions deploy ai-copilot --no-verify-jwt
+// Secrets: npx supabase secrets set XAI_API_KEY=xxx ANTHROPIC_API_KEY=xxx
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.97.0';
 
+// ─── CORS headers ────────────────────────────────────────────────────────
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info, apikey',
 };
 
-const JSON_HEADERS = {
-  ...CORS_HEADERS,
-  "Content-Type": "application/json",
+// ─── Supabase client for tool execution ──────────────────────────────────
+function getSupabaseClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+}
+
+// ─── File Registry (from Handover v10.0) ─────────────────────────────────
+const FILE_REGISTRY: Record<string, { version: string; lock: string; purpose: string; key: string }> = {
+  'App.js':                 { version: 'v3.5', lock: '🔒 LOCKED', purpose: 'Root component, routing, RequireAuth/RequireRole guards, RoleContext, CoPilot overlay', key: 'Routes, guards, context providers' },
+  'Account.js':             { version: 'v5.5', lock: '🔒 LOCKED', purpose: 'Login/Register with role-based redirect + smart returnUrl', key: 'signInWithPassword, role redirect logic' },
+  'supabaseClient.js':      { version: 'v5.1', lock: '🔒 LOCKED', purpose: 'Supabase client singleton + LockManager no-op', key: 'createClient(), supabase export' },
+  'scanService.js':         { version: 'v5.1', lock: '🔒 LOCKED', purpose: 'QR scan processing — validate, award points, record scan', key: 'processScan(), awardLoyaltyPoints()' },
+  'ScanResult.js':          { version: 'v5.1', lock: '🔒 LOCKED', purpose: 'Post-scan UI with celebration modal + product info', key: 'Animated result display' },
+  'Landing.js':             { version: 'v5.2', lock: '🔒 LOCKED', purpose: 'Public landing page with auth detection + header visibility fix', key: 'Hero, features, CTA' },
+  'tokens.js':              { version: 'v2',   lock: '🔒 LOCKED', purpose: 'Design system tokens — colors, fonts, spacing, radii', key: 'All style constants' },
+  'PageShell.js':           { version: 'v1.0', lock: '🔒 LOCKED', purpose: 'Shared layout wrapper — max-width 1200px, padding, background', key: 'Layout container' },
+  'AdminDashboard.js':      { version: 'v3.5', lock: '🔒 LOCKED', purpose: '5-tab admin panel: Overview, Users, Products, Scans, Smart QR', key: 'Tab system, bulk QR, smart QR link' },
+  'WholesalePortal.js':     { version: 'v1.1', lock: '🔒 LOCKED', purpose: 'Wholesale partner dashboard with PageShell integration', key: 'Order form, partner info' },
+  'Redeem.js':              { version: 'v1.1', lock: '🔒 LOCKED', purpose: 'Loyalty point redemption with PageShell', key: 'Voucher display, redeem flow' },
+  'Shop.js':                { version: 'v2.3', lock: '🔒 LOCKED', purpose: '36 vape products (18 strains × 2 formats) + 6 Coming Soon', key: 'Product grid, R800/R1600 pricing' },
+  'ProductVerification.js': { version: 'v2.2', lock: '🔒 LOCKED', purpose: '18 Eybna strain profiles with terpene data + COA links', key: 'Strain lookup, terpene display' },
+  'AdminQrGenerator.js':    { version: 'v1.0', lock: '🔒 LOCKED', purpose: 'Smart QR generator — 4 types: product, promo, loyalty, custom', key: 'QR type selector, URL builder, download' },
+  'CoPilot.js':             { version: 'v1.0', lock: '🔓 OPEN',   purpose: 'AI Co-Pilot floating chat widget', key: 'Chat UI, provider toggle, message handling' },
+  'copilotService.js':      { version: 'v1.0', lock: '🔓 OPEN',   purpose: 'Client service layer for Co-Pilot Edge Function', key: 'sendMessage(), checkBackendHealth()' },
+  'AgeGate.js':             { version: 'v1.0', lock: '🔓 OPEN',   purpose: '4-step age verification modal (not yet integrated)', key: 'Modal flow, age check' },
+  'PromoBanner.js':         { version: 'v1.0', lock: '🔓 OPEN',   purpose: 'Animated promotional banner (not yet integrated)', key: 'Banner animation, dismiss' },
+  'Loyalty.js':             { version: 'v5.0', lock: '🔓 OPEN',   purpose: 'Loyalty dashboard — points, history, rewards', key: 'Points display, transaction history' },
+  'QrCode.js':              { version: 'v1',   lock: '🔓 OPEN',   purpose: 'QR code display component using qrcode.react', key: 'QRCodeSVG render' },
 };
 
-// ── WP-FIN S0: Lump-sum invoice cost allocation ───────────────────────────────
-// Detects invoices where some or all line items have no unit_price.
-// Allocates implied unit cost: (total - explicit lines) / unpriced quantity.
-// Patches line_items and receive_delivery_item proposed_updates with:
-//   unit_cost (USD), unit_cost_zar (ZAR at PO-locked FX rate), allocated_cost: true
-// Confidence on allocated lines capped at 0.75 (amber dot in review screen).
-function allocateLumpSumCosts(
-  ext: Record<string, unknown>,
-  pos: Array<Record<string, unknown>>,
-): Record<string, unknown> {
-  const lineItems = (ext.line_items as Array<Record<string, unknown>>) || [];
-  const updates =
-    (ext.proposed_updates as Array<Record<string, unknown>>) || [];
-  const totalAmount = Number(ext.total_amount ?? 0);
-  if (!totalAmount || lineItems.length === 0) return ext;
+// ─── Route Registry (from App.js v3.5) ───────────────────────────────────
+const ROUTE_TABLE = [
+  { path: '/',              component: 'Landing.js',             guards: 'None (public)',            layout: 'No NavBar', purpose: 'Public landing page' },
+  { path: '/account',       component: 'Account.js',            guards: 'None (public)',            layout: 'NavBar + PageShell', purpose: 'Login/Register' },
+  { path: '/scan/:qrCode',  component: 'ScanResult.js',         guards: 'None (public)',            layout: 'Standalone', purpose: 'QR scan processing' },
+  { path: '/verify/:id',    component: 'ProductVerification.js', guards: 'None (public)',           layout: 'NavBar',    purpose: 'Public product/COA verification' },
+  { path: '/shop',          component: 'Shop.js',               guards: 'None (public)',            layout: 'NavBar',    purpose: 'Product catalog (36 vapes)' },
+  { path: '/cart',          component: 'CartPage.js',           guards: 'None (public)',            layout: 'NavBar',    purpose: 'Shopping cart' },
+  { path: '/loyalty',       component: 'Loyalty.js',            guards: 'RequireAuth',              layout: 'NavBar + PageShell', purpose: 'Loyalty dashboard' },
+  { path: '/redeem',        component: 'Redeem.js',             guards: 'RequireAuth',              layout: 'NavBar + PageShell', purpose: 'Redeem loyalty points' },
+  { path: '/checkout',      component: 'CheckoutPage.js',       guards: 'RequireAuth',              layout: 'NavBar + PageShell', purpose: 'Payment checkout' },
+  { path: '/order-success', component: 'OrderSuccess.js',       guards: 'None',                     layout: 'NavBar + PageShell', purpose: 'Order confirmation' },
+  { path: '/wholesale',     component: 'WholesalePortal.js',    guards: 'RequireAuth + RequireRole(retailer)', layout: 'NavBar + PageShell', purpose: 'Wholesale partner portal' },
+  { path: '/admin',         component: 'AdminDashboard.js',     guards: 'RequireAuth + RequireRole(admin)',    layout: 'NavBar + PageShell(1200)', purpose: 'Admin dashboard (5 tabs)' },
+  { path: '/admin/qr',      component: 'AdminQrGenerator.js',   guards: 'RequireAuth + RequireRole(admin)',    layout: 'NavBar + PageShell(1200)', purpose: 'Smart QR generator' },
+  { path: '*',              component: 'NotFound.js',           guards: 'None',                     layout: 'NavBar',    purpose: '404 page' },
+];
 
-  // Detect lump-sum: any line item missing unit_price or unit_price === 0
-  const unpricedLines = lineItems.filter(
-    (l) => !l.unit_price || Number(l.unit_price) === 0,
-  );
-  if (unpricedLines.length === 0) return ext; // All lines have prices — no allocation needed
+// ─── Lessons Learned ─────────────────────────────────────────────────────
+const LESSONS_LEARNED = [
+  { id: 'LL-006', lesson: 'onAuthStateChange is unreliable for redirect — use redirect after signInWithPassword response instead' },
+  { id: 'LL-011', lesson: 'Supabase v2.x ignores lock:false parameter — LockManager is a no-op' },
+  { id: 'LL-012', lesson: 'RequireAuth must check loading && !role before redirect to avoid flash' },
+  { id: 'LL-014', lesson: 'DB role values must match code exactly (customer, retailer, admin)' },
+  { id: 'LL-015', lesson: 'Password gates are redundant when RequireRole guards are in place' },
+  { id: 'LL-016', lesson: 'Always diff against the ACTUAL file version, not the handover description' },
+  { id: 'LL-017', lesson: 'Two QR tools are complementary: Bulk Generator creates DB records, Smart Generator creates URLs' },
+];
 
-  // Sum explicit costs (lines that DO have pricing)
-  const explicitTotal = lineItems
-    .filter((l) => l.unit_price && Number(l.unit_price) > 0)
-    .reduce((s, l) => s + Number(l.unit_price) * Number(l.quantity ?? 1), 0);
-  const remainingTotal = totalAmount - explicitTotal;
-  const unpricedQty = unpricedLines.reduce(
-    (s, l) => s + Number(l.quantity ?? 1),
-    0,
-  );
-  if (unpricedQty <= 0 || remainingTotal <= 0) return ext;
-  const impliedUnitPrice = remainingTotal / unpricedQty;
+// ─── Tool Execution ──────────────────────────────────────────────────────
+async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+  const supabase = getSupabaseClient();
 
-  // Resolve FX rate: prefer PO-locked rate, then extraction, then fallback 18.5
-  const matchedPO = pos.find(
-    (po) =>
-      po.supplier_id ===
-        (ext.supplier as Record<string, unknown>)?.matched_id ||
-      po.po_number === (ext.reference as Record<string, unknown>)?.number,
-  );
-  const fxRate = Number(
-    matchedPO?.usd_zar_rate ?? ext.usd_zar_rate ?? ext.fx_rate ?? 18.5,
-  );
-  const impliedUnitPriceZar = Math.round(impliedUnitPrice * fxRate * 100) / 100;
-
-  // Apply implied price to all unpriced line items
-  const patchedLines = lineItems.map((l) => {
-    if (!l.unit_price || Number(l.unit_price) === 0) {
-      return {
-        ...l,
-        unit_price: impliedUnitPrice,
-        unit_cost: impliedUnitPrice,
-        unit_cost_zar: impliedUnitPriceZar,
-        allocated_cost: true,
-        confidence: Math.min(Number(l.confidence ?? 0.9), 0.75),
-      };
-    }
-    return l;
-  });
-
-  // Patch unit_cost on receive_delivery_item proposed_updates that have no cost
-  const patchedUpdates = updates.map((u) => {
-    if (u.action !== "receive_delivery_item") return u;
-    const uData = (u.data as Record<string, unknown>) || {};
-    const existingCost = Number(uData.unit_cost ?? uData.unit_price ?? 0);
-    if (existingCost > 0) return u; // Already has a cost — do not override
-    return {
-      ...u,
-      confidence: 0.75,
-      data: {
-        ...uData,
-        unit_cost: impliedUnitPrice,
-        unit_cost_zar: impliedUnitPriceZar,
-        allocated_cost: true,
-      },
-    };
-  });
-
-  const allExplicitCount = lineItems.length - unpricedLines.length;
-  const allocationNote =
-    `Lump-sum invoice detected. Implied unit cost: ${ext.currency ?? "USD"} ` +
-    `${impliedUnitPrice.toFixed(4)} (total ${ext.currency ?? "USD"} ${totalAmount.toFixed(2)} ` +
-    `less ${allExplicitCount} explicit line(s) = ${ext.currency ?? "USD"} ${remainingTotal.toFixed(2)} ` +
-    `/ ${unpricedQty} unpriced units). ZAR: R${impliedUnitPriceZar.toFixed(2)} at ` +
-    `R${fxRate.toFixed(4)}/USD. Verify against supplier pricing schedule.`;
-
-  return {
-    ...ext,
-    line_items: patchedLines,
-    proposed_updates: patchedUpdates,
-    lump_sum_invoice: true,
-    extraction_notes: [ext.extraction_notes, allocationNote]
-      .filter(Boolean)
-      .join(" | "),
-  };
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
-function buildSystemPrompt(
-  existingSuppliers: unknown[],
-  existingProducts: unknown[],
-  existingInventory: unknown[],
-  openPurchaseOrders: unknown[],
-  industryProfile: string,
-): string {
-  const industryContext =
-    industryProfile === "food_beverage"
-      ? "food & beverage producer (ingredients, packaging, equipment)"
-      : industryProfile === "general_retail"
-        ? "general retail business (finished goods, accessories, packaging)"
-        : "cannabis extract company (terpenes, hardware, distillate, packaging)";
-  return `You are a document extraction engine for a ${industryContext} in South Africa.
-Extract ALL structured data from business documents and propose specific database updates.
-You MUST respond with ONLY valid JSON - no markdown, no code fences, no explanation, no preamble.
-
-DOCUMENT TYPES (detect from content):
-invoice | quote | proof_of_payment | delivery_note | coa | price_list | stock_sheet | contract | unknown
-
-EXISTING SUPPLIERS IN SYSTEM:
-${JSON.stringify(existingSuppliers, null, 2)}
-
-EXISTING PRODUCTS/SKUs IN SYSTEM (${existingProducts.length} products already in database):
-${JSON.stringify(existingProducts, null, 2)}
-
-EXISTING INVENTORY ITEMS (use for delivery_note item matching - match by name/sku):
-${JSON.stringify(existingInventory, null, 2)}
-
-OPEN PURCHASE ORDERS (use for delivery_note PO matching - match by po_number or supplier):
-${JSON.stringify(openPurchaseOrders, null, 2)}
-
-RESPOND EXACTLY in this JSON structure (all fields required, use null where not applicable):
-{
-  "document_type": "invoice",
-  "confidence": 0.94,
-  "supplier": {
-    "name": "exact supplier name from document",
-    "matched_id": "uuid from existing suppliers if matched, else null",
-    "confidence": 0.97
-  },
-  "reference": {
-    "number": "INV-2026-0441",
-    "date": "2026-03-01",
-    "due_date": null,
-    "confidence": 0.99
-  },
-  "currency": "USD",
-  "total_amount": 950.00,
-  "line_items": [],
-  "proposed_updates": [],
-  "unknown_items": [],
-  "warnings": [],
-  "extraction_notes": "brief note about document quality and extraction confidence"
-}
-
-=======================================================
-MANDATORY RULE - proposed_updates MUST NEVER BE EMPTY
-=======================================================
-
-If the document contains ANY line items, suppliers, payments, or quantities,
-you MUST produce at least one proposed_update. An empty proposed_updates array
-is only acceptable for a document with literally no actionable data (e.g. a blank page).
-
-For EVERY document type, always produce these actions:
-
-INVOICE or QUOTE (any order document):
-  1. ALWAYS propose create_purchase_order - one action covering the whole order.
-     Include all matched line items as purchase_order_items in the data.
-  2. For each matched product line item, ALSO propose update_product_price IF
-     the unit price is > 0 and not a free sample / 100% discount.
-  3. For each unmatched product, propose create_supplier_product.
-
-PROOF OF PAYMENT:
-  1. Propose update_po_payment on purchase_orders - set payment_date,
-     payment_reference, po_status = "paid".
-
-DELIVERY NOTE:
-  For EACH received line item that matches existing_inventory (match by name/sku similarity):
-    1. Propose receive_delivery_item action - this will increment quantity_on_hand
-       in inventory_items and create a stock_movements audit record.
-       CRITICAL: data MUST include item_id (uuid from existing_inventory) + quantity_received (number > 0).
-       record_id MUST also be set to the inventory_items uuid (same as item_id).
-  For items NOT matched in existing_inventory:
-    -> Add to unknown_items only. Do NOT propose receive_delivery_item for unmatched items.
-  If a matching PO is found in open_purchase_orders (match by po_number or supplier):
-    2. Propose update_po_status on purchase_orders - set po_status = "received".
-       CRITICAL: record_id MUST be the PO uuid from open_purchase_orders.
-       data MUST include po_status: "received" and actual_arrival (date string YYYY-MM-DD).
-
-COA / LAB REPORT:
-  1. Propose update_batch_coa on batches - set thc_content, cbd_content,
-     lab_name, lab_test_date, lab_certified = true, coa_url if present.
-
-PRICE LIST:
-  1. set line_items to []. For EVERY product in the list, propose
-     update_product_price (matched) or create_supplier_product (unmatched).
-
-=======================================================
-PRODUCT MATCHING RULES
-=======================================================
-
-For EVERY product in the document:
-
-STEP 1 - Search existing_products by name similarity (fuzzy/partial match).
-  "Orange Cookies" matches "Orange Cookies - Live Line".
-  "Gelato #41" matches "Gelato #41 - Palate Line - 2ml".
-
-STEP 2 - If MATCHED:
-  -> Set matched_product_id in the line_item.
-  -> Propose update_product_price ONLY IF unit_price > 0 (not free sample).
-  -> Do NOT add to unknown_items.
-  -> Do NOT propose create_supplier_product.
-
-STEP 3 - If NOT MATCHED:
-  -> Add to unknown_items.
-  -> Propose create_supplier_product with full data object.
-
-RULE: Never propose create_supplier_product for products already in existing_products.
-RULE: If unsure whether a product matches, prefer MATCHED (update, not create).
-RULE: Free samples ($0 or 100% discounted) -> still matched in line_items,
-      but skip the update_product_price (don't overwrite real prices with $0).
-      The create_purchase_order action still captures them as order items.
-
-=======================================================
-create_purchase_order EXAMPLE (use for invoice/quote):
-=======================================================
-{
-  "action": "create_purchase_order",
-  "table": "purchase_orders",
-  "record_id": null,
-  "description": "Create PO for Eybna GmbH quote PQG2600182 - 14 terpene samples",
-  "data": {
-    "supplier_id": "3357f93b-8dac-46fa-b591-d5cf74c6d313",
-    "po_number": "PQG2600182",
-    "supplier_invoice_ref": "PQG2600182",
-    "status": "ordered",
-    "po_status": "ordered",
-    "order_date": "2026-02-23",
-    "currency": "USD",
-    "subtotal": 234.00,
-    "notes": "Terpene samples - 2ml each",
-    "items": [
-      {
-        "supplier_product_id": "matched-uuid-or-null",
-        "description": "Pineapple Express - Pure Terpenes Line - 2ml",
-        "quantity_ordered": 1,
-        "unit_price_usd": 25.00
+  switch (name) {
+    case 'get_system_health': {
+      const tables = ['batches', 'products', 'scans', 'user_profiles', 'loyalty_transactions', 'redemptions'];
+      const counts: Record<string, number | string> = {};
+      for (const table of tables) {
+        const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
+        counts[table] = error ? `Error: ${error.message}` : (count ?? 0);
       }
-    ]
-  },
-  "confidence": 0.92
+      return JSON.stringify({ status: 'connected', project: 'uvicrqapgzcdvozxrreo', tables: counts }, null, 2);
+    }
+
+    case 'query_supabase': {
+      const table = args.table as string;
+      const select = (args.select as string) || '*';
+      const filters = (args.filters as Record<string, unknown>) || {};
+      const order = args.order as string | undefined;
+      const limit = Math.min((args.limit as number) || 20, 100);
+
+      const ALLOWED = ['batches', 'products', 'scans', 'user_profiles', 'loyalty_transactions', 'redemptions', 'wholesale_partners', 'orders', 'order_items', 'inventory'];
+      if (!ALLOWED.includes(table)) {
+        return JSON.stringify({ error: `Table "${table}" not in allowlist. Allowed: ${ALLOWED.join(', ')}` });
+      }
+
+      let query = supabase.from(table).select(select).limit(limit);
+      for (const [key, val] of Object.entries(filters)) {
+        query = query.eq(key, val);
+      }
+      if (order) {
+        query = query.order(order, { ascending: false });
+      }
+
+      const { data, error } = await query;
+      if (error) return JSON.stringify({ error: error.message });
+      return JSON.stringify({ table, rowCount: data?.length ?? 0, data }, null, 2);
+    }
+
+    case 'explain_file': {
+      const name = args.name as string;
+      const key = name.endsWith('.js') ? name : `${name}.js`;
+      const info = FILE_REGISTRY[key];
+      if (!info) {
+        return JSON.stringify({ error: `File "${name}" not found. Known files: ${Object.keys(FILE_REGISTRY).join(', ')}` });
+      }
+      return JSON.stringify({ file: key, ...info }, null, 2);
+    }
+
+    case 'decode_error': {
+      const trace = args.trace as string;
+      const hints: string[] = [];
+      if (trace.includes('onAuthStateChange')) hints.push(LESSONS_LEARNED[0].lesson);
+      if (trace.includes('lock') || trace.includes('Lock')) hints.push(LESSONS_LEARNED[1].lesson);
+      if (trace.includes('RequireAuth') || trace.includes('redirect')) hints.push(LESSONS_LEARNED[2].lesson);
+      if (trace.includes('role')) hints.push(LESSONS_LEARNED[3].lesson);
+      return JSON.stringify({
+        trace: trace.substring(0, 500),
+        matchedLessons: hints.length > 0 ? hints : ['No direct match — check console for full stack trace.'],
+        allLessons: LESSONS_LEARNED,
+      }, null, 2);
+    }
+
+    case 'list_routes': {
+      return JSON.stringify({ routeCount: ROUTE_TABLE.length, routes: ROUTE_TABLE }, null, 2);
+    }
+
+    case 'list_files': {
+      const files = Object.entries(FILE_REGISTRY).map(([name, info]) => ({
+        file: name,
+        version: info.version,
+        lock: info.lock,
+        purpose: info.purpose,
+      }));
+      return JSON.stringify({ fileCount: files.length, files }, null, 2);
+    }
+
+    case 'help': {
+      return JSON.stringify({
+        commands: [
+          { command: 'system health', description: 'Check Supabase connection + table row counts' },
+          { command: 'list routes', description: 'Show all routes with guards and layouts' },
+          { command: 'list files', description: 'Show all project files with version and lock status' },
+          { command: 'explain <file>', description: 'Get details about a specific file (e.g. "explain App.js")' },
+          { command: 'show <table>', description: 'Query a Supabase table (e.g. "show products", "show user_profiles")' },
+          { command: 'count <table>', description: 'Count rows in a table' },
+          { command: '<error text>', description: 'Paste an error to get diagnosis + matching Lessons Learned' },
+        ],
+        tip: 'AI summarization available when Grok/Claude API keys are configured.',
+      }, null, 2);
+    }
+
+    default:
+      return JSON.stringify({ error: `Unknown tool: ${name}` });
+  }
 }
 
-=======================================================
-receive_delivery_item EXAMPLE (use for delivery_note - one per matched item):
-=======================================================
-{
-  "action": "receive_delivery_item",
-  "table": "inventory_items",
-  "record_id": "uuid-of-inventory-item",
-  "description": "Receive 50 units of Pineapple Express terpene (current stock: 10 -> new: 60)",
-  "data": {
-    "item_id": "uuid-of-inventory-item",
-    "quantity_received": 50
-  },
-  "confidence": 0.94
+// ─── Smart formatting for tools-only mode ────────────────────────────────
+function formatToolResult(name: string, resultJson: string): string {
+  try {
+    const data = JSON.parse(resultJson);
+
+    switch (name) {
+      case 'get_system_health': {
+        let msg = `✅ Supabase connected (${data.project})\n\n📊 Table row counts:\n`;
+        for (const [table, count] of Object.entries(data.tables)) {
+          msg += `  • ${table}: ${count} rows\n`;
+        }
+        return msg;
+      }
+
+      case 'list_routes': {
+        let msg = `🗺 ${data.routeCount} routes:\n\n`;
+        for (const r of data.routes) {
+          msg += `  ${r.path}\n    → ${r.component} | ${r.guards} | ${r.layout}\n\n`;
+        }
+        return msg;
+      }
+
+      case 'list_files': {
+        let msg = `📁 ${data.fileCount} project files:\n\n`;
+        for (const f of data.files) {
+          msg += `  ${f.lock} ${f.file} (${f.version})\n    ${f.purpose}\n\n`;
+        }
+        return msg;
+      }
+
+      case 'explain_file': {
+        if (data.error) return `❌ ${data.error}`;
+        return `📄 ${data.file} (${data.version}) ${data.lock}\n\nPurpose: ${data.purpose}\nKey: ${data.key}`;
+      }
+
+      case 'query_supabase': {
+        if (data.error) return `❌ Query error: ${data.error}`;
+        let msg = `📋 ${data.table}: ${data.rowCount} rows returned\n\n`;
+        if (data.data && data.data.length > 0) {
+          // Show first 5 rows formatted
+          const rows = data.data.slice(0, 5);
+          for (const row of rows) {
+            const summary = Object.entries(row)
+              .slice(0, 5)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(' | ');
+            msg += `  • ${summary}\n`;
+          }
+          if (data.rowCount > 5) msg += `\n  ... and ${data.rowCount - 5} more`;
+        } else {
+          msg += '  (no rows)';
+        }
+        return msg;
+      }
+
+      case 'decode_error': {
+        let msg = `🔍 Error analysis:\n\n`;
+        if (data.matchedLessons.length > 0) {
+          msg += `Matching Lessons Learned:\n`;
+          for (const lesson of data.matchedLessons) {
+            msg += `  ⚡ ${lesson}\n`;
+          }
+        }
+        return msg;
+      }
+
+      case 'help': {
+        let msg = `🤖 Co-Pilot Commands:\n\n`;
+        for (const cmd of data.commands) {
+          msg += `  "${cmd.command}"\n    → ${cmd.description}\n\n`;
+        }
+        msg += `\n${data.tip}`;
+        return msg;
+      }
+
+      default:
+        return resultJson;
+    }
+  } catch {
+    return resultJson;
+  }
 }
 
-RULES for receive_delivery_item:
-- record_id and data.item_id MUST be the same uuid from existing_inventory
-- quantity_received MUST be a positive number (the qty on the delivery note, not cumulative)
-- Only propose this for items FOUND in existing_inventory
-- Include current quantity in description so operator can verify
+// ─── AI Provider Calls ───────────────────────────────────────────────────
 
-=======================================================
-update_po_status EXAMPLE (use for delivery_note when PO found):
-=======================================================
-{
-  "action": "update_po_status",
-  "table": "purchase_orders",
-  "record_id": "uuid-of-purchase-order",
-  "description": "Mark PO-2026-001 as received - goods arrived 2026-03-11",
-  "data": {
-    "po_status": "received",
-    "actual_arrival": "2026-03-11"
-  },
-  "confidence": 0.88
+async function callGrok(systemPrompt: string, messages: Array<{ role: string; content: string }>) {
+  const apiKey = Deno.env.get('XAI_API_KEY');
+  if (!apiKey) return null; // No key = skip
+
+  try {
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-3-fast',
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        temperature: 0.3,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) return null; // API error = fall back to tools-only
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch {
+    return null; // Network error = fall back to tools-only
+  }
 }
 
-RULES for update_po_status:
-- record_id MUST be a uuid from open_purchase_orders - never invent one
-- po_status MUST be exactly: "received"
-- actual_arrival MUST be the delivery date from the document (YYYY-MM-DD format)
-- If no matching PO found in open_purchase_orders, do NOT propose this action
+async function callClaude(systemPrompt: string, messages: Array<{ role: string; content: string }>) {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) return null;
 
-=======================================================
-update_product_price EXAMPLE (matched product, price > 0):
-=======================================================
-{
-  "action": "update_product_price",
-  "table": "supplier_products",
-  "record_id": "uuid-of-existing-product",
-  "description": "Update Pineapple Express unit price to $25.00",
-  "data": { "unit_price_usd": 25.00, "price_effective_date": "2026-02-23" },
-  "confidence": 0.95
+  try {
+    const anthropicMessages = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        system: systemPrompt,
+        messages: anthropicMessages,
+        max_tokens: 2000,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.content?.[0]?.text || null;
+  } catch {
+    return null;
+  }
 }
 
-=======================================================
-create_supplier_product EXAMPLE (unmatched only):
-=======================================================
-{
-  "action": "create_supplier_product",
-  "table": "supplier_products",
-  "record_id": null,
-  "description": "Create new product: ZKZ - Live Plus+ Line - 2ml",
-  "data": {
-    "supplier_id": "3357f93b-8dac-46fa-b591-d5cf74c6d313",
-    "name": "ZKZ - Live Plus+ Line - 2ml",
-    "sku": "EYBNA-ZKZ-LIVEPLUS-2ML",
-    "category": "terpene",
-    "unit_price_usd": 25.00,
-    "currency": "USD",
-    "moq": 1,
-    "lead_time_days": 7,
-    "is_active": true,
-    "notes": "Auto-created from document ingestion"
-  },
-  "confidence": 0.88
-}
+// ─── Main Handler ────────────────────────────────────────────────────────
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
 
-=======================================================
-SUPPLIER INVOICE - GENERAL RETAIL (non-cannabis, no existing PO)
-=======================================================
-Use this section when the document is a supplier invoice for general products
-(clothing, food, beverages, accessories, supplements) where no matching PO exists
-in open_purchase_orders and products are not in existing_products.
-
-For EACH line item NOT matched in existing_inventory:
-  1. Propose create_inventory_item - creates a new inventory_items row.
-     data MUST include: sku, name, category, unit, quantity_on_hand, cost_price.
-     category: "finished_product" for retail goods, "raw_material" for ingredients,
-     "packaging" for packaging, "accessory" for accessories.
-     unit: "pcs" for countable, "kg" for weight, "l" for liquid, "ml" for small volumes.
-     cost_price: unit price in ZAR. If USD invoice, set cost_price to 0 and note in extraction_notes.
-     sell_price: always 0 (operator sets in HQ Pricing after receiving).
-
-  2. Propose create_stock_movement - always paired with create_inventory_item.
-     data MUST include: quantity (same as quantity_on_hand above), unit_cost,
-     movement_type: "purchase_in", reference (invoice number).
-     record_id MUST be null (handler creates item first then links movement).
-
-For EACH line item MATCHED in existing_inventory:
-  -> Propose receive_delivery_item instead (same as delivery_note flow above).
-
-=======================================================
-create_inventory_item EXAMPLE (new SKU from general supplier invoice):
-=======================================================
-{
-  "action": "create_inventory_item",
-  "table": "inventory_items",
-  "record_id": null,
-  "description": "Create new inventory item: Classic White Tee XL - 50 units received",
-  "data": {
-    "sku": "CLT-WHITE-XL",
-    "name": "Classic White Tee XL",
-    "category": "finished_product",
-    "unit": "pcs",
-    "quantity_on_hand": 50,
-    "cost_price": 85.00,
-    "sell_price": 0,
-    "is_active": true,
-    "description": "Auto-created from supplier invoice ingestion"
-  },
-  "confidence": 0.88
-}
-
-=======================================================
-create_stock_movement EXAMPLE (always paired with create_inventory_item):
-=======================================================
-{
-  "action": "create_stock_movement",
-  "table": "stock_movements",
-  "record_id": null,
-  "description": "Record purchase_in for Classic White Tee XL - 50 units at R85",
-  "data": {
-    "quantity": 50,
-    "unit_cost": 85.00,
-    "movement_type": "purchase_in",
-    "reference": "INV-2026-0441",
-    "notes": "Received via supplier invoice INV-2026-0441"
-  },
-  "confidence": 0.88
-}
-
-RULES for create_inventory_item + create_stock_movement:
-- Always propose them as a PAIR - one create_inventory_item + one create_stock_movement per new SKU
-- record_id is always null for both - the handler creates the item first then links the movement
-- Do NOT use for items already in existing_inventory - use receive_delivery_item instead
-- Do NOT use when a matching PO exists - use create_purchase_order instead
-
-=======================================================
-GENERAL EXTRACTION RULES:
-- Confidence scores: 0.0-1.0. Conservative - never inflate.
-- Currencies: R/ZAR = ZAR, $ = USD, EUR = EUR
-- Match suppliers by name similarity
-- Non-English documents: translate extracted data to English
-- Multi-page PDFs: extract from all pages
-- supplier_products.category must be: hardware OR terpene (lowercase, no plural)`;
-}
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
     const body = await req.json();
-    const {
-      file_base64,
-      mime_type,
-      file_url = "",
-      file_name = "document",
-      file_size_kb = null,
-      document_type_hint = null,
-      context = {},
-    } = body;
+    const { message, provider = 'grok', history = [] } = body;
 
-    if (!file_base64 || !mime_type) {
-      return new Response(
-        JSON.stringify({ error: "file_base64 and mime_type are required" }),
-        { status: 400, headers: JSON_HEADERS },
-      );
+    // Health check
+    if (message === '__health_check__') {
+      return new Response(JSON.stringify({ status: 'ok', provider, timestamp: new Date().toISOString() }), {
+        status: 200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
     }
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    // ── Step 1: Match tools ──────────────────────────────────────────
+    const toolCalls: Array<{ name: string; args: string; result: string }> = [];
+    const lowerMsg = message.toLowerCase().trim();
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get(
-      "SUPABASE_SERVICE_ROLE_KEY",
-    )!;
+    // Help
+    if (lowerMsg === 'help' || lowerMsg === '?' || lowerMsg === 'commands') {
+      const result = await executeTool('help', {});
+      toolCalls.push({ name: 'help', args: '', result });
+    }
 
-    const existingSuppliers = (context.existing_suppliers || []).map(
-      (s: Record<string, unknown>) => ({
-        id: s.id,
-        name: s.name,
-        country: s.country,
-        currency: s.currency,
-      }),
-    );
-    const existingProducts = (context.existing_products || []).map(
-      (p: Record<string, unknown>) => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        category: p.category,
-        unit_price_usd: p.unit_price_usd,
-        supplier_id: p.supplier_id,
-      }),
-    );
-    // v1.6 - inventory items for delivery note matching
-    const existingInventory = (context.existing_inventory || []).map(
-      (i: Record<string, unknown>) => ({
-        id: i.id,
-        name: i.name,
-        sku: i.sku,
-        category: i.category,
-        quantity_on_hand: i.quantity_on_hand,
-      }),
-    );
-    // v1.6 - open POs for delivery note PO matching
-    // v1.8 - usd_zar_rate included for accurate lump-sum FX allocation
-    const openPurchaseOrders = (context.open_purchase_orders || []).map(
-      (po: Record<string, unknown>) => ({
-        id: po.id,
-        po_number: po.po_number,
-        supplier_id: po.supplier_id,
-        po_status: po.po_status,
-        expected_arrival: po.expected_arrival,
-        usd_zar_rate: po.usd_zar_rate ?? null,
-      }),
-    );
+    // System health
+    if (lowerMsg.includes('health') || lowerMsg.includes('status') || lowerMsg.includes('connection') || lowerMsg.includes('ping')) {
+      const result = await executeTool('get_system_health', {});
+      toolCalls.push({ name: 'get_system_health', args: '', result });
+    }
 
-    const industryProfile = String(
-      body.industry_profile || context.industry_profile || "cannabis_retail",
-    );
+    // Routes
+    if (lowerMsg.includes('route') || lowerMsg.includes('routes') || lowerMsg.includes('url') || lowerMsg.includes('pages')) {
+      const result = await executeTool('list_routes', {});
+      toolCalls.push({ name: 'list_routes', args: '', result });
+    }
 
-    const isPdf = mime_type === "application/pdf";
-    const documentBlock = isPdf
-      ? {
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: "application/pdf",
-            data: file_base64,
-          },
-        }
-      : {
-          type: "image",
-          source: { type: "base64", media_type: mime_type, data: file_base64 },
-        };
+    // Files
+    if (lowerMsg === 'list files' || lowerMsg === 'files' || lowerMsg.includes('file registry') || lowerMsg.includes('all files')) {
+      const result = await executeTool('list_files', {});
+      toolCalls.push({ name: 'list_files', args: '', result });
+    }
 
-    const userContent = [
-      documentBlock,
-      {
-        type: "text",
-        text: `Extract all data from this ${document_type_hint ? document_type_hint + " " : ""}document and return the JSON as specified.
+    // Query table
+    const tableMatch = lowerMsg.match(/(?:query|show|list|count|how many|check|get)\s+(batches|products|scans|user_profiles|loyalty_transactions|redemptions|wholesale_partners|orders|order_items|inventory)/);
+    if (tableMatch) {
+      const result = await executeTool('query_supabase', { table: tableMatch[1], limit: 10 });
+      toolCalls.push({ name: 'query_supabase', args: tableMatch[1], result });
+    }
 
-CRITICAL REMINDERS:
-1. proposed_updates MUST NOT be empty if there are any line items or actionable data.
-2. For invoices and quotes with existing supplier products: ALWAYS create a create_purchase_order action.
-3. For matched products with price > 0: ALSO propose update_product_price.
-4. For unmatched supplier products: propose create_supplier_product.
-5. Free samples ($0): include in the PO items but skip update_product_price.
-6. Check EXISTING PRODUCTS list before proposing any create - if name matches, use update instead.
-7. For delivery notes: use receive_delivery_item (NOT update_inventory_qty) for each matched inventory item.
-   record_id and data.item_id MUST be the uuid from existing_inventory. quantity_received must be > 0.
-8. For delivery notes: use update_po_status (NOT update_purchase_order) to mark the PO received.
-   record_id MUST be a uuid from open_purchase_orders. Only propose if a match is found.
-9. For general supplier invoices (clothing, food, accessories, non-cannabis goods) where no PO exists:
-   use create_inventory_item + create_stock_movement (as a pair) for each new SKU.
-   Use receive_delivery_item for any SKUs already in existing_inventory.`,
-      },
+    // Explain file
+    const fileMatch = lowerMsg.match(/(?:explain|what does|tell me about|describe|info on|what is)\s+(\w+\.?j?s?)/);
+    if (fileMatch && !['the', 'this', 'that', 'my', 'a', 'an'].includes(fileMatch[1])) {
+      const fileName = fileMatch[1].endsWith('.js') ? fileMatch[1] : `${fileMatch[1]}.js`;
+      const result = await executeTool('explain_file', { name: fileName });
+      toolCalls.push({ name: 'explain_file', args: fileName, result });
+    }
+
+    // Error decode
+    if ((lowerMsg.includes('error') || lowerMsg.includes('failed') || lowerMsg.includes('crash') || lowerMsg.includes('bug')) && message.length > 30) {
+      const result = await executeTool('decode_error', { trace: message });
+      toolCalls.push({ name: 'decode_error', args: 'trace', result });
+    }
+
+    // No tool matched — show help
+    if (toolCalls.length === 0) {
+      const result = await executeTool('help', {});
+      toolCalls.push({ name: 'help', args: '', result });
+    }
+
+    // ── Step 2: Try AI provider (graceful fallback) ──────────────────
+    const toolResultsStr = toolCalls.map((tc) => `[${tc.name}]: ${tc.result}`).join('\n\n');
+
+    const systemPrompt = `You are the Protea Botanicals Co-Pilot. React 18 CRA + Supabase v2.97.0. v10.0 status. Be concise.\n\n--- TOOL RESULTS ---\n${toolResultsStr}\n--- END ---\n\nSummarize the tool results clearly for the developer.`;
+
+    const conversationMessages = [
+      ...history.slice(-10).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message },
     ];
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "pdfs-2024-09-25,output-128k-2025-02-19",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 32000,
-        system: buildSystemPrompt(
-          existingSuppliers,
-          existingProducts,
-          existingInventory,
-          openPurchaseOrders,
-          industryProfile,
-        ),
-        messages: [{ role: "user", content: userContent }],
-      }),
-    });
+    let answer: string | null = null;
 
-    if (!claudeRes.ok) {
-      const errText = await claudeRes.text();
-      throw new Error(`Anthropic API error ${claudeRes.status}: ${errText}`);
+    if (provider === 'claude') {
+      answer = await callClaude(systemPrompt, conversationMessages);
+    } else {
+      answer = await callGrok(systemPrompt, conversationMessages);
     }
 
-    const claudeData = await claudeRes.json();
-    const rawText: string = claudeData.content?.[0]?.text || "";
-
-    let extraction: Record<string, unknown>;
-    try {
-      const cleaned = rawText
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-      extraction = JSON.parse(cleaned);
-    } catch {
-      throw new Error(
-        `Claude returned non-JSON response: ${rawText.substring(0, 300)}`,
-      );
-    }
-
-    // WP-FIN S0: run lump-sum cost allocation if needed (module-level function)
-    extraction = allocateLumpSumCosts(extraction, openPurchaseOrders);
-
-    const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // WP-FIN S0 / LL-084: Duplicate invoice guard — check before logging
-    const refNumber = (extraction.reference as Record<string, unknown>)
-      ?.number as string | null;
-    const supplierId = (extraction.supplier as Record<string, unknown>)
-      ?.matched_id as string | null;
-    if (refNumber && supplierId) {
-      const { data: existingConfirmed } = await db
-        .from("document_log")
-        .select("id, file_name, confirmed_at")
-        .eq("status", "confirmed")
-        .eq("supplier_id", supplierId)
-        .filter("extracted_data->reference->>number", "eq", refNumber)
-        .limit(1);
-      if (existingConfirmed && existingConfirmed.length > 0) {
-        const dup = existingConfirmed[0];
-        const dupDate = new Date(dup.confirmed_at).toLocaleDateString("en-ZA");
-        const dupWarning =
-          `⚠ DUPLICATE INVOICE DETECTED: Reference "${refNumber}" was already ` +
-          `confirmed on ${dupDate} (file: ${dup.file_name}). ` +
-          `Do NOT confirm any stock movement actions — this will create duplicate inventory entries. ` +
-          `If corrections are needed, re-open the original confirmed document.`;
-        (extraction.warnings as string[]).push(dupWarning);
-        extraction.potential_duplicate = true;
-        extraction.confidence = Math.min(
-          Number(extraction.confidence ?? 1),
-          0.4,
-        );
-      }
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    const { data: logEntry, error: logErr } = await db
-      .from("document_log")
-      .insert({
-        document_type: String(extraction.document_type || "unknown"),
-        file_url: file_url,
-        file_name: file_name,
-        file_size_kb: file_size_kb,
-        supplier_name:
-          ((extraction.supplier as Record<string, unknown>)?.name as
-            | string
-            | null) ?? null,
-        supplier_id:
-          ((extraction.supplier as Record<string, unknown>)?.matched_id as
-            | string
-            | null) ?? null,
-        extracted_data: extraction,
-        confidence_score:
-          typeof extraction.confidence === "number"
-            ? extraction.confidence
-            : null,
-        status: "pending_review",
-      })
-      .select()
-      .single();
-
-    if (logErr) {
-      throw new Error(`Failed to log to document_log: ${logErr.message}`);
+    // ── Step 3: Fallback to formatted tool results ───────────────────
+    if (!answer) {
+      // No AI available — format tool results directly
+      answer = toolCalls
+        .map((tc) => formatToolResult(tc.name, tc.result))
+        .join('\n─────────────────\n');
+      answer += '\n\n💡 Tip: Add API keys for AI-powered summaries (see COPILOT_SETUP.md)';
     }
 
     return new Response(
       JSON.stringify({
-        success: true,
-        document_log_id: logEntry.id,
-        extraction,
+        answer,
+        provider: answer ? provider : 'tools-only',
+        toolCalls: toolCalls.map((tc) => ({ name: tc.name, args: tc.args })),
+        timestamp: new Date().toISOString(),
       }),
-      { headers: JSON_HEADERS },
+      {
+        status: 200,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      }
     );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[process-document] Error:", message);
-    return new Response(JSON.stringify({ success: false, error: message }), {
-      status: 500,
-      headers: JSON_HEADERS,
-    });
+  } catch (error) {
+    console.error('[ai-copilot] Error:', error);
+    return new Response(
+      JSON.stringify({
+        error: error.message || 'Internal server error',
+        answer: `⚠ Co-Pilot error: ${error.message}. Check Edge Function logs.`,
+        toolCalls: [],
+      }),
+      {
+        status: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });

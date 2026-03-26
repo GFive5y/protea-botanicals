@@ -754,7 +754,9 @@ function ReviewPanel({
           ? "#f5eef8"
           : action === "update_po_shipping"
             ? C.lightOrange
-            : T.infoBg,
+            : action === "create_expense"
+              ? T.warningBg
+              : T.infoBg,
     color:
       action === "receive_delivery_item"
         ? T.accentMid
@@ -762,7 +764,9 @@ function ReviewPanel({
           ? "#6c3483"
           : action === "update_po_shipping"
             ? C.orange
-            : T.info,
+            : action === "create_expense"
+              ? T.warning
+              : T.info,
     fontFamily: T.font,
     letterSpacing: "0.05em",
   });
@@ -772,6 +776,7 @@ function ReviewPanel({
     if (action === "update_po_status") return "🔄 " + table;
     if (action === "create_supplier_product") return "➕ " + table;
     if (action === "update_po_shipping") return "🚢 Shipping Cost";
+    if (action === "create_expense") return "💰 expenses";
     return table;
   };
   const handleSupplierSave = async (supplierData) => {
@@ -1829,6 +1834,14 @@ export default function HQDocuments({ initialDocId = null }) {
   }, [initialDocId, documents]);
 
   const fetchFreshContext = async () => {
+    const fxRes = await supabase
+      .from("fx_rates")
+      .select("usd_zar")
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const cachedUsdZar = fxRes.data?.usd_zar || 18.5;
+
     const [{ data: sups }, { data: prods }, { data: invs }, { data: pos }] =
       await Promise.all([
         supabase
@@ -1853,6 +1866,7 @@ export default function HQDocuments({ initialDocId = null }) {
       existing_products: prods || [],
       existing_inventory: invs || [],
       open_purchase_orders: pos || [],
+      usd_zar_rate: cachedUsdZar,
     };
   };
 
@@ -2529,6 +2543,38 @@ export default function HQDocuments({ initialDocId = null }) {
               performed_by: user?.id ?? null,
             });
           if (movErr) throw movErr;
+        } else if (action === "create_expense") {
+          // WP-FIN S3: create expense from document ingestion
+          const { data: newExp, error: expErr } = await supabase
+            .from("expenses")
+            .insert({
+              tenant_id: tenantId || null,
+              expense_date:
+                data.expense_date ||
+                selectedDoc.uploaded_at?.split("T")[0] ||
+                new Date().toISOString().slice(0, 10),
+              category: data.category || "opex",
+              subcategory: data.subcategory || null,
+              description: data.description || "Document expense",
+              amount_zar: parseFloat(data.amount_zar) || 0,
+              amount_foreign: data.amount_foreign
+                ? parseFloat(data.amount_foreign)
+                : null,
+              currency: data.currency || "ZAR",
+              fx_rate: data.fx_rate ? parseFloat(data.fx_rate) : null,
+              supplier_id: data.supplier_id || docSupplierId || null,
+              document_id: selectedDoc.id,
+              inventory_item_id: data.inventory_item_id || null,
+            })
+            .select("id")
+            .single();
+          if (expErr)
+            throw new Error(`Expense create failed: ${expErr.message}`);
+          // Link document back to expense
+          await supabase
+            .from("document_log")
+            .update({ expense_id: newExp.id })
+            .eq("id", selectedDoc.id);
         } else if (record_id) {
           const { error } = await supabase
             .from(table)
