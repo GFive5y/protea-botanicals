@@ -15,7 +15,7 @@
 // v3.1: Supply Chain + Production + Distribution + Shops
 
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 
 // ── Phase 2B ──────────────────────────────────────────────────────────────────
@@ -137,6 +137,7 @@ const TABS = [
 
 export default function HQDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const navigate = useNavigate();
   const { tenant, allTenants, tenantName, isHQ, switchTenant } = useTenant();
   const location = useLocation();
 
@@ -213,7 +214,13 @@ export default function HQDashboard() {
                   const selected = allTenants.find(
                     (t) => t.id === e.target.value,
                   );
-                  if (selected) switchTenant(selected);
+                  if (!selected) return;
+                  switchTenant(selected);
+                  if (selected.industry_profile === "operator") {
+                    navigate("/hq");
+                  } else {
+                    navigate("/tenant-portal");
+                  }
                 }}
                 style={{
                   padding: "6px 10px",
