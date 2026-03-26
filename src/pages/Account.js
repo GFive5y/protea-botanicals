@@ -2888,8 +2888,19 @@ export default function Account() {
     if (redirectedRef.current) return;
     redirectedRef.current = true;
     if (profile?.role) setRole(profile.role);
+    // Smart routing — operator and management bypass returnUrl defaults
+    if (profile?.is_operator || profile?.hq_access) {
+      navigate("/hq", { replace: true });
+      return;
+    }
+    if (profile?.role === "management") {
+      navigate("/tenant-portal", { replace: true });
+      return;
+    }
     const roleRoute = {
       admin: "/admin",
+      hr: "/hr",
+      staff: "/staff",
       retailer: "/wholesale",
       customer: "/loyalty",
     };
@@ -3348,6 +3359,29 @@ export default function Account() {
                 }}
               >
                 🛒 Customer → /loyalty
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() =>
+                  handleDevLogin(
+                    "gerhardt@proteabotanicals.co.za",
+                    process.env.REACT_APP_DEV_HQ_PW || "",
+                  )
+                }
+                style={{
+                  padding: "10px 16px",
+                  background: "#1A3D2B",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: F.body,
+                }}
+              >
+                🌿 HQ Operator → /hq
               </button>
               <button
                 type="button"
