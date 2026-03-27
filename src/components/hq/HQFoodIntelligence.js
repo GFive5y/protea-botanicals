@@ -1238,19 +1238,22 @@ Paragraph 2 (2-3 sentences): Top risks requiring attention — reference actual 
 Paragraph 3 (1-2 sentences): One or two recommended next actions — concrete and actionable.
 Use plain language. No markdown formatting, no bullet points, no headers. Just clean prose.`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/ai-copilot`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: prompt }],
+            userContext: { role: "admin" },
+          }),
+        },
+      );
       const json = await response.json();
-      const text =
-        json.content?.find((b) => b.type === "text")?.text ||
-        "Unable to generate insight at this time.";
+      const text = json.reply || "Unable to generate insight at this time.";
       setAiInsight(text);
     } catch (err) {
       setAiInsight(

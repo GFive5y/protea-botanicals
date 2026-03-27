@@ -168,24 +168,28 @@ Rules:
 - Return ONLY the JSON object, no other text`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: `Analyse this stock item: ${JSON.stringify(itemContext, null, 2)}`,
-            },
-          ],
-        }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/ai-copilot`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: "user",
+                content: `${systemPrompt}\n\nAnalyse this stock item: ${JSON.stringify(itemContext, null, 2)}`,
+              },
+            ],
+            userContext: { role: "admin" },
+          }),
+        },
+      );
 
       const data = await response.json();
-      const text = data.content?.[0]?.text || "";
+      const text = data.reply || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
       setReport(parsed);
