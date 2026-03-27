@@ -22,6 +22,7 @@ import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
+import { useTenant } from "../../services/tenantService"; // ✦ WP-MULTISITE
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -231,6 +232,7 @@ export default function HQOverview({ onNavigate }) {
   const [revDelta, setRevDelta] = useState(null); // % vs prior month
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
+  const { allTenants, isOperator, switchTenant } = useTenant(); // ✦ WP-MULTISITE
 
   const fetchFx = useCallback(async (silent = false) => {
     if (!silent) setFxRefreshing(true);
@@ -820,6 +822,182 @@ export default function HQOverview({ onNavigate }) {
         storageKey="hq_overview"
         defaultOpen={false}
       />
+
+      {/* ── WP-MULTISITE: Tenant card grid (operator only) ── */}
+      {isOperator && allTenants.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              ...T.label,
+              color: T.ink300,
+              marginBottom: 12,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Your Tenants
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {allTenants.map((t) => (
+              <div
+                key={t.id}
+                style={{
+                  background: "#fff",
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 8,
+                  padding: "16px 18px",
+                  cursor: "pointer",
+                  transition: "border-color 0.15s, box-shadow 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = T.accentMid;
+                  e.currentTarget.style.boxShadow = T.shadowMd;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = T.ink150;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+                onClick={() => {
+                  switchTenant(t);
+                  nav("hq-overview");
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 6,
+                      background:
+                        t.industry_profile === "operator"
+                          ? "#0A0A0A"
+                          : T.accentLit,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color:
+                        t.industry_profile === "operator"
+                          ? "#00E87A"
+                          : T.accentMid,
+                    }}
+                  >
+                    {(t.name || "?").slice(0, 2).toUpperCase()}
+                  </div>
+                  {t.domain && (
+                    <a
+                      href={`https://${t.domain}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        fontSize: 10,
+                        color: T.accentMid,
+                        textDecoration: "none",
+                        fontFamily: T.fontUi,
+                        fontWeight: 600,
+                      }}
+                    >
+                      ↗ Live
+                    </a>
+                  )}
+                </div>
+                <div
+                  style={{
+                    ...T.body,
+                    color: T.ink900,
+                    fontWeight: 600,
+                    marginBottom: 2,
+                  }}
+                >
+                  {t.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink300,
+                    fontFamily: T.fontUi,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 10,
+                  }}
+                >
+                  {t.industry_profile?.replace(/_/g, " ") || "Tenant"}
+                </div>
+                <div
+                  style={{
+                    width: "100%",
+                    padding: "7px 0",
+                    textAlign: "center",
+                    background: T.accentLit,
+                    border: `1px solid ${T.accentBd}`,
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: T.accentMid,
+                    fontFamily: T.fontUi,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Enter world →
+                </div>
+              </div>
+            ))}
+            {/* Add new tenant card */}
+            <div
+              style={{
+                border: `1px dashed ${T.ink150}`,
+                borderRadius: 8,
+                padding: "16px 18px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                minHeight: 140,
+                cursor: "pointer",
+              }}
+              onClick={() => nav("tenants")}
+            >
+              <div style={{ fontSize: 22, color: T.ink300 }}>+</div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: T.ink500,
+                  fontFamily: T.fontUi,
+                  fontWeight: 600,
+                }}
+              >
+                New tenant
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.ink300,
+                  fontFamily: T.fontUi,
+                  textAlign: "center",
+                }}
+              >
+                Pick a template, deploy in minutes
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── REVENUE HERO — Area chart (orders.total last 30 days) ── */}
       {revenueTrend.length > 0 && (

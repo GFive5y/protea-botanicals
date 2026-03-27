@@ -28,6 +28,7 @@ import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
 import ClientHeader from "../components/ClientHeader";
 import { useTenant } from "../services/tenantService";
+import { useStorefront } from "../contexts/StorefrontContext"; // ✦ WP-MULTISITE
 
 // ── Distillate COA ────────────────────────────────────────────────────────────
 const DISTILLATE_COA = {
@@ -2155,6 +2156,8 @@ export default function Shop() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { industryProfile } = useTenant();
+  const { storefrontTenantId, brandingConfig } = useStorefront(); // ✦ WP-MULTISITE
+  const brandName = brandingConfig?.brand_name || "Pure Premium THC Vapes";
   const isFoodBev = industryProfile === "food_beverage";
   const isGeneral =
     industryProfile === "general_retail" || industryProfile === "mixed_retail";
@@ -2259,6 +2262,7 @@ export default function Shop() {
           .eq("category", "finished_product")
           .eq("is_active", true)
           .gt("quantity_on_hand", 0)
+          .eq("tenant_id", storefrontTenantId) // ✦ WP-MULTISITE
           .order("name");
         if (error) {
           console.error("[Shop] Inventory fetch error:", error);
@@ -2455,7 +2459,7 @@ export default function Shop() {
                 fontWeight: 500,
               }}
             >
-              Protea Botanicals · Online Store
+              {brandName} · Online Store
             </span>
           </div>
           <h1
@@ -2951,7 +2955,7 @@ export default function Shop() {
                 letterSpacing: "0.08em",
               }}
             >
-              Protea Botanicals
+              {brandName}
             </span>
             <p
               className="body-font"
@@ -3002,7 +3006,7 @@ export default function Shop() {
               margin: 0,
             }}
           >
-            © 2026 Protea Botanicals · Lab Verified · QR Authenticated
+            © 2026 {brandName} · Lab Verified · QR Authenticated
           </p>
         </div>
       </div>

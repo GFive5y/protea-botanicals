@@ -15,8 +15,9 @@ import { RoleContext } from "../App";
 import { supabase } from "../services/supabaseClient";
 import { C } from "../styles/tokens";
 import ClientHeader from "../components/ClientHeader";
+import { useStorefront } from "../contexts/StorefrontContext"; // ✦ WP-MULTISITE
 
-const HQ_TENANT_ID = "43b34c33-6864-4f02-98dd-df1d340475c3";
+// ✦ WP-MULTISITE: tenant ID resolved from domain via StorefrontContext
 
 const DEFAULT_CONFIG = {
   pts_per_r100_online: 2.0,
@@ -53,6 +54,7 @@ function getTierMult(tier, cfg) {
 export default function CheckoutPage() {
   const { cartItems, getCartTotal, clearCart } = useCart();
   const { userEmail } = useContext(RoleContext);
+  const { storefrontTenantId } = useStorefront(); // ✦ WP-MULTISITE
   const navigate = useNavigate();
   const formRef = useRef(null);
 
@@ -256,7 +258,7 @@ export default function CheckoutPage() {
             unit_cost: item.price || 0,
             reference: result.order_ref,
             notes: `Customer order ${result.order_ref}: ${qty} × ${item.name}`,
-            tenant_id: HQ_TENANT_ID,
+            tenant_id: storefrontTenantId,
           });
         } catch (_) {}
       }

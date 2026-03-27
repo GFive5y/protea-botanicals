@@ -78,6 +78,7 @@ import PageShell from "./components/PageShell";
 import AppShell from "./components/AppShell"; // ★ v6.0
 import { CartProvider, useCart } from "./contexts/CartContext";
 import { TenantProvider, useTenant } from "./services/tenantService";
+import { StorefrontProvider } from "./contexts/StorefrontContext"; // ✦ WP-MULTISITE v1.0
 
 export const RoleContext = createContext(null);
 
@@ -888,228 +889,230 @@ export default function App() {
     <RoleContext.Provider
       value={{ role, setRole, isDevMode, setIsDevMode, loading, userEmail }}
     >
-      <CartProvider>
-        <TenantProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* ── STANDALONE — no nav ─────────────────────────────── */}
-              <Route path="/" element={<Landing />} />
+      <StorefrontProvider>
+        <CartProvider>
+          <TenantProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* ── STANDALONE — no nav ─────────────────────────────── */}
+                <Route path="/" element={<Landing />} />
 
-              <Route
-                path="/shop"
-                element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <Shop />
-                    </div>
-                  </>
-                }
-              />
-              <Route
-                path="/verify/:productId"
-                element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <ProductVerification />
-                    </div>
-                  </>
-                }
-              />
-              <Route
-                path="/terpenes/:terpeneId"
-                element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <TerpenePage />
-                    </div>
-                  </>
-                }
-              />
-              <Route
-                path="/cart"
-                element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <CartPage />
-                    </div>
-                  </>
-                }
-              />
+                <Route
+                  path="/shop"
+                  element={
+                    <>
+                      <NavBar />
+                      <div style={{ paddingTop: "56px" }}>
+                        <Shop />
+                      </div>
+                    </>
+                  }
+                />
+                <Route
+                  path="/verify/:productId"
+                  element={
+                    <>
+                      <NavBar />
+                      <div style={{ paddingTop: "56px" }}>
+                        <ProductVerification />
+                      </div>
+                    </>
+                  }
+                />
+                <Route
+                  path="/terpenes/:terpeneId"
+                  element={
+                    <>
+                      <NavBar />
+                      <div style={{ paddingTop: "56px" }}>
+                        <TerpenePage />
+                      </div>
+                    </>
+                  }
+                />
+                <Route
+                  path="/cart"
+                  element={
+                    <>
+                      <NavBar />
+                      <div style={{ paddingTop: "56px" }}>
+                        <CartPage />
+                      </div>
+                    </>
+                  }
+                />
 
-              {/* v3.9: Leaderboard — public, no auth required */}
-              <Route
-                path="/leaderboard"
-                element={
-                  <>
-                    <NavBar />
-                    <div style={{ paddingTop: "56px" }}>
-                      <Leaderboard />
-                    </div>
-                  </>
-                }
-              />
+                {/* v3.9: Leaderboard — public, no auth required */}
+                <Route
+                  path="/leaderboard"
+                  element={
+                    <>
+                      <NavBar />
+                      <div style={{ paddingTop: "56px" }}>
+                        <Leaderboard />
+                      </div>
+                    </>
+                  }
+                />
 
-              {/* Scan routes — standalone, no nav */}
-              <Route path="/scan" element={<ScanPage />} />
-              <Route path="/scan/:qrCode" element={<ScanResult />} />
+                {/* Scan routes — standalone, no nav */}
+                <Route path="/scan" element={<ScanPage />} />
+                <Route path="/scan/:qrCode" element={<ScanResult />} />
 
-              {/* ── WITH nav + auth guard ───────────────────────────── */}
-              <Route
-                path="/loyalty"
-                element={
-                  <WithNav>
+                {/* ── WITH nav + auth guard ───────────────────────────── */}
+                <Route
+                  path="/loyalty"
+                  element={
+                    <WithNav>
+                      <RequireAuth>
+                        <Loyalty />
+                      </RequireAuth>
+                    </WithNav>
+                  }
+                />
+                <Route
+                  path="/redeem"
+                  element={
+                    <WithNav>
+                      <RequireAuth>
+                        <Redeem />
+                      </RequireAuth>
+                    </WithNav>
+                  }
+                />
+                <Route
+                  path="/checkout"
+                  element={
+                    <WithNav>
+                      <RequireAuth>
+                        <CheckoutPage />
+                      </RequireAuth>
+                    </WithNav>
+                  }
+                />
+                <Route
+                  path="/order-success"
+                  element={
+                    <WithNav>
+                      <OrderSuccess />
+                    </WithNav>
+                  }
+                />
+                <Route
+                  path="/wholesale"
+                  element={
+                    <WithNav>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["retailer", "admin"]}>
+                          <WholesalePortal />
+                        </RequireRole>
+                      </RequireAuth>
+                    </WithNav>
+                  }
+                />
+
+                {/* ★ v6.0: AppShell routes — premium nav sidebar ──────── */}
+                <Route
+                  path="/admin"
+                  element={
+                    <AppShell maxWidth={1200}>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["admin"]}>
+                          <AdminDashboardRouter />
+                        </RequireRole>
+                      </RequireAuth>
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/admin/qr"
+                  element={
+                    <AppShell maxWidth={1200}>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["admin"]}>
+                          <AdminQrGenerator />
+                        </RequireRole>
+                      </RequireAuth>
+                    </AppShell>
+                  }
+                />
+                <Route
+                  path="/hq/*"
+                  element={
+                    <AppShell maxWidth={1400}>
+                      <RequireAuth>
+                        <RequireRole allowedRoles={["admin"]}>
+                          <RequireHQ>
+                            <HQDashboard />
+                          </RequireHQ>
+                        </RequireRole>
+                      </RequireAuth>
+                    </AppShell>
+                  }
+                />
+
+                {/* WP-TENANT S3: Tenant management portal */}
+                <Route
+                  path="/tenant-portal/*"
+                  element={
                     <RequireAuth>
-                      <Loyalty />
+                      <TenantPortal />
                     </RequireAuth>
-                  </WithNav>
-                }
-              />
-              <Route
-                path="/redeem"
-                element={
-                  <WithNav>
-                    <RequireAuth>
-                      <Redeem />
-                    </RequireAuth>
-                  </WithNav>
-                }
-              />
-              <Route
-                path="/checkout"
-                element={
-                  <WithNav>
-                    <RequireAuth>
-                      <CheckoutPage />
-                    </RequireAuth>
-                  </WithNav>
-                }
-              />
-              <Route
-                path="/order-success"
-                element={
-                  <WithNav>
-                    <OrderSuccess />
-                  </WithNav>
-                }
-              />
-              <Route
-                path="/wholesale"
-                element={
-                  <WithNav>
-                    <RequireAuth>
-                      <RequireRole allowedRoles={["retailer", "admin"]}>
-                        <WholesalePortal />
-                      </RequireRole>
-                    </RequireAuth>
-                  </WithNav>
-                }
-              />
+                  }
+                />
 
-              {/* ★ v6.0: AppShell routes — premium nav sidebar ──────── */}
-              <Route
-                path="/admin"
-                element={
-                  <AppShell maxWidth={1200}>
-                    <RequireAuth>
-                      <RequireRole allowedRoles={["admin"]}>
-                        <AdminDashboardRouter />
-                      </RequireRole>
-                    </RequireAuth>
-                  </AppShell>
-                }
-              />
-              <Route
-                path="/admin/qr"
-                element={
-                  <AppShell maxWidth={1200}>
-                    <RequireAuth>
-                      <RequireRole allowedRoles={["admin"]}>
-                        <AdminQrGenerator />
-                      </RequireRole>
-                    </RequireAuth>
-                  </AppShell>
-                }
-              />
-              <Route
-                path="/hq/*"
-                element={
-                  <AppShell maxWidth={1400}>
-                    <RequireAuth>
-                      <RequireRole allowedRoles={["admin"]}>
-                        <RequireHQ>
-                          <HQDashboard />
-                        </RequireHQ>
-                      </RequireRole>
-                    </RequireAuth>
-                  </AppShell>
-                }
-              />
+                {/* ★ v4.0: HR Dashboard — role='hr' or isHQ */}
+                <Route
+                  path="/hr/*"
+                  element={
+                    <AppShell maxWidth={1400}>
+                      <RequireAuth>
+                        <RequireHR>
+                          <HRDashboard />
+                        </RequireHR>
+                      </RequireAuth>
+                    </AppShell>
+                  }
+                />
 
-              {/* WP-TENANT S3: Tenant management portal */}
-              <Route
-                path="/tenant-portal/*"
-                element={
-                  <RequireAuth>
-                    <TenantPortal />
-                  </RequireAuth>
-                }
-              />
+                {/* ★ v5.0: Staff Portal — any logged-in user, profile check inside */}
+                <Route
+                  path="/staff/*"
+                  element={
+                    <AppShell maxWidth={1000}>
+                      <RequireStaff>
+                        <StaffPortal />
+                      </RequireStaff>
+                    </AppShell>
+                  }
+                />
 
-              {/* ★ v4.0: HR Dashboard — role='hr' or isHQ */}
-              <Route
-                path="/hr/*"
-                element={
-                  <AppShell maxWidth={1400}>
-                    <RequireAuth>
-                      <RequireHR>
-                        <HRDashboard />
-                      </RequireHR>
-                    </RequireAuth>
-                  </AppShell>
-                }
-              />
+                {/* ── WITH nav, no auth required ──────────────────────── */}
+                <Route
+                  path="/account"
+                  element={
+                    <WithNav>
+                      <Account />
+                    </WithNav>
+                  }
+                />
+                <Route
+                  path="/welcome"
+                  element={
+                    <WithNav>
+                      <Welcome />
+                    </WithNav>
+                  }
+                />
 
-              {/* ★ v5.0: Staff Portal — any logged-in user, profile check inside */}
-              <Route
-                path="/staff/*"
-                element={
-                  <AppShell maxWidth={1000}>
-                    <RequireStaff>
-                      <StaffPortal />
-                    </RequireStaff>
-                  </AppShell>
-                }
-              />
-
-              {/* ── WITH nav, no auth required ──────────────────────── */}
-              <Route
-                path="/account"
-                element={
-                  <WithNav>
-                    <Account />
-                  </WithNav>
-                }
-              />
-              <Route
-                path="/welcome"
-                element={
-                  <WithNav>
-                    <Welcome />
-                  </WithNav>
-                }
-              />
-
-              {/* Fallback */}
-              <Route path="/404" element={<NotFound />} />
-              <Route path="*" element={<Navigate to="/404" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </TenantProvider>
-      </CartProvider>
+                {/* Fallback */}
+                <Route path="/404" element={<NotFound />} />
+                <Route path="*" element={<Navigate to="/404" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </TenantProvider>
+        </CartProvider>
+      </StorefrontProvider>
     </RoleContext.Provider>
   );
 }
