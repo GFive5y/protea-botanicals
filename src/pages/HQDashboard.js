@@ -239,6 +239,31 @@ export default function HQDashboard() {
                   </option>
                 ))}
               </select>
+              {tenant?.domain && (
+                <a
+                  href={`https://${tenant.domain}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "6px 12px",
+                    background: "#0A0A0A",
+                    color: "#00E87A",
+                    border: "1px solid rgba(0,232,122,0.3)",
+                    borderRadius: "2px",
+                    fontFamily: "Jost, sans-serif",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ↗ View live site
+                </a>
+              )}
             </div>
           )}
         </div>
