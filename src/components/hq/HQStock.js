@@ -13,8 +13,6 @@ import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
 
-const HQ_TENANT_ID = "43b34c33-6864-4f02-98dd-df1d340475c3";
-
 const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
@@ -364,7 +362,7 @@ const isLowFn = (item) =>
   (item.quantity_on_hand || 0) <= item.reorder_level;
 
 export default function HQStock() {
-  const { industryProfile } = useTenant();
+  const { industryProfile, tenantId } = useTenant();
 
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -396,6 +394,7 @@ export default function HQStock() {
   const labels = PANEL_LABELS[industryProfile] || PANEL_LABELS.general_retail;
 
   const load = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     setError(null);
     try {
@@ -404,7 +403,7 @@ export default function HQStock() {
           supabase
             .from("inventory_items")
             .select("*, suppliers(name)")
-            .eq("tenant_id", HQ_TENANT_ID)
+            .eq("tenant_id", tenantId)
             .order("name"),
           supabase
             .from("suppliers")
@@ -414,7 +413,7 @@ export default function HQStock() {
           supabase
             .from("stock_movements")
             .select("*")
-            .eq("tenant_id", HQ_TENANT_ID)
+            .eq("tenant_id", tenantId)
             .order("created_at", { ascending: false })
             .limit(100),
         ]);
@@ -427,7 +426,7 @@ export default function HQStock() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     load();
@@ -488,17 +487,15 @@ export default function HQStock() {
     setAdjustError("");
     try {
       const newQty = Math.max(0, (item.quantity_on_hand || 0) + delta);
-      await supabase
-        .from("stock_movements")
-        .insert({
-          item_id: item.id,
-          tenant_id: HQ_TENANT_ID,
-          movement_type: "adjustment",
-          quantity: delta,
-          reference: `ADJ-HQ-${Date.now()}`,
-          notes: adjustReason.trim(),
-          unit_cost: item.weighted_avg_cost || null,
-        });
+      await supabase.from("stock_movements").insert({
+        item_id: item.id,
+        tenant_id: tenantId,
+        movement_type: "adjustment",
+        quantity: delta,
+        reference: `ADJ-HQ-${Date.now()}`,
+        notes: adjustReason.trim(),
+        unit_cost: item.weighted_avg_cost || null,
+      });
       await supabase
         .from("inventory_items")
         .update({ quantity_on_hand: newQty })
@@ -2281,21 +2278,361 @@ export default function HQStock() {
       </div>
     );
   };
+  // ── GENERAL OVERVIEW (cannabis / general / mixed) ─────────────────────
+  const GeneralOverview = () => {
+    const activeItems = items.filter((i) => i.is_active !== false);
+    const totalSkus = activeItems.length;
+    const totalValue = activeItems.reduce(
+      (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+      0,
+    );
+    const totalCost = activeItems.reduce(
+      (s, i) => s + (i.quantity_on_hand || 0) * (i.cost_price || 0),
+      0,
+    );
+    const lowItems = activeItems.filter(isLowFn);
+    const outItems = activeItems.filter((i) => (i.quantity_on_hand || 0) === 0);
+    const liveItems = activeItems.filter(
+      (i) => (i.sell_price || 0) > 0 && (i.quantity_on_hand || 0) > 0,
+    );
+    const reserved = activeItems.reduce((s, i) => s + (i.reserved_qty || 0), 0);
+    const healthyCount = activeItems.filter(
+      (i) => (i.quantity_on_hand || 0) > 0 && !isLowFn(i),
+    ).length;
+    const healthPct =
+      totalSkus > 0 ? Math.round((healthyCount / totalSkus) * 100) : 0;
+    const catMap = {};
+    activeItems.forEach((i) => {
+      const cat = i.category || "other";
+      if (!catMap[cat]) catMap[cat] = { count: 0, value: 0 };
+      catMap[cat].count++;
+      catMap[cat].value +=
+        (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0);
+    });
+    const recentMov = movements.slice(0, 8);
+    return (
+      <div style={{ display: "grid", gap: 20 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))",
+            gap: "1px",
+            background: T.ink150,
+            borderRadius: 6,
+            overflow: "hidden",
+            border: "1px solid " + T.ink150,
+          }}
+        >
+          {[
+            { label: "Total SKUs", value: totalSkus, top: T.ink150 },
+            { label: "Stock Value", value: fmt(totalValue), top: T.accentMid },
+            { label: "Stock Cost", value: fmt(totalCost), top: T.ink150 },
+            {
+              label: "Low Stock",
+              value: lowItems.length,
+              top: lowItems.length > 0 ? T.warning : T.ink150,
+            },
+            {
+              label: "Out of Stock",
+              value: outItems.length,
+              top: outItems.length > 0 ? T.danger : T.ink150,
+            },
+            { label: "Live in Shop", value: liveItems.length, top: T.success },
+            { label: "Reserved", value: reserved, top: T.ink150 },
+          ].map((k) => (
+            <div
+              key={k.label}
+              style={{
+                background: "#fff",
+                padding: "16px 18px",
+                borderTop: "3px solid " + k.top,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 400,
+                  color: T.ink900,
+                  fontFamily: T.mono,
+                  lineHeight: 1,
+                  marginBottom: 4,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {k.value}
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: T.ink400,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                {k.label}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid " + T.ink150,
+            borderRadius: 6,
+            padding: "16px 20px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink400,
+              marginBottom: 12,
+            }}
+          >
+            Stock Health
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div
+                style={{
+                  height: 8,
+                  background: T.ink150,
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: healthPct + "%",
+                    background:
+                      healthPct > 70
+                        ? T.success
+                        : healthPct > 40
+                          ? T.warning
+                          : T.danger,
+                    borderRadius: 4,
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 20 }}>
+              <span style={{ fontSize: 12, color: T.success, fontWeight: 600 }}>
+                Healthy: {healthyCount} SKUs
+              </span>
+              <span style={{ fontSize: 12, color: T.warning, fontWeight: 600 }}>
+                Low: {lowItems.length}
+              </span>
+              <span style={{ fontSize: 12, color: T.danger, fontWeight: 600 }}>
+                Out: {outItems.length}
+              </span>
+            </div>
+          </div>
+        </div>
+        {Object.keys(catMap).length > 0 && (
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid " + T.ink150,
+              borderRadius: 6,
+              padding: "16px 20px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                marginBottom: 12,
+              }}
+            >
+              Stock by Category
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))",
+                gap: 10,
+              }}
+            >
+              {Object.entries(catMap).map(([cat, data]) => (
+                <div
+                  key={cat}
+                  style={{
+                    padding: "12px 14px",
+                    background: T.ink050,
+                    border: "1px solid " + T.ink150,
+                    borderRadius: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: T.accentMid,
+                      marginBottom: 6,
+                    }}
+                  >
+                    {CATEGORY_LABELS[cat] || cat}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 400,
+                      color: T.ink900,
+                      fontFamily: T.mono,
+                    }}
+                  >
+                    {data.count} items
+                  </div>
+                  <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
+                    {fmt(data.value)} value
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {recentMov.length > 0 && (
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid " + T.ink150,
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "12px 20px",
+                borderBottom: "1px solid " + T.ink150,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: T.ink400,
+              }}
+            >
+              Recent Stock Movements
+            </div>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 12,
+                fontFamily: T.font,
+              }}
+            >
+              <thead>
+                <tr>
+                  {["Date", "Item", "Type", "Qty", "Reference"].map((h) => (
+                    <th key={h} style={sTh}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {recentMov.map((m) => {
+                  const item = items.find((i) => i.id === m.item_id);
+                  const qty = m.quantity || 0;
+                  return (
+                    <tr key={m.id}>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontSize: 11,
+                          color: T.ink400,
+                          fontFamily: T.mono,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {fmtDate(m.created_at)}
+                      </td>
+                      <td style={{ ...sTd, fontWeight: 500 }}>
+                        {item?.name || (
+                          <span style={{ color: T.ink300 }}>—</span>
+                        )}
+                      </td>
+                      <td style={sTd}>
+                        <span
+                          style={{
+                            fontSize: 9,
+                            padding: "2px 7px",
+                            borderRadius: 3,
+                            background: T.ink075,
+                            color: T.ink500,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {(m.movement_type || "").replace(/_/g, " ")}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontFamily: T.mono,
+                          fontWeight: 700,
+                          color: qty >= 0 ? T.success : T.danger,
+                        }}
+                      >
+                        {qty >= 0 ? "+" : ""}
+                        {fmtQty(qty, item?.unit)}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontSize: 11,
+                          color: T.ink400,
+                          fontFamily: T.mono,
+                        }}
+                      >
+                        {m.reference || "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ── RENDER ────────────────────────────────────────────────────────────────
   if (loading)
-    return (
-      <p
-        style={{
-          padding: "32px 0",
-          color: T.ink300,
-          fontSize: "13px",
-          fontFamily: T.font,
-        }}
-      >
-        Loading HQ stock...
-      </p>
-    );
+    if (loading)
+      // ── RENDER ────────────────────────────────────────────────────────────────
+      return (
+        <p
+          style={{
+            padding: "32px 0",
+            color: T.ink300,
+            fontSize: "13px",
+            fontFamily: T.font,
+          }}
+        >
+          Loading HQ stock...
+        </p>
+      );
   if (error)
     return (
       <div
@@ -2371,60 +2708,52 @@ export default function HQStock() {
         </button>
       </div>
 
-      {isFoodBev ? (
-        <>
-          <div
-            style={{
-              display: "flex",
-              gap: 0,
-              borderBottom: "1px solid " + T.ink150,
-              marginBottom: "24px",
-              marginTop: "16px",
-            }}
-          >
-            {[
-              { id: "overview", label: "Overview" },
-              { id: "items", label: `Items (${items.length})` },
-              { id: "movements", label: "Movements" },
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setSubTab(t.id)}
-                style={{
-                  padding: "10px 16px",
-                  background: "none",
-                  border: "none",
-                  borderBottom:
-                    subTab === t.id
-                      ? "2px solid " + T.accentMid
-                      : "2px solid transparent",
-                  fontFamily: T.font,
-                  fontSize: "11px",
-                  fontWeight: subTab === t.id ? 700 : 400,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  color: subTab === t.id ? T.accentMid : T.ink500,
-                  cursor: "pointer",
-                  marginBottom: "-1px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          {subTab === "overview" && <FoodOverview />}
-          {subTab === "items" && <FoodItems />}
-          {subTab === "movements" && <FoodMovements />}
-        </>
-      ) : (
-        <>
-          {renderAccPanel("p1")}
-          {renderAccPanel("p2")}
-          {renderAccPanel("p3")}
-          {renderAccPanel("p4")}
-        </>
-      )}
+      <>
+        <div
+          style={{
+            display: "flex",
+            gap: 0,
+            borderBottom: "1px solid " + T.ink150,
+            marginBottom: "24px",
+            marginTop: "16px",
+          }}
+        >
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "items", label: `Items (${items.length})` },
+            { id: "movements", label: "Movements" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setSubTab(t.id)}
+              style={{
+                padding: "10px 16px",
+                background: "none",
+                border: "none",
+                borderBottom:
+                  subTab === t.id
+                    ? "2px solid " + T.accentMid
+                    : "2px solid transparent",
+                fontFamily: T.font,
+                fontSize: "11px",
+                fontWeight: subTab === t.id ? 700 : 400,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: subTab === t.id ? T.accentMid : T.ink500,
+                cursor: "pointer",
+                marginBottom: "-1px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {subTab === "overview" &&
+          (isFoodBev ? <FoodOverview /> : <GeneralOverview />)}
+        {subTab === "items" && <FoodItems />}
+        {subTab === "movements" && <FoodMovements />}
+      </>
 
       {renderMovDrawer()}
       {modalItem !== undefined && (
