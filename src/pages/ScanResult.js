@@ -1,4 +1,4 @@
-// src/pages/ScanResult.js v4.8
+// src/pages/ScanResult.js v4.9
 // WP-BIB Session 8: Profile-adaptive QR scan result page
 // v4.8 changes from v4.7:
 //   - useTenant() wired — reads industryProfile from live tenant row
@@ -31,10 +31,21 @@ const DEFAULT_LOYALTY_CONFIG = {
   threshold_silver: 200,
   threshold_gold: 500,
   threshold_platinum: 1000,
+  threshold_harvest_club: 2500,
+  mult_tier_harvest_club: 2.5,
   redemption_value_zar: 0.1,
   breakage_rate: 0.3,
+  mult_cat_cannabis_flower: 2.0,
+  mult_cat_cannabis_vape: 1.75,
+  mult_cat_cannabis_edible: 1.5,
+  mult_cat_seeds_clones: 3.0,
+  mult_cat_grow_supplies: 1.0,
+  mult_cat_accessories: 0.75,
+  mult_cat_health_wellness: 1.5,
+  mult_cat_lifestyle_merch: 2.0,
 };
 function getTierLabel(pts, cfg) {
+  if (pts >= (cfg.threshold_harvest_club || 2500)) return "Harvest Club";
   if (pts >= cfg.threshold_platinum) return "Platinum";
   if (pts >= cfg.threshold_gold) return "Gold";
   if (pts >= cfg.threshold_silver) return "Silver";
@@ -47,6 +58,7 @@ function getTierMult(tier, cfg) {
       Silver: cfg.mult_silver,
       Gold: cfg.mult_gold,
       Platinum: cfg.mult_platinum,
+      "Harvest Club": cfg.mult_tier_harvest_club || 2.5,
     }[tier] || 1.0
   );
 }
@@ -1113,7 +1125,8 @@ function GpsConsentBanner({ onAllow, onDeny }) {
 export default function ScanResult() {
   const { qrCode } = useParams();
   const navigate = useNavigate();
-  const { industryProfile } = useTenant();
+  const { industryProfile, tenant } = useTenant();
+  const tenantId = tenant?.id || null;
   const [inventoryItem, setInventoryItem] = useState(null);
 
   const [phase, setPhase] = useState("loading");
@@ -1222,6 +1235,7 @@ export default function ScanResult() {
       scanLogId,
       multiplierApplied,
       tierAtTime,
+      category,
     }) => {
       try {
         await supabase.from("loyalty_transactions").insert({
@@ -1238,6 +1252,7 @@ export default function ScanResult() {
           tier_at_time: tierAtTime || "Bronze",
           channel: "qr_scan",
           tenant_id: tenantId || null,
+          category: category || null,
         });
       } catch (err) {
         console.error("writeLoyaltyTransaction error:", err);
@@ -1296,24 +1311,24 @@ export default function ScanResult() {
 
     let config = DEFAULT_LOYALTY_CONFIG;
     try {
-      const { data: cfgData } = await supabase
-        .from("loyalty_config")
-        .select("*")
-        .single();
-      if (cfgData) config = cfgData;
+      const cfgQuery = supabase.from("loyalty_config").select("*");
+      if (tenantId) cfgQuery.eq("tenant_id", tenantId);
+      const { data: cfgData } = await cfgQuery.single();
+      if (cfgData) config = { ...DEFAULT_LOYALTY_CONFIG, ...cfgData };
     } catch (_) {}
 
     // v4.5: Fetch active campaign
     let campaign = null;
     try {
       const today = new Date().toISOString().split("T")[0];
-      const { data: camps } = await supabase
+      let campQuery = supabase
         .from("double_points_campaigns")
         .select("*")
         .eq("is_active", true)
         .lte("start_date", today)
-        .gte("end_date", today)
-        .limit(1);
+        .gte("end_date", today);
+      if (tenantId) campQuery = campQuery.eq("tenant_id", tenantId);
+      const { data: camps } = await campQuery.limit(1);
       if (camps && camps.length > 0) campaign = camps[0];
     } catch (_) {}
     setActiveCampaign(campaign);
@@ -1323,7 +1338,7 @@ export default function ScanResult() {
       const { data: qrRows, error: qrErr } = await supabase
         .from("qr_codes")
         .select(
-          "*, batches(batch_number, product_name, strain, volume, coa_document_id, lab_certified, lab_name, expiry_date, thc_content, cbd_content), inventory_items(id, name, sku, category, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, medium_type, expiry_date, description)",
+          "*, batches(batch_number, product_name, strain, volume, coa_document_id, lab_certified, lab_name, expiry_date, thc_content, cbd_content), inventory_items(id, name, sku, category, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, medium_type, expiry_date, description, loyalty_category, pts_override)",
         )
         .eq("qr_code", qrCode)
         .limit(1);
@@ -1483,8 +1498,17 @@ export default function ScanResult() {
             const currentPts = profile?.loyalty_points || 0;
             const userTier = getTierLabel(currentPts, config);
             const multiplier = getTierMult(userTier, config);
+            const loyaltyCategory =
+              qr.inventory_items?.loyalty_category || null;
+            const ptsOverride = qr.inventory_items?.pts_override ?? null;
+            const categoryMult =
+              ptsOverride !== null
+                ? ptsOverride
+                : loyaltyCategory
+                  ? (config[`mult_cat_${loyaltyCategory}`] ?? 1.0)
+                  : 1.0;
             const finalPoints = Math.round(
-              basePoints * multiplier * campaignMult,
+              basePoints * multiplier * categoryMult * campaignMult,
             );
 
             if (action.one_time && qr.claimed) {
@@ -1679,7 +1703,7 @@ export default function ScanResult() {
         const currentPts = profile?.loyalty_points || 0;
         await writeLoyaltyTransaction({
           userId: currentUser.id,
-          tenantId: qr.tenant_id || profile?.tenant_id || null,
+          tenantId: qr.tenant_id || profile?.tenant_id || tenantId || null,
           points: pointsAwardedAmt,
           balanceAfter: currentPts + pointsAwardedAmt,
           qrCodeStr: qrCode,
@@ -1687,6 +1711,7 @@ export default function ScanResult() {
           scanLogId: logId,
           multiplierApplied: tierMultiplierUsed * campaignMult,
           tierAtTime: tierLabelUsed,
+          category: qr.inventory_items?.loyalty_category || null,
         });
       }
 
