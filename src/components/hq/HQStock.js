@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
+import StockItemPanel from "./StockItemPanel";
 
 const T = {
   ink900: "#0D0D0D",
@@ -376,6 +377,7 @@ export default function HQStock() {
   const [movLoading, setMovLoading] = useState(false);
   const [modalItem, setModalItem] = useState(undefined);
   const [modalSaving, setModalSaving] = useState(false);
+  const [panelItem, setPanelItem] = useState(null);
   const [modalDefaults, setModalDefaults] = useState({});
   const [adjustOpen, setAdjustOpen] = useState(null);
   const [adjustQty, setAdjustQty] = useState("");
@@ -2982,9 +2984,40 @@ export default function HQStock() {
                   </button>
                 ))}
               </div>
-              <button style={sBtn()} onClick={() => setModalItem(null)}>
-                + Add Item
-              </button>
+              {catFilter === "all" ? (
+                <button
+                  style={sBtn()}
+                  onClick={() => {
+                    setModalDefaults({});
+                    setModalItem(null);
+                  }}
+                >
+                  + Add Item
+                </button>
+              ) : (
+                (() => {
+                  const activeGroup = CAT_GROUPS.find(
+                    (g) => g.id === catFilter,
+                  );
+                  return (
+                    <button
+                      style={sBtn()}
+                      onClick={() => {
+                        setModalDefaults({
+                          category:
+                            activeGroup?.enums?.[0] || "finished_product",
+                          subcategory: "",
+                          world: catFilter,
+                          worldLabel: activeGroup?.label || catFilter,
+                        });
+                        setModalItem(null);
+                      }}
+                    >
+                      + Add {activeGroup?.label || "Item"}
+                    </button>
+                  );
+                })()
+              )}
             </div>
 
             {/* Brand pills */}
@@ -3164,6 +3197,8 @@ export default function HQStock() {
                         setModalDefaults({
                           category: group.enums?.[0] || "finished_product",
                           subcategory: group.subs?.[0] || "",
+                          world: group.id,
+                          worldLabel: group.label,
                         });
                         setModalItem(null);
                       }}
@@ -3548,9 +3583,19 @@ export default function HQStock() {
                                   : "3px solid transparent",
                               }}
                             >
-                              <td style={{ ...sTd, minWidth: 180 }}>
+                              <td
+                                style={{
+                                  ...sTd,
+                                  minWidth: 180,
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => setPanelItem(item)}
+                              >
                                 <div
-                                  style={{ fontWeight: 600, color: T.ink700 }}
+                                  style={{
+                                    fontWeight: 600,
+                                    color: T.accentMid,
+                                  }}
                                 >
                                   {item.name}
                                 </div>
@@ -3943,6 +3988,19 @@ export default function HQStock() {
       </>
 
       {renderMovDrawer()}
+      {panelItem && (
+        <StockItemPanel
+          item={panelItem}
+          onClose={() => setPanelItem(null)}
+          onEdit={() => {
+            setModalItem(panelItem);
+            setPanelItem(null);
+          }}
+          onRefresh={() => {
+            load();
+          }}
+        />
+      )}
       {modalItem !== undefined && (
         <StockItemModal
           item={modalItem || null}

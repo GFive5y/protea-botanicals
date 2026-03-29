@@ -1,7 +1,8 @@
-// src/components/StockItemModal.js v1.2 — WP-STOCK-UI Session A
-// Surgical additions: brand, subcategory, variant_type, variant_value, tags
-// All existing fields, logic, and sections PRESERVED exactly from v1.1
-// New section: "Cannabis Catalogue" — shown for cannabis_retail profile only
+// src/components/StockItemModal.js v2.0 — WP-STOCK-UX Session 1
+// WORLD MODE: Every category has its own pill-based add item experience
+// Replaces all subcategory dropdowns with contextual pill rows
+// Preserves ALL v1.2 fields: brand, variant, tags, food fields, allergens, hardware, storage
+// New: PillRow component, auto-name builder, auto-SKU builder, world banner
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "../services/supabaseClient";
@@ -33,9 +34,11 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
+  purple: "#5B21B6",
+  purpleBg: "#F5F3FF",
+  purpleBd: "#DDD6FE",
+  purpleMid: "#7C3AED",
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
 
 const sInput = {
@@ -69,8 +72,637 @@ const sBtn = (v = "primary") => ({
   transition: "opacity 0.15s",
 });
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── World config ──────────────────────────────────────────────────────────────
+const WORLD_ICONS = {
+  flower: "🌿",
+  papers: "📄",
+  accessories: "🛠",
+  concentrate: "💎",
+  hash: "🟤",
+  vape: "💨",
+  edible: "🍬",
+  seeds: "🌱",
+  substrate: "🪴",
+  nutrients: "🧪",
+  equipment: "💡",
+  wellness: "💚",
+  merch: "👕",
+  preroll: "🌀",
+};
+const WORLD_UNITS = {
+  flower: "g",
+  hash: "g",
+  concentrate: "g",
+  vape: "pcs",
+  papers: "pcs",
+  accessories: "pcs",
+  merch: "pcs",
+  preroll: "pcs",
+  edible: "pcs",
+  wellness: "pcs",
+  seeds: "pcs",
+  equipment: "pcs",
+  substrate: "kg",
+  nutrients: "ml",
+};
 
+// ── PillRow ───────────────────────────────────────────────────────────────────
+function PillRow({
+  label,
+  options,
+  selected,
+  onSelect,
+  multi = false,
+  note,
+  customKey,
+  onAddCustom,
+  extraOptions = [],
+}) {
+  const sel = multi
+    ? Array.isArray(selected)
+      ? selected
+      : []
+    : selected
+      ? [selected]
+      : [];
+  const [adding, setAdding] = React.useState(false);
+  const [customVal, setCustomVal] = React.useState("");
+
+  const allOptions = [
+    ...options,
+    ...extraOptions.map((v) => ({ value: v, label: v, custom: true })),
+  ];
+
+  const handleAdd = () => {
+    const trimmed = customVal.trim();
+    if (!trimmed) return;
+    if (onAddCustom) onAddCustom(trimmed);
+    if (multi)
+      onSelect([...(Array.isArray(selected) ? selected : []), trimmed]);
+    else onSelect(trimmed);
+    setCustomVal("");
+    setAdding(false);
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {label && (
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: T.purple,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            marginBottom: 7,
+            fontFamily: T.fontUi,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span>
+            {label}
+            {note && (
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 400,
+                  color: T.ink400,
+                  textTransform: "none",
+                  letterSpacing: 0,
+                  marginLeft: 5,
+                }}
+              >
+                {note}
+              </span>
+            )}
+          </span>
+          {customKey && !adding && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: T.purpleMid,
+                background: "transparent",
+                border: `1px solid ${T.purpleBd}`,
+                borderRadius: 10,
+                padding: "1px 8px",
+                cursor: "pointer",
+                fontFamily: T.fontUi,
+              }}
+            >
+              + Custom
+            </button>
+          )}
+        </div>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {allOptions.map((opt) => {
+          const val = typeof opt === "object" ? opt.value : opt;
+          const lbl = typeof opt === "object" ? opt.label : opt;
+          const isCustom = opt.custom;
+          const active = sel.includes(val);
+          return (
+            <button
+              key={val}
+              type="button"
+              onClick={() => {
+                if (multi) {
+                  onSelect(
+                    active ? sel.filter((v) => v !== val) : [...sel, val],
+                  );
+                } else {
+                  onSelect(active ? "" : val);
+                }
+              }}
+              style={{
+                padding: "5px 13px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: active ? 700 : 400,
+                fontFamily: T.fontUi,
+                border: `${isCustom ? "1.5px dashed" : "1.5px solid"} ${active ? T.purple : T.purpleBd}`,
+                background: active ? T.purple : "#fff",
+                color: active ? "#fff" : T.purple,
+                cursor: "pointer",
+              }}
+            >
+              {lbl}
+            </button>
+          );
+        })}
+        {adding && (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              autoFocus
+              type="text"
+              value={customVal}
+              onChange={(e) => setCustomVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+                if (e.key === "Escape") {
+                  setAdding(false);
+                  setCustomVal("");
+                }
+              }}
+              placeholder="Type then Enter"
+              style={{
+                padding: "4px 10px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontFamily: T.fontUi,
+                border: `1.5px dashed ${T.purple}`,
+                outline: "none",
+                width: 130,
+                color: T.purple,
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAdd}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontFamily: T.fontUi,
+                background: T.purple,
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setCustomVal("");
+              }}
+              style={{
+                padding: "4px 8px",
+                borderRadius: 20,
+                fontSize: 12,
+                fontFamily: T.fontUi,
+                background: "transparent",
+                color: T.ink400,
+                border: `1px solid ${T.ink150}`,
+                cursor: "pointer",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Pill data ─────────────────────────────────────────────────────────────────
+const STRAIN_TYPES = ["Indica", "Sativa", "Hybrid", "CBD", "Auto"];
+const FLOWER_WEIGHTS = ["1g", "2g", "3.5g", "5g", "7g", "14g", "28g"];
+const CONC_WEIGHTS = ["0.5g", "1g", "2g", "3.5g", "5g", "7g"];
+const HASH_WEIGHTS = ["1g", "2g", "3.5g", "5g", "7g", "10g", "14g"];
+const PREROLL_WEIGHTS = ["0.5g", "1g", "1.5g", "2g", "3g"];
+const PREROLL_PACKS = ["Single", "2-Pack", "5-Pack", "10-Pack"];
+const PREROLL_TYPES = [
+  "Standard",
+  "Infused",
+  "Hash Roll",
+  "Spliff",
+  "King Size",
+];
+const PAPER_SUBCATS = [
+  { value: "rolling_papers", label: "Rolling Papers" },
+  { value: "cones", label: "Cones" },
+  { value: "tips", label: "Tips" },
+  { value: "rolling_machine", label: "Rolling Machine" },
+  { value: "tray", label: "Rolling Tray" },
+];
+const PAPER_SIZES = [
+  "Regular",
+  "1.25",
+  "King Size",
+  "King Slim",
+  "Double Wide",
+  "110mm",
+  "Extra Long",
+  "Blunt Wrap",
+];
+const PAPER_COUNTS = ["1pk", "3pk", "6pk", "25s", "50s"];
+const TIP_MATERIALS = ["Natural Unbleached", "Cardboard", "Glass", "Cellulose"];
+const MACHINE_SIZES = ["70mm", "79mm", "110mm"];
+const TRAY_SIZES = ["Small", "Medium", "Large", "XL"];
+const ACC_SUBCATS = [
+  { value: "grinder", label: "Grinder" },
+  { value: "pipe", label: "Pipe" },
+  { value: "bong", label: "Bong" },
+  { value: "dab_rig", label: "Dab Rig" },
+  { value: "dab_tool", label: "Dab Tool" },
+  { value: "humidity_pack", label: "Humidity Pack" },
+  { value: "storage", label: "Storage Jar" },
+  { value: "lighter", label: "Lighter / Wick" },
+  { value: "extraction_bag", label: "Extraction Bag" },
+  { value: "rosin_bag", label: "Rosin Bag" },
+  { value: "screens", label: "Screens" },
+];
+const GRINDER_SIZES = ["40mm", "50mm", "55mm", "63mm", "75mm"];
+const GRINDER_PIECES = ["2-Piece", "4-Piece", "5-Piece"];
+const HUMIDITY_PCT = ["58%", "62%"];
+const HUMIDITY_WEIGHT = ["4g", "8g", "67g"];
+const BONG_MATERIALS = ["Glass", "Silicone", "Acrylic", "Ceramic"];
+const CONC_TYPES = [
+  { value: "budder", label: "Budder" },
+  { value: "badder", label: "Badder" },
+  { value: "live_resin", label: "Live Resin" },
+  { value: "rosin", label: "Rosin" },
+  { value: "sauce", label: "Terp Sauce" },
+  { value: "diamonds", label: "Diamonds" },
+  { value: "distillate", label: "Distillate" },
+  { value: "crumble", label: "Crumble" },
+  { value: "shatter", label: "Shatter" },
+  { value: "wax", label: "Wax" },
+  { value: "feco", label: "FECO" },
+  { value: "rso", label: "RSO" },
+  { value: "bho", label: "BHO" },
+];
+const EXTRACTION_METHODS = [
+  "BHO",
+  "CO2",
+  "Solventless",
+  "Cold-press",
+  "Live",
+  "Cured",
+  "Full-spectrum",
+  "Broad-spectrum",
+  "Single-source",
+];
+const HASH_TYPES = [
+  { value: "hash", label: "Hash (generic)" },
+  { value: "dry_sift", label: "Dry Sift" },
+  { value: "bubble_hash", label: "Bubble Hash" },
+  { value: "pressed_hash", label: "Pressed Hash" },
+  { value: "charas", label: "Charas" },
+  { value: "temple_ball", label: "Temple Ball" },
+  { value: "lebanese", label: "Lebanese" },
+  { value: "moroccan", label: "Moroccan" },
+  { value: "afghani", label: "Afghani" },
+  { value: "finger_hash", label: "Finger Hash" },
+  { value: "kief", label: "Kief" },
+  { value: "moon_rock", label: "Moon Rock" },
+  { value: "dry_ice_hash", label: "Dry Ice Hash" },
+];
+const VAPE_TYPES = [
+  { value: "cartridge", label: "Cartridge" },
+  { value: "disposable", label: "Disposable" },
+  { value: "battery", label: "Battery" },
+];
+const VAPE_VOLUMES = ["0.5ml", "1ml", "2ml", "3ml"];
+const BATTERY_TYPES = ["510 Thread", "Pod System", "Twist", "Box Mod"];
+const FILL_TYPES = [
+  "Distillate",
+  "Live Resin",
+  "CO2 Oil",
+  "Rosin",
+  "Broad-spectrum",
+  "Full-spectrum",
+];
+const SEED_TYPES = [
+  { value: "seed", label: "Seed" },
+  { value: "clone", label: "Clone" },
+  { value: "seedling", label: "Seedling" },
+  { value: "propagation", label: "Propagation Supply" },
+];
+const SEED_GENETICS = [
+  "Feminised",
+  "Auto-flower",
+  "Regular",
+  "Fast Flower",
+  "CBD Seed",
+];
+const SEED_PACKS = ["1 seed", "3-pack", "5-pack", "10-pack", "25-pack"];
+const SUBSTRATE_TYPES = [
+  { value: "substrate", label: "Substrate / Coco" },
+  { value: "soil", label: "Soil Mix" },
+  { value: "rockwool", label: "Rockwool" },
+];
+const SUBSTRATE_SIZES = ["5L", "10L", "20L", "50L", "80L"];
+const ROCKWOOL_SIZES = ["Mini Cube", "Slab", "Large Block"];
+const NUTRIENT_TYPES = [
+  { value: "base_nutrient", label: "Base Nutrient" },
+  { value: "bloom_booster", label: "Bloom Booster" },
+  { value: "root_stimulant", label: "Root Stimulant" },
+  { value: "enzyme", label: "Enzyme" },
+  { value: "ph_management", label: "pH Management" },
+  { value: "supplement", label: "CalMag / Supplement" },
+  { value: "beneficial", label: "Beneficial Organism" },
+];
+const NUTRIENT_PHASES = ["Grow", "Bloom", "Both", "All-in-1"];
+const NUTRIENT_FORMS = ["Liquid", "Powder", "Tablet"];
+const PH_TYPES = ["pH Up", "pH Down", "Buffer", "Tester"];
+const BENEFICIAL_TYPES = [
+  "Mycorrhizae",
+  "Trichoderma",
+  "Beneficial Nema",
+  "Bacillus",
+];
+const NUTRIENT_VOL_LIQUID = ["250ml", "500ml", "1L", "5L", "20L"];
+const NUTRIENT_VOL_POWDER = ["100g", "250g", "500g", "1kg"];
+const NUTRIENT_BRANDS = [
+  "Biobizz",
+  "Canna",
+  "Mills",
+  "Plagron",
+  "Athena",
+  "General Hydroponics",
+  "Dutch Pro",
+  "Generic",
+];
+const EQUIP_TYPES = [
+  { value: "grow_light", label: "Grow Light" },
+  { value: "grow_tent", label: "Grow Tent" },
+  { value: "fan", label: "Fan" },
+  { value: "carbon_filter", label: "Carbon Filter" },
+  { value: "meter", label: "Meter/Monitor" },
+  { value: "timer", label: "Timer" },
+  { value: "pot", label: "Pot/Container" },
+  { value: "training", label: "Training/SCROG" },
+];
+const LIGHT_TYPES = ["LED", "HPS", "CMH / LEC", "CFL", "Quantum Board"];
+const LIGHT_WATTS = ["100W", "200W", "300W", "400W", "600W", "1000W"];
+const TENT_SIZES = [
+  "60x60cm",
+  "80x80cm",
+  "100x100cm",
+  "120x120cm",
+  "240x120cm",
+];
+const POT_SIZES = ["5L", "10L", "15L", "20L", "25L", "50L"];
+const METER_TYPES = [
+  "pH Meter",
+  "EC/TDS Meter",
+  "Thermometer",
+  "Hygrometer",
+  "Combo Meter",
+  "CO2 Monitor",
+];
+const EDIBLE_TYPES = [
+  { value: "edible", label: "Edible" },
+  { value: "tincture", label: "Tincture" },
+  { value: "capsule", label: "Capsule" },
+];
+const EDIBLE_FORMATS = [
+  "Gummy",
+  "Chocolate",
+  "Cookie",
+  "Brownie",
+  "Candy",
+  "Lozenge",
+  "Beverage",
+  "Honey",
+];
+const EDIBLE_POTENCY = ["5mg", "10mg", "25mg", "50mg", "100mg"];
+const CANNABINOIDS = ["THC", "CBD", "CBG", "THC:CBD (1:1)"];
+const EDIBLE_PACKS = ["1", "5-pack", "10-pack", "20-pack", "30-pack"];
+const EFFECT_TAGS = [
+  "Relaxing",
+  "Uplifting",
+  "Creative",
+  "Sleepy",
+  "Focused",
+  "Energetic",
+  "Pain-relief",
+  "Appetite",
+];
+const WELLNESS_TYPES = [
+  { value: "mushroom", label: "Mushroom" },
+  { value: "adaptogen", label: "Adaptogen" },
+  { value: "cbd", label: "CBD Product" },
+  { value: "cbd_pet", label: "CBD Pet" },
+];
+const MUSHROOM_TYPES = [
+  "Lion's Mane",
+  "Reishi",
+  "Chaga",
+  "Turkey Tail",
+  "Cordyceps",
+  "Blend",
+];
+const WELLNESS_FORMATS = [
+  "Capsule",
+  "Tincture",
+  "Powder",
+  "Tea",
+  "Gummy",
+  "Topical",
+];
+const WELLNESS_STRENGTHS = ["250mg", "500mg", "1000mg", "2000mg"];
+const WELLNESS_COUNTS = ["30 caps", "60 caps", "90 caps", "120 caps"];
+const WELLNESS_EFFECTS = [
+  "Focus",
+  "Energy",
+  "Sleep",
+  "Immunity",
+  "Stress",
+  "Recovery",
+];
+const GARMENT_TYPES = [
+  "T-Shirt",
+  "Hoodie",
+  "Cap",
+  "Snapback",
+  "Beanie",
+  "Tote Bag",
+  "Socks",
+  "Jacket",
+];
+const GARMENT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
+const GARMENT_COLOURS = [
+  "Black",
+  "White",
+  "Green",
+  "Navy",
+  "Olive",
+  "Cream",
+  "Tie-dye",
+];
+const CULTIVATION_TAGS = [
+  "Indoor",
+  "Outdoor",
+  "Greenhouse",
+  "Hydroponic",
+  "Organic",
+  "Living Soil",
+  "Greendoor",
+  "Sun-grown",
+  "LED Grown",
+  "HPS Grown",
+];
+const GRADE_TAGS = [
+  "Budget",
+  "Commercial",
+  "A Grade",
+  "AA Grade",
+  "AAA Grade",
+  "AAAA Grade",
+  "Craft",
+  "Top Shelf",
+  "Exotic",
+  "Premium",
+];
+const PROCESSING_TAGS = [
+  "Hang-dried",
+  "Freeze-dried",
+  "Machine-trimmed",
+  "Hand-trimmed",
+  "Slow-cured",
+  "Flash-frozen",
+  "Fresh Frozen",
+];
+
+// ── Auto name builder ─────────────────────────────────────────────────────────
+function buildAutoName(world, brand, s) {
+  const b = brand?.trim() || "";
+  const parts = [];
+  if (b) parts.push(b);
+  const w = world;
+  if (w === "flower") {
+    if (s.weight) parts.push(s.weight);
+    if (s.strain) parts.push(s.strain);
+  } else if (w === "hash") {
+    const t = HASH_TYPES.find((h) => h.value === s.subcat)?.label || "Hash";
+    parts.push(t);
+    if (s.weight) parts.push(s.weight);
+  } else if (w === "concentrate") {
+    const t =
+      CONC_TYPES.find((c) => c.value === s.subcat)?.label || "Concentrate";
+    parts.push(t);
+    if (s.weight) parts.push(s.weight);
+  } else if (w === "papers") {
+    const t = PAPER_SUBCATS.find((p) => p.value === s.subcat)?.label || "Paper";
+    if (s.size) parts.push(s.size);
+    parts.push(t);
+    if (s.packSize) parts.push(s.packSize);
+  } else if (w === "accessories") {
+    const t =
+      ACC_SUBCATS.find((a) => a.value === s.subcat)?.label || "Accessory";
+    if (s.size) parts.push(s.size);
+    parts.push(t);
+  } else if (w === "vape") {
+    const t = VAPE_TYPES.find((v) => v.value === s.subcat)?.label || "Vape";
+    if (s.volume) parts.push(s.volume);
+    if (s.strain) parts.push(s.strain);
+    parts.push(t);
+  } else if (w === "nutrients") {
+    const t =
+      NUTRIENT_TYPES.find((n) => n.value === s.subcat)?.label || "Nutrient";
+    parts.push(t);
+    if (s.phase) parts.push(s.phase);
+    if (s.size) parts.push(s.size);
+  } else if (w === "substrate") {
+    const t =
+      SUBSTRATE_TYPES.find((x) => x.value === s.subcat)?.label || "Substrate";
+    parts.push(t);
+    if (s.size) parts.push(s.size);
+  } else if (w === "equipment") {
+    const t =
+      EQUIP_TYPES.find((e) => e.value === s.subcat)?.label || "Equipment";
+    parts.push(t);
+    if (s.size) parts.push(s.size);
+  } else if (w === "edible") {
+    if (s.form) parts.push(s.form);
+    if (s.strain) parts.push(s.strain);
+    if (s.weight) parts.push(s.weight);
+  } else if (w === "wellness") {
+    if (s.form) parts.push(s.form);
+    if (s.size) parts.push(s.size);
+  } else if (w === "merch") {
+    if (s.garment) parts.push(s.garment);
+    if (s.colour && s.colour !== "Black") parts.push(s.colour);
+    if (s.size) parts.push(s.size);
+  } else if (w === "seeds") {
+    if (s.form) parts.push(s.form);
+    if (s.packSize) parts.push(s.packSize);
+    parts.push("Seeds");
+  } else if (w === "preroll") {
+    if (s.strain) parts.push(s.strain);
+    if (s.weight) parts.push(s.weight);
+    parts.push("Pre-Roll");
+    if (s.packSize && s.packSize !== "Single") parts.push(s.packSize);
+  }
+  return parts.join(" ");
+}
+
+function buildAutoSKU(world, brand) {
+  const wc =
+    {
+      flower: "FL",
+      hash: "HK",
+      concentrate: "CONC",
+      papers: "PAP",
+      accessories: "ACC",
+      vape: "VPE",
+      nutrients: "NUT",
+      substrate: "SUB",
+      equipment: "EQP",
+      edible: "EDI",
+      wellness: "WEL",
+      merch: "MRC",
+      seeds: "SED",
+      preroll: "PR",
+    }[world] || "STK";
+  const bc = brand
+    ? brand.trim().toUpperCase().replace(/\s+/g, "").substring(0, 4)
+    : "GEN";
+  return `MED-${wc}-${bc}-`;
+}
+
+// ── Legacy constants ──────────────────────────────────────────────────────────
 const MEDIUM_TYPES = [
   { value: "distillate", label: "Distillate" },
   { value: "live_resin", label: "Live Resin" },
@@ -81,7 +713,6 @@ const MEDIUM_TYPES = [
   { value: "bho", label: "BHO" },
   { value: "other", label: "Other" },
 ];
-
 const ALLERGEN_FLAGS = [
   { key: "gluten", label: "Gluten" },
   { key: "crustaceans", label: "Crustaceans" },
@@ -98,7 +729,6 @@ const ALLERGEN_FLAGS = [
   { key: "lupin", label: "Lupin" },
   { key: "molluscs", label: "Molluscs" },
 ];
-
 const UNIT_OPTIONS = [
   "pcs",
   "ea",
@@ -114,7 +744,6 @@ const UNIT_OPTIONS = [
   "por",
   "tray",
 ];
-
 const CATEGORY_LABELS = {
   finished_product: "Finished Product",
   raw_material: "Raw Material",
@@ -133,191 +762,7 @@ const CATEGORY_LABELS = {
   other: "Other",
 };
 
-// ── NEW: Subcategory options per DB category enum ─────────────────────────────
-const SUBCATEGORY_BY_CATEGORY = {
-  accessory: [
-    { value: "rolling_papers", label: "Rolling Papers" },
-    { value: "cones", label: "Cones" },
-    { value: "tips", label: "Tips" },
-    { value: "rolling_machine", label: "Rolling Machine" },
-    { value: "tray", label: "Rolling Tray" },
-    { value: "grinder", label: "Grinder" },
-    { value: "pipe", label: "Pipe" },
-    { value: "bong", label: "Bong / Water Pipe" },
-    { value: "dab_rig", label: "Dab Rig" },
-    { value: "dab_tool", label: "Dab Tool" },
-    { value: "humidity_pack", label: "Humidity Pack" },
-    { value: "storage", label: "Storage Jar" },
-    { value: "lighter", label: "Lighter / Wick" },
-    { value: "extraction_bag", label: "Extraction Bag" },
-    { value: "rosin_bag", label: "Rosin Bag" },
-    { value: "screens", label: "Screens" },
-  ],
-  flower: [{ value: "flower", label: "Flower" }],
-  concentrate: [
-    { value: "concentrate", label: "Concentrate (generic)" },
-    { value: "budder", label: "Budder" },
-    { value: "badder", label: "Badder" },
-    { value: "live_resin", label: "Live Resin" },
-    { value: "rosin", label: "Rosin (solventless)" },
-    { value: "sauce", label: "Terp Sauce" },
-    { value: "diamonds", label: "THCA Diamonds" },
-    { value: "distillate", label: "Distillate" },
-    { value: "crumble", label: "Crumble" },
-    { value: "shatter", label: "Shatter" },
-    { value: "wax", label: "Wax" },
-    { value: "feco", label: "FECO" },
-    { value: "rso", label: "RSO" },
-    { value: "bho", label: "BHO" },
-    // ── Hash & Kief (shared DB category: concentrate) ──
-    { value: "hash", label: "Hash (generic)" },
-    { value: "dry_sift", label: "Dry Sift Hash" },
-    { value: "bubble_hash", label: "Bubble Hash (Ice Water)" },
-    { value: "pressed_hash", label: "Pressed Hash" },
-    { value: "charas", label: "Charas (Hand-rolled)" },
-    { value: "temple_ball", label: "Temple Ball" },
-    { value: "lebanese", label: "Lebanese Hash" },
-    { value: "moroccan", label: "Moroccan Hash" },
-    { value: "afghani", label: "Afghani Hash" },
-    { value: "finger_hash", label: "Finger Hash" },
-    { value: "kief", label: "Kief (raw)" },
-    { value: "moon_rock", label: "Moon Rock" },
-    { value: "dry_ice_hash", label: "Dry Ice Hash" },
-  ],
-  finished_product: [
-    { value: "preroll", label: "Pre-Roll" },
-    { value: "cartridge", label: "Vape Cartridge" },
-    { value: "disposable", label: "Disposable Vape" },
-    { value: "battery", label: "Vape Battery" },
-    { value: "edible", label: "Edible" },
-    { value: "tincture", label: "Tincture" },
-    { value: "capsule", label: "Capsule" },
-    { value: "mushroom", label: "Mushroom Supplement" },
-    { value: "adaptogen", label: "Adaptogen" },
-    { value: "cbd", label: "CBD Product" },
-    { value: "cbd_pet", label: "CBD Pet Product" },
-    { value: "clothing", label: "Clothing / Merch" },
-    { value: "topical", label: "Topical" },
-  ],
-  raw_material: [
-    { value: "seed", label: "Seed" },
-    { value: "clone", label: "Clone" },
-    { value: "seedling", label: "Seedling" },
-    { value: "propagation", label: "Propagation Supply" },
-    { value: "substrate", label: "Substrate / Coco" },
-    { value: "soil", label: "Soil Mix" },
-    { value: "rockwool", label: "Rockwool" },
-    { value: "base_nutrient", label: "Base Nutrient" },
-    { value: "bloom_booster", label: "Bloom Booster" },
-    { value: "root_stimulant", label: "Root Stimulant" },
-    { value: "enzyme", label: "Enzyme" },
-    { value: "ph_management", label: "pH Management" },
-    { value: "supplement", label: "Supplement / CalMag" },
-    { value: "beneficial", label: "Beneficial Organism" },
-  ],
-  hardware: [
-    { value: "grow_light", label: "Grow Light" },
-    { value: "grow_tent", label: "Grow Tent" },
-    { value: "fan", label: "Fan / Ventilation" },
-    { value: "carbon_filter", label: "Carbon Filter" },
-    { value: "meter", label: "Meter / Monitor" },
-    { value: "timer", label: "Timer" },
-    { value: "pot", label: "Pot / Container" },
-    { value: "training", label: "Training / SCROG" },
-    { value: "propagation", label: "Propagation Gear" },
-  ],
-  edible: [
-    { value: "edible", label: "Edible" },
-    { value: "tincture", label: "Tincture" },
-    { value: "capsule", label: "Capsule" },
-  ],
-};
-
-const VARIANT_TYPES = [
-  { value: "", label: "— None —" },
-  { value: "weight", label: "Weight" },
-  { value: "size", label: "Size" },
-  { value: "strain", label: "Strain" },
-  { value: "count", label: "Count" },
-  { value: "strength", label: "Strength" },
-  { value: "colour", label: "Colour" },
-];
-
-// ── NEW: Tag library ──────────────────────────────────────────────────────────
-const TAG_GROUPS = [
-  {
-    group: "Cultivation",
-    tags: [
-      "Indoor",
-      "Outdoor",
-      "Greenhouse",
-      "Hydroponic",
-      "Organic",
-      "Living Soil",
-      "Greendoor",
-      "Sun-grown",
-      "LED Grown",
-      "HPS Grown",
-    ],
-  },
-  {
-    group: "Grade",
-    tags: [
-      "Budget",
-      "Commercial",
-      "A Grade",
-      "AA Grade",
-      "AAA Grade",
-      "AAAA Grade",
-      "Craft",
-      "Top Shelf",
-      "Exotic",
-      "Premium",
-    ],
-  },
-  {
-    group: "Processing",
-    tags: [
-      "Hang-dried",
-      "Freeze-dried",
-      "Machine-trimmed",
-      "Hand-trimmed",
-      "Slow-cured",
-      "Flash-frozen",
-      "Fresh Frozen",
-    ],
-  },
-  {
-    group: "Concentrate Type",
-    tags: [
-      "BHO",
-      "CO2",
-      "Solventless",
-      "Cold-press",
-      "Live",
-      "Cured",
-      "Full-spectrum",
-      "Broad-spectrum",
-      "Single-source",
-    ],
-  },
-  {
-    group: "Effect",
-    tags: [
-      "Relaxing",
-      "Uplifting",
-      "Creative",
-      "Sleepy",
-      "Focused",
-      "Energetic",
-      "Pain-relief",
-      "Appetite",
-    ],
-  },
-];
-
-// ── Layout helpers (identical to v1.1) ───────────────────────────────────────
-
+// ── Layout helpers ────────────────────────────────────────────────────────────
 function SectionHead({
   label,
   color = T.accentMid,
@@ -345,7 +790,6 @@ function SectionHead({
     </div>
   );
 }
-
 function Lbl({ children, note, required }) {
   return (
     <label
@@ -379,11 +823,9 @@ function Lbl({ children, note, required }) {
     </label>
   );
 }
-
 function Field({ children, style }) {
   return <div style={{ marginBottom: "14px", ...style }}>{children}</div>;
 }
-
 function Grid2({ children }) {
   return (
     <div
@@ -394,10 +836,9 @@ function Grid2({ children }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function StockItemModal({
-  item, // null = new, object = edit
+  item,
   defaults = {},
   suppliers,
   visibleCategories,
@@ -424,23 +865,22 @@ export default function StockItemModal({
     "mixed_retail",
   ].includes(industryProfile);
   const isFoodBev = industryProfile === "food_beverage";
+  const world = defaults.world || "";
+  const worldLabel = defaults.worldLabel || "";
+  const worldIcon = WORLD_ICONS[world] || "📦";
+  const isWorldMode = isCannabis && !item && !!world;
 
-  const parseAllergens = (flags) =>
-    !flags || typeof flags !== "object" ? {} : flags;
-
-  // ── Parse existing tags (stored as TEXT[] in DB) ──────────────────────────
+  const parseAllergens = (f) => (!f || typeof f !== "object" ? {} : f);
   const parseTags = (t) => {
     if (!t) return [];
     if (Array.isArray(t)) return t;
-    if (typeof t === "string") {
-      try {
-        return JSON.parse(t);
-      } catch {
-        return [];
-      }
+    try {
+      return JSON.parse(t);
+    } catch {
+      return [];
     }
-    return [];
   };
+  const smartUnit = WORLD_UNITS[world] || "pcs";
 
   const [form, setForm] = useState({
     sku: item?.sku || "",
@@ -449,7 +889,7 @@ export default function StockItemModal({
       item?.category ||
       defaults.category ||
       (isFoodBev ? "raw_material" : "finished_product"),
-    unit: item?.unit || "pcs",
+    unit: item?.unit || smartUnit,
     description: item?.description || "",
     quantity_on_hand: item?.quantity_on_hand ?? 0,
     reorder_level: item?.reorder_level ?? 0,
@@ -470,7 +910,6 @@ export default function StockItemModal({
     reorder_qty: item?.reorder_qty ?? "",
     compatible_formats: item?.compatible_formats || [],
     is_active: item?.is_active !== false,
-    // ── NEW v1.2 fields ──
     brand: item?.brand || "",
     subcategory: item?.subcategory || defaults.subcategory || "",
     variant_type: item?.variant_type || "",
@@ -478,39 +917,135 @@ export default function StockItemModal({
     tags: parseTags(item?.tags),
   });
 
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  // World pill state
+  const [wStrain, setWStrain] = useState("");
+  const [wWeight, setWWeight] = useState("");
+  const [wSize, setWSize] = useState("");
+  const [wVolume, setWVolume] = useState("");
+  const [wPackSize, setWPackSize] = useState("");
+  const [wForm, setWForm] = useState("");
+  const [wPhase, setWPhase] = useState("");
+  const [wGarment, setWGarment] = useState("");
+  const [wColour, setWColour] = useState("");
+  const [wExtraction, setWExtraction] = useState([]);
+  const [wCultivation, setWCultivation] = useState([]);
+  const [wGrade, setWGrade] = useState([]);
+  const [wProcessing, setWProcessing] = useState([]);
+  const [wEffect, setWEffect] = useState([]);
 
+  // Custom options — persisted per tenant+world in localStorage
+  const [customOpts, setCustomOpts] = React.useState(() => {
+    try {
+      const key = `nuai_custom_${tenantId || "local"}_${world}`;
+      return JSON.parse(localStorage.getItem(key) || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  const addCustomOption = (field, value) => {
+    setCustomOpts((prev) => {
+      const next = { ...prev, [field]: [...(prev[field] || []), value] };
+      try {
+        const key = `nuai_custom_${tenantId || "local"}_${world}`;
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   const toggleAllergen = (key) =>
     setForm((p) => ({
       ...p,
       allergen_flags: { ...p.allergen_flags, [key]: !p.allergen_flags[key] },
     }));
-
   const toggleFormat = (fmtId) =>
     setForm((p) => {
-      const cur = p.compatible_formats || [];
+      const c = p.compatible_formats || [];
       return {
         ...p,
-        compatible_formats: cur.includes(fmtId)
-          ? cur.filter((id) => id !== fmtId)
-          : [...cur, fmtId],
+        compatible_formats: c.includes(fmtId)
+          ? c.filter((i) => i !== fmtId)
+          : [...c, fmtId],
       };
     });
-
-  // ── NEW: Toggle a tag ─────────────────────────────────────────────────────
-  const toggleTag = (tag) =>
-    setForm((p) => ({
-      ...p,
-      tags: p.tags.includes(tag)
-        ? p.tags.filter((t) => t !== tag)
-        : [...p.tags, tag],
-    }));
-
-  // ── Reset subcategory when category changes ───────────────────────────────
   const handleCategoryChange = (val) => {
     set("category", val);
-    set("subcategory", ""); // reset subcategory so it doesn't mismatch
+    set("subcategory", "");
   };
+
+  // Auto-sync variant + name + tags from pill state
+  useEffect(() => {
+    if (!isWorldMode) return;
+    const s = {
+      subcat: form.subcategory,
+      strain: wStrain,
+      weight: wWeight,
+      size: wSize,
+      volume: wVolume,
+      packSize: wPackSize,
+      form: wForm,
+      phase: wPhase,
+      garment: wGarment,
+      colour: wColour,
+    };
+    // variant_value
+    if (world === "flower" && (wWeight || wStrain)) {
+      set("variant_value", [wWeight, wStrain].filter(Boolean).join(" "));
+      set("variant_type", "weight");
+    } else if (["hash", "concentrate"].includes(world) && wWeight) {
+      set("variant_value", wWeight);
+      set("variant_type", "weight");
+    } else if (world === "vape" && (wVolume || wStrain)) {
+      set("variant_value", [wVolume, wStrain].filter(Boolean).join(" "));
+      set("variant_type", "size");
+    } else if (world === "papers" && (wSize || wPackSize)) {
+      set("variant_value", [wSize, wPackSize].filter(Boolean).join(" "));
+      set("variant_type", "size");
+    } else if (world === "accessories" && wSize) {
+      set("variant_value", wSize);
+      set("variant_type", "size");
+    } else if (world === "nutrients" && (wPhase || wSize)) {
+      set("variant_value", [wPhase, wSize].filter(Boolean).join(" "));
+    } else if (world === "merch" && wSize) {
+      set("variant_value", wSize);
+      set("variant_type", "size");
+    } else if (world === "preroll" && (wWeight || wStrain)) {
+      set("variant_value", [wWeight, wStrain].filter(Boolean).join(" "));
+      set("variant_type", "weight");
+    }
+    // tags
+    set("tags", [
+      ...wExtraction,
+      ...wCultivation,
+      ...wGrade,
+      ...wProcessing,
+      ...wEffect,
+    ]);
+    // auto-name (only if user hasn't typed)
+    const auto = buildAutoName(world, form.brand, s);
+    if (auto) set("name", auto);
+    // auto-SKU prefix if empty
+    if (!form.sku) set("sku", buildAutoSKU(world, form.brand));
+  }, [
+    wStrain,
+    wWeight,
+    wSize,
+    wVolume,
+    wPackSize,
+    wForm,
+    wPhase,
+    wGarment,
+    wColour,
+    wExtraction,
+    wCultivation,
+    wGrade,
+    wProcessing,
+    wEffect,
+    form.subcategory,
+    form.brand,
+  ]); // eslint-disable-line
 
   const cat = form.category;
   const isFinished = cat === "finished_product";
@@ -528,18 +1063,20 @@ export default function StockItemModal({
   const allergenCount = Object.values(form.allergen_flags).filter(
     Boolean,
   ).length;
-
-  // Available subcategories for selected category
-  const subcategoryOptions = SUBCATEGORY_BY_CATEGORY[cat] || [];
-
   const generateAllergenText = () => {
-    const present = ALLERGEN_FLAGS.filter(
-      (a) => form.allergen_flags[a.key],
-    ).map((a) => a.label);
-    return present.length === 0
+    const p = ALLERGEN_FLAGS.filter((a) => form.allergen_flags[a.key]).map(
+      (a) => a.label,
+    );
+    return p.length === 0
       ? "No allergens declared."
-      : `Contains: ${present.join(", ")}.`;
+      : `Contains: ${p.join(", ")}.`;
   };
+  const liveMargin =
+    form.sell_price > 0 && form.cost_price > 0
+      ? (((form.sell_price - form.cost_price) / form.sell_price) * 100).toFixed(
+          1,
+        )
+      : null;
 
   const handleSubmit = () => {
     if (!form.sku.trim() || !form.name.trim()) {
@@ -549,15 +1086,13 @@ export default function StockItemModal({
     if (isFoodBev && isFinished && !form.expiry_date) {
       setToast({
         type: "error",
-        text: "Expiry date is required for food & beverage finished products.",
+        text: "Expiry date required for food & beverage.",
       });
       return;
     }
-
     const allergenOut = Object.fromEntries(
       Object.entries(form.allergen_flags).filter(([, v]) => v === true),
     );
-
     const payload = {
       sku: form.sku.trim(),
       name: form.name.trim(),
@@ -585,22 +1120,839 @@ export default function StockItemModal({
       country_of_origin: form.country_of_origin || null,
       reorder_qty:
         form.reorder_qty !== "" ? parseFloat(form.reorder_qty) : null,
-      // ── NEW v1.2 ──
       brand: form.brand.trim() || null,
       subcategory: form.subcategory || null,
       variant_type: form.variant_type || null,
       variant_value: form.variant_value.trim() || null,
       tags: form.tags.length > 0 ? form.tags : null,
     };
-
-    if (!item) {
-      payload.tenant_id = tenantId || null;
-    }
-
+    if (!item) payload.tenant_id = tenantId || null;
     onSave(payload);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── World renderer ────────────────────────────────────────────────────────
+  const renderWorld = () => (
+    <div>
+      <div
+        style={{
+          background: T.purpleBg,
+          border: `1px solid ${T.purpleBd}`,
+          borderRadius: 8,
+          padding: "12px 16px",
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <span style={{ fontSize: 28, lineHeight: 1 }}>{worldIcon}</span>
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: T.purple,
+              fontFamily: T.fontUi,
+            }}
+          >
+            You are in {worldLabel} World
+          </div>
+          <div
+            style={{
+              fontSize: 10,
+              color: T.purpleMid,
+              fontFamily: T.fontUi,
+              marginTop: 2,
+            }}
+          >
+            Only fields relevant to {worldLabel} shown below
+          </div>
+        </div>
+      </div>
+
+      {/* Brand — all worlds */}
+      {world !== "merch" && (
+        <Field>
+          <Lbl note="shown in brand filter">Brand</Lbl>
+          <input
+            style={sInput}
+            value={form.brand}
+            onChange={(e) => set("brand", e.target.value)}
+            placeholder="e.g. RAW, Canna, Biobizz, Uncle John's Farm"
+          />
+        </Field>
+      )}
+
+      {/* FLOWER */}
+      {world === "flower" && (
+        <>
+          <PillRow
+            label="Strain Type"
+            options={STRAIN_TYPES}
+            selected={wStrain}
+            onSelect={setWStrain}
+          />
+          <PillRow
+            label="Weight"
+            options={FLOWER_WEIGHTS}
+            selected={wWeight}
+            onSelect={setWWeight}
+            customKey="flower_weight"
+            extraOptions={customOpts["flower_weight"] || []}
+            onAddCustom={(v) => addCustomOption("flower_weight", v)}
+          />
+          <PillRow
+            label="Cultivation"
+            note="(multi-select)"
+            options={CULTIVATION_TAGS}
+            selected={wCultivation}
+            onSelect={setWCultivation}
+            multi
+          />
+          <PillRow
+            label="Grade"
+            note="(multi-select)"
+            options={GRADE_TAGS}
+            selected={wGrade}
+            onSelect={setWGrade}
+            multi
+          />
+          <PillRow
+            label="Processing"
+            note="(multi-select)"
+            options={PROCESSING_TAGS}
+            selected={wProcessing}
+            onSelect={setWProcessing}
+            multi
+          />
+          <PillRow
+            label="Effect"
+            note="(multi-select)"
+            options={EFFECT_TAGS}
+            selected={wEffect}
+            onSelect={setWEffect}
+            multi
+          />
+        </>
+      )}
+
+      {/* ROLLING PAPERS */}
+      {world === "papers" && (
+        <>
+          <PillRow
+            label="Type"
+            options={PAPER_SUBCATS}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {["rolling_papers", "cones"].includes(form.subcategory) && (
+            <>
+              <PillRow
+                label="Size"
+                options={PAPER_SIZES}
+                selected={wSize}
+                onSelect={setWSize}
+                customKey="papers_size"
+                extraOptions={customOpts["papers_size"] || []}
+                onAddCustom={(v) => addCustomOption("papers_size", v)}
+              />
+              <PillRow
+                label="Pack Count"
+                options={PAPER_COUNTS}
+                selected={wPackSize}
+                onSelect={setWPackSize}
+                customKey="papers_count"
+                extraOptions={customOpts["papers_count"] || []}
+                onAddCustom={(v) => addCustomOption("papers_count", v)}
+              />
+            </>
+          )}
+          {form.subcategory === "tips" && (
+            <PillRow
+              label="Material"
+              options={TIP_MATERIALS}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {form.subcategory === "rolling_machine" && (
+            <PillRow
+              label="Machine Size"
+              options={MACHINE_SIZES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {form.subcategory === "tray" && (
+            <PillRow
+              label="Tray Size"
+              options={TRAY_SIZES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+        </>
+      )}
+
+      {/* ACCESSORIES */}
+      {world === "accessories" && (
+        <>
+          <PillRow
+            label="Type"
+            options={ACC_SUBCATS}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {form.subcategory === "grinder" && (
+            <>
+              <PillRow
+                label="Diameter"
+                options={GRINDER_SIZES}
+                selected={wSize}
+                onSelect={setWSize}
+              />
+              <PillRow
+                label="Pieces"
+                options={GRINDER_PIECES}
+                selected={wForm}
+                onSelect={setWForm}
+              />
+            </>
+          )}
+          {form.subcategory === "humidity_pack" && (
+            <>
+              <PillRow
+                label="RH %"
+                options={HUMIDITY_PCT}
+                selected={wSize}
+                onSelect={setWSize}
+              />
+              <PillRow
+                label="Weight"
+                options={HUMIDITY_WEIGHT}
+                selected={wWeight}
+                onSelect={setWWeight}
+              />
+            </>
+          )}
+          {["bong", "dab_rig"].includes(form.subcategory) && (
+            <PillRow
+              label="Material"
+              options={BONG_MATERIALS}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+        </>
+      )}
+
+      {/* CONCENTRATES */}
+      {world === "concentrate" && (
+        <>
+          <PillRow
+            label="Type"
+            options={CONC_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          <PillRow
+            label="Weight"
+            options={CONC_WEIGHTS}
+            selected={wWeight}
+            onSelect={setWWeight}
+            customKey="conc_weight"
+            extraOptions={customOpts["conc_weight"] || []}
+            onAddCustom={(v) => addCustomOption("conc_weight", v)}
+          />
+          <PillRow
+            label="Extraction Method"
+            note="(multi-select)"
+            options={EXTRACTION_METHODS}
+            selected={wExtraction}
+            onSelect={setWExtraction}
+            multi
+          />
+          <PillRow
+            label="Cultivation"
+            note="(multi-select)"
+            options={CULTIVATION_TAGS.slice(0, 6)}
+            selected={wCultivation}
+            onSelect={setWCultivation}
+            multi
+          />
+          <PillRow
+            label="Grade"
+            note="(multi-select)"
+            options={GRADE_TAGS.slice(2)}
+            selected={wGrade}
+            onSelect={setWGrade}
+            multi
+          />
+        </>
+      )}
+
+      {/* HASH & KIEF */}
+      {world === "hash" && (
+        <>
+          <PillRow
+            label="Type"
+            options={HASH_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          <PillRow
+            label="Weight"
+            options={HASH_WEIGHTS}
+            selected={wWeight}
+            onSelect={setWWeight}
+            customKey="hash_weight"
+            extraOptions={customOpts["hash_weight"] || []}
+            onAddCustom={(v) => addCustomOption("hash_weight", v)}
+          />
+          <PillRow
+            label="Grade"
+            note="(multi-select)"
+            options={[...GRADE_TAGS.slice(1, 7), "Imported", "Artisanal"]}
+            selected={wGrade}
+            onSelect={setWGrade}
+            multi
+          />
+          <PillRow
+            label="Cultivation"
+            note="(multi-select)"
+            options={CULTIVATION_TAGS.slice(0, 5)}
+            selected={wCultivation}
+            onSelect={setWCultivation}
+            multi
+          />
+        </>
+      )}
+
+      {/* VAPES */}
+      {world === "vape" && (
+        <>
+          <PillRow
+            label="Device Type"
+            options={VAPE_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {["cartridge", "disposable"].includes(form.subcategory) && (
+            <>
+              <PillRow
+                label="Volume"
+                options={VAPE_VOLUMES}
+                selected={wVolume}
+                onSelect={setWVolume}
+              />
+              <PillRow
+                label="Strain"
+                options={STRAIN_TYPES}
+                selected={wStrain}
+                onSelect={setWStrain}
+              />
+              <PillRow
+                label="Fill Type"
+                options={FILL_TYPES}
+                selected={wSize}
+                onSelect={setWSize}
+              />
+            </>
+          )}
+          {form.subcategory === "battery" && (
+            <PillRow
+              label="Battery Type"
+              options={BATTERY_TYPES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+        </>
+      )}
+
+      {/* SEEDS & CLONES */}
+      {world === "seeds" && (
+        <>
+          <PillRow
+            label="Type"
+            options={SEED_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {form.subcategory === "seed" && (
+            <>
+              <PillRow
+                label="Genetics"
+                options={SEED_GENETICS}
+                selected={wForm}
+                onSelect={setWForm}
+              />
+              <PillRow
+                label="Pack Size"
+                options={SEED_PACKS}
+                selected={wPackSize}
+                onSelect={setWPackSize}
+              />
+            </>
+          )}
+          <Field>
+            <Lbl note="strain name / genetics">Strain Name</Lbl>
+            <input
+              style={sInput}
+              value={form.strain_id}
+              onChange={(e) => set("strain_id", e.target.value)}
+              placeholder="e.g. Blue Dream, OG Kush, Wedding Cake x Gelato"
+            />
+          </Field>
+          <PillRow
+            label="Cultivation"
+            note="(multi-select)"
+            options={CULTIVATION_TAGS.slice(0, 5)}
+            selected={wCultivation}
+            onSelect={setWCultivation}
+            multi
+          />
+        </>
+      )}
+
+      {/* SUBSTRATE */}
+      {world === "substrate" && (
+        <>
+          <PillRow
+            label="Type"
+            options={SUBSTRATE_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {["substrate", "soil"].includes(form.subcategory) && (
+            <PillRow
+              label="Volume"
+              options={SUBSTRATE_SIZES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {form.subcategory === "rockwool" && (
+            <PillRow
+              label="Size"
+              options={ROCKWOOL_SIZES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+        </>
+      )}
+
+      {/* NUTRIENTS — THE STAR */}
+      {world === "nutrients" && (
+        <>
+          <PillRow
+            label="Nutrient Type"
+            options={NUTRIENT_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => {
+              set("subcategory", v);
+              setWForm("");
+              setWPhase("");
+              setWSize("");
+            }}
+          />
+          {["base_nutrient", "bloom_booster"].includes(form.subcategory) && (
+            <PillRow
+              label="Growth Phase"
+              options={NUTRIENT_PHASES}
+              selected={wPhase}
+              onSelect={setWPhase}
+            />
+          )}
+          {[
+            "base_nutrient",
+            "bloom_booster",
+            "root_stimulant",
+            "supplement",
+          ].includes(form.subcategory) && (
+            <PillRow
+              label="Form"
+              options={NUTRIENT_FORMS}
+              selected={wForm}
+              onSelect={(v) => {
+                setWForm(v);
+                set("unit", v === "Powder" ? "g" : "ml");
+              }}
+            />
+          )}
+          {form.subcategory === "ph_management" && (
+            <PillRow
+              label="pH Type"
+              options={PH_TYPES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {form.subcategory === "beneficial" && (
+            <PillRow
+              label="Organism Type"
+              options={BENEFICIAL_TYPES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {(wForm === "Liquid" ||
+            (!wForm &&
+              form.subcategory &&
+              form.subcategory !== "beneficial" &&
+              form.subcategory !== "ph_management")) && (
+            <PillRow
+              label="Volume"
+              options={NUTRIENT_VOL_LIQUID}
+              selected={wSize}
+              onSelect={setWSize}
+              customKey="nut_vol_liquid"
+              extraOptions={customOpts["nut_vol_liquid"] || []}
+              onAddCustom={(v) => addCustomOption("nut_vol_liquid", v)}
+            />
+          )}
+          {wForm === "Powder" && (
+            <PillRow
+              label="Weight"
+              options={NUTRIENT_VOL_POWDER}
+              selected={wSize}
+              onSelect={setWSize}
+              customKey="nut_vol_powder"
+              extraOptions={customOpts["nut_vol_powder"] || []}
+              onAddCustom={(v) => addCustomOption("nut_vol_powder", v)}
+            />
+          )}
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: T.purple,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 7,
+                fontFamily: T.fontUi,
+              }}
+            >
+              Known Brands — quick pick
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {NUTRIENT_BRANDS.map((b) => {
+                const a = form.brand === b;
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => set("brand", b)}
+                    style={{
+                      padding: "5px 13px",
+                      borderRadius: 20,
+                      fontSize: 12,
+                      fontWeight: a ? 700 : 400,
+                      fontFamily: T.fontUi,
+                      border: `1.5px solid ${a ? T.accentMid : T.ink150}`,
+                      background: a ? T.accentMid : "#fff",
+                      color: a ? "#fff" : T.ink700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {b}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* GROW EQUIPMENT */}
+      {world === "equipment" && (
+        <>
+          <PillRow
+            label="Equipment Type"
+            options={EQUIP_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => {
+              set("subcategory", v);
+              setWSize("");
+              setWForm("");
+            }}
+          />
+          {form.subcategory === "grow_light" && (
+            <>
+              <PillRow
+                label="Light Type"
+                options={LIGHT_TYPES}
+                selected={wForm}
+                onSelect={setWForm}
+              />
+              <PillRow
+                label="Wattage"
+                options={LIGHT_WATTS}
+                selected={wSize}
+                onSelect={setWSize}
+              />
+            </>
+          )}
+          {form.subcategory === "grow_tent" && (
+            <PillRow
+              label="Tent Size"
+              options={TENT_SIZES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {form.subcategory === "pot" && (
+            <PillRow
+              label="Pot Volume"
+              options={POT_SIZES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+          {form.subcategory === "meter" && (
+            <PillRow
+              label="Meter Type"
+              options={METER_TYPES}
+              selected={wSize}
+              onSelect={setWSize}
+            />
+          )}
+        </>
+      )}
+
+      {/* EDIBLES */}
+      {world === "edible" && (
+        <>
+          <PillRow
+            label="Type"
+            options={EDIBLE_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {form.subcategory === "edible" && (
+            <PillRow
+              label="Format"
+              options={EDIBLE_FORMATS}
+              selected={wForm}
+              onSelect={setWForm}
+            />
+          )}
+          <PillRow
+            label="Potency"
+            options={EDIBLE_POTENCY}
+            selected={wWeight}
+            onSelect={setWWeight}
+          />
+          <PillRow
+            label="Cannabinoid"
+            options={CANNABINOIDS}
+            selected={wStrain}
+            onSelect={setWStrain}
+          />
+          <PillRow
+            label="Pack Count"
+            options={EDIBLE_PACKS}
+            selected={wPackSize}
+            onSelect={setWPackSize}
+          />
+          <PillRow
+            label="Effect"
+            note="(multi-select)"
+            options={EFFECT_TAGS}
+            selected={wEffect}
+            onSelect={setWEffect}
+            multi
+          />
+        </>
+      )}
+
+      {/* WELLNESS */}
+      {world === "wellness" && (
+        <>
+          <PillRow
+            label="Type"
+            options={WELLNESS_TYPES}
+            selected={form.subcategory}
+            onSelect={(v) => set("subcategory", v)}
+          />
+          {form.subcategory === "mushroom" && (
+            <PillRow
+              label="Mushroom Type"
+              options={MUSHROOM_TYPES}
+              selected={wForm}
+              onSelect={setWForm}
+            />
+          )}
+          <PillRow
+            label="Format"
+            options={WELLNESS_FORMATS}
+            selected={wSize}
+            onSelect={setWSize}
+          />
+          {wSize === "Capsule" && (
+            <>
+              <PillRow
+                label="Strength"
+                options={WELLNESS_STRENGTHS}
+                selected={wWeight}
+                onSelect={setWWeight}
+              />
+              <PillRow
+                label="Count"
+                options={WELLNESS_COUNTS}
+                selected={wPackSize}
+                onSelect={setWPackSize}
+              />
+            </>
+          )}
+          <PillRow
+            label="Effect"
+            note="(multi-select)"
+            options={WELLNESS_EFFECTS}
+            selected={wEffect}
+            onSelect={setWEffect}
+            multi
+          />
+        </>
+      )}
+
+      {/* MERCH */}
+      {world === "merch" && (
+        <>
+          <Field>
+            <Lbl note="brand / label name">Brand</Lbl>
+            <input
+              style={sInput}
+              value={form.brand}
+              onChange={(e) => set("brand", e.target.value)}
+              placeholder="e.g. Medi Recreational, NuAi"
+            />
+          </Field>
+          <PillRow
+            label="Garment"
+            options={GARMENT_TYPES}
+            selected={wGarment}
+            onSelect={(v) => {
+              setWGarment(v);
+              set("subcategory", "clothing");
+            }}
+          />
+          <PillRow
+            label="Size"
+            options={GARMENT_SIZES}
+            selected={wSize}
+            onSelect={setWSize}
+          />
+          <PillRow
+            label="Colour"
+            options={GARMENT_COLOURS}
+            selected={wColour}
+            onSelect={setWColour}
+          />
+        </>
+      )}
+
+      {/* PRE-ROLLS */}
+      {world === "preroll" && (
+        <>
+          <PillRow
+            label="Strain"
+            options={STRAIN_TYPES}
+            selected={wStrain}
+            onSelect={setWStrain}
+          />
+          <PillRow
+            label="Weight"
+            options={PREROLL_WEIGHTS}
+            selected={wWeight}
+            onSelect={setWWeight}
+          />
+          <PillRow
+            label="Pack Size"
+            options={PREROLL_PACKS}
+            selected={wPackSize}
+            onSelect={setWPackSize}
+          />
+          <PillRow
+            label="Type"
+            options={PREROLL_TYPES}
+            selected={wSize}
+            onSelect={setWSize}
+          />
+          <PillRow
+            label="Cultivation"
+            note="(multi-select)"
+            options={CULTIVATION_TAGS.slice(0, 5)}
+            selected={wCultivation}
+            onSelect={setWCultivation}
+            multi
+          />
+          <PillRow
+            label="Grade"
+            note="(multi-select)"
+            options={GRADE_TAGS.slice(2, 8)}
+            selected={wGrade}
+            onSelect={setWGrade}
+            multi
+          />
+        </>
+      )}
+
+      {/* Auto-preview */}
+      {(form.name || form.sku) && (
+        <div
+          style={{
+            background: T.ink075,
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
+            padding: "10px 14px",
+            marginBottom: 14,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              color: T.ink400,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              marginBottom: 4,
+              fontFamily: T.fontUi,
+            }}
+          >
+            Auto Preview
+          </div>
+          {form.name && (
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: T.ink700,
+                fontFamily: T.fontUi,
+              }}
+            >
+              {form.name}
+            </div>
+          )}
+          {form.sku && (
+            <div
+              style={{
+                fontSize: 10,
+                color: T.ink400,
+                fontFamily: "'DM Mono','Courier New',monospace",
+                marginTop: 2,
+              }}
+            >
+              {form.sku}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div
@@ -652,7 +2004,11 @@ export default function StockItemModal({
                 color: T.ink900,
               }}
             >
-              {item ? `Edit: ${item.name}` : "Add Stock Item"}
+              {item
+                ? `Edit: ${item.name}`
+                : isWorldMode
+                  ? `${worldIcon} Add ${worldLabel} Item`
+                  : "Add Stock Item"}
             </h3>
             <p
               style={{
@@ -664,7 +2020,9 @@ export default function StockItemModal({
             >
               {item
                 ? `${CATEGORY_LABELS[item.category] || item.category} · ${item.sku}`
-                : "Fields adapt by category and industry profile"}
+                : isWorldMode
+                  ? `Fields adapted for ${worldLabel}`
+                  : "Fields adapt by category and industry profile"}
             </p>
           </div>
           <button
@@ -683,7 +2041,6 @@ export default function StockItemModal({
           </button>
         </div>
 
-        {/* Body */}
         <div style={{ padding: "24px", flex: 1 }}>
           {toast && (
             <div
@@ -703,7 +2060,20 @@ export default function StockItemModal({
             </div>
           )}
 
-          {/* ── SECTION: Core Identity ── */}
+          {/* WORLD MODE section */}
+          {isWorldMode && (
+            <>
+              <SectionHead
+                label={`${worldLabel} Details`}
+                color={T.purple}
+                bg={T.purpleBg}
+                border={T.purpleBd}
+              />
+              {renderWorld()}
+            </>
+          )}
+
+          {/* Core Identity */}
           <SectionHead
             label="Core Identity"
             color={T.info}
@@ -717,7 +2087,7 @@ export default function StockItemModal({
                 style={sInput}
                 value={form.sku}
                 onChange={(e) => set("sku", e.target.value)}
-                placeholder="e.g. MED-CONC-BUD-1G"
+                placeholder="e.g. MED-FL-UJF-IND-35"
               />
             </Field>
             <Field>
@@ -726,26 +2096,43 @@ export default function StockItemModal({
                 style={sInput}
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="e.g. Budder 1g"
+                placeholder="Product name"
               />
             </Field>
           </Grid2>
           <Grid2>
             <Field>
               <Lbl>Category</Lbl>
-              <select
-                style={sSelect}
-                value={form.category}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-              >
-                {Object.entries(CATEGORY_LABELS)
-                  .filter(([k]) => visibleCategories.includes(k))
-                  .map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-              </select>
+              {isWorldMode ? (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: T.purpleBg,
+                    border: `1px solid ${T.purpleBd}`,
+                    borderRadius: 4,
+                    fontSize: 13,
+                    color: T.purple,
+                    fontWeight: 700,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  {worldIcon} {CATEGORY_LABELS[form.category] || form.category}
+                </div>
+              ) : (
+                <select
+                  style={sSelect}
+                  value={form.category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                >
+                  {Object.entries(CATEGORY_LABELS)
+                    .filter(([k]) => visibleCategories.includes(k))
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
+                </select>
+              )}
             </Field>
             <Field>
               <Lbl>Unit</Lbl>
@@ -768,65 +2155,56 @@ export default function StockItemModal({
               style={{ ...sInput, minHeight: "60px", resize: "vertical" }}
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
-              placeholder="Optional internal notes about this item"
+              placeholder="Optional internal notes"
             />
           </Field>
 
-          {/* ── SECTION: Cannabis Catalogue (NEW v1.2 — cannabis profiles only) ── */}
-          {isCannabis && (
+          {/* Legacy Cannabis Catalogue — edit mode only */}
+          {isCannabis && !isWorldMode && (
             <>
               <SectionHead
                 label="Cannabis Catalogue"
-                color="#5B21B6"
-                bg="#F5F3FF"
-                border="#DDD6FE"
+                color={T.purple}
+                bg={T.purpleBg}
+                border={T.purpleBd}
               />
-
               <Grid2>
                 <Field>
-                  <Lbl note="brand name shown in filters">Brand</Lbl>
+                  <Lbl note="brand filter">Brand</Lbl>
                   <input
                     style={sInput}
                     value={form.brand}
                     onChange={(e) => set("brand", e.target.value)}
-                    placeholder="e.g. RAW, Canna, Biobizz"
+                    placeholder="e.g. RAW, Canna"
                   />
                 </Field>
                 <Field>
-                  <Lbl note="product type within category">Subcategory</Lbl>
-                  {subcategoryOptions.length > 0 ? (
-                    <select
-                      style={sSelect}
-                      value={form.subcategory}
-                      onChange={(e) => set("subcategory", e.target.value)}
-                    >
-                      <option value="">— Select type —</option>
-                      {subcategoryOptions.map((s) => (
-                        <option key={s.value} value={s.value}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      style={sInput}
-                      value={form.subcategory}
-                      onChange={(e) => set("subcategory", e.target.value)}
-                      placeholder="e.g. rosin_bag"
-                    />
-                  )}
+                  <Lbl note="product type">Subcategory</Lbl>
+                  <input
+                    style={sInput}
+                    value={form.subcategory}
+                    onChange={(e) => set("subcategory", e.target.value)}
+                    placeholder="e.g. budder, rolling_papers"
+                  />
                 </Field>
               </Grid2>
-
               <Grid2>
                 <Field>
-                  <Lbl note="what the variant describes">Variant Type</Lbl>
+                  <Lbl>Variant Type</Lbl>
                   <select
                     style={sSelect}
                     value={form.variant_type}
                     onChange={(e) => set("variant_type", e.target.value)}
                   >
-                    {VARIANT_TYPES.map((v) => (
+                    {[
+                      { value: "", label: "— None —" },
+                      { value: "weight", label: "Weight" },
+                      { value: "size", label: "Size" },
+                      { value: "strain", label: "Strain" },
+                      { value: "count", label: "Count" },
+                      { value: "strength", label: "Strength" },
+                      { value: "colour", label: "Colour" },
+                    ].map((v) => (
                       <option key={v.value} value={v.value}>
                         {v.label}
                       </option>
@@ -834,215 +2212,19 @@ export default function StockItemModal({
                   </select>
                 </Field>
                 <Field>
-                  <Lbl note="shown as badge on product card">Variant Value</Lbl>
+                  <Lbl note="badge on product card">Variant Value</Lbl>
                   <input
                     style={sInput}
                     value={form.variant_value}
                     onChange={(e) => set("variant_value", e.target.value)}
-                    placeholder={
-                      form.variant_type === "weight"
-                        ? "e.g. 3.5g, 1g, 7g"
-                        : form.variant_type === "size"
-                          ? "e.g. King Size, 110mm"
-                          : form.variant_type === "strain"
-                            ? "e.g. Indica, Sativa, Gelato"
-                            : form.variant_type === "count"
-                              ? "e.g. 3-Pack, 6-Pack"
-                              : form.variant_type === "strength"
-                                ? "e.g. 500mg, 58% 4g"
-                                : "e.g. King Size, 3.5g, Indica"
-                    }
+                    placeholder="e.g. 3.5g Indica"
                   />
                 </Field>
               </Grid2>
-
-              {/* Tags — only shown when relevant groups exist for this category/subcategory */}
-              {TAG_GROUPS.some((group) => {
-                const c = form.category;
-                const s = form.subcategory;
-                const noTags = [
-                  "clothing",
-                  "cartridge",
-                  "disposable",
-                  "battery",
-                  "mushroom",
-                  "adaptogen",
-                  "cbd",
-                  "cbd_pet",
-                  "preroll",
-                  "tincture",
-                  "capsule",
-                  "topical",
-                ];
-                if (noTags.includes(s)) return false;
-                if (group.group === "Concentrate Type")
-                  return (
-                    ["concentrate"].includes(c) ||
-                    [
-                      "hash",
-                      "budder",
-                      "badder",
-                      "live_resin",
-                      "rosin",
-                      "sauce",
-                      "diamonds",
-                      "distillate",
-                      "crumble",
-                      "shatter",
-                      "wax",
-                      "feco",
-                      "rso",
-                      "bho",
-                      "kief",
-                    ].includes(s)
-                  );
-                if (group.group === "Processing")
-                  return ["flower", "concentrate", "raw_material"].includes(c);
-                if (group.group === "Cultivation")
-                  return ["flower", "concentrate", "raw_material"].includes(c);
-                if (group.group === "Grade")
-                  return ["flower", "concentrate"].includes(c);
-                if (group.group === "Effect")
-                  return ["flower", "concentrate", "edible"].includes(c);
-                return false;
-              }) && (
-                <Field>
-                  <Lbl note="cultivation method, grade, processing — unlimited">
-                    Tags
-                  </Lbl>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                      padding: "12px",
-                      background: "#F5F3FF",
-                      border: "1px solid #DDD6FE",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    {TAG_GROUPS.filter((group) => {
-                      const c = form.category;
-                      const s = form.subcategory;
-                      const noTags = [
-                        "clothing",
-                        "cartridge",
-                        "disposable",
-                        "battery",
-                        "mushroom",
-                        "adaptogen",
-                        "cbd",
-                        "cbd_pet",
-                        "preroll",
-                        "tincture",
-                        "capsule",
-                        "topical",
-                      ];
-                      if (noTags.includes(s)) return false;
-                      if (group.group === "Concentrate Type")
-                        return (
-                          ["concentrate"].includes(c) ||
-                          [
-                            "hash",
-                            "budder",
-                            "badder",
-                            "live_resin",
-                            "rosin",
-                            "sauce",
-                            "diamonds",
-                            "distillate",
-                            "crumble",
-                            "shatter",
-                            "wax",
-                            "feco",
-                            "rso",
-                            "bho",
-                            "kief",
-                          ].includes(s)
-                        );
-                      if (group.group === "Processing")
-                        return [
-                          "flower",
-                          "concentrate",
-                          "raw_material",
-                        ].includes(c);
-                      if (group.group === "Cultivation")
-                        return [
-                          "flower",
-                          "concentrate",
-                          "raw_material",
-                        ].includes(c);
-                      if (group.group === "Grade")
-                        return ["flower", "concentrate"].includes(c);
-                      if (group.group === "Effect")
-                        return ["flower", "concentrate", "edible"].includes(c);
-                      return false;
-                    }).map((group) => (
-                      <div key={group.group}>
-                        <div
-                          style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            color: "#5B21B6",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.08em",
-                            marginBottom: 6,
-                            fontFamily: T.fontUi,
-                          }}
-                        >
-                          {group.group}
-                        </div>
-                        <div
-                          style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-                        >
-                          {group.tags.map((tag) => {
-                            const active = form.tags.includes(tag);
-                            return (
-                              <button
-                                key={tag}
-                                type="button"
-                                onClick={() => toggleTag(tag)}
-                                style={{
-                                  padding: "3px 10px",
-                                  borderRadius: 12,
-                                  fontSize: 11,
-                                  fontWeight: active ? 700 : 400,
-                                  fontFamily: T.fontUi,
-                                  border:
-                                    "1.5px solid " +
-                                    (active ? "#5B21B6" : "#DDD6FE"),
-                                  background: active ? "#5B21B6" : "#fff",
-                                  color: active ? "#fff" : "#5B21B6",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {tag}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                    {form.tags.length > 0 && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "#5B21B6",
-                          fontFamily: T.fontUi,
-                          borderTop: "1px solid #DDD6FE",
-                          paddingTop: 8,
-                        }}
-                      >
-                        Selected: {form.tags.join(" · ")}
-                      </div>
-                    )}
-                  </div>
-                </Field>
-              )}
             </>
           )}
 
-          {/* ── SECTION: Stock Levels ── */}
+          {/* Stock Levels */}
           <SectionHead
             label="Stock Levels"
             color={T.accentMid}
@@ -1105,7 +2287,7 @@ export default function StockItemModal({
             </Field>
           </Grid2>
 
-          {/* ── SECTION: Pricing ── */}
+          {/* Pricing */}
           <SectionHead
             label="Pricing"
             color="#92400E"
@@ -1125,9 +2307,7 @@ export default function StockItemModal({
               />
             </Field>
             <Field>
-              <Lbl note={isFinished ? "← shown in shop" : undefined}>
-                Sell Price (ZAR)
-              </Lbl>
+              <Lbl note="← shown in shop">Sell Price (ZAR)</Lbl>
               <input
                 style={sInput}
                 type="number"
@@ -1135,18 +2315,18 @@ export default function StockItemModal({
                 min="0"
                 value={form.sell_price}
                 onChange={(e) => set("sell_price", e.target.value)}
-                disabled={!isFinished}
               />
-              {!isFinished && (
+              {liveMargin && (
                 <p
                   style={{
-                    fontSize: "10px",
-                    color: T.ink300,
+                    fontSize: 11,
+                    color: parseFloat(liveMargin) >= 50 ? T.success : T.warning,
                     margin: "4px 0 0",
+                    fontWeight: 700,
                     fontFamily: T.fontUi,
                   }}
                 >
-                  Only applicable for finished products
+                  Margin: {liveMargin}%
                 </p>
               )}
             </Field>
@@ -1183,7 +2363,7 @@ export default function StockItemModal({
                     fontFamily: T.fontUi,
                   }}
                 >
-                  ✓ Will appear in customer shop — R
+                  ✓ Will appear in shop — R
                   {parseFloat(form.sell_price).toFixed(2)} ·{" "}
                   {form.quantity_on_hand} {form.unit}
                 </div>
@@ -1195,14 +2375,13 @@ export default function StockItemModal({
                     fontFamily: T.fontUi,
                   }}
                 >
-                  Not live — requires: finished_product · sell price &gt; R0 ·
-                  stock &gt; 0
+                  Not live — needs sell price &gt; R0 and stock &gt; 0
                 </div>
               )}
             </div>
           )}
 
-          {/* ── SECTION: Dates ── */}
+          {/* Dates */}
           <SectionHead
             label="Dates"
             color={T.ink500}
@@ -1224,18 +2403,6 @@ export default function StockItemModal({
                 value={form.expiry_date}
                 onChange={(e) => set("expiry_date", e.target.value)}
               />
-              {isFoodBev && isFinished && !form.expiry_date && (
-                <p
-                  style={{
-                    fontSize: "11px",
-                    color: T.danger,
-                    margin: "4px 0 0",
-                    fontFamily: T.fontUi,
-                  }}
-                >
-                  Mandatory for food & beverage
-                </p>
-              )}
             </Field>
             {(isFoodBev || showFoodFields) && (
               <Field>
@@ -1253,7 +2420,7 @@ export default function StockItemModal({
             )}
           </Grid2>
 
-          {/* ── SECTION: Cannabis Profile (raw_material, concentrate, terpene) ── */}
+          {/* Cannabis Profile */}
           {showCannabisFields && (isRawMaterial || isTerpene) && (
             <>
               <SectionHead
@@ -1282,7 +2449,7 @@ export default function StockItemModal({
                 )}
                 {isTerpene && (
                   <Field>
-                    <Lbl note="terpene flavour profile">Medium Type</Lbl>
+                    <Lbl note="flavour profile">Medium Type</Lbl>
                     <select
                       style={sSelect}
                       value={form.medium_type}
@@ -1312,7 +2479,7 @@ export default function StockItemModal({
             </>
           )}
 
-          {/* ── SECTION: Food & Beverage specific (S3) ── */}
+          {/* Food & Beverage */}
           {(isFoodBev || (isRawMaterial && !isCannabis)) && (
             <>
               <SectionHead
@@ -1336,7 +2503,7 @@ export default function StockItemModal({
                   </select>
                 </Field>
                 <Field>
-                  <Lbl note="standard order qty (MOQ)">Reorder Qty</Lbl>
+                  <Lbl note="MOQ">Reorder Qty</Lbl>
                   <input
                     style={sInput}
                     type="number"
@@ -1350,9 +2517,7 @@ export default function StockItemModal({
               </Grid2>
               <Grid2>
                 <Field>
-                  <Lbl note="supplier's delivery lot ref">
-                    Batch / Lot Number
-                  </Lbl>
+                  <Lbl note="lot ref">Batch / Lot Number</Lbl>
                   <input
                     style={sInput}
                     value={form.batch_lot_number}
@@ -1361,7 +2526,7 @@ export default function StockItemModal({
                   />
                 </Field>
                 <Field>
-                  <Lbl note="import compliance">Country of Origin</Lbl>
+                  <Lbl note="import">Country of Origin</Lbl>
                   <input
                     style={sInput}
                     value={form.country_of_origin}
@@ -1376,7 +2541,7 @@ export default function StockItemModal({
                   style={{ ...sInput, minHeight: "60px", resize: "vertical" }}
                   value={form.ingredients_notes}
                   onChange={(e) => set("ingredients_notes", e.target.value)}
-                  placeholder="e.g. Contains natural lemon flavouring, citric acid (E330)"
+                  placeholder="e.g. Contains citric acid (E330)"
                 />
               </Field>
               <Field>
@@ -1389,7 +2554,7 @@ export default function StockItemModal({
                   }}
                 >
                   <Lbl>
-                    Allergen Declaration
+                    Allergen Declaration{" "}
                     {allergenCount > 0 && (
                       <span
                         style={{
@@ -1410,23 +2575,14 @@ export default function StockItemModal({
                   {allergenCount > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        const txt = generateAllergenText();
+                      onClick={() =>
                         navigator.clipboard
-                          .writeText(txt)
+                          .writeText(generateAllergenText())
                           .then(() =>
-                            setToast({
-                              type: "success",
-                              text: "Allergen declaration text copied to clipboard.",
-                            }),
+                            setToast({ type: "success", text: "Copied." }),
                           )
-                          .catch(() =>
-                            setToast({
-                              type: "error",
-                              text: `Declaration: ${txt}`,
-                            }),
-                          );
-                      }}
+                          .catch(() => {})
+                      }
                       style={{
                         fontSize: "10px",
                         fontFamily: T.fontUi,
@@ -1437,8 +2593,6 @@ export default function StockItemModal({
                         borderRadius: "3px",
                         padding: "3px 10px",
                         cursor: "pointer",
-                        letterSpacing: "0.04em",
-                        whiteSpace: "nowrap",
                       }}
                     >
                       Copy Label Text
@@ -1501,7 +2655,7 @@ export default function StockItemModal({
             </>
           )}
 
-          {/* ── SECTION: Hardware ── */}
+          {/* Hardware */}
           {isHardware && (
             <>
               <SectionHead
@@ -1538,7 +2692,7 @@ export default function StockItemModal({
                     }}
                   >
                     {productFormats.map((f) => {
-                      const selected = (form.compatible_formats || []).includes(
+                      const sel = (form.compatible_formats || []).includes(
                         f.id,
                       );
                       return (
@@ -1553,15 +2707,15 @@ export default function StockItemModal({
                             fontFamily: T.fontUi,
                             padding: "4px 8px",
                             borderRadius: "3px",
-                            background: selected ? T.accentLit : "transparent",
-                            color: selected ? T.accentMid : T.ink700,
-                            fontWeight: selected ? 700 : 400,
-                            border: `1px solid ${selected ? T.accentBd : "transparent"}`,
+                            background: sel ? T.accentLit : "transparent",
+                            color: sel ? T.accentMid : T.ink700,
+                            fontWeight: sel ? 700 : 400,
+                            border: `1px solid ${sel ? T.accentBd : "transparent"}`,
                           }}
                         >
                           <input
                             type="checkbox"
-                            checked={selected}
+                            checked={sel}
                             onChange={() => toggleFormat(f.id)}
                             style={{ accentColor: T.accentMid }}
                           />
@@ -1580,7 +2734,7 @@ export default function StockItemModal({
             </>
           )}
 
-          {/* ── SECTION: Storage ── */}
+          {/* Storage */}
           {(isRawMaterial ||
             isTerpene ||
             isHardware ||
@@ -1601,17 +2755,17 @@ export default function StockItemModal({
                   onChange={(e) => set("storage_instructions", e.target.value)}
                   placeholder={
                     isFoodBev
-                      ? "e.g. Store below 25°C. Keep away from direct sunlight."
+                      ? "e.g. Store below 25°C."
                       : isTerpene
-                        ? "e.g. Store in airtight container, 15–20°C, away from light."
-                        : "e.g. Store in cool, dry place."
+                        ? "e.g. Airtight container."
+                        : "e.g. Cool, dry place."
                   }
                 />
               </Field>
             </>
           )}
 
-          {/* ── Active toggle ── */}
+          {/* Active */}
           <div style={{ marginBottom: "20px" }}>
             <label
               style={{
@@ -1631,12 +2785,12 @@ export default function StockItemModal({
                 onChange={(e) => set("is_active", e.target.checked)}
                 style={{ width: "15px", height: "15px", accentColor: T.accent }}
               />
-              Item is active
+              Item is active{" "}
               {!form.is_active && (
                 <span
                   style={{ fontSize: "11px", color: T.danger, fontWeight: 400 }}
                 >
-                  — inactive items are hidden from stock views and shop
+                  — hidden from views and shop
                 </span>
               )}
             </label>
@@ -1685,10 +2839,16 @@ export default function StockItemModal({
               style={{
                 ...sBtn("primary"),
                 opacity: saving ? 0.6 : 1,
-                minWidth: "140px",
+                minWidth: "160px",
               }}
             >
-              {saving ? "Saving..." : item ? "Update Item" : "Create Item"}
+              {saving
+                ? "Saving..."
+                : item
+                  ? "Update Item"
+                  : isWorldMode
+                    ? `Create ${worldLabel} Item`
+                    : "Create Item"}
             </button>
           </div>
         </div>
