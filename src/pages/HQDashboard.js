@@ -59,6 +59,9 @@ import HQFoodIntelligence from "../components/hq/HQFoodIntelligence";
 // ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
 
+// ── WP-FIN S5+S6 ─────────────────────────────────────────────────────────────
+import HQBalanceSheet from "../components/hq/HQBalanceSheet";
+
 // ── WP-8 ─────────────────────────────────────────────────────────────────────
 import HQFraud from "../components/hq/HQFraud";
 import HQInvoices from "../components/hq/HQInvoices";
@@ -115,6 +118,7 @@ const TABS = [
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
   { id: "costing", label: "Costing", icon: "🧮", ready: true },
   { id: "pl", label: "P&L", icon: "📉", ready: true },
+  { id: "balance-sheet", label: "Balance Sheet", icon: "⚖️", ready: true },
   // Intelligence
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
   { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
@@ -292,6 +296,7 @@ export default function HQDashboard() {
           {activeTab === "costing" && <HQCogs />}
           {activeTab === "pricing" && <HQPricing />}
           {activeTab === "pl" && <HQProfitLoss />}
+          {activeTab === "balance-sheet" && <HQBalanceSheet />}
           {activeTab === "reorder" && <HQReorderScoring />}
           {activeTab === "documents" && <HQDocuments />}
           {activeTab === "medical" && <HQMedical />}

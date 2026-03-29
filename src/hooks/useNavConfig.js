@@ -102,6 +102,12 @@ const HQ_PAGES = [
   { group: "Finance", icon: "◉", label: "Pricing", path: "/hq?tab=pricing" },
   { group: "Finance", icon: "🧮", label: "Costing", path: "/hq?tab=costing" },
   { group: "Finance", icon: "≡", label: "P&L", path: "/hq?tab=pl" },
+  {
+    group: "Finance",
+    icon: "⚖️",
+    label: "Balance Sheet",
+    path: "/hq?tab=balance-sheet",
+  },
   { group: "Finance", icon: "🧾", label: "Invoices", path: "/hq?tab=invoices" },
   // ── Intelligence ─────────────────────────────────────────────────────────────
   {
