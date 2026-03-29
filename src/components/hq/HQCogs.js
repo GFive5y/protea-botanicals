@@ -1,4 +1,4 @@
-// src/components/hq/HQCogs.js v4.1 — WP-THEME-2: Inter font
+// src/components/hq/HQCogs.js v4.2 — WP-THEME-2: Inter font
 // v4.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all displayed numeric / financial values
@@ -76,6 +76,7 @@ const CATEGORY_COLOURS = {
   lab: { bg: "#E8EAF6", color: "#283593" },
   transport: { bg: "#E0F7FA", color: "#00695C" },
   misc: { bg: "#ECEFF1", color: "#455A64" },
+  loyalty: { bg: "#EDE9FE", color: "#5B21B6" },
   other: { bg: "#ECEFF1", color: "#455A64" },
 };
 
@@ -276,7 +277,14 @@ function useFxRate() {
 }
 
 // ── COGS calc ─────────────────────────────────────────────────────────────────
-function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
+function calcCogs(
+  recipe,
+  supplierProducts,
+  localInputs,
+  usdZar,
+  loyaltyConfig,
+  sellPrice,
+) {
   if (!recipe || !usdZar) return null;
   const hw = supplierProducts.find((p) => p.id === recipe.hardware_item_id);
   const tp = supplierProducts.find((p) => p.id === recipe.terpene_item_id);
@@ -354,6 +362,17 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
   const labPerUnit = labTotal / batchSize;
   const transportPU = parseFloat(recipe.transport_cost_zar || 0) / batchSize;
   const miscPU = parseFloat(recipe.misc_cost_zar || 0) / batchSize;
+  // WP-O v2.0: loyalty acquisition cost (informational — not added to COGS total)
+  const loyaltyCostPerPt = loyaltyConfig
+    ? loyaltyConfig.redemption_value_zar * (1 - loyaltyConfig.breakage_rate)
+    : 0;
+  const loyaltyCost =
+    loyaltyConfig && sellPrice > 0
+      ? (sellPrice / 100) *
+        (loyaltyConfig.pts_per_r100_online || 2) *
+        (1 + (loyaltyConfig.online_bonus_pct || 50) / 100) *
+        loyaltyCostPerPt
+      : 0;
   const total =
     hwCost +
     tpCost +
@@ -393,6 +412,7 @@ function calcCogs(recipe, supplierProducts, localInputs, usdZar) {
     hasMissingCosts:
       (pk && !pk.cost_zar && !recipe.packaging_manual_zar) ||
       (lb && !lb.cost_zar && !recipe.labour_manual_zar),
+    loyalty: loyaltyCost,
   };
 }
 
@@ -645,6 +665,7 @@ function CogsBar({ breakdown }) {
     { key: "lab", label: "Lab" },
     { key: "transport", label: "Transport" },
     { key: "misc", label: "Misc" },
+    { key: "loyalty", label: "Loyalty" },
   ].filter((c) => breakdown[c.key] > 0);
   return (
     <div style={{ marginTop: 12 }}>
@@ -1120,6 +1141,8 @@ export default function HQCogs() {
   const [recipes, setRecipes] = useState([]);
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [localInputs, setLocalInputs] = useState([]);
+  const [productPricing, setProductPricing] = useState([]);
+  const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState("costing");
   const [showBuilder, setShowBuilder] = useState(false);
@@ -1135,7 +1158,7 @@ export default function HQCogs() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [r1, r2, r3] = await Promise.all([
+    const [r1, r2, r3, r4, r5] = await Promise.all([
       supabase
         .from("product_cogs")
         .select("*")
@@ -1153,12 +1176,22 @@ export default function HQCogs() {
         .eq("is_active", true)
         .order("category")
         .order("name"),
+      supabase.from("product_pricing").select("*"),
+      tenantId
+        ? supabase
+            .from("loyalty_config")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .single()
+        : Promise.resolve({ data: null }),
     ]);
     setRecipes(r1.data || []);
     setSupplierProducts(r2.data || []);
     setLocalInputs(r3.data || []);
+    setProductPricing(r4.data || []);
+    if (r5.data) setLoyaltyConfig(r5.data);
     setLoading(false);
-  }, []);
+  }, [tenantId]);
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
@@ -1876,11 +1909,21 @@ export default function HQCogs() {
               }}
             >
               {recipes.map((recipe) => {
+                // WP-O v2.0: pass website sell price + loyalty config for loyalty cost line
+                const _wp = productPricing.find(
+                  (p) =>
+                    p.product_cogs_id === recipe.id && p.channel === "website",
+                );
+                const _sell = _wp?.sell_price_zar
+                  ? parseFloat(_wp.sell_price_zar)
+                  : 0;
                 const bd = calcCogs(
                   recipe,
                   supplierProducts,
                   localInputs,
                   usdZar,
+                  loyaltyConfig,
+                  _sell,
                 );
                 return (
                   <div key={recipe.id} style={{ ...sCard, marginBottom: 0 }}>
@@ -2205,6 +2248,15 @@ export default function HQCogs() {
                             label: `Misc (÷${bd.batchSize})`,
                             name: null,
                           },
+                          ...(bd.loyalty > 0
+                            ? [
+                                {
+                                  key: "loyalty",
+                                  label: "Loyalty (acquisition cost)",
+                                  name: `R${bd.loyalty.toFixed(4)}/unit at current earn rate`,
+                                },
+                              ]
+                            : []),
                         ]
                           .filter((r) => bd[r.key] > 0 || r.name)
                           .map((row) => {

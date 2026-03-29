@@ -1,4 +1,4 @@
-// src/components/hq/HQPricing.js v4.1 — WP-THEME-2: Inter font
+// src/components/hq/HQPricing.js v4.2 — WP-THEME-2: Inter font
 // v4.0 — WP-THEME: Unified design system applied
 //   - Outfit replaces Cormorant Garamond + Jost everywhere
 //   - DM Mono for all numeric / financial values
@@ -761,6 +761,7 @@ export default function HQPricing() {
   const [supplierProducts, setSupplierProducts] = useState([]);
   const [localInputs, setLocalInputs] = useState([]);
   const [pricing, setPricing] = useState([]);
+  const [loyaltyConfig, setLoyaltyConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const detailRef = useRef(null);
@@ -771,7 +772,8 @@ export default function HQPricing() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [r1, r2, r3, r4] = await Promise.all([
+    const _tid = tenant?.id;
+    const [r1, r2, r3, r4, r5] = await Promise.all([
       supabase
         .from("product_cogs")
         .select("*")
@@ -780,11 +782,19 @@ export default function HQPricing() {
       supabase.from("supplier_products").select("*").eq("is_active", true),
       supabase.from("local_inputs").select("*").eq("is_active", true),
       supabase.from("product_pricing").select("*"),
+      _tid
+        ? supabase
+            .from("loyalty_config")
+            .select("*")
+            .eq("tenant_id", _tid)
+            .single()
+        : Promise.resolve({ data: null }),
     ]);
     setRecipes(r1.data || []);
     setSupplierProducts(r2.data || []);
     setLocalInputs(r3.data || []);
     setPricing(r4.data || []);
+    if (r5.data) setLoyaltyConfig(r5.data);
     setLoading(false);
     if (!selectedId && r1.data?.length > 0) setSelectedId(r1.data[0].id);
   }, [selectedId]);
@@ -989,6 +999,7 @@ export default function HQPricing() {
                       "Wholesale",
                       "Retail",
                       "Website",
+                      "Net (after loyalty)",
                       "",
                     ].map((h) => (
                       <th key={h} style={sTh}>
@@ -1057,6 +1068,43 @@ export default function HQPricing() {
                           )}
                         </td>
                       ))}
+                      <td style={sTd}>
+                        {(() => {
+                          const wc = row.channels.find(
+                            (c) => c.id === "website",
+                          );
+                          if (!wc?.sell || !loyaltyConfig)
+                            return (
+                              <span style={{ fontSize: 12, color: T.ink150 }}>
+                                —
+                              </span>
+                            );
+                          const cPt =
+                            loyaltyConfig.redemption_value_zar *
+                            (1 - loyaltyConfig.breakage_rate);
+                          const lCost =
+                            (wc.sell / 100) *
+                            (loyaltyConfig.pts_per_r100_online || 2) *
+                            (1 + (loyaltyConfig.online_bonus_pct || 50) / 100) *
+                            cPt;
+                          const netMgn = calcMargin(wc.sell, row.cogs + lCost);
+                          return (
+                            <div>
+                              <div
+                                style={{
+                                  fontFamily: T.fontData,
+                                  fontSize: 11,
+                                  color: T.ink500,
+                                  marginBottom: 3,
+                                }}
+                              >
+                                −{fmtZar(lCost)}/unit
+                              </div>
+                              <MarginBadge pct={netMgn} />
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td style={sTd}>
                         <button
                           onClick={(e) => {
