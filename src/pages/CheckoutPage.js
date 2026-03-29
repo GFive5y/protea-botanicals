@@ -1,12 +1,18 @@
-// src/pages/CheckoutPage.js v2.3
-// Protea Botanicals — WP-O: loyalty_config integration + referral code field
-// v2.3 changes from v2.2:
-//   - Fetches loyalty_config on mount
-//   - Points preview: (total/100) × pts_per_r100_online × online_bonus_pct × tier_mult
-//   - Shows breakdown: "Base X pts + Online bonus + Gold tier 1.5× = Y pts total"
-//   - Referral code input: validates against referral_codes table
-//   - Stores validated referral code in localStorage for OrderSuccess to award
-//   All v2.2 PayFast + inventory deduction logic preserved exactly
+// src/pages/CheckoutPage.js v2.4
+// WP-O v2.0: Category multipliers + redemption flow + first-purchase + cross-sell bonuses
+// v2.4 changes from v2.3:
+//   CRITICAL FIX: loyalty_config fetched with .eq('tenant_id', storefrontTenantId) — no more global .single()
+//   CRITICAL FIX: referral_codes lookup now tenant-scoped
+//   CRITICAL FIX: useEffect deps include storefrontTenantId — re-runs when tenant resolves async
+//   NEW: Category multiplier detection — reads loyalty_category from inventory_items per cart item
+//   NEW: 8-category multiplier stack: base × online_bonus × category_mult × tier_mult
+//   NEW: First online purchase bonus (pts_first_online_purchase) — one-time, detected via orders table
+//   NEW: Cross-sell bonus (pts_crosssell_trigger) — new category detected via user_profiles.category_flags
+//   NEW: Harvest Club tier added to getTierLabel + getTierMult
+//   NEW: Redemption toggle — shows when userPoints >= min_pts_to_redeem
+//   NEW: Redemption adjusts PayFast total, stores redemption data in localStorage for OrderSuccess
+//   NEW: protea_last_order enriched with category, multipliers, bonuses for OrderSuccess
+//   All v2.3 PayFast + inventory deduction logic preserved EXACTLY — zero changes to that block
 
 import { useState, useRef, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
@@ -29,12 +35,31 @@ const DEFAULT_CONFIG = {
   threshold_silver: 200,
   threshold_gold: 500,
   threshold_platinum: 1000,
+  // WP-O v2.0 additions
+  threshold_harvest_club: 2500,
+  mult_tier_harvest_club: 2.5,
   pts_referral_referrer: 100,
   pts_referral_referee: 50,
   referral_min_order_zar: 100,
+  redemption_value_zar: 0.1,
+  min_pts_to_redeem: 100,
+  max_redeem_pct_per_order: 20.0,
+  pts_first_online_purchase: 200,
+  pts_crosssell_trigger: 150,
+  // Category multipliers (defaults = neutral)
+  mult_cat_cannabis_flower: 2.0,
+  mult_cat_cannabis_vape: 1.75,
+  mult_cat_cannabis_edible: 1.5,
+  mult_cat_seeds_clones: 3.0,
+  mult_cat_grow_supplies: 1.0,
+  mult_cat_accessories: 0.75,
+  mult_cat_health_wellness: 1.5,
+  mult_cat_lifestyle_merch: 2.0,
 };
 
+// ─── Tier helpers — WP-O v2.0: Harvest Club added ────────────────────────────
 function getTierLabel(pts, cfg) {
+  if (pts >= (cfg.threshold_harvest_club || 2500)) return "Harvest Club";
   if (pts >= cfg.threshold_platinum) return "Platinum";
   if (pts >= cfg.threshold_gold) return "Gold";
   if (pts >= cfg.threshold_silver) return "Silver";
@@ -43,16 +68,40 @@ function getTierLabel(pts, cfg) {
 function getTierMult(tier, cfg) {
   return (
     {
-      Bronze: cfg.mult_bronze,
-      Silver: cfg.mult_silver,
-      Gold: cfg.mult_gold,
-      Platinum: cfg.mult_platinum,
+      Bronze: cfg.mult_bronze || 1.0,
+      Silver: cfg.mult_silver || 1.25,
+      Gold: cfg.mult_gold || 1.5,
+      Platinum: cfg.mult_platinum || 2.0,
+      "Harvest Club": cfg.mult_tier_harvest_club || 2.5,
     }[tier] || 1.0
   );
 }
 
+// ─── Category multiplier helper ───────────────────────────────────────────────
+function getCategoryMult(loyaltyCategory, cfg) {
+  if (!loyaltyCategory) return 1.0;
+  const key = `mult_cat_${loyaltyCategory}`;
+  return cfg[key] ?? 1.0;
+}
+
+// ─── Detect primary category from cart items (highest unit price wins) ────────
+function detectPrimaryCategory(cartItems, categoryMap) {
+  // categoryMap: { inventory_item_id → loyalty_category }
+  // Use the highest-value item's category
+  if (!cartItems || cartItems.length === 0) return null;
+  const sorted = [...cartItems].sort((a, b) => (b.price || 0) - (a.price || 0));
+  for (const item of sorted) {
+    const cat = categoryMap[item.inventory_item_id];
+    if (cat) return cat;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function CheckoutPage() {
-  const { cartItems, getCartTotal, clearCart } = useCart();
+  const { cartItems, getCartTotal } = useCart();
   const { userEmail } = useContext(RoleContext);
   const { storefrontTenantId } = useStorefront(); // ✦ WP-MULTISITE
   const navigate = useNavigate();
@@ -63,43 +112,130 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState(null);
   const [payfastUrl, setPayfastUrl] = useState(null);
 
-  // WP-O: loyalty config + user tier
+  // WP-O: loyalty config + user data
   const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_CONFIG);
   const [userPoints, setUserPoints] = useState(0);
   const [referralInput, setReferralInput] = useState("");
   const [referralValid, setReferralValid] = useState(null); // null | "valid" | "invalid"
   const [referralChecking, setReferralChecking] = useState(false);
-  const [referralOwnerPts, setReferralOwnerPts] = useState(0);
+
+  // WP-O v2.0: Category + bonus state
+  const [categoryMap, setCategoryMap] = useState({}); // { inventory_item_id → loyalty_category }
+  const [isFirstOnlinePurchase, setIsFirstOnlinePurchase] = useState(false);
+  const [userCategoryFlags, setUserCategoryFlags] = useState({}); // { cannabis_flower: true, ... }
+
+  // WP-O v2.0: Redemption state
+  const [redeemPoints, setRedeemPoints] = useState(false);
 
   const total = getCartTotal();
 
-  // Compute loyalty points preview (config-driven)
+  // ─── Derived: category detection ─────────────────────────────────────────
+  const primaryCategory = detectPrimaryCategory(cartItems, categoryMap);
+  const categoryMult = getCategoryMult(primaryCategory, loyaltyConfig);
+
+  // ─── Derived: bonus detection ─────────────────────────────────────────────
+  const firstPurchaseBonus = isFirstOnlinePurchase
+    ? loyaltyConfig.pts_first_online_purchase || 200
+    : 0;
+
+  // Cross-sell: user has never bought from this category before
+  const isCrossSell = primaryCategory && !userCategoryFlags[primaryCategory];
+  const crossSellBonus = isCrossSell
+    ? loyaltyConfig.pts_crosssell_trigger || 150
+    : 0;
+
+  // Referral bonus (earned by referee on this order)
+  const referralBonus =
+    referralValid === "valid" ? loyaltyConfig.pts_referral_referee || 50 : 0;
+
+  // ─── Derived: points calculation ──────────────────────────────────────────
   const userTier = getTierLabel(userPoints, loyaltyConfig);
   const tierMult = getTierMult(userTier, loyaltyConfig);
   const basePts = (total / 100) * loyaltyConfig.pts_per_r100_online;
   const withBonus = basePts * (1 + loyaltyConfig.online_bonus_pct / 100);
-  const finalPts = Math.round(withBonus * tierMult);
+  const withCategory = withBonus * categoryMult;
+  const withTier = withCategory * tierMult;
+  const earnedPts = Math.round(withTier);
+  const finalPts =
+    earnedPts + firstPurchaseBonus + crossSellBonus + referralBonus;
 
+  // ─── Derived: redemption ──────────────────────────────────────────────────
+  const canRedeem = userPoints >= (loyaltyConfig.min_pts_to_redeem || 100);
+  const maxRedeemPts = Math.floor(
+    (total * (loyaltyConfig.max_redeem_pct_per_order || 20)) /
+      100 /
+      (loyaltyConfig.redemption_value_zar || 0.1),
+  );
+  const redeemablePts = Math.min(userPoints, maxRedeemPts);
+  const redeemableZar =
+    redeemablePts * (loyaltyConfig.redemption_value_zar || 0.1);
+  // Effective total sent to PayFast
+  const effectiveTotal = redeemPoints
+    ? Math.max(1, total - redeemableZar)
+    : total;
+
+  // ─── Load loyalty config + user data ──────────────────────────────────────
+  // CRITICAL FIX v2.4: deps include storefrontTenantId (was [] in v2.3 — missed async tenant resolution)
   useEffect(() => {
-    // Fetch loyalty config and user profile in parallel
     async function loadLoyaltyData() {
-      const [cfgRes, sessionRes] = await Promise.all([
-        supabase.from("loyalty_config").select("*").single(),
-        supabase.auth.getSession(),
-      ]);
-      if (cfgRes.data) setLoyaltyConfig(cfgRes.data);
-      const userId = sessionRes.data?.session?.user?.id;
-      if (userId) {
+      const [sessionRes] = await Promise.all([supabase.auth.getSession()]);
+      const uid = sessionRes.data?.session?.user?.id;
+
+      // CRITICAL FIX: tenant-scoped config fetch (was .single() with no tenant filter in v2.3)
+      if (storefrontTenantId) {
+        const { data: cfgData } = await supabase
+          .from("loyalty_config")
+          .select("*")
+          .eq("tenant_id", storefrontTenantId)
+          .single();
+        if (cfgData) setLoyaltyConfig({ ...DEFAULT_CONFIG, ...cfgData });
+      }
+
+      if (uid) {
+        // Fetch user profile: loyalty_points + category_flags
         const { data: prof } = await supabase
           .from("user_profiles")
-          .select("loyalty_points")
-          .eq("id", userId)
+          .select("loyalty_points, category_flags")
+          .eq("id", uid)
           .single();
-        if (prof) setUserPoints(prof.loyalty_points || 0);
+        if (prof) {
+          setUserPoints(prof.loyalty_points || 0);
+          setUserCategoryFlags(prof.category_flags || {});
+        }
+
+        // Detect first online purchase: check orders table for any prior orders
+        if (storefrontTenantId) {
+          const { data: priorOrders } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("user_id", uid)
+            .eq("tenant_id", storefrontTenantId)
+            .limit(1);
+          setIsFirstOnlinePurchase(!priorOrders || priorOrders.length === 0);
+        }
+
+        // Fetch loyalty_category for each cart item with an inventory_item_id
+        const itemIds = cartItems
+          .map((i) => i.inventory_item_id)
+          .filter(Boolean);
+        if (itemIds.length > 0) {
+          const { data: invItems } = await supabase
+            .from("inventory_items")
+            .select("id, loyalty_category")
+            .in("id", itemIds);
+          if (invItems) {
+            const map = {};
+            invItems.forEach((i) => {
+              if (i.loyalty_category) map[i.id] = i.loyalty_category;
+            });
+            setCategoryMap(map);
+          }
+        }
       }
     }
     loadLoyaltyData();
-  }, []);
+  }, [storefrontTenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: cartItems intentionally not in deps — categories load once per checkout session
 
   useEffect(() => {
     if (cartItems.length === 0 && !submitting && !formData) {
@@ -116,7 +252,8 @@ export default function CheckoutPage() {
     }
   }, [formData]);
 
-  // Validate referral code (debounced)
+  // ─── Referral code validation (debounced) ─────────────────────────────────
+  // CRITICAL FIX v2.4: now tenant-scoped
   useEffect(() => {
     if (!referralInput.trim()) {
       setReferralValid(null);
@@ -125,35 +262,32 @@ export default function CheckoutPage() {
     const timer = setTimeout(async () => {
       setReferralChecking(true);
       const cleanCode = referralInput.trim().toUpperCase().replace(/\s/g, "");
-      // maybeSingle() returns null data (not error) when 0 rows — safer than single()
-      const { data, error } = await supabase
+
+      // Build query — tenant-scope if we have storefrontTenantId
+      let query = supabase
         .from("referral_codes")
         .select("code, owner_id, uses_count")
         .eq("code", cleanCode)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (error) {
+        .eq("is_active", true);
+      if (storefrontTenantId) {
+        query = query.eq("tenant_id", storefrontTenantId);
+      }
+      const { data, error: refErr } = await query.maybeSingle();
+
+      if (refErr) {
         console.error(
           "[Checkout] referral code lookup error:",
-          error.code,
-          error.message,
+          refErr.code,
+          refErr.message,
         );
       }
-      console.log(
-        "[Checkout] referral lookup →",
-        cleanCode,
-        "→ data:",
-        data,
-        "error:",
-        error?.code,
-      );
       setReferralValid(data ? "valid" : "invalid");
-      setReferralOwnerPts(data ? loyaltyConfig.pts_referral_referrer : 0);
       setReferralChecking(false);
     }, 600);
     return () => clearTimeout(timer);
-  }, [referralInput, loyaltyConfig.pts_referral_referrer]);
+  }, [referralInput, loyaltyConfig.pts_referral_referrer, storefrontTenantId]);
 
+  // ─── PayFast submit — PRESERVED EXACTLY FROM v2.3, minor additions marked ──
   const handlePayFast = async () => {
     setSubmitting(true);
     setError(null);
@@ -169,7 +303,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Store referral code for OrderSuccess to process
+      // Store referral code for OrderSuccess to process (unchanged from v2.3)
       if (referralValid === "valid" && referralInput.trim()) {
         const cleanCode = referralInput.trim().toUpperCase().replace(/\s/g, "");
         try {
@@ -181,6 +315,25 @@ export default function CheckoutPage() {
         } catch (_) {}
       }
 
+      // WP-O v2.4: Store redemption data for OrderSuccess
+      if (redeemPoints && redeemablePts > 0) {
+        try {
+          localStorage.setItem(
+            "protea_redemption",
+            JSON.stringify({
+              pts: redeemablePts,
+              zar: redeemableZar,
+            }),
+          );
+        } catch (_) {}
+      } else {
+        try {
+          localStorage.removeItem("protea_redemption");
+        } catch (_) {}
+      }
+
+      // PRESERVED EXACTLY: PayFast edge function call
+      // WP-O v2.4: effectiveTotal used instead of total when redemption active
       const { data: result, error: fnError } = await supabase.functions.invoke(
         "payfast-checkout",
         {
@@ -193,7 +346,7 @@ export default function CheckoutPage() {
               gradientTo: item.gradientTo,
               icon: item.icon,
             })),
-            total,
+            total: effectiveTotal, // v2.4: reduced by redemption if active
             user_email: userEmail || session.user?.email || "",
             origin_url: window.location.origin,
           },
@@ -208,6 +361,7 @@ export default function CheckoutPage() {
         );
       }
 
+      // WP-O v2.4: Enriched localStorage payload for OrderSuccess
       try {
         localStorage.setItem(
           "protea_last_order",
@@ -221,12 +375,25 @@ export default function CheckoutPage() {
               price: i.price,
             })),
             date: new Date().toISOString(),
+            // WP-O v2.3 field (preserved)
             loyalty_pts_pending: finalPts,
+            // WP-O v2.4 additions for OrderSuccess to write enriched loyalty_transactions
+            category: primaryCategory,
+            category_mult: categoryMult,
+            tier_at_time: userTier,
+            tier_mult: tierMult,
+            multiplier_applied: Math.round(categoryMult * tierMult * 100) / 100,
+            first_purchase_bonus: firstPurchaseBonus,
+            crosssell_bonus: crossSellBonus,
+            referral_bonus: referralBonus,
+            redeem_pts: redeemPoints ? redeemablePts : 0,
+            redeem_zar: redeemPoints ? redeemableZar : 0,
+            effective_total: effectiveTotal,
           }),
         );
       } catch (_) {}
 
-      // Task A-5: Deduct inventory
+      // PRESERVED EXACTLY: Inventory deduction (Task A-5 from v2.2/v2.3)
       for (const item of cartItems) {
         const qty = item.quantity || 0;
         if (!item.inventory_item_id || qty <= 0) continue;
@@ -276,6 +443,7 @@ export default function CheckoutPage() {
 
   const showBonus = loyaltyConfig.online_bonus_pct > 0;
   const showTierBonus = tierMult > 1;
+  const showCategoryBonus = categoryMult !== 1.0 && primaryCategory;
 
   return (
     <>
@@ -360,7 +528,7 @@ export default function CheckoutPage() {
             alignItems: "start",
           }}
         >
-          {/* Left: Order items */}
+          {/* Left: Order items — PRESERVED EXACTLY */}
           <div>
             <div
               className="body-font"
@@ -498,6 +666,35 @@ export default function CheckoutPage() {
                 FREE
               </span>
             </div>
+
+            {/* WP-O v2.4: Redemption discount line */}
+            {redeemPoints && redeemablePts > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "10px",
+                }}
+              >
+                <span
+                  className="body-font"
+                  style={{ fontSize: "13px", color: "#2d6a4f" }}
+                >
+                  Points redeemed ({redeemablePts} pts)
+                </span>
+                <span
+                  className="body-font"
+                  style={{
+                    fontSize: "13px",
+                    color: "#2d6a4f",
+                    fontWeight: 600,
+                  }}
+                >
+                  −R{redeemableZar.toFixed(2)}
+                </span>
+              </div>
+            )}
+
             <div
               style={{
                 borderTop: `1px solid ${C.border}`,
@@ -525,11 +722,98 @@ export default function CheckoutPage() {
                 className="shop-font"
                 style={{ fontSize: "28px", color: "#2d6a4f", fontWeight: 600 }}
               >
-                R{total.toLocaleString()}
+                R
+                {effectiveTotal.toLocaleString(undefined, {
+                  minimumFractionDigits: redeemPoints ? 2 : 0,
+                  maximumFractionDigits: redeemPoints ? 2 : 0,
+                })}
               </span>
             </div>
 
-            {/* WP-O: Config-driven points preview */}
+            {/* WP-O v2.4: Redemption toggle — shows when balance >= min_pts_to_redeem */}
+            {canRedeem && !submitting && (
+              <div
+                style={{
+                  background: "#fff",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: "2px",
+                  padding: "12px 14px",
+                  marginBottom: "16px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: redeemPoints ? 6 : 0,
+                  }}
+                >
+                  <div>
+                    <span
+                      className="body-font"
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: "#1b4332",
+                      }}
+                    >
+                      Use {redeemablePts} pts = −R{redeemableZar.toFixed(2)} off
+                    </span>
+                    <div
+                      className="body-font"
+                      style={{ fontSize: "10px", color: "#888", marginTop: 2 }}
+                    >
+                      You have {userPoints} pts · Max{" "}
+                      {loyaltyConfig.max_redeem_pct_per_order}% of order
+                    </div>
+                  </div>
+                  {/* Toggle */}
+                  <div
+                    onClick={() => setRedeemPoints((v) => !v)}
+                    style={{
+                      width: 36,
+                      height: 20,
+                      borderRadius: 10,
+                      background: redeemPoints ? "#2d6a4f" : "#ccc",
+                      cursor: "pointer",
+                      position: "relative",
+                      flexShrink: 0,
+                      transition: "background 0.2s",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: redeemPoints ? 18 : 2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        transition: "left 0.2s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                      }}
+                    />
+                  </div>
+                </div>
+                {redeemPoints && (
+                  <div
+                    className="body-font"
+                    style={{
+                      fontSize: "10px",
+                      color: "#2d6a4f",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ Points applied — your card will be charged R
+                    {effectiveTotal.toFixed(2)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WP-O: Config-driven points preview — enhanced for v2.4 */}
             <div
               className="body-font"
               style={{
@@ -561,20 +845,27 @@ export default function CheckoutPage() {
               >
                 +{finalPts} pts
               </div>
-              {(showBonus || showTierBonus) && (
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: "#666",
-                    marginTop: 6,
-                    lineHeight: 1.6,
-                  }}
-                >
+              {/* Points breakdown */}
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "#666",
+                  marginTop: 6,
+                  lineHeight: 1.7,
+                }}
+              >
+                <div>
                   Base: {Math.round(basePts)} pts
                   {showBonus && (
                     <span>
                       {" "}
                       + {loyaltyConfig.online_bonus_pct}% online bonus
+                    </span>
+                  )}
+                  {showCategoryBonus && (
+                    <span style={{ color: "#1b4332" }}>
+                      {" "}
+                      + {primaryCategory.replace(/_/g, " ")} {categoryMult}×
                     </span>
                   )}
                   {showTierBonus && (
@@ -587,7 +878,23 @@ export default function CheckoutPage() {
                     </span>
                   )}
                 </div>
-              )}
+                {firstPurchaseBonus > 0 && (
+                  <div style={{ color: "#2d6a4f", fontWeight: 600 }}>
+                    + {firstPurchaseBonus} pts first online order bonus!
+                  </div>
+                )}
+                {crossSellBonus > 0 && (
+                  <div style={{ color: "#2d6a4f", fontWeight: 600 }}>
+                    + {crossSellBonus} pts first{" "}
+                    {(primaryCategory || "").replace(/_/g, " ")} purchase!
+                  </div>
+                )}
+                {referralBonus > 0 && (
+                  <div style={{ color: "#2d6a4f", fontWeight: 600 }}>
+                    + {referralBonus} pts referral bonus
+                  </div>
+                )}
+              </div>
               {!showTierBonus && (
                 <div style={{ fontSize: "10px", color: "#888", marginTop: 4 }}>
                   Reach Silver tier for 1.25× bonus on every purchase!
@@ -595,7 +902,7 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* WP-O: Referral code field */}
+            {/* WP-O: Referral code field — PRESERVED from v2.3, now tenant-scoped */}
             <div style={{ marginBottom: "16px" }}>
               <label
                 className="body-font"
@@ -716,6 +1023,7 @@ export default function CheckoutPage() {
               )}
             </div>
 
+            {/* Pay button — PRESERVED EXACTLY from v2.3 */}
             <button
               className="body-font"
               onClick={handlePayFast}
@@ -840,6 +1148,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {/* PayFast hidden form — PRESERVED EXACTLY */}
         {formData && payfastUrl && (
           <form
             ref={formRef}
