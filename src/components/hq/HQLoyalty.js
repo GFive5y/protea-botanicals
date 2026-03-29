@@ -1,12 +1,17 @@
-// HQLoyalty.js v3.0
-// WP-THEME: Unified design system applied
-//   - Outfit replaces Cormorant Garamond + Jost
-//   - DM Mono for all metric/numeric values
-//   - Purple removed — Aggressive schema uses info-blue
-//   - Emoji removed from h1 title and sub-tab labels
-//   - SectionCard: gradient header removed, clean border-left accent
-//   - Schema cards: no coloured top borders, semantic badge colours
-//   - Google Fonts <style> tag removed (loaded globally via index.html)
+// HQLoyalty.js v4.0
+// WP-O v2.0: Next-Gen AI Loyalty Economics Engine
+//   CRITICAL FIX: All queries now tenant-scoped via useTenant() (Rule 0G)
+//   - loyalty_config fetched with .eq('tenant_id', tenantId) — no more global single()
+//   - loyalty_transactions filtered by tenant_id
+//   - referral_codes filtered by tenant_id
+//   NEW TAB: Category Multipliers (8 product categories, margin-aware earn rates)
+//   NEW TAB: AI Engine (automation toggles, loyalty_ai_log feed, weekly brief)
+//   TIERS: Harvest Club tier (2,500 pts, 2.5×, multi-category elite)
+//   TIERS: At-risk segment — customers near tier drop, 21+ days silent
+//   ECONOMICS: Programme Health Score panel (6 factors, 1–10 score)
+//   REFERRALS: WhatsApp share button (wa.me deep link, SA market)
+//   REFERRALS: tenant_id scoped queries
+// v3.0: WP-THEME unified design system — Inter, info-blue, clean borders
 // v2.4: InfoTooltip — loyalty-threshold, loyalty-multiplier, loyalty-redemption-value
 // v2.3: WP-GUIDE-B tooltips | v2.2: WP-GUIDE-A context | v2.1: WP-Z tier recalc
 // v2.0: Schema Selector + Live Config
@@ -26,6 +31,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService"; // Rule 0G
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import InfoTooltip from "../InfoTooltip";
@@ -36,6 +42,7 @@ const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
   ink500: "#5A5A5A",
+  ink400: "#474747",
   ink300: "#999999",
   ink150: "#E2E2E2",
   ink075: "#F4F4F3",
@@ -59,11 +66,8 @@ const T = {
   fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
   fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink400: "#474747",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
 };
-
-// Legacy aliases used internally
 const C = {
   bg: T.ink050,
   card: "#ffffff",
@@ -86,10 +90,12 @@ const C = {
   gold: "#b5935a",
   goldPale: "#FFF8E7",
 };
-const FONT_DISPLAY = T.fontUi; // Outfit replaces Cormorant everywhere
+const FONT_DISPLAY = T.fontUi;
 const FONT_BODY = T.fontUi;
 
+// ─── DEFAULT CONFIG (includes all WP-O v2.0 fields) ─────────────────────────
 const DEFAULT_CONFIG = {
+  // Existing fields
   pts_qr_scan: 10,
   pts_per_r100_online: 4.0,
   pts_per_r100_retail: 1.5,
@@ -117,6 +123,38 @@ const DEFAULT_CONFIG = {
   streak_interval: 5,
   pts_birthday: 100,
   active_schema: "standard",
+  // WP-O v2.0: Category multipliers
+  mult_cat_cannabis_flower: 2.0,
+  mult_cat_cannabis_vape: 1.75,
+  mult_cat_cannabis_edible: 1.5,
+  mult_cat_seeds_clones: 3.0,
+  mult_cat_grow_supplies: 1.0,
+  mult_cat_accessories: 0.75,
+  mult_cat_health_wellness: 1.5,
+  mult_cat_lifestyle_merch: 2.0,
+  // WP-O v2.0: Engagement bonuses
+  pts_first_online_purchase: 200,
+  pts_first_instore_purchase: 100,
+  pts_crosssell_trigger: 150,
+  pts_birthday_bonus: 100,
+  birthday_bonus_active: true,
+  pts_content_engagement: 5,
+  // WP-O v2.0: Harvest Club tier
+  threshold_harvest_club: 2500,
+  mult_tier_harvest_club: 2.5,
+  // WP-O v2.0: Streak (visit + spend)
+  streak_visits_threshold: 3,
+  streak_visits_bonus_pts: 50,
+  streak_spend_threshold_zar: 1000,
+  streak_spend_bonus_pts: 100,
+  // WP-O v2.0: AI automation flags
+  ai_churn_rescue_enabled: true,
+  ai_churn_rescue_threshold_days: 21,
+  ai_stock_boost_enabled: true,
+  ai_stock_boost_days_on_hand: 90,
+  ai_crosssell_nudge_enabled: true,
+  ai_margin_guard_pct: 5.0,
+  ai_promo_suggestions_enabled: true,
 };
 
 const SCHEMAS = [
@@ -218,7 +256,7 @@ const SCHEMAS = [
       "Maximum engagement and acquisition power. Higher programme cost but drives strong word-of-mouth, repeat purchase, and brand advocacy. Best for growth phases or competitive markets.",
     costBadge: "~R0.16 per point issued",
     costColor: T.ink700,
-    costBg: T.ink075, // ★ WP-THEME: purple retired → neutral dark
+    costBg: T.ink075,
     preview: [
       { label: "QR scan reward", value: "25 pts" },
       { label: "R400 online order", value: "~100 pts  (Bronze, no mult)" },
@@ -258,6 +296,7 @@ const SCHEMAS = [
 ];
 
 function getTierLabel(pts, cfg) {
+  if (pts >= (cfg.threshold_harvest_club || 2500)) return "Harvest Club";
   if (pts >= cfg.threshold_platinum) return "Platinum";
   if (pts >= cfg.threshold_gold) return "Gold";
   if (pts >= cfg.threshold_silver) return "Silver";
@@ -269,6 +308,7 @@ function getTierMult(tier, cfg) {
     Silver: cfg.mult_silver,
     Gold: cfg.mult_gold,
     Platinum: cfg.mult_platinum,
+    "Harvest Club": cfg.mult_tier_harvest_club || 2.5,
   };
   return map[tier] || 1.0;
 }
@@ -277,11 +317,11 @@ const TIER_COLOURS = {
   Bronze: { bg: "#FFF3E0", text: "#92400E", border: "#FDE68A" },
   Silver: { bg: "#F5F5F5", text: "#424242", border: "#BDBDBD" },
   Gold: { bg: "#FFFDE7", text: "#92400E", border: "#FFD54F" },
-  Platinum: { bg: T.infoBg, text: T.info, border: T.infoBd }, // info-blue replaces purple
+  Platinum: { bg: T.infoBg, text: T.info, border: T.infoBd },
+  "Harvest Club": { bg: T.accentLit, text: T.accent, border: T.accentBd },
 };
 
 // ─── Reusable sub-components ─────────────────────────────────────────────────
-
 function SectionCard({ title, subtitle, children, accent }) {
   const ac = accent || T.accent;
   return (
@@ -523,7 +563,6 @@ function Toast({ msg, type, onDone }) {
 function TabSchema({ config, onApplySchema, applyingSchema }) {
   const activeSchemaId = config?.active_schema || "standard";
   const [confirmSchema, setConfirmSchema] = useState(null);
-
   const COMPARISON_ROWS = [
     { label: "QR scan", key: "pts_qr_scan", format: (v) => `${v} pts` },
     {
@@ -552,17 +591,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
       key: "pts_streak_bonus",
       format: (v) => `${v} pts`,
     },
-    {
-      label: "Streak interval",
-      key: "streak_interval",
-      format: (v) => `every ${v} scans`,
-    },
     { label: "Birthday bonus", key: "pts_birthday", format: (v) => `${v} pts` },
-    {
-      label: "Profile complete",
-      key: "pts_profile_complete",
-      format: (v) => `${v} pts`,
-    },
     {
       label: "Silver tier at",
       key: "threshold_silver",
@@ -600,37 +629,8 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
       format: (v) => `${v} months`,
     },
   ];
-
-  const ONBOARDING = [
-    {
-      title: "How live updates work",
-      body: "Every page — ScanResult, CheckoutPage, Loyalty and Redeem — reads from loyalty_config on each load. When you apply a schema, all values are written in a single operation. All existing customer tiers are immediately recalculated.",
-    },
-    {
-      title: "Understanding cost per point",
-      body: "Cost per point = redemption_value_zar × (1 − breakage_rate). Conservative: R0.10 × 0.65 = R0.065. Standard: R0.15 × 0.75 = R0.11. Aggressive: R0.20 × 0.80 = R0.16.",
-    },
-    {
-      title: "Online bonus vs retail",
-      body: "The online_bonus_pct gives direct website purchasers more points than retail customers who scan a QR. Standard gives 100% extra online — a direct customer earns double what a retail customer earns on the same spend.",
-    },
-    {
-      title: "Tier multipliers",
-      body: "Multipliers apply to ALL earned points — scans, purchases, referrals and streak bonuses. A Platinum customer at 3× earns triple points on every interaction. Once a customer reaches Platinum tier, downgrading to a competitor means losing their multiplier advantage.",
-    },
-    {
-      title: "Breakage rate",
-      body: "Breakage is the percentage of issued points never redeemed. Industry average is 20–35%. A higher breakage rate lowers your actual programme cost. Conservative assumes 35% breakage; Aggressive assumes 20%.",
-    },
-    {
-      title: "Schema + manual override",
-      body: "Applying a schema sets all values at once — useful for a clean baseline. After applying, fine-tune individual values using the tabs above. Manual overrides save separately via Save All Changes.",
-    },
-  ];
-
   return (
     <div>
-      {/* Intro banner */}
       <div
         style={{
           background: T.accentLit,
@@ -652,8 +652,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             gap: 8,
           }}
         >
-          One-Click Loyalty Schema Selection
-          <InfoTooltip id="loyalty-schema" />
+          One-Click Loyalty Schema Selection <InfoTooltip id="loyalty-schema" />
         </div>
         <div
           style={{
@@ -699,8 +698,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           ))}
         </div>
       </div>
-
-      {/* Schema cards */}
       <div
         style={{
           display: "grid",
@@ -724,7 +721,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                   : T.shadow,
               }}
             >
-              {/* Card header */}
               <div
                 style={{
                   background: active ? schema.costColor : T.ink075,
@@ -772,9 +768,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                   </span>
                 )}
               </div>
-              {/* Card body */}
               <div style={{ padding: "16px 20px" }}>
-                {/* Cost badge */}
                 <span
                   style={{
                     display: "inline-block",
@@ -802,7 +796,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                 >
                   {schema.description}
                 </div>
-                {/* Preview rows */}
                 <div
                   style={{
                     background: T.ink075,
@@ -847,7 +840,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                     </div>
                   ))}
                 </div>
-                {/* Apply button */}
                 {confirmSchema === schema.id ? (
                   <div>
                     <div
@@ -938,8 +930,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
           );
         })}
       </div>
-
-      {/* Full comparison table */}
       <SectionCard
         title="Full Schema Comparison"
         subtitle="All values across all three schemas"
@@ -1036,7 +1026,7 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
                             : "transparent",
                         }}
                       >
-                        {row.format(val)}
+                        {val !== undefined ? row.format(val) : "—"}
                       </td>
                     );
                   })}
@@ -1045,60 +1035,6 @@ function TabSchema({ config, onApplySchema, applyingSchema }) {
             </tbody>
           </table>
         </div>
-      </SectionCard>
-
-      {/* Understanding each setting */}
-      <SectionCard
-        title="Understanding Each Setting"
-        subtitle="What these values control across the platform"
-        accent={T.warning}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
-            gap: 14,
-          }}
-        >
-          {ONBOARDING.map((item, i) => (
-            <div
-              key={i}
-              style={{
-                background: T.ink075,
-                border: `1px solid ${T.ink150}`,
-                borderRadius: 6,
-                padding: "14px 16px",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: T.fontUi,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: T.ink900,
-                  marginBottom: 6,
-                }}
-              >
-                {item.title}
-              </div>
-              <div
-                style={{
-                  fontFamily: T.fontUi,
-                  fontSize: 12,
-                  color: T.ink700,
-                  lineHeight: 1.65,
-                }}
-              >
-                {item.body}
-              </div>
-            </div>
-          ))}
-        </div>
-        <InfoBox colour={T.warning} bgColour={T.warningBg}>
-          <strong>Pro tip:</strong> Apply a schema first to get a clean
-          baseline, then use the Earning Rules, Tiers, and Economics tabs to
-          tweak individual values.
-        </InfoBox>
       </SectionCard>
     </div>
   );
@@ -1191,7 +1127,7 @@ function TabEarning({ draft, setDraft }) {
             value={`R${zarValue.toFixed(2)}`}
           />
           <PreviewLine
-            label="Cost to Protea (after breakage)"
+            label="Cost to store (after breakage)"
             value={`R${zarCost.toFixed(2)} (${((zarCost / 400) * 100).toFixed(2)}% of order)`}
           />
         </PreviewBox>
@@ -1213,8 +1149,53 @@ function TabEarning({ draft, setDraft }) {
         </FieldRow>
       </SectionCard>
       <SectionCard
+        title="First Purchase Bonuses"
+        subtitle="One-time conversion rewards — highest ROI loyalty action"
+        accent={T.accentMid}
+      >
+        <FieldRow
+          label="First online purchase (one-time)"
+          explanation="Awarded once per customer on their very first completed online order. This is the channel-switching moment."
+        >
+          <NumInput
+            value={cfg.pts_first_online_purchase || 200}
+            onChange={(v) => setField("pts_first_online_purchase", v)}
+            min={0}
+            max={2000}
+            step={50}
+            suffix="pts"
+          />
+        </FieldRow>
+        <FieldRow
+          label="First in-store purchase (one-time)"
+          explanation="Awarded once per customer on their first confirmed in-store purchase."
+        >
+          <NumInput
+            value={cfg.pts_first_instore_purchase || 100}
+            onChange={(v) => setField("pts_first_instore_purchase", v)}
+            min={0}
+            max={1000}
+            step={25}
+            suffix="pts"
+          />
+        </FieldRow>
+        <FieldRow
+          label="Cross-sell bonus (one per new category)"
+          explanation="Automatically awarded when a customer makes their first purchase in a second product category. E.g. cannabis customer buying grow supplies for the first time."
+        >
+          <NumInput
+            value={cfg.pts_crosssell_trigger || 150}
+            onChange={(v) => setField("pts_crosssell_trigger", v)}
+            min={0}
+            max={1000}
+            step={25}
+            suffix="pts"
+          />
+        </FieldRow>
+      </SectionCard>
+      <SectionCard
         title="Streak & Birthday Bonuses"
-        subtitle="Bonus points for consistent scanning behaviour and birthdays"
+        subtitle="Bonus points for consistent behaviour and birthdays"
         accent={T.info}
       >
         <FieldRow
@@ -1230,10 +1211,7 @@ function TabEarning({ draft, setDraft }) {
             suffix="pts per streak"
           />
         </FieldRow>
-        <FieldRow
-          label="Scans per streak"
-          explanation="How many scans trigger the streak bonus."
-        >
+        <FieldRow label="Scans per streak">
           <NumInput
             value={cfg.streak_interval || 5}
             onChange={(v) => setField("streak_interval", v)}
@@ -1245,7 +1223,7 @@ function TabEarning({ draft, setDraft }) {
         </FieldRow>
         <FieldRow
           label="Birthday bonus"
-          explanation="Points auto-awarded on customer's birthday."
+          explanation="Points auto-awarded in the customer's birthday month."
         >
           <NumInput
             value={cfg.pts_birthday || 100}
@@ -1280,13 +1258,305 @@ function TabEarning({ draft, setDraft }) {
             suffix="pts"
           />
         </FieldRow>
+        <FieldRow
+          label="Educational content (per session)"
+          explanation="Awarded once per session when customer reads molecule, terpene, or strain education pages."
+        >
+          <NumInput
+            value={cfg.pts_content_engagement || 5}
+            onChange={(v) => setField("pts_content_engagement", v)}
+            min={0}
+            max={50}
+            step={1}
+            suffix="pts"
+          />
+        </FieldRow>
+      </SectionCard>
+    </div>
+  );
+}
+
+// ─── Tab: Category Multipliers (NEW — WP-O v2.0) ─────────────────────────────
+function TabCategories({ draft, setDraft }) {
+  const cfg = draft;
+  const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const costPerPt = cfg.redemption_value_zar * (1 - cfg.breakage_rate);
+  const baseOnline300 =
+    (300 / 100) * cfg.pts_per_r100_online * (1 + cfg.online_bonus_pct / 100);
+
+  const CATEGORIES = [
+    {
+      key: "mult_cat_cannabis_flower",
+      label: "Cannabis Flower",
+      icon: "🌿",
+      desc: "Flower, pre-rolls, hash, kief",
+      margin: "60–70%",
+      rationale: "Highest repeat purchase — reward loyalty hard",
+    },
+    {
+      key: "mult_cat_cannabis_vape",
+      label: "Cannabis Vape",
+      icon: "💨",
+      desc: "Cartridges, disposables, pods",
+      margin: "55–65%",
+      rationale: "Good margin — drive channel preference",
+    },
+    {
+      key: "mult_cat_cannabis_edible",
+      label: "Cannabis Edibles",
+      icon: "🍬",
+      desc: "Gummies, chocolate, beverages",
+      margin: "50–65%",
+      rationale: "Variable margin — balanced earn",
+    },
+    {
+      key: "mult_cat_seeds_clones",
+      label: "Seeds & Clones",
+      icon: "🌱",
+      desc: "Feminised seeds, live clones, plugs, trays",
+      margin: "65–80%",
+      rationale: "Highest value — builds lifelong grower loyalty",
+    },
+    {
+      key: "mult_cat_grow_supplies",
+      label: "Grow Supplies",
+      icon: "🧪",
+      desc: "Nutrients, substrate, fertilizer, rooting gel",
+      margin: "30–45%",
+      rationale: "Lower margin — neutral earn, cross-sell play",
+    },
+    {
+      key: "mult_cat_accessories",
+      label: "Accessories",
+      icon: "🔧",
+      desc: "Papers, cones, Boveda, grinders, trays",
+      margin: "35–55%",
+      rationale: "Competitive pricing — lower earn to protect margin",
+    },
+    {
+      key: "mult_cat_health_wellness",
+      label: "Health & Wellness",
+      icon: "🍄",
+      desc: "Lion's Mane, Ashwagandha, CBD pet, mushrooms",
+      margin: "45–60%",
+      rationale: "Growth category — reward to build habit",
+    },
+    {
+      key: "mult_cat_lifestyle_merch",
+      label: "Lifestyle & Merch",
+      icon: "👕",
+      desc: "Branded clothing, caps, accessories",
+      margin: "60–75%",
+      rationale: "Brand advocacy — high margin, reward ambassadors",
+    },
+  ];
+
+  // Margin guard: warn if loyalty cost > ai_margin_guard_pct% of lower end of margin range
+  function isMarginGuardTriggered(catKey, marginLow) {
+    const mult = cfg[catKey] || 1.0;
+    const ptsPerR100 =
+      cfg.pts_per_r100_online * (1 + cfg.online_bonus_pct / 100) * mult;
+    const loyaltyCostPctRev = (ptsPerR100 / 100) * costPerPt * 100;
+    return (
+      loyaltyCostPctRev > (marginLow * (cfg.ai_margin_guard_pct || 5)) / 100
+    );
+  }
+
+  return (
+    <div>
+      <SectionCard
+        title="Product Category Earn Multipliers"
+        subtitle="Applied on top of the base earn rate. Reflects actual margin by category."
+        accent={T.accentMid}
+      >
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
+          <strong>How category multipliers work:</strong> Final points = base
+          earn rate × online bonus × <strong>category multiplier</strong> × tier
+          multiplier. Set each multiplier to match the margin that category
+          generates. Higher margin = higher multiplier = more loyalty investment
+          is justified.
+        </InfoBox>
+      </SectionCard>
+
+      {CATEGORIES.map((cat) => {
+        const mult = cfg[cat.key] || 1.0;
+        const ptsPreview = Math.round(baseOnline300 * mult);
+        const costPreview = ptsPreview * costPerPt;
+        const marginLow = parseFloat(cat.margin.split("–")[0]);
+        const guardTriggered = isMarginGuardTriggered(cat.key, marginLow);
+
+        return (
+          <SectionCard
+            key={cat.key}
+            title={`${cat.icon}  ${cat.label}`}
+            subtitle={cat.desc}
+            accent={guardTriggered ? T.warning : T.accent}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 24,
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <FieldRow label="Earn multiplier" explanation={cat.rationale}>
+                  <NumInput
+                    value={mult}
+                    onChange={(v) => setField(cat.key, v)}
+                    min={0.1}
+                    max={10}
+                    step={0.25}
+                    suffix="×"
+                    width={70}
+                  />
+                </FieldRow>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginTop: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      background: T.ink075,
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 3,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      color: T.ink500,
+                    }}
+                  >
+                    Est. gross margin: {cat.margin}
+                  </span>
+                  {guardTriggered && (
+                    <span
+                      style={{
+                        background: T.warningBg,
+                        border: `1px solid ${T.warningBd}`,
+                        borderRadius: 3,
+                        padding: "2px 8px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: T.warning,
+                      }}
+                    >
+                      ⚠ Approaching margin guard ({cfg.ai_margin_guard_pct || 5}
+                      %)
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div
+                style={{
+                  background: T.accentLit,
+                  border: `1px solid ${T.accentBd}`,
+                  borderRadius: 6,
+                  padding: "12px 16px",
+                  minWidth: 220,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: T.fontUi,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: T.accentMid,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    marginBottom: 6,
+                  }}
+                >
+                  R300 purchase preview
+                </div>
+                <PreviewLine
+                  label={`Base earn × ${mult}× category`}
+                  value={`${ptsPreview} pts`}
+                  highlight
+                />
+                <PreviewLine
+                  label="Value to customer"
+                  value={`R${(ptsPreview * cfg.redemption_value_zar).toFixed(2)}`}
+                />
+                <PreviewLine
+                  label="Cost to store"
+                  value={`R${costPreview.toFixed(2)} (${((costPreview / 300) * 100).toFixed(2)}%)`}
+                />
+              </div>
+            </div>
+          </SectionCard>
+        );
+      })}
+
+      <SectionCard
+        title="Setting loyalty_category on Products"
+        subtitle="Required for category multipliers to apply at scan and checkout time"
+        accent={T.info}
+      >
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
+          <strong>Next step:</strong> In HQ Stock, set the{" "}
+          <code>loyalty_category</code> field on each inventory item to one of
+          the 8 categories above. Items without a category earn at the base rate
+          (1.0× neutral multiplier). Products with a <code>pts_override</code>{" "}
+          value bypass the category multiplier entirely — useful for
+          limited-time promotions on specific SKUs.
+        </InfoBox>
+        <div
+          style={{
+            marginTop: 12,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+            gap: 8,
+          }}
+        >
+          {CATEGORIES.map((cat) => (
+            <div
+              key={cat.key}
+              style={{
+                background: T.ink075,
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 5,
+                padding: "8px 10px",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>{cat.icon}</span>
+              <div>
+                <div
+                  style={{
+                    fontFamily: T.fontData,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.accent,
+                  }}
+                >
+                  {cfg[cat.key] || 1.0}×
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontUi,
+                    fontSize: 10,
+                    color: T.ink500,
+                  }}
+                >
+                  {cat.key.replace("mult_cat_", "")}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </SectionCard>
     </div>
   );
 }
 
 // ─── Tab: Tiers ───────────────────────────────────────────────────────────────
-function TabTiers({ draft, setDraft }) {
+function TabTiers({ draft, setDraft, atRiskCustomers }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
   const tiers = [
@@ -1318,6 +1588,13 @@ function TabTiers({ draft, setDraft }) {
       thKey: "threshold_platinum",
       colour: TIER_COLOURS.Platinum,
     },
+    {
+      name: "Harvest Club",
+      threshold: cfg.threshold_harvest_club || 2500,
+      multKey: "mult_tier_harvest_club",
+      thKey: "threshold_harvest_club",
+      colour: TIER_COLOURS["Harvest Club"],
+    },
   ];
   function weeksToTier(p) {
     return Math.ceil(p / cfg.pts_qr_scan);
@@ -1327,24 +1604,22 @@ function TabTiers({ draft, setDraft }) {
       (400 / 100) * cfg.pts_per_r100_online * (1 + cfg.online_bonus_pct / 100);
     return Math.ceil(p / ppm);
   }
-  const platBuying =
-    (400 / 100) *
-    cfg.pts_per_r100_online *
-    (1 + cfg.online_bonus_pct / 100) *
-    cfg.mult_platinum;
-  const bronzeBuying =
-    (400 / 100) *
-    cfg.pts_per_r100_online *
-    (1 + cfg.online_bonus_pct / 100) *
-    cfg.mult_bronze;
   return (
     <div>
       <SectionCard title="Tier Thresholds & Multipliers">
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
+          <strong>Harvest Club</strong> is the elite tier for customers who shop
+          both sides of the store — cannabis + grow supplies + health. It
+          rewards multi-category loyalty with the highest earn multiplier (
+          {cfg.mult_tier_harvest_club || 2.5}×). These customers have the
+          highest LTV.
+        </InfoBox>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
+            gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
             gap: 16,
+            marginTop: 16,
             marginBottom: 20,
           }}
         >
@@ -1361,7 +1636,7 @@ function TabTiers({ draft, setDraft }) {
               <div
                 style={{
                   fontFamily: T.fontUi,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: 700,
                   color: tier.colour.text,
                   marginBottom: 12,
@@ -1373,26 +1648,21 @@ function TabTiers({ draft, setDraft }) {
                 <div style={{ marginBottom: 12 }}>
                   <div
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
                       fontFamily: T.fontUi,
                       fontSize: 10,
                       color: T.ink500,
                       marginBottom: 4,
                       textTransform: "uppercase",
                       letterSpacing: "0.06em",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
                     }}
                   >
-                    Reaches at{" "}
-                    <InfoTooltip
-                      id="loyalty-threshold"
-                      title="What is a tier threshold?"
-                      body="Total points a customer needs to reach this tier. Once they cross this threshold their tier upgrades instantly. Thresholds apply to all-time accumulated points."
-                    />
+                    Reaches at <InfoTooltip id="loyalty-threshold" />
                   </div>
                   <NumInput
-                    value={cfg[tier.thKey]}
+                    value={cfg[tier.thKey] || 0}
                     onChange={(v) => setField(tier.thKey, v)}
                     min={1}
                     max={10000}
@@ -1416,21 +1686,21 @@ function TabTiers({ draft, setDraft }) {
               <div>
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
                     fontFamily: T.fontUi,
                     fontSize: 10,
                     color: T.ink500,
                     marginBottom: 4,
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
                   }}
                 >
                   Earn multiplier <InfoTooltip id="loyalty-multiplier" />
                 </div>
                 <NumInput
-                  value={cfg[tier.multKey]}
+                  value={cfg[tier.multKey] || 1.0}
                   onChange={(v) => setField(tier.multKey, v)}
                   min={1.0}
                   max={5.0}
@@ -1442,18 +1712,22 @@ function TabTiers({ draft, setDraft }) {
             </div>
           ))}
         </div>
-        <PreviewBox title="Tier Journey">
+        <PreviewBox title="Tier Journey — Time to reach each tier">
           {[
             { label: "Bronze → Silver", pts: cfg.threshold_silver },
             { label: "Silver → Gold", pts: cfg.threshold_gold },
             { label: "Gold → Platinum", pts: cfg.threshold_platinum },
+            {
+              label: "Platinum → Harvest Club",
+              pts: cfg.threshold_harvest_club || 2500,
+            },
           ].map((step, i) => (
             <div
               key={i}
               style={{
                 marginBottom: 10,
                 paddingBottom: 10,
-                borderBottom: i < 2 ? `1px solid ${T.ink150}` : "none",
+                borderBottom: i < 3 ? `1px solid ${T.ink150}` : "none",
               }}
             >
               <div
@@ -1477,20 +1751,86 @@ function TabTiers({ draft, setDraft }) {
           ))}
         </PreviewBox>
       </SectionCard>
-      <SectionCard title="Multiplier Impact" accent={T.info}>
-        <InfoBox colour={T.info} bgColour={T.infoBg}>
-          <strong>Platinum vs Bronze on R400/month online:</strong>
-          <br />
-          Bronze (1×): {Math.round(bronzeBuying)} pts/month = R
-          {(Math.round(bronzeBuying) * cfg.redemption_value_zar).toFixed(2)}
-          /month value
-          <br />
-          Platinum ({cfg.mult_platinum}×): {Math.round(platBuying)} pts/month =
-          R{(Math.round(platBuying) * cfg.redemption_value_zar).toFixed(2)}
-          /month value
-          <br />
-          Difference: +{Math.round(platBuying - bronzeBuying)} pts/month
-        </InfoBox>
+
+      {/* At-risk segment — live data */}
+      <SectionCard
+        title="At-Risk Tier Customers"
+        subtitle="Haven't purchased in 21+ days — at risk of losing tier status"
+        accent={T.warning}
+      >
+        {atRiskCustomers && atRiskCustomers.length > 0 ? (
+          <div>
+            {atRiskCustomers.map((customer, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px 0",
+                  borderBottom:
+                    i < atRiskCustomers.length - 1
+                      ? `1px solid ${T.ink150}`
+                      : "none",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: T.ink900,
+                    }}
+                  >
+                    {customer.full_name || "Customer"}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 11,
+                      color: T.ink500,
+                    }}
+                  >
+                    {customer.loyalty_tier} tier · Last active:{" "}
+                    {customer.days_since} days ago
+                  </div>
+                </div>
+                <span
+                  style={{
+                    background: T.warningBg,
+                    color: T.warning,
+                    border: `1px solid ${T.warningBd}`,
+                    borderRadius: 3,
+                    padding: "2px 8px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  At risk
+                </span>
+              </div>
+            ))}
+            <InfoBox colour={T.warning} bgColour={T.warningBg}>
+              <strong>Action:</strong> Use the AI Engine tab to trigger
+              automated WhatsApp re-engagement for these customers, or send a
+              manual campaign via AdminCommsCenter.
+            </InfoBox>
+          </div>
+        ) : (
+          <div
+            style={{
+              fontFamily: T.fontUi,
+              fontSize: 13,
+              color: T.ink500,
+              textAlign: "center",
+              padding: "20px 0",
+            }}
+          >
+            No at-risk tier customers right now. Check back as your programme
+            grows.
+          </div>
+        )}
       </SectionCard>
     </div>
   );
@@ -1517,18 +1857,129 @@ function TabEconomics({ draft, setDraft, liveStats }) {
     liveStats && liveStats.totalRevenue > 0
       ? ((programmeCost / liveStats.totalRevenue) * 100).toFixed(2)
       : "0.00";
+
+  // Programme Health Score (1–10)
+  function calcHealthScore() {
+    let score = 5.0;
+    const redemptionRate = parseFloat(actualRedemptionRate);
+    const breakagePct = cfg.breakage_rate * 100;
+    if (redemptionRate < breakagePct * 1.2) score += 1.0; // redemption tracking model
+    if (liveStats?.totalPtsIssued > 0) score += 0.5; // programme is active
+    if (parseFloat(costAsPctRev) < 2) score += 1.0; // cost is low
+    if (parseFloat(costAsPctRev) < 1) score += 0.5; // cost is very low
+    if (liveStats?.totalPtsIssued30d > 100) score += 1.0; // active last 30d
+    if (liveStats?.totalPtsRedeemed > 0) score += 1.0; // redemptions happening
+    return Math.min(10, Math.max(1, score)).toFixed(1);
+  }
+  const healthScore = parseFloat(calcHealthScore());
+  const healthColour =
+    healthScore >= 7 ? T.success : healthScore >= 4 ? T.warning : T.danger;
+  const healthBg =
+    healthScore >= 7
+      ? T.successBg
+      : healthScore >= 4
+        ? T.warningBg
+        : T.dangerBg;
+  const healthLabel =
+    healthScore >= 7
+      ? "Good"
+      : healthScore >= 4
+        ? "Needs attention"
+        : "Action required";
+
   return (
     <div>
+      {/* Programme Health Score */}
+      <SectionCard title="Programme Health Score" accent={healthColour}>
+        <div
+          style={{
+            background: healthBg,
+            border: `1px solid ${healthColour}30`,
+            borderRadius: 8,
+            padding: "16px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                fontFamily: T.fontData,
+                fontSize: 48,
+                fontWeight: 700,
+                color: healthColour,
+                lineHeight: 1,
+              }}
+            >
+              {healthScore}
+            </div>
+            <div
+              style={{
+                fontFamily: T.fontUi,
+                fontSize: 11,
+                color: healthColour,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              /10
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div
+              style={{
+                fontFamily: T.fontUi,
+                fontSize: 16,
+                fontWeight: 600,
+                color: healthColour,
+                marginBottom: 8,
+              }}
+            >
+              {healthLabel}
+            </div>
+            <div
+              style={{
+                height: 8,
+                background: `${healthColour}20`,
+                borderRadius: 4,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${(healthScore / 10) * 100}%`,
+                  background: healthColour,
+                  borderRadius: 4,
+                  transition: "width 0.6s",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                fontFamily: T.fontUi,
+                fontSize: 12,
+                color: T.ink500,
+                marginTop: 8,
+                lineHeight: 1.5,
+              }}
+            >
+              Score based on: programme activity, redemption vs breakage
+              alignment, cost as % revenue, and engagement trends. Aim for 7+.
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="Redemption Settings">
         <FieldRow
           label={
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              1 point = R___ value to customer
-              <InfoTooltip
-                id="loyalty-redemption-value"
-                title="What does point value mean?"
-                body="This is how much each point is worth in Rand when a customer redeems. At R0.15 per point, 1 000 points = R150 off their order."
-              />
+              1 point = R___ value to customer{" "}
+              <InfoTooltip id="loyalty-redemption-value" />
             </span>
           }
         >
@@ -1574,6 +2025,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
           />
         </FieldRow>
       </SectionCard>
+
       <SectionCard title="Financial Model" accent={T.info}>
         <FieldRow
           label={
@@ -1610,11 +2062,10 @@ function TabEconomics({ draft, setDraft, liveStats }) {
           />
         </PreviewBox>
       </SectionCard>
-      {/* ── CHARTS: Points trend + Tier distribution ── */}
+
+      {/* Charts */}
       {liveStats &&
         (() => {
-          // We need per-day data — fetch it from transactions passed in
-          // Use liveStats totals to build a simple donut + summary area
           const totalIssued = liveStats.totalPtsIssued || 0;
           const totalRedeemed = liveStats.totalPtsRedeemed || 0;
           const outstanding = Math.max(0, totalIssued - totalRedeemed);
@@ -1623,8 +2074,6 @@ function TabEconomics({ draft, setDraft, liveStats }) {
             { name: "Outstanding", value: outstanding },
           ].filter((d) => d.value > 0);
           const DONUT_COLOURS = [T.accentMid, T.info];
-
-          // Period bars using 30d vs all-time
           const barData = [
             {
               period: "All Time",
@@ -1637,7 +2086,6 @@ function TabEconomics({ draft, setDraft, liveStats }) {
               redeemed: liveStats.totalPtsRedeemed30d || 0,
             },
           ];
-
           if (totalIssued === 0) return null;
           return (
             <div
@@ -1763,7 +2211,6 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
-
               <ChartCard title="Points Balance" height={200}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1855,14 +2302,12 @@ function TabEconomics({ draft, setDraft, liveStats }) {
               },
             ].map((s, i) => {
               const semColors = {
-                success: { c: T.success, bg: T.successBg },
-                warning: { c: T.warning, bg: T.warningBg },
-                danger: { c: T.danger, bg: T.dangerBg },
-                info: { c: T.info, bg: T.infoBg },
+                success: { c: T.success },
+                warning: { c: T.warning },
+                danger: { c: T.danger },
+                info: { c: T.info },
               };
-              const sem = s.semantic
-                ? semColors[s.semantic]
-                : { c: T.ink700, bg: "#fff" };
+              const c = s.semantic ? semColors[s.semantic].c : T.ink500;
               return (
                 <div
                   key={i}
@@ -1879,7 +2324,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                       fontFamily: T.fontData,
                       fontSize: 20,
                       fontWeight: 700,
-                      color: sem.c,
+                      color: c,
                     }}
                   >
                     {s.value}
@@ -1912,19 +2357,36 @@ function TabEconomics({ draft, setDraft, liveStats }) {
             Loading live transaction data...
           </div>
         )}
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
+          Your loyalty programme costs{" "}
+          <strong>{costAsPctRev}% of revenue</strong>. The average customer
+          acquisition cost via paid ads is R200–500. Your programme acquires and
+          retains customers for a fraction of that.
+        </InfoBox>
       </SectionCard>
     </div>
   );
 }
 
 // ─── Tab: Referrals ───────────────────────────────────────────────────────────
-function TabReferrals({ draft, setDraft, referralLeaderboard }) {
+function TabReferrals({ draft, setDraft, referralLeaderboard, tenantName }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const storeName = tenantName || "our store";
+
+  function buildWhatsAppMessage(code) {
+    return encodeURIComponent(
+      `I shop at ${storeName} — use my code ${code} at checkout for ${cfg.pts_referral_referee} bonus points! 🌿`,
+    );
+  }
+
   return (
     <div>
       <SectionCard title="Referral Programme Settings">
-        <FieldRow label="Points to the referrer">
+        <FieldRow
+          label="Points to the referrer"
+          explanation="Awarded when the referred friend completes their first confirmed order."
+        >
           <NumInput
             value={cfg.pts_referral_referrer}
             onChange={(v) => setField("pts_referral_referrer", v)}
@@ -1934,7 +2396,10 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
             suffix="pts per referral"
           />
         </FieldRow>
-        <FieldRow label="Points to the new customer">
+        <FieldRow
+          label="Points to the new customer"
+          explanation="Awarded to the new customer on their first completed order using the referral code."
+        >
           <NumInput
             value={cfg.pts_referral_referee}
             onChange={(v) => setField("pts_referral_referee", v)}
@@ -1954,8 +2419,20 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
             suffix="R minimum order"
           />
         </FieldRow>
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
+          <strong>How it works:</strong> Each customer gets a unique code
+          (visible on their Loyalty page + Account page). New customer enters
+          code at checkout. Both parties earn points when the first order is
+          confirmed. Referrer earns {cfg.pts_referral_referrer} pts per referral
+          — no cap.
+        </InfoBox>
       </SectionCard>
-      <SectionCard title="Top Referrers" accent={T.info}>
+
+      <SectionCard
+        title="Top Referrers"
+        subtitle="Live from referral_codes — all scoped to this store"
+        accent={T.info}
+      >
         {referralLeaderboard && referralLeaderboard.length > 0 ? (
           referralLeaderboard.map((entry, i) => (
             <div
@@ -2001,13 +2478,37 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
                     {entry.name || entry.code}
                   </div>
                   <div
-                    style={{
-                      fontFamily: T.fontData,
-                      fontSize: 11,
-                      color: T.ink500,
-                    }}
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
                   >
-                    Code: {entry.code}
+                    <span
+                      style={{
+                        fontFamily: T.fontData,
+                        fontSize: 11,
+                        color: T.ink500,
+                      }}
+                    >
+                      Code: {entry.code}
+                    </span>
+                    {/* WhatsApp share for referral code preview */}
+                    <a
+                      href={`https://wa.me/?text=${buildWhatsAppMessage(entry.code)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        background: "#25D366",
+                        color: "#fff",
+                        borderRadius: 3,
+                        padding: "1px 7px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Share ↗
+                    </a>
                   </div>
                 </div>
               </div>
@@ -2044,9 +2545,50 @@ function TabReferrals({ draft, setDraft, referralLeaderboard }) {
               padding: "24px 0",
             }}
           >
-            No referral data yet.
+            No referral data yet. Referral codes are shown on each customer's
+            Loyalty page.
           </div>
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="WhatsApp Share Preview"
+        subtitle="This is what customers share when they tap the WhatsApp button on their Loyalty page"
+        accent={T.accentMid}
+      >
+        <div
+          style={{
+            background: "#DCF8C6",
+            border: "1px solid #A8D99C",
+            borderRadius: 8,
+            padding: "14px 16px",
+            maxWidth: 360,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: T.fontUi,
+              fontSize: 13,
+              color: "#1a1a1a",
+              lineHeight: 1.6,
+            }}
+          >
+            I shop at <strong>{storeName}</strong> — use my code{" "}
+            <strong>EXAMPLE</strong> at checkout for{" "}
+            <strong>{cfg.pts_referral_referee} bonus points!</strong> 🌿
+          </div>
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontUi,
+            fontSize: 12,
+            color: T.ink500,
+            marginTop: 8,
+          }}
+        >
+          Customer's actual code replaces EXAMPLE above. Message pre-populates
+          in WhatsApp — customer just hits send.
+        </div>
       </SectionCard>
     </div>
   );
@@ -2078,9 +2620,27 @@ function TabQRSecurity({ draft, setDraft, qrStats }) {
             suffix="months"
           />
         </FieldRow>
+        <InfoBox colour={T.info} bgColour={T.infoBg}>
+          <strong>How product QR codes are protected:</strong>
+          <br />
+          • HMAC-signed by sign-qr edge function (deployed --no-verify-jwt)
+          <br />
+          • Bound to inventory_item_id — not reusable across products
+          <br />
+          • One-time claim: first scan sets claimed = true
+          <br />
+          • Hard server-side cap: max_scans_per_qr enforced at scan time
+          <br />
+          • Instant kill: is_active = false via AdminQRCodes
+          <br />• Screenshot sharing earns nothing after first claim
+        </InfoBox>
       </SectionCard>
       {qrStats && (
-        <SectionCard title="Live QR Stats" accent={T.info}>
+        <SectionCard
+          title="Live QR Stats"
+          subtitle="Scoped to this store's inventory_items"
+          accent={T.info}
+        >
           <div
             style={{
               display: "grid",
@@ -2387,7 +2947,7 @@ function TabSimulator({ draft }) {
                         color: gain > 0 ? T.success : T.danger,
                       }}
                     >
-                      {gain > 0 ? "▲" : "▼"} {gain > 0 ? "+" : ""}R
+                      {gain > 0 ? "▲ +" : "▼ "}R
                       {Math.abs(gain).toLocaleString(undefined, {
                         maximumFractionDigits: 0,
                       })}
@@ -2404,8 +2964,437 @@ function TabSimulator({ draft }) {
   );
 }
 
+// ─── Tab: AI Engine (NEW — WP-O v2.0) ────────────────────────────────────────
+function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName }) {
+  const cfg = draft;
+  const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+
+  const AUTOMATIONS = [
+    {
+      key: "ai_churn_rescue_enabled",
+      label: "Churn Rescue",
+      desc: `Triggers WhatsApp re-engagement when a Gold+ customer goes silent for ${cfg.ai_churn_rescue_threshold_days || 21} days.`,
+      thresholdKey: "ai_churn_rescue_threshold_days",
+      thresholdSuffix: "days",
+    },
+    {
+      key: "ai_stock_boost_enabled",
+      label: "Stock-Linked Boost",
+      desc: `Suggests a points multiplier boost when a product has more than ${cfg.ai_stock_boost_days_on_hand || 90} days stock on hand.`,
+      thresholdKey: "ai_stock_boost_days_on_hand",
+      thresholdSuffix: "days on hand",
+    },
+    {
+      key: "ai_crosssell_nudge_enabled",
+      label: "Cross-Sell Nudge",
+      desc: "Identifies single-category customers and suggests cross-sell offers to move them to multi-category buying.",
+      thresholdKey: null,
+    },
+    {
+      key: "ai_promo_suggestions_enabled",
+      label: "Promo Suggestions",
+      desc: "Weekly AI analysis of programme performance with actionable recommendations surfaced in this tab.",
+      thresholdKey: null,
+    },
+  ];
+
+  const ACTION_COLOURS = {
+    churn_rescue: {
+      bg: T.dangerBg,
+      border: T.dangerBd,
+      label: "Churn Rescue",
+      c: T.danger,
+    },
+    stock_boost_suggestion: {
+      bg: T.warningBg,
+      border: T.warningBd,
+      label: "Stock Boost",
+      c: T.warning,
+    },
+    crosssell_nudge: {
+      bg: T.infoBg,
+      border: T.infoBd,
+      label: "Cross-Sell",
+      c: T.info,
+    },
+    promo_suggestion: {
+      bg: T.accentLit,
+      border: T.accentBd,
+      label: "Promo",
+      c: T.accent,
+    },
+    weekly_brief: {
+      bg: T.successBg,
+      border: T.successBd,
+      label: "Weekly Brief",
+      c: T.success,
+    },
+  };
+
+  return (
+    <div>
+      {/* Automation Status */}
+      <SectionCard
+        title="AI Automation Status"
+        subtitle="All actions are logged to loyalty_ai_log — full audit trail"
+        accent={T.accentMid}
+      >
+        {AUTOMATIONS.map((auto) => (
+          <div
+            key={auto.key}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 16,
+              padding: "14px 0",
+              borderBottom: `1px solid ${T.ink150}`,
+            }}
+          >
+            <div style={{ paddingTop: 2 }}>
+              <div
+                onClick={() => setField(auto.key, !cfg[auto.key])}
+                style={{
+                  width: 36,
+                  height: 20,
+                  borderRadius: 10,
+                  background: cfg[auto.key] ? T.accentMid : T.ink300,
+                  cursor: "pointer",
+                  position: "relative",
+                  transition: "background 0.2s",
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: cfg[auto.key] ? 18 : 2,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    transition: "left 0.2s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 4,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: T.fontUi,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: T.ink900,
+                  }}
+                >
+                  {auto.label}
+                </span>
+                <span
+                  style={{
+                    background: cfg[auto.key] ? T.successBg : T.ink075,
+                    color: cfg[auto.key] ? T.success : T.ink500,
+                    border: `1px solid ${cfg[auto.key] ? T.successBd : T.ink150}`,
+                    borderRadius: 3,
+                    padding: "1px 7px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
+                  {cfg[auto.key] ? "ACTIVE" : "PAUSED"}
+                </span>
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontUi,
+                  fontSize: 12,
+                  color: T.ink500,
+                  lineHeight: 1.5,
+                }}
+              >
+                {auto.desc}
+              </div>
+              {auto.thresholdKey && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 12,
+                      color: T.ink500,
+                    }}
+                  >
+                    Threshold:
+                  </span>
+                  <NumInput
+                    value={cfg[auto.thresholdKey] || 21}
+                    onChange={(v) => setField(auto.thresholdKey, v)}
+                    min={1}
+                    max={365}
+                    step={1}
+                    suffix={auto.thresholdSuffix}
+                    width={70}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        <div style={{ padding: "14px 0" }}>
+          <FieldRow
+            label="Margin guard threshold"
+            explanation="Alert when loyalty cost for any category exceeds this % of estimated gross margin."
+          >
+            <NumInput
+              value={cfg.ai_margin_guard_pct || 5.0}
+              onChange={(v) => setField("ai_margin_guard_pct", v)}
+              min={1}
+              max={30}
+              step={0.5}
+              suffix="% of category margin"
+            />
+          </FieldRow>
+        </div>
+      </SectionCard>
+
+      {/* AI Actions Feed */}
+      <SectionCard
+        title="AI Actions Feed"
+        subtitle="Recent AI-initiated loyalty actions — all logged to loyalty_ai_log"
+        accent={T.info}
+      >
+        {loadingAiLog ? (
+          <div
+            style={{
+              fontFamily: T.fontUi,
+              fontSize: 13,
+              color: T.ink500,
+              textAlign: "center",
+              padding: 24,
+            }}
+          >
+            Loading AI actions...
+          </div>
+        ) : aiLog && aiLog.length > 0 ? (
+          aiLog.map((entry, i) => {
+            const colours =
+              ACTION_COLOURS[entry.action_type] ||
+              ACTION_COLOURS.promo_suggestion;
+            const payload = entry.payload || {};
+            return (
+              <div
+                key={i}
+                style={{
+                  background: colours.bg,
+                  border: `1px solid ${colours.border}`,
+                  borderRadius: 6,
+                  padding: "12px 14px",
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      background: colours.c,
+                      color: "#fff",
+                      borderRadius: 3,
+                      padding: "2px 8px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {colours.label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: T.fontUi,
+                      fontSize: 11,
+                      color: T.ink500,
+                    }}
+                  >
+                    {new Date(entry.created_at).toLocaleDateString("en-ZA")}
+                  </span>
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      background:
+                        entry.outcome === "actioned"
+                          ? T.successBg
+                          : entry.outcome === "dismissed"
+                            ? T.ink075
+                            : T.warningBg,
+                      color:
+                        entry.outcome === "actioned"
+                          ? T.success
+                          : entry.outcome === "dismissed"
+                            ? T.ink500
+                            : T.warning,
+                      border: `1px solid ${entry.outcome === "actioned" ? T.successBd : entry.outcome === "dismissed" ? T.ink150 : T.warningBd}`,
+                      borderRadius: 3,
+                      padding: "1px 7px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {entry.outcome?.toUpperCase() || "PENDING"}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontUi,
+                    fontSize: 12,
+                    color: T.ink700,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {payload.message ||
+                    payload.recommendation ||
+                    `${colours.label} action — see payload for details.`}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div
+            style={{
+              fontFamily: T.fontUi,
+              fontSize: 13,
+              color: T.ink500,
+              textAlign: "center",
+              padding: "30px 0",
+            }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>
+              ⚡
+            </div>
+            No AI actions yet. The loyalty-ai edge function runs nightly and
+            will populate this feed once the programme has enough data.
+            <div
+              style={{
+                marginTop: 12,
+                fontFamily: T.fontUi,
+                fontSize: 12,
+                color: T.ink300,
+              }}
+            >
+              Actions appear here for: churn rescue · stock boost suggestions ·
+              cross-sell nudges · weekly briefs
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* What the AI engine will do */}
+      <SectionCard
+        title="AI Engine — What Runs Nightly"
+        subtitle="loyalty-ai edge function: 7 automated jobs at 2am daily"
+        accent={T.warning}
+      >
+        {[
+          {
+            icon: "🎯",
+            title: "Churn Scoring",
+            desc: "Calculates churn_risk_score (0–1) for every active customer based on recency, tier, and spend trend. Updates user_profiles.",
+          },
+          {
+            icon: "📱",
+            title: "Churn Rescue WhatsApp",
+            desc: `Sends personalised WhatsApp re-engagement to Gold+ customers silent for ${cfg.ai_churn_rescue_threshold_days || 21}+ days. Logs to loyalty_ai_log.`,
+          },
+          {
+            icon: "📦",
+            title: "Stock-Linked Boost Suggestions",
+            desc: `Identifies inventory_items with >${cfg.ai_stock_boost_days_on_hand || 90} days stock on hand. Suggests pts multiplier boost to drive clearance.`,
+          },
+          {
+            icon: "🔀",
+            title: "Cross-Sell Intelligence",
+            desc: "Identifies single-category buyers. Creates nudge records in loyalty_ai_log for targeted WhatsApp campaigns.",
+          },
+          {
+            icon: "🎂",
+            title: "Birthday Bonuses",
+            desc: "Daily check: awards pts_birthday_bonus to customers whose birthday month matches today. Dedup-safe — one award per year.",
+          },
+          {
+            icon: "⏰",
+            title: "Point Expiry",
+            desc: "Marks expired points (is_expired = true). Updates user_profiles.loyalty_points to deduct expired balance. Logs recaptured liability.",
+          },
+          {
+            icon: "📊",
+            title: "Weekly Programme Brief",
+            desc: "Monday: compiles Health Score, wins, warnings, and opportunities. Surfaces in this tab's AI Actions Feed.",
+          },
+        ].map((item, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              gap: 12,
+              padding: "10px 0",
+              borderBottom: i < 6 ? `1px solid ${T.ink150}` : "none",
+            }}
+          >
+            <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon}</span>
+            <div>
+              <div
+                style={{
+                  fontFamily: T.fontUi,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: T.ink900,
+                  marginBottom: 2,
+                }}
+              >
+                {item.title}
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontUi,
+                  fontSize: 12,
+                  color: T.ink500,
+                  lineHeight: 1.5,
+                }}
+              >
+                {item.desc}
+              </div>
+            </div>
+          </div>
+        ))}
+        <InfoBox colour={T.warning} bgColour={T.warningBg}>
+          <strong>Edge function status:</strong> loyalty-ai/index.ts needs to be
+          deployed to Supabase Functions. This tab shows its output once
+          running. All automation toggles above control which jobs execute.
+        </InfoBox>
+      </SectionCard>
+    </div>
+  );
+}
+
 // ─── Tab: Campaigns ───────────────────────────────────────────────────────────
-function TabCampaigns({ showToast }) {
+function TabCampaigns({ showToast, tenantId }) {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2422,11 +3411,13 @@ function TabCampaigns({ showToast }) {
   const today = new Date().toISOString().split("T")[0];
 
   const load = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("double_points_campaigns")
         .select("*")
+        .eq("tenant_id", tenantId) // tenant-scoped
         .order("start_date", { ascending: false });
       if (error) throw error;
       setCampaigns(data || []);
@@ -2435,11 +3426,12 @@ function TabCampaigns({ showToast }) {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, tenantId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
   function isActive(c) {
     return c.is_active && c.start_date <= today && c.end_date >= today;
   }
@@ -2493,6 +3485,7 @@ function TabCampaigns({ showToast }) {
             end_date: form.end_date,
             multiplier: parseFloat(form.multiplier),
             is_active: form.is_active,
+            tenant_id: tenantId,
           });
         if (error) throw error;
         showToast("Campaign created");
@@ -2505,6 +3498,7 @@ function TabCampaigns({ showToast }) {
       setSaving(false);
     }
   }
+
   async function toggleActive(c) {
     try {
       const { error } = await supabase
@@ -2518,6 +3512,7 @@ function TabCampaigns({ showToast }) {
       showToast("Update failed: " + err.message, "error");
     }
   }
+
   async function handleDelete(id) {
     if (!window.confirm("Delete this campaign? This cannot be undone.")) return;
     try {
@@ -2758,8 +3753,8 @@ function TabCampaigns({ showToast }) {
               padding: "30px 0",
             }}
           >
-            <div style={{ fontSize: 32, marginBottom: 10 }}>—</div>No campaigns
-            yet. Create one to double your customers' points during a promotion.
+            No campaigns yet. Create one to double your customers' points during
+            a promotion.
           </div>
         ) : (
           <div>
@@ -2908,6 +3903,9 @@ function TabCampaigns({ showToast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 export default function HQLoyalty() {
   const ctx = usePageContext("loyalty", null);
+  const { tenant, tenantName } = useTenant(); // Rule 0G — inside component
+  const tenantId = tenant?.id;
+
   const [config, setConfig] = useState(null);
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2918,44 +3916,53 @@ export default function HQLoyalty() {
   const [liveStats, setLiveStats] = useState(null);
   const [qrStats, setQrStats] = useState(null);
   const [referralLB, setReferralLB] = useState([]);
+  const [atRiskCustomers, setAtRiskCustomers] = useState([]);
+  const [aiLog, setAiLog] = useState([]);
+  const [loadingAiLog, setLoadingAiLog] = useState(false);
 
-  // ★ WP-THEME: emoji removed from tab labels
+  // 10 tabs: Schema, Earning, Categories, Tiers, Economics, Referrals, QR Security, Simulator, AI Engine, Campaigns
   const SUB_TABS = [
     { label: "Schema", key: "schema" },
     { label: "Earning Rules", key: "earning" },
+    { label: "Categories", key: "categories" },
     { label: "Tiers", key: "tiers" },
     { label: "Economics", key: "economics" },
     { label: "Referrals", key: "referrals" },
     { label: "QR Security", key: "qrsecurity" },
     { label: "Simulator", key: "simulator" },
+    { label: "AI Engine", key: "aiengine" },
     { label: "Campaigns", key: "campaigns" },
   ];
 
-  const isConfigTab = activeTab < 7;
+  // Config tabs = 1 through 7 (Earning → Simulator). Schema(0), AI Engine(8), Campaigns(9) are not draft-based.
+  const isConfigTab = activeTab >= 1 && activeTab <= 7;
   const isDirty =
     draft && config ? JSON.stringify(draft) !== JSON.stringify(config) : false;
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
   }, []);
 
-  useEffect(() => {
-    loadAll();
-  }, []);
-
-  async function loadAll() {
+  // ── loadAll: ALL queries tenant-scoped ─────────────────────────────────────
+  async function loadAll(tid) {
+    if (!tid) return;
     setLoading(true);
     try {
+      // CRITICAL FIX: loyalty_config is now tenant-scoped (WP-O v2.0)
       const { data: cfgData, error: cfgErr } = await supabase
         .from("loyalty_config")
         .select("*")
+        .eq("tenant_id", tid) // tenant-scoped — was missing in v3.0
         .single();
       if (cfgErr && cfgErr.code !== "PGRST116") throw cfgErr;
       const cfg = { ...DEFAULT_CONFIG, ...(cfgData || {}) };
       setConfig(cfg);
       setDraft({ ...cfg });
+
+      // loyalty_transactions — tenant-scoped
       const { data: txData } = await supabase
         .from("loyalty_transactions")
-        .select("points,transaction_type,created_at");
+        .select("points,transaction_type,created_at")
+        .eq("tenant_id", tid);
       if (txData) {
         const now = new Date(),
           cutoff30 = new Date(now - 30 * 24 * 3600 * 1000);
@@ -2982,9 +3989,12 @@ export default function HQLoyalty() {
           totalRevenue: 0,
         });
       }
+
+      // qr_codes — scoped via inventory_items join (LL-056: scan_logs has no tenant_id — do NOT use scan_logs here)
       const { data: qrData } = await supabase
         .from("qr_codes")
-        .select("is_active,claimed,expires_at");
+        .select("is_active,claimed,expires_at,inventory_items!inner(tenant_id)")
+        .eq("inventory_items.tenant_id", tid);
       if (qrData) {
         const now = new Date();
         setQrStats({
@@ -2996,9 +4006,12 @@ export default function HQLoyalty() {
           invalidToday: 0,
         });
       }
+
+      // referral_codes — tenant-scoped (now has tenant_id column)
       const { data: refData } = await supabase
         .from("referral_codes")
         .select("code,uses_count,owner_id")
+        .eq("tenant_id", tid) // tenant-scoped — was missing in v3.0
         .eq("is_active", true)
         .order("uses_count", { ascending: false })
         .limit(10);
@@ -3016,14 +4029,70 @@ export default function HQLoyalty() {
           refData.map((r) => ({ ...r, name: profileMap[r.owner_id] || null })),
         );
       }
+
+      // At-risk customers: Gold+ who haven't purchased in threshold days
+      // Query user_profiles for this tenant's customers at Gold/Platinum/Harvest Club tier
+      const { data: atRiskData } = await supabase
+        .from("user_profiles")
+        .select("id,full_name,loyalty_tier,last_purchase_at")
+        .eq("tenant_id", tid)
+        .in("loyalty_tier", ["Gold", "Platinum", "Harvest Club"]);
+      if (atRiskData) {
+        const threshold = cfg.ai_churn_rescue_threshold_days || 21;
+        const thresholdDate = new Date(
+          Date.now() - threshold * 24 * 3600 * 1000,
+        );
+        const atRisk = atRiskData
+          .filter(
+            (c) =>
+              c.last_purchase_at &&
+              new Date(c.last_purchase_at) < thresholdDate,
+          )
+          .map((c) => ({
+            ...c,
+            days_since: Math.floor(
+              (Date.now() - new Date(c.last_purchase_at)) / (24 * 3600 * 1000),
+            ),
+          }))
+          .sort((a, b) => b.days_since - a.days_since)
+          .slice(0, 10);
+        setAtRiskCustomers(atRisk);
+      }
     } catch (err) {
-      console.error("HQLoyalty load error:", err);
+      console.error("HQLoyalty loadAll error:", err);
       setDraft({ ...DEFAULT_CONFIG });
       showToast("Could not load config — using defaults", "error");
     } finally {
       setLoading(false);
     }
   }
+
+  // Load AI log separately (can be slow)
+  async function loadAiLog(tid) {
+    if (!tid) return;
+    setLoadingAiLog(true);
+    try {
+      const { data } = await supabase
+        .from("loyalty_ai_log")
+        .select("*")
+        .eq("tenant_id", tid)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      setAiLog(data || []);
+    } catch (err) {
+      console.error("HQLoyalty loadAiLog error:", err);
+    } finally {
+      setLoadingAiLog(false);
+    }
+  }
+
+  // Mount: wait for tenantId before loading
+  useEffect(() => {
+    if (tenantId) {
+      loadAll(tenantId);
+      loadAiLog(tenantId);
+    }
+  }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function recalculateAllTiers() {
     try {
@@ -3035,13 +4104,14 @@ export default function HQLoyalty() {
   }
 
   async function handleApplySchema(schema) {
+    if (!tenantId) return;
     setApplyingSchema(true);
     try {
       const schemaValues = { ...schema.values, active_schema: schema.id };
       const { error } = await supabase
         .from("loyalty_config")
         .update(schemaValues)
-        .eq("id", config.id);
+        .eq("tenant_id", tenantId); // tenant-scoped update
       if (error) throw error;
       await recalculateAllTiers();
       const newConfig = { ...config, ...schemaValues };
@@ -3060,9 +4130,11 @@ export default function HQLoyalty() {
   }
 
   async function handleSave() {
+    if (!tenantId) return;
     setSaving(true);
     try {
-      const { id, updated_by, ...fields } = draft;
+      // Exclude non-updatable fields. NEVER include tenant_id in SET clause.
+      const { id, updated_by, tenant_id: _tid, ...fields } = draft;
       const activeSchema = SCHEMAS.find((s) => s.id === draft.active_schema);
       let schemaToSave = draft.active_schema || "standard";
       if (activeSchema) {
@@ -3074,7 +4146,7 @@ export default function HQLoyalty() {
       const { error } = await supabase
         .from("loyalty_config")
         .update({ ...fields, active_schema: schemaToSave })
-        .eq("id", config.id);
+        .eq("tenant_id", tenantId); // tenant-scoped update
       if (error) throw error;
       await recalculateAllTiers();
       setConfig({ ...draft, active_schema: schemaToSave });
@@ -3106,7 +4178,6 @@ export default function HQLoyalty() {
     );
   }
 
-  // Schema badge colour (no purple)
   const schemaBadge = {
     conservative: { bg: T.infoBg, color: T.info, label: "Conservative" },
     standard: { bg: T.accentLit, color: T.accent, label: "Standard" },
@@ -3159,7 +4230,6 @@ export default function HQLoyalty() {
                 flexWrap: "wrap",
               }}
             >
-              {/* ★ WP-THEME: emoji removed from h1 */}
               <h1
                 style={{
                   fontFamily: T.fontUi,
@@ -3205,6 +4275,21 @@ export default function HQLoyalty() {
                   Unsaved changes
                 </span>
               )}
+              {tenantName && (
+                <span
+                  style={{
+                    background: T.ink075,
+                    color: T.ink500,
+                    border: `1px solid ${T.ink150}`,
+                    borderRadius: 3,
+                    padding: "2px 10px",
+                    fontFamily: T.fontUi,
+                    fontSize: 11,
+                  }}
+                >
+                  {tenantName}
+                </span>
+              )}
             </div>
             <p
               style={{
@@ -3218,7 +4303,7 @@ export default function HQLoyalty() {
               CheckoutPage, Loyalty, Redeem.
             </p>
           </div>
-          {isConfigTab && activeTab > 0 && (
+          {isConfigTab && (
             <button
               onClick={handleSave}
               disabled={!isDirty || saving}
@@ -3240,14 +4325,21 @@ export default function HQLoyalty() {
           )}
         </div>
 
-        {/* Sub-tabs — standard underline style */}
-        <div style={{ display: "flex", gap: 0, flexWrap: "nowrap" }}>
+        {/* Sub-tabs */}
+        <div
+          style={{
+            display: "flex",
+            gap: 0,
+            flexWrap: "nowrap",
+            overflowX: "auto",
+          }}
+        >
           {SUB_TABS.map((tab, i) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(i)}
               style={{
-                padding: "10px 16px",
+                padding: "10px 14px",
                 background: "none",
                 border: "none",
                 borderBottom:
@@ -3271,8 +4363,8 @@ export default function HQLoyalty() {
         </div>
       </div>
 
-      {/* Tab content */}
-      <div style={{ display: "flex", gap: 0 }}>
+      {/* ── Tab content ── */}
+      <div style={{ padding: "24px 28px" }}>
         {activeTab === 0 && (
           <TabSchema
             config={config}
@@ -3281,30 +4373,49 @@ export default function HQLoyalty() {
           />
         )}
         {activeTab === 1 && <TabEarning draft={draft} setDraft={setDraft} />}
-        {activeTab === 2 && <TabTiers draft={draft} setDraft={setDraft} />}
+        {activeTab === 2 && <TabCategories draft={draft} setDraft={setDraft} />}
         {activeTab === 3 && (
+          <TabTiers
+            draft={draft}
+            setDraft={setDraft}
+            atRiskCustomers={atRiskCustomers}
+          />
+        )}
+        {activeTab === 4 && (
           <TabEconomics
             draft={draft}
             setDraft={setDraft}
             liveStats={liveStats}
           />
         )}
-        {activeTab === 4 && (
+        {activeTab === 5 && (
           <TabReferrals
             draft={draft}
             setDraft={setDraft}
             referralLeaderboard={referralLB}
+            tenantName={tenantName}
           />
         )}
-        {activeTab === 5 && (
+        {activeTab === 6 && (
           <TabQRSecurity draft={draft} setDraft={setDraft} qrStats={qrStats} />
         )}
-        {activeTab === 6 && <TabSimulator draft={draft} />}
-        {activeTab === 7 && <TabCampaigns showToast={showToast} />}
+        {activeTab === 7 && <TabSimulator draft={draft} />}
+        {activeTab === 8 && (
+          <TabAIEngine
+            draft={draft}
+            setDraft={setDraft}
+            aiLog={aiLog}
+            loadingAiLog={loadingAiLog}
+            tenantName={tenantName}
+          />
+        )}
+        {activeTab === 9 && (
+          <TabCampaigns showToast={showToast} tenantId={tenantId} />
+        )}
       </div>
 
-      {/* Sticky save bar */}
-      {isDirty && activeTab > 0 && activeTab < 7 && (
+      {/* Sticky save bar — only for config tabs (1–7) */}
+      {isDirty && isConfigTab && (
         <div
           style={{
             position: "sticky",
