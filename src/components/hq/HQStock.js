@@ -1,12 +1,7 @@
-// src/components/hq/HQStock.js v3.0 — WP-STOCK-PRO S3c
-// HQ stock intelligence — profile-adaptive layout
-// food_beverage: tabbed command centre (Overview | Items | Movements)
-//   matching Admin Stock paradigm — searchable table, sortable columns,
-//   food KPI strip, expiry colouring, temp zone, allergen count, lot#,
-//   FEFO alert, cold chain panel, AVCO drift, Quick Adjust, Add/Edit
-// All other profiles: accordion (preserved exactly from v2.0)
-// Tables: inventory_items (HQ tenant only), stock_movements, suppliers
-// RULE 0G: useTenant() called inside this component
+// src/components/hq/HQStock.js v3.1 — WP-STOCK-UI Session A
+// Surgical addition: CannabisItemsView for cannabis_retail profile
+// All other profiles (food_beverage, general_retail, mixed_retail) — UNCHANGED
+// ESLint fixes: renderAccPanel disable (kept for future use), avail disable in grid
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -376,13 +371,12 @@ export default function HQStock() {
     p3: false,
     p4: false,
   });
-
   const [movItem, setMovItem] = useState(null);
   const [movList, setMovList] = useState([]);
   const [movLoading, setMovLoading] = useState(false);
-
   const [modalItem, setModalItem] = useState(undefined);
   const [modalSaving, setModalSaving] = useState(false);
+  const [modalDefaults, setModalDefaults] = useState({});
   const [adjustOpen, setAdjustOpen] = useState(null);
   const [adjustQty, setAdjustQty] = useState("");
   const [adjustReason, setAdjustReason] = useState("");
@@ -551,6 +545,7 @@ export default function HQStock() {
       })()
     : null;
 
+  // ── MOVEMENT DRAWER ───────────────────────────────────────────────────────
   const renderMovDrawer = () => {
     if (!movItem) return null;
     const expiry = isFoodBev ? expiryStatus(movItem) : null;
@@ -730,6 +725,7 @@ export default function HQStock() {
     );
   };
 
+  // ── ADJUST INLINE ─────────────────────────────────────────────────────────
   const renderAdjust = (item) =>
     adjustOpen !== item.id ? null : (
       <div
@@ -868,10 +864,8 @@ export default function HQStock() {
         i.cost_price &&
         Math.abs((i.weighted_avg_cost - i.cost_price) / i.cost_price) > 0.05,
     );
-
     return (
       <div style={{ display: "grid", gap: "20px" }}>
-        {/* KPI grid */}
         <div
           style={{
             display: "grid",
@@ -973,8 +967,6 @@ export default function HQStock() {
             </div>
           ))}
         </div>
-
-        {/* FEFO alert */}
         {expiring.length > 0 && (
           <div
             style={{
@@ -1111,8 +1103,6 @@ export default function HQStock() {
             </table>
           </div>
         )}
-
-        {/* Cold chain */}
         {coldItems.length > 0 && (
           <div
             style={{
@@ -1210,8 +1200,6 @@ export default function HQStock() {
             </div>
           </div>
         )}
-
-        {/* Low stock */}
         {lowItems.length > 0 && (
           <div
             style={{
@@ -1305,8 +1293,6 @@ export default function HQStock() {
             ))}
           </div>
         )}
-
-        {/* AVCO drift */}
         {drifted.length > 0 && (
           <div
             style={{
@@ -1508,7 +1494,6 @@ export default function HQStock() {
             + Add Item
           </button>
         </div>
-
         <div
           style={{
             background: "#fff",
@@ -1584,7 +1569,6 @@ export default function HQStock() {
                       : expiry?.variant === "warning"
                         ? "3px solid " + T.warning
                         : "3px solid transparent";
-
                   return (
                     <React.Fragment key={item.id}>
                       <tr style={{ background: rowBg, borderLeft: leftBorder }}>
@@ -2022,7 +2006,7 @@ export default function HQStock() {
     );
   };
 
-  // ── ACCORDION ITEM (non-food) ─────────────────────────────────────────────
+  // ── ACCORDION ITEM (non-food, non-cannabis_retail) ────────────────────────
   const renderAccItem = (item) => {
     const low = isLowFn(item);
     const avail = (item.quantity_on_hand || 0) - (item.reserved_qty || 0);
@@ -2172,6 +2156,7 @@ export default function HQStock() {
     );
   };
 
+  // eslint-disable-next-line no-unused-vars
   const renderAccPanel = (key) => {
     const prof =
       PANEL_CATS_BY_PROFILE[industryProfile] ||
@@ -2278,7 +2263,8 @@ export default function HQStock() {
       </div>
     );
   };
-  // ── GENERAL OVERVIEW (cannabis / general / mixed) ─────────────────────
+
+  // ── GENERAL OVERVIEW ──────────────────────────────────────────────────────
   const GeneralOverview = () => {
     const activeItems = items.filter((i) => i.is_active !== false);
     const totalSkus = activeItems.length;
@@ -2617,22 +2603,1215 @@ export default function HQStock() {
     );
   };
 
+  // ── CANNABIS ITEMS VIEW (cannabis_retail only) ────────────────────────────
+  const CannabisItemsView = () => {
+    const [catFilter, setCatFilter] = useState("all");
+    const [brandFilter, setBrandFilter] = useState("all");
+    const [search, setSearch] = useState("");
+    const [viewMode, setViewMode] = useState("list");
+
+    const brands = [
+      ...new Set(items.map((i) => i.brand).filter(Boolean)),
+    ].sort();
+
+    const CAT_GROUPS = [
+      { id: "all", label: "All Products", icon: "◈", enums: null, subs: null },
+      {
+        id: "papers",
+        label: "Rolling Papers",
+        icon: "📄",
+        enums: ["accessory"],
+        subs: ["rolling_papers", "cones", "tips", "rolling_machine", "tray"],
+      },
+      {
+        id: "accessories",
+        label: "Accessories",
+        icon: "🛠",
+        enums: ["accessory"],
+        subs: [
+          "grinder",
+          "pipe",
+          "bong",
+          "dab_rig",
+          "dab_tool",
+          "humidity_pack",
+          "storage",
+          "lighter",
+          "extraction_bag",
+          "rosin_bag",
+        ],
+      },
+      {
+        id: "flower",
+        label: "Flower",
+        icon: "🌿",
+        enums: ["flower"],
+        subs: null,
+      },
+      {
+        id: "preroll",
+        label: "Pre-Rolls",
+        icon: "🌀",
+        enums: ["finished_product"],
+        subs: ["preroll"],
+      },
+      {
+        id: "hash",
+        label: "Hash & Kief",
+        icon: "🟤",
+        enums: ["concentrate"],
+        subs: [
+          "hash",
+          "dry_sift",
+          "bubble_hash",
+          "pressed_hash",
+          "charas",
+          "temple_ball",
+          "lebanese",
+          "moroccan",
+          "afghani",
+          "finger_hash",
+          "kief",
+          "moon_rock",
+          "dry_ice_hash",
+        ],
+      },
+      {
+        id: "concentrate",
+        label: "Concentrates",
+        icon: "💎",
+        enums: ["concentrate"],
+        subs: [
+          "concentrate",
+          "budder",
+          "badder",
+          "live_resin",
+          "rosin",
+          "sauce",
+          "diamonds",
+          "distillate",
+          "crumble",
+          "shatter",
+          "wax",
+          "feco",
+          "rso",
+          "bho",
+        ],
+      },
+      {
+        id: "vape",
+        label: "Vapes",
+        icon: "💨",
+        enums: ["finished_product"],
+        subs: ["cartridge", "disposable", "battery"],
+      },
+      {
+        id: "edible",
+        label: "Edibles",
+        icon: "🍬",
+        enums: ["edible"],
+        subs: null,
+      },
+      {
+        id: "seeds",
+        label: "Seeds & Clones",
+        icon: "🌱",
+        enums: ["raw_material"],
+        subs: ["seed", "clone", "seedling", "propagation"],
+      },
+      {
+        id: "substrate",
+        label: "Substrate",
+        icon: "🪴",
+        enums: ["raw_material"],
+        subs: ["substrate", "soil", "rockwool"],
+      },
+      {
+        id: "nutrients",
+        label: "Nutrients",
+        icon: "🧪",
+        enums: ["raw_material"],
+        subs: [
+          "base_nutrient",
+          "bloom_booster",
+          "root_stimulant",
+          "enzyme",
+          "ph_management",
+          "supplement",
+          "beneficial",
+        ],
+      },
+      {
+        id: "equipment",
+        label: "Grow Equipment",
+        icon: "💡",
+        enums: ["hardware"],
+        subs: null,
+      },
+      {
+        id: "wellness",
+        label: "Wellness",
+        icon: "💚",
+        enums: ["finished_product"],
+        subs: ["mushroom", "adaptogen", "cbd", "cbd_pet"],
+      },
+      {
+        id: "merch",
+        label: "Merch",
+        icon: "👕",
+        enums: ["finished_product"],
+        subs: ["clothing"],
+      },
+    ];
+
+    const matchesGroup = (item, group) => {
+      if (group.id === "all") return true;
+      if (group.subs && group.subs.length > 0)
+        return group.subs.includes(item.subcategory);
+      return group.enums ? group.enums.includes(item.category) : false;
+    };
+
+    const filtered = items.filter((item) => {
+      if (item.is_active === false) return false;
+      const group = CAT_GROUPS.find((g) => g.id === catFilter);
+      if (group && !matchesGroup(item, group)) return false;
+      if (brandFilter !== "all" && item.brand !== brandFilter) return false;
+      if (search) {
+        const s = search.toLowerCase();
+        if (
+          !item.name?.toLowerCase().includes(s) &&
+          !item.sku?.toLowerCase().includes(s) &&
+          !item.brand?.toLowerCase().includes(s) &&
+          !(item.variant_value || "").toLowerCase().includes(s)
+        )
+          return false;
+      }
+      return true;
+    });
+
+    const activeItems = items.filter((i) => i.is_active !== false);
+    const noPrice = activeItems.filter(
+      (i) => !i.sell_price || i.sell_price <= 0,
+    ).length;
+    const outCount = activeItems.filter(
+      (i) => (i.quantity_on_hand || 0) <= 0,
+    ).length;
+    const groupCount = (group) =>
+      group.id === "all"
+        ? activeItems.length
+        : activeItems.filter((i) => matchesGroup(i, group)).length;
+
+    return (
+      <div>
+        {(noPrice > 0 || outCount > 0) && (
+          <div
+            style={{
+              background: T.warningBg,
+              border: "1px solid " + T.warningBd,
+              borderRadius: 6,
+              padding: "10px 16px",
+              marginBottom: 14,
+              display: "flex",
+              gap: 20,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: T.warning,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              ⚠ Needs Attention
+            </span>
+            {noPrice > 0 && (
+              <span style={{ fontSize: 12, color: T.warning }}>
+                {noPrice} item{noPrice !== 1 ? "s" : ""} have no sell price —
+                hidden from shop
+              </span>
+            )}
+            {outCount > 0 && (
+              <span style={{ fontSize: 12, color: T.danger }}>
+                {outCount} item{outCount !== 1 ? "s" : ""} out of stock
+              </span>
+            )}
+          </div>
+        )}
+
+        <div
+          style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 16 }}
+        >
+          {/* Category sidebar */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid " + T.ink150,
+              borderRadius: 6,
+              padding: "8px 0",
+              height: "fit-content",
+            }}
+          >
+            <div
+              style={{
+                padding: "8px 12px 6px",
+                fontSize: 9,
+                fontWeight: 700,
+                color: T.ink400,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                fontFamily: T.font,
+              }}
+            >
+              Categories
+            </div>
+            {CAT_GROUPS.map((group) => {
+              const count = groupCount(group);
+              const active = catFilter === group.id;
+              return (
+                <button
+                  key={group.id}
+                  onClick={() => {
+                    setCatFilter(group.id);
+                    setBrandFilter("all");
+                  }}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "7px 12px",
+                    border: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    background: active ? T.accentLit : "transparent",
+                    borderLeft: active
+                      ? "3px solid " + T.accentMid
+                      : "3px solid transparent",
+                  }}
+                >
+                  <span
+                    style={{ display: "flex", alignItems: "center", gap: 7 }}
+                  >
+                    <span style={{ fontSize: 13 }}>{group.icon}</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: active ? 700 : 500,
+                        color: active ? T.accentMid : T.ink700,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      {group.label}
+                    </span>
+                  </span>
+                  {count > 0 && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        fontFamily: T.font,
+                        background: active ? T.accentMid : T.ink150,
+                        color: active ? "#fff" : T.ink500,
+                        padding: "1px 5px",
+                        borderRadius: 8,
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Main content */}
+          <div>
+            {/* Controls */}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginBottom: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Search name, SKU, brand…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ ...sInput, width: 220 }}
+              />
+              <div style={{ flex: 1 }} />
+              <span
+                style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}
+              >
+                {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  border: "1px solid " + T.ink150,
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}
+              >
+                {[
+                  { id: "list", label: "☰" },
+                  { id: "grid", label: "⊞" },
+                ].map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => setViewMode(v.id)}
+                    style={{
+                      padding: "5px 10px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontFamily: T.font,
+                      background: viewMode === v.id ? T.accentMid : "#fff",
+                      color: viewMode === v.id ? "#fff" : T.ink500,
+                    }}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              <button style={sBtn()} onClick={() => setModalItem(null)}>
+                + Add Item
+              </button>
+            </div>
+
+            {/* Brand pills */}
+            {brands.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  marginBottom: 12,
+                }}
+              >
+                {["all", ...brands].map((brand) => {
+                  const isAll = brand === "all";
+                  const count = isAll
+                    ? filtered.length
+                    : filtered.filter((i) => i.brand === brand).length;
+                  const active = brandFilter === brand;
+                  if (!isAll && count === 0) return null;
+                  return (
+                    <button
+                      key={brand}
+                      onClick={() => setBrandFilter(brand)}
+                      style={{
+                        padding: "4px 11px",
+                        borderRadius: 16,
+                        fontSize: 11,
+                        fontWeight: active ? 700 : 500,
+                        fontFamily: T.font,
+                        border:
+                          "1.5px solid " + (active ? T.accentMid : T.ink150),
+                        background: active ? T.accentMid : "#fff",
+                        color: active ? "#fff" : T.ink700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {isAll ? "All Brands" : brand}{" "}
+                      <span style={{ opacity: 0.65 }}>×{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Subcategory tiles */}
+            {catFilter !== "all" &&
+              (() => {
+                const group = CAT_GROUPS.find((g) => g.id === catFilter);
+                if (!group?.subs || group.subs.length === 0) return null;
+                const subLabels = {
+                  rolling_papers: "Rolling Papers",
+                  cones: "Cones",
+                  tips: "Tips",
+                  rolling_machine: "Machines",
+                  tray: "Trays",
+                  grinder: "Grinders",
+                  pipe: "Pipes",
+                  bong: "Bongs",
+                  dab_rig: "Dab Rigs",
+                  dab_tool: "Dab Tools",
+                  humidity_pack: "Humidity Packs",
+                  storage: "Storage Jars",
+                  lighter: "Lighters",
+                  extraction_bag: "Extraction Bags",
+                  rosin_bag: "Rosin Bags",
+                  flower: "Flower",
+                  preroll: "Pre-Rolls",
+                  hash: "Hash",
+                  dry_sift: "Dry Sift",
+                  bubble_hash: "Bubble Hash",
+                  pressed_hash: "Pressed Hash",
+                  charas: "Charas",
+                  temple_ball: "Temple Ball",
+                  lebanese: "Lebanese",
+                  moroccan: "Moroccan",
+                  afghani: "Afghani",
+                  finger_hash: "Finger Hash",
+                  kief: "Kief",
+                  moon_rock: "Moon Rock",
+                  dry_ice_hash: "Dry Ice Hash",
+                  concentrate: "Concentrates",
+                  budder: "Budder",
+                  badder: "Badder",
+                  live_resin: "Live Resin",
+                  rosin: "Rosin",
+                  sauce: "Terp Sauce",
+                  diamonds: "Diamonds",
+                  distillate: "Distillate",
+                  crumble: "Crumble",
+                  shatter: "Shatter",
+                  wax: "Wax",
+                  feco: "FECO",
+                  rso: "RSO",
+                  cartridge: "Cartridges",
+                  disposable: "Disposables",
+                  battery: "Batteries",
+                  seed: "Seeds",
+                  clone: "Clones",
+                  seedling: "Seedlings",
+                  propagation: "Propagation",
+                  substrate: "Substrate",
+                  soil: "Soil",
+                  rockwool: "Rockwool",
+                  base_nutrient: "Base Nutrients",
+                  bloom_booster: "Bloom Boosters",
+                  root_stimulant: "Root Stimulants",
+                  enzyme: "Enzymes",
+                  ph_management: "pH Mgmt",
+                  supplement: "Supplements",
+                  beneficial: "Beneficials",
+                  grow_light: "Lights",
+                  grow_tent: "Tents",
+                  fan: "Fans",
+                  carbon_filter: "Filters",
+                  meter: "Meters",
+                  timer: "Timers",
+                  pot: "Pots",
+                  training: "Training",
+                  mushroom: "Mushrooms",
+                  adaptogen: "Adaptogens",
+                  cbd: "CBD",
+                  cbd_pet: "Pet CBD",
+                  clothing: "Clothing",
+                };
+                const subCounts = group.subs
+                  .map((sub) => ({
+                    sub,
+                    count: activeItems.filter(
+                      (i) => matchesGroup(i, group) && i.subcategory === sub,
+                    ).length,
+                  }))
+                  .filter((s) => s.count > 0);
+                if (subCounts.length === 0) return null;
+                return (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      flexWrap: "wrap",
+                      marginBottom: 14,
+                    }}
+                  >
+                    {subCounts.map(({ sub, count }) => (
+                      <button
+                        key={sub}
+                        onClick={() => setSearch(subLabels[sub] || sub)}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          border: "1.5px solid " + T.accentBd,
+                          background: T.accentLit,
+                          fontFamily: T.font,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          gap: 2,
+                          minWidth: 80,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: T.accentMid,
+                          }}
+                        >
+                          {subLabels[sub] || sub}
+                        </span>
+                        <span style={{ fontSize: 10, color: T.ink400 }}>
+                          {count} items
+                        </span>
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setModalDefaults({
+                          category: group.enums?.[0] || "finished_product",
+                          subcategory: group.subs?.[0] || "",
+                        });
+                        setModalItem(null);
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        border: "1.5px dashed " + T.ink150,
+                        background: T.ink050,
+                        fontFamily: T.font,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        gap: 2,
+                        minWidth: 80,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: T.ink400,
+                        }}
+                      >
+                        + Add New
+                      </span>
+                      <span style={{ fontSize: 10, color: T.ink300 }}>
+                        Create item
+                      </span>
+                    </button>
+                  </div>
+                );
+              })()}
+
+            {/* Grid view */}
+            {viewMode === "grid" && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {filtered.length === 0 ? (
+                  <div
+                    style={{
+                      gridColumn: "1/-1",
+                      textAlign: "center",
+                      padding: 40,
+                      color: T.ink300,
+                      fontSize: 13,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    No products match.{" "}
+                    <span
+                      style={{
+                        color: T.accentMid,
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                      onClick={() => setModalItem(null)}
+                    >
+                      Add the first one →
+                    </span>
+                  </div>
+                ) : (
+                  filtered.map((item) => {
+                    const low = isLowFn(item);
+                    // eslint-disable-next-line no-unused-vars
+                    const avail =
+                      (item.quantity_on_hand || 0) - (item.reserved_qty || 0);
+                    const margin =
+                      item.sell_price > 0 && item.cost_price > 0
+                        ? Math.round(
+                            ((item.sell_price - item.cost_price) /
+                              item.sell_price) *
+                              100,
+                          )
+                        : null;
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid " + (low ? T.dangerBd : T.ink150),
+                          borderRadius: 8,
+                          padding: 14,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: T.ink700,
+                              lineHeight: 1.3,
+                              flex: 1,
+                            }}
+                          >
+                            {item.name}
+                          </span>
+                          {low && <span style={sBadge("danger")}>LOW</span>}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: T.ink300,
+                            fontFamily: T.mono,
+                          }}
+                        >
+                          {item.sku}
+                        </span>
+                        {item.brand && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: T.ink400,
+                              fontFamily: T.font,
+                            }}
+                          >
+                            {item.brand}
+                          </span>
+                        )}
+                        {item.variant_value && (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 7px",
+                              borderRadius: 3,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              width: "fit-content",
+                              background: "#EEF2FF",
+                              color: "#3730A3",
+                            }}
+                          >
+                            {item.variant_value}
+                          </span>
+                        )}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 800,
+                              color: T.accentMid,
+                              fontFamily: T.mono,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {item.sell_price > 0 ? (
+                              fmt(item.sell_price)
+                            ) : (
+                              <span
+                                style={{
+                                  color: T.ink300,
+                                  fontSize: 11,
+                                  fontWeight: 400,
+                                }}
+                              >
+                                No price
+                              </span>
+                            )}
+                          </span>
+                          {margin !== null && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: 3,
+                                background:
+                                  margin >= 50
+                                    ? T.successBg
+                                    : margin >= 30
+                                      ? T.warningBg
+                                      : T.dangerBg,
+                                color:
+                                  margin >= 50
+                                    ? T.success
+                                    : margin >= 30
+                                      ? T.warning
+                                      : T.danger,
+                              }}
+                            >
+                              {margin}%
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: low ? T.danger : T.ink400,
+                            fontFamily: T.mono,
+                          }}
+                        >
+                          {fmtQty(item.quantity_on_hand, item.unit)} on hand
+                          {(item.reserved_qty || 0) > 0 &&
+                            ` · ${item.reserved_qty} held`}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 5,
+                            borderTop: "1px solid " + T.ink075,
+                            paddingTop: 8,
+                          }}
+                        >
+                          <button
+                            onClick={() => loadMovForItem(item)}
+                            style={{
+                              flex: 1,
+                              padding: "5px 0",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              fontFamily: T.font,
+                              border: "1px solid " + T.ink150,
+                              color: T.ink500,
+                              background: "transparent",
+                              borderRadius: 3,
+                              cursor: "pointer",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Mov
+                          </button>
+                          <button
+                            onClick={() => setModalItem(item)}
+                            style={{
+                              flex: 1,
+                              padding: "5px 0",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              fontFamily: T.font,
+                              border: "1px solid " + T.accentBd,
+                              color: T.accentMid,
+                              background: "transparent",
+                              borderRadius: 3,
+                              cursor: "pointer",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() =>
+                              adjustOpen === item.id
+                                ? closeAdj()
+                                : openAdj(item.id)
+                            }
+                            style={{
+                              flex: 1,
+                              padding: "5px 0",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              fontFamily: T.font,
+                              border:
+                                "1px solid " +
+                                (adjustOpen === item.id
+                                  ? T.dangerBd
+                                  : T.warningBd),
+                              color:
+                                adjustOpen === item.id ? T.danger : T.warning,
+                              background: "transparent",
+                              borderRadius: 3,
+                              cursor: "pointer",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            {adjustOpen === item.id ? "Cancel" : "Adj"}
+                          </button>
+                        </div>
+                        {adjustOpen === item.id && renderAdjust(item)}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* List view */}
+            {viewMode === "list" && (
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid " + T.ink150,
+                  borderRadius: 6,
+                  overflow: "auto",
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 13,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {[
+                        "Product / SKU",
+                        "Variant",
+                        "On Hand",
+                        "Available",
+                        "Sell Price",
+                        "Margin",
+                        "AVCO",
+                        "",
+                      ].map((h) => (
+                        <th key={h} style={sTh}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          style={{
+                            ...sTd,
+                            textAlign: "center",
+                            color: T.ink300,
+                            padding: 32,
+                          }}
+                        >
+                          No products match your filters.{" "}
+                          <span
+                            style={{
+                              color: T.accentMid,
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                            onClick={() => setModalItem(null)}
+                          >
+                            Add the first one →
+                          </span>
+                        </td>
+                      </tr>
+                    ) : (
+                      filtered.map((item, idx) => {
+                        const low = isLowFn(item);
+                        const avail =
+                          (item.quantity_on_hand || 0) -
+                          (item.reserved_qty || 0);
+                        const margin =
+                          item.sell_price > 0 && item.cost_price > 0
+                            ? Math.round(
+                                ((item.sell_price - item.cost_price) /
+                                  item.sell_price) *
+                                  100,
+                              )
+                            : null;
+                        const isAdj = adjustOpen === item.id;
+                        return (
+                          <React.Fragment key={item.id}>
+                            <tr
+                              style={{
+                                background: idx % 2 === 0 ? "#fff" : T.ink050,
+                                borderLeft: low
+                                  ? "3px solid " + T.danger
+                                  : "3px solid transparent",
+                              }}
+                            >
+                              <td style={{ ...sTd, minWidth: 180 }}>
+                                <div
+                                  style={{ fontWeight: 600, color: T.ink700 }}
+                                >
+                                  {item.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    color: T.ink300,
+                                    fontFamily: T.mono,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {item.sku}
+                                </div>
+                                {item.brand && (
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      color: T.ink400,
+                                      marginTop: 1,
+                                    }}
+                                  >
+                                    {item.brand}
+                                  </div>
+                                )}
+                                {low && (
+                                  <span
+                                    style={{
+                                      ...sBadge("danger"),
+                                      display: "inline-block",
+                                      marginTop: 3,
+                                    }}
+                                  >
+                                    LOW STOCK
+                                  </span>
+                                )}
+                              </td>
+                              <td style={sTd}>
+                                {item.variant_value ? (
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      padding: "2px 7px",
+                                      borderRadius: 3,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      background: "#EEF2FF",
+                                      color: "#3730A3",
+                                    }}
+                                  >
+                                    {item.variant_value}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: T.ink300 }}>—</span>
+                                )}
+                              </td>
+                              <td
+                                style={{
+                                  ...sTd,
+                                  fontFamily: T.mono,
+                                  fontWeight: 700,
+                                  color: low ? T.danger : T.ink700,
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                {fmtQty(item.quantity_on_hand, item.unit)}
+                              </td>
+                              <td
+                                style={{
+                                  ...sTd,
+                                  fontFamily: T.mono,
+                                  fontWeight: 700,
+                                  color: avail <= 0 ? T.danger : T.success,
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                {fmtQty(avail, item.unit)}
+                                {(item.reserved_qty || 0) > 0 && (
+                                  <span
+                                    style={{
+                                      display: "block",
+                                      fontSize: 9,
+                                      color: T.warning,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {item.reserved_qty} held
+                                  </span>
+                                )}
+                              </td>
+                              <td
+                                style={{
+                                  ...sTd,
+                                  fontFamily: T.mono,
+                                  fontWeight: 700,
+                                  color: T.accentMid,
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                {item.sell_price > 0 ? (
+                                  fmt(item.sell_price)
+                                ) : (
+                                  <span
+                                    style={{
+                                      color: T.ink300,
+                                      fontWeight: 400,
+                                      fontSize: 11,
+                                    }}
+                                  >
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                              <td style={sTd}>
+                                {margin !== null ? (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      padding: "2px 6px",
+                                      borderRadius: 3,
+                                      background:
+                                        margin >= 50
+                                          ? T.successBg
+                                          : margin >= 30
+                                            ? T.warningBg
+                                            : T.dangerBg,
+                                      color:
+                                        margin >= 50
+                                          ? T.success
+                                          : margin >= 30
+                                            ? T.warning
+                                            : T.danger,
+                                    }}
+                                  >
+                                    {margin}%
+                                  </span>
+                                ) : (
+                                  <span style={{ color: T.ink300 }}>—</span>
+                                )}
+                              </td>
+                              <td
+                                style={{
+                                  ...sTd,
+                                  fontFamily: T.mono,
+                                  fontSize: 12,
+                                  color: T.ink500,
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                {item.weighted_avg_cost ? (
+                                  fmt(item.weighted_avg_cost) +
+                                  "/" +
+                                  (item.unit || "u")
+                                ) : (
+                                  <span style={{ color: T.ink300 }}>—</span>
+                                )}
+                              </td>
+                              <td style={{ ...sTd, whiteSpace: "nowrap" }}>
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  <button
+                                    onClick={() => loadMovForItem(item)}
+                                    style={{
+                                      padding: "3px 8px",
+                                      fontSize: 10,
+                                      fontFamily: T.font,
+                                      fontWeight: 600,
+                                      border: "1px solid " + T.ink150,
+                                      color: T.ink500,
+                                      background: "transparent",
+                                      borderRadius: 3,
+                                      cursor: "pointer",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.04em",
+                                    }}
+                                  >
+                                    Mov
+                                  </button>
+                                  <button
+                                    onClick={() => setModalItem(item)}
+                                    style={{
+                                      padding: "3px 8px",
+                                      fontSize: 10,
+                                      fontFamily: T.font,
+                                      fontWeight: 600,
+                                      border: "1px solid " + T.accentBd,
+                                      color: T.accentMid,
+                                      background: "transparent",
+                                      borderRadius: 3,
+                                      cursor: "pointer",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.04em",
+                                    }}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      isAdj ? closeAdj() : openAdj(item.id)
+                                    }
+                                    style={{
+                                      padding: "3px 8px",
+                                      fontSize: 10,
+                                      fontFamily: T.font,
+                                      fontWeight: 600,
+                                      border:
+                                        "1px solid " +
+                                        (isAdj ? T.dangerBd : T.warningBd),
+                                      color: isAdj ? T.danger : T.warning,
+                                      background: "transparent",
+                                      borderRadius: 3,
+                                      cursor: "pointer",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.04em",
+                                    }}
+                                  >
+                                    {isAdj ? "Cancel" : "Adjust"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            {isAdj && (
+                              <tr>
+                                <td
+                                  colSpan={8}
+                                  style={{
+                                    padding: "0 12px 12px",
+                                    background: "#FFF9F9",
+                                  }}
+                                >
+                                  {renderAdjust(item)}
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── RENDER ────────────────────────────────────────────────────────────────
   if (loading)
-    if (loading)
-      // ── RENDER ────────────────────────────────────────────────────────────────
-      return (
-        <p
-          style={{
-            padding: "32px 0",
-            color: T.ink300,
-            fontSize: "13px",
-            fontFamily: T.font,
-          }}
-        >
-          Loading HQ stock...
-        </p>
-      );
+    return (
+      <p
+        style={{
+          padding: "32px 0",
+          color: T.ink300,
+          fontSize: "13px",
+          fontFamily: T.font,
+        }}
+      >
+        Loading HQ stock...
+      </p>
+    );
   if (error)
     return (
       <div
@@ -2749,9 +3928,17 @@ export default function HQStock() {
             </button>
           ))}
         </div>
+
         {subTab === "overview" &&
           (isFoodBev ? <FoodOverview /> : <GeneralOverview />)}
-        {subTab === "items" && <FoodItems />}
+        {subTab === "items" &&
+          (isFoodBev ? (
+            <FoodItems />
+          ) : industryProfile === "cannabis_retail" ? (
+            <CannabisItemsView />
+          ) : (
+            <FoodItems />
+          ))}
         {subTab === "movements" && <FoodMovements />}
       </>
 
@@ -2759,10 +3946,14 @@ export default function HQStock() {
       {modalItem !== undefined && (
         <StockItemModal
           item={modalItem || null}
+          defaults={modalDefaults}
           suppliers={suppliers}
           visibleCategories={Object.keys(CATEGORY_LABELS)}
           onSave={handleSave}
-          onCancel={() => setModalItem(undefined)}
+          onCancel={() => {
+            setModalItem(undefined);
+            setModalDefaults({});
+          }}
           saving={modalSaving}
         />
       )}

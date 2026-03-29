@@ -1,18 +1,13 @@
-// src/components/StockItemModal.js v1.1 — WP-STOCK-PRO S3
-// Category-adaptive stock item add/edit modal
-// Replaces ItemForm inline panel in StockControl.js
-// Profile-aware: cannabis / food_beverage / general_retail / mixed_retail
-// BIB S1 columns: medium_type, allergen_flags, shelf_life_days,
-//   ingredients_notes, storage_instructions, supplier_id
-// S3 columns: temperature_zone, batch_lot_number, country_of_origin, reorder_qty
-// ALLERGEN_FLAGS: 14 keys (SA R638 compliant). UNIT_OPTIONS: 13 units.
+// src/components/StockItemModal.js v1.2 — WP-STOCK-UI Session A
+// Surgical additions: brand, subcategory, variant_type, variant_value, tags
+// All existing fields, logic, and sections PRESERVED exactly from v1.1
+// New section: "Cannabis Catalogue" — shown for cannabis_retail profile only
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "../services/supabaseClient";
 import { useTenant } from "../services/tenantService";
 import { showCannabisField } from "../constants/industryProfiles";
 
-// ── Design tokens (matches StockControl.js + HQProduction.js) ───────────────
 const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
@@ -87,8 +82,6 @@ const MEDIUM_TYPES = [
   { value: "other", label: "Other" },
 ];
 
-// SA R638 + EU 1169/2011 — 14 mandatory allergens
-// Keys match production_runs.allergen_flags (WP-PROD-MASTER Session A)
 const ALLERGEN_FLAGS = [
   { key: "gluten", label: "Gluten" },
   { key: "crustaceans", label: "Crustaceans" },
@@ -107,22 +100,17 @@ const ALLERGEN_FLAGS = [
 ];
 
 const UNIT_OPTIONS = [
-  // Universal
   "pcs",
   "ea",
-  // Liquid
   "ml",
   "L",
   "bottles",
-  // Weight
   "g",
   "kg",
-  // Retail / textile
   "m",
   "set",
   "roll",
   "box",
-  // Food service
   "por",
   "tray",
 ];
@@ -145,7 +133,191 @@ const CATEGORY_LABELS = {
   other: "Other",
 };
 
-// Section header component
+// ── NEW: Subcategory options per DB category enum ─────────────────────────────
+const SUBCATEGORY_BY_CATEGORY = {
+  accessory: [
+    { value: "rolling_papers", label: "Rolling Papers" },
+    { value: "cones", label: "Cones" },
+    { value: "tips", label: "Tips" },
+    { value: "rolling_machine", label: "Rolling Machine" },
+    { value: "tray", label: "Rolling Tray" },
+    { value: "grinder", label: "Grinder" },
+    { value: "pipe", label: "Pipe" },
+    { value: "bong", label: "Bong / Water Pipe" },
+    { value: "dab_rig", label: "Dab Rig" },
+    { value: "dab_tool", label: "Dab Tool" },
+    { value: "humidity_pack", label: "Humidity Pack" },
+    { value: "storage", label: "Storage Jar" },
+    { value: "lighter", label: "Lighter / Wick" },
+    { value: "extraction_bag", label: "Extraction Bag" },
+    { value: "rosin_bag", label: "Rosin Bag" },
+    { value: "screens", label: "Screens" },
+  ],
+  flower: [{ value: "flower", label: "Flower" }],
+  concentrate: [
+    { value: "concentrate", label: "Concentrate (generic)" },
+    { value: "budder", label: "Budder" },
+    { value: "badder", label: "Badder" },
+    { value: "live_resin", label: "Live Resin" },
+    { value: "rosin", label: "Rosin (solventless)" },
+    { value: "sauce", label: "Terp Sauce" },
+    { value: "diamonds", label: "THCA Diamonds" },
+    { value: "distillate", label: "Distillate" },
+    { value: "crumble", label: "Crumble" },
+    { value: "shatter", label: "Shatter" },
+    { value: "wax", label: "Wax" },
+    { value: "feco", label: "FECO" },
+    { value: "rso", label: "RSO" },
+    { value: "bho", label: "BHO" },
+    // ── Hash & Kief (shared DB category: concentrate) ──
+    { value: "hash", label: "Hash (generic)" },
+    { value: "dry_sift", label: "Dry Sift Hash" },
+    { value: "bubble_hash", label: "Bubble Hash (Ice Water)" },
+    { value: "pressed_hash", label: "Pressed Hash" },
+    { value: "charas", label: "Charas (Hand-rolled)" },
+    { value: "temple_ball", label: "Temple Ball" },
+    { value: "lebanese", label: "Lebanese Hash" },
+    { value: "moroccan", label: "Moroccan Hash" },
+    { value: "afghani", label: "Afghani Hash" },
+    { value: "finger_hash", label: "Finger Hash" },
+    { value: "kief", label: "Kief (raw)" },
+    { value: "moon_rock", label: "Moon Rock" },
+    { value: "dry_ice_hash", label: "Dry Ice Hash" },
+  ],
+  finished_product: [
+    { value: "preroll", label: "Pre-Roll" },
+    { value: "cartridge", label: "Vape Cartridge" },
+    { value: "disposable", label: "Disposable Vape" },
+    { value: "battery", label: "Vape Battery" },
+    { value: "edible", label: "Edible" },
+    { value: "tincture", label: "Tincture" },
+    { value: "capsule", label: "Capsule" },
+    { value: "mushroom", label: "Mushroom Supplement" },
+    { value: "adaptogen", label: "Adaptogen" },
+    { value: "cbd", label: "CBD Product" },
+    { value: "cbd_pet", label: "CBD Pet Product" },
+    { value: "clothing", label: "Clothing / Merch" },
+    { value: "topical", label: "Topical" },
+  ],
+  raw_material: [
+    { value: "seed", label: "Seed" },
+    { value: "clone", label: "Clone" },
+    { value: "seedling", label: "Seedling" },
+    { value: "propagation", label: "Propagation Supply" },
+    { value: "substrate", label: "Substrate / Coco" },
+    { value: "soil", label: "Soil Mix" },
+    { value: "rockwool", label: "Rockwool" },
+    { value: "base_nutrient", label: "Base Nutrient" },
+    { value: "bloom_booster", label: "Bloom Booster" },
+    { value: "root_stimulant", label: "Root Stimulant" },
+    { value: "enzyme", label: "Enzyme" },
+    { value: "ph_management", label: "pH Management" },
+    { value: "supplement", label: "Supplement / CalMag" },
+    { value: "beneficial", label: "Beneficial Organism" },
+  ],
+  hardware: [
+    { value: "grow_light", label: "Grow Light" },
+    { value: "grow_tent", label: "Grow Tent" },
+    { value: "fan", label: "Fan / Ventilation" },
+    { value: "carbon_filter", label: "Carbon Filter" },
+    { value: "meter", label: "Meter / Monitor" },
+    { value: "timer", label: "Timer" },
+    { value: "pot", label: "Pot / Container" },
+    { value: "training", label: "Training / SCROG" },
+    { value: "propagation", label: "Propagation Gear" },
+  ],
+  edible: [
+    { value: "edible", label: "Edible" },
+    { value: "tincture", label: "Tincture" },
+    { value: "capsule", label: "Capsule" },
+  ],
+};
+
+const VARIANT_TYPES = [
+  { value: "", label: "— None —" },
+  { value: "weight", label: "Weight" },
+  { value: "size", label: "Size" },
+  { value: "strain", label: "Strain" },
+  { value: "count", label: "Count" },
+  { value: "strength", label: "Strength" },
+  { value: "colour", label: "Colour" },
+];
+
+// ── NEW: Tag library ──────────────────────────────────────────────────────────
+const TAG_GROUPS = [
+  {
+    group: "Cultivation",
+    tags: [
+      "Indoor",
+      "Outdoor",
+      "Greenhouse",
+      "Hydroponic",
+      "Organic",
+      "Living Soil",
+      "Greendoor",
+      "Sun-grown",
+      "LED Grown",
+      "HPS Grown",
+    ],
+  },
+  {
+    group: "Grade",
+    tags: [
+      "Budget",
+      "Commercial",
+      "A Grade",
+      "AA Grade",
+      "AAA Grade",
+      "AAAA Grade",
+      "Craft",
+      "Top Shelf",
+      "Exotic",
+      "Premium",
+    ],
+  },
+  {
+    group: "Processing",
+    tags: [
+      "Hang-dried",
+      "Freeze-dried",
+      "Machine-trimmed",
+      "Hand-trimmed",
+      "Slow-cured",
+      "Flash-frozen",
+      "Fresh Frozen",
+    ],
+  },
+  {
+    group: "Concentrate Type",
+    tags: [
+      "BHO",
+      "CO2",
+      "Solventless",
+      "Cold-press",
+      "Live",
+      "Cured",
+      "Full-spectrum",
+      "Broad-spectrum",
+      "Single-source",
+    ],
+  },
+  {
+    group: "Effect",
+    tags: [
+      "Relaxing",
+      "Uplifting",
+      "Creative",
+      "Sleepy",
+      "Focused",
+      "Energetic",
+      "Pain-relief",
+      "Appetite",
+    ],
+  },
+];
+
+// ── Layout helpers (identical to v1.1) ───────────────────────────────────────
+
 function SectionHead({
   label,
   color = T.accentMid,
@@ -174,7 +346,6 @@ function SectionHead({
   );
 }
 
-// Field label helper
 function Lbl({ children, note, required }) {
   return (
     <label
@@ -209,12 +380,10 @@ function Lbl({ children, note, required }) {
   );
 }
 
-// Field wrapper
 function Field({ children, style }) {
   return <div style={{ marginBottom: "14px", ...style }}>{children}</div>;
 }
 
-// Two-col grid
 function Grid2({ children }) {
   return (
     <div
@@ -225,23 +394,21 @@ function Grid2({ children }) {
   );
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function StockItemModal({
   item, // null = new, object = edit
+  defaults = {},
   suppliers,
   visibleCategories,
   onSave,
   onCancel,
   saving,
 }) {
-  // RULE 0G — useTenant() called inside this component
   const { tenantId, industryProfile } = useTenant();
-
   const [productFormats, setProductFormats] = useState([]);
   const [toast, setToast] = useState(null);
 
-  // Fetch product_formats for hardware compatible-formats selector
   useEffect(() => {
     supabase
       .from("product_formats")
@@ -258,17 +425,30 @@ export default function StockItemModal({
   ].includes(industryProfile);
   const isFoodBev = industryProfile === "food_beverage";
 
-  // Parse allergen_flags JSONB from existing item
-  const parseAllergens = (flags) => {
-    if (!flags || typeof flags !== "object") return {};
-    return flags;
+  const parseAllergens = (flags) =>
+    !flags || typeof flags !== "object" ? {} : flags;
+
+  // ── Parse existing tags (stored as TEXT[] in DB) ──────────────────────────
+  const parseTags = (t) => {
+    if (!t) return [];
+    if (Array.isArray(t)) return t;
+    if (typeof t === "string") {
+      try {
+        return JSON.parse(t);
+      } catch {
+        return [];
+      }
+    }
+    return [];
   };
 
   const [form, setForm] = useState({
     sku: item?.sku || "",
     name: item?.name || "",
     category:
-      item?.category || (isFoodBev ? "raw_material" : "finished_product"),
+      item?.category ||
+      defaults.category ||
+      (isFoodBev ? "raw_material" : "finished_product"),
     unit: item?.unit || "pcs",
     description: item?.description || "",
     quantity_on_hand: item?.quantity_on_hand ?? 0,
@@ -279,20 +459,23 @@ export default function StockItemModal({
     supplier_id: item?.supplier_id || "",
     expiry_date: item?.expiry_date || "",
     strain_id: item?.strain_id || "",
-    // New BIB S1 columns
     medium_type: item?.medium_type || "",
     shelf_life_days: item?.shelf_life_days ?? "",
     ingredients_notes: item?.ingredients_notes || "",
     storage_instructions: item?.storage_instructions || "",
     allergen_flags: parseAllergens(item?.allergen_flags),
-    // S3 food fields
     temperature_zone: item?.temperature_zone || "",
     batch_lot_number: item?.batch_lot_number || "",
     country_of_origin: item?.country_of_origin || "",
     reorder_qty: item?.reorder_qty ?? "",
-    // Compatible formats for hardware (stored in description as fallback)
     compatible_formats: item?.compatible_formats || [],
     is_active: item?.is_active !== false,
+    // ── NEW v1.2 fields ──
+    brand: item?.brand || "",
+    subcategory: item?.subcategory || defaults.subcategory || "",
+    variant_type: item?.variant_type || "",
+    variant_value: item?.variant_value || "",
+    tags: parseTags(item?.tags),
   });
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -300,10 +483,7 @@ export default function StockItemModal({
   const toggleAllergen = (key) =>
     setForm((p) => ({
       ...p,
-      allergen_flags: {
-        ...p.allergen_flags,
-        [key]: !p.allergen_flags[key],
-      },
+      allergen_flags: { ...p.allergen_flags, [key]: !p.allergen_flags[key] },
     }));
 
   const toggleFormat = (fmtId) =>
@@ -317,7 +497,21 @@ export default function StockItemModal({
       };
     });
 
-  // Derived
+  // ── NEW: Toggle a tag ─────────────────────────────────────────────────────
+  const toggleTag = (tag) =>
+    setForm((p) => ({
+      ...p,
+      tags: p.tags.includes(tag)
+        ? p.tags.filter((t) => t !== tag)
+        : [...p.tags, tag],
+    }));
+
+  // ── Reset subcategory when category changes ───────────────────────────────
+  const handleCategoryChange = (val) => {
+    set("category", val);
+    set("subcategory", ""); // reset subcategory so it doesn't mismatch
+  };
+
   const cat = form.category;
   const isFinished = cat === "finished_product";
   const isRawMaterial = cat === "raw_material" || cat === "ingredient";
@@ -331,18 +525,20 @@ export default function StockItemModal({
     isFinished &&
     parseFloat(form.sell_price || 0) > 0 &&
     parseFloat(form.quantity_on_hand || 0) > 0;
-
   const allergenCount = Object.values(form.allergen_flags).filter(
     Boolean,
   ).length;
 
-  // Generates R638 declaration text for label copy
+  // Available subcategories for selected category
+  const subcategoryOptions = SUBCATEGORY_BY_CATEGORY[cat] || [];
+
   const generateAllergenText = () => {
     const present = ALLERGEN_FLAGS.filter(
       (a) => form.allergen_flags[a.key],
     ).map((a) => a.label);
-    if (present.length === 0) return "No allergens declared.";
-    return `Contains: ${present.join(", ")}.`;
+    return present.length === 0
+      ? "No allergens declared."
+      : `Contains: ${present.join(", ")}.`;
   };
 
   const handleSubmit = () => {
@@ -358,7 +554,6 @@ export default function StockItemModal({
       return;
     }
 
-    // Build clean allergen_flags — only include true values
     const allergenOut = Object.fromEntries(
       Object.entries(form.allergen_flags).filter(([, v]) => v === true),
     );
@@ -379,22 +574,25 @@ export default function StockItemModal({
       expiry_date: form.expiry_date || null,
       strain_id: form.strain_id || null,
       is_active: form.is_active,
-      // BIB S1 columns
       medium_type: form.medium_type || null,
       shelf_life_days:
         form.shelf_life_days !== "" ? parseInt(form.shelf_life_days) : null,
       ingredients_notes: form.ingredients_notes || null,
       storage_instructions: form.storage_instructions || null,
       allergen_flags: Object.keys(allergenOut).length > 0 ? allergenOut : null,
-      // S3 columns
       temperature_zone: form.temperature_zone || null,
       batch_lot_number: form.batch_lot_number || null,
       country_of_origin: form.country_of_origin || null,
       reorder_qty:
         form.reorder_qty !== "" ? parseFloat(form.reorder_qty) : null,
+      // ── NEW v1.2 ──
+      brand: form.brand.trim() || null,
+      subcategory: form.subcategory || null,
+      variant_type: form.variant_type || null,
+      variant_value: form.variant_value.trim() || null,
+      tags: form.tags.length > 0 ? form.tags : null,
     };
 
-    // RULE 0F — tenant_id on INSERT only (not UPDATE — let existing value persist)
     if (!item) {
       payload.tenant_id = tenantId || null;
     }
@@ -405,7 +603,6 @@ export default function StockItemModal({
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onCancel}
         style={{
@@ -415,8 +612,6 @@ export default function StockItemModal({
           zIndex: 1000,
         }}
       />
-
-      {/* Panel */}
       <div
         style={{
           position: "fixed",
@@ -490,7 +685,6 @@ export default function StockItemModal({
 
         {/* Body */}
         <div style={{ padding: "24px", flex: 1 }}>
-          {/* Toast */}
           {toast && (
             <div
               style={{
@@ -516,7 +710,6 @@ export default function StockItemModal({
             bg={T.infoBg}
             border={T.infoBd}
           />
-
           <Grid2>
             <Field>
               <Lbl required>SKU</Lbl>
@@ -524,7 +717,7 @@ export default function StockItemModal({
                 style={sInput}
                 value={form.sku}
                 onChange={(e) => set("sku", e.target.value)}
-                placeholder="e.g. RM-D9-DIST-01"
+                placeholder="e.g. MED-CONC-BUD-1G"
               />
             </Field>
             <Field>
@@ -533,18 +726,17 @@ export default function StockItemModal({
                 style={sInput}
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="e.g. D9 Distillate"
+                placeholder="e.g. Budder 1g"
               />
             </Field>
           </Grid2>
-
           <Grid2>
             <Field>
               <Lbl>Category</Lbl>
               <select
                 style={sSelect}
                 value={form.category}
-                onChange={(e) => set("category", e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
               >
                 {Object.entries(CATEGORY_LABELS)
                   .filter(([k]) => visibleCategories.includes(k))
@@ -570,7 +762,6 @@ export default function StockItemModal({
               </select>
             </Field>
           </Grid2>
-
           <Field>
             <Lbl>Description</Lbl>
             <textarea
@@ -581,6 +772,276 @@ export default function StockItemModal({
             />
           </Field>
 
+          {/* ── SECTION: Cannabis Catalogue (NEW v1.2 — cannabis profiles only) ── */}
+          {isCannabis && (
+            <>
+              <SectionHead
+                label="Cannabis Catalogue"
+                color="#5B21B6"
+                bg="#F5F3FF"
+                border="#DDD6FE"
+              />
+
+              <Grid2>
+                <Field>
+                  <Lbl note="brand name shown in filters">Brand</Lbl>
+                  <input
+                    style={sInput}
+                    value={form.brand}
+                    onChange={(e) => set("brand", e.target.value)}
+                    placeholder="e.g. RAW, Canna, Biobizz"
+                  />
+                </Field>
+                <Field>
+                  <Lbl note="product type within category">Subcategory</Lbl>
+                  {subcategoryOptions.length > 0 ? (
+                    <select
+                      style={sSelect}
+                      value={form.subcategory}
+                      onChange={(e) => set("subcategory", e.target.value)}
+                    >
+                      <option value="">— Select type —</option>
+                      {subcategoryOptions.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      style={sInput}
+                      value={form.subcategory}
+                      onChange={(e) => set("subcategory", e.target.value)}
+                      placeholder="e.g. rosin_bag"
+                    />
+                  )}
+                </Field>
+              </Grid2>
+
+              <Grid2>
+                <Field>
+                  <Lbl note="what the variant describes">Variant Type</Lbl>
+                  <select
+                    style={sSelect}
+                    value={form.variant_type}
+                    onChange={(e) => set("variant_type", e.target.value)}
+                  >
+                    {VARIANT_TYPES.map((v) => (
+                      <option key={v.value} value={v.value}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field>
+                  <Lbl note="shown as badge on product card">Variant Value</Lbl>
+                  <input
+                    style={sInput}
+                    value={form.variant_value}
+                    onChange={(e) => set("variant_value", e.target.value)}
+                    placeholder={
+                      form.variant_type === "weight"
+                        ? "e.g. 3.5g, 1g, 7g"
+                        : form.variant_type === "size"
+                          ? "e.g. King Size, 110mm"
+                          : form.variant_type === "strain"
+                            ? "e.g. Indica, Sativa, Gelato"
+                            : form.variant_type === "count"
+                              ? "e.g. 3-Pack, 6-Pack"
+                              : form.variant_type === "strength"
+                                ? "e.g. 500mg, 58% 4g"
+                                : "e.g. King Size, 3.5g, Indica"
+                    }
+                  />
+                </Field>
+              </Grid2>
+
+              {/* Tags — only shown when relevant groups exist for this category/subcategory */}
+              {TAG_GROUPS.some((group) => {
+                const c = form.category;
+                const s = form.subcategory;
+                const noTags = [
+                  "clothing",
+                  "cartridge",
+                  "disposable",
+                  "battery",
+                  "mushroom",
+                  "adaptogen",
+                  "cbd",
+                  "cbd_pet",
+                  "preroll",
+                  "tincture",
+                  "capsule",
+                  "topical",
+                ];
+                if (noTags.includes(s)) return false;
+                if (group.group === "Concentrate Type")
+                  return (
+                    ["concentrate"].includes(c) ||
+                    [
+                      "hash",
+                      "budder",
+                      "badder",
+                      "live_resin",
+                      "rosin",
+                      "sauce",
+                      "diamonds",
+                      "distillate",
+                      "crumble",
+                      "shatter",
+                      "wax",
+                      "feco",
+                      "rso",
+                      "bho",
+                      "kief",
+                    ].includes(s)
+                  );
+                if (group.group === "Processing")
+                  return ["flower", "concentrate", "raw_material"].includes(c);
+                if (group.group === "Cultivation")
+                  return ["flower", "concentrate", "raw_material"].includes(c);
+                if (group.group === "Grade")
+                  return ["flower", "concentrate"].includes(c);
+                if (group.group === "Effect")
+                  return ["flower", "concentrate", "edible"].includes(c);
+                return false;
+              }) && (
+                <Field>
+                  <Lbl note="cultivation method, grade, processing — unlimited">
+                    Tags
+                  </Lbl>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                      padding: "12px",
+                      background: "#F5F3FF",
+                      border: "1px solid #DDD6FE",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    {TAG_GROUPS.filter((group) => {
+                      const c = form.category;
+                      const s = form.subcategory;
+                      const noTags = [
+                        "clothing",
+                        "cartridge",
+                        "disposable",
+                        "battery",
+                        "mushroom",
+                        "adaptogen",
+                        "cbd",
+                        "cbd_pet",
+                        "preroll",
+                        "tincture",
+                        "capsule",
+                        "topical",
+                      ];
+                      if (noTags.includes(s)) return false;
+                      if (group.group === "Concentrate Type")
+                        return (
+                          ["concentrate"].includes(c) ||
+                          [
+                            "hash",
+                            "budder",
+                            "badder",
+                            "live_resin",
+                            "rosin",
+                            "sauce",
+                            "diamonds",
+                            "distillate",
+                            "crumble",
+                            "shatter",
+                            "wax",
+                            "feco",
+                            "rso",
+                            "bho",
+                            "kief",
+                          ].includes(s)
+                        );
+                      if (group.group === "Processing")
+                        return [
+                          "flower",
+                          "concentrate",
+                          "raw_material",
+                        ].includes(c);
+                      if (group.group === "Cultivation")
+                        return [
+                          "flower",
+                          "concentrate",
+                          "raw_material",
+                        ].includes(c);
+                      if (group.group === "Grade")
+                        return ["flower", "concentrate"].includes(c);
+                      if (group.group === "Effect")
+                        return ["flower", "concentrate", "edible"].includes(c);
+                      return false;
+                    }).map((group) => (
+                      <div key={group.group}>
+                        <div
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: "#5B21B6",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                            marginBottom: 6,
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          {group.group}
+                        </div>
+                        <div
+                          style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                        >
+                          {group.tags.map((tag) => {
+                            const active = form.tags.includes(tag);
+                            return (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => toggleTag(tag)}
+                                style={{
+                                  padding: "3px 10px",
+                                  borderRadius: 12,
+                                  fontSize: 11,
+                                  fontWeight: active ? 700 : 400,
+                                  fontFamily: T.fontUi,
+                                  border:
+                                    "1.5px solid " +
+                                    (active ? "#5B21B6" : "#DDD6FE"),
+                                  background: active ? "#5B21B6" : "#fff",
+                                  color: active ? "#fff" : "#5B21B6",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {tag}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    {form.tags.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#5B21B6",
+                          fontFamily: T.fontUi,
+                          borderTop: "1px solid #DDD6FE",
+                          paddingTop: 8,
+                        }}
+                      >
+                        Selected: {form.tags.join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                </Field>
+              )}
+            </>
+          )}
+
           {/* ── SECTION: Stock Levels ── */}
           <SectionHead
             label="Stock Levels"
@@ -588,7 +1049,6 @@ export default function StockItemModal({
             bg={T.accentLit}
             border={T.accentBd}
           />
-
           <Grid2>
             <Field>
               <Lbl note="current on-hand qty">Quantity on Hand</Lbl>
@@ -613,7 +1073,6 @@ export default function StockItemModal({
               />
             </Field>
           </Grid2>
-
           <Grid2>
             <Field>
               <Lbl note="optional">Max Stock Level</Lbl>
@@ -653,7 +1112,6 @@ export default function StockItemModal({
             bg="#FFF8E1"
             border="#FFE082"
           />
-
           <Grid2>
             <Field>
               <Lbl>Cost Price (ZAR)</Lbl>
@@ -693,8 +1151,6 @@ export default function StockItemModal({
               )}
             </Field>
           </Grid2>
-
-          {/* Shop status for finished products */}
           {isFinished && (
             <div
               style={{
@@ -739,8 +1195,8 @@ export default function StockItemModal({
                     fontFamily: T.fontUi,
                   }}
                 >
-                  Not live — requires: finished_product · sell price {">"} R0 ·
-                  stock {">"} 0
+                  Not live — requires: finished_product · sell price &gt; R0 ·
+                  stock &gt; 0
                 </div>
               )}
             </div>
@@ -753,7 +1209,6 @@ export default function StockItemModal({
             bg={T.ink075}
             border={T.ink150}
           />
-
           <Grid2>
             <Field>
               <Lbl required={isFoodBev && isFinished}>Expiry Date</Lbl>
@@ -798,7 +1253,7 @@ export default function StockItemModal({
             )}
           </Grid2>
 
-          {/* ── SECTION: Cannabis-specific (raw_material, concentrate, terpene) ── */}
+          {/* ── SECTION: Cannabis Profile (raw_material, concentrate, terpene) ── */}
           {showCannabisFields && (isRawMaterial || isTerpene) && (
             <>
               <SectionHead
@@ -807,7 +1262,6 @@ export default function StockItemModal({
                 bg={T.accentLit}
                 border={T.accentBd}
               />
-
               <Grid2>
                 {isRawMaterial && (
                   <Field>
@@ -867,8 +1321,6 @@ export default function StockItemModal({
                 bg="#E8F5E9"
                 border="#A5D6A7"
               />
-
-              {/* Temperature zone + reorder qty */}
               <Grid2>
                 <Field>
                   <Lbl>Temperature Zone</Lbl>
@@ -896,8 +1348,6 @@ export default function StockItemModal({
                   />
                 </Field>
               </Grid2>
-
-              {/* Supplier lot + country of origin */}
               <Grid2>
                 <Field>
                   <Lbl note="supplier's delivery lot ref">
@@ -920,8 +1370,6 @@ export default function StockItemModal({
                   />
                 </Field>
               </Grid2>
-
-              {/* Ingredients notes */}
               <Field>
                 <Lbl>Ingredients Notes</Lbl>
                 <textarea
@@ -931,8 +1379,6 @@ export default function StockItemModal({
                   placeholder="e.g. Contains natural lemon flavouring, citric acid (E330)"
                 />
               </Field>
-
-              {/* Allergen Declaration — 14 SA R638 toggles */}
               <Field>
                 <div
                   style={{
@@ -999,8 +1445,6 @@ export default function StockItemModal({
                     </button>
                   )}
                 </div>
-
-                {/* 14-toggle grid */}
                 <div
                   style={{
                     display: "grid",
@@ -1039,8 +1483,6 @@ export default function StockItemModal({
                     </label>
                   ))}
                 </div>
-
-                {/* Live declaration preview */}
                 {allergenCount > 0 && (
                   <p
                     style={{
@@ -1068,7 +1510,6 @@ export default function StockItemModal({
                 bg={T.infoBg}
                 border={T.infoBd}
               />
-
               <Field>
                 <Lbl note="select compatible formats">
                   Compatible Product Formats
