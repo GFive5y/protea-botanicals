@@ -3,7 +3,7 @@
 // All other profiles (food_beverage, general_retail, mixed_retail) — UNCHANGED
 // ESLint fixes: renderAccPanel disable (kept for future use), avail disable in grid
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
@@ -12,6 +12,9 @@ import StockReceiveModal from "./StockReceiveModal";
 import StockPricingPanel from "./StockPricingPanel";
 import StockChannelPanel from "./StockChannelPanel";
 import StockReceiveHistoryPanel from "./StockReceiveHistoryPanel";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { SparkLine, BulletChart } from "../viz";
+import StockIntelPanel from "./StockIntelPanel";
 
 const T = {
   ink900: "#0D0D0D",
@@ -2289,235 +2292,729 @@ export default function HQStock() {
   };
 
   // ── GENERAL OVERVIEW ──────────────────────────────────────────────────────
+  // ── GENERAL OVERVIEW v4.0 — WP-STOCK-OVERVIEW Phase 1 ───────────────────
+  // Zone 1: Action Queue · Zone 2: Command Metrics · Zone 3: Category Health
+  // Zone 4–6: StockIntelPanel (Phase 2/3) · Zone 7: StockChannelPanel (kept)
+  // Zone 8: Recent Movements (restyled)
   const GeneralOverview = () => {
-    const activeItems = items.filter((i) => i.is_active !== false);
-    const totalSkus = activeItems.length;
-    const totalValue = activeItems.reduce(
-      (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
-      0,
+    // ── Shared derivations ────────────────────────────────────────────────────
+    const activeItems = useMemo(
+      () => items.filter((i) => i.is_active !== false),
+      [],
     );
-    const totalCost = activeItems.reduce(
-      (s, i) => s + (i.quantity_on_hand || 0) * (i.cost_price || 0),
-      0,
+    const pricedItems = useMemo(
+      () =>
+        activeItems.filter((i) => i.sell_price > 0 && i.weighted_avg_cost > 0),
+      [activeItems],
     );
-    const lowItems = activeItems.filter(isLowFn);
-    const outItems = activeItems.filter((i) => (i.quantity_on_hand || 0) === 0);
+    const outOfStock = useMemo(
+      () => activeItems.filter((i) => (i.quantity_on_hand || 0) <= 0),
+      [activeItems],
+    );
+    const lowItems = useMemo(() => activeItems.filter(isLowFn), [activeItems]);
+    const inStockLow = useMemo(
+      () => lowItems.filter((i) => (i.quantity_on_hand || 0) > 0),
+      [lowItems],
+    );
+
+    const totalValue = useMemo(
+      () =>
+        activeItems.reduce(
+          (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+          0,
+        ),
+      [activeItems],
+    );
+    const availValue = useMemo(
+      () =>
+        activeItems.reduce(
+          (s, i) =>
+            s +
+            Math.max(0, (i.quantity_on_hand || 0) - (i.reserved_qty || 0)) *
+              (i.weighted_avg_cost || 0),
+          0,
+        ),
+      [activeItems],
+    );
+    const healthyCount = useMemo(
+      () =>
+        activeItems.filter((i) => (i.quantity_on_hand || 0) > 0 && !isLowFn(i))
+          .length,
+      [activeItems],
+    );
+    const highMarginCnt = useMemo(
+      () =>
+        pricedItems.filter(
+          (i) =>
+            ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 > 40,
+        ).length,
+      [pricedItems],
+    );
+    const marginalCnt = useMemo(
+      () =>
+        pricedItems.filter((i) => {
+          const m = ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100;
+          return m >= 20 && m <= 40;
+        }).length,
+      [pricedItems],
+    );
+    const reorderCnt = useMemo(
+      () =>
+        activeItems.filter((i) => isLowFn(i) && (i.quantity_on_hand || 0) > 0)
+          .length,
+      [activeItems],
+    );
+
+    // 7-day activity sparkline — derived from real movements, not mocked.
+    // Shows movement count per day as a proxy for business activity.
+    // Hidden gracefully if fewer than 3 days have data (new tenant / no history).
+    const spark7 = useMemo(() => {
+      const now = Date.now();
+      return Array.from({ length: 7 }, (_, i) => {
+        const dayStart = new Date(now - (6 - i) * 86400000);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
+        const count = movements.filter((m) => {
+          const d = new Date(m.created_at);
+          return d >= dayStart && d <= dayEnd;
+        }).length;
+        return { v: count };
+      });
+    }, []);
+    const hasSparkData = useMemo(
+      () => spark7.filter((d) => d.v > 0).length >= 3,
+      [spark7],
+    );
+
+    // Zone 3 — category groups for BulletChart
+    const catGroups = useMemo(() => {
+      const map = {};
+      activeItems.forEach((i) => {
+        const cat = i.category || "other";
+        if (!map[cat])
+          map[cat] = { count: 0, onHand: 0, reorder: 0, maxStock: 0, value: 0 };
+        map[cat].count++;
+        map[cat].onHand += i.quantity_on_hand || 0;
+        map[cat].reorder += i.reorder_level || 0;
+        map[cat].maxStock += i.max_stock_level || 0;
+        map[cat].value +=
+          (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0);
+      });
+      return Object.entries(map).sort((a, b) => b[1].count - a[1].count);
+    }, [activeItems]);
+
+    // Zone 3 — margin distribution donut
+    const marginDonut = useMemo(() => {
+      const healthy = pricedItems.filter(
+        (i) => ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 > 40,
+      ).length;
+      const marginal = pricedItems.filter((i) => {
+        const m = ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100;
+        return m >= 20 && m <= 40;
+      }).length;
+      const thin = pricedItems.filter(
+        (i) => ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 < 20,
+      ).length;
+      const unpriced = activeItems.length - pricedItems.length;
+      return [
+        { name: "Healthy >40%", value: healthy, color: T.success },
+        { name: "Marginal 20–40%", value: marginal, color: T.warning },
+        { name: "Thin <20%", value: thin, color: T.danger },
+        { name: "No price set", value: unpriced, color: T.ink150 },
+      ].filter((d) => d.value > 0);
+    }, [activeItems, pricedItems]);
+
+    // Zone 1 — Action Queue
+    const noPrice = activeItems.filter((i) => !(i.sell_price > 0));
+    const topCategories = (list) => {
+      const map = {};
+      list.forEach((i) => {
+        const c = CATEGORY_LABELS[i.category] || i.category || "Other";
+        map[c] = (map[c] || 0) + 1;
+      });
+      return Object.entries(map)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([c, n]) => `${c} ×${n}`)
+        .join(" · ");
+    };
+    const queueActions = [];
+    if (outOfStock.length > 0)
+      queueActions.push({
+        severity: "critical",
+        text: `${outOfStock.length} item${outOfStock.length !== 1 ? "s" : ""} out of stock — hidden from shop`,
+        sub: topCategories(outOfStock),
+        cta: "View items",
+        action: () => setSubTab("items"),
+      });
+    if (noPrice.length > 0)
+      queueActions.push({
+        severity: "critical",
+        text: `${noPrice.length} SKU${noPrice.length !== 1 ? "s" : ""} have no sell price — shop shows nothing`,
+        sub: topCategories(noPrice),
+        cta: "Open pricing",
+        action: () => setSubTab("pricing"),
+      });
+    if (inStockLow.length > 0)
+      queueActions.push({
+        severity: "info",
+        text: `${inStockLow.length} item${inStockLow.length !== 1 ? "s" : ""} below reorder level`,
+        sub: topCategories(inStockLow),
+        // Purchase Orders tab is visible in the tab bar (disabled, SOON badge).
+        // setSubTab fires but renders nothing until WP-STOCK-PO ships.
+        // This is intentional — keeps the planned feature visible in the UI.
+        cta: "Raise PO",
+        action: () => setSubTab("purchase-orders"),
+      });
+
+    const SEV = {
+      critical: {
+        color: T.danger,
+        bg: T.dangerBg,
+        bd: T.dangerBd,
+        label: "CRITICAL",
+      },
+      warning: {
+        color: T.warning,
+        bg: T.warningBg,
+        bd: T.warningBd,
+        label: "WARNING",
+      },
+      info: { color: T.info, bg: T.infoBg, bd: T.infoBd, label: "INFO" },
+    };
+
+    const recentMov = movements.slice(0, 8);
+
+    // Zone 2 — KPI tile definitions
     const liveItems = activeItems.filter(
       (i) => (i.sell_price || 0) > 0 && (i.quantity_on_hand || 0) > 0,
     );
-    const reserved = activeItems.reduce((s, i) => s + (i.reserved_qty || 0), 0);
-    const healthyCount = activeItems.filter(
-      (i) => (i.quantity_on_hand || 0) > 0 && !isLowFn(i),
-    ).length;
-    const healthPct =
-      totalSkus > 0 ? Math.round((healthyCount / totalSkus) * 100) : 0;
-    const catMap = {};
-    activeItems.forEach((i) => {
-      const cat = i.category || "other";
-      if (!catMap[cat]) catMap[cat] = { count: 0, value: 0 };
-      catMap[cat].count++;
-      catMap[cat].value +=
-        (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0);
-    });
-    const recentMov = movements.slice(0, 8);
+    const kpiTiles = [
+      {
+        label: "Stock Value",
+        value: fmt(totalValue),
+        sub: `Available ${fmt(availValue)}`,
+        valueColor: T.ink900,
+        spark: spark7,
+        sparkPositive: true,
+        delta: null,
+      },
+      {
+        label: "Healthy SKUs",
+        value: healthyCount,
+        sub: `of ${activeItems.length} active`,
+        valueColor:
+          healthyCount > activeItems.length * 0.7
+            ? T.success
+            : healthyCount > activeItems.length * 0.4
+              ? T.warning
+              : T.danger,
+        spark: spark7,
+        sparkPositive: true,
+        delta: null,
+      },
+      {
+        label: "Margin Health",
+        value:
+          pricedItems.length > 0
+            ? `${Math.round((highMarginCnt / pricedItems.length) * 100)}%`
+            : "—",
+        sub: `${highMarginCnt} healthy · ${marginalCnt} marginal`,
+        valueColor:
+          pricedItems.length > 0 && highMarginCnt / pricedItems.length > 0.5
+            ? T.success
+            : T.warning,
+        spark: null,
+        delta: null,
+      },
+      {
+        label: "Live in Shop",
+        value: liveItems.length,
+        sub: `priced & in stock`,
+        valueColor: liveItems.length > 0 ? T.accentMid : T.danger,
+        spark: null,
+        delta: null,
+      },
+      {
+        label: "Reorder Pressure",
+        value: reorderCnt,
+        sub:
+          reorderCnt === 0
+            ? "all above reorder level"
+            : `item${reorderCnt !== 1 ? "s" : ""} need restocking`,
+        valueColor:
+          reorderCnt > 10 ? T.danger : reorderCnt > 5 ? T.warning : T.success,
+        spark: null,
+        delta: null,
+      },
+    ];
+
     return (
       <div style={{ display: "grid", gap: 20 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px,1fr))",
-            gap: "1px",
-            background: T.ink150,
-            borderRadius: 6,
-            overflow: "hidden",
-            border: "1px solid " + T.ink150,
-          }}
-        >
-          {[
-            { label: "Total SKUs", value: totalSkus, top: T.ink150 },
-            { label: "Stock Value", value: fmt(totalValue), top: T.accentMid },
-            { label: "Stock Cost", value: fmt(totalCost), top: T.ink150 },
-            {
-              label: "Low Stock",
-              value: lowItems.length,
-              top: lowItems.length > 0 ? T.warning : T.ink150,
-            },
-            {
-              label: "Out of Stock",
-              value: outItems.length,
-              top: outItems.length > 0 ? T.danger : T.ink150,
-            },
-            { label: "Live in Shop", value: liveItems.length, top: T.success },
-            { label: "Reserved", value: reserved, top: T.ink150 },
-          ].map((k) => (
-            <div
-              key={k.label}
-              style={{
-                background: "#fff",
-                padding: "16px 18px",
-                borderTop: "3px solid " + k.top,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 400,
-                  color: T.ink900,
-                  fontFamily: T.mono,
-                  lineHeight: 1,
-                  marginBottom: 4,
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {k.value}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: T.ink400,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                }}
-              >
-                {k.label}
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* ── ZONE 1: ACTION QUEUE ────────────────────────────────────────── */}
         <div
           style={{
             background: "#fff",
             border: "1px solid " + T.ink150,
             borderRadius: 6,
-            padding: "16px 20px",
+            overflow: "hidden",
           }}
         >
           <div
             style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: T.ink400,
-              marginBottom: 12,
-            }}
-          >
-            Stock Health
-          </div>
-          <div
-            style={{
+              padding: "12px 20px",
+              borderBottom: "1px solid " + T.ink150,
               display: "flex",
-              gap: 16,
+              justifyContent: "space-between",
               alignItems: "center",
-              flexWrap: "wrap",
             }}
           >
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div
-                style={{
-                  height: 8,
-                  background: T.ink150,
-                  borderRadius: 4,
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: healthPct + "%",
-                    background:
-                      healthPct > 70
-                        ? T.success
-                        : healthPct > 40
-                          ? T.warning
-                          : T.danger,
-                    borderRadius: 4,
-                  }}
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 20 }}>
-              <span style={{ fontSize: 12, color: T.success, fontWeight: 600 }}>
-                Healthy: {healthyCount} SKUs
-              </span>
-              <span style={{ fontSize: 12, color: T.warning, fontWeight: 600 }}>
-                Low: {lowItems.length}
-              </span>
-              <span style={{ fontSize: 12, color: T.danger, fontWeight: 600 }}>
-                Out: {outItems.length}
-              </span>
-            </div>
-          </div>
-        </div>
-        {Object.keys(catMap).length > 0 && (
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid " + T.ink150,
-              borderRadius: 6,
-              padding: "16px 20px",
-            }}
-          >
-            <div
+            <span
               style={{
                 fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 color: T.ink400,
-                marginBottom: 12,
               }}
             >
-              Stock by Category
-            </div>
+              Action Queue
+            </span>
+            <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.mono }}>
+              {new Date().toLocaleTimeString("en-ZA", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+          {queueActions.length === 0 ? (
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))",
+                padding: "14px 20px",
+                display: "flex",
+                alignItems: "center",
                 gap: 10,
               }}
             >
-              {Object.entries(catMap).map(([cat, data]) => (
+              <div
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  background: T.successBg,
+                  border: "1px solid " + T.successBd,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  color: T.success,
+                  flexShrink: 0,
+                }}
+              >
+                ✓
+              </div>
+              <div>
                 <div
-                  key={cat}
+                  style={{ fontSize: 13, fontWeight: 600, color: T.success }}
+                >
+                  All good
+                </div>
+                <div style={{ fontSize: 11, color: T.ink400, marginTop: 1 }}>
+                  All items in stock · All SKUs priced · No critical holds
+                </div>
+              </div>
+            </div>
+          ) : (
+            queueActions.map((act, idx) => {
+              const s = SEV[act.severity];
+              return (
+                <div
+                  key={idx}
                   style={{
-                    padding: "12px 14px",
-                    background: T.ink050,
-                    border: "1px solid " + T.ink150,
-                    borderRadius: 4,
+                    padding: "12px 20px",
+                    borderLeft: "3px solid " + s.color,
+                    borderBottom:
+                      idx < queueActions.length - 1
+                        ? "1px solid " + T.ink150
+                        : "none",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 16,
+                    background: idx % 2 === 0 ? "#fff" : T.ink075,
                   }}
                 >
                   <div
                     style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: T.accentMid,
-                      marginBottom: 6,
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "flex-start",
+                      flex: 1,
+                      minWidth: 0,
                     }}
                   >
-                    {CATEGORY_LABELS[cat] || cat}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        padding: "2px 6px",
+                        borderRadius: 3,
+                        background: s.bg,
+                        color: s.color,
+                        border: "1px solid " + s.bd,
+                        whiteSpace: "nowrap",
+                        marginTop: 2,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {s.label}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: T.ink700,
+                        }}
+                      >
+                        {act.text}
+                      </div>
+                      {act.sub && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: T.ink400,
+                            marginTop: 2,
+                            fontFamily: T.mono,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {act.sub}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    onClick={act.action}
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: s.bg,
+                      color: s.color,
+                      border: "1px solid " + s.bd,
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      fontFamily: T.font,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {act.cta} →
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ── ZONE 2: COMMAND METRICS ─────────────────────────────────────── */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px,1fr))",
+            gap: 10,
+          }}
+        >
+          {kpiTiles.map((tile) => (
+            <div
+              key={tile.label}
+              style={{
+                background: "#fff",
+                border: "1px solid " + T.ink150,
+                borderRadius: 6,
+                padding: "14px 16px",
+                // No coloured top borders — forbidden by WP-VISUAL-SYSTEM v1.0
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                  marginBottom: 8,
+                }}
+              >
+                {tile.label}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-end",
+                }}
+              >
+                <div>
                   <div
                     style={{
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: 400,
-                      color: T.ink900,
                       fontFamily: T.mono,
+                      fontVariantNumeric: "tabular-nums",
+                      color: tile.valueColor,
+                      lineHeight: 1,
                     }}
                   >
-                    {data.count} items
+                    {tile.value}
                   </div>
-                  <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
-                    {fmt(data.value)} value
-                  </div>
+                  {tile.sub && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: T.ink300,
+                        marginTop: 4,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      {tile.sub}
+                    </div>
+                  )}
                 </div>
-              ))}
+                {tile.spark && hasSparkData && (
+                  <SparkLine
+                    data={tile.spark}
+                    positive={tile.sparkPositive}
+                    width={56}
+                    height={28}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── ZONE 3: CATEGORY HEALTH MATRIX ─────────────────────────────── */}
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+        >
+          {/* Left: BulletChart per category */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid " + T.ink150,
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "12px 20px",
+                borderBottom: "1px solid " + T.ink150,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                }}
+              >
+                Category Health
+              </span>
+            </div>
+            <div style={{ padding: "12px 20px", display: "grid", gap: 12 }}>
+              {catGroups.length === 0 ? (
+                <div
+                  style={{ fontSize: 12, color: T.ink300, padding: "8px 0" }}
+                >
+                  No categories found
+                </div>
+              ) : (
+                catGroups.map(([cat, data]) => {
+                  const maxVal =
+                    data.maxStock > 0
+                      ? data.maxStock
+                      : Math.max(data.onHand * 2, 1);
+                  return (
+                    <div
+                      key={cat}
+                      onClick={() => setSubTab("items")}
+                      style={{ cursor: "pointer" }}
+                      title={`Click to view ${CATEGORY_LABELS[cat] || cat} items`}
+                    >
+                      <BulletChart
+                        label={CATEGORY_LABELS[cat] || cat}
+                        value={data.onHand}
+                        target={data.reorder}
+                        max={maxVal}
+                        unit=" units"
+                        height={16}
+                      />
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
-        )}
+
+          {/* Right: Margin distribution donut */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid " + T.ink150,
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                padding: "12px 20px",
+                borderBottom: "1px solid " + T.ink150,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                }}
+              >
+                Margin Distribution
+              </span>
+              {noPrice.length > 0 && (
+                <button
+                  onClick={() => setSubTab("pricing")}
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    padding: "2px 8px",
+                    borderRadius: 3,
+                    cursor: "pointer",
+                    background: T.warningBg,
+                    color: T.warning,
+                    border: "1px solid " + T.warningBd,
+                    fontFamily: T.font,
+                  }}
+                >
+                  {noPrice.length} unpriced →
+                </button>
+              )}
+            </div>
+            <div style={{ padding: "12px 20px" }}>
+              {marginDonut.length === 0 ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: T.ink300,
+                    padding: "20px 0",
+                    textAlign: "center",
+                  }}
+                >
+                  Set prices to see margin breakdown
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <PieChart>
+                      <Pie
+                        data={marginDonut}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={60}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {marginDonut.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value, name) => [`${value} SKUs`, name]}
+                        contentStyle={{
+                          fontSize: 11,
+                          fontFamily: T.font,
+                          border: "1px solid " + T.ink150,
+                          borderRadius: 4,
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "4px 12px",
+                      marginTop: 4,
+                    }}
+                  >
+                    {marginDonut.map((d, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 11,
+                          color: T.ink500,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: d.color,
+                            flexShrink: 0,
+                            display: "inline-block",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontFamily: T.mono,
+                            fontVariantNumeric: "tabular-nums",
+                            color: T.ink700,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {d.value}
+                        </span>
+                        <span>{d.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── ZONES 4, 5, 6: StockIntelPanel (Phase 2 + 3) ───────────────── */}
+        <StockIntelPanel
+          items={items}
+          movements={movements}
+          tenantId={tenantId}
+          onNavigate={setSubTab}
+        />
+
+        {/* ── ZONE 7: CHANNEL STOCK HOLD (unchanged) ──────────────────────── */}
+        <StockChannelPanel tenantId={tenantId} />
+
+        {/* ── ZONE 8: RECENT MOVEMENTS (restyled — T-tokens, no coloured borders) */}
         {recentMov.length > 0 && (
           <div
             style={{
@@ -2531,14 +3028,37 @@ export default function HQStock() {
               style={{
                 padding: "12px 20px",
                 borderBottom: "1px solid " + T.ink150,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: T.ink400,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              Recent Stock Movements
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                }}
+              >
+                Recent Stock Movements
+              </span>
+              <button
+                onClick={() => setSubTab("movements")}
+                style={{
+                  fontSize: 10,
+                  color: T.accentMid,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: T.font,
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                View all →
+              </button>
             </div>
             <table
               style={{
@@ -2558,11 +3078,14 @@ export default function HQStock() {
                 </tr>
               </thead>
               <tbody>
-                {recentMov.map((m) => {
+                {recentMov.map((m, idx) => {
                   const item = items.find((i) => i.id === m.item_id);
                   const qty = m.quantity || 0;
                   return (
-                    <tr key={m.id}>
+                    <tr
+                      key={m.id}
+                      style={{ background: idx % 2 === 0 ? "#fff" : T.ink075 }}
+                    >
                       <td
                         style={{
                           ...sTd,
@@ -2587,6 +3110,7 @@ export default function HQStock() {
                             borderRadius: 3,
                             background: T.ink075,
                             color: T.ink500,
+                            border: "1px solid " + T.ink150,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
                             fontWeight: 700,
@@ -2599,6 +3123,7 @@ export default function HQStock() {
                         style={{
                           ...sTd,
                           fontFamily: T.mono,
+                          fontVariantNumeric: "tabular-nums",
                           fontWeight: 700,
                           color: qty >= 0 ? T.success : T.danger,
                         }}
@@ -2623,7 +3148,6 @@ export default function HQStock() {
             </table>
           </div>
         )}
-        <StockChannelPanel tenantId={tenantId} />
       </div>
     );
   };
@@ -4368,10 +4892,16 @@ export default function HQStock() {
             { id: "movements", label: "Movements" },
             { id: "pricing", label: "💰 Pricing" },
             { id: "receipts", label: "📦 Receipts" },
+            {
+              id: "purchase-orders",
+              label: "🛒 Purchase Orders",
+              disabled: true,
+              soon: true,
+            },
           ].map((t) => (
             <button
               key={t.id}
-              onClick={() => setSubTab(t.id)}
+              onClick={() => !t.disabled && setSubTab(t.id)}
               style={{
                 padding: "10px 16px",
                 background: "none",
@@ -4385,13 +4915,38 @@ export default function HQStock() {
                 fontWeight: subTab === t.id ? 700 : 400,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: subTab === t.id ? T.accentMid : T.ink500,
-                cursor: "pointer",
+                color: t.disabled
+                  ? T.ink300
+                  : subTab === t.id
+                    ? T.accentMid
+                    : T.ink500,
+                cursor: t.disabled ? "default" : "pointer",
                 marginBottom: "-1px",
                 whiteSpace: "nowrap",
+                opacity: t.disabled ? 0.6 : 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
               }}
             >
               {t.label}
+              {t.soon && (
+                <span
+                  style={{
+                    fontSize: 8,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    padding: "1px 5px",
+                    borderRadius: 3,
+                    background: T.infoBg,
+                    color: T.info,
+                    border: "1px solid " + T.infoBd,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  SOON
+                </span>
+              )}
             </button>
           ))}
         </div>
