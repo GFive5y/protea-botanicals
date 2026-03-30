@@ -263,9 +263,9 @@ function Step2({
         .select(
           "id,name,sku,brand,category,subcategory,variant_value,tags,quantity_on_hand,weighted_avg_cost,cost_price,expiry_date,batch_lot_number",
         )
-        .or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%`)
+        .or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%,variant_value.ilike.%${q}%,subcategory.ilike.%${q}%`)
         .eq("is_active", true)
-        .limit(10);
+        .limit(30);
       setResults(data || []);
       setSearching(false);
     }, 280);
