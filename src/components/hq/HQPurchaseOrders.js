@@ -27,6 +27,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
+import StockReceiveModal from "./StockReceiveModal";
 import WorkflowGuide from "../WorkflowGuide";
 import { ChartCard, ChartTooltip } from "../viz";
 import { usePageContext } from "../../hooks/usePageContext";
@@ -127,12 +129,29 @@ const STATUSES = [
 ];
 
 const STATUS_META = {
+  // USD international statuses (Pure PTV flow — unchanged)
   draft: { label: "Draft", color: T.ink500, bg: T.ink075 },
   ordered: { label: "Ordered", color: T.info, bg: T.infoBg },
   in_transit: { label: "In Transit", color: T.warning, bg: T.warningBg },
   customs: { label: "Customs", color: "#6B21A8", bg: "#F5F3FF" },
   received: { label: "Received", color: T.success, bg: T.successBg },
   complete: { label: "Complete", color: T.accent, bg: T.accentLit },
+  // Document ingestion statuses (WHO- POs from Pure PTV pipeline)
+  confirmed: { label: "Confirmed", color: T.success, bg: T.successBg },
+  cancelled: { label: "Cancelled", color: T.ink500, bg: T.ink075 },
+  // ZAR local statuses (Medi Rec flow — new)
+  sent: { label: "Sent", color: T.info, bg: T.infoBg },
+  awaiting_delivery: { label: "Awaiting", color: T.warning, bg: T.warningBg },
+  partial: { label: "Partial", color: "#6B21A8", bg: "#F5F3FF" },
+  paid: { label: "Paid", color: T.accent, bg: T.accentLit },
+};
+
+// ZAR local status progression
+// eslint-disable-next-line no-unused-vars -- planned for partial delivery status progression (future WP)
+const NEXT_STATUS_ZAR = {
+  draft: "sent",
+  sent: "awaiting_delivery",
+  awaiting_delivery: "received",
 };
 
 const NEXT_STATUS = {
@@ -301,8 +320,15 @@ function StatusBadge({ status }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function HQPurchaseOrders() {
+export default function HQPurchaseOrders({
+  tenantId: tenantIdProp,
+  industryProfile: profileProp,
+} = {}) {
   const { fxRate, fxLoading } = useFxRate();
+  const { tenantId: ctxTenantId, industryProfile: ctxProfile } = useTenant();
+  const tenantId = tenantIdProp || ctxTenantId;
+  const industryProfile = profileProp || ctxProfile || "vape";
+  const isCannabisTenant = industryProfile === "cannabis_retail";
   const [pos, setPos] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -322,13 +348,25 @@ export default function HQPurchaseOrders() {
   const [creating, setCreating] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [catFilter, setCatFilter] = useState("all");
+  // ZAR local mode
+  const [poMode, setPoMode] = useState(
+    isCannabisTenant ? "local" : "international",
+  );
+  const [zarLines, setZarLines] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [expectedDelivery, setExpectedDelivery] = useState("");
+  const [zarNotes, setZarNotes] = useState("");
+  const [receivePo, setReceivePo] = useState(null);
   const ctx = usePageContext("procurement", null);
 
   const fetchPOs = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("purchase_orders")
       .select("*, suppliers(name, country, currency)")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
     if (error)
       console.error(
@@ -339,7 +377,23 @@ export default function HQPurchaseOrders() {
       );
     setPos(data || []);
     setLoading(false);
-  }, []);
+  }, [tenantId]);
+
+  const fetchInventoryItems = useCallback(async () => {
+    if (!tenantId) return;
+    setItemsLoading(true);
+    const { data } = await supabase
+      .from("inventory_items")
+      .select(
+        "id,name,sku,brand,category,subcategory,variant_value,sell_price,weighted_avg_cost,quantity_on_hand,reorder_level,unit",
+      )
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .order("category")
+      .order("name");
+    setInventoryItems(data || []);
+    setItemsLoading(false);
+  }, [tenantId]);
 
   const fetchSuppliers = useCallback(async () => {
     const { data } = await supabase.from("suppliers").select("*").order("name");
@@ -349,7 +403,8 @@ export default function HQPurchaseOrders() {
   useEffect(() => {
     fetchPOs();
     fetchSuppliers();
-  }, [fetchPOs, fetchSuppliers]);
+    fetchInventoryItems();
+  }, [fetchPOs, fetchSuppliers, fetchInventoryItems]);
 
   const fetchCatalogue = async (supplierId) => {
     setCatLoading(true);
@@ -433,12 +488,15 @@ export default function HQPurchaseOrders() {
   const handleCreate = async () => {
     if (!selSupplier || lineItems.length === 0) return;
     setCreating(true);
-    const poNumber = `PO-${Date.now().toString().slice(-8)}`;
+    const _d = new Date();
+    const _ds = `${_d.getFullYear()}${String(_d.getMonth() + 1).padStart(2, "0")}${String(_d.getDate()).padStart(2, "0")}`;
+    const poNumber = `PO-${_ds}-${Math.floor(1000 + Math.random() * 9000)}`;
     const lockedRate = usdZar;
     const { data: po, error } = await supabase
       .from("purchase_orders")
       .insert({
         po_number: poNumber,
+        tenant_id: tenantId,
         supplier_id: selSupplier.id,
         status: "draft",
         po_status: "draft",
@@ -637,6 +695,127 @@ export default function HQPurchaseOrders() {
       .join(" · ");
     showToast(`PO received — ${summary || "inventory updated"}`);
     fetchPOs();
+  };
+  // ── ZAR local PO create ──────────────────────────────────────────────────
+  const handleCreateLocal = async () => {
+    if (!selSupplier || zarLines.length === 0) return;
+    setCreating(true);
+    const _d = new Date();
+    const _ds = `${_d.getFullYear()}${String(_d.getMonth() + 1).padStart(2, "0")}${String(_d.getDate()).padStart(2, "0")}`;
+    const poNumber = `PO-${_ds}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const subtotalZar = zarLines.reduce((s, l) => s + l.qty * l.unit_cost, 0);
+    const { data: po, error } = await supabase
+      .from("purchase_orders")
+      .insert({
+        po_number: poNumber,
+        tenant_id: tenantId,
+        supplier_id: selSupplier.id,
+        status: "draft",
+        po_status: "draft",
+        order_date: new Date().toISOString().split("T")[0],
+        expected_date: expectedDelivery || null,
+        expected_arrival: expectedDelivery || null,
+        subtotal: parseFloat(subtotalZar.toFixed(2)),
+        landed_cost_zar: parseFloat(subtotalZar.toFixed(2)),
+        currency: "ZAR",
+        notes: zarNotes || null,
+        direction: "inbound",
+      })
+      .select()
+      .single();
+    if (error || !po) {
+      console.error("[HQPurchaseOrders] ZAR PO create error:", error);
+      setCreating(false);
+      return;
+    }
+    const lineInserts = zarLines.map((l) => ({
+      po_id: po.id,
+      item_id: l.item_id,
+      quantity_ordered: l.qty,
+      unit_cost: parseFloat(l.unit_cost.toFixed(2)),
+      line_total: parseFloat((l.qty * l.unit_cost).toFixed(2)),
+      notes: l.name,
+    }));
+    await supabase.from("purchase_order_items").insert(lineInserts);
+    setCreating(false);
+    setShowCreate(false);
+    setZarLines([]);
+    setExpectedDelivery("");
+    setZarNotes("");
+    setSelSupplier(null);
+    showToast(
+      `${poNumber} created — R${subtotalZar.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`,
+    );
+    fetchPOs();
+  };
+
+  // ── PDF generation ───────────────────────────────────────────────────────
+  const generatePDF = async (po) => {
+    const { data: lines } = await supabase
+      .from("purchase_order_items")
+      .select("*, inventory_items(name, sku, unit)")
+      .eq("po_id", po.id);
+    const supplierName = po.suppliers?.name || "Supplier";
+    const total = (lines || []).reduce(
+      (s, l) => s + parseFloat(l.line_total || 0),
+      0,
+    );
+    const html = `<!DOCTYPE html><html><head><title>${po.po_number}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;color:#111;padding:40px}
+  h1{font-size:22px;font-weight:600;margin-bottom:4px}
+  .meta{color:#666;font-size:12px;margin-bottom:24px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:16px;border-bottom:2px solid #1A3D2B}
+  .co{font-size:13px;font-weight:600;color:#1A3D2B}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{background:#1A3D2B;color:#fff;padding:8px 10px;text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase}
+  td{padding:9px 10px;border-bottom:1px solid #eee;font-size:12px}
+  tr:nth-child(even) td{background:#f9f9f9}
+  .total{text-align:right;padding:14px 10px 0;font-weight:600;font-size:14px;color:#1A3D2B}
+  .footer{margin-top:32px;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:12px}
+  .badge{display:inline-block;padding:3px 10px;background:#E8F5EE;color:#1A3D2B;border-radius:3px;font-size:11px;font-weight:600;letter-spacing:0.05em}
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="co">Medi Recreational</div>
+    <div style="color:#999;font-size:11px;margin-top:2px">Purchase Order</div>
+  </div>
+  <div style="text-align:right">
+    <h1>${po.po_number}</h1>
+    <div class="meta">Date: ${po.order_date || new Date().toLocaleDateString("en-ZA")}</div>
+    ${po.expected_date ? `<div class="meta">Expected delivery: ${po.expected_date}</div>` : ""}
+    <span class="badge">ZAR Order</span>
+  </div>
+</div>
+<div style="margin-bottom:20px">
+  <div style="font-weight:600;font-size:13px">${supplierName}</div>
+  ${po.notes ? `<div style="margin-top:6px;font-size:11px;color:#666">${po.notes}</div>` : ""}
+</div>
+<table>
+  <thead><tr><th>Item</th><th>SKU</th><th>Unit</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Cost</th><th style="text-align:right">Line Total</th></tr></thead>
+  <tbody>
+    ${(lines || [])
+      .map(
+        (l) => `<tr>
+      <td>${l.inventory_items?.name || l.notes || "—"}</td>
+      <td style="font-family:monospace;font-size:11px">${l.inventory_items?.sku || "—"}</td>
+      <td>${l.inventory_items?.unit || "unit"}</td>
+      <td style="text-align:right">${parseFloat(l.quantity_ordered || 0).toLocaleString("en-ZA")}</td>
+      <td style="text-align:right">R${parseFloat(l.unit_cost || 0).toFixed(2)}</td>
+      <td style="text-align:right;font-weight:500">R${parseFloat(l.line_total || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</td>
+    </tr>`,
+      )
+      .join("")}
+  </tbody>
+</table>
+<div class="total">Total: R${total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</div>
+<div class="footer">Generated by NuAi · ${new Date().toLocaleDateString("en-ZA")} · ${po.po_number} · This is an official purchase order. Please confirm receipt.</div>
+</body></html>`;
+    const w = window.open("", "_blank", "width=900,height=700");
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
   };
 
   const filteredPos =
@@ -1180,7 +1359,8 @@ export default function HQPurchaseOrders() {
                                 → {STATUS_META[nextStatus]?.label}
                               </button>
                             )}
-                          {status === "customs" && (
+                          {/* USD international — Pure PTV: unchanged */}
+                          {status === "customs" && po.currency !== "ZAR" && (
                             <button
                               style={mkBtn("success")}
                               onClick={() => handleReceive(po)}
@@ -1189,12 +1369,48 @@ export default function HQPurchaseOrders() {
                               {receiving ? "Receiving…" : "Receive"}
                             </button>
                           )}
-                          {status === "received" && (
+                          {status === "received" && po.currency !== "ZAR" && (
                             <button
                               style={mkBtn("small")}
                               onClick={() => handleAdvance(po, "complete")}
                             >
                               Complete
+                            </button>
+                          )}
+                          {/* ZAR local — Medi Rec: routes through StockReceiveModal */}
+                          {(status === "sent" ||
+                            status === "awaiting_delivery") &&
+                            po.currency === "ZAR" && (
+                              <button
+                                style={mkBtn("success")}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReceivePo(po);
+                                }}
+                              >
+                                Receive →
+                              </button>
+                            )}
+                          {status === "received" && po.currency === "ZAR" && (
+                            <button
+                              style={mkBtn("small")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdvance(po, "paid");
+                              }}
+                            >
+                              Mark paid
+                            </button>
+                          )}
+                          {po.currency === "ZAR" && (
+                            <button
+                              style={mkBtn("small")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                generatePDF(po);
+                              }}
+                            >
+                              PDF
                             </button>
                           )}
                         </div>
@@ -1257,13 +1473,33 @@ export default function HQPurchaseOrders() {
                   New Purchase Order
                 </h3>
                 <div style={{ fontSize: 12, color: T.ink400, marginTop: 3 }}>
-                  Step {step} of 3 —{" "}
-                  {
-                    ["Select Supplier", "Add Items", "Shipping & Confirm"][
-                      step - 1
-                    ]
-                  }
+                  {poMode === "local"
+                    ? "Local supplier (ZAR) — items from your catalogue"
+                    : `Step ${step} of 3 — ${["Select Supplier", "Add Items", "Shipping & Confirm"][step - 1]}`}
                 </div>
+              </div>
+              {/* Mode toggle */}
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  style={{
+                    ...mkBtn(poMode === "local" ? "primary" : "ghost"),
+                    fontSize: 11,
+                    padding: "5px 12px",
+                  }}
+                  onClick={() => setPoMode("local")}
+                >
+                  ZAR Local
+                </button>
+                <button
+                  style={{
+                    ...mkBtn(poMode === "international" ? "primary" : "ghost"),
+                    fontSize: 11,
+                    padding: "5px 12px",
+                  }}
+                  onClick={() => setPoMode("international")}
+                >
+                  USD Import
+                </button>
               </div>
               <button
                 style={{
@@ -1282,667 +1518,1200 @@ export default function HQPurchaseOrders() {
               </button>
             </div>
 
-            {/* Progress bar */}
-            <div
-              style={{
-                padding: "12px 24px",
-                borderBottom: `1px solid ${T.ink150}`,
-                display: "flex",
-                gap: 6,
-              }}
-            >
-              {[1, 2, 3].map((n) => (
-                <div key={n} style={{ flex: 1 }}>
-                  <div
+            {/* ZAR local create form */}
+            {poMode === "local" && (
+              <div style={{ padding: 24, flex: 1, overflowY: "auto" }}>
+                {/* Step 1: Supplier */}
+                <div style={{ marginBottom: 20 }}>
+                  <label
                     style={{
-                      height: 3,
-                      borderRadius: 2,
-                      background: step >= n ? T.accent : T.ink150,
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: step >= n ? T.accent : T.ink300,
-                      marginTop: 4,
-                      fontWeight: step === n ? 700 : 400,
+                      display: "block",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      letterSpacing: "0.06em",
+                      color: T.ink400,
+                      marginBottom: 6,
+                      fontFamily: T.fontUi,
                     }}
                   >
-                    {["Supplier", "Items", "Shipping"][n - 1]}
-                  </div>
+                    Supplier
+                  </label>
+                  <select
+                    value={selSupplier?.id || ""}
+                    onChange={(e) => {
+                      const s = suppliers.find((x) => x.id === e.target.value);
+                      setSelSupplier(s || null);
+                    }}
+                    style={{
+                      ...{
+                        padding: "9px 12px",
+                        border: `1px solid ${T.ink150}`,
+                        borderRadius: 4,
+                        fontFamily: T.fontUi,
+                        fontSize: 13,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        color: T.ink900,
+                      },
+                      background: "#fff",
+                    }}
+                  >
+                    <option value="">— Select supplier —</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.country ? ` (${s.country})` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))}
-            </div>
-
-            {/* Body */}
-            <div style={{ padding: 24, flex: 1 }}>
-              {/* Step 1 */}
-              {step === 1 && (
-                <div>
-                  <p style={{ color: T.ink500, marginTop: 0, fontSize: 13 }}>
-                    Choose the supplier for this purchase order.{" "}
-                    <InfoTooltip id="po-select-supplier" />
-                  </p>
-                  {suppliers.map((s) => (
-                    <div
-                      key={s.id}
-                      onClick={() => setSelSupplier(s)}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  <div>
+                    <label
                       style={{
-                        padding: "16px 18px",
-                        borderRadius: 6,
-                        marginBottom: 10,
-                        cursor: "pointer",
-                        border: `2px solid ${selSupplier?.id === s.id ? T.accent : T.ink150}`,
-                        background:
-                          selSupplier?.id === s.id ? T.accentLit : "#fff",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div>
-                          <strong style={{ color: T.ink900 }}>{s.name}</strong>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: T.ink500,
-                              marginTop: 3,
-                            }}
-                          >
-                            {s.country} · {s.currency}
-                          </div>
-                        </div>
-                        {selSupplier?.id === s.id && (
-                          <span
-                            style={{
-                              color: T.success,
-                              fontSize: 18,
-                              fontWeight: 700,
-                            }}
-                          >
-                            ✓
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {suppliers.length === 0 && (
-                    <div
-                      style={{
+                        display: "block",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
                         color: T.ink400,
-                        textAlign: "center",
-                        padding: 32,
+                        marginBottom: 6,
                         fontFamily: T.fontUi,
                       }}
                     >
-                      No suppliers found. Add via HQ → Supply Chain.
-                    </div>
-                  )}
+                      Expected delivery{" "}
+                      <span style={{ color: T.danger }}>*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={expectedDelivery}
+                      onChange={(e) => setExpectedDelivery(e.target.value)}
+                      style={{
+                        padding: "9px 12px",
+                        border: `1px solid ${T.ink150}`,
+                        borderRadius: 4,
+                        fontFamily: T.fontUi,
+                        fontSize: 13,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        color: T.ink900,
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: T.ink400,
+                        marginBottom: 6,
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={zarNotes}
+                      onChange={(e) => setZarNotes(e.target.value)}
+                      placeholder="e.g. delivery instructions"
+                      style={{
+                        padding: "9px 12px",
+                        border: `1px solid ${T.ink150}`,
+                        borderRadius: 4,
+                        fontFamily: T.fontUi,
+                        fontSize: 13,
+                        width: "100%",
+                        boxSizing: "border-box",
+                        color: T.ink900,
+                      }}
+                    />
+                  </div>
                 </div>
-              )}
-
-              {/* Step 2 */}
-              {step === 2 && (
-                <div>
-                  <div
+                {/* Item picker */}
+                <div
+                  style={{
+                    marginBottom: 8,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <label
                     style={{
-                      display: "flex",
-                      gap: 6,
-                      marginBottom: 14,
-                      flexWrap: "wrap",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: T.ink400,
+                      fontFamily: T.fontUi,
                     }}
                   >
-                    {["all", ...catCategories].map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setCatFilter(c)}
-                        style={{
-                          padding: "4px 12px",
-                          borderRadius: 16,
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: 11,
-                          fontFamily: T.fontUi,
-                          background: catFilter === c ? T.accent : T.ink075,
-                          color: catFilter === c ? "#fff" : T.ink500,
-                          fontWeight: catFilter === c ? 700 : 400,
-                        }}
-                      >
-                        {c === "all"
-                          ? "All"
-                          : c.charAt(0).toUpperCase() + c.slice(1)}
-                      </button>
-                    ))}
+                    Add items ({zarLines.length} selected)
+                  </label>
+                  {zarLines.length > 0 && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontFamily: T.fontData,
+                        color: T.accent,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Total: R
+                      {zarLines
+                        .reduce((s, l) => s + l.qty * l.unit_cost, 0)
+                        .toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+                {/* Selected lines */}
+                {zarLines.length > 0 && (
+                  <div
+                    style={{
+                      border: `1px solid ${T.successBd}`,
+                      borderRadius: 6,
+                      marginBottom: 14,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ background: T.successBg }}>
+                          {["Item", "Qty", "Unit cost (R)", "Total", ""].map(
+                            (h) => (
+                              <th
+                                key={h}
+                                style={{
+                                  padding: "6px 10px",
+                                  textAlign: "left",
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  letterSpacing: "0.08em",
+                                  textTransform: "uppercase",
+                                  color: T.ink400,
+                                  borderBottom: `1px solid ${T.successBd}`,
+                                }}
+                              >
+                                {h}
+                              </th>
+                            ),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {zarLines.map((l, i) => (
+                          <tr key={l.item_id}>
+                            <td
+                              style={{
+                                padding: "7px 10px",
+                                fontSize: 12,
+                                color: T.ink900,
+                              }}
+                            >
+                              <div>{l.name}</div>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: T.ink400,
+                                  fontFamily: T.fontData,
+                                }}
+                              >
+                                {l.sku}
+                              </div>
+                            </td>
+                            <td style={{ padding: "7px 10px" }}>
+                              <input
+                                type="number"
+                                min={1}
+                                value={l.qty}
+                                onChange={(e) =>
+                                  setZarLines((prev) =>
+                                    prev.map((x, j) =>
+                                      j === i
+                                        ? {
+                                            ...x,
+                                            qty: Math.max(
+                                              1,
+                                              parseInt(e.target.value) || 1,
+                                            ),
+                                          }
+                                        : x,
+                                    ),
+                                  )
+                                }
+                                style={{
+                                  width: 60,
+                                  padding: "3px 6px",
+                                  border: `1px solid ${T.ink150}`,
+                                  borderRadius: 3,
+                                  fontFamily: T.fontData,
+                                  fontSize: 12,
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: "7px 10px" }}>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={l.unit_cost}
+                                onChange={(e) =>
+                                  setZarLines((prev) =>
+                                    prev.map((x, j) =>
+                                      j === i
+                                        ? {
+                                            ...x,
+                                            unit_cost:
+                                              parseFloat(e.target.value) || 0,
+                                          }
+                                        : x,
+                                    ),
+                                  )
+                                }
+                                style={{
+                                  width: 80,
+                                  padding: "3px 6px",
+                                  border: `1px solid ${T.ink150}`,
+                                  borderRadius: 3,
+                                  fontFamily: T.fontData,
+                                  fontSize: 12,
+                                }}
+                              />
+                            </td>
+                            <td
+                              style={{
+                                padding: "7px 10px",
+                                fontFamily: T.fontData,
+                                fontSize: 12,
+                                color: T.accent,
+                                fontWeight: 600,
+                              }}
+                            >
+                              R{(l.qty * l.unit_cost).toFixed(2)}
+                            </td>
+                            <td style={{ padding: "7px 10px" }}>
+                              <button
+                                onClick={() =>
+                                  setZarLines((prev) =>
+                                    prev.filter((_, j) => j !== i),
+                                  )
+                                }
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  color: T.danger,
+                                  fontSize: 14,
+                                }}
+                              >
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  {catLoading ? (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        padding: 32,
-                        color: T.ink400,
-                      }}
-                    >
-                      Loading catalogue…
-                    </div>
-                  ) : catalogueView.length === 0 ? (
-                    <div
-                      style={{
-                        color: T.ink300,
-                        textAlign: "center",
-                        padding: 32,
-                      }}
-                    >
-                      No products found for {selSupplier?.name}
-                    </div>
-                  ) : (
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 12,
-                          color: T.ink500,
-                          margin: "0 0 10px",
-                        }}
-                      >
-                        Click a product to add it to the order:
-                      </p>
-                      {catalogueView.map((p) => {
-                        const inOrder = lineItems.find(
-                          (i) => i.product_id === p.id,
-                        );
+                )}
+                {/* Inventory search */}
+                {itemsLoading ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: 20,
+                      color: T.ink400,
+                      fontSize: 12,
+                    }}
+                  >
+                    Loading catalogue…
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      maxHeight: 300,
+                      overflowY: "auto",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 6,
+                    }}
+                  >
+                    {inventoryItems
+                      .filter((i) => !zarLines.find((l) => l.item_id === i.id))
+                      .map((item) => {
+                        const suggestedCost =
+                          item.weighted_avg_cost > 0
+                            ? item.weighted_avg_cost
+                            : parseFloat((item.sell_price * 0.4).toFixed(2));
+                        const isLow =
+                          item.reorder_level > 0 &&
+                          item.quantity_on_hand <= item.reorder_level;
                         return (
                           <div
-                            key={p.id}
-                            onClick={() => addItem(p)}
+                            key={item.id}
+                            onClick={() =>
+                              setZarLines((prev) => [
+                                ...prev,
+                                {
+                                  item_id: item.id,
+                                  name: item.name,
+                                  sku: item.sku,
+                                  qty: Math.max(
+                                    1,
+                                    (item.reorder_level || 0) * 2 -
+                                      (item.quantity_on_hand || 0) || 10,
+                                  ),
+                                  unit_cost: suggestedCost,
+                                },
+                              ])
+                            }
                             style={{
-                              padding: "12px 14px",
-                              borderRadius: 6,
-                              marginBottom: 6,
+                              padding: "9px 12px",
+                              borderBottom: `1px solid ${T.ink075}`,
                               cursor: "pointer",
-                              border: `1px solid ${inOrder ? T.successBd : T.ink150}`,
-                              background: inOrder ? T.successBg : T.ink050,
                               display: "flex",
                               justifyContent: "space-between",
                               alignItems: "center",
+                              background: isLow ? T.warningBg : "transparent",
                             }}
+                            onMouseOver={(e) =>
+                              (e.currentTarget.style.background = T.accentLit)
+                            }
+                            onMouseOut={(e) =>
+                              (e.currentTarget.style.background = isLow
+                                ? T.warningBg
+                                : "transparent")
+                            }
                           >
                             <div>
-                              <span style={{ fontWeight: 600, fontSize: 13 }}>
-                                {p.name}
-                              </span>
-                              {p.sku && (
-                                <span
-                                  style={{
-                                    marginLeft: 8,
-                                    fontSize: 11,
-                                    color: T.ink400,
-                                    fontFamily: T.fontData,
-                                  }}
-                                >
-                                  {p.sku}
-                                </span>
-                              )}
-                              <span
-                                style={{
-                                  marginLeft: 8,
-                                  fontSize: 10,
-                                  padding: "2px 7px",
-                                  borderRadius: 3,
-                                  background: T.ink075,
-                                  color: T.ink500,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.06em",
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {p.category}
-                              </span>
                               <div
                                 style={{
-                                  fontSize: 11,
-                                  color: T.ink500,
-                                  marginTop: 3,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  color: T.ink900,
                                 }}
                               >
-                                MOQ: {p.moq || 1} · {fmtUsd(p.unit_price_usd)}
-                                /unit
-                                {p.weight_kg_per_unit
-                                  ? ` · ${p.weight_kg_per_unit}kg/unit`
-                                  : ""}
+                                {item.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: T.ink400,
+                                  fontFamily: T.fontData,
+                                }}
+                              >
+                                {item.sku} · {item.category} · On hand:{" "}
+                                {item.quantity_on_hand || 0}
                               </div>
                             </div>
                             <div style={{ textAlign: "right" }}>
                               <div
                                 style={{
+                                  fontSize: 12,
                                   fontFamily: T.fontData,
+                                  color: T.accentMid,
                                   fontWeight: 600,
-                                  color: T.accent,
                                 }}
                               >
-                                {fmtUsd(p.unit_price_usd)}
+                                R{suggestedCost.toFixed(2)}
                               </div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: T.ink500,
-                                  fontFamily: T.fontData,
-                                }}
-                              >
-                                {fmtZar(p.unit_price_usd * usdZar)}
-                              </div>
-                              {inOrder && (
+                              {isLow && (
                                 <div
                                   style={{
-                                    fontSize: 10,
-                                    color: T.success,
+                                    fontSize: 9,
+                                    color: T.warning,
                                     fontWeight: 700,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.06em",
                                   }}
                                 >
-                                  In order
+                                  Below reorder
                                 </div>
                               )}
                             </div>
                           </div>
                         );
                       })}
-                      {lineItems.length > 0 && (
+                    {inventoryItems.filter(
+                      (i) => !zarLines.find((l) => l.item_id === i.id),
+                    ).length === 0 && (
+                      <div
+                        style={{
+                          padding: 20,
+                          textAlign: "center",
+                          color: T.ink400,
+                          fontSize: 12,
+                        }}
+                      >
+                        All items added
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Footer */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    marginTop: 20,
+                    paddingTop: 16,
+                    borderTop: `1px solid ${T.ink150}`,
+                  }}
+                >
+                  <button
+                    style={mkBtn("ghost")}
+                    onClick={() => {
+                      setShowCreate(false);
+                      setZarLines([]);
+                      setSelSupplier(null);
+                      setExpectedDelivery("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    style={mkBtn("primary")}
+                    disabled={
+                      !selSupplier ||
+                      zarLines.length === 0 ||
+                      !expectedDelivery ||
+                      creating
+                    }
+                    onClick={handleCreateLocal}
+                  >
+                    {creating
+                      ? "Creating…"
+                      : `Create PO (${zarLines.length} items)`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* USD international steps — Pure PTV unchanged */}
+            {poMode === "international" && (
+              <>
+                {/* Progress bar */}
+                <div
+                  style={{
+                    padding: "12px 24px",
+                    borderBottom: `1px solid ${T.ink150}`,
+                    display: "flex",
+                    gap: 6,
+                  }}
+                >
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          height: 3,
+                          borderRadius: 2,
+                          background: step >= n ? T.accent : T.ink150,
+                        }}
+                      />
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: step >= n ? T.accent : T.ink300,
+                          marginTop: 4,
+                          fontWeight: step === n ? 700 : 400,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {["Supplier", "Items", "Shipping"][n - 1]}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: 24, flex: 1 }}>
+                  {/* Step 1 */}
+                  {step === 1 && (
+                    <div>
+                      <p
+                        style={{ color: T.ink500, marginTop: 0, fontSize: 13 }}
+                      >
+                        Choose the supplier for this purchase order.{" "}
+                        <InfoTooltip id="po-select-supplier" />
+                      </p>
+                      {suppliers.map((s) => (
                         <div
+                          key={s.id}
+                          onClick={() => setSelSupplier(s)}
                           style={{
-                            ...sCard,
-                            padding: 16,
-                            marginTop: 16,
-                            marginBottom: 0,
+                            padding: "16px 18px",
+                            borderRadius: 6,
+                            marginBottom: 10,
+                            cursor: "pointer",
+                            border: `2px solid ${selSupplier?.id === s.id ? T.accent : T.ink150}`,
+                            background:
+                              selSupplier?.id === s.id ? T.accentLit : "#fff",
                           }}
                         >
-                          <h4
-                            style={{
-                              margin: "0 0 12px",
-                              fontSize: 13,
-                              color: T.ink700,
-                            }}
-                          >
-                            Order Items ({lineItems.length})
-                          </h4>
-                          {lineItems.map((item) => (
-                            <div
-                              key={item.product_id}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                padding: "8px 0",
-                                borderBottom: `1px solid ${T.ink075}`,
-                              }}
-                            >
-                              <div style={{ flex: 2, fontSize: 12 }}>
-                                <strong>{item.name}</strong>
-                                {item.sku && (
-                                  <span
-                                    style={{
-                                      color: T.ink400,
-                                      marginLeft: 6,
-                                      fontFamily: T.fontData,
-                                      fontSize: 11,
-                                    }}
-                                  >
-                                    {item.sku}
-                                  </span>
-                                )}
-                              </div>
-                              <input
-                                type="number"
-                                value={item.qty}
-                                min={1}
-                                onChange={(e) =>
-                                  updateQty(item.product_id, e.target.value)
-                                }
-                                style={{
-                                  ...sInput,
-                                  width: 70,
-                                  textAlign: "center",
-                                }}
-                              />
-                              <div
-                                style={{
-                                  flex: 1,
-                                  fontSize: 12,
-                                  color: T.ink700,
-                                  fontFamily: T.fontData,
-                                }}
-                              >
-                                {fmtUsd(item.unit_price_usd * item.qty)}
-                              </div>
-                              <button
-                                onClick={() => removeItem(item.product_id)}
-                                style={{
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  color: T.danger,
-                                  fontSize: 16,
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
                           <div
                             style={{
-                              marginTop: 10,
-                              fontSize: 12,
-                              color: T.ink500,
                               display: "flex",
                               justifyContent: "space-between",
-                              fontFamily: T.fontData,
                             }}
                           >
-                            <span>
-                              Total weight:{" "}
-                              <strong>{fmt(totalWeight, 3)} kg</strong>
-                            </span>
-                            <span>
-                              Subtotal: <strong>{fmtUsd(subtotalUsd)}</strong>
-                            </span>
+                            <div>
+                              <strong style={{ color: T.ink900 }}>
+                                {s.name}
+                              </strong>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: T.ink500,
+                                  marginTop: 3,
+                                }}
+                              >
+                                {s.country} · {s.currency}
+                              </div>
+                            </div>
+                            {selSupplier?.id === s.id && (
+                              <span
+                                style={{
+                                  color: T.success,
+                                  fontSize: 18,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ✓
+                              </span>
+                            )}
                           </div>
+                        </div>
+                      ))}
+                      {suppliers.length === 0 && (
+                        <div
+                          style={{
+                            color: T.ink400,
+                            textAlign: "center",
+                            padding: 32,
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          No suppliers found. Add via HQ → Supply Chain.
                         </div>
                       )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Step 3 */}
-              {step === 3 && (
-                <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <label
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: T.ink500,
-                        display: "block",
-                        marginBottom: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                      }}
-                    >
-                      Shipping Mode <InfoTooltip id="po-shipping-mode" />
-                    </label>
-                    {SHIPPING_MODES.map((m) => (
+                  {/* Step 2 */}
+                  {step === 2 && (
+                    <div>
                       <div
-                        key={m.id}
-                        onClick={() => setShipMode(m.id)}
                         style={{
-                          padding: "12px 16px",
-                          borderRadius: 6,
-                          marginBottom: 6,
-                          cursor: "pointer",
-                          border: `2px solid ${shipMode === m.id ? T.accent : T.ink150}`,
-                          background: shipMode === m.id ? T.accentLit : "#fff",
                           display: "flex",
-                          gap: 12,
-                          alignItems: "center",
+                          gap: 6,
+                          marginBottom: 14,
+                          flexWrap: "wrap",
                         }}
                       >
-                        <div style={{ flex: 1 }}>
-                          <div
+                        {["all", ...catCategories].map((c) => (
+                          <button
+                            key={c}
+                            onClick={() => setCatFilter(c)}
                             style={{
-                              fontWeight: 600,
-                              fontSize: 13,
-                              color: T.ink900,
+                              padding: "4px 12px",
+                              borderRadius: 16,
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: 11,
+                              fontFamily: T.fontUi,
+                              background: catFilter === c ? T.accent : T.ink075,
+                              color: catFilter === c ? "#fff" : T.ink500,
+                              fontWeight: catFilter === c ? 700 : 400,
                             }}
                           >
-                            {m.label}
-                          </div>
-                          <div style={{ fontSize: 11, color: T.ink500 }}>
-                            {m.note}
-                          </div>
-                        </div>
-                        {shipMode === m.id && (
-                          <span style={{ color: T.success, fontWeight: 700 }}>
-                            ✓
-                          </span>
-                        )}
+                            {c === "all"
+                              ? "All"
+                              : c.charAt(0).toUpperCase() + c.slice(1)}
+                          </button>
+                        ))}
                       </div>
-                    ))}
-                    {shipMode === "sea_freight" && (
-                      <div style={{ marginTop: 10 }}>
-                        <label
+                      {catLoading ? (
+                        <div
                           style={{
-                            fontSize: 12,
-                            color: T.ink500,
-                            display: "block",
-                            marginBottom: 6,
+                            textAlign: "center",
+                            padding: 32,
+                            color: T.ink400,
                           }}
                         >
-                          Sea freight cost (USD)
-                        </label>
-                        <input
-                          type="number"
-                          value={seaCost}
-                          onChange={(e) =>
-                            setSeaCost(parseFloat(e.target.value) || 650)
-                          }
-                          style={{ ...sInput, width: 140 }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {shipMode === "ddp_air" && (
-                    <div
-                      style={{
-                        ...sCard,
-                        padding: 14,
-                        marginBottom: 16,
-                        background: T.ink050,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: T.ink400,
-                          marginBottom: 8,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.08em",
-                        }}
-                      >
-                        DDP Air Rate Card (China → SA)
-                      </div>
-                      {DDP_TIERS.map((t, i) => {
-                        const active =
-                          totalWeight <= t.maxKg &&
-                          (i === 0 || totalWeight > DDP_TIERS[i - 1].maxKg);
-                        return (
-                          <div
-                            key={i}
+                          Loading catalogue…
+                        </div>
+                      ) : catalogueView.length === 0 ? (
+                        <div
+                          style={{
+                            color: T.ink300,
+                            textAlign: "center",
+                            padding: 32,
+                          }}
+                        >
+                          No products found for {selSupplier?.name}
+                        </div>
+                      ) : (
+                        <div>
+                          <p
                             style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              fontSize: 11,
-                              padding: "3px 0",
-                              color: active ? T.accent : T.ink300,
-                              fontWeight: active ? 700 : 400,
-                              fontFamily: T.fontData,
+                              fontSize: 12,
+                              color: T.ink500,
+                              margin: "0 0 10px",
                             }}
                           >
-                            <span>
-                              {i === 0 ? "≤" : `${DDP_TIERS[i - 1].maxKg}–`}
-                              {t.maxKg === Infinity ? "100+" : t.maxKg}kg
-                            </span>
-                            <span>
-                              ${t.rateUsd}/kg + $25 clearance
-                              {active ? " ← current" : ""}
-                            </span>
-                          </div>
-                        );
-                      })}
+                            Click a product to add it to the order:
+                          </p>
+                          {catalogueView.map((p) => {
+                            const inOrder = lineItems.find(
+                              (i) => i.product_id === p.id,
+                            );
+                            return (
+                              <div
+                                key={p.id}
+                                onClick={() => addItem(p)}
+                                style={{
+                                  padding: "12px 14px",
+                                  borderRadius: 6,
+                                  marginBottom: 6,
+                                  cursor: "pointer",
+                                  border: `1px solid ${inOrder ? T.successBd : T.ink150}`,
+                                  background: inOrder ? T.successBg : T.ink050,
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <div>
+                                  <span
+                                    style={{ fontWeight: 600, fontSize: 13 }}
+                                  >
+                                    {p.name}
+                                  </span>
+                                  {p.sku && (
+                                    <span
+                                      style={{
+                                        marginLeft: 8,
+                                        fontSize: 11,
+                                        color: T.ink400,
+                                        fontFamily: T.fontData,
+                                      }}
+                                    >
+                                      {p.sku}
+                                    </span>
+                                  )}
+                                  <span
+                                    style={{
+                                      marginLeft: 8,
+                                      fontSize: 10,
+                                      padding: "2px 7px",
+                                      borderRadius: 3,
+                                      background: T.ink075,
+                                      color: T.ink500,
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.06em",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {p.category}
+                                  </span>
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: T.ink500,
+                                      marginTop: 3,
+                                    }}
+                                  >
+                                    MOQ: {p.moq || 1} ·{" "}
+                                    {fmtUsd(p.unit_price_usd)}
+                                    /unit
+                                    {p.weight_kg_per_unit
+                                      ? ` · ${p.weight_kg_per_unit}kg/unit`
+                                      : ""}
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                  <div
+                                    style={{
+                                      fontFamily: T.fontData,
+                                      fontWeight: 600,
+                                      color: T.accent,
+                                    }}
+                                  >
+                                    {fmtUsd(p.unit_price_usd)}
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: T.ink500,
+                                      fontFamily: T.fontData,
+                                    }}
+                                  >
+                                    {fmtZar(p.unit_price_usd * usdZar)}
+                                  </div>
+                                  {inOrder && (
+                                    <div
+                                      style={{
+                                        fontSize: 10,
+                                        color: T.success,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      In order
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {lineItems.length > 0 && (
+                            <div
+                              style={{
+                                ...sCard,
+                                padding: 16,
+                                marginTop: 16,
+                                marginBottom: 0,
+                              }}
+                            >
+                              <h4
+                                style={{
+                                  margin: "0 0 12px",
+                                  fontSize: 13,
+                                  color: T.ink700,
+                                }}
+                              >
+                                Order Items ({lineItems.length})
+                              </h4>
+                              {lineItems.map((item) => (
+                                <div
+                                  key={item.product_id}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "8px 0",
+                                    borderBottom: `1px solid ${T.ink075}`,
+                                  }}
+                                >
+                                  <div style={{ flex: 2, fontSize: 12 }}>
+                                    <strong>{item.name}</strong>
+                                    {item.sku && (
+                                      <span
+                                        style={{
+                                          color: T.ink400,
+                                          marginLeft: 6,
+                                          fontFamily: T.fontData,
+                                          fontSize: 11,
+                                        }}
+                                      >
+                                        {item.sku}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <input
+                                    type="number"
+                                    value={item.qty}
+                                    min={1}
+                                    onChange={(e) =>
+                                      updateQty(item.product_id, e.target.value)
+                                    }
+                                    style={{
+                                      ...sInput,
+                                      width: 70,
+                                      textAlign: "center",
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      flex: 1,
+                                      fontSize: 12,
+                                      color: T.ink700,
+                                      fontFamily: T.fontData,
+                                    }}
+                                  >
+                                    {fmtUsd(item.unit_price_usd * item.qty)}
+                                  </div>
+                                  <button
+                                    onClick={() => removeItem(item.product_id)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      color: T.danger,
+                                      fontSize: 16,
+                                    }}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              <div
+                                style={{
+                                  marginTop: 10,
+                                  fontSize: 12,
+                                  color: T.ink500,
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontFamily: T.fontData,
+                                }}
+                              >
+                                <span>
+                                  Total weight:{" "}
+                                  <strong>{fmt(totalWeight, 3)} kg</strong>
+                                </span>
+                                <span>
+                                  Subtotal:{" "}
+                                  <strong>{fmtUsd(subtotalUsd)}</strong>
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <div style={{ marginBottom: 20 }}>
-                    <label
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: T.ink500,
-                        display: "block",
-                        marginBottom: 6,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                      }}
-                    >
-                      Notes (optional)
-                    </label>
-                    <textarea
-                      value={poNotes}
-                      onChange={(e) => setPoNotes(e.target.value)}
-                      rows={3}
-                      placeholder="Supplier invoice ref, special instructions, etc."
-                      style={{ ...sInput, resize: "vertical" }}
-                    />
-                  </div>
-
-                  {/* Cost summary */}
-                  <div
-                    style={{
-                      ...sCard,
-                      padding: 16,
-                      background: T.accentLit,
-                      border: `1px solid ${T.accentBd}`,
-                    }}
-                  >
-                    <h4
-                      style={{
-                        margin: "0 0 14px",
-                        color: T.accent,
-                        fontSize: 14,
-                        fontFamily: T.fontUi,
-                      }}
-                    >
-                      Cost Summary — FX locked at{" "}
-                      <span style={{ fontFamily: T.fontData }}>
-                        R{usdZar.toFixed(4)}/USD
-                      </span>
-                    </h4>
-                    {lineItems.map((item) => (
-                      <div
-                        key={item.product_id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: 12,
-                          padding: "5px 0",
-                          borderBottom: `1px solid ${T.accentBd}`,
-                          fontFamily: T.fontUi,
-                        }}
-                      >
-                        <span>
-                          {item.name} × {item.qty}
-                        </span>
-                        <span style={{ fontFamily: T.fontData }}>
-                          {fmtUsd(item.unit_price_usd * item.qty)}
-                        </span>
-                      </div>
-                    ))}
-                    <div
-                      style={{
-                        marginTop: 10,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                      }}
-                    >
-                      {[
-                        ["Subtotal (USD)", fmtUsd(subtotalUsd)],
-                        [
-                          `Shipping — ${SHIPPING_MODES.find((m) => m.id === shipMode)?.label} (${fmt(totalWeight, 3)} kg)`,
-                          fmtUsd(shipCostUsd),
-                        ],
-                        ["Total (USD)", fmtUsd(totalUsd)],
-                        ["Total landed cost (ZAR)", fmtZar(landedZar)],
-                        ["Landed cost per unit (ZAR)", fmtZar(landedPerUnit)],
-                        ["Total units", totalUnits],
-                        ["Total weight", `${fmt(totalWeight, 3)} kg`],
-                      ].map(([label, val]) => (
-                        <div
-                          key={label}
+                  {/* Step 3 */}
+                  {step === 3 && (
+                    <div>
+                      <div style={{ marginBottom: 20 }}>
+                        <label
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
                             fontSize: 12,
+                            fontWeight: 700,
+                            color: T.ink500,
+                            display: "block",
+                            marginBottom: 10,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
                           }}
                         >
-                          <span style={{ color: T.ink700 }}>{label}</span>
-                          <strong
-                            style={{ color: T.accent, fontFamily: T.fontData }}
+                          Shipping Mode <InfoTooltip id="po-shipping-mode" />
+                        </label>
+                        {SHIPPING_MODES.map((m) => (
+                          <div
+                            key={m.id}
+                            onClick={() => setShipMode(m.id)}
+                            style={{
+                              padding: "12px 16px",
+                              borderRadius: 6,
+                              marginBottom: 6,
+                              cursor: "pointer",
+                              border: `2px solid ${shipMode === m.id ? T.accent : T.ink150}`,
+                              background:
+                                shipMode === m.id ? T.accentLit : "#fff",
+                              display: "flex",
+                              gap: 12,
+                              alignItems: "center",
+                            }}
                           >
-                            {val}
-                          </strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+                            <div style={{ flex: 1 }}>
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  color: T.ink900,
+                                }}
+                              >
+                                {m.label}
+                              </div>
+                              <div style={{ fontSize: 11, color: T.ink500 }}>
+                                {m.note}
+                              </div>
+                            </div>
+                            {shipMode === m.id && (
+                              <span
+                                style={{ color: T.success, fontWeight: 700 }}
+                              >
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        {shipMode === "sea_freight" && (
+                          <div style={{ marginTop: 10 }}>
+                            <label
+                              style={{
+                                fontSize: 12,
+                                color: T.ink500,
+                                display: "block",
+                                marginBottom: 6,
+                              }}
+                            >
+                              Sea freight cost (USD)
+                            </label>
+                            <input
+                              type="number"
+                              value={seaCost}
+                              onChange={(e) =>
+                                setSeaCost(parseFloat(e.target.value) || 650)
+                              }
+                              style={{ ...sInput, width: 140 }}
+                            />
+                          </div>
+                        )}
+                      </div>
 
-            {/* Footer */}
-            <div
-              style={{
-                padding: "16px 24px",
-                borderTop: `1px solid ${T.ink150}`,
-                display: "flex",
-                justifyContent: "space-between",
-                position: "sticky",
-                bottom: 0,
-                background: "#fff",
-              }}
-            >
-              <button
-                style={mkBtn("ghost")}
-                onClick={() => {
-                  if (step === 1) {
-                    setShowCreate(false);
-                    resetCreate();
-                  } else setStep((s) => s - 1);
-                }}
-              >
-                {step === 1 ? "Cancel" : "← Back"}
-              </button>
-              {step < 3 ? (
-                <button
-                  style={mkBtn("primary")}
-                  disabled={
-                    (step === 1 && !selSupplier) ||
-                    (step === 2 && lineItems.length === 0)
-                  }
-                  onClick={() => {
-                    if (step === 1 && selSupplier) {
-                      fetchCatalogue(selSupplier.id);
-                      setStep(2);
-                    } else if (step === 2 && lineItems.length > 0) setStep(3);
+                      {shipMode === "ddp_air" && (
+                        <div
+                          style={{
+                            ...sCard,
+                            padding: 14,
+                            marginBottom: 16,
+                            background: T.ink050,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: T.ink400,
+                              marginBottom: 8,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.08em",
+                            }}
+                          >
+                            DDP Air Rate Card (China → SA)
+                          </div>
+                          {DDP_TIERS.map((t, i) => {
+                            const active =
+                              totalWeight <= t.maxKg &&
+                              (i === 0 || totalWeight > DDP_TIERS[i - 1].maxKg);
+                            return (
+                              <div
+                                key={i}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  fontSize: 11,
+                                  padding: "3px 0",
+                                  color: active ? T.accent : T.ink300,
+                                  fontWeight: active ? 700 : 400,
+                                  fontFamily: T.fontData,
+                                }}
+                              >
+                                <span>
+                                  {i === 0 ? "≤" : `${DDP_TIERS[i - 1].maxKg}–`}
+                                  {t.maxKg === Infinity ? "100+" : t.maxKg}kg
+                                </span>
+                                <span>
+                                  ${t.rateUsd}/kg + $25 clearance
+                                  {active ? " ← current" : ""}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <div style={{ marginBottom: 20 }}>
+                        <label
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: T.ink500,
+                            display: "block",
+                            marginBottom: 6,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                          }}
+                        >
+                          Notes (optional)
+                        </label>
+                        <textarea
+                          value={poNotes}
+                          onChange={(e) => setPoNotes(e.target.value)}
+                          rows={3}
+                          placeholder="Supplier invoice ref, special instructions, etc."
+                          style={{ ...sInput, resize: "vertical" }}
+                        />
+                      </div>
+
+                      {/* Cost summary */}
+                      <div
+                        style={{
+                          ...sCard,
+                          padding: 16,
+                          background: T.accentLit,
+                          border: `1px solid ${T.accentBd}`,
+                        }}
+                      >
+                        <h4
+                          style={{
+                            margin: "0 0 14px",
+                            color: T.accent,
+                            fontSize: 14,
+                            fontFamily: T.fontUi,
+                          }}
+                        >
+                          Cost Summary — FX locked at{" "}
+                          <span style={{ fontFamily: T.fontData }}>
+                            R{usdZar.toFixed(4)}/USD
+                          </span>
+                        </h4>
+                        {lineItems.map((item) => (
+                          <div
+                            key={item.product_id}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              fontSize: 12,
+                              padding: "5px 0",
+                              borderBottom: `1px solid ${T.accentBd}`,
+                              fontFamily: T.fontUi,
+                            }}
+                          >
+                            <span>
+                              {item.name} × {item.qty}
+                            </span>
+                            <span style={{ fontFamily: T.fontData }}>
+                              {fmtUsd(item.unit_price_usd * item.qty)}
+                            </span>
+                          </div>
+                        ))}
+                        <div
+                          style={{
+                            marginTop: 10,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          {[
+                            ["Subtotal (USD)", fmtUsd(subtotalUsd)],
+                            [
+                              `Shipping — ${SHIPPING_MODES.find((m) => m.id === shipMode)?.label} (${fmt(totalWeight, 3)} kg)`,
+                              fmtUsd(shipCostUsd),
+                            ],
+                            ["Total (USD)", fmtUsd(totalUsd)],
+                            ["Total landed cost (ZAR)", fmtZar(landedZar)],
+                            [
+                              "Landed cost per unit (ZAR)",
+                              fmtZar(landedPerUnit),
+                            ],
+                            ["Total units", totalUnits],
+                            ["Total weight", `${fmt(totalWeight, 3)} kg`],
+                          ].map(([label, val]) => (
+                            <div
+                              key={label}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: 12,
+                              }}
+                            >
+                              <span style={{ color: T.ink700 }}>{label}</span>
+                              <strong
+                                style={{
+                                  color: T.accent,
+                                  fontFamily: T.fontData,
+                                }}
+                              >
+                                {val}
+                              </strong>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div
+                  style={{
+                    padding: "16px 24px",
+                    borderTop: `1px solid ${T.ink150}`,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    position: "sticky",
+                    bottom: 0,
+                    background: "#fff",
                   }}
                 >
-                  Next →
-                </button>
-              ) : (
-                <button
-                  style={mkBtn("primary")}
-                  disabled={creating || lineItems.length === 0}
-                  onClick={handleCreate}
-                >
-                  {creating ? "Creating…" : `Create PO (${fmtZar(landedZar)})`}
-                </button>
-              )}
-            </div>
+                  <button
+                    style={mkBtn("ghost")}
+                    onClick={() => {
+                      if (step === 1) {
+                        setShowCreate(false);
+                        resetCreate();
+                      } else setStep((s) => s - 1);
+                    }}
+                  >
+                    {step === 1 ? "Cancel" : "← Back"}
+                  </button>
+                  {step < 3 ? (
+                    <button
+                      style={mkBtn("primary")}
+                      disabled={
+                        (step === 1 && !selSupplier) ||
+                        (step === 2 && lineItems.length === 0)
+                      }
+                      onClick={() => {
+                        if (step === 1 && selSupplier) {
+                          fetchCatalogue(selSupplier.id);
+                          setStep(2);
+                        } else if (step === 2 && lineItems.length > 0)
+                          setStep(3);
+                      }}
+                    >
+                      Next →
+                    </button>
+                  ) : (
+                    <button
+                      style={mkBtn("primary")}
+                      disabled={creating || lineItems.length === 0}
+                      onClick={handleCreate}
+                    >
+                      {creating
+                        ? "Creating…"
+                        : `Create PO (${fmtZar(landedZar)})`}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
+      )}
+
+      {/* ── StockReceiveModal for ZAR POs ── */}
+      {receivePo && (
+        <StockReceiveModal
+          tenantId={tenantId}
+          onClose={() => setReceivePo(null)}
+          onComplete={async () => {
+            await supabase
+              .from("purchase_orders")
+              .update({
+                po_status: "received",
+                status: "received",
+                actual_arrival: new Date().toISOString().split("T")[0],
+                received_date: new Date().toISOString().split("T")[0],
+              })
+              .eq("id", receivePo.id);
+            setReceivePo(null);
+            showToast(`${receivePo.po_number} marked received — AVCO updated`);
+            fetchPOs();
+          }}
+        />
       )}
 
       {/* ── PO Detail Modal ── */}
@@ -2270,7 +3039,8 @@ export default function HQPurchaseOrders() {
                           → Advance to {STATUS_META[nextStatus]?.label}
                         </button>
                       )}
-                    {status === "customs" && (
+                    {/* USD: Pure PTV unchanged */}
+                    {status === "customs" && po.currency !== "ZAR" && (
                       <button
                         style={mkBtn("success")}
                         onClick={() => handleReceive(po)}
@@ -2281,12 +3051,38 @@ export default function HQPurchaseOrders() {
                           : "Mark as Received & Update Inventory"}
                       </button>
                     )}
-                    {status === "received" && (
+                    {status === "received" && po.currency !== "ZAR" && (
                       <button
                         style={mkBtn("primary")}
                         onClick={() => handleAdvance(po, "complete")}
                       >
                         Mark Complete
+                      </button>
+                    )}
+                    {/* ZAR: Medi Rec */}
+                    {(status === "sent" || status === "awaiting_delivery") &&
+                      po.currency === "ZAR" && (
+                        <button
+                          style={mkBtn("success")}
+                          onClick={() => setReceivePo(po)}
+                        >
+                          Receive Delivery →
+                        </button>
+                      )}
+                    {status === "received" && po.currency === "ZAR" && (
+                      <button
+                        style={mkBtn("primary")}
+                        onClick={() => handleAdvance(po, "paid")}
+                      >
+                        Mark Paid
+                      </button>
+                    )}
+                    {po.currency === "ZAR" && (
+                      <button
+                        style={mkBtn("ghost")}
+                        onClick={() => generatePDF(po)}
+                      >
+                        Download PDF
                       </button>
                     )}
                     <button

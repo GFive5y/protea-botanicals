@@ -248,14 +248,19 @@ const PROFILE_BADGE = {
 };
 
 // ── Tab renderer ──────────────────────────────────────────────────────────
-function renderTab(tabId) {
+function renderTab(tabId, tenantId, industryProfile) {
   switch (tabId) {
     case "overview":
       return <HQOverview />;
     case "suppliers":
       return <HQSuppliers />;
     case "procurement":
-      return <HQPurchaseOrders />;
+      return (
+        <HQPurchaseOrders
+          tenantId={tenantId}
+          industryProfile={industryProfile}
+        />
+      );
     case "supply-chain":
       return <SupplyChain />;
     case "documents":
@@ -614,7 +619,7 @@ export default function TenantPortal() {
                 boxSizing: "border-box",
               }}
             >
-              {renderTab(activeTab)}
+              {renderTab(activeTab, tenantId, industryProfile)}
             </div>
           </div>
 
