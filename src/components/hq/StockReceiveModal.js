@@ -1215,7 +1215,7 @@ export default function StockReceiveModal({ onClose, onComplete }) {
           .insert({
             tenant_id,
             item_id: line.item_id,
-            transaction_type: "purchase_in",
+            movement_type: "purchase_in",
             quantity: qty,
             unit_cost: cost,
             reference: ref,
