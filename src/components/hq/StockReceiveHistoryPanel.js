@@ -250,7 +250,25 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
         .order("received_at", { ascending: false })
         .limit(100);
       if (e) throw e;
-      setReceipts(data || []);
+
+      // Enrich with line counts — separate query, no FK join needed
+      const rows = data || [];
+      if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
+        const { data: lineRows } = await supabase
+          .from("stock_receipt_lines")
+          .select("receipt_id")
+          .in("receipt_id", ids);
+        const countMap = {};
+        (lineRows || []).forEach((l) => {
+          countMap[l.receipt_id] = (countMap[l.receipt_id] || 0) + 1;
+        });
+        setReceipts(
+          rows.map((r) => ({ ...r, _line_count: countMap[r.id] || 0 })),
+        );
+      } else {
+        setReceipts([]);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -629,9 +647,7 @@ export default function StockReceiveHistoryPanel({ tenantId, onReviewPrices }) {
                           color: T.ink500,
                         }}
                       >
-                        {r.item_count ||
-                          r.line_count ||
-                          (isOpen ? lines.length : "—")}
+                        {r._line_count || (isOpen ? lines.length : "—")}
                       </td>
 
                       {/* Total value */}

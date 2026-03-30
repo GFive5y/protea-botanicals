@@ -120,12 +120,18 @@ function useFxRate() {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const STATUSES = [
+  // USD international (Pure PTV)
   "draft",
   "ordered",
   "in_transit",
   "customs",
   "received",
   "complete",
+  // ZAR local (Medi Rec)
+  "sent",
+  "awaiting_delivery",
+  "partial",
+  "paid",
 ];
 
 const STATUS_META = {

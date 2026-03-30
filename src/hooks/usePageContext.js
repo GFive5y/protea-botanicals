@@ -354,8 +354,9 @@ const CONTEXT_QUERIES = {
     const [posRes] = await Promise.allSettled([
       sb
         .from("purchase_orders")
-        .select("po_number, status, suppliers(name)")
-        .neq("status", "complete")
+        .select("po_number, status, po_status, suppliers(name)")
+        .eq("tenant_id", tenantId)
+        .not("po_status", "in", '("complete","paid","cancelled")')
         .order("created_at", { ascending: false }),
     ]);
 
@@ -374,7 +375,7 @@ const CONTEXT_QUERIES = {
 
     const items = pos.map(
       (p) =>
-        `${p.po_number} · ${p.suppliers?.name || "Unknown supplier"} · ${p.status}`,
+        `${p.po_number} · ${p.suppliers?.name || "Unknown supplier"} · ${p.po_status || p.status}`,
     );
 
     return {
