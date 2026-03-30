@@ -3064,10 +3064,321 @@ export default function HQStock() {
               </div>
             )}
 
-            {/* Subcategory tiles */}
+            {/* Smart Catalog Pills — live catalog + stock recon */}
             {catFilter !== "all" &&
               (() => {
                 const group = CAT_GROUPS.find((g) => g.id === catFilter);
+                const groupItems = activeItems.filter((i) =>
+                  matchesGroup(i, group),
+                );
+
+                const PillBlock = ({ label, note, pills }) => {
+                  const hasAny = pills.some((p) => p.count > 0);
+                  return (
+                    <div style={{ marginBottom: 10 }}>
+                      <div
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: T.ink400,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                          marginBottom: 6,
+                          fontFamily: T.font,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        {label}
+                        {note && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 400,
+                              color: T.ink300,
+                              textTransform: "none",
+                              letterSpacing: 0,
+                            }}
+                          >
+                            {note}
+                          </span>
+                        )}
+                        {!hasAny && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 400,
+                              color: T.ink300,
+                              textTransform: "none",
+                              letterSpacing: 0,
+                            }}
+                          >
+                            — no items tagged yet
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+                      >
+                        {pills.map(({ key, label: lbl, count }) => {
+                          const inStock = count > 0;
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => {
+                                if (inStock) setSearch(lbl);
+                              }}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: 6,
+                                cursor: inStock ? "pointer" : "default",
+                                border:
+                                  "1.5px solid " +
+                                  (inStock ? T.accentBd : T.ink150),
+                                background: inStock ? T.accentLit : T.ink050,
+                                fontFamily: T.font,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "flex-start",
+                                gap: 1,
+                                minWidth: 72,
+                                opacity: inStock ? 1 : 0.4,
+                                transition: "opacity .15s",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: inStock ? T.accentMid : T.ink400,
+                                }}
+                              >
+                                {lbl}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: inStock ? T.ink500 : T.ink300,
+                                }}
+                              >
+                                {count > 0
+                                  ? `${count} item${count !== 1 ? "s" : ""}`
+                                  : "no stock"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                };
+
+                // ── FLOWER ──
+                if (catFilter === "flower") {
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <PillBlock
+                        label="Strain"
+                        pills={[
+                          "Indica",
+                          "Sativa",
+                          "Hybrid",
+                          "CBD",
+                          "Auto",
+                        ].map((s) => ({
+                          key: s,
+                          label: s,
+                          count: groupItems.filter((i) => i.strain_type === s)
+                            .length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Weight"
+                        pills={[
+                          "0.5g",
+                          "1g",
+                          "2g",
+                          "3.5g",
+                          "5g",
+                          "7g",
+                          "10g",
+                          "14g",
+                          "28g",
+                        ].map((w) => ({
+                          key: w,
+                          label: w,
+                          count: groupItems.filter(
+                            (i) =>
+                              parseFloat(i.weight_grams) === parseFloat(w) ||
+                              (i.variant_value || "").startsWith(w),
+                          ).length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Grade"
+                        note="— edit items and add grade tags to activate"
+                        pills={[
+                          "Budget",
+                          "Commercial",
+                          "A Grade",
+                          "AA Grade",
+                          "AAA Grade",
+                          "AAAA Grade",
+                          "Craft",
+                          "Top Shelf",
+                          "Exotic",
+                          "Premium",
+                        ].map((g) => ({
+                          key: g,
+                          label: g,
+                          count: groupItems.filter(
+                            (i) => Array.isArray(i.tags) && i.tags.includes(g),
+                          ).length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Cultivation"
+                        note="— edit items and add cultivation tags to activate"
+                        pills={[
+                          "Indoor",
+                          "Outdoor",
+                          "Greenhouse",
+                          "Hydroponic",
+                          "Organic",
+                          "Living Soil",
+                          "Greendoor",
+                          "Sun-grown",
+                          "LED Grown",
+                          "HPS Grown",
+                        ].map((c) => ({
+                          key: c,
+                          label: c,
+                          count: groupItems.filter(
+                            (i) => Array.isArray(i.tags) && i.tags.includes(c),
+                          ).length,
+                        }))}
+                      />
+                    </div>
+                  );
+                }
+
+                // ── CONCENTRATES ──
+                if (catFilter === "concentrate") {
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <PillBlock
+                        label="Type"
+                        pills={[
+                          ["budder", "Budder"],
+                          ["badder", "Badder"],
+                          ["live_resin", "Live Resin"],
+                          ["rosin", "Rosin"],
+                          ["sauce", "Terp Sauce"],
+                          ["diamonds", "Diamonds"],
+                          ["distillate", "Distillate"],
+                          ["crumble", "Crumble"],
+                          ["shatter", "Shatter"],
+                          ["wax", "Wax"],
+                          ["feco", "FECO"],
+                          ["rso", "RSO"],
+                          ["bho", "BHO"],
+                        ].map(([key, lbl]) => ({
+                          key,
+                          label: lbl,
+                          count: groupItems.filter(
+                            (i) =>
+                              (i.variant_value || "")
+                                .toLowerCase()
+                                .includes(lbl.toLowerCase()) ||
+                              (i.name || "")
+                                .toLowerCase()
+                                .includes(lbl.toLowerCase()),
+                          ).length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Weight / Size"
+                        pills={["0.5g", "1g", "2g", "3.5g", "5g", "1ml"].map(
+                          (w) => ({
+                            key: w,
+                            label: w,
+                            count: groupItems.filter((i) =>
+                              (i.variant_value || "").startsWith(w),
+                            ).length,
+                          }),
+                        )}
+                      />
+                    </div>
+                  );
+                }
+
+                // ── HASH & KIEF ──
+                if (catFilter === "hash") {
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <PillBlock
+                        label="Type"
+                        pills={[
+                          ["bubble", "Bubble Hash"],
+                          ["dry_sift", "Dry Sift"],
+                          ["kief", "Kief"],
+                          ["lebanese", "Lebanese"],
+                          ["moroccan", "Moroccan"],
+                          ["traditional", "Traditional"],
+                          ["afghani", "Afghani"],
+                          ["charas", "Charas"],
+                          ["temple_ball", "Temple Ball"],
+                          ["moon_rock", "Moon Rock"],
+                          ["finger_hash", "Finger Hash"],
+                          ["dry_ice", "Dry Ice Hash"],
+                        ].map(([key, lbl]) => ({
+                          key,
+                          label: lbl,
+                          count: groupItems.filter((i) => {
+                            const vv = (i.variant_value || "").toLowerCase();
+                            const nm = (i.name || "").toLowerCase();
+                            const search = lbl.toLowerCase().split(" ")[0];
+                            return vv.includes(search) || nm.includes(search);
+                          }).length,
+                        }))}
+                      />
+                    </div>
+                  );
+                }
+
+                // ── VAPES ──
+                if (catFilter === "vape") {
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <PillBlock
+                        label="Device Type"
+                        pills={[
+                          ["cartridge", "Cartridges"],
+                          ["disposable", "Disposables"],
+                          ["battery", "Batteries"],
+                        ].map(([key, lbl]) => ({
+                          key,
+                          label: lbl,
+                          count: groupItems.filter((i) => i.subcategory === key)
+                            .length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Volume"
+                        pills={["0.5ml", "1ml", "2ml", "3ml"].map((v) => ({
+                          key: v,
+                          label: v,
+                          count: groupItems.filter((i) =>
+                            (i.variant_value || "").includes(v),
+                          ).length,
+                        }))}
+                      />
+                    </div>
+                  );
+                }
+
+                // ── DEFAULT: all other categories ──
                 if (!group?.subs || group.subs.length === 0) return null;
                 const subLabels = {
                   rolling_papers: "Rolling Papers",
@@ -3085,37 +3396,6 @@ export default function HQStock() {
                   lighter: "Lighters",
                   extraction_bag: "Extraction Bags",
                   rosin_bag: "Rosin Bags",
-                  flower: "Flower",
-                  preroll: "Pre-Rolls",
-                  hash: "Hash",
-                  dry_sift: "Dry Sift",
-                  bubble_hash: "Bubble Hash",
-                  pressed_hash: "Pressed Hash",
-                  charas: "Charas",
-                  temple_ball: "Temple Ball",
-                  lebanese: "Lebanese",
-                  moroccan: "Moroccan",
-                  afghani: "Afghani",
-                  finger_hash: "Finger Hash",
-                  kief: "Kief",
-                  moon_rock: "Moon Rock",
-                  dry_ice_hash: "Dry Ice Hash",
-                  concentrate: "Concentrates",
-                  budder: "Budder",
-                  badder: "Badder",
-                  live_resin: "Live Resin",
-                  rosin: "Rosin",
-                  sauce: "Terp Sauce",
-                  diamonds: "Diamonds",
-                  distillate: "Distillate",
-                  crumble: "Crumble",
-                  shatter: "Shatter",
-                  wax: "Wax",
-                  feco: "FECO",
-                  rso: "RSO",
-                  cartridge: "Cartridges",
-                  disposable: "Disposables",
-                  battery: "Batteries",
                   seed: "Seeds",
                   clone: "Clones",
                   seedling: "Seedlings",
@@ -3143,6 +3423,10 @@ export default function HQStock() {
                   cbd: "CBD",
                   cbd_pet: "Pet CBD",
                   clothing: "Clothing",
+                  preroll: "Pre-Rolls",
+                  cartridge: "Cartridges",
+                  disposable: "Disposables",
+                  battery: "Batteries",
                 };
                 const subCounts = group.subs
                   .map((sub) => ({
@@ -4010,7 +4294,8 @@ export default function HQStock() {
 
       {renderMovDrawer()}
       {receiveOpen && (
-        <StockReceiveModal tenantId={tenantId}
+        <StockReceiveModal
+          tenantId={tenantId}
           onClose={() => setReceiveOpen(false)}
           onComplete={() => {
             load();
