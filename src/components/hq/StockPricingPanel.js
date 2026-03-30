@@ -1,84 +1,214 @@
-// StockPricingPanel.js v1.0
-// WP-STOCK-PRICING — Bulk sell price setter with live margin preview + batch save
-// LL-160: tenantId passed as PROP — never fetched from user_profiles
-// LL-161: full inventory_items column list selected
-// LL-162: smart pills pattern for category filtering
-// Author: NuAi session March 30, 2026
+// StockPricingPanel.js v1.1
+// WP-STOCK-PRICING — Bulk sell price setter, live margin preview, batch save
+// Visual system: matches HQStock T-token palette exactly (WP-VISUAL-SYSTEM v1.0)
+// LL-160: tenantId as PROP — never fetched from user_profiles
+// LL-161: full inventory_items column select
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+// ─── T Tokens (mirrors HQStock exactly) ──────────────────────────────────────
+const T = {
+  ink900: "#0D0D0D",
+  ink700: "#2C2C2C",
+  ink500: "#5A5A5A",
+  ink400: "#474747",
+  ink300: "#999999",
+  ink150: "#E2E2E2",
+  ink075: "#F4F4F3",
+  ink050: "#FAFAF9",
+  success: "#166534",
+  successBg: "#F0FDF4",
+  successBd: "#BBF7D0",
+  warning: "#92400E",
+  warningBg: "#FFFBEB",
+  warningBd: "#FDE68A",
+  danger: "#991B1B",
+  dangerBg: "#FEF2F2",
+  dangerBd: "#FECACA",
+  info: "#1E3A5F",
+  infoBg: "#EFF6FF",
+  infoBd: "#BFDBFE",
+  accent: "#1A3D2B",
+  accentMid: "#2D6A4F",
+  accentLit: "#E8F5EE",
+  accentBd: "#A7D9B8",
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  mono: "'DM Mono','Courier New',monospace",
+  shadow: "0 1px 3px rgba(0,0,0,0.07)",
+};
 
-const CATEGORY_CONFIG = [
-  { key: "all", label: "All Items", icon: "◎" },
+// ─── Typography tokens (WP-VISUAL-SYSTEM Section 2.1) ────────────────────────
+const Ty = {
+  label: {
+    fontSize: "11px",
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    fontFamily: T.font,
+  },
+  body: { fontSize: "13px", fontWeight: 400, fontFamily: T.font },
+  caption: { fontSize: "11px", fontWeight: 400, fontFamily: T.font },
+  data: {
+    fontSize: "12px",
+    fontWeight: 400,
+    fontFamily: T.mono,
+    fontVariantNumeric: "tabular-nums",
+  },
+};
+
+// ─── Shared table styles (mirrors HQStock sTh / sTd) ─────────────────────────
+const sTh = {
+  textAlign: "left",
+  padding: "10px 12px",
+  ...Ty.label,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.ink150}`,
+  background: T.ink050,
+  whiteSpace: "nowrap",
+};
+const sTd = {
+  padding: "10px 12px",
+  borderBottom: `1px solid ${T.ink150}`,
+  ...Ty.body,
+  color: T.ink700,
+  verticalAlign: "middle",
+};
+
+// ─── Button helpers (WP-VISUAL-SYSTEM Section 3.3) ───────────────────────────
+const sBtn = (variant = "primary", disabled = false) => ({
+  ...Ty.label,
+  padding: "7px 16px",
+  borderRadius: 6,
+  cursor: disabled ? "not-allowed" : "pointer",
+  opacity: disabled ? 0.45 : 1,
+  transition: "opacity .15s",
+  ...(variant === "primary"
+    ? { background: T.accentMid, color: "#fff", border: "none" }
+    : {}),
+  ...(variant === "secondary"
+    ? {
+        background: "transparent",
+        color: T.accentMid,
+        border: `1px solid ${T.accentBd}`,
+      }
+    : {}),
+  ...(variant === "ghost"
+    ? {
+        background: "transparent",
+        color: T.ink500,
+        border: `1px solid ${T.ink150}`,
+      }
+    : {}),
+});
+
+// ─── LL-161 full column list ──────────────────────────────────────────────────
+const FULL_SELECT = [
+  "id",
+  "name",
+  "sku",
+  "brand",
+  "category",
+  "subcategory",
+  "variant_type",
+  "variant_value",
+  "tags",
+  "strain_type",
+  "weight_grams",
+  "quantity_on_hand",
+  "weighted_avg_cost",
+  "cost_price",
+  "sell_price",
+  "unit",
+  "reorder_level",
+  "reorder_qty",
+  "max_stock_level",
+  "supplier_id",
+  "expiry_date",
+  "batch_lot_number",
+  "is_active",
+  "tenant_id",
+  "loyalty_category",
+  "pts_override",
+  "medium_type",
+  "description",
+  "created_at",
+].join(", ");
+
+const CATS = [
+  { key: "all", label: "All Items", icon: "◈" },
   { key: "flower", label: "Flower", icon: "🌿" },
   { key: "concentrate", label: "Concentrate", icon: "💧" },
-  { key: "hash", label: "Hash", icon: "🟫" },
+  { key: "hash", label: "Hash", icon: "🟤" },
   { key: "finished_product", label: "Vapes", icon: "💨" },
-  { key: "edible", label: "Edibles", icon: "🍬" },
+  { key: "edible", label: "Edible", icon: "🍬" },
   { key: "hardware", label: "Equipment", icon: "🔧" },
 ];
 
-// LL-161 — full column select (never use SELECT *)
-const FULL_SELECT = `
-  id, name, sku, brand, category, subcategory, variant_type, variant_value,
-  tags, strain_type, weight_grams, quantity_on_hand, weighted_avg_cost,
-  cost_price, sell_price, unit, reorder_level, reorder_qty, max_stock_level,
-  supplier_id, expiry_date, batch_lot_number, is_active, tenant_id,
-  loyalty_category, pts_override, medium_type, description, created_at
-`;
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-function calcMargin(sellPrice, avco) {
-  const sp = parseFloat(sellPrice);
+// ─── Margin helpers ───────────────────────────────────────────────────────────
+function calcMargin(sell, avco) {
+  const sp = parseFloat(sell);
   const ac = parseFloat(avco);
   if (!sp || sp <= 0) return null;
   if (!ac || ac <= 0) return 100;
   return ((sp - ac) / sp) * 100;
 }
 
-function marginStyle(margin) {
-  if (margin === null)
-    return { bg: "#1e293b", color: "#475569", border: "#334155" };
+function marginBadge(margin) {
+  if (margin === null) return null;
   if (margin < 20)
-    return { bg: "#ef444415", color: "#ef4444", border: "#ef444430" };
+    return {
+      bg: T.dangerBg,
+      bd: T.dangerBd,
+      color: T.danger,
+      label: `${margin.toFixed(1)}%`,
+    };
   if (margin < 40)
-    return { bg: "#f59e0b15", color: "#f59e0b", border: "#f59e0b30" };
-  return { bg: "#22c55e15", color: "#22c55e", border: "#22c55e30" };
+    return {
+      bg: T.warningBg,
+      bd: T.warningBd,
+      color: T.warning,
+      label: `${margin.toFixed(1)}%`,
+    };
+  return {
+    bg: T.successBg,
+    bd: T.successBd,
+    color: T.success,
+    label: `${margin.toFixed(1)}%`,
+  };
 }
 
-function fmt(n) {
-  if (n === null || n === undefined || n === "") return "";
-  const num = parseFloat(n);
-  if (isNaN(num)) return "";
-  return num.toFixed(2);
-}
-
-function variantDisplay(item) {
+function variantStr(item) {
   if (item.variant_value) return item.variant_value;
   if (item.weight_grams) return `${item.weight_grams}g`;
   if (item.strain_type) return item.strain_type;
   return "";
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+const fmtR = (n) =>
+  n == null
+    ? "—"
+    : "R " +
+      Number(n).toLocaleString("en-ZA", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
 
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function StockPricingPanel({ tenantId }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [catFilter, setCatFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [edits, setEdits] = useState({}); // { [id]: string }
+  const [edits, setEdits] = useState({});
   const [saving, setSaving] = useState(false);
-  const [saveResult, setSaveResult] = useState(null); // { saved, errors[] }
+  const [result, setResult] = useState(null);
   const [focusId, setFocusId] = useState(null);
   const searchRef = useRef(null);
 
-  // ── Load ──────────────────────────────────────────────────────────────────
-
+  // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("inventory_items")
@@ -87,9 +217,8 @@ export default function StockPricingPanel({ tenantId }) {
       .eq("is_active", true)
       .order("category")
       .order("name");
-
     if (!error && data) setItems(data);
-    if (error) console.error("[StockPricingPanel] load error:", error.message);
+    if (error) console.error("[StockPricingPanel] load:", error.message);
     setLoading(false);
   }, [tenantId]);
 
@@ -97,7 +226,14 @@ export default function StockPricingPanel({ tenantId }) {
     load();
   }, [load]);
 
-  // ── Derived state ─────────────────────────────────────────────────────────
+  // ── Derived ─────────────────────────────────────────────────────────────────
+  const catCounts = CATS.reduce((acc, c) => {
+    acc[c.key] =
+      c.key === "all"
+        ? items.length
+        : items.filter((i) => i.category === c.key).length;
+    return acc;
+  }, {});
 
   const filtered = items.filter((item) => {
     if (catFilter !== "all" && item.category !== catFilter) return false;
@@ -107,629 +243,522 @@ export default function StockPricingPanel({ tenantId }) {
       item.name?.toLowerCase().includes(q) ||
       item.sku?.toLowerCase().includes(q) ||
       item.brand?.toLowerCase().includes(q) ||
-      item.variant_value?.toLowerCase().includes(q) ||
-      item.subcategory?.toLowerCase().includes(q)
+      (item.variant_value || "").toLowerCase().includes(q) ||
+      (item.subcategory || "").toLowerCase().includes(q)
     );
   });
 
   const changedCount = Object.keys(edits).length;
-
-  const catCounts = CATEGORY_CONFIG.reduce((acc, c) => {
-    acc[c.key] =
-      c.key === "all"
-        ? items.length
-        : items.filter((i) => i.category === c.key).length;
-    return acc;
-  }, {});
-
   const unpricedCount = filtered.filter((i) => {
-    const ep = edits[i.id];
-    const val = ep !== undefined ? ep : i.sell_price;
+    const val = edits[i.id] !== undefined ? edits[i.id] : i.sell_price;
     return !val || parseFloat(val) <= 0;
   }).length;
 
-  // ── Edit handlers ─────────────────────────────────────────────────────────
-
-  const handlePriceChange = (id, val) => {
-    setEdits((prev) => ({ ...prev, [id]: val }));
-    setSaveResult(null);
-  };
-
-  const getSellPrice = (item) =>
+  const getSell = (item) =>
     edits[item.id] !== undefined ? edits[item.id] : (item.sell_price ?? "");
+  const getMargin = (item) => calcMargin(getSell(item), item.weighted_avg_cost);
 
-  const getMargin = (item) => {
-    const sp = edits[item.id] !== undefined ? edits[item.id] : item.sell_price;
-    return calcMargin(sp, item.weighted_avg_cost);
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const handleChange = (id, val) => {
+    setEdits((p) => ({ ...p, [id]: val }));
+    setResult(null);
   };
-
-  const discardAll = () => {
+  const discard = () => {
     setEdits({});
-    setSaveResult(null);
+    setResult(null);
   };
 
-  // ── Batch save ────────────────────────────────────────────────────────────
-
-  const handleSaveAll = async () => {
+  const saveAll = async () => {
     if (!changedCount || saving) return;
     setSaving(true);
-    setSaveResult(null);
-
-    const entries = Object.entries(edits);
+    setResult(null);
     let saved = 0;
     const errors = [];
-
-    for (const [id, rawPrice] of entries) {
-      const numPrice = parseFloat(rawPrice);
-      if (isNaN(numPrice) || numPrice < 0) {
-        const item = items.find((i) => i.id === id);
-        errors.push(`"${item?.name ?? id}" — invalid price`);
+    for (const [id, raw] of Object.entries(edits)) {
+      const num = parseFloat(raw);
+      if (isNaN(num) || num < 0) {
+        errors.push(`Invalid: ${items.find((i) => i.id === id)?.name ?? id}`);
         continue;
       }
       const { error } = await supabase
         .from("inventory_items")
-        .update({ sell_price: numPrice })
+        .update({ sell_price: num })
         .eq("id", id)
-        .eq("tenant_id", tenantId); // LL-160 — never update without tenant guard
-
-      if (error) {
-        errors.push(error.message);
-      } else {
-        saved++;
-      }
+        .eq("tenant_id", tenantId); // LL-160 always guard with tenant
+      if (error) errors.push(error.message);
+      else saved++;
     }
-
-    await load(); // refresh — clears stale avco/qty
+    await load();
     setEdits({});
-    setSaveResult({ saved, errors });
+    setResult({ saved, errors });
     setSaving(false);
   };
 
-  // ── Keyboard shortcut: Ctrl+S ─────────────────────────────────────────────
-
+  // Ctrl+S
   useEffect(() => {
-    const handler = (e) => {
+    const h = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        if (changedCount && !saving) handleSaveAll();
+        if (changedCount && !saving) saveAll();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [changedCount, saving, edits]); // eslint-disable-line
 
-  // ─── STYLES (inline — no CSS file needed) ─────────────────────────────────
-
-  const s = {
-    root: {
-      padding: "4px 0 48px",
-      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    },
-    header: {
-      display: "flex",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 12,
-      marginBottom: 18,
-    },
-    headerTitle: {
-      margin: 0,
-      fontSize: 14,
-      fontWeight: 700,
-      color: "#f1f5f9",
-      letterSpacing: "-0.01em",
-    },
-    headerSub: {
-      margin: "3px 0 0",
-      fontSize: 12,
-      color: "#475569",
-      fontFamily: "system-ui, sans-serif",
-    },
-    headerActions: {
-      display: "flex",
-      gap: 8,
-      alignItems: "center",
-      flexShrink: 0,
-    },
-    unsavedBadge: {
-      background: "#f59e0b18",
-      color: "#f59e0b",
-      border: "1px solid #f59e0b35",
-      borderRadius: 6,
-      padding: "4px 10px",
-      fontSize: 11,
-      fontWeight: 700,
-      fontFamily: "system-ui, sans-serif",
-    },
-    discardBtn: {
-      background: "transparent",
-      color: "#64748b",
-      border: "1px solid #334155",
-      borderRadius: 6,
-      padding: "6px 12px",
-      fontSize: 12,
-      cursor: "pointer",
-      fontFamily: "system-ui, sans-serif",
-    },
-    saveBtn: (active) => ({
-      background: active ? "#22c55e" : "#1e293b",
-      color: active ? "#fff" : "#475569",
-      border: `1px solid ${active ? "#22c55e" : "#334155"}`,
-      borderRadius: 6,
-      padding: "6px 16px",
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: active ? "pointer" : "not-allowed",
-      transition: "all 0.15s",
-      fontFamily: "system-ui, sans-serif",
-    }),
-    banner: (isError) => ({
-      background: isError ? "#ef444412" : "#22c55e12",
-      border: `1px solid ${isError ? "#ef444430" : "#22c55e30"}`,
-      borderRadius: 7,
-      padding: "9px 14px",
-      marginBottom: 14,
-      fontSize: 12,
-      color: isError ? "#ef4444" : "#22c55e",
-      fontFamily: "system-ui, sans-serif",
-    }),
-    pillRow: {
-      display: "flex",
-      gap: 6,
-      flexWrap: "wrap",
-      marginBottom: 14,
-    },
-    pill: (active, count) => ({
-      background: active ? "#22c55e" : count === 0 ? "#0f172a" : "#1e293b",
-      color: active ? "#fff" : count === 0 ? "#334155" : "#94a3b8",
-      border: `1px solid ${active ? "#22c55e60" : "#334155"}`,
-      borderRadius: 20,
-      padding: "4px 12px",
-      fontSize: 11,
-      fontWeight: 600,
-      cursor: count === 0 && !active ? "default" : "pointer",
-      transition: "all 0.12s",
-      fontFamily: "system-ui, sans-serif",
-      opacity: count === 0 && !active ? 0.4 : 1,
-    }),
-    searchInput: {
-      width: "100%",
-      maxWidth: 320,
-      background: "#0f172a",
-      border: "1px solid #334155",
-      borderRadius: 6,
-      padding: "7px 12px",
-      color: "#f1f5f9",
-      fontSize: 12,
-      outline: "none",
-      boxSizing: "border-box",
-      fontFamily: "system-ui, sans-serif",
-    },
-    legend: {
-      display: "flex",
-      gap: 14,
-      marginBottom: 10,
-      alignItems: "center",
-      flexWrap: "wrap",
-    },
-    legendLabel: {
-      fontSize: 10,
-      color: "#475569",
-      letterSpacing: "0.06em",
-      fontWeight: 700,
-    },
-    table: { width: "100%", borderCollapse: "collapse", fontSize: 12 },
-    th: {
-      padding: "7px 10px",
-      fontWeight: 700,
-      textAlign: "left",
-      color: "#475569",
-      fontSize: 10,
-      letterSpacing: "0.06em",
-      borderBottom: "1px solid #1e293b",
-      background: "#080e1a",
-      whiteSpace: "nowrap",
-    },
-    thRight: {
-      padding: "7px 10px",
-      fontWeight: 700,
-      textAlign: "right",
-      color: "#475569",
-      fontSize: 10,
-      letterSpacing: "0.06em",
-      borderBottom: "1px solid #1e293b",
-      background: "#080e1a",
-      whiteSpace: "nowrap",
-    },
-    td: (focused, edited, isEven) => ({
-      padding: "5px 10px",
-      background: focused
-        ? "#0d2137"
-        : edited
-          ? "#0d1f14"
-          : isEven
-            ? "#0c1422"
-            : "#080e1a",
-      borderBottom: "1px solid #111827",
-      transition: "background 0.08s",
-    }),
-    priceInput: (edited, focused) => ({
-      width: 78,
-      background: "transparent",
-      border: `1px solid ${focused ? "#38bdf8" : edited ? "#22c55e" : "#1e293b"}`,
-      borderRadius: 5,
-      padding: "4px 7px",
-      color: "#f1f5f9",
-      fontSize: 12,
-      outline: "none",
-      textAlign: "right",
-      fontFamily: "'JetBrains Mono', monospace",
-      transition: "border-color 0.12s",
-    }),
-    marginBadge: (margin) => {
-      const ms = marginStyle(margin);
-      return {
-        background: ms.bg,
-        color: ms.color,
-        border: `1px solid ${ms.border}`,
-        borderRadius: 4,
-        padding: "2px 8px",
-        fontWeight: 700,
-        fontSize: 11,
-        letterSpacing: "0.02em",
-        fontFamily: "system-ui, sans-serif",
-      };
-    },
-    footer: {
-      marginTop: 12,
-      color: "#475569",
-      fontSize: 11,
-      fontFamily: "system-ui, sans-serif",
-      display: "flex",
-      gap: 16,
-      flexWrap: "wrap",
-    },
-    unpricedWarn: { color: "#ef4444" },
-    ctrlHint: { color: "#334155" },
-  };
-
-  // ─── LOADING ───────────────────────────────────────────────────────────────
-
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading)
     return (
-      <div
-        style={{
-          padding: 40,
-          color: "#334155",
-          textAlign: "center",
-          fontSize: 13,
-        }}
-      >
-        Loading {items.length > 0 ? items.length : "…"} items…
-      </div>
+      <p style={{ ...Ty.body, color: T.ink300, padding: "32px 0" }}>
+        Loading pricing data…
+      </p>
     );
 
-  // ─── RENDER ────────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={s.root}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       {/* ── Header ── */}
-      <div style={s.header}>
-        <div>
-          <h3 style={s.headerTitle}>💰 Bulk Price Setter</h3>
-          <p style={s.headerSub}>
-            {items.length} active items · edit sell prices inline · margin
-            calculated live from AVCO
-          </p>
-        </div>
-        <div style={s.headerActions}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 16,
+          flexWrap: "wrap",
+          gap: 10,
+        }}
+      >
+        <p style={{ ...Ty.caption, color: T.ink300, margin: 0 }}>
+          {items.length} active items · edit sell prices inline · margin
+          calculated live from AVCO
+        </p>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {changedCount > 0 && (
-            <span style={s.unsavedBadge}>{changedCount} unsaved</span>
+            <span
+              style={{
+                ...Ty.label,
+                background: T.warningBg,
+                border: `1px solid ${T.warningBd}`,
+                color: T.warning,
+                padding: "4px 10px",
+                borderRadius: 4,
+              }}
+            >
+              {changedCount} unsaved
+            </span>
           )}
           {changedCount > 0 && (
-            <button style={s.discardBtn} onClick={discardAll}>
+            <button style={sBtn("ghost")} onClick={discard}>
               Discard
             </button>
           )}
           <button
-            style={s.saveBtn(changedCount > 0 && !saving)}
-            onClick={handleSaveAll}
+            style={sBtn("primary", !changedCount || saving)}
+            onClick={saveAll}
             disabled={!changedCount || saving}
           >
             {saving
-              ? "⏳ Saving…"
-              : `💾 Save All${changedCount ? ` (${changedCount})` : ""}`}
+              ? "Saving…"
+              : `Save All${changedCount ? ` (${changedCount})` : ""}`}
           </button>
         </div>
       </div>
 
-      {/* ── Save result banner ── */}
-      {saveResult && (
-        <div style={s.banner(saveResult.errors.length > 0)}>
-          {saveResult.saved > 0 && (
+      {/* ── Result banner ── */}
+      {result && (
+        <div
+          style={{
+            background: result.errors.length ? T.dangerBg : T.successBg,
+            border: `1px solid ${result.errors.length ? T.dangerBd : T.successBd}`,
+            color: result.errors.length ? T.danger : T.success,
+            borderRadius: 6,
+            padding: "10px 16px",
+            marginBottom: 16,
+            ...Ty.body,
+          }}
+        >
+          {result.saved > 0 && (
             <span>
-              ✅ {saveResult.saved} price{saveResult.saved !== 1 ? "s" : ""}{" "}
-              saved.{" "}
+              ✓ {result.saved} price{result.saved !== 1 ? "s" : ""} saved.{" "}
             </span>
           )}
-          {saveResult.errors.length > 0 && (
-            <span>
-              ⚠️ {saveResult.errors.length} error
-              {saveResult.errors.length !== 1 ? "s" : ""}:{" "}
-              {saveResult.errors.join(" · ")}
-            </span>
+          {result.errors.length > 0 && (
+            <span>⚠ {result.errors.join(" · ")}</span>
           )}
         </div>
       )}
 
-      {/* ── Category pills ── */}
-      <div style={s.pillRow}>
-        {CATEGORY_CONFIG.map(({ key, label, icon }) => (
-          <button
-            key={key}
-            style={s.pill(catFilter === key, catCounts[key])}
-            onClick={() => {
-              if (catCounts[key] > 0 || key === "all") setCatFilter(key);
-            }}
-          >
-            {icon} {label}
-            <span style={{ opacity: 0.6, marginLeft: 4 }}>
-              ({catCounts[key]})
-            </span>
-          </button>
-        ))}
+      {/* ── Category pills — matches HQStock brand pill style ── */}
+      <div
+        style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}
+      >
+        {CATS.map(({ key, label, icon }) => {
+          const count = catCounts[key];
+          const active = catFilter === key;
+          return (
+            <button
+              key={key}
+              onClick={() => {
+                if (count > 0 || key === "all") setCatFilter(key);
+              }}
+              style={{
+                padding: "4px 11px",
+                borderRadius: 16,
+                ...Ty.caption,
+                fontWeight: active ? 700 : 500,
+                border: `1.5px solid ${active ? T.accentMid : T.ink150}`,
+                background: active ? T.accentMid : "#fff",
+                color: active ? "#fff" : T.ink700,
+                cursor: count === 0 && key !== "all" ? "default" : "pointer",
+                opacity: count === 0 && key !== "all" ? 0.4 : 1,
+              }}
+            >
+              {icon} {label} <span style={{ opacity: 0.65 }}>×{count}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── Search ── */}
-      <div style={{ marginBottom: 12 }}>
-        <input
-          ref={searchRef}
-          style={s.searchInput}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, SKU, brand, variant…"
-        />
-      </div>
-
-      {/* ── Margin legend ── */}
-      <div style={s.legend}>
-        <span style={s.legendLabel}>MARGIN</span>
-        {[
-          { label: "< 20% — low", color: "#ef4444" },
-          { label: "20–40% — ok", color: "#f59e0b" },
-          { label: "> 40% — strong", color: "#22c55e" },
-          { label: "no price", color: "#475569" },
-        ].map(({ label, color }) => (
-          <span
-            key={label}
-            style={{ fontSize: 11, color, fontFamily: "system-ui, sans-serif" }}
-          >
-            ● {label}
-          </span>
-        ))}
-      </div>
-
-      {/* ── Spreadsheet table ── */}
+      {/* ── Search + legend row ── */}
       <div
         style={{
-          overflowX: "auto",
-          borderRadius: 8,
-          border: "1px solid #1e293b",
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 14,
+          flexWrap: "wrap",
         }}
       >
-        <table style={s.table}>
+        <input
+          ref={searchRef}
+          type="text"
+          placeholder="Search name, SKU, brand, variant…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            padding: "8px 12px",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 4,
+            ...Ty.body,
+            background: "#fff",
+            outline: "none",
+            width: 260,
+            boxSizing: "border-box",
+            color: T.ink900,
+          }}
+        />
+        <div style={{ flex: 1 }} />
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <span style={{ ...Ty.label, color: T.ink400 }}>MARGIN</span>
+          {[
+            { label: "< 20% low", color: T.danger },
+            { label: "20–40% ok", color: T.warning },
+            { label: "> 40% strong", color: T.success },
+          ].map(({ label, color }) => (
+            <span key={label} style={{ ...Ty.caption, color }}>
+              ● {label}
+            </span>
+          ))}
+        </div>
+        <span style={{ ...Ty.caption, color: T.ink400 }}>
+          {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* ── Table — matches HQStock FoodItems table pattern ── */}
+      <div
+        style={{
+          background: "#fff",
+          border: `1px solid ${T.ink150}`,
+          borderRadius: 6,
+          overflow: "auto",
+          boxShadow: T.shadow,
+          marginBottom: 12,
+        }}
+      >
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "13px",
+            fontFamily: T.font,
+          }}
+        >
           <thead>
             <tr>
-              <th style={s.th}>SKU</th>
-              <th style={s.th}>NAME</th>
-              <th style={s.th}>CATEGORY</th>
-              <th style={s.th}>VARIANT</th>
-              <th style={s.thRight}>AVCO COST</th>
-              <th style={s.thRight}>SELL PRICE</th>
-              <th style={s.thRight}>MARGIN</th>
-              <th style={s.thRight}>ON HAND</th>
+              <th style={sTh}>SKU</th>
+              <th style={sTh}>Name</th>
+              <th style={sTh}>Category</th>
+              <th style={sTh}>Variant</th>
+              <th style={{ ...sTh, textAlign: "right" }}>AVCO Cost</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Sell Price</th>
+              <th style={{ ...sTh, textAlign: "right" }}>Margin</th>
+              <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((item, idx) => {
-              const edited = edits[item.id] !== undefined;
-              const focused = focusId === item.id;
-              const margin = getMargin(item);
-              const isEven = idx % 2 === 0;
-              const tdStyle = s.td(focused, edited, isEven);
-
-              return (
-                <tr key={item.id}>
-                  {/* SKU */}
-                  <td style={tdStyle}>
-                    <span
-                      style={{
-                        color: "#334155",
-                        fontFamily: "monospace",
-                        fontSize: 11,
-                      }}
-                    >
-                      {item.sku || "—"}
-                    </span>
-                  </td>
-
-                  {/* Name */}
-                  <td style={{ ...tdStyle, maxWidth: 220 }}>
-                    <div
-                      style={{
-                        color: "#e2e8f0",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        fontFamily: "system-ui, sans-serif",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {item.name}
-                    </div>
-                    {item.brand && item.brand !== "Medi Recreational" && (
-                      <div
-                        style={{
-                          color: "#334155",
-                          fontSize: 10,
-                          fontFamily: "system-ui, sans-serif",
-                        }}
-                      >
-                        {item.brand}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Category */}
-                  <td style={tdStyle}>
-                    <span
-                      style={{
-                        background: "#111827",
-                        border: "1px solid #1e293b",
-                        borderRadius: 4,
-                        padding: "2px 7px",
-                        fontSize: 10,
-                        color: "#64748b",
-                        fontFamily: "system-ui, sans-serif",
-                      }}
-                    >
-                      {item.category}
-                    </span>
-                    {item.subcategory && (
-                      <span
-                        style={{
-                          color: "#334155",
-                          fontSize: 10,
-                          marginLeft: 5,
-                          fontFamily: "system-ui, sans-serif",
-                        }}
-                      >
-                        {item.subcategory}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Variant */}
-                  <td style={{ ...tdStyle }}>
-                    <span style={{ color: "#475569", fontSize: 11 }}>
-                      {variantDisplay(item) || "—"}
-                    </span>
-                  </td>
-
-                  {/* AVCO Cost */}
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    {item.weighted_avg_cost ? (
-                      <span style={{ color: "#64748b" }}>
-                        R {fmt(item.weighted_avg_cost)}
-                      </span>
-                    ) : (
-                      <span style={{ color: "#1e293b" }}>—</span>
-                    )}
-                  </td>
-
-                  {/* Sell Price — editable */}
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "flex-end",
-                        gap: 3,
-                      }}
-                    >
-                      <span style={{ color: "#475569", fontSize: 11 }}>R</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={getSellPrice(item)}
-                        placeholder="0.00"
-                        onFocus={() => setFocusId(item.id)}
-                        onBlur={() => setFocusId(null)}
-                        onChange={(e) =>
-                          handlePriceChange(item.id, e.target.value)
-                        }
-                        style={s.priceInput(edited, focused)}
-                      />
-                    </div>
-                  </td>
-
-                  {/* Margin badge */}
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    {margin !== null ? (
-                      <span style={s.marginBadge(margin)}>
-                        {margin.toFixed(1)}%
-                      </span>
-                    ) : (
-                      <span style={{ color: "#1e293b", fontSize: 11 }}>—</span>
-                    )}
-                  </td>
-
-                  {/* On Hand */}
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <span
-                      style={{
-                        color:
-                          (item.quantity_on_hand ?? 0) === 0
-                            ? "#334155"
-                            : "#64748b",
-                      }}
-                    >
-                      {item.quantity_on_hand ?? 0}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-
-            {filtered.length === 0 && (
+            {filtered.length === 0 ? (
               <tr>
                 <td
                   colSpan={8}
                   style={{
-                    padding: 28,
+                    ...sTd,
                     textAlign: "center",
-                    color: "#334155",
-                    fontFamily: "system-ui, sans-serif",
-                    fontSize: 13,
-                    background: "#080e1a",
+                    color: T.ink300,
+                    padding: 40,
                   }}
                 >
                   No items match.{" "}
                   {search && (
-                    <button
-                      onClick={() => setSearch("")}
+                    <span
                       style={{
-                        color: "#22c55e",
-                        background: "none",
-                        border: "none",
+                        color: T.accentMid,
                         cursor: "pointer",
-                        fontSize: 12,
+                        fontWeight: 600,
                       }}
+                      onClick={() => setSearch("")}
                     >
-                      Clear search
-                    </button>
+                      Clear search →
+                    </span>
                   )}
                 </td>
               </tr>
+            ) : (
+              filtered.map((item, idx) => {
+                const focused = focusId === item.id;
+                const edited = edits[item.id] !== undefined;
+                const margin = getMargin(item);
+                const mb = marginBadge(margin);
+                const isEven = idx % 2 === 0;
+                const rowBg = focused
+                  ? T.accentLit
+                  : edited
+                    ? "#FFFEF5"
+                    : isEven
+                      ? "#fff"
+                      : T.ink050;
+                const lowStock = (item.quantity_on_hand ?? 0) <= 0;
+
+                return (
+                  <tr
+                    key={item.id}
+                    style={{
+                      background: rowBg,
+                      borderLeft: edited
+                        ? `3px solid ${T.accentMid}`
+                        : "3px solid transparent",
+                    }}
+                  >
+                    {/* SKU */}
+                    <td
+                      style={{
+                        ...sTd,
+                        ...Ty.data,
+                        color: T.ink300,
+                        minWidth: 100,
+                      }}
+                    >
+                      {item.sku || "—"}
+                    </td>
+
+                    {/* Name */}
+                    <td style={{ ...sTd, minWidth: 180 }}>
+                      <div style={{ fontWeight: 600, color: T.ink700 }}>
+                        {item.name}
+                      </div>
+                      {item.brand && (
+                        <div
+                          style={{
+                            ...Ty.caption,
+                            color: T.ink400,
+                            marginTop: 2,
+                          }}
+                        >
+                          {item.brand}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Category */}
+                    <td style={sTd}>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          padding: "2px 7px",
+                          borderRadius: 3,
+                          background: T.ink075,
+                          color: T.ink500,
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {item.category}
+                      </span>
+                      {item.subcategory && (
+                        <span
+                          style={{
+                            ...Ty.caption,
+                            color: T.ink300,
+                            marginLeft: 5,
+                          }}
+                        >
+                          {item.subcategory}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Variant */}
+                    <td style={sTd}>
+                      {variantStr(item) ? (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 7px",
+                            borderRadius: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            background: "#EEF2FF",
+                            color: "#3730A3",
+                          }}
+                        >
+                          {variantStr(item)}
+                        </span>
+                      ) : (
+                        <span style={{ color: T.ink300 }}>—</span>
+                      )}
+                    </td>
+
+                    {/* AVCO Cost */}
+                    <td
+                      style={{
+                        ...sTd,
+                        ...Ty.data,
+                        textAlign: "right",
+                        color: T.ink500,
+                      }}
+                    >
+                      {item.weighted_avg_cost ? (
+                        fmtR(item.weighted_avg_cost)
+                      ) : (
+                        <span style={{ color: T.ink300 }}>—</span>
+                      )}
+                    </td>
+
+                    {/* Sell Price — editable */}
+                    <td style={{ ...sTd, textAlign: "right" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: 3,
+                        }}
+                      >
+                        <span style={{ ...Ty.caption, color: T.ink400 }}>
+                          R
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={getSell(item)}
+                          placeholder="0.00"
+                          onFocus={() => setFocusId(item.id)}
+                          onBlur={() => setFocusId(null)}
+                          onChange={(e) =>
+                            handleChange(item.id, e.target.value)
+                          }
+                          style={{
+                            width: 80,
+                            padding: "5px 8px",
+                            border: `1px solid ${focused ? T.accent : edited ? T.accentMid : T.ink150}`,
+                            borderRadius: 3,
+                            ...Ty.data,
+                            color: T.ink900,
+                            textAlign: "right",
+                            background: "#fff",
+                            outline: "none",
+                            transition: "border-color .15s",
+                          }}
+                        />
+                      </div>
+                    </td>
+
+                    {/* Margin */}
+                    <td style={{ ...sTd, textAlign: "right" }}>
+                      {mb ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                            letterSpacing: "0.06em",
+                            background: mb.bg,
+                            border: `1px solid ${mb.bd}`,
+                            color: mb.color,
+                          }}
+                        >
+                          {mb.label}
+                        </span>
+                      ) : (
+                        <span style={{ color: T.ink300 }}>—</span>
+                      )}
+                    </td>
+
+                    {/* On Hand */}
+                    <td
+                      style={{
+                        ...sTd,
+                        ...Ty.data,
+                        textAlign: "right",
+                        color: lowStock ? T.danger : T.ink500,
+                      }}
+                    >
+                      {item.quantity_on_hand ?? 0}
+                      {lowStock && (
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: T.danger,
+                          }}
+                        >
+                          OUT
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
       {/* ── Footer ── */}
-      <div style={s.footer}>
-        <span>
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ ...Ty.caption, color: T.ink400 }}>
           Showing {filtered.length} of {items.length} items
         </span>
         {unpricedCount > 0 && (
-          <span style={s.unpricedWarn}>
-            ⚠️ {unpricedCount} item{unpricedCount !== 1 ? "s" : ""} with no sell
-            price
+          <span style={{ ...Ty.caption, color: T.danger, fontWeight: 600 }}>
+            ⚠ {unpricedCount} item{unpricedCount !== 1 ? "s" : ""} with no sell
+            price — hidden from shop
           </span>
         )}
-        <span style={s.ctrlHint}>Ctrl+S to save</span>
+        <span style={{ ...Ty.caption, color: T.ink300 }}>
+          Ctrl+S to save all
+        </span>
       </div>
     </div>
   );
