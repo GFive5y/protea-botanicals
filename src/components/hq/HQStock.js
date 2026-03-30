@@ -10,6 +10,7 @@ import StockItemModal from "../StockItemModal";
 import StockItemPanel from "./StockItemPanel";
 import StockReceiveModal from "./StockReceiveModal";
 import StockPricingPanel from "./StockPricingPanel";
+import StockChannelPanel from "./StockChannelPanel";
 
 const T = {
   ink900: "#0D0D0D",
@@ -2604,6 +2605,7 @@ export default function HQStock() {
             </table>
           </div>
         )}
+        <StockChannelPanel tenantId={tenantId} />
       </div>
     );
   };

@@ -1250,6 +1250,12 @@ function OrderCard({
         });
         if (error) throw new Error(`Reserve failed for line: ${error.message}`);
       }
+      // Tag reservations with channel + reference for StockChannelPanel visibility
+      await supabase
+        .from("stock_reservations")
+        .update({ channel: "wholesale", order_reference: order.po_number })
+        .eq("order_id", order.id);
+
       // Update order status
       const { error: upErr } = await supabase
         .from("purchase_orders")
