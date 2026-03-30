@@ -1117,7 +1117,7 @@ const ghostBtn = {
 };
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
-export default function StockReceiveModal({ onClose, onComplete }) {
+export default function StockReceiveModal({ onClose, onComplete, tenantId: tenantIdProp }) {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -1166,7 +1166,7 @@ export default function StockReceiveModal({ onClose, onComplete }) {
         .eq("id", user.id)
         .single();
 
-      const tenant_id = profile?.tenant_id;
+      const tenant_id = tenantIdProp || profile?.tenant_id;
       const ref = genReference();
 
       const tv = lines.reduce(
