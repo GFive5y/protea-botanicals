@@ -9,6 +9,7 @@ import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
 import StockItemPanel from "./StockItemPanel";
 import StockReceiveModal from "./StockReceiveModal";
+import StockPricingPanel from "./StockPricingPanel";
 
 const T = {
   ink900: "#0D0D0D",
@@ -4340,6 +4341,7 @@ export default function HQStock() {
             { id: "overview", label: "Overview" },
             { id: "items", label: `Items (${items.length})` },
             { id: "movements", label: "Movements" },
+            { id: "pricing", label: "💰 Pricing" },
           ].map((t) => (
             <button
               key={t.id}
@@ -4379,6 +4381,7 @@ export default function HQStock() {
             <FoodItems />
           ))}
         {subTab === "movements" && <FoodMovements />}
+        {subTab === "pricing" && <StockPricingPanel tenantId={tenantId} />}
       </>
 
       {renderMovDrawer()}
