@@ -11,6 +11,7 @@ import StockItemPanel from "./StockItemPanel";
 import StockReceiveModal from "./StockReceiveModal";
 import StockPricingPanel from "./StockPricingPanel";
 import StockChannelPanel from "./StockChannelPanel";
+import StockReceiveHistoryPanel from "./StockReceiveHistoryPanel";
 
 const T = {
   ink900: "#0D0D0D",
@@ -382,6 +383,9 @@ export default function HQStock() {
   const [modalSaving, setModalSaving] = useState(false);
   const [panelItem, setPanelItem] = useState(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [avcoAlertItems, setAvcoAlertItems] = useState([]);
+  const [checkAvcoAfterLoad, setCheckAvcoAfterLoad] = useState(false);
+  const preReceiveRef = React.useRef(null);
   const [modalDefaults, setModalDefaults] = useState({});
   const [adjustOpen, setAdjustOpen] = useState(null);
   const [adjustQty, setAdjustQty] = useState("");
@@ -431,6 +435,20 @@ export default function HQStock() {
   useEffect(() => {
     load();
   }, [load]);
+  // Detect AVCO changes after a delivery is received
+  useEffect(() => {
+    if (!checkAvcoAfterLoad || loading || !preReceiveRef.current) return;
+    const snapshot = preReceiveRef.current;
+    const changed = items.filter((i) => {
+      const before = snapshot[i.id];
+      const after = i.weighted_avg_cost;
+      if (!before || !after) return false;
+      return Math.abs((after - before) / before) > 0.05;
+    });
+    if (changed.length > 0) setAvcoAlertItems(changed);
+    setCheckAvcoAfterLoad(false);
+    preReceiveRef.current = null;
+  }, [items, loading, checkAvcoAfterLoad]);
 
   const loadMovForItem = async (item) => {
     setMovItem(item);
@@ -4295,7 +4313,12 @@ export default function HQStock() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={() => setReceiveOpen(true)}
+            onClick={() => {
+              preReceiveRef.current = Object.fromEntries(
+                items.map((i) => [i.id, i.weighted_avg_cost]),
+              );
+              setReceiveOpen(true);
+            }}
             style={{
               padding: "6px 16px",
               background: T.accentMid,
@@ -4344,6 +4367,7 @@ export default function HQStock() {
             { id: "items", label: `Items (${items.length})` },
             { id: "movements", label: "Movements" },
             { id: "pricing", label: "💰 Pricing" },
+            { id: "receipts", label: "📦 Receipts" },
           ].map((t) => (
             <button
               key={t.id}
@@ -4384,6 +4408,91 @@ export default function HQStock() {
           ))}
         {subTab === "movements" && <FoodMovements />}
         {subTab === "pricing" && <StockPricingPanel tenantId={tenantId} />}
+        {subTab === "receipts" && (
+          <StockReceiveHistoryPanel
+            tenantId={tenantId}
+            onReviewPrices={() => setSubTab("pricing")}
+          />
+        )}
+
+        {avcoAlertItems.length > 0 && (
+          <div
+            style={{
+              position: "fixed",
+              bottom: 24,
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: T.warningBg,
+              border: `1px solid ${T.warningBd}`,
+              borderRadius: 8,
+              padding: "14px 20px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+              zIndex: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              fontFamily: T.font,
+              maxWidth: 520,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: T.warning,
+                  marginBottom: 2,
+                }}
+              >
+                ⚠ {avcoAlertItems.length} item
+                {avcoAlertItems.length !== 1 ? "s" : ""} had AVCO changes &gt;5%
+                — check your sell prices
+              </div>
+              <div style={{ fontSize: 11, color: T.warning, opacity: 0.8 }}>
+                {avcoAlertItems
+                  .slice(0, 3)
+                  .map((i) => i.name)
+                  .join(", ")}
+                {avcoAlertItems.length > 3
+                  ? ` +${avcoAlertItems.length - 3} more`
+                  : ""}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button
+                onClick={() => setSubTab("pricing")}
+                style={{
+                  padding: "6px 14px",
+                  background: T.warning,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: T.font,
+                }}
+              >
+                Review Prices →
+              </button>
+              <button
+                onClick={() => setAvcoAlertItems([])}
+                style={{
+                  padding: "6px 10px",
+                  background: "transparent",
+                  color: T.warning,
+                  border: `1px solid ${T.warningBd}`,
+                  borderRadius: 3,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontFamily: T.font,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </>
 
       {renderMovDrawer()}
@@ -4392,6 +4501,7 @@ export default function HQStock() {
           tenantId={tenantId}
           onClose={() => setReceiveOpen(false)}
           onComplete={() => {
+            setCheckAvcoAfterLoad(true);
             load();
             setReceiveOpen(false);
           }}
