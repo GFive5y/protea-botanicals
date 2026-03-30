@@ -8,6 +8,7 @@ import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
 import StockItemPanel from "./StockItemPanel";
+import StockReceiveModal from "./StockReceiveModal";
 
 const T = {
   ink900: "#0D0D0D",
@@ -378,6 +379,7 @@ export default function HQStock() {
   const [modalItem, setModalItem] = useState(undefined);
   const [modalSaving, setModalSaving] = useState(false);
   const [panelItem, setPanelItem] = useState(null);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const [modalDefaults, setModalDefaults] = useState({});
   const [adjustOpen, setAdjustOpen] = useState(null);
   const [adjustQty, setAdjustQty] = useState("");
@@ -3915,21 +3917,40 @@ export default function HQStock() {
             )}
           </p>
         </div>
-        <button
-          style={{
-            padding: "6px 14px",
-            background: "transparent",
-            border: "1px solid " + T.ink150,
-            borderRadius: "3px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontFamily: T.font,
-            color: T.ink500,
-          }}
-          onClick={load}
-        >
-          Refresh
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setReceiveOpen(true)}
+            style={{
+              padding: "6px 16px",
+              background: T.accentMid,
+              border: "none",
+              borderRadius: "3px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontFamily: T.font,
+              color: "#fff",
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+            }}
+          >
+            📦 Receive Delivery
+          </button>
+          <button
+            style={{
+              padding: "6px 14px",
+              background: "transparent",
+              border: "1px solid " + T.ink150,
+              borderRadius: "3px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontFamily: T.font,
+              color: T.ink500,
+            }}
+            onClick={load}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       <>
@@ -3988,6 +4009,15 @@ export default function HQStock() {
       </>
 
       {renderMovDrawer()}
+      {receiveOpen && (
+        <StockReceiveModal
+          onClose={() => setReceiveOpen(false)}
+          onComplete={() => {
+            load();
+            setReceiveOpen(false);
+          }}
+        />
+      )}
       {panelItem && (
         <StockItemPanel
           item={panelItem}
