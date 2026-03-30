@@ -1,12 +1,17 @@
-// StockReceiveModal.js — v1.0
-// WP-STOCK-RECEIVE S1
-// 4-step guided delivery receive flow
+// StockReceiveModal.js — v2.0
+// WP-STOCK-RECEIVE-S3 — Product World item picker
+// Step 2 rebuilt: category sidebar + world-aware attributes + new product flow
 // Writes: stock_receipts, stock_receipt_lines, stock_movements (purchase_in)
 // Updates: inventory_items (qty, weighted_avg_cost, cost_price, batch, expiry)
 // AVCO: ((Qold × Aold) + (Qin × Cin)) / (Qold + Qin)
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";
+import {
+  PRODUCT_WORLDS,
+  itemMatchesWorld,
+  defaultsForWorld,
+} from "./ProductWorlds";
 
 // ─── Theme tokens (mirrors HQStock palette) ──────────────────────────────────
 const T = {
@@ -237,6 +242,7 @@ function Step1({ data, onChange, onNext }) {
 }
 
 // ─── Step 2 — Add Items ───────────────────────────────────────────────────────
+// ─── Step 2 — Add Items (WP-STOCK-RECEIVE-S3: product world picker) ──────────
 function Step2({
   lines,
   onAddLine,
@@ -244,44 +250,78 @@ function Step2({
   onRemoveLine,
   onNext,
   onBack,
+  tenantId,
 }) {
+  // World sidebar selection — excludes "all" (not useful in receive context)
+  const WORLDS = useMemo(
+    () => PRODUCT_WORLDS.filter((w) => w.id !== "all"),
+    [],
+  );
+  const [activeWorld, setActiveWorld] = useState(WORLDS[0]);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const debounceRef = useRef(null);
+  const [worldItems, setWorldItems] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const search = useCallback((q) => {
-    if (!q || q.length < 2) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from("inventory_items")
-        .select(
-          "id,name,sku,brand,category,subcategory,variant_value,tags,quantity_on_hand,weighted_avg_cost,cost_price,expiry_date,batch_lot_number",
-        )
-        .or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%,variant_value.ilike.%${q}%,subcategory.ilike.%${q}%`)
-        .eq("is_active", true)
-        .limit(30);
-      setResults(data || []);
-      setSearching(false);
-    }, 280);
-  }, []);
+  // New product inline form
+  const [showNewProduct, setShowNewProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    sku: "",
+    cost_per_unit: "",
+  });
+  const [savingNew, setSavingNew] = useState(false);
+  const [newProductError, setNewProductError] = useState("");
+
+  // Load items for the selected world
+  const loadWorldItems = useCallback(
+    async (world) => {
+      if (!tenantId) return;
+      setLoading(true);
+      setQuery("");
+      try {
+        let qb = supabase
+          .from("inventory_items")
+          .select(
+            "id,name,sku,brand,category,subcategory,variant_value,strain_type,weight_grams,tags,quantity_on_hand,weighted_avg_cost,cost_price,sell_price,expiry_date,batch_lot_number,unit",
+          )
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .order("name");
+        if (world.enums && world.enums.length > 0) {
+          qb = qb.in("category", world.enums);
+        }
+        const { data } = await qb.limit(200);
+        let items = data || [];
+        // Further filter by subs if world has them
+        if (world.subs && world.subs.length > 0) {
+          items = items.filter((i) => world.subs.includes(i.subcategory));
+        }
+        setWorldItems(items);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [tenantId],
+  );
 
   useEffect(() => {
-    search(query);
-  }, [query, search]);
+    loadWorldItems(activeWorld);
+  }, [activeWorld, loadWorldItems]);
+
+  const filteredItems = useMemo(() => {
+    if (!query) return worldItems;
+    const q = query.toLowerCase();
+    return worldItems.filter(
+      (i) =>
+        (i.name || "").toLowerCase().includes(q) ||
+        (i.sku || "").toLowerCase().includes(q) ||
+        (i.brand || "").toLowerCase().includes(q) ||
+        (i.variant_value || "").toLowerCase().includes(q),
+    );
+  }, [worldItems, query]);
 
   function addItem(item) {
-    // Don't add duplicates
-    if (lines.find((l) => l.item_id === item.id)) {
-      setQuery("");
-      setResults([]);
-      return;
-    }
+    if (lines.find((l) => l.item_id === item.id)) return;
     const avco = calcNewAvco(
       item.quantity_on_hand,
       item.weighted_avg_cost,
@@ -290,20 +330,19 @@ function Step2({
     );
     onAddLine({
       item_id: item.id,
-      item: item,
+      item,
       qty_received: "",
       cost_per_unit: item.cost_price ? String(item.cost_price) : "",
       batch_lot: item.batch_lot_number || "",
       expiry_date: item.expiry_date || "",
       preview_avco: avco,
+      is_new: false,
     });
-    setQuery("");
-    setResults([]);
   }
 
   function updateLineField(idx, field, value) {
     const line = lines[idx];
-    let preview_avco = line.preview_avco;
+    let preview_avco = line.preview_avco || 0;
     if (field === "qty_received" || field === "cost_per_unit") {
       const qty =
         field === "qty_received"
@@ -323,6 +362,63 @@ function Step2({
     onUpdateLine(idx, { ...line, [field]: value, preview_avco });
   }
 
+  async function createAndAddNewProduct() {
+    if (!newProduct.name.trim()) {
+      setNewProductError("Product name is required.");
+      return;
+    }
+    if (
+      !newProduct.cost_per_unit ||
+      parseFloat(newProduct.cost_per_unit) <= 0
+    ) {
+      setNewProductError("Cost per unit is required to set AVCO correctly.");
+      return;
+    }
+    setSavingNew(true);
+    setNewProductError("");
+    try {
+      const defaults = defaultsForWorld(activeWorld);
+      const sku =
+        newProduct.sku.trim() ||
+        `${defaults.category.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`;
+      const { data, error } = await supabase
+        .from("inventory_items")
+        .insert({
+          tenant_id: tenantId,
+          name: newProduct.name.trim(),
+          sku,
+          category: defaults.category,
+          subcategory: defaults.subcategory || null,
+          quantity_on_hand: 0,
+          is_active: true,
+          cost_price: parseFloat(newProduct.cost_per_unit),
+        })
+        .select(
+          "id,name,sku,brand,category,subcategory,variant_value,strain_type,weight_grams,tags,quantity_on_hand,weighted_avg_cost,cost_price,sell_price,expiry_date,batch_lot_number,unit",
+        )
+        .single();
+      if (error) throw error;
+      // Add to world items list + add as delivery line
+      setWorldItems((prev) => [data, ...prev]);
+      onAddLine({
+        item_id: data.id,
+        item: data,
+        qty_received: "",
+        cost_per_unit: newProduct.cost_per_unit,
+        batch_lot: "",
+        expiry_date: "",
+        preview_avco: parseFloat(newProduct.cost_per_unit),
+        is_new: true,
+      });
+      setNewProduct({ name: "", sku: "", cost_per_unit: "" });
+      setShowNewProduct(false);
+    } catch (err) {
+      setNewProductError(err.message);
+    } finally {
+      setSavingNew(false);
+    }
+  }
+
   const canProceed =
     lines.length > 0 &&
     lines.every((l) => l.qty_received && parseFloat(l.qty_received) > 0);
@@ -331,8 +427,8 @@ function Step2({
     <div>
       <h3
         style={{
-          margin: "0 0 6px",
-          fontSize: "16px",
+          margin: "0 0 4px",
+          fontSize: 16,
           fontFamily: T.font,
           fontWeight: 700,
           color: T.ink900,
@@ -342,288 +438,733 @@ function Step2({
       </h3>
       <p
         style={{
-          margin: "0 0 16px",
-          fontSize: "12px",
+          margin: "0 0 14px",
+          fontSize: 12,
           color: T.ink400,
           fontFamily: T.font,
         }}
       >
-        Search by item name, SKU, or brand. Add all items in this delivery.
+        Browse by product category, then select items to add to this delivery.
       </p>
 
-      {/* Search */}
-      <div style={{ position: "relative", marginBottom: 12 }}>
-        <input
-          type="text"
-          placeholder="🔍  Search items..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ ...inputStyle, marginBottom: 0, paddingRight: 36 }}
-        />
-        {searching && (
-          <span
-            style={{
-              position: "absolute",
-              right: 10,
-              top: "50%",
-              transform: "translateY(-50%)",
-              fontSize: "11px",
-              color: T.ink400,
-              fontFamily: T.font,
-            }}
-          >
-            …
-          </span>
-        )}
-        {results.length > 0 && (
+      {/* ── Two-column layout: world sidebar + item list ── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "160px 1fr",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        {/* World sidebar */}
+        <div
+          style={{
+            background: T.surface,
+            border: `1px solid ${T.border}`,
+            borderRadius: 6,
+            overflow: "hidden",
+            height: "fit-content",
+            maxHeight: 340,
+            overflowY: "auto",
+          }}
+        >
+          {WORLDS.map((world) => {
+            const active = activeWorld.id === world.id;
+            const count = worldItems.length; // only meaningful for active world
+            return (
+              <button
+                key={world.id}
+                onClick={() => {
+                  setActiveWorld(world);
+                  setShowNewProduct(false);
+                }}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 10px",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  background: active ? T.accentBg : "transparent",
+                  borderLeft: active
+                    ? `3px solid ${T.accentMid}`
+                    : "3px solid transparent",
+                  fontFamily: T.font,
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13 }}>{world.icon}</span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? T.accentDark : T.ink600,
+                    }}
+                  >
+                    {world.label}
+                  </span>
+                </span>
+                {active && count > 0 && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      background: T.accentMid,
+                      color: "#fff",
+                      padding: "1px 5px",
+                      borderRadius: 8,
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Item list */}
+        <div>
+          {/* Search within world */}
+          <input
+            type="text"
+            placeholder={`Search ${activeWorld.label}…`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ ...inputStyle, marginBottom: 8 }}
+          />
+
           <div
             style={{
-              position: "absolute",
-              top: "100%",
-              left: 0,
-              right: 0,
-              zIndex: 50,
               background: T.surface,
               border: `1px solid ${T.border}`,
-              borderRadius: 4,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-              maxHeight: 240,
+              borderRadius: 6,
+              maxHeight: 250,
               overflowY: "auto",
             }}
           >
-            {results.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => addItem(item)}
-                style={{
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                  borderBottom: `1px solid ${T.ink075}`,
-                  fontFamily: T.font,
-                  transition: "background .1s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = T.accentBg)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                <div
-                  style={{ fontSize: "13px", fontWeight: 600, color: T.ink900 }}
-                >
-                  {item.name}
-                </div>
-                <div
-                  style={{ fontSize: "11px", color: T.ink400, marginTop: 2 }}
-                >
-                  {item.sku} · {item.brand} · {item.category} ·{" "}
-                  <span
-                    style={{
-                      color: item.quantity_on_hand < 0 ? T.danger : T.ink400,
-                    }}
-                  >
-                    {item.quantity_on_hand ?? 0} on hand
-                  </span>
-                  {item.weighted_avg_cost
-                    ? ` · AVCO R${Number(item.weighted_avg_cost).toFixed(2)}`
-                    : ""}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Lines */}
-      {lines.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "32px 0",
-            color: T.ink400,
-            fontSize: "13px",
-            fontFamily: T.font,
-            background: T.ink075,
-            borderRadius: 6,
-            marginBottom: 16,
-          }}
-        >
-          No items added yet. Search above to add delivery lines.
-        </div>
-      )}
-
-      {lines.map((line, idx) => (
-        <div
-          key={line.item_id}
-          style={{
-            background: T.ink075,
-            borderRadius: 6,
-            padding: "12px 14px",
-            marginBottom: 10,
-            position: "relative",
-          }}
-        >
-          {/* Item header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              marginBottom: 10,
-            }}
-          >
-            <div>
+            {loading ? (
               <div
                 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: T.ink900,
-                  fontFamily: T.font,
-                }}
-              >
-                {line.item.name}
-              </div>
-              <div
-                style={{
-                  fontSize: "11px",
+                  padding: 16,
+                  fontSize: 12,
                   color: T.ink400,
                   fontFamily: T.font,
-                  marginTop: 2,
+                  textAlign: "center",
                 }}
               >
-                {line.item.sku} · {line.item.category} ·{" "}
-                {line.item.quantity_on_hand ?? 0} on hand
+                Loading {activeWorld.label}…
               </div>
-            </div>
-            <button
-              onClick={() => onRemoveLine(idx)}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: T.danger,
-                fontSize: "16px",
-                lineHeight: 1,
-                padding: 4,
-              }}
-            >
-              ×
-            </button>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 8,
-              marginBottom: 8,
-            }}
-          >
-            <div>
-              <label style={{ ...labelStyle, marginBottom: 4 }}>
-                Qty Received <span style={{ color: T.danger }}>*</span>
-              </label>
-              <input
-                type="number"
-                min="0.001"
-                step="0.001"
-                placeholder="0"
-                value={line.qty_received}
-                onChange={(e) =>
-                  updateLineField(idx, "qty_received", e.target.value)
-                }
-                style={{ ...inputStyle, marginBottom: 0 }}
-              />
-            </div>
-            <div>
-              <label style={{ ...labelStyle, marginBottom: 4 }}>
-                Cost Per Unit (R)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={line.cost_per_unit}
-                onChange={(e) =>
-                  updateLineField(idx, "cost_per_unit", e.target.value)
-                }
-                style={{ ...inputStyle, marginBottom: 0 }}
-              />
-            </div>
-            <div>
-              <label style={{ ...labelStyle, marginBottom: 4 }}>
-                Batch / Lot
-              </label>
-              <input
-                type="text"
-                placeholder="Optional"
-                value={line.batch_lot}
-                onChange={(e) =>
-                  updateLineField(idx, "batch_lot", e.target.value)
-                }
-                style={{ ...inputStyle, marginBottom: 0 }}
-              />
-            </div>
-            {needsExpiry(line.item) && (
-              <div>
-                <label style={{ ...labelStyle, marginBottom: 4 }}>
-                  Expiry Date
-                </label>
-                <input
-                  type="date"
-                  value={line.expiry_date}
-                  onChange={(e) =>
-                    updateLineField(idx, "expiry_date", e.target.value)
-                  }
-                  style={{ ...inputStyle, marginBottom: 0 }}
-                />
+            ) : filteredItems.length === 0 ? (
+              <div
+                style={{
+                  padding: 16,
+                  fontSize: 12,
+                  color: T.ink400,
+                  fontFamily: T.font,
+                  textAlign: "center",
+                }}
+              >
+                No {activeWorld.label} items found.
+                <br />
+                <span
+                  onClick={() => setShowNewProduct(true)}
+                  style={{
+                    color: T.accentMid,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    marginTop: 4,
+                    display: "inline-block",
+                  }}
+                >
+                  + Add as new product →
+                </span>
               </div>
+            ) : (
+              filteredItems.map((item) => {
+                const alreadyAdded = !!lines.find((l) => l.item_id === item.id);
+                const noPrice = !(item.sell_price > 0);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => !alreadyAdded && addItem(item)}
+                    style={{
+                      padding: "9px 12px",
+                      borderBottom: `1px solid ${T.ink075}`,
+                      cursor: alreadyAdded ? "default" : "pointer",
+                      background: alreadyAdded ? T.accentBg : "transparent",
+                      fontFamily: T.font,
+                      opacity: alreadyAdded ? 0.7 : 1,
+                      transition: "background .1s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!alreadyAdded)
+                        e.currentTarget.style.background = T.accentBg;
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!alreadyAdded)
+                        e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <div>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: T.ink900,
+                          }}
+                        >
+                          {item.name}
+                        </span>
+                        {alreadyAdded && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 9,
+                              fontWeight: 700,
+                              background: T.accentMid,
+                              color: "#fff",
+                              padding: "1px 5px",
+                              borderRadius: 3,
+                            }}
+                          >
+                            ADDED
+                          </span>
+                        )}
+                        {item.is_new && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 9,
+                              fontWeight: 700,
+                              background: T.warning,
+                              color: "#fff",
+                              padding: "1px 5px",
+                              borderRadius: 3,
+                            }}
+                          >
+                            NEW
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        {noPrice && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              padding: "1px 5px",
+                              borderRadius: 3,
+                              background: T.warningBg,
+                              color: T.warning,
+                              border: `1px solid ${T.warning}40`,
+                            }}
+                          >
+                            NO PRICE
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, color: T.ink400 }}>
+                          {item.quantity_on_hand ?? 0} on hand
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      style={{ fontSize: 10, color: T.ink400, marginTop: 2 }}
+                    >
+                      {item.sku}
+                      {item.brand ? ` · ${item.brand}` : ""}
+                      {item.variant_value ? ` · ${item.variant_value}` : ""}
+                      {item.weighted_avg_cost > 0
+                        ? ` · AVCO R${Number(item.weighted_avg_cost).toFixed(2)}`
+                        : ""}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
 
-          {/* AVCO preview */}
-          {line.qty_received && line.cost_per_unit && (
-            <div
+          {/* New product trigger */}
+          {!showNewProduct ? (
+            <button
+              onClick={() => setShowNewProduct(true)}
               style={{
-                background: T.accentBg,
-                border: `1px solid ${T.accentLight}40`,
+                marginTop: 8,
+                width: "100%",
+                padding: "7px 0",
+                border: `1px dashed ${T.border}`,
                 borderRadius: 4,
-                padding: "6px 10px",
-                fontSize: "11px",
-                color: T.accentDark,
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.ink400,
                 fontFamily: T.font,
-                display: "flex",
-                gap: 16,
+                letterSpacing: "0.04em",
               }}
             >
-              <span>
-                New AVCO: <strong>R{line.preview_avco.toFixed(2)}</strong>
-              </span>
-              <span>
-                Line total:{" "}
-                <strong>
-                  R
-                  {(
-                    parseFloat(line.qty_received || 0) *
-                    parseFloat(line.cost_per_unit || 0)
-                  ).toFixed(2)}
-                </strong>
-              </span>
-              <span>
-                New on-hand:{" "}
-                <strong>
-                  {(
-                    parseFloat(line.item.quantity_on_hand || 0) +
-                    parseFloat(line.qty_received || 0)
-                  ).toFixed(3)}
-                </strong>
-              </span>
+              + New product from supplier — not in system yet
+            </button>
+          ) : (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "12px 14px",
+                background: T.warningBg,
+                border: `1px solid ${T.warning}40`,
+                borderRadius: 6,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: T.warning,
+                  marginBottom: 10,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                New {activeWorld.label} product
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 120px auto",
+                  gap: 8,
+                  alignItems: "flex-end",
+                }}
+              >
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: 4 }}>
+                    Name <span style={{ color: T.danger }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Premium Bubble Hash 5g"
+                    value={newProduct.name}
+                    onChange={(e) =>
+                      setNewProduct((p) => ({ ...p, name: e.target.value }))
+                    }
+                    style={{ ...inputStyle, marginBottom: 0 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: 4 }}>
+                    SKU (optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Auto-generate if empty"
+                    value={newProduct.sku}
+                    onChange={(e) =>
+                      setNewProduct((p) => ({ ...p, sku: e.target.value }))
+                    }
+                    style={{ ...inputStyle, marginBottom: 0 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: 4 }}>
+                    Cost/unit (R) <span style={{ color: T.danger }}>*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newProduct.cost_per_unit}
+                    onChange={(e) =>
+                      setNewProduct((p) => ({
+                        ...p,
+                        cost_per_unit: e.target.value,
+                      }))
+                    }
+                    style={{ ...inputStyle, marginBottom: 0 }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={createAndAddNewProduct}
+                    disabled={savingNew}
+                    style={{
+                      ...primaryBtn(true),
+                      padding: "7px 12px",
+                      fontSize: 11,
+                      opacity: savingNew ? 0.6 : 1,
+                    }}
+                  >
+                    {savingNew ? "…" : "Add"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewProduct(false);
+                      setNewProductError("");
+                    }}
+                    style={{ ...ghostBtn, padding: "7px 10px", fontSize: 11 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              {newProductError && (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: T.danger,
+                    margin: "6px 0 0",
+                    fontFamily: T.font,
+                  }}
+                >
+                  {newProductError}
+                </p>
+              )}
+              <p
+                style={{
+                  fontSize: 10,
+                  color: T.warning,
+                  margin: "6px 0 0",
+                  fontFamily: T.font,
+                }}
+              >
+                Product will be created in <strong>{activeWorld.label}</strong>{" "}
+                category. Complete the full profile (attributes, sell price)
+                from the Items tab after receiving.
+              </p>
             </div>
           )}
         </div>
-      ))}
+      </div>
+
+      {/* ── Added delivery lines ── */}
+      {lines.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: T.ink400,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 8,
+              fontFamily: T.font,
+            }}
+          >
+            Delivery Lines — {lines.length} item{lines.length !== 1 ? "s" : ""}
+          </div>
+          {lines.map((line, idx) => {
+            // Get world-specific attributes for this item
+            const itemWorld =
+              PRODUCT_WORLDS.find(
+                (w) => w.id !== "all" && itemMatchesWorld(line.item, w),
+              ) || PRODUCT_WORLDS[1];
+
+            return (
+              <div
+                key={line.item_id}
+                style={{
+                  background: line.is_new ? T.warningBg : T.ink075,
+                  border: `1px solid ${line.is_new ? T.warning + "40" : T.border}`,
+                  borderRadius: 6,
+                  padding: "12px 14px",
+                  marginBottom: 8,
+                }}
+              >
+                {/* Line header */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: 10,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: T.ink900,
+                        fontFamily: T.font,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {line.item.name}
+                      {line.is_new && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            background: T.warning,
+                            color: "#fff",
+                            padding: "1px 5px",
+                            borderRadius: 3,
+                          }}
+                        >
+                          NEW PRODUCT
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                        marginTop: 2,
+                      }}
+                    >
+                      {line.item.sku}
+                      {line.item.category ? ` · ${line.item.category}` : ""}
+                      {line.item.subcategory
+                        ? ` / ${line.item.subcategory}`
+                        : ""}
+                      {" · "}
+                      {line.item.quantity_on_hand ?? 0} on hand
+                    </div>
+                    {/* No sell price warning */}
+                    {!(line.item.sell_price > 0) && (
+                      <div
+                        style={{
+                          marginTop: 4,
+                          fontSize: 10,
+                          color: T.warning,
+                          fontFamily: T.font,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        ⚠ No sell price set — margin will show as 100% until
+                        priced in the Pricing tab
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onRemoveLine(idx)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: T.danger,
+                      fontSize: 16,
+                      padding: 4,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Core fields: qty + cost always first */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <div>
+                    <label style={{ ...labelStyle, marginBottom: 4 }}>
+                      Qty Received <span style={{ color: T.danger }}>*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      placeholder="0"
+                      value={line.qty_received}
+                      onChange={(e) =>
+                        updateLineField(idx, "qty_received", e.target.value)
+                      }
+                      style={{ ...inputStyle, marginBottom: 0 }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ ...labelStyle, marginBottom: 4 }}>
+                      Cost Per Unit (R)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={line.cost_per_unit}
+                      onChange={(e) =>
+                        updateLineField(idx, "cost_per_unit", e.target.value)
+                      }
+                      style={{ ...inputStyle, marginBottom: 0 }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ ...labelStyle, marginBottom: 4 }}>
+                      Batch / Lot
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Optional"
+                      value={line.batch_lot}
+                      onChange={(e) =>
+                        updateLineField(idx, "batch_lot", e.target.value)
+                      }
+                      style={{ ...inputStyle, marginBottom: 0 }}
+                    />
+                  </div>
+                  {needsExpiry(line.item) && (
+                    <div>
+                      <label style={{ ...labelStyle, marginBottom: 4 }}>
+                        Expiry Date
+                      </label>
+                      <input
+                        type="date"
+                        value={line.expiry_date}
+                        onChange={(e) =>
+                          updateLineField(idx, "expiry_date", e.target.value)
+                        }
+                        style={{ ...inputStyle, marginBottom: 0 }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* World-specific attribute fields */}
+                {itemWorld.receiveAttrs.length > 0 && (
+                  <div
+                    style={{
+                      background: T.surface,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 4,
+                      padding: "8px 10px",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: T.ink400,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: 6,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      {itemWorld.icon} {itemWorld.label} details
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fill, minmax(140px, 1fr))",
+                        gap: 8,
+                      }}
+                    >
+                      {itemWorld.receiveAttrs.map((attr) => (
+                        <div key={attr.key}>
+                          <label style={{ ...labelStyle, marginBottom: 4 }}>
+                            {attr.label}
+                          </label>
+                          {attr.type === "select" ? (
+                            <select
+                              value={line[attr.key] || ""}
+                              onChange={(e) =>
+                                updateLineField(idx, attr.key, e.target.value)
+                              }
+                              style={{ ...inputStyle, marginBottom: 0 }}
+                            >
+                              <option value="">— select —</option>
+                              {attr.options.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt || "—"}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              placeholder={attr.placeholder || ""}
+                              value={line[attr.key] || ""}
+                              onChange={(e) =>
+                                updateLineField(idx, attr.key, e.target.value)
+                              }
+                              style={{ ...inputStyle, marginBottom: 0 }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* AVCO preview */}
+                {line.qty_received && line.cost_per_unit && (
+                  <div
+                    style={{
+                      background: T.accentBg,
+                      border: `1px solid ${T.accentLight}40`,
+                      borderRadius: 4,
+                      padding: "6px 10px",
+                      fontSize: 11,
+                      color: T.accentDark,
+                      fontFamily: T.font,
+                      display: "flex",
+                      gap: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span>
+                      New AVCO:{" "}
+                      <strong>R{(line.preview_avco || 0).toFixed(2)}</strong>
+                    </span>
+                    <span>
+                      Line total:{" "}
+                      <strong>
+                        R
+                        {(
+                          parseFloat(line.qty_received || 0) *
+                          parseFloat(line.cost_per_unit || 0)
+                        ).toFixed(2)}
+                      </strong>
+                    </span>
+                    <span>
+                      New on-hand:{" "}
+                      <strong>
+                        {(
+                          parseFloat(line.item.quantity_on_hand || 0) +
+                          parseFloat(line.qty_received || 0)
+                        ).toFixed(3)}
+                      </strong>
+                    </span>
+                    {line.item.sell_price > 0 && line.cost_per_unit > 0 && (
+                      <span style={{ color: T.accentMid }}>
+                        Margin:{" "}
+                        <strong>
+                          {Math.round(
+                            ((line.item.sell_price -
+                              parseFloat(line.cost_per_unit)) /
+                              line.item.sell_price) *
+                              100,
+                          )}
+                          %
+                        </strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div
         style={{
@@ -884,9 +1425,14 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
 }
 
 // ─── Step 4 — Complete ────────────────────────────────────────────────────────
-function Step4({ receiptRef, lines, totalValue, deliveryInfo, onClose }) {
-  const printRef = useRef();
-
+function Step4({
+  receiptRef,
+  lines,
+  totalValue,
+  deliveryInfo,
+  onClose,
+  newProductCount,
+}) {
   function handlePrint() {
     const w = window.open("", "_blank", "width=800,height=600");
     w.document.write(`
@@ -1049,6 +1595,43 @@ function Step4({ receiptRef, lines, totalValue, deliveryInfo, onClose }) {
         })}
       </div>
 
+      {/* New products alert — LL-169: visible trigger, full dev later */}
+      {newProductCount > 0 && (
+        <div
+          style={{
+            background: T.warningBg,
+            border: `1px solid ${T.warning}40`,
+            borderRadius: 6,
+            padding: "12px 16px",
+            marginBottom: 16,
+            fontFamily: T.font,
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+          }}
+        >
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠</span>
+          <div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: T.warning,
+                marginBottom: 2,
+              }}
+            >
+              {newProductCount} new product{newProductCount !== 1 ? "s" : ""}{" "}
+              added to your catalogue
+            </div>
+            <div style={{ fontSize: 11, color: T.warning, opacity: 0.85 }}>
+              These items were created with basic details only. Complete their
+              profiles in the Items tab — add sell price, variant, strain type,
+              and other attributes so they appear correctly in your shop.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
         <button onClick={handlePrint} style={{ ...ghostBtn, fontSize: "12px" }}>
           🖨 Print Receipt
@@ -1117,7 +1700,11 @@ const ghostBtn = {
 };
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
-export default function StockReceiveModal({ onClose, onComplete, tenantId: tenantIdProp }) {
+export default function StockReceiveModal({
+  onClose,
+  onComplete,
+  tenantId: tenantIdProp,
+}) {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -1151,7 +1738,8 @@ export default function StockReceiveModal({ onClose, onComplete, tenantId: tenan
   }
 
   async function confirm() {
-    setSaving(true); setError(null);
+    setSaving(true);
+    setError(null);
 
     try {
       const {
@@ -1371,6 +1959,7 @@ export default function StockReceiveModal({ onClose, onComplete, tenantId: tenan
             onRemoveLine={removeLine}
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
+            tenantId={tenantIdProp}
           />
         )}
         {step === 3 && (
@@ -1389,6 +1978,7 @@ export default function StockReceiveModal({ onClose, onComplete, tenantId: tenan
             totalValue={totalValue}
             deliveryInfo={deliveryInfo}
             onClose={onComplete || onClose}
+            newProductCount={lines.filter((l) => l.is_new).length}
           />
         )}
       </div>

@@ -15,6 +15,7 @@ import StockReceiveHistoryPanel from "./StockReceiveHistoryPanel";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { SparkLine, BulletChart } from "../viz";
 import StockIntelPanel from "./StockIntelPanel";
+import { PRODUCT_WORLDS, itemMatchesWorld } from "./ProductWorlds";
 
 const T = {
   ink900: "#0D0D0D",
@@ -3163,162 +3164,10 @@ export default function HQStock() {
       ...new Set(items.map((i) => i.brand).filter(Boolean)),
     ].sort();
 
-    const CAT_GROUPS = [
-      { id: "all", label: "All Products", icon: "◈", enums: null, subs: null },
-      {
-        id: "papers",
-        label: "Rolling Papers",
-        icon: "📄",
-        enums: ["accessory"],
-        subs: ["rolling_papers", "cones", "tips", "rolling_machine", "tray"],
-      },
-      {
-        id: "accessories",
-        label: "Accessories",
-        icon: "🛠",
-        enums: ["accessory"],
-        subs: [
-          "grinder",
-          "pipe",
-          "bong",
-          "dab_rig",
-          "dab_tool",
-          "humidity_pack",
-          "storage",
-          "lighter",
-          "extraction_bag",
-          "rosin_bag",
-        ],
-      },
-      {
-        id: "flower",
-        label: "Flower",
-        icon: "🌿",
-        enums: ["flower"],
-        subs: null,
-      },
-      {
-        id: "preroll",
-        label: "Pre-Rolls",
-        icon: "🌀",
-        enums: ["finished_product"],
-        subs: ["preroll"],
-      },
-      {
-        id: "hash",
-        label: "Hash & Kief",
-        icon: "🟤",
-        enums: ["concentrate"],
-        subs: [
-          "hash",
-          "dry_sift",
-          "bubble_hash",
-          "pressed_hash",
-          "charas",
-          "temple_ball",
-          "lebanese",
-          "moroccan",
-          "afghani",
-          "finger_hash",
-          "kief",
-          "moon_rock",
-          "dry_ice_hash",
-        ],
-      },
-      {
-        id: "concentrate",
-        label: "Concentrates",
-        icon: "💎",
-        enums: ["concentrate"],
-        subs: [
-          "concentrate",
-          "budder",
-          "badder",
-          "live_resin",
-          "rosin",
-          "sauce",
-          "diamonds",
-          "distillate",
-          "crumble",
-          "shatter",
-          "wax",
-          "feco",
-          "rso",
-          "bho",
-        ],
-      },
-      {
-        id: "vape",
-        label: "Vapes",
-        icon: "💨",
-        enums: ["finished_product"],
-        subs: ["cartridge", "disposable", "battery"],
-      },
-      {
-        id: "edible",
-        label: "Edibles",
-        icon: "🍬",
-        enums: ["edible"],
-        subs: null,
-      },
-      {
-        id: "seeds",
-        label: "Seeds & Clones",
-        icon: "🌱",
-        enums: ["raw_material"],
-        subs: ["seed", "clone", "seedling", "propagation"],
-      },
-      {
-        id: "substrate",
-        label: "Substrate",
-        icon: "🪴",
-        enums: ["raw_material"],
-        subs: ["substrate", "soil", "rockwool"],
-      },
-      {
-        id: "nutrients",
-        label: "Nutrients",
-        icon: "🧪",
-        enums: ["raw_material"],
-        subs: [
-          "base_nutrient",
-          "bloom_booster",
-          "root_stimulant",
-          "enzyme",
-          "ph_management",
-          "supplement",
-          "beneficial",
-        ],
-      },
-      {
-        id: "equipment",
-        label: "Grow Equipment",
-        icon: "💡",
-        enums: ["hardware"],
-        subs: null,
-      },
-      {
-        id: "wellness",
-        label: "Wellness",
-        icon: "💚",
-        enums: ["finished_product"],
-        subs: ["mushroom", "adaptogen", "cbd", "cbd_pet"],
-      },
-      {
-        id: "merch",
-        label: "Merch",
-        icon: "👕",
-        enums: ["finished_product"],
-        subs: ["clothing"],
-      },
-    ];
-
-    const matchesGroup = (item, group) => {
-      if (group.id === "all") return true;
-      if (group.subs && group.subs.length > 0)
-        return group.subs.includes(item.subcategory);
-      return group.enums ? group.enums.includes(item.category) : false;
-    };
+    // CAT_GROUPS and matchesGroup now live in ProductWorlds.js (single source of truth).
+    // StockReceiveModal reads the same definition — add a world once, both update.
+    const CAT_GROUPS = PRODUCT_WORLDS;
+    const matchesGroup = itemMatchesWorld;
 
     const filtered = items.filter((item) => {
       if (item.is_active === false) return false;
