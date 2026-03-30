@@ -2457,6 +2457,22 @@ export default function HQStock() {
         cta: "Open pricing",
         action: () => setSubTab("pricing"),
       });
+    // WARNING: items priced but AVCO=0 — margins show as NO COST (BUG-051 fix)
+    // Only items with stock > 0 are actionable — no point receiving for items not in stock yet
+    const pricedNoAvco = activeItems.filter(
+      (i) =>
+        i.sell_price > 0 &&
+        !(i.weighted_avg_cost > 0) &&
+        (i.quantity_on_hand || 0) > 0,
+    );
+    if (pricedNoAvco.length > 0)
+      queueActions.push({
+        severity: "warning",
+        text: `${pricedNoAvco.length} item${pricedNoAvco.length !== 1 ? "s" : ""} priced but no cost basis — margin shows as NO COST`,
+        sub: topCategories(pricedNoAvco),
+        cta: "Receive stock",
+        action: () => setReceiveOpen(true),
+      });
     if (inStockLow.length > 0)
       queueActions.push({
         severity: "info",

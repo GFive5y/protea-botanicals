@@ -197,11 +197,16 @@ const CATS = [
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
+// Sentinel: item has a sell price but no cost basis yet (AVCO = 0).
+// Distinct from null (no sell price) and from a real 100% margin.
+// Fix: use Receive Delivery (not Adjust) to set AVCO via DB trigger.
+const NO_COST = "NO_COST";
+
 function calcMargin(sell, avco) {
   const sp = parseFloat(sell),
     ac = parseFloat(avco);
-  if (!sp || sp <= 0) return null;
-  if (!ac || ac <= 0) return 100;
+  if (!sp || sp <= 0) return null; // no sell price — show —
+  if (!ac || ac <= 0) return NO_COST; // priced but no cost — show NO COST
   return ((sp - ac) / sp) * 100;
 }
 function priceFromMargin(pct, avco) {
@@ -212,6 +217,17 @@ function priceFromMargin(pct, avco) {
 }
 function marginBadge(margin) {
   if (margin === null) return null;
+  // NO_COST sentinel: item is priced but AVCO=0 — misleading to show 100%
+  // Owner must use Receive Delivery to establish cost basis.
+  if (margin === NO_COST)
+    return {
+      bg: T.ink075,
+      bd: T.ink150,
+      color: T.ink400,
+      label: "NO COST",
+      tooltip:
+        "Receive a delivery to set cost basis. Margin calculates automatically.",
+    };
   if (margin < 20)
     return {
       bg: T.dangerBg,
@@ -411,6 +427,7 @@ function AuditDrawer({ item, onClose }) {
                     color: mb.color,
                     bg: mb.bg,
                     bd: mb.bd,
+                    tooltip: mb.tooltip,
                   }
                 : null,
               {
@@ -423,11 +440,13 @@ function AuditDrawer({ item, onClose }) {
               .map((k, i) => (
                 <div
                   key={i}
+                  title={k.tooltip || undefined}
                   style={{
                     background: k.bg || T.ink075,
                     border: `1px solid ${k.bd || T.ink150}`,
                     borderRadius: 4,
                     padding: "6px 10px",
+                    cursor: k.tooltip ? "help" : "default",
                   }}
                 >
                   <div style={{ ...Ty.caption, color: k.color || T.ink400 }}>
@@ -1481,6 +1500,7 @@ export default function StockPricingPanel({ tenantId }) {
                     <td style={{ ...sTd, textAlign: "right" }}>
                       {mb ? (
                         <span
+                          title={mb.tooltip || undefined}
                           style={{
                             fontSize: 10,
                             fontWeight: 700,
@@ -1490,6 +1510,7 @@ export default function StockPricingPanel({ tenantId }) {
                             background: mb.bg,
                             border: `1px solid ${mb.bd}`,
                             color: mb.color,
+                            cursor: mb.tooltip ? "help" : "default",
                           }}
                         >
                           {mb.label}
