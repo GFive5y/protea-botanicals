@@ -3347,6 +3347,69 @@ export default function HQStock() {
                   );
                 }
 
+                // ── EDIBLES ──
+                if (catFilter === "edible") {
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <PillBlock
+                        label="Type"
+                        pills={[
+                          ["edible", "Edible"],
+                          ["tincture", "Tincture"],
+                          ["capsule", "Capsule"],
+                        ].map(([key, lbl]) => ({
+                          key,
+                          label: lbl,
+                          count: groupItems.filter((i) => i.subcategory === key)
+                            .length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Potency"
+                        pills={[
+                          "5mg",
+                          "10mg",
+                          "20mg",
+                          "25mg",
+                          "50mg",
+                          "100mg",
+                        ].map((p) => ({
+                          key: p,
+                          label: p,
+                          count: groupItems.filter((i) =>
+                            (i.variant_value || "").includes(p),
+                          ).length,
+                        }))}
+                      />
+                      <PillBlock
+                        label="Format"
+                        pills={[
+                          "Gummy",
+                          "Chocolate",
+                          "Cookie",
+                          "Brownie",
+                          "Candy",
+                          "Lozenge",
+                          "Beverage",
+                          "Honey",
+                        ].map((f) => ({
+                          key: f,
+                          label: f,
+                          count: groupItems.filter(
+                            (i) =>
+                              (i.variant_value || "")
+                                .toLowerCase()
+                                .includes(f.toLowerCase()) ||
+                              (i.name || "")
+                                .toLowerCase()
+                                .includes(f.toLowerCase()),
+                          ).length,
+                        }))}
+                      />
+                    </div>
+                  );
+                }
+
                 // ── VAPES ──
                 if (catFilter === "vape") {
                   return (
@@ -3372,6 +3435,32 @@ export default function HQStock() {
                           count: groupItems.filter((i) =>
                             (i.variant_value || "").includes(v),
                           ).length,
+                        }))}
+                      />
+                    </div>
+                  );
+                }
+
+                // ── GROW EQUIPMENT ──
+                if (catFilter === "equipment") {
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <PillBlock
+                        label="Equipment Type"
+                        pills={[
+                          ["grow_light", "Lights"],
+                          ["grow_tent", "Tents"],
+                          ["fan", "Fans"],
+                          ["carbon_filter", "Filters"],
+                          ["meter", "Meters"],
+                          ["timer", "Timers"],
+                          ["pot", "Pots / Containers"],
+                          ["training", "Training / SCROG"],
+                        ].map(([key, lbl]) => ({
+                          key,
+                          label: lbl,
+                          count: groupItems.filter((i) => i.subcategory === key)
+                            .length,
                         }))}
                       />
                     </div>
