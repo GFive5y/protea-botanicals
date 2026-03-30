@@ -12,6 +12,7 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import ClientHeader from "../components/ClientHeader";
 import LoyaltyBadges from "../components/LoyaltyBadges";
+import { useStorefront } from "../contexts/StorefrontContext";
 
 const DEFAULT_CONFIG = {
   pts_qr_scan: 10,
@@ -140,6 +141,7 @@ const F = {
 };
 
 export default function Loyalty() {
+  const { storefrontTenantId } = useStorefront();
   const [points, setPoints] = useState(null);
   const [profile, setProfile] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -172,7 +174,13 @@ export default function Loyalty() {
       }
 
       const [cfgRes, profileRes, txnRes] = await Promise.all([
-        supabase.from("loyalty_config").select("*").single(),
+        storefrontTenantId
+          ? supabase
+              .from("loyalty_config")
+              .select("*")
+              .eq("tenant_id", storefrontTenantId)
+              .single()
+          : supabase.from("loyalty_config").select("*").single(),
         supabase.from("user_profiles").select("*").eq("id", user.id).single(),
         supabase
           .from("loyalty_transactions")
@@ -284,7 +292,7 @@ export default function Loyalty() {
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, storefrontTenantId]);
 
   useEffect(() => {
     fetchLoyaltyData();

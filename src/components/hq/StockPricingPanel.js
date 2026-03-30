@@ -1511,6 +1511,7 @@ export default function StockPricingPanel({ tenantId }) {
                             border: `1px solid ${mb.bd}`,
                             color: mb.color,
                             cursor: mb.tooltip ? "help" : "default",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {mb.label}

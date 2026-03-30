@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import ClientHeader from "../components/ClientHeader";
+import { useStorefront } from "../contexts/StorefrontContext";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -88,6 +89,7 @@ function calcPurchasePoints(total, cfg, tier) {
 }
 
 export default function OrderSuccess() {
+  const { storefrontTenantId } = useStorefront();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderRef =
@@ -130,7 +132,13 @@ export default function OrderSuccess() {
 
         // 2. Fetch loyalty config + user profile in parallel
         const [cfgRes, profileRes] = await Promise.all([
-          supabase.from("loyalty_config").select("*").single(),
+          storefrontTenantId
+            ? supabase
+                .from("loyalty_config")
+                .select("*")
+                .eq("tenant_id", storefrontTenantId)
+                .single()
+            : supabase.from("loyalty_config").select("*").single(),
           supabase.from("user_profiles").select("*").eq("id", userId).single(),
         ]);
 
@@ -408,7 +416,7 @@ export default function OrderSuccess() {
     }
 
     processOrder();
-  }, [orderRef, processed]);
+  }, [orderRef, processed, storefrontTenantId]);
 
   const totalPts = pointsAwarded + referralBonus;
 

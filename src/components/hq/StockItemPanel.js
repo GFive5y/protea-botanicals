@@ -606,6 +606,7 @@ function TabHistory({ item, tenantId }) {
     loadMovements();
   };
 
+  // eslint-disable-next-line no-unused-vars
   const movTypeColor = (type) => {
     if (
       ["purchase_in", "transfer_in", "production_in", "adjustment"].includes(
