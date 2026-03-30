@@ -3,7 +3,7 @@
 //
 // Zone 4: Best Sellers · Margin Heroes · Fast Movers · Dead Stock
 // Zone 5: 12-week × 7-day movement velocity heatmap
-// Zone 6: AI Insights — Phase 3 placeholder (LL-169: stays visible)
+// Zone 6: AI Insights — ProteaAI via ai-copilot EF (LL-120: never direct to api.anthropic.com)
 //
 // Props:
 //   items      — array   — from HQStock items state
@@ -360,89 +360,355 @@ function HeatmapTooltip({ cell, x, y }) {
   );
 }
 
-const Zone6Placeholder = () => (
-  <div
-    style={{
-      background: "#fff",
-      border: "1px solid " + T.ink150,
-      borderRadius: 6,
-      overflow: "hidden",
-    }}
-  >
+// ── Zone 6 — AI Insights (Phase 3 — LL-120 compliant) ────────────────────────
+// Calls ai-copilot Edge Function ONLY. Never api.anthropic.com directly.
+// 3 contextual insights with severity dot + action link per insight.
+// 30-minute cache prevents unnecessary EF calls on re-render.
+// Graceful fallback: if EF unavailable, shows static message, does not crash.
+function Zone6AIInsights({ context, onNavigate }) {
+  const [insights, setInsights] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [timestamp, setTimestamp] = React.useState(null);
+  const CACHE_MS = 30 * 60 * 1000;
+
+  const SEV = {
+    critical: {
+      dot: T.danger,
+      bg: T.dangerBg,
+      bd: T.dangerBd,
+      label: "Critical",
+    },
+    warning: {
+      dot: T.warning,
+      bg: T.warningBg,
+      bd: T.warningBd,
+      label: "Watch",
+    },
+    info: { dot: T.info, bg: T.infoBg, bd: T.infoBd, label: "Info" },
+    positive: {
+      dot: T.success,
+      bg: T.successBg,
+      bd: T.successBd,
+      label: "Good",
+    },
+  };
+
+  const ACTION_LABELS = {
+    pricing: "Open pricing",
+    items: "View items",
+    receipts: "View receipts",
+    orders: "View orders",
+  };
+
+  const doLoad = async (force) => {
+    if (
+      !force &&
+      timestamp &&
+      Date.now() - timestamp < CACHE_MS &&
+      insights.length > 0
+    )
+      return;
+    setLoading(true);
+    setError(null);
+    try {
+      const url = process.env.REACT_APP_SUPABASE_URL;
+      const anon = process.env.REACT_APP_SUPABASE_ANON_KEY;
+      if (!url || !anon) throw new Error("Supabase env vars not configured");
+      // LL-120: NEVER call api.anthropic.com — always use ai-copilot EF
+      const res = await fetch(`${url}/functions/v1/ai-copilot`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${anon}`,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content: `You are a cannabis retail stock analyst for a South African cannabis store using NuAi ERP. Analyse this stock position and give exactly 3 specific actionable insights.
+
+Stock context: ${JSON.stringify(context)}
+
+Rules:
+- Each insight must reference a specific metric or number from the context
+- Be direct and actionable — what should the owner do today
+- Do not mention Claude, Anthropic, AI, or NuAi
+- severity must be one of: critical, warning, info, positive
+- actionType must be one of: pricing, items, receipts, orders
+
+Return ONLY a valid JSON array of exactly 3 objects, no markdown, no explanation:
+[{"severity":"warning","text":"...","action":"...","actionType":"pricing"}]`,
+            },
+          ],
+          userContext: { role: "hq" },
+        }),
+      });
+      const data = await res.json();
+      const raw = (data.reply || "").replace(/```json|```/g, "").trim();
+      const a = raw.indexOf("["),
+        b = raw.lastIndexOf("]");
+      if (a === -1 || b === -1) throw new Error("No JSON array in response");
+      const parsed = JSON.parse(raw.slice(a, b + 1));
+      if (!Array.isArray(parsed) || parsed.length === 0)
+        throw new Error("Empty response");
+      setInsights(parsed.slice(0, 3));
+      setTimestamp(Date.now());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    doLoad(false);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
     <div
       style={{
-        padding: "12px 20px",
-        borderBottom: "1px solid " + T.ink150,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        background: T.ink075,
+        background: "#fff",
+        border: "1px solid " + T.ink150,
+        borderRadius: 6,
+        overflow: "hidden",
       }}
     >
-      <span
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: T.ink400,
-        }}
-      >
-        Zone 6 — AI Insights
-      </span>
-      <span
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          padding: "2px 7px",
-          borderRadius: 3,
-          background: T.infoBg,
-          color: T.info,
-          border: "1px solid " + T.infoBd,
-        }}
-      >
-        Phase 3
-      </span>
-    </div>
-    <div
-      style={{
-        padding: "14px 20px",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
+      {/* Header */}
       <div
         style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
-          background: T.infoBg,
-          border: "1px solid " + T.infoBd,
+          padding: "12px 20px",
+          borderBottom: "1px solid " + T.ink150,
           display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
-          justifyContent: "center",
-          fontSize: 13,
-          color: T.info,
-          flexShrink: 0,
         }}
       >
-        ◌
-      </div>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.ink700 }}>
-          ProteaAI-powered contextual stock insights
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <SectionLabel>AI Stock Insights</SectionLabel>
+          {timestamp && !loading && (
+            <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.font }}>
+              {new Date(timestamp).toLocaleTimeString("en-ZA", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
         </div>
-        <div style={{ fontSize: 11, color: T.ink400, marginTop: 2 }}>
-          3 insights per load · severity dots · action links · 30-min cache ·
-          ai-copilot EF only (LL-120)
-        </div>
+        <button
+          onClick={() => doLoad(true)}
+          disabled={loading}
+          style={{
+            padding: "4px 10px",
+            fontSize: 10,
+            fontWeight: 600,
+            border: "1px solid " + T.ink150,
+            borderRadius: 4,
+            cursor: loading ? "default" : "pointer",
+            background: "transparent",
+            color: T.ink500,
+            fontFamily: T.font,
+            opacity: loading ? 0.5 : 1,
+          }}
+        >
+          {loading ? "Loading…" : "↻ Refresh"}
+        </button>
       </div>
+
+      {/* Body */}
+      {loading && insights.length === 0 ? (
+        /* First-load skeleton */
+        <div style={{ padding: "16px 20px" }}>
+          {[80, 65, 75].map((w, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+                marginBottom: i < 2 ? 14 : 0,
+              }}
+            >
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: T.ink150,
+                  marginTop: 5,
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    height: 11,
+                    background: T.ink075,
+                    borderRadius: 3,
+                    marginBottom: 6,
+                    width: w + "%",
+                  }}
+                />
+                <div
+                  style={{
+                    height: 9,
+                    background: T.ink075,
+                    borderRadius: 3,
+                    width: "38%",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        /* Graceful fallback — Overview does not crash */
+        <div
+          style={{
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              flexShrink: 0,
+              background: T.warningBg,
+              border: "1px solid " + T.warningBd,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              color: T.warning,
+            }}
+          >
+            ⚠
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: T.ink700,
+                marginBottom: 3,
+              }}
+            >
+              AI insights unavailable
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: T.ink400,
+                fontFamily: T.font,
+                marginBottom: 8,
+                lineHeight: 1.4,
+              }}
+            >
+              {error.includes("env vars")
+                ? "Supabase environment variables not configured."
+                : "Could not load insights. The ai-copilot Edge Function may not be deployed."}
+            </div>
+            <button
+              onClick={() => doLoad(true)}
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.accentMid,
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                fontFamily: T.font,
+              }}
+            >
+              Try again →
+            </button>
+          </div>
+        </div>
+      ) : (
+        insights.map((insight, idx) => {
+          const sev = SEV[insight.severity] || SEV.info;
+          return (
+            <div
+              key={idx}
+              style={{
+                padding: "13px 20px",
+                borderBottom:
+                  idx < insights.length - 1 ? "1px solid " + T.ink075 : "none",
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+              }}
+            >
+              {/* Severity dot */}
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: sev.dot,
+                  marginTop: 5,
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: T.ink700,
+                    fontFamily: T.font,
+                    lineHeight: 1.45,
+                    marginBottom: insight.action ? 6 : 0,
+                  }}
+                >
+                  {insight.text}
+                </div>
+                {insight.action && insight.actionType && (
+                  <button
+                    onClick={() => onNavigate(insight.actionType)}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: T.accentMid,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    {ACTION_LABELS[insight.actionType] || insight.action} →
+                  </button>
+                )}
+              </div>
+              {/* Severity badge */}
+              <span
+                style={{
+                  fontSize: 8,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  padding: "2px 6px",
+                  borderRadius: 3,
+                  flexShrink: 0,
+                  background: sev.bg,
+                  color: sev.dot,
+                  border: "1px solid " + sev.bd,
+                }}
+              >
+                {sev.label}
+              </span>
+            </div>
+          );
+        })
+      )}
     </div>
-  </div>
-);
+  );
+}
 
 export default function StockIntelPanel({
   items = [],
@@ -684,6 +950,66 @@ export default function StockIntelPanel({
   }, [heatmapCells]);
   const totalMovements = heatmapCells.reduce((s, c) => s + c.count, 0);
   const DAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
+
+  // AI context payload — derived from loaded data, no extra DB calls
+  const aiContext = useMemo(() => {
+    const pricedWithCost = activeItems.filter(
+      (i) => i.sell_price > 0 && i.weighted_avg_cost > 0,
+    );
+    const outOfStock = activeItems.filter(
+      (i) => (i.quantity_on_hand || 0) <= 0,
+    );
+    const noPrice = activeItems.filter((i) => !(i.sell_price > 0));
+    const lowStock = activeItems.filter(
+      (i) =>
+        i.reorder_level != null && (i.quantity_on_hand || 0) <= i.reorder_level,
+    );
+    const totalValue = activeItems.reduce(
+      (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+      0,
+    );
+    const avgMargin =
+      pricedWithCost.length > 0
+        ? pricedWithCost.reduce(
+            (s, i) =>
+              s + ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100,
+            0,
+          ) / pricedWithCost.length
+        : 0;
+    const deadItems = activeItems.filter(
+      (i) =>
+        (i.quantity_on_hand || 0) > 0 &&
+        i.last_movement_at &&
+        new Date(i.last_movement_at) < new Date(Date.now() - 45 * 86400000),
+    );
+    const deadValue = deadItems.reduce(
+      (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+      0,
+    );
+    const catCounts = {};
+    activeItems.forEach((i) => {
+      catCounts[i.category || "other"] =
+        (catCounts[i.category || "other"] || 0) + 1;
+    });
+    const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
+    return {
+      totalSKUs: activeItems.length,
+      outOfStock: outOfStock.length,
+      noPrice: noPrice.length,
+      lowStock: lowStock.length,
+      noCostBasis: activeItems.filter(
+        (i) => i.sell_price > 0 && !(i.weighted_avg_cost > 0),
+      ).length,
+      totalStockValue: "R" + Math.round(totalValue).toLocaleString("en-ZA"),
+      avgMarginPct: avgMargin > 0 ? Math.round(avgMargin) + "%" : "unknown",
+      pricedSKUs: pricedWithCost.length,
+      deadStockItems: deadItems.length,
+      deadStockValue: "R" + Math.round(deadValue).toLocaleString("en-ZA"),
+      topCategory: topCat ? topCat[0] + " (" + topCat[1] + " SKUs)" : "unknown",
+      salesLast30d: saleOuts.length,
+      bestSeller: bestSellers[0]?.name || "none recorded",
+    };
+  }, [activeItems, saleOuts, bestSellers]);
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -945,8 +1271,8 @@ export default function StockIntelPanel({
         <HeatmapTooltip cell={hoverCell} x={hoverPos.x} y={hoverPos.y} />
       )}
 
-      {/* Zone 6 — Phase 3 placeholder (LL-169) */}
-      <Zone6Placeholder />
+      {/* Zone 6 — AI Insights (Phase 3 — live) */}
+      <Zone6AIInsights context={aiContext} onNavigate={onNavigate} />
     </div>
   );
 }
