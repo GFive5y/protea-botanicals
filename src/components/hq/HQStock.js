@@ -9,6 +9,7 @@ import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
 import StockItemPanel from "./StockItemPanel";
 import StockReceiveModal from "./StockReceiveModal";
+import StockOpeningCalibration from "./StockOpeningCalibration";
 import StockPricingPanel from "./StockPricingPanel";
 import StockChannelPanel from "./StockChannelPanel";
 import StockReceiveHistoryPanel from "./StockReceiveHistoryPanel";
@@ -387,6 +388,7 @@ export default function HQStock() {
   const [modalSaving, setModalSaving] = useState(false);
   const [panelItem, setPanelItem] = useState(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [calibOpen, setCalibOpen] = useState(false);
   const [avcoAlertItems, setAvcoAlertItems] = useState([]);
   const [checkAvcoAfterLoad, setCheckAvcoAfterLoad] = useState(false);
   const preReceiveRef = React.useRef(null);
@@ -2470,8 +2472,8 @@ export default function HQStock() {
         severity: "warning",
         text: `${pricedNoAvco.length} item${pricedNoAvco.length !== 1 ? "s" : ""} priced but no cost basis — margin shows as NO COST`,
         sub: topCategories(pricedNoAvco),
-        cta: "Receive stock",
-        action: () => setReceiveOpen(true),
+        cta: "Set opening AVCO",
+        action: () => setCalibOpen(true),
       });
     if (inStockLow.length > 0)
       queueActions.push({
@@ -4925,6 +4927,16 @@ export default function HQStock() {
             setCheckAvcoAfterLoad(true);
             load();
             setReceiveOpen(false);
+          }}
+        />
+      )}
+      {calibOpen && (
+        <StockOpeningCalibration
+          tenantId={tenantId}
+          onClose={() => setCalibOpen(false)}
+          onComplete={() => {
+            setCalibOpen(false);
+            load();
           }}
         />
       )}

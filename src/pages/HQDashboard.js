@@ -142,7 +142,8 @@ const TABS = [
 export default function HQDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const navigate = useNavigate();
-  const { tenant, allTenants, tenantName, isHQ, switchTenant } = useTenant();
+  const { tenant, allTenants, tenantName, isHQ, isOperator, switchTenant } =
+    useTenant();
   const location = useLocation();
 
   // ★ v4.0: sync ?tab= query param from sidebar navigation
@@ -198,8 +199,8 @@ export default function HQDashboard() {
             </p>
           </div>
 
-          {/* Tenant Switcher — retained */}
-          {isHQ && allTenants.length > 1 && (
+          {/* Tenant Switcher — operator only (LL-173: isOperator not isHQ) */}
+          {isOperator && allTenants.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span
                 style={{
