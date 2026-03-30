@@ -4010,7 +4010,7 @@ export default function HQStock() {
 
       {renderMovDrawer()}
       {receiveOpen && (
-        <StockReceiveModal
+        <StockReceiveModal tenantId={tenantId}
           onClose={() => setReceiveOpen(false)}
           onComplete={() => {
             load();
