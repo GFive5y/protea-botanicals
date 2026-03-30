@@ -250,6 +250,8 @@ function Toggle({ on, onChange, disabled }) {
 }
 
 // ── Add New Tenant modal ──────────────────────────────────────────────────────
+// Superseded by TenantSetupWizard (WP-BIB Session 7) — kept as reference for WP-TENANTS.
+// eslint-disable-next-line no-unused-vars
 function AddTenantModal({ onClose, onSaved, showToast }) {
   const [form, setForm] = useState({
     name: "",
