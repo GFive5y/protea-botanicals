@@ -1,13 +1,15 @@
-// StockPricingPanel.js v1.1
-// WP-STOCK-PRICING — Bulk sell price setter, live margin preview, batch save
-// Visual system: matches HQStock T-token palette exactly (WP-VISUAL-SYSTEM v1.0)
+// StockPricingPanel.js v1.3
+// WP-STOCK-PRICING — Bulk pricing + full audit trail
+// NEW: price_history writes on every save · AuditDrawer per item
+//      (price changes + stock movements — who/when/from→to)
 // LL-160: tenantId as PROP — never fetched from user_profiles
 // LL-161: full inventory_items column select
+// Visual: T-token system, matches HQStock (WP-VISUAL-SYSTEM v1.0)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
-// ─── T Tokens (mirrors HQStock exactly) ──────────────────────────────────────
+// ─── T Tokens ──────────────────────────────────────────────────────────────────
 const T = {
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
@@ -36,9 +38,9 @@ const T = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
   mono: "'DM Mono','Courier New',monospace",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowMd: "0 4px 12px rgba(0,0,0,0.10)",
 };
 
-// ─── Typography tokens (WP-VISUAL-SYSTEM Section 2.1) ────────────────────────
 const Ty = {
   label: {
     fontSize: "11px",
@@ -57,7 +59,6 @@ const Ty = {
   },
 };
 
-// ─── Shared table styles (mirrors HQStock sTh / sTd) ─────────────────────────
 const sTh = {
   textAlign: "left",
   padding: "10px 12px",
@@ -68,41 +69,43 @@ const sTh = {
   whiteSpace: "nowrap",
 };
 const sTd = {
-  padding: "10px 12px",
+  padding: "9px 12px",
   borderBottom: `1px solid ${T.ink150}`,
   ...Ty.body,
   color: T.ink700,
   verticalAlign: "middle",
 };
 
-// ─── Button helpers (WP-VISUAL-SYSTEM Section 3.3) ───────────────────────────
-const sBtn = (variant = "primary", disabled = false) => ({
+const sBtn = (v = "primary", dis = false) => ({
   ...Ty.label,
   padding: "7px 16px",
   borderRadius: 6,
-  cursor: disabled ? "not-allowed" : "pointer",
-  opacity: disabled ? 0.45 : 1,
+  cursor: dis ? "not-allowed" : "pointer",
+  opacity: dis ? 0.45 : 1,
   transition: "opacity .15s",
-  ...(variant === "primary"
+  ...(v === "primary"
     ? { background: T.accentMid, color: "#fff", border: "none" }
     : {}),
-  ...(variant === "secondary"
+  ...(v === "secondary"
     ? {
         background: "transparent",
         color: T.accentMid,
         border: `1px solid ${T.accentBd}`,
       }
     : {}),
-  ...(variant === "ghost"
+  ...(v === "ghost"
     ? {
         background: "transparent",
         color: T.ink500,
         border: `1px solid ${T.ink150}`,
       }
     : {}),
+  ...(v === "danger"
+    ? { background: T.danger, color: "#fff", border: "none" }
+    : {}),
 });
 
-// ─── LL-161 full column list ──────────────────────────────────────────────────
+// ─── LL-161 full column list ───────────────────────────────────────────────────
 const FULL_SELECT = [
   "id",
   "name",
@@ -135,25 +138,78 @@ const FULL_SELECT = [
   "created_at",
 ].join(", ");
 
-const CATS = [
-  { key: "all", label: "All Items", icon: "◈" },
-  { key: "flower", label: "Flower", icon: "🌿" },
-  { key: "concentrate", label: "Concentrate", icon: "💧" },
-  { key: "hash", label: "Hash", icon: "🟤" },
-  { key: "finished_product", label: "Vapes", icon: "💨" },
-  { key: "edible", label: "Edible", icon: "🍬" },
-  { key: "hardware", label: "Equipment", icon: "🔧" },
+const HASH_SUBS = [
+  "hash",
+  "dry_sift",
+  "bubble_hash",
+  "pressed_hash",
+  "charas",
+  "temple_ball",
+  "lebanese",
+  "moroccan",
+  "afghani",
+  "finger_hash",
+  "kief",
+  "moon_rock",
+  "dry_ice_hash",
 ];
 
-// ─── Margin helpers ───────────────────────────────────────────────────────────
+const CATS = [
+  { key: "all", label: "All Items", icon: "◈", match: () => true },
+  {
+    key: "flower",
+    label: "Flower",
+    icon: "🌿",
+    match: (i) => i.category === "flower",
+  },
+  {
+    key: "concentrate",
+    label: "Concentrate",
+    icon: "💧",
+    match: (i) =>
+      i.category === "concentrate" && !HASH_SUBS.includes(i.subcategory),
+  },
+  {
+    key: "hash",
+    label: "Hash",
+    icon: "🟤",
+    match: (i) =>
+      i.category === "concentrate" && HASH_SUBS.includes(i.subcategory),
+  },
+  {
+    key: "finished_product",
+    label: "Vapes",
+    icon: "💨",
+    match: (i) => i.category === "finished_product",
+  },
+  {
+    key: "edible",
+    label: "Edible",
+    icon: "🍬",
+    match: (i) => i.category === "edible",
+  },
+  {
+    key: "hardware",
+    label: "Equipment",
+    icon: "🔧",
+    match: (i) => i.category === "hardware",
+  },
+];
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 function calcMargin(sell, avco) {
-  const sp = parseFloat(sell);
-  const ac = parseFloat(avco);
+  const sp = parseFloat(sell),
+    ac = parseFloat(avco);
   if (!sp || sp <= 0) return null;
   if (!ac || ac <= 0) return 100;
   return ((sp - ac) / sp) * 100;
 }
-
+function priceFromMargin(pct, avco) {
+  const ac = parseFloat(avco),
+    m = parseFloat(pct);
+  if (!ac || ac <= 0 || isNaN(m) || m <= 0 || m >= 100) return null;
+  return ac / (1 - m / 100);
+}
 function marginBadge(margin) {
   if (margin === null) return null;
   if (margin < 20)
@@ -177,14 +233,12 @@ function marginBadge(margin) {
     label: `${margin.toFixed(1)}%`,
   };
 }
-
 function variantStr(item) {
   if (item.variant_value) return item.variant_value;
   if (item.weight_grams) return `${item.weight_grams}g`;
   if (item.strain_type) return item.strain_type;
   return "";
 }
-
 const fmtR = (n) =>
   n == null
     ? "—"
@@ -193,29 +247,509 @@ const fmtR = (n) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
+const fmtShort = (n) =>
+  n == null
+    ? ""
+    : Number(n).toLocaleString("en-ZA", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+const fmtDate = (d) =>
+  d
+    ? new Date(d).toLocaleString("en-ZA", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "—";
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Movement type colours ─────────────────────────────────────────────────────
+const MOV_COLOR = {
+  purchase_in: T.success,
+  sale_out: T.danger,
+  adjustment: T.warning,
+  transfer_in: T.info,
+  transfer_out: T.info,
+  production_in: T.accentMid,
+  production_out: T.accentMid,
+  stock_take_adjustment: T.warning,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AuditDrawer — slide-in from right
+// Shows: price_history (who/when/from→to/source) + stock_movements (full trail)
+// ─────────────────────────────────────────────────────────────────────────────
+function AuditDrawer({ item, onClose }) {
+  const [tab, setTab] = useState("prices");
+  const [prices, setPrices] = useState([]);
+  const [movs, setMovs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!item) return;
+    setLoading(true);
+    setTab("prices");
+    Promise.all([
+      supabase
+        .from("price_history")
+        .select("*")
+        .eq("item_id", item.id)
+        .order("changed_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("stock_movements")
+        .select("*")
+        .eq("item_id", item.id)
+        .order("created_at", { ascending: false })
+        .limit(40),
+    ]).then(([ph, mv]) => {
+      setPrices(ph.data || []);
+      setMovs(mv.data || []);
+      setLoading(false);
+    });
+  }, [item]);
+
+  if (!item) return null;
+  const margin = calcMargin(item.sell_price, item.weighted_avg_cost);
+  const mb = marginBadge(margin);
+
+  return (
+    <>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.18)",
+          zIndex: 999,
+        }}
+        onClick={onClose}
+      />
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: 480,
+          height: "100vh",
+          background: "#fff",
+          borderLeft: `1px solid ${T.ink150}`,
+          boxShadow: "-4px 0 24px rgba(0,0,0,0.09)",
+          zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: T.font,
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: `1px solid ${T.ink150}`,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: T.ink900,
+                  marginBottom: 2,
+                }}
+              >
+                {item.name}
+              </div>
+              <div style={{ ...Ty.caption, color: T.ink300 }}>
+                {item.sku} · {item.subcategory || item.category}
+                {variantStr(item) && ` · ${variantStr(item)}`}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 18,
+                color: T.ink300,
+                lineHeight: 1,
+                padding: 4,
+                marginLeft: 8,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          {/* KPI strip */}
+          <div
+            style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
+          >
+            {[
+              {
+                label: "Current Price",
+                value: item.sell_price ? fmtR(item.sell_price) : "Not set",
+                danger: !item.sell_price,
+              },
+              {
+                label: "AVCO Cost",
+                value: item.weighted_avg_cost
+                  ? fmtR(item.weighted_avg_cost)
+                  : "—",
+              },
+              mb
+                ? {
+                    label: "Margin",
+                    value: mb.label,
+                    color: mb.color,
+                    bg: mb.bg,
+                    bd: mb.bd,
+                  }
+                : null,
+              {
+                label: "On Hand",
+                value: `${item.quantity_on_hand ?? 0}${item.unit ? " " + item.unit : ""}`,
+                danger: (item.quantity_on_hand ?? 0) <= 0,
+              },
+            ]
+              .filter(Boolean)
+              .map((k, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: k.bg || T.ink075,
+                    border: `1px solid ${k.bd || T.ink150}`,
+                    borderRadius: 4,
+                    padding: "6px 10px",
+                  }}
+                >
+                  <div style={{ ...Ty.caption, color: k.color || T.ink400 }}>
+                    {k.label}
+                  </div>
+                  <div
+                    style={{
+                      ...Ty.data,
+                      fontWeight: 700,
+                      color: k.danger ? T.danger : k.color || T.ink900,
+                    }}
+                  >
+                    {k.value}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${T.ink150}` }}>
+          {[
+            { id: "prices", label: `Price History (${prices.length})` },
+            { id: "movements", label: `Stock Movements (${movs.length})` },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                padding: "10px 16px",
+                background: "none",
+                border: "none",
+                borderBottom:
+                  tab === t.id
+                    ? `2px solid ${T.accentMid}`
+                    : "2px solid transparent",
+                ...Ty.label,
+                color: tab === t.id ? T.accentMid : T.ink400,
+                cursor: "pointer",
+                marginBottom: -1,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
+          {loading ? (
+            <p style={{ ...Ty.body, color: T.ink300, padding: "24px 0" }}>
+              Loading audit trail…
+            </p>
+          ) : tab === "prices" ? (
+            prices.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 0",
+                  color: T.ink300,
+                }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
+                <div style={{ ...Ty.body }}>No price changes recorded yet.</div>
+                <div style={{ ...Ty.caption, color: T.ink400, marginTop: 4 }}>
+                  Price changes logged here from v1.3 onwards.
+                </div>
+              </div>
+            ) : (
+              prices.map((ph, i) => {
+                const delta =
+                  ph.old_price != null ? ph.new_price - ph.old_price : null;
+                return (
+                  <div
+                    key={ph.id}
+                    style={{
+                      padding: "12px 14px",
+                      marginBottom: 8,
+                      background: i === 0 ? T.accentLit : T.ink050,
+                      border: `1px solid ${i === 0 ? T.accentBd : T.ink150}`,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {ph.old_price != null ? (
+                          <span
+                            style={{
+                              ...Ty.data,
+                              color: T.ink400,
+                              textDecoration: "line-through",
+                            }}
+                          >
+                            {fmtR(ph.old_price)}
+                          </span>
+                        ) : (
+                          <span style={{ ...Ty.caption, color: T.ink400 }}>
+                            First price →
+                          </span>
+                        )}
+                        <span style={{ ...Ty.caption, color: T.ink300 }}>
+                          →
+                        </span>
+                        <span
+                          style={{
+                            ...Ty.data,
+                            fontWeight: 700,
+                            color: T.ink900,
+                          }}
+                        >
+                          {fmtR(ph.new_price)}
+                        </span>
+                        {delta !== null && (
+                          <span
+                            style={{
+                              ...Ty.caption,
+                              fontWeight: 700,
+                              color: delta > 0 ? T.success : T.danger,
+                            }}
+                          >
+                            {delta > 0 ? "▲" : "▼"} R
+                            {Math.abs(delta).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          padding: "2px 6px",
+                          borderRadius: 3,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          background:
+                            ph.source === "target_margin" ? T.infoBg : T.ink075,
+                          color:
+                            ph.source === "target_margin" ? T.info : T.ink500,
+                          border: `1px solid ${ph.source === "target_margin" ? T.infoBd : T.ink150}`,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {ph.source === "target_margin"
+                          ? "Margin Calc"
+                          : "Manual"}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <span style={{ ...Ty.caption, color: T.ink500 }}>
+                        👤 {ph.changed_by_email || "Unknown"}
+                      </span>
+                      <span style={{ ...Ty.caption, color: T.ink300 }}>
+                        🕐 {fmtDate(ph.changed_at)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : movs.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "40px 0",
+                color: T.ink300,
+              }}
+            >
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📦</div>
+              <div style={{ ...Ty.body }}>No stock movements recorded.</div>
+            </div>
+          ) : (
+            movs.map((m) => {
+              const qty = m.quantity || 0;
+              const typeColor = MOV_COLOR[m.movement_type] || T.ink500;
+              return (
+                <div
+                  key={m.id}
+                  style={{
+                    padding: "10px 14px",
+                    marginBottom: 6,
+                    background: T.ink050,
+                    border: `1px solid ${T.ink150}`,
+                    borderLeft: `3px solid ${typeColor}`,
+                    borderRadius: 6,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 9,
+                        padding: "2px 7px",
+                        borderRadius: 3,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        background: T.ink075,
+                        color: typeColor,
+                        border: `1px solid ${T.ink150}`,
+                      }}
+                    >
+                      {(m.movement_type || "").replace(/_/g, " ")}
+                    </span>
+                    <span
+                      style={{
+                        ...Ty.data,
+                        fontWeight: 700,
+                        color: qty >= 0 ? T.success : T.danger,
+                      }}
+                    >
+                      {qty >= 0 ? "+" : ""}
+                      {qty}
+                      {item.unit ? " " + item.unit : ""}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      marginTop: 6,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span style={{ ...Ty.caption, color: T.ink300 }}>
+                      🕐 {fmtDate(m.created_at)}
+                    </span>
+                    {m.unit_cost > 0 && (
+                      <span style={{ ...Ty.caption, color: T.ink500 }}>
+                        {fmtR(m.unit_cost)}/unit
+                      </span>
+                    )}
+                    {m.reference && (
+                      <span
+                        style={{ ...Ty.data, fontSize: 10, color: T.ink400 }}
+                      >
+                        Ref: {m.reference}
+                      </span>
+                    )}
+                  </div>
+                  {m.notes && (
+                    <div
+                      style={{
+                        ...Ty.caption,
+                        color: T.ink500,
+                        marginTop: 4,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      "{m.notes}"
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "10px 20px",
+            borderTop: `1px solid ${T.ink150}`,
+            background: T.ink050,
+          }}
+        >
+          <span style={{ ...Ty.caption, color: T.ink300 }}>
+            {prices.length} price change{prices.length !== 1 ? "s" : ""} ·{" "}
+            {movs.length} stock movement{movs.length !== 1 ? "s" : ""} · click
+            outside to close
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
 export default function StockPricingPanel({ tenantId }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [catFilter, setCatFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [unpricedOnly, setUnpricedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState("name");
   const [edits, setEdits] = useState({});
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [focusId, setFocusId] = useState(null);
+  const [drawerItem, setDrawerItem] = useState(null);
+  const [saveSource, setSaveSource] = useState("manual");
+  const [targetMargin, setTargetMargin] = useState("");
+  const [calcOpen, setCalcOpen] = useState(false);
   const searchRef = useRef(null);
 
-  // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("inventory_items")
       .select(FULL_SELECT)
-      .eq("tenant_id", tenantId) // LL-160
+      .eq("tenant_id", tenantId)
       .eq("is_active", true)
-      .order("category")
       .order("name");
     if (!error && data) setItems(data);
     if (error) console.error("[StockPricingPanel] load:", error.message);
@@ -226,75 +760,154 @@ export default function StockPricingPanel({ tenantId }) {
     load();
   }, [load]);
 
-  // ── Derived ─────────────────────────────────────────────────────────────────
   const catCounts = CATS.reduce((acc, c) => {
-    acc[c.key] =
-      c.key === "all"
-        ? items.length
-        : items.filter((i) => i.category === c.key).length;
+    acc[c.key] = items.filter((i) => c.match(i)).length;
     return acc;
   }, {});
+  const activeCat = CATS.find((c) => c.key === catFilter) || CATS[0];
 
-  const filtered = items.filter((item) => {
-    if (catFilter !== "all" && item.category !== catFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      item.name?.toLowerCase().includes(q) ||
-      item.sku?.toLowerCase().includes(q) ||
-      item.brand?.toLowerCase().includes(q) ||
-      (item.variant_value || "").toLowerCase().includes(q) ||
-      (item.subcategory || "").toLowerCase().includes(q)
-    );
+  let filtered = items.filter((item) => {
+    if (!activeCat.match(item)) return false;
+    if (unpricedOnly) {
+      const val =
+        edits[item.id] !== undefined ? edits[item.id] : item.sell_price;
+      if (val && parseFloat(val) > 0) return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        item.name?.toLowerCase().includes(q) ||
+        item.sku?.toLowerCase().includes(q) ||
+        item.brand?.toLowerCase().includes(q) ||
+        (item.variant_value || "").toLowerCase().includes(q) ||
+        (item.subcategory || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  filtered = [...filtered].sort((a, b) => {
+    if (sortBy === "margin_asc") {
+      const ma = calcMargin(edits[a.id] ?? a.sell_price, a.weighted_avg_cost),
+        mb2 = calcMargin(edits[b.id] ?? b.sell_price, b.weighted_avg_cost);
+      if (ma === null && mb2 === null) return 0;
+      if (ma === null) return -1;
+      if (mb2 === null) return 1;
+      return ma - mb2;
+    }
+    if (sortBy === "margin_desc") {
+      const ma = calcMargin(edits[a.id] ?? a.sell_price, a.weighted_avg_cost),
+        mb2 = calcMargin(edits[b.id] ?? b.sell_price, b.weighted_avg_cost);
+      if (ma === null && mb2 === null) return 0;
+      if (ma === null) return 1;
+      if (mb2 === null) return -1;
+      return mb2 - ma;
+    }
+    if (sortBy === "price_asc")
+      return (a.sell_price || 0) - (b.sell_price || 0);
+    if (sortBy === "stock_asc")
+      return (a.quantity_on_hand || 0) - (b.quantity_on_hand || 0);
+    return (a.name || "").localeCompare(b.name || "");
   });
 
   const changedCount = Object.keys(edits).length;
-  const unpricedCount = filtered.filter((i) => {
+  const allUnpriced = items.filter(
+    (i) => !i.sell_price || i.sell_price <= 0,
+  ).length;
+  const visUnpriced = filtered.filter((i) => {
     const val = edits[i.id] !== undefined ? edits[i.id] : i.sell_price;
     return !val || parseFloat(val) <= 0;
   }).length;
-
   const getSell = (item) =>
     edits[item.id] !== undefined ? edits[item.id] : (item.sell_price ?? "");
   const getMargin = (item) => calcMargin(getSell(item), item.weighted_avg_cost);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleChange = (id, val) => {
+    setSaveSource("manual");
     setEdits((p) => ({ ...p, [id]: val }));
     setResult(null);
   };
   const discard = () => {
     setEdits({});
     setResult(null);
+    setSaveSource("manual");
+  };
+
+  const applyTargetMargin = () => {
+    const pct = parseFloat(targetMargin);
+    if (!pct || pct <= 0 || pct >= 100) return;
+    const newEdits = { ...edits };
+    filtered.forEach((item) => {
+      if (!item.weighted_avg_cost) return;
+      const price = priceFromMargin(pct, item.weighted_avg_cost);
+      if (price !== null) newEdits[item.id] = price.toFixed(2);
+    });
+    setEdits(newEdits);
+    setSaveSource("target_margin");
+    setResult(null);
+    setCalcOpen(false);
+    setTargetMargin("");
   };
 
   const saveAll = async () => {
     if (!changedCount || saving) return;
     setSaving(true);
     setResult(null);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const userEmail = user?.email || "Unknown";
+    const userId = user?.id || null;
+    const currentPrices = items.reduce((acc, i) => {
+      acc[i.id] = i.sell_price;
+      return acc;
+    }, {});
     let saved = 0;
     const errors = [];
+
     for (const [id, raw] of Object.entries(edits)) {
       const num = parseFloat(raw);
       if (isNaN(num) || num < 0) {
         errors.push(`Invalid: ${items.find((i) => i.id === id)?.name ?? id}`);
         continue;
       }
-      const { error } = await supabase
+
+      const { error: uErr } = await supabase
         .from("inventory_items")
         .update({ sell_price: num })
         .eq("id", id)
-        .eq("tenant_id", tenantId); // LL-160 always guard with tenant
-      if (error) errors.push(error.message);
-      else saved++;
+        .eq("tenant_id", tenantId);
+      if (uErr) {
+        errors.push(uErr.message);
+        continue;
+      }
+
+      // Write audit trail — non-fatal if it fails
+      const { error: hErr } = await supabase.from("price_history").insert({
+        tenant_id: tenantId || null,
+        item_id: id,
+        changed_by: userId,
+        changed_by_email: userEmail,
+        old_price: currentPrices[id] ?? null,
+        new_price: num,
+        source: saveSource,
+      });
+      if (hErr)
+        console.warn(
+          "[StockPricingPanel] price_history write failed:",
+          hErr.message,
+        );
+
+      saved++;
     }
+
     await load();
     setEdits({});
+    setSaveSource("manual");
     setResult({ saved, errors });
     setSaving(false);
   };
 
-  // Ctrl+S
   useEffect(() => {
     const h = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -304,9 +917,8 @@ export default function StockPricingPanel({ tenantId }) {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [changedCount, saving, edits]); // eslint-disable-line
+  }, [changedCount, saving, edits, saveSource]); // eslint-disable-line
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading)
     return (
       <p style={{ ...Ty.body, color: T.ink300, padding: "32px 0" }}>
@@ -314,57 +926,49 @@ export default function StockPricingPanel({ tenantId }) {
       </p>
     );
 
-  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: T.font, color: T.ink700 }}>
-      {/* ── Header ── */}
+    <div
+      style={{
+        fontFamily: T.font,
+        color: T.ink700,
+        paddingBottom: changedCount > 0 ? 72 : 0,
+      }}
+    >
+      {/* Top bar */}
       <div
         style={{
           display: "flex",
-          alignItems: "flex-start",
+          alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 16,
+          marginBottom: 14,
           flexWrap: "wrap",
           gap: 10,
         }}
       >
         <p style={{ ...Ty.caption, color: T.ink300, margin: 0 }}>
-          {items.length} active items · edit sell prices inline · margin
-          calculated live from AVCO
-        </p>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {changedCount > 0 && (
-            <span
-              style={{
-                ...Ty.label,
-                background: T.warningBg,
-                border: `1px solid ${T.warningBd}`,
-                color: T.warning,
-                padding: "4px 10px",
-                borderRadius: 4,
-              }}
-            >
-              {changedCount} unsaved
+          {items.length} active items · edit inline · margin from AVCO ·{" "}
+          <span style={{ color: T.accentMid, fontWeight: 600 }}>
+            click any name for audit trail
+          </span>
+          {allUnpriced > 0 && (
+            <span style={{ color: T.danger, fontWeight: 600, marginLeft: 10 }}>
+              · {allUnpriced} unpriced
             </span>
           )}
-          {changedCount > 0 && (
-            <button style={sBtn("ghost")} onClick={discard}>
-              Discard
-            </button>
-          )}
-          <button
-            style={sBtn("primary", !changedCount || saving)}
-            onClick={saveAll}
-            disabled={!changedCount || saving}
-          >
-            {saving
-              ? "Saving…"
-              : `Save All${changedCount ? ` (${changedCount})` : ""}`}
-          </button>
-        </div>
+        </p>
+        <button
+          style={{
+            ...sBtn("secondary"),
+            fontSize: "11px",
+            padding: "5px 12px",
+          }}
+          onClick={() => setCalcOpen((o) => !o)}
+        >
+          🎯 {calcOpen ? "Close" : "Target Margin"}
+        </button>
       </div>
 
-      {/* ── Result banner ── */}
+      {/* Result banner */}
       {result && (
         <div
           style={{
@@ -373,13 +977,14 @@ export default function StockPricingPanel({ tenantId }) {
             color: result.errors.length ? T.danger : T.success,
             borderRadius: 6,
             padding: "10px 16px",
-            marginBottom: 16,
+            marginBottom: 14,
             ...Ty.body,
           }}
         >
           {result.saved > 0 && (
             <span>
-              ✓ {result.saved} price{result.saved !== 1 ? "s" : ""} saved.{" "}
+              ✓ {result.saved} price{result.saved !== 1 ? "s" : ""} saved and
+              logged to audit trail.{" "}
             </span>
           )}
           {result.errors.length > 0 && (
@@ -388,13 +993,136 @@ export default function StockPricingPanel({ tenantId }) {
         </div>
       )}
 
-      {/* ── Category pills — matches HQStock brand pill style ── */}
+      {/* Margin Calculator */}
+      {calcOpen && (
+        <div
+          style={{
+            background: T.infoBg,
+            border: `1px solid ${T.infoBd}`,
+            borderRadius: 6,
+            padding: "14px 18px",
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ ...Ty.label, color: T.info, marginBottom: 10 }}>
+            Target Margin Calculator
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div style={{ ...Ty.caption, color: T.ink400, marginBottom: 4 }}>
+                Target margin %
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  step="1"
+                  placeholder="e.g. 65"
+                  value={targetMargin}
+                  onChange={(e) => setTargetMargin(e.target.value)}
+                  style={{
+                    width: 80,
+                    padding: "7px 10px",
+                    border: `1px solid ${T.infoBd}`,
+                    borderRadius: 4,
+                    ...Ty.data,
+                    color: T.ink900,
+                    background: "#fff",
+                    outline: "none",
+                  }}
+                />
+                <span style={{ ...Ty.caption, color: T.ink400 }}>%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ ...Ty.caption, color: T.ink400, marginBottom: 4 }}>
+                Applies to
+              </div>
+              <div style={{ ...Ty.body, color: T.info, fontWeight: 600 }}>
+                {filtered.filter((i) => i.weighted_avg_cost > 0).length} visible
+                items with AVCO
+              </div>
+            </div>
+            {targetMargin &&
+              parseFloat(targetMargin) > 0 &&
+              parseFloat(targetMargin) < 100 && (
+                <div>
+                  <div
+                    style={{ ...Ty.caption, color: T.ink400, marginBottom: 4 }}
+                  >
+                    Preview (first 3)
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {filtered
+                      .filter((i) => i.weighted_avg_cost > 0)
+                      .slice(0, 3)
+                      .map((i) => {
+                        const price = priceFromMargin(
+                          targetMargin,
+                          i.weighted_avg_cost,
+                        );
+                        return price ? (
+                          <span
+                            key={i.id}
+                            style={{ ...Ty.caption, color: T.info }}
+                          >
+                            {i.name.split(" ").slice(0, 2).join(" ")} → R
+                            {price.toFixed(2)}
+                          </span>
+                        ) : null;
+                      })}
+                  </div>
+                </div>
+              )}
+            <button
+              style={sBtn(
+                "primary",
+                !targetMargin ||
+                  parseFloat(targetMargin) <= 0 ||
+                  parseFloat(targetMargin) >= 100,
+              )}
+              onClick={applyTargetMargin}
+              disabled={
+                !targetMargin ||
+                parseFloat(targetMargin) <= 0 ||
+                parseFloat(targetMargin) >= 100
+              }
+            >
+              Apply to {filtered.filter((i) => i.weighted_avg_cost > 0).length}{" "}
+              Items
+            </button>
+            <button
+              style={sBtn("ghost")}
+              onClick={() => {
+                setCalcOpen(false);
+                setTargetMargin("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+          <p style={{ ...Ty.caption, color: T.ink400, margin: "10px 0 0" }}>
+            Formula: sell = AVCO ÷ (1 − margin%). Logged to audit trail as
+            "Margin Calc". Items with no AVCO skipped.
+          </p>
+        </div>
+      )}
+
+      {/* Category pills */}
       <div
         style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}
       >
         {CATS.map(({ key, label, icon }) => {
-          const count = catCounts[key];
-          const active = catFilter === key;
+          const count = catCounts[key],
+            active = catFilter === key;
           return (
             <button
               key={key}
@@ -419,13 +1147,13 @@ export default function StockPricingPanel({ tenantId }) {
         })}
       </div>
 
-      {/* ── Search + legend row ── */}
+      {/* Toolbar */}
       <div
         style={{
           display: "flex",
-          gap: 10,
+          gap: 8,
           alignItems: "center",
-          marginBottom: 14,
+          marginBottom: 12,
           flexWrap: "wrap",
         }}
       >
@@ -436,36 +1164,68 @@ export default function StockPricingPanel({ tenantId }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
-            padding: "8px 12px",
+            padding: "7px 12px",
             border: `1px solid ${T.ink150}`,
             borderRadius: 4,
             ...Ty.body,
             background: "#fff",
             outline: "none",
-            width: 260,
+            width: 220,
             boxSizing: "border-box",
             color: T.ink900,
           }}
         />
+        <button
+          onClick={() => setUnpricedOnly((o) => !o)}
+          style={{
+            ...sBtn(unpricedOnly ? "danger" : "ghost"),
+            padding: "7px 12px",
+            fontSize: "11px",
+          }}
+        >
+          {unpricedOnly
+            ? `✕ Unpriced only (${visUnpriced})`
+            : `⚠ Unpriced (${allUnpriced})`}
+        </button>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          style={{
+            padding: "7px 10px",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 4,
+            ...Ty.body,
+            background: "#fff",
+            color: T.ink700,
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <option value="name">Sort: Name A–Z</option>
+          <option value="margin_asc">Sort: Margin Low → High</option>
+          <option value="margin_desc">Sort: Margin High → Low</option>
+          <option value="price_asc">Sort: Price Low → High</option>
+          <option value="stock_asc">Sort: On Hand Low → High</option>
+        </select>
         <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <span style={{ ...Ty.label, color: T.ink400 }}>MARGIN</span>
           {[
-            { label: "< 20% low", color: T.danger },
-            { label: "20–40% ok", color: T.warning },
-            { label: "> 40% strong", color: T.success },
-          ].map(({ label, color }) => (
-            <span key={label} style={{ ...Ty.caption, color }}>
-              ● {label}
+            { l: "< 20%", c: T.danger },
+            { l: "20–40%", c: T.warning },
+            { l: "> 40%", c: T.success },
+          ].map(({ l, c }) => (
+            <span key={l} style={{ ...Ty.caption, color: c }}>
+              ● {l}
             </span>
           ))}
         </div>
         <span style={{ ...Ty.caption, color: T.ink400 }}>
-          {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+          {filtered.length} of {items.length}
         </span>
       </div>
 
-      {/* ── Table — matches HQStock FoodItems table pattern ── */}
+      {/* Table */}
       <div
         style={{
           background: "#fff",
@@ -486,21 +1246,28 @@ export default function StockPricingPanel({ tenantId }) {
         >
           <thead>
             <tr>
-              <th style={sTh}>SKU</th>
-              <th style={sTh}>Name</th>
-              <th style={sTh}>Category</th>
-              <th style={sTh}>Variant</th>
-              <th style={{ ...sTh, textAlign: "right" }}>AVCO Cost</th>
-              <th style={{ ...sTh, textAlign: "right" }}>Sell Price</th>
-              <th style={{ ...sTh, textAlign: "right" }}>Margin</th>
-              <th style={{ ...sTh, textAlign: "right" }}>On Hand</th>
+              <th style={{ ...sTh, width: "11%" }}>SKU</th>
+              <th style={{ ...sTh, width: "27%" }}>Name</th>
+              <th style={{ ...sTh, width: "11%" }}>Category</th>
+              <th style={{ ...sTh, width: "10%" }}>Variant</th>
+              <th style={{ ...sTh, width: "12%", textAlign: "right" }}>
+                AVCO Cost
+              </th>
+              <th style={{ ...sTh, width: "13%", textAlign: "right" }}>
+                Sell Price
+              </th>
+              <th style={{ ...sTh, width: "8%", textAlign: "right" }}>
+                Margin
+              </th>
+              <th style={{ ...sTh, width: "5%", textAlign: "right" }}>Stock</th>
+              <th style={{ ...sTh, width: "3%", textAlign: "center" }}>📋</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   style={{
                     ...sTd,
                     textAlign: "center",
@@ -508,7 +1275,9 @@ export default function StockPricingPanel({ tenantId }) {
                     padding: 40,
                   }}
                 >
-                  No items match.{" "}
+                  {unpricedOnly
+                    ? "All visible items are priced."
+                    : "No items match."}{" "}
                   {search && (
                     <span
                       style={{
@@ -521,6 +1290,18 @@ export default function StockPricingPanel({ tenantId }) {
                       Clear search →
                     </span>
                   )}
+                  {unpricedOnly && (
+                    <span
+                      style={{
+                        color: T.accentMid,
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                      onClick={() => setUnpricedOnly(false)}
+                    >
+                      Show all →
+                    </span>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -529,12 +1310,11 @@ export default function StockPricingPanel({ tenantId }) {
                 const edited = edits[item.id] !== undefined;
                 const margin = getMargin(item);
                 const mb = marginBadge(margin);
-                const isEven = idx % 2 === 0;
                 const rowBg = focused
                   ? T.accentLit
                   : edited
-                    ? "#FFFEF5"
-                    : isEven
+                    ? "#FFFEF0"
+                    : idx % 2 === 0
                       ? "#fff"
                       : T.ink050;
                 const lowStock = (item.quantity_on_hand ?? 0) <= 0;
@@ -549,29 +1329,38 @@ export default function StockPricingPanel({ tenantId }) {
                         : "3px solid transparent",
                     }}
                   >
-                    {/* SKU */}
                     <td
                       style={{
                         ...sTd,
                         ...Ty.data,
                         color: T.ink300,
-                        minWidth: 100,
+                        fontSize: "10px",
                       }}
                     >
                       {item.sku || "—"}
                     </td>
 
-                    {/* Name */}
-                    <td style={{ ...sTd, minWidth: 180 }}>
-                      <div style={{ fontWeight: 600, color: T.ink700 }}>
+                    {/* Name — click to open audit drawer */}
+                    <td
+                      style={{ ...sTd, cursor: "pointer" }}
+                      onClick={() => setDrawerItem(item)}
+                      title="Click to view audit trail"
+                    >
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: T.accentMid,
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {item.name}
                       </div>
                       {item.brand && (
                         <div
                           style={{
                             ...Ty.caption,
-                            color: T.ink400,
-                            marginTop: 2,
+                            color: T.ink300,
+                            marginTop: 1,
                           }}
                         >
                           {item.brand}
@@ -579,42 +1368,29 @@ export default function StockPricingPanel({ tenantId }) {
                       )}
                     </td>
 
-                    {/* Category */}
                     <td style={sTd}>
                       <span
                         style={{
                           fontSize: 9,
-                          padding: "2px 7px",
+                          padding: "2px 6px",
                           borderRadius: 3,
                           background: T.ink075,
                           color: T.ink500,
-                          letterSpacing: "0.1em",
+                          letterSpacing: "0.08em",
                           textTransform: "uppercase",
                           fontWeight: 700,
                         }}
                       >
-                        {item.category}
+                        {item.subcategory || item.category}
                       </span>
-                      {item.subcategory && (
-                        <span
-                          style={{
-                            ...Ty.caption,
-                            color: T.ink300,
-                            marginLeft: 5,
-                          }}
-                        >
-                          {item.subcategory}
-                        </span>
-                      )}
                     </td>
 
-                    {/* Variant */}
                     <td style={sTd}>
                       {variantStr(item) ? (
                         <span
                           style={{
                             display: "inline-block",
-                            padding: "2px 7px",
+                            padding: "2px 6px",
                             borderRadius: 3,
                             fontSize: 10,
                             fontWeight: 700,
@@ -629,7 +1405,6 @@ export default function StockPricingPanel({ tenantId }) {
                       )}
                     </td>
 
-                    {/* AVCO Cost */}
                     <td
                       style={{
                         ...sTd,
@@ -658,41 +1433,58 @@ export default function StockPricingPanel({ tenantId }) {
                         <span style={{ ...Ty.caption, color: T.ink400 }}>
                           R
                         </span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={getSell(item)}
-                          placeholder="0.00"
-                          onFocus={() => setFocusId(item.id)}
-                          onBlur={() => setFocusId(null)}
-                          onChange={(e) =>
-                            handleChange(item.id, e.target.value)
-                          }
-                          style={{
-                            width: 80,
-                            padding: "5px 8px",
-                            border: `1px solid ${focused ? T.accent : edited ? T.accentMid : T.ink150}`,
-                            borderRadius: 3,
-                            ...Ty.data,
-                            color: T.ink900,
-                            textAlign: "right",
-                            background: "#fff",
-                            outline: "none",
-                            transition: "border-color .15s",
-                          }}
-                        />
+                        <div>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={getSell(item)}
+                            placeholder="0.00"
+                            onFocus={() => setFocusId(item.id)}
+                            onBlur={() => setFocusId(null)}
+                            onChange={(e) =>
+                              handleChange(item.id, e.target.value)
+                            }
+                            style={{
+                              width: 80,
+                              padding: "5px 8px",
+                              border: `1px solid ${focused ? T.accent : edited ? T.accentMid : T.ink150}`,
+                              borderRadius: 3,
+                              ...Ty.data,
+                              color: T.ink900,
+                              textAlign: "right",
+                              background: "#fff",
+                              outline: "none",
+                              transition: "border-color .15s",
+                              display: "block",
+                            }}
+                          />
+                          {edited &&
+                            item.sell_price &&
+                            parseFloat(item.sell_price) > 0 && (
+                              <div
+                                style={{
+                                  ...Ty.caption,
+                                  color: T.ink300,
+                                  textAlign: "right",
+                                  marginTop: 2,
+                                  fontSize: 9,
+                                }}
+                              >
+                                was {fmtShort(item.sell_price)}
+                              </div>
+                            )}
+                        </div>
                       </div>
                     </td>
 
-                    {/* Margin */}
                     <td style={{ ...sTd, textAlign: "right" }}>
                       {mb ? (
                         <span
                           style={{
                             fontSize: 10,
                             fontWeight: 700,
-                            padding: "2px 8px",
+                            padding: "2px 7px",
                             borderRadius: 3,
                             letterSpacing: "0.06em",
                             background: mb.bg,
@@ -703,11 +1495,12 @@ export default function StockPricingPanel({ tenantId }) {
                           {mb.label}
                         </span>
                       ) : (
-                        <span style={{ color: T.ink300 }}>—</span>
+                        <span style={{ ...Ty.caption, color: T.ink300 }}>
+                          —
+                        </span>
                       )}
                     </td>
 
-                    {/* On Hand */}
                     <td
                       style={{
                         ...sTd,
@@ -730,6 +1523,31 @@ export default function StockPricingPanel({ tenantId }) {
                         </span>
                       )}
                     </td>
+
+                    {/* Audit icon */}
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "center",
+                        padding: "9px 6px",
+                      }}
+                    >
+                      <button
+                        onClick={() => setDrawerItem(item)}
+                        title="View audit trail"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: T.ink300,
+                          fontSize: 13,
+                          padding: 2,
+                          lineHeight: 1,
+                        }}
+                      >
+                        📋
+                      </button>
+                    </td>
                   </tr>
                 );
               })
@@ -738,7 +1556,7 @@ export default function StockPricingPanel({ tenantId }) {
         </table>
       </div>
 
-      {/* ── Footer ── */}
+      {/* Footer */}
       <div
         style={{
           display: "flex",
@@ -748,18 +1566,82 @@ export default function StockPricingPanel({ tenantId }) {
         }}
       >
         <span style={{ ...Ty.caption, color: T.ink400 }}>
-          Showing {filtered.length} of {items.length} items
+          {filtered.length} of {items.length} items shown
         </span>
-        {unpricedCount > 0 && (
-          <span style={{ ...Ty.caption, color: T.danger, fontWeight: 600 }}>
-            ⚠ {unpricedCount} item{unpricedCount !== 1 ? "s" : ""} with no sell
-            price — hidden from shop
-          </span>
+        {visUnpriced > 0 && !unpricedOnly && (
+          <button
+            onClick={() => setUnpricedOnly(true)}
+            style={{
+              ...Ty.caption,
+              color: T.danger,
+              fontWeight: 600,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            ⚠ {visUnpriced} unpriced in view — click to filter
+          </button>
         )}
         <span style={{ ...Ty.caption, color: T.ink300 }}>
-          Ctrl+S to save all
+          Click any name for audit trail · Ctrl+S to save
         </span>
       </div>
+
+      {/* Sticky save bar */}
+      {changedCount > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 200,
+            background: "#fff",
+            borderTop: `2px solid ${T.accentBd}`,
+            boxShadow: "0 -4px 16px rgba(0,0,0,0.08)",
+            padding: "12px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
+        >
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <span
+              style={{
+                ...Ty.label,
+                background: T.warningBg,
+                border: `1px solid ${T.warningBd}`,
+                color: T.warning,
+                padding: "4px 10px",
+                borderRadius: 4,
+              }}
+            >
+              {changedCount} unsaved change{changedCount !== 1 ? "s" : ""}
+            </span>
+            <span style={{ ...Ty.caption, color: T.ink400 }}>
+              Ctrl+S · not yet written · audit trail written on save
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={sBtn("ghost")} onClick={discard}>
+              Discard All
+            </button>
+            <button
+              style={sBtn("primary", saving)}
+              onClick={saveAll}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : `Save All (${changedCount})`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Audit Drawer */}
+      <AuditDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
     </div>
   );
 }
