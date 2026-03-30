@@ -1159,14 +1159,7 @@ export default function StockReceiveModal({ onClose, onComplete, tenantId: tenan
         data: { user },
       } = await supabase.auth.getUser();
 
-      // Get tenant_id
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("tenant_id")
-        .eq("id", user.id)
-        .single();
-
-      const tenant_id = tenantIdProp || profile?.tenant_id;
+      const tenant_id = tenantIdProp;
       const ref = genReference();
 
       const tv = lines.reduce(
