@@ -1,5 +1,5 @@
-// src/components/hq/StockIntelPanel.js — v2.0
-// WP-STOCK-OVERVIEW Phase 2 — Intelligence Panels + Movement Heatmap
+// src/components/hq/StockIntelPanel.js — v3.0
+// WP-STOCK-OVERVIEW Phase 2 + Phase 4 — Intelligence Panels + Movement Heatmap
 //
 // Zone 4: Best Sellers · Margin Heroes · Fast Movers · Dead Stock
 // Zone 5: 12-week × 7-day movement velocity heatmap
@@ -12,7 +12,8 @@
 //   onNavigate — fn(tab) — jump to HQStock tab
 //   onOpenItem — fn(item)— open StockItemPanel drawer
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { supabase } from "../../services/supabaseClient";
 
 const T = {
   ink900: "#0D0D0D",
@@ -355,6 +356,260 @@ function HeatmapTooltip({ cell, x, y }) {
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+// ── Stock Glossary — collapsible, explains every term used on this screen ────
+// Collapsed by default. One click to open. Plain English definitions.
+// Same terms are used across the platform — this is the single reference.
+const GLOSSARY_TERMS = [
+  {
+    term: "AVCO",
+    full: "Average Weighted Cost",
+    def: "The average cost you paid per unit, weighted across all deliveries. Updates automatically every time you receive stock. If you paid R30 for 10 units then R50 for 10 units, your AVCO is R40.",
+  },
+  {
+    term: "Margin",
+    full: "Gross Profit %",
+    def: "How much profit you make on each sale, as a percentage. Formula: (Sell Price − AVCO) ÷ Sell Price × 100. A 60% margin on a R100 item means R60 profit per sale.",
+  },
+  {
+    term: "NO COST",
+    full: "No cost basis set",
+    def: "You have set a sell price but no cost has been recorded yet (AVCO = R0). Receive a delivery with a unit cost to establish the cost basis. Until then, margin cannot be calculated accurately.",
+  },
+  {
+    term: "Stock Value",
+    full: "Total stock value at cost",
+    def: "The total value of all stock on hand, calculated as: quantity × AVCO per item. This is what your stock cost you — not what you would sell it for.",
+  },
+  {
+    term: "Available",
+    full: "Available quantity",
+    def: "Stock on hand minus stock held for confirmed wholesale orders. This is the quantity you can safely sell without double-selling into a confirmed order.",
+  },
+  {
+    term: "Reorder Level",
+    full: "Restock trigger quantity",
+    def: "The quantity at which you should place a new order. When stock drops to or below this number, the item appears in your Action Queue as a reorder alert.",
+  },
+  {
+    term: "Dead Stock",
+    full: "Idle stock (45+ days)",
+    def: "Items that have had no stock movement (no sales, no deliveries, no adjustments) for 45 or more days. Cash is tied up in these items. Consider discounting, bundling, or returning to supplier.",
+  },
+  {
+    term: "Velocity",
+    full: "Daily sell rate",
+    def: "How many units you sell per day on average, based on the last 30 days. Used to calculate 'days of stock remaining'. Velocity of 2 means you sell 2 units per day.",
+  },
+  {
+    term: "Days Left",
+    full: "Estimated days until out of stock",
+    def: "Based on current velocity: quantity on hand ÷ daily sell rate. If you have 30 units and sell 3 per day, you have 10 days left. An item at 7 days or fewer triggers a REORDER alert.",
+  },
+  {
+    term: "Bulk Discount / RCV",
+    full: "Receipt / Receive Delivery reference",
+    def: "Every delivery you receive is assigned an RCV reference number (e.g. RCV-20260331-4770). This is your audit trail — traceable to the exact delivery, supplier, quantities, and costs.",
+  },
+  {
+    term: "Channel Hold",
+    full: "Stock reserved for a channel",
+    def: "Stock that is soft-reserved for a confirmed wholesale order or online checkout. It is still physically in your warehouse but cannot be sold to another channel until the hold is released.",
+  },
+  {
+    term: "price_history",
+    full: "Price audit trail",
+    def: "Every time a sell price is changed, a record is written with: who changed it, when, what it was before, and what it is now. Accessible via the audit drawer in the Pricing tab.",
+  },
+];
+
+function StockGlossary() {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+
+  const filtered = search.trim()
+    ? GLOSSARY_TERMS.filter(
+        (t) =>
+          t.term.toLowerCase().includes(search.toLowerCase()) ||
+          t.def.toLowerCase().includes(search.toLowerCase()),
+      )
+    : GLOSSARY_TERMS;
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid " + T.ink150,
+        borderRadius: 6,
+        overflow: "hidden",
+      }}
+    >
+      {/* Toggle header */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: "100%",
+          padding: "12px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: T.font,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink400,
+            }}
+          >
+            📖 Stock Terms Explained
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              color: T.ink300,
+              fontFamily: T.font,
+            }}
+          >
+            {GLOSSARY_TERMS.length} terms — AVCO, Margin, Dead Stock and more
+          </span>
+        </div>
+        <span style={{ fontSize: 12, color: T.ink300 }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ borderTop: "1px solid " + T.ink150 }}>
+          {/* Search */}
+          <div
+            style={{
+              padding: "10px 20px",
+              borderBottom: "1px solid " + T.ink075,
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Search terms…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                fontSize: 12,
+                fontFamily: T.font,
+                border: "1px solid " + T.ink150,
+                borderRadius: 4,
+                outline: "none",
+                boxSizing: "border-box",
+                color: T.ink700,
+                background: T.ink075,
+              }}
+            />
+          </div>
+
+          {/* Terms grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1px",
+              background: T.ink150,
+              maxHeight: 420,
+              overflowY: "auto",
+            }}
+          >
+            {filtered.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  background: "#fff",
+                  padding: "20px",
+                  fontSize: 12,
+                  color: T.ink300,
+                  fontFamily: T.font,
+                  textAlign: "center",
+                }}
+              >
+                No terms match "{search}"
+              </div>
+            ) : (
+              filtered.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: "#fff",
+                    padding: "12px 16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 6,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: T.accentMid,
+                        fontFamily: T.mono,
+                      }}
+                    >
+                      {item.term}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: T.ink400,
+                        fontFamily: T.font,
+                      }}
+                    >
+                      {item.full}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: T.ink500,
+                      fontFamily: T.font,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {item.def}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div
+            style={{
+              padding: "8px 20px",
+              fontSize: 10,
+              color: T.ink300,
+              fontFamily: T.font,
+              borderTop: "1px solid " + T.ink150,
+            }}
+          >
+            These terms are standard across the cannabis and retail industry.
+            They appear throughout NuAi exactly as your accountant, bank, and
+            suppliers use them.
+          </div>
+        </div>
       )}
     </div>
   );
@@ -898,6 +1153,159 @@ export default function StockIntelPanel({
     }));
   }, [activeItems, deadCutoff, catFilter, onOpenItem]);
 
+  // ── Phase 4 computed panels (plain language — no jargon) ────────────────
+  // "Making You Money" — Revenue Leaders (units sold × sell price)
+  const revenueLeaders = useMemo(() => {
+    const revMap = {};
+    saleOuts.forEach((m) => {
+      revMap[m.item_id] = (revMap[m.item_id] || 0) + Math.abs(m.quantity || 0);
+    });
+    const ranked = Object.entries(revMap)
+      .map(([id, units]) => {
+        const item = items.find((i) => i.id === id);
+        if (!item) return null;
+        const rev = units * (item.sell_price || 0);
+        const margin =
+          item.sell_price > 0 && item.weighted_avg_cost > 0
+            ? Math.round(
+                ((item.sell_price - item.weighted_avg_cost) / item.sell_price) *
+                  100,
+              )
+            : null;
+        return { item, units, rev, margin };
+      })
+      .filter(
+        (x) => x && x.rev > 0 && (!catFilter || x.item.category === catFilter),
+      )
+      .sort((a, b) => b.rev - a.rev)
+      .slice(0, 5);
+    const maxRev = ranked[0]?.rev || 1;
+    return ranked.map(({ item, units, rev, margin }, idx) => ({
+      name: item.name,
+      value: fmt(rev),
+      pct: Math.round((rev / maxRev) * 100),
+      sub: `${units} sold · ${margin !== null ? margin + "% profit" : "no cost set"}`,
+      barColor: T.accentMid,
+      valueColor: T.success,
+      badge:
+        idx === 0
+          ? { label: "TOP", color: T.success, bg: T.successBg, bd: T.successBd }
+          : null,
+      onClick: () => onOpenItem(item),
+    }));
+  }, [saleOuts, items, catFilter, onOpenItem]);
+
+  // "Selling Fast, Earning Little" — Margin at Risk
+  const marginAtRisk = useMemo(() => {
+    const ranked = activeItems
+      .filter((i) => {
+        if ((i.quantity_on_hand || 0) <= 0) return false;
+        if (!(i.sell_price > 0) || !(i.weighted_avg_cost > 0)) return false;
+        if (catFilter && i.category !== catFilter) return false;
+        const margin =
+          ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100;
+        if (margin >= 25) return false;
+        // Must be selling — check saleOuts
+        const unitsSold = saleOuts
+          .filter((m) => m.item_id === i.id)
+          .reduce((s, m) => s + Math.abs(m.quantity || 0), 0);
+        return unitsSold > 0;
+      })
+      .map((i) => {
+        const margin = Math.round(
+          ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100,
+        );
+        const unitsSold = saleOuts
+          .filter((m) => m.item_id === i.id)
+          .reduce((s, m) => s + Math.abs(m.quantity || 0), 0);
+        return { item: i, margin, unitsSold };
+      })
+      .sort((a, b) => a.margin - b.margin)
+      .slice(0, 5);
+    return ranked.map(({ item, margin, unitsSold }, idx) => ({
+      name: item.name,
+      value: `${margin}% profit`,
+      pct: Math.max(10, margin),
+      sub: `${unitsSold} sold · ${fmt(item.sell_price)} sell · ${fmt(item.weighted_avg_cost)} cost`,
+      barColor: margin < 10 ? T.danger : T.warning,
+      valueColor: margin < 10 ? T.danger : T.warning,
+      badge:
+        idx === 0
+          ? {
+              label: "FIX PRICE",
+              color: T.danger,
+              bg: T.dangerBg,
+              bd: T.dangerBd,
+            }
+          : null,
+      onClick: () => onOpenItem(item),
+    }));
+  }, [activeItems, saleOuts, catFilter, onOpenItem]);
+
+  // "Prices Worth Checking" — items where price_history shows last change > 60 days ago
+  const [priceAgeMap, setPriceAgeMap] = useState({}); // item_id → last changed_at
+  const [priceAgeLoaded, setPriceAgeLoaded] = useState(false);
+  useEffect(() => {
+    if (!tenantId || priceAgeLoaded) return;
+    supabase
+      .from("price_history")
+      .select("item_id, changed_at")
+      .eq("tenant_id", tenantId)
+      .order("changed_at", { ascending: false })
+      .then(({ data }) => {
+        if (!data) return;
+        const map = {};
+        data.forEach((row) => {
+          if (!map[row.item_id]) map[row.item_id] = row.changed_at;
+        });
+        setPriceAgeMap(map);
+        setPriceAgeLoaded(true);
+      });
+  }, [tenantId, priceAgeLoaded]);
+
+  const priceReview = useMemo(() => {
+    const STALE_DAYS = 60;
+    const cutoff = new Date(Date.now() - STALE_DAYS * 86400000);
+    const ranked = activeItems
+      .filter((i) => {
+        if (!(i.sell_price > 0) || !(i.weighted_avg_cost > 0)) return false;
+        if ((i.quantity_on_hand || 0) <= 0) return false;
+        if (catFilter && i.category !== catFilter) return false;
+        const lastChange = priceAgeMap[i.id];
+        if (!lastChange) return false;
+        return new Date(lastChange) < cutoff;
+      })
+      .map((i) => {
+        const lastChange = new Date(priceAgeMap[i.id]);
+        const daysSince = Math.floor((Date.now() - lastChange) / 86400000);
+        const margin = Math.round(
+          ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100,
+        );
+        return { item: i, daysSince, margin };
+      })
+      .sort((a, b) => b.daysSince - a.daysSince)
+      .slice(0, 5);
+    const maxDays = ranked[0]?.daysSince || 1;
+    return ranked.map(({ item, daysSince, margin }, idx) => ({
+      name: item.name,
+      value: `${daysSince}d ago`,
+      pct: Math.round((daysSince / maxDays) * 100),
+      sub: `${fmt(item.sell_price)} price · ${margin}% profit now`,
+      barColor: daysSince > 120 ? T.warning : T.ink300,
+      valueColor: daysSince > 120 ? T.warning : T.ink500,
+      badge:
+        idx === 0
+          ? {
+              label: "REVIEW",
+              color: T.warning,
+              bg: T.warningBg,
+              bd: T.warningBd,
+            }
+          : null,
+      onClick: () => onNavigate("pricing"),
+    }));
+  }, [activeItems, priceAgeMap, catFilter, onNavigate]);
+
   // Heatmap
   const HEATMAP_COLORS = [
     T.ink150,
@@ -1109,6 +1517,48 @@ export default function StockIntelPanel({
         </div>
       </div>
 
+      {/* ── Zone 4b: Phase 4 — Plain language money panels ──────────────── */}
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
+      >
+        <IntelPanel
+          title="Making You Money"
+          icon="💵"
+          badge={revenueLeaders.length > 0 ? "last 30 days" : null}
+          badgeColor={{ color: T.success, bg: T.successBg, bd: T.successBd }}
+          rows={revenueLeaders}
+          emptyMsg="No sales yet — your revenue leaders will appear here once you process sales"
+          footerLabel="View all sales"
+          onFooter={() => onNavigate("movements")}
+        />
+
+        <IntelPanel
+          title="Selling Fast, Earning Little"
+          icon="⚠️"
+          badge={marginAtRisk.length > 0 ? "under 25% profit" : null}
+          badgeColor={{ color: T.danger, bg: T.dangerBg, bd: T.dangerBd }}
+          rows={marginAtRisk}
+          emptyMsg="All your fast-selling items have healthy profit margins — great work"
+          footerLabel="Review prices"
+          onFooter={() => onNavigate("pricing")}
+        />
+
+        <IntelPanel
+          title="Prices Worth Checking"
+          icon="🗓"
+          badge={priceReview.length > 0 ? "60+ days old" : null}
+          badgeColor={{ color: T.warning, bg: T.warningBg, bd: T.warningBd }}
+          rows={priceReview}
+          emptyMsg={
+            !priceAgeLoaded
+              ? "Loading price history…"
+              : "All your prices have been reviewed recently"
+          }
+          footerLabel="Open pricing"
+          onFooter={() => onNavigate("pricing")}
+        />
+      </div>
+
       {/* Zone 5 — Heatmap */}
       <div
         style={{
@@ -1273,6 +1723,9 @@ export default function StockIntelPanel({
 
       {/* Zone 6 — AI Insights (Phase 3 — live) */}
       <Zone6AIInsights context={aiContext} onNavigate={onNavigate} />
+
+      {/* Glossary — collapsed by default, always accessible */}
+      <StockGlossary />
     </div>
   );
 }
