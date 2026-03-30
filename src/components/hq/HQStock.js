@@ -3010,6 +3010,7 @@ export default function HQStock() {
           movements={movements}
           tenantId={tenantId}
           onNavigate={setSubTab}
+          onOpenItem={setPanelItem}
         />
 
         {/* ── ZONE 7: CHANNEL STOCK HOLD (unchanged) ──────────────────────── */}
