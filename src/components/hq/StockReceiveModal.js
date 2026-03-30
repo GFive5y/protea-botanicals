@@ -6,7 +6,7 @@
 // AVCO: ((Qold × Aold) + (Qin × Cin)) / (Qold + Qin)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../services/supabaseClient";
 
 // ─── Theme tokens (mirrors HQStock palette) ──────────────────────────────────
 const T = {
