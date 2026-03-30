@@ -1567,32 +1567,184 @@ function Step4({
         </div>
       </div>
 
-      {/* Summary lines */}
+      {/* Summary lines with margin preview */}
       <div style={{ marginBottom: 24 }}>
         {lines.map((l) => {
-          const lineTotal =
-            parseFloat(l.qty_received || 0) * parseFloat(l.cost_per_unit || 0);
+          const cost = parseFloat(l.cost_per_unit || 0);
+          const qty = parseFloat(l.qty_received || 0);
+          const lineTotal = qty * cost;
+          const newAvco = calcNewAvco(
+            l.item.quantity_on_hand,
+            l.item.weighted_avg_cost,
+            qty,
+            cost,
+          );
+          const sell = parseFloat(l.item.sell_price || 0);
+          const margin =
+            sell > 0 && newAvco > 0 ? ((sell - newAvco) / sell) * 100 : null;
+          const marginColor =
+            margin === null
+              ? T.ink300
+              : margin >= 50
+                ? T.success
+                : margin >= 30
+                  ? T.warning
+                  : T.danger;
+
           return (
             <div
               key={l.item_id}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "6px 0",
+                padding: "8px 0",
                 borderBottom: `1px solid ${T.ink075}`,
+                fontFamily: T.font,
+              }}
+            >
+              {/* Row 1: item name + line cost */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                }}
+              >
+                <span style={{ color: T.ink900, fontWeight: 500 }}>
+                  {l.item.name}
+                </span>
+                <span style={{ color: T.ink600 }}>
+                  {qty} × R{cost.toFixed(2)} = R{lineTotal.toFixed(2)}
+                </span>
+              </div>
+              {/* Row 2: AVCO → Sell → Margin (only if sell price set) */}
+              {sell > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    marginTop: 3,
+                    fontSize: "11px",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ color: T.ink400 }}>
+                    AVCO{" "}
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono','Courier New',monospace",
+                        color: T.ink700,
+                      }}
+                    >
+                      R{newAvco.toFixed(2)}
+                    </span>
+                  </span>
+                  <span style={{ color: T.ink300 }}>→</span>
+                  <span style={{ color: T.ink400 }}>
+                    Sell{" "}
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono','Courier New',monospace",
+                        color: T.ink700,
+                      }}
+                    >
+                      R{sell.toFixed(2)}
+                    </span>
+                  </span>
+                  <span style={{ color: T.ink300 }}>→</span>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: marginColor,
+                      fontFamily: "'DM Mono','Courier New',monospace",
+                    }}
+                  >
+                    {margin === null ? "—" : `${Math.round(margin)}%`}
+                    {margin !== null && margin >= 40 && " ✓"}
+                    {margin !== null && margin < 30 && " ⚠"}
+                  </span>
+                </div>
+              ) : (
+                <div
+                  style={{ fontSize: "11px", color: T.ink300, marginTop: 3 }}
+                >
+                  No sell price — set via Pricing tab to see margin
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Aggregate strip */}
+        {(() => {
+          const priced = lines.filter(
+            (l) => parseFloat(l.item.sell_price || 0) > 0,
+          );
+          if (priced.length === 0) return null;
+          const margins = priced
+            .map((l) => {
+              const newAvco = calcNewAvco(
+                l.item.quantity_on_hand,
+                l.item.weighted_avg_cost,
+                parseFloat(l.qty_received || 0),
+                parseFloat(l.cost_per_unit || 0),
+              );
+              const sell = parseFloat(l.item.sell_price || 0);
+              return sell > 0 && newAvco > 0
+                ? ((sell - newAvco) / sell) * 100
+                : null;
+            })
+            .filter((m) => m !== null);
+          const avgMargin =
+            margins.length > 0
+              ? margins.reduce((s, m) => s + m, 0) / margins.length
+              : null;
+          const healthy = margins.filter((m) => m >= 40).length;
+          const compressed = margins.filter((m) => m < 30).length;
+          return (
+            <div
+              style={{
+                marginTop: 12,
+                padding: "10px 14px",
+                borderRadius: 6,
+                background: compressed > 0 ? T.warningBg : T.successBg,
+                border: `1px solid ${compressed > 0 ? T.warningBd : T.successBd}`,
+                display: "flex",
+                gap: 20,
                 fontSize: "12px",
                 fontFamily: T.font,
               }}
             >
-              <span style={{ color: T.ink900 }}>{l.item.name}</span>
-              <span style={{ color: T.ink600 }}>
-                {l.qty_received} × R
-                {parseFloat(l.cost_per_unit || 0).toFixed(2)} = R
-                {lineTotal.toFixed(2)}
-              </span>
+              {avgMargin !== null && (
+                <span
+                  style={{
+                    color: compressed > 0 ? T.warning : T.success,
+                    fontWeight: 700,
+                  }}
+                >
+                  Avg margin {Math.round(avgMargin)}%
+                </span>
+              )}
+              {healthy > 0 && (
+                <span style={{ color: T.success }}>{healthy} healthy ✓</span>
+              )}
+              {compressed > 0 && (
+                <span style={{ color: T.warning }}>
+                  {compressed} compressed — review pricing
+                </span>
+              )}
+              {lines.filter((l) => !(parseFloat(l.item.sell_price || 0) > 0))
+                .length > 0 && (
+                <span style={{ color: T.ink400 }}>
+                  {
+                    lines.filter(
+                      (l) => !(parseFloat(l.item.sell_price || 0) > 0),
+                    ).length
+                  }{" "}
+                  unpriced
+                </span>
+              )}
             </div>
           );
-        })}
+        })()}
       </div>
 
       {/* New products alert — LL-169: visible trigger, full dev later */}
