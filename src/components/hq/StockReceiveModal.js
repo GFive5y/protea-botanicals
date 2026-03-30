@@ -1151,8 +1151,7 @@ export default function StockReceiveModal({ onClose, onComplete, tenantId: tenan
   }
 
   async function confirm() {
-    setSaving(true);
-    setError(null);
+    setSaving(true); setError(null);
 
     try {
       const {
