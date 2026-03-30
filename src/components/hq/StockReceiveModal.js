@@ -261,7 +261,7 @@ function Step2({
       const { data } = await supabase
         .from("inventory_items")
         .select(
-          "id,name,sku,brand,category,quantity_on_hand,weighted_avg_cost,cost_price,expiry_date,batch_lot_number",
+          "id,name,sku,brand,category,subcategory,variant_value,tags,quantity_on_hand,weighted_avg_cost,cost_price,expiry_date,batch_lot_number",
         )
         .or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%`)
         .eq("is_active", true)
