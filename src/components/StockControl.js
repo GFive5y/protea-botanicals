@@ -32,6 +32,7 @@ import InfoTooltip from "./InfoTooltip";
 import { ChartCard, ChartTooltip, InlineProgressBar } from "./viz";
 import StockItemModal from "./StockItemModal";
 import StockAIAnalysis from "./hq/StockAIAnalysis";
+import StockReceiveModal from "./hq/StockReceiveModal";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -299,7 +300,7 @@ export default function StockControl() {
   const [items, setItems] = useState([]);
   const [stockAlerts, setStockAlerts] = useState([]);
   const ctx = usePageContext("admin-stock", null);
-  const { industryProfile } = useTenant();
+  const { industryProfile, tenantId } = useTenant();
   const profile =
     INDUSTRY_PROFILES[industryProfile] || INDUSTRY_PROFILES.cannabis_retail;
   const visibleCategories =
@@ -313,6 +314,7 @@ export default function StockControl() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [receiveOpen, setReceiveOpen] = useState(false);
 
   // GAP-02: write a system_alert (non-blocking, fire-and-forget)
   const writeAlert = useCallback(async (alertType, severity, title, body) => {
@@ -477,6 +479,32 @@ export default function StockControl() {
         defaultOpen={false}
       />
 
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: "12px",
+        }}
+      >
+        <button
+          onClick={() => setReceiveOpen(true)}
+          style={{
+            padding: "7px 18px",
+            background: T.accentMid,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "11px",
+            fontFamily: T.fontUi,
+            color: "#fff",
+            fontWeight: 600,
+            letterSpacing: "0.06em",
+          }}
+        >
+          📦 Receive Delivery
+        </button>
+      </div>
+
       {/* Alerts handled globally by AlertsBar */}
 
       {/* Sub-tab bar — standard underline style */}
@@ -567,6 +595,16 @@ export default function StockControl() {
             <SuppliersView suppliers={suppliers} onRefresh={fetchAll} />
           )}
         </>
+      )}
+      {receiveOpen && tenantId && (
+        <StockReceiveModal
+          tenantId={tenantId}
+          onClose={() => setReceiveOpen(false)}
+          onComplete={() => {
+            fetchAll();
+            setReceiveOpen(false);
+          }}
+        />
       )}
     </div>
   );
