@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "../services/supabaseClient";
+import { useTenant } from "../services/tenantService";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
@@ -225,26 +226,22 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      await supabase
-        .from("ticket_messages")
-        .insert({
-          ticket_id: ticket.id,
-          sender_type: "admin",
-          sender_id: user.id,
-          content: reply.trim(),
-        });
-      await supabase
-        .from("customer_messages")
-        .insert({
-          user_id: ticket.user_id,
-          direction: "outbound",
-          message_type: "response",
-          subject: `Re: ${ticket.subject} [${ticket.ticket_number}]`,
-          body: reply.trim(),
-          sent_by: user.id,
-          sent_by_name: user.email?.split("@")[0] || "Admin",
-          metadata: { ticket_id: ticket.id },
-        });
+      await supabase.from("ticket_messages").insert({
+        ticket_id: ticket.id,
+        sender_type: "admin",
+        sender_id: user.id,
+        content: reply.trim(),
+      });
+      await supabase.from("customer_messages").insert({
+        user_id: ticket.user_id,
+        direction: "outbound",
+        message_type: "response",
+        subject: `Re: ${ticket.subject} [${ticket.ticket_number}]`,
+        body: reply.trim(),
+        sent_by: user.id,
+        sent_by_name: user.email?.split("@")[0] || "Admin",
+        metadata: { ticket_id: ticket.id },
+      });
       const newStatus = status === "pending_reply" ? "open" : status;
       await supabase
         .from("support_tickets")
@@ -289,17 +286,15 @@ function TicketThread({ ticket, profile, onStatusChange, onClose }) {
         await supabase
           .from("ticket_messages")
           .insert({ ticket_id: ticket.id, sender_type: "auto", content });
-        await supabase
-          .from("customer_messages")
-          .insert({
-            user_id: ticket.user_id,
-            direction: "outbound",
-            message_type: "support_reply",
-            subject,
-            body: content,
-            sent_by_name: "Auto-reply",
-            metadata: { ticket_id: ticket.id },
-          });
+        await supabase.from("customer_messages").insert({
+          user_id: ticket.user_id,
+          direction: "outbound",
+          message_type: "support_reply",
+          subject,
+          body: content,
+          sent_by_name: "Auto-reply",
+          metadata: { ticket_id: ticket.id },
+        });
         loadMessages();
       }
     }
@@ -685,18 +680,16 @@ function CustomerThread({ userId, profile, adminUser, onUnreadCleared }) {
   const handleSend = async () => {
     if (!replyBody.trim()) return;
     setSending(true);
-    const { error } = await supabase
-      .from("customer_messages")
-      .insert({
-        user_id: userId,
-        direction: "outbound",
-        message_type: "response",
-        subject: "Re: Your message",
-        body: replyBody.trim(),
-        sent_by: adminUser?.id || null,
-        sent_by_name: adminUser?.email?.split("@")[0] || "Admin",
-        metadata: {},
-      });
+    const { error } = await supabase.from("customer_messages").insert({
+      user_id: userId,
+      direction: "outbound",
+      message_type: "response",
+      subject: "Re: Your message",
+      body: replyBody.trim(),
+      sent_by: adminUser?.id || null,
+      sent_by_name: adminUser?.email?.split("@")[0] || "Admin",
+      metadata: {},
+    });
     if (error) {
       showToast("Failed to send: " + error.message, false);
     } else {
@@ -1151,16 +1144,14 @@ function WholesaleThread({ partner, adminUser }) {
   const handleSend = async () => {
     if (!replyBody.trim()) return;
     setSending(true);
-    const { error } = await supabase
-      .from("wholesale_messages")
-      .insert({
-        partner_id: partner.id,
-        direction: "outbound",
-        message_type: "general",
-        body: replyBody.trim(),
-        sent_by: adminUser?.id || null,
-        sent_by_name: adminUser?.email?.split("@")[0] || "Admin",
-      });
+    const { error } = await supabase.from("wholesale_messages").insert({
+      partner_id: partner.id,
+      direction: "outbound",
+      message_type: "general",
+      body: replyBody.trim(),
+      sent_by: adminUser?.id || null,
+      sent_by_name: adminUser?.email?.split("@")[0] || "Admin",
+    });
     if (error) {
       showToast("Failed: " + error.message, false);
     } else {
@@ -1961,7 +1952,9 @@ function ChannelTabs({
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function AdminCommsCenter() {
+export default function AdminCommsCenter({ tenantId: tenantIdProp } = {}) {
+  const { tenantId: ctxTenantId } = useTenant();
+  const tenantId = tenantIdProp || ctxTenantId;
   const ctx = usePageContext("comms", null);
 
   const [channel, setChannel] = useState("customers");
@@ -1987,10 +1980,12 @@ export default function AdminCommsCenter() {
         supabase
           .from("customer_messages")
           .select("user_id,direction,read_at,created_at,body,message_type")
+          .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
           .order("created_at", { ascending: false }),
         supabase
           .from("support_tickets")
           .select("user_id,status,created_at,subject,ticket_number")
+          .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
           .order("created_at", { ascending: false }),
       ]);
       const msgs = msgRes.data || [],

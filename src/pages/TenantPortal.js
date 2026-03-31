@@ -31,6 +31,9 @@ import HQAnalytics from "../components/hq/HQAnalytics";
 import HQReorderScoring from "../components/hq/HQReorderScoring";
 import HQInvoices from "../components/hq/HQInvoices";
 import HRStaffDirectory from "../components/hq/HRStaffDirectory";
+import AdminQRCodes from "../components/AdminQRCodes";
+import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
+import AdminCommsCenter from "../components/AdminCommsCenter";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
@@ -201,6 +204,157 @@ const WATERFALL = [
   },
 ];
 
+// ── Cannabis Retail Waterfall ─────────────────────────────────────────────
+// Used when industryProfile === 'cannabis_retail' or 'cannabis_dispensary'
+// Retailer model: Buy stock → Price it → Sell it → Understand the numbers
+// No Production Runs. No Material Pipeline. No Retailer Health (they ARE the retailer).
+
+const CANNABIS_RETAIL_WATERFALL = [
+  {
+    id: "home",
+    label: "Home",
+    emoji: "🏠",
+    color: "#1A3D2B",
+    alwaysOpen: true,
+    tabs: [
+      {
+        id: "overview",
+        label: "Dashboard",
+        desc: "Action queue · KPIs · alerts",
+      },
+    ],
+  },
+  {
+    id: "inventory",
+    label: "Inventory",
+    emoji: "📦",
+    color: "#1A3D2B",
+    tabs: [
+      {
+        id: "stock",
+        label: "Stock",
+        desc: "Inventory · movements · AVCO · margins",
+      },
+    ],
+  },
+  {
+    id: "procurement",
+    label: "Procurement",
+    emoji: "🛒",
+    color: "#1E3A5F",
+    tabs: [
+      {
+        id: "suppliers",
+        label: "Suppliers",
+        desc: "Local SA suppliers · contacts",
+      },
+      {
+        id: "procurement",
+        label: "Purchase Orders",
+        desc: "ZAR local POs · receive delivery",
+      },
+      {
+        id: "documents",
+        label: "Documents",
+        desc: "Upload invoice → AI extracts costs",
+      },
+    ],
+  },
+  {
+    id: "sales",
+    label: "Sales & Customers",
+    emoji: "💰",
+    color: "#065F46",
+    tabs: [
+      {
+        id: "pricing",
+        label: "Pricing",
+        desc: "Sell prices · margins · scenarios",
+      },
+      {
+        id: "loyalty",
+        label: "Loyalty",
+        desc: "Points · tiers · campaigns · referrals",
+      },
+      {
+        id: "invoices",
+        label: "Invoices",
+        desc: "AR receivables · AP payables · aged",
+      },
+    ],
+  },
+  {
+    id: "customers",
+    label: "Customers",
+    emoji: "👤",
+    color: "#1E3A5F",
+    tabs: [
+      {
+        id: "customers",
+        label: "Customer 360",
+        desc: "Profiles · loyalty · churn risk · engagement",
+      },
+      {
+        id: "qr-codes",
+        label: "QR Codes",
+        desc: "Generate · batch · print · scan analytics",
+      },
+      {
+        id: "comms",
+        label: "Messaging",
+        desc: "Customer messages · support · broadcast",
+      },
+    ],
+  },
+  {
+    id: "intelligence",
+    label: "Intelligence",
+    emoji: "📊",
+    color: "#991B1B",
+    tabs: [
+      {
+        id: "pl",
+        label: "Profit & Loss",
+        desc: "Live revenue · COGS · net margin",
+      },
+      {
+        id: "analytics",
+        label: "Analytics",
+        desc: "Scans · customer data · trends",
+      },
+      {
+        id: "reorder",
+        label: "Reorder",
+        desc: "Stock alerts · procurement triggers",
+      },
+    ],
+  },
+  {
+    id: "people",
+    label: "People",
+    emoji: "👥",
+    color: "#374151",
+    tabs: [
+      {
+        id: "staff",
+        label: "Staff",
+        desc: "Directory · schedules · timesheets",
+      },
+    ],
+  },
+];
+
+// Profile → which waterfall to use
+function getWaterfall(industryProfile) {
+  if (
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary"
+  ) {
+    return CANNABIS_RETAIL_WATERFALL;
+  }
+  return WATERFALL;
+}
+
 // Role → visible sections
 const ROLE_SECTIONS = {
   owner: [
@@ -291,6 +445,13 @@ function renderTab(tabId, tenantId, industryProfile) {
       return <HQReorderScoring />;
     case "staff":
       return <HRStaffDirectory />;
+    // ── Customer operations — ported with tenantId prop ──────────────────
+    case "qr-codes":
+      return <AdminQRCodes tenantId={tenantId} />;
+    case "customers":
+      return <AdminCustomerEngagement tenantId={tenantId} />;
+    case "comms":
+      return <AdminCommsCenter tenantId={tenantId} />;
     default:
       return (
         <div
@@ -439,16 +600,19 @@ export default function TenantPortal() {
   );
 
   const role = "owner";
+  const activeWaterfall = getWaterfall(industryProfile);
   const visibleSectionIds = ROLE_SECTIONS[role] || ROLE_SECTIONS.owner;
-  const visibleSections = WATERFALL.filter((s) =>
-    visibleSectionIds.includes(s.id),
-  );
+  // Cannabis retail waterfall has its own sections — show all for owner role
+  const visibleSections =
+    activeWaterfall === CANNABIS_RETAIL_WATERFALL
+      ? activeWaterfall
+      : activeWaterfall.filter((s) => visibleSectionIds.includes(s.id));
 
   const profileBadge =
     PROFILE_BADGE[industryProfile] || PROFILE_BADGE.general_retail;
   const tenantName = tenant?.name || "My Business";
 
-  const activeSection = WATERFALL.find((s) =>
+  const activeSection = activeWaterfall.find((s) =>
     s.tabs.some((t) => t.id === activeTab),
   );
   const activeTabDef = activeSection?.tabs.find((t) => t.id === activeTab);

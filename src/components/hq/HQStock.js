@@ -17,7 +17,12 @@ import HQPurchaseOrders from "./HQPurchaseOrders";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { SparkLine, BulletChart } from "../viz";
 import StockIntelPanel from "./StockIntelPanel";
-import { PRODUCT_WORLDS, itemMatchesWorld } from "./ProductWorlds";
+import {
+  PRODUCT_WORLDS,
+  itemMatchesWorld,
+  CATEGORY_LABELS,
+  CATEGORY_ICONS,
+} from "./ProductWorlds";
 
 const T = {
   ink900: "#0D0D0D",
@@ -277,22 +282,7 @@ const CANNABIS_PROFILES = [
   "mixed_retail",
 ];
 
-const CATEGORY_LABELS = {
-  finished_product: "Finished Product",
-  raw_material: "Raw Material",
-  terpene: "Terpene",
-  hardware: "Hardware",
-  packaging: "Packaging",
-  concentrate: "Concentrate",
-  flower: "Flower",
-  edible: "Edible",
-  topical: "Topical",
-  medical_consumable: "Medical Consumable",
-  accessory: "Accessory",
-  ingredient: "Ingredient",
-  equipment: "Equipment",
-  other: "Other",
-};
+// CATEGORY_LABELS imported from ProductWorlds.js
 
 const FOOD_CATS = [
   "raw_material",
@@ -366,6 +356,473 @@ const countAllergens = (flags) =>
 const isLowFn = (item) =>
   item.reorder_level != null &&
   (item.quantity_on_hand || 0) <= item.reorder_level;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHOP TAB — visual product grid, image upload, visibility + featured controls
+// Owner manages exactly what the website shows from this panel
+// ═══════════════════════════════════════════════════════════════════════════════
+function ShopTab({ items, tenantId, onRefresh }) {
+  const BUCKET_URL =
+    "https://uvicrqapgzcdvozxrreo.supabase.co/storage/v1/object/public/product-images";
+  const [uploading, setUploading] = useState({});
+  const [saving, setSaving] = useState({});
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("all");
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const cats = [...new Set(items.map((i) => i.category).filter(Boolean))];
+
+  const filtered = items
+    .filter((i) => i.sell_price > 0)
+    .filter((i) => catFilter === "all" || i.category === catFilter)
+    .filter(
+      (i) =>
+        !search ||
+        i.name.toLowerCase().includes(search.toLowerCase()) ||
+        (i.brand || "").toLowerCase().includes(search.toLowerCase()),
+    )
+    .sort(
+      (a, b) =>
+        (a.display_order || 0) - (b.display_order || 0) ||
+        (a.name || "").localeCompare(b.name || ""),
+    );
+
+  const shopLive = filtered.filter(
+    (i) => i.is_active && (i.quantity_on_hand || 0) > 0,
+  ).length;
+  const soldOut = filtered.filter(
+    (i) => i.is_active && (i.quantity_on_hand || 0) === 0,
+  ).length;
+  const hidden = filtered.filter((i) => !i.is_active).length;
+  const noPhoto = filtered.filter((i) => !i.image_url).length;
+
+  const handleImageUpload = async (item, file) => {
+    if (!file) return;
+    setUploading((p) => ({ ...p, [item.id]: true }));
+    try {
+      const ext = file.name.split(".").pop().toLowerCase();
+      const path = `${tenantId}/${item.id}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("product-images")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const url = `${BUCKET_URL}/${path}`;
+      const { error: dbErr } = await supabase
+        .from("inventory_items")
+        .update({ image_url: url })
+        .eq("id", item.id);
+      if (dbErr) throw dbErr;
+      showToast(`Photo saved for ${item.name}`);
+      onRefresh();
+    } catch (err) {
+      showToast("Upload failed: " + err.message, "error");
+    } finally {
+      setUploading((p) => ({ ...p, [item.id]: false }));
+    }
+  };
+
+  const toggleField = async (item, field) => {
+    setSaving((p) => ({ ...p, [item.id]: true }));
+    const { error } = await supabase
+      .from("inventory_items")
+      .update({ [field]: !item[field] })
+      .eq("id", item.id);
+    if (!error) onRefresh();
+    setSaving((p) => ({ ...p, [item.id]: false }));
+  };
+
+  const removeImage = async (item) => {
+    setSaving((p) => ({ ...p, [item.id]: true }));
+    await supabase
+      .from("inventory_items")
+      .update({ image_url: null })
+      .eq("id", item.id);
+    onRefresh();
+    setSaving((p) => ({ ...p, [item.id]: false }));
+  };
+
+  const CAT_ICON_MAP = CATEGORY_ICONS;
+  const CAT_LABEL_MAP = CATEGORY_LABELS;
+
+  return (
+    <div style={{ fontFamily: T.font }}>
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 24,
+            zIndex: 999,
+            padding: "10px 18px",
+            borderRadius: 8,
+            background: toast.type === "error" ? T.danger : T.success,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 600,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header stats */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4,1fr)",
+          gap: "1px",
+          background: T.ink150,
+          borderRadius: 8,
+          overflow: "hidden",
+          border: `1px solid ${T.ink150}`,
+          marginBottom: 20,
+        }}
+      >
+        {[
+          ["Live in Shop", shopLive, T.success],
+          ["Sold Out (visible)", soldOut, T.warning],
+          ["Hidden", hidden, T.ink400],
+          ["No Photo Yet", noPhoto, T.danger],
+        ].map(([label, val, color]) => (
+          <div
+            key={label}
+            style={{
+              background: "#fff",
+              padding: "12px 16px",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{ fontSize: 22, fontWeight: 300, color, lineHeight: 1 }}
+            >
+              {val}
+            </div>
+            <div
+              style={{
+                fontSize: 9,
+                color: T.ink400,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                marginTop: 4,
+              }}
+            >
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 16,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search products…"
+          style={{
+            padding: "7px 10px",
+            border: `1px solid ${T.ink150}`,
+            borderRadius: 6,
+            fontSize: 12,
+            fontFamily: T.font,
+            width: 220,
+          }}
+        />
+        <select
+          value={catFilter}
+          onChange={(e) => setCatFilter(e.target.value)}
+        >
+          <option value="all">All categories</option>
+          {cats.map((c) => (
+            <option key={c} value={c}>
+              {CAT_LABEL_MAP[c] || c}
+            </option>
+          ))}
+        </select>
+        <div style={{ marginLeft: "auto", fontSize: 11, color: T.ink400 }}>
+          {filtered.length} products · items without sell price are excluded
+        </div>
+      </div>
+
+      {/* Product grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))",
+          gap: 12,
+        }}
+      >
+        {filtered.map((item) => {
+          const inStock = (item.quantity_on_hand || 0) > 0;
+          const isLive = item.is_active && inStock;
+          const isSoldOut = item.is_active && !inStock;
+          const isHidden = !item.is_active;
+          const statusColor = isLive
+            ? T.success
+            : isSoldOut
+              ? T.warning
+              : T.ink300;
+          const statusLabel = isLive
+            ? "LIVE"
+            : isSoldOut
+              ? "SOLD OUT"
+              : "HIDDEN";
+
+          return (
+            <div
+              key={item.id}
+              style={{
+                background: "#fff",
+                border: `1px solid ${T.ink150}`,
+                borderRadius: 10,
+                overflow: "hidden",
+                opacity: isHidden ? 0.65 : 1,
+              }}
+            >
+              {/* Image area */}
+              <div
+                style={{
+                  height: 130,
+                  background: item.image_url
+                    ? "#f5f5f3"
+                    : `linear-gradient(135deg,${isHidden ? "#888" : "#1A3D2B"} 0%,${isHidden ? "#aaa" : "#2D6A4F"} 100%)`,
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {item.image_url ? (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      padding: 8,
+                    }}
+                  />
+                ) : (
+                  <span
+                    style={{
+                      fontSize: 40,
+                      filter: isHidden ? "grayscale(1)" : "none",
+                    }}
+                  >
+                    {CAT_ICON_MAP[item.category] || "🌿"}
+                  </span>
+                )}
+
+                {/* Status badge */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    left: 6,
+                    background: isLive
+                      ? T.success
+                      : isSoldOut
+                        ? "#b5935a"
+                        : "#666",
+                    color: "#fff",
+                    fontSize: 8,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  {statusLabel}
+                </div>
+
+                {/* Featured badge */}
+                {item.is_featured && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      right: 6,
+                      background: "#b5935a",
+                      color: "#fff",
+                      fontSize: 8,
+                      fontWeight: 700,
+                      padding: "2px 7px",
+                      borderRadius: 10,
+                    }}
+                  >
+                    ★ FEATURED
+                  </div>
+                )}
+
+                {/* Upload button overlay */}
+                <label
+                  style={{
+                    position: "absolute",
+                    bottom: 6,
+                    right: 6,
+                    background: "rgba(0,0,0,0.55)",
+                    color: "#fff",
+                    fontSize: 10,
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => handleImageUpload(item, e.target.files[0])}
+                  />
+                  {uploading[item.id] ? "⏳" : "📷"}{" "}
+                  {item.image_url ? "Replace" : "Add photo"}
+                </label>
+              </div>
+
+              {/* Product info */}
+              <div style={{ padding: "10px 12px" }}>
+                {item.brand && (
+                  <div
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: T.accentMid,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      marginBottom: 2,
+                    }}
+                  >
+                    {item.brand}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: T.ink900,
+                    lineHeight: 1.3,
+                    marginBottom: 6,
+                  }}
+                >
+                  {item.name}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                  }}
+                >
+                  <span
+                    style={{ fontSize: 14, fontWeight: 700, color: T.accent }}
+                  >
+                    R{parseFloat(item.sell_price).toFixed(2)}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: statusColor,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {item.quantity_on_hand || 0} in stock
+                  </span>
+                </div>
+
+                {/* Controls */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => toggleField(item, "is_active")}
+                    disabled={saving[item.id]}
+                    style={{
+                      flex: 1,
+                      padding: "5px 8px",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      border: `1px solid ${item.is_active ? T.danger : T.success}`,
+                      borderRadius: 5,
+                      background: "transparent",
+                      color: item.is_active ? T.danger : T.success,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {item.is_active ? "Hide" : "Show"}
+                  </button>
+                  <button
+                    onClick={() => toggleField(item, "is_featured")}
+                    disabled={saving[item.id]}
+                    style={{
+                      flex: 1,
+                      padding: "5px 8px",
+                      fontSize: 10,
+                      fontWeight: 600,
+                      border: `1px solid ${item.is_featured ? "#b5935a" : T.ink150}`,
+                      borderRadius: 5,
+                      background: item.is_featured ? "#FFF8F0" : "transparent",
+                      color: item.is_featured ? "#b5935a" : T.ink400,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {item.is_featured ? "★ Featured" : "Feature"}
+                  </button>
+                  {item.image_url && (
+                    <button
+                      onClick={() => removeImage(item)}
+                      title="Remove photo"
+                      style={{
+                        padding: "5px 8px",
+                        fontSize: 10,
+                        border: `1px solid ${T.dangerBd}`,
+                        borderRadius: 5,
+                        background: T.dangerBg,
+                        color: T.danger,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {filtered.length === 0 && (
+        <div
+          style={{
+            padding: 60,
+            textAlign: "center",
+            color: T.ink300,
+            fontSize: 13,
+          }}
+        >
+          No products with a sell price yet. Set prices in the Pricing tab to
+          control what appears in your shop.
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function HQStock() {
   const { industryProfile, tenantId } = useTenant();
@@ -4907,6 +5364,7 @@ export default function HQStock() {
             { id: "pricing", label: "💰 Pricing" },
             { id: "receipts", label: "📦 Receipts" },
             { id: "purchase-orders", label: "🛒 Purchase Orders" },
+            ...(isCannabis ? [{ id: "shop", label: "🌐 Shop Manager" }] : []),
           ].map((t) => (
             <button
               key={t.id}
@@ -4983,6 +5441,9 @@ export default function HQStock() {
             tenantId={tenantId}
             industryProfile={industryProfile}
           />
+        )}
+        {subTab === "shop" && isCannabis && (
+          <ShopTab items={items} tenantId={tenantId} onRefresh={load} />
         )}
 
         {avcoAlertItems.length > 0 && (

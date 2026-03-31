@@ -937,37 +937,38 @@ const CANNABIS_FILTER_OPTIONS = [
     key: "concentrate",
     label: "Concentrates",
     icon: "💎",
-    categories: ["concentrate", "hash"],
+    categories: ["concentrate"],
   },
-  { key: "vapes", label: "Vapes", icon: "💨", categories: ["vape"] },
-  { key: "edibles", label: "Edibles", icon: "🍬", categories: ["edible"] },
-  { key: "prerolls", label: "Pre-Rolls", icon: "🚬", categories: ["preroll"] },
+  { key: "edible", label: "Edibles", icon: "🍬", categories: ["edible"] },
   {
-    key: "accessories",
+    key: "accessory",
     label: "Accessories",
     icon: "🔧",
-    categories: ["accessories", "accessory"],
+    categories: ["accessory"],
   },
   {
     key: "wellness",
     label: "Wellness",
     icon: "💊",
-    categories: ["wellness", "finished_product"],
+    categories: ["finished_product"],
   },
 ];
 
 // ── Cannabis product builder ──────────────────────────────────────────────────
+// CATEGORY_ICON imported as CATEGORY_ICONS from ProductWorlds via supabase client
+// Using local alias for backward compat with existing references
 const CATEGORY_ICON = {
   flower: "🌸",
   concentrate: "💎",
-  vape: "💨",
   edible: "🍬",
-  preroll: "🚬",
-  hash: "🟤",
-  accessories: "🔧",
   accessory: "🔧",
-  wellness: "💊",
   finished_product: "🌿",
+  hardware: "⚙️",
+  raw_material: "🧪",
+  terpene: "🔬",
+  packaging: "📦",
+  equipment: "🔩",
+  other: "📋",
 };
 
 function buildCannabisProduct(item) {
@@ -977,19 +978,50 @@ function buildCannabisProduct(item) {
     name: item.name,
     sku: item.sku,
     category: item.category,
+    brand: item.brand || null,
     price: parseFloat(item.sell_price) || 0,
     unit: item.unit || "unit",
     quantity_on_hand: item.quantity_on_hand,
+    inStock: (item.quantity_on_hand || 0) > 0,
     description: item.description || null,
     expiry_date: item.expiry_date || null,
+    image_url: item.image_url || null,
+    is_featured: item.is_featured || false,
+    display_order: item.display_order || 0,
     icon: CATEGORY_ICON[item.category] || "🌿",
   };
 }
 
+// ── 3-tier image resolution helper ───────────────────────────────────────────
+function resolveProductImage(product, brandLibrary) {
+  // Tier 1: custom photo uploaded by owner
+  if (product.image_url) return { src: product.image_url, type: "custom" };
+  // Tier 2: brand library match (brand name match, optional keyword match)
+  if (product.brand && brandLibrary.length > 0) {
+    const brandLower = product.brand.toLowerCase();
+    const nameLower = (product.name || "").toLowerCase();
+    const match = brandLibrary.find((lib) => {
+      const libBrand = lib.brand_name.toLowerCase();
+      if (!libBrand.includes(brandLower) && !brandLower.includes(libBrand))
+        return false;
+      if (!lib.product_keywords || lib.product_keywords.length === 0)
+        return true;
+      return lib.product_keywords.some((kw) =>
+        nameLower.includes(kw.toLowerCase()),
+      );
+    });
+    if (match) return { src: match.image_url, type: "library" };
+  }
+  // Tier 3: category emoji fallback
+  return { src: null, type: "icon" };
+}
+
 // ── Cannabis product card ─────────────────────────────────────────────────────
-function CannabisShopCard({ product, onAddToCart }) {
+function CannabisShopCard({ product, onAddToCart, brandLibrary }) {
   const [adding, setAdding] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const handleAdd = () => {
+    if (!product.inStock) return;
     setAdding(true);
     onAddToCart(product);
     setTimeout(() => setAdding(false), 800);
@@ -997,19 +1029,24 @@ function CannabisShopCard({ product, onAddToCart }) {
   const daysToExpiry = product.expiry_date
     ? Math.ceil((new Date(product.expiry_date) - new Date()) / 86400000)
     : null;
-  const expirySoon = daysToExpiry !== null && daysToExpiry < 30;
+  const expirySoon =
+    daysToExpiry !== null && daysToExpiry < 30 && daysToExpiry >= 0;
+  const expired = daysToExpiry !== null && daysToExpiry < 0;
+  const imgRes = resolveProductImage(product, brandLibrary || []);
+  const showImg = imgRes.type !== "icon" && !imgError;
 
   return (
     <div
       style={{
         background: "#fff",
-        border: "1px solid #E8E8E4",
+        border: `1px solid ${product.inStock ? "#E8E8E4" : "#D0D0CC"}`,
         borderRadius: 12,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         transition: "box-shadow 0.2s",
         boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        opacity: product.inStock ? 1 : 0.82,
       }}
       onMouseOver={(e) =>
         (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)")
@@ -1018,20 +1055,117 @@ function CannabisShopCard({ product, onAddToCart }) {
         (e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)")
       }
     >
-      {/* Product hero */}
+      {/* Product hero — photo or gradient+icon */}
       <div
         style={{
-          height: 120,
-          background: "linear-gradient(135deg, #1A3D2B 0%, #2D6A4F 100%)",
+          height: 140,
+          position: "relative",
+          background: showImg
+            ? "#f5f5f3"
+            : `linear-gradient(135deg, ${product.inStock ? "#1A3D2B" : "#444"} 0%, ${product.inStock ? "#2D6A4F" : "#666"} 100%)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 48,
-          position: "relative",
+          overflow: "hidden",
         }}
       >
-        {product.icon}
-        {expirySoon && (
+        {showImg ? (
+          <img
+            src={imgRes.src}
+            alt={product.name}
+            onError={() => setImgError(true)}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              padding: 8,
+            }}
+          />
+        ) : (
+          <span
+            style={{
+              fontSize: 52,
+              filter: product.inStock ? "none" : "grayscale(1) opacity(0.6)",
+            }}
+          >
+            {product.icon}
+          </span>
+        )}
+
+        {/* Sold out overlay */}
+        {!product.inStock && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(0,0,0,0.45)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                background: "#fff",
+                color: "#111",
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "4px 12px",
+                borderRadius: 20,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+              }}
+            >
+              Sold Out
+            </span>
+          </div>
+        )}
+
+        {/* Top badges */}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            display: "flex",
+            gap: 4,
+            flexWrap: "wrap",
+          }}
+        >
+          {product.is_featured && (
+            <span
+              style={{
+                background: "#b5935a",
+                color: "#fff",
+                fontSize: 9,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 10,
+                letterSpacing: "0.07em",
+              }}
+            >
+              FEATURED
+            </span>
+          )}
+          <span
+            style={{
+              background: "rgba(0,0,0,0.45)",
+              color: "#fff",
+              fontSize: 9,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 10,
+              letterSpacing: "0.07em",
+              textTransform: "uppercase",
+            }}
+          >
+            {CATEGORY_ICON[product.category]}{" "}
+            {product.category?.replace(/_/g, " ")}
+          </span>
+        </div>
+
+        {/* Expiry badge */}
+        {expirySoon && product.inStock && (
           <div
             style={{
               position: "absolute",
@@ -1043,43 +1177,73 @@ function CannabisShopCard({ product, onAddToCart }) {
               fontWeight: 700,
               padding: "2px 7px",
               borderRadius: 10,
-              letterSpacing: "0.08em",
             }}
           >
             {daysToExpiry}d left
           </div>
         )}
-        <div
-          style={{
-            position: "absolute",
-            top: 8,
-            left: 8,
-            background: "rgba(0,0,0,0.4)",
-            color: "#fff",
-            fontSize: 9,
-            fontWeight: 600,
-            padding: "2px 8px",
-            borderRadius: 10,
-            letterSpacing: "0.07em",
-            textTransform: "uppercase",
-          }}
-        >
-          {product.category}
-        </div>
+        {expired && product.inStock && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              background: "#FEF2F2",
+              color: "#991B1B",
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 10,
+            }}
+          >
+            EXPIRED
+          </div>
+        )}
+        {/* Library badge — subtle indicator image came from brand library */}
+        {imgRes.type === "library" && !imgError && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 6,
+              right: 6,
+              background: "rgba(0,0,0,0.35)",
+              color: "rgba(255,255,255,0.7)",
+              fontSize: 8,
+              padding: "1px 5px",
+              borderRadius: 6,
+            }}
+          >
+            ✓ brand
+          </div>
+        )}
       </div>
+
       {/* Product info */}
       <div
         style={{
-          padding: "14px 16px",
+          padding: "12px 14px",
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          gap: 3,
         }}
       >
+        {product.brand && (
+          <div
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              color: "#52b788",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+            }}
+          >
+            {product.brand}
+          </div>
+        )}
         <div
           style={{
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 600,
             color: "#0D0D0D",
             lineHeight: 1.3,
@@ -1093,50 +1257,74 @@ function CannabisShopCard({ product, onAddToCart }) {
               fontSize: 11,
               color: "#666",
               lineHeight: 1.5,
-              marginTop: 4,
+              marginTop: 2,
             }}
           >
-            {product.description.slice(0, 80)}
-            {product.description.length > 80 ? "…" : ""}
+            {product.description.slice(0, 72)}
+            {product.description.length > 72 ? "…" : ""}
           </div>
         )}
         <div
           style={{
             marginTop: "auto",
-            paddingTop: 12,
+            paddingTop: 10,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            gap: 8,
           }}
         >
           <div
             style={{
-              fontSize: 18,
+              fontSize: 17,
               fontWeight: 700,
-              color: "#1A3D2B",
+              color: product.inStock ? "#1A3D2B" : "#999",
               fontFamily: "'DM Mono', monospace",
             }}
           >
             R{parseFloat(product.price).toFixed(2)}
           </div>
-          <button
-            onClick={handleAdd}
-            disabled={adding}
-            style={{
-              padding: "8px 16px",
-              background: adding ? "#52b788" : "#1A3D2B",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "background 0.2s",
-              letterSpacing: "0.04em",
-            }}
-          >
-            {adding ? "✓ Added" : "+ Add"}
-          </button>
+          {product.inStock ? (
+            <button
+              onClick={handleAdd}
+              disabled={adding}
+              style={{
+                padding: "7px 14px",
+                background: adding ? "#52b788" : "#1A3D2B",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "background 0.2s",
+                letterSpacing: "0.04em",
+                flexShrink: 0,
+              }}
+            >
+              {adding ? "✓ Added" : "+ Add"}
+            </button>
+          ) : (
+            <button
+              style={{
+                padding: "7px 12px",
+                background: "transparent",
+                color: "#666",
+                border: "1px solid #D0D0CC",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                letterSpacing: "0.04em",
+                flexShrink: 0,
+              }}
+              onClick={() => {
+                /* Notify me — future: open email/WhatsApp capture */
+              }}
+            >
+              Notify Me
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -2416,6 +2604,7 @@ export default function Shop() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [liveProducts, setLiveProducts] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
+  const [brandLibrary, setBrandLibrary] = useState([]); // platform brand image library
 
   // ── WP-H: Admin below-COGS warning ──────────────────────────────────
   const [cogsWarnings, setCogsWarnings] = useState([]);
@@ -2507,9 +2696,8 @@ export default function Shop() {
         const { data, error } = await storefrontDb
           .from("inventory_items")
           .select(
-            // Only columns confirmed to exist in inventory_items
-            // subcategory, variant_value, brand omitted — not in base schema
-            "id, name, sku, category, unit, quantity_on_hand, cost_price, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, expiry_date, description",
+            // image_url + brand added after SQL migration (April 2026)
+            "id, name, sku, category, unit, quantity_on_hand, cost_price, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, expiry_date, description, image_url, brand, display_order, is_featured",
           )
           .in(
             "category",
@@ -2518,20 +2706,16 @@ export default function Shop() {
                   "flower",
                   "concentrate",
                   "edible",
-                  "vape",
-                  "preroll",
-                  "hash",
-                  "finished_product",
-                  "accessories",
                   "accessory",
-                  "wellness",
+                  "finished_product",
                 ]
               : ["finished_product"],
           )
           .eq("is_active", true)
-          .gt("quantity_on_hand", 0)
           .gt("sell_price", 0)
+          // Removed: .gt("quantity_on_hand", 0) — show sold-out items with SOLD OUT state
           .eq("tenant_id", storefrontTenantId) // ✦ WP-MULTISITE
+          .order("display_order", { ascending: true })
           .order("category")
           .order("name");
         if (error) {
@@ -2565,6 +2749,15 @@ export default function Shop() {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storefrontTenantId, isCannabisRetail]);
+
+  // Fetch brand image library once on mount — shared across all tenants
+  useEffect(() => {
+    storefrontDb
+      .from("brand_image_library")
+      .select("brand_name, product_keywords, image_url, category")
+      .eq("is_verified", true)
+      .then(({ data }) => setBrandLibrary(data || []));
+  }, []);
 
   const handleAddToCart = (product) => {
     addToCart(product);
@@ -2994,6 +3187,7 @@ export default function Shop() {
                         key={product.id}
                         product={product}
                         onAddToCart={handleAddToCart}
+                        brandLibrary={brandLibrary}
                       />
                     ))}
                   </div>

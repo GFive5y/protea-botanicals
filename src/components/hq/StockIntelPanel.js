@@ -14,6 +14,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { CATEGORY_LABELS } from "./ProductWorlds";
 
 const T = {
   ink900: "#0D0D0D",
@@ -44,20 +45,7 @@ const T = {
   mono: "'DM Mono','Courier New',monospace",
 };
 
-const CATEGORY_LABELS = {
-  finished_product: "Finished Product",
-  raw_material: "Raw Material",
-  terpene: "Terpene",
-  hardware: "Hardware",
-  packaging: "Packaging",
-  concentrate: "Concentrate",
-  flower: "Flower",
-  edible: "Edible",
-  topical: "Topical",
-  accessory: "Accessory",
-  equipment: "Equipment",
-  other: "Other",
-};
+// CATEGORY_LABELS imported from ProductWorlds.js
 
 const fmt = (n) =>
   n == null

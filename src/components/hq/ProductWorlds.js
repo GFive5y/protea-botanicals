@@ -628,3 +628,68 @@ export function defaultsForWorld(world) {
     subcategory: world.subs?.[0] || "",
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SINGLE SOURCE OF TRUTH — category labels, icons, valid enum values
+// LL-170: All components must import from here. Never redefine locally.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Valid PostgreSQL inventory_category enum values */
+export const CANNABIS_CATEGORIES = [
+  "flower",
+  "concentrate",
+  "edible",
+  "accessory",
+  "finished_product",
+  "hardware",
+  "raw_material",
+];
+
+/** Human-readable labels for every valid inventory_category enum value */
+export const CATEGORY_LABELS = {
+  flower: "Flower",
+  concentrate: "Concentrate",
+  edible: "Edible",
+  accessory: "Accessory",
+  finished_product: "Finished Product",
+  hardware: "Hardware",
+  raw_material: "Raw Material",
+  // Legacy / non-cannabis profiles
+  terpene: "Terpene",
+  packaging: "Packaging",
+  equipment: "Equipment",
+  topical: "Topical",
+  medical_consumable: "Medical Consumable",
+  ingredient: "Ingredient",
+  service: "Service",
+  other: "Other",
+};
+
+/** Emoji icons for every valid inventory_category enum value */
+export const CATEGORY_ICONS = {
+  flower: "🌸",
+  concentrate: "💎",
+  edible: "🍬",
+  accessory: "🔧",
+  finished_product: "🌿",
+  hardware: "⚙️",
+  raw_material: "🧪",
+  terpene: "🔬",
+  packaging: "📦",
+  equipment: "🔩",
+  topical: "💆",
+  medical_consumable: "💊",
+  ingredient: "🧂",
+  other: "📋",
+};
+
+/** Map inventory_category → loyalty_category for auto-derivation */
+export const CATEGORY_TO_LOYALTY = {
+  flower: "cannabis_flower",
+  concentrate: "cannabis_flower",
+  edible: "cannabis_edible",
+  accessory: "accessories",
+  finished_product: "health_wellness",
+  hardware: "grow_supplies",
+  raw_material: "grow_supplies",
+};

@@ -20,6 +20,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { CATEGORY_LABELS } from "./ProductWorlds";
 import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
@@ -145,13 +146,7 @@ const sTd = {
   fontSize: "12px",
 };
 
-const CATEGORY_LABELS = {
-  finished_product: "Finished Product",
-  raw_material: "Raw Material",
-  terpene: "Terpene",
-  hardware: "Hardware",
-  uncategorised: "Uncategorised",
-};
+// CATEGORY_LABELS imported from ProductWorlds.js
 const CATEGORY_COLORS = {
   finished_product: T.success,
   raw_material: T.info,

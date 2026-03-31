@@ -12,6 +12,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { CATEGORY_LABELS } from "./ProductWorlds";
 import { useTenant } from "../../services/tenantService";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -145,19 +146,7 @@ const sBadge = (v) => ({
     : {}),
 });
 
-const CATEGORY_LABELS = {
-  finished_product: "Finished Product",
-  raw_material: "Raw Material",
-  terpene: "Terpene",
-  hardware: "Hardware",
-  packaging: "Packaging",
-  concentrate: "Concentrate",
-  flower: "Flower",
-  accessory: "Accessory",
-  ingredient: "Ingredient",
-  equipment: "Equipment",
-  other: "Other",
-};
+// CATEGORY_LABELS imported from ProductWorlds.js
 
 const SCHEDULE_OPTIONS = [
   { value: "adhoc", label: "Ad Hoc (trigger anytime)" },

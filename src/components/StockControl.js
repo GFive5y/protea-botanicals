@@ -21,6 +21,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
+import { CATEGORY_LABELS, CATEGORY_ICONS } from "./hq/ProductWorlds";
 import { useTenant } from "../services/tenantService";
 import {
   INDUSTRY_PROFILES,
@@ -156,20 +157,7 @@ const sTd = {
   verticalAlign: "middle",
 };
 
-const CATEGORY_LABELS = {
-  finished_product: "Finished Product",
-  raw_material: "Raw Material",
-  terpene: "Terpene",
-  hardware: "Hardware",
-  packaging: "Packaging",
-  concentrate: "Concentrate",
-  flower: "Flower",
-  edible: "Edible",
-  topical: "Topical",
-  medical_consumable: "Medical Consumable",
-  accessory: "Accessory",
-  service: "Service",
-};
+// CATEGORY_LABELS imported from ProductWorlds.js
 const CATEGORY_COLORS = {
   finished_product: T.success,
   raw_material: T.info,

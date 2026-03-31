@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
+import { useTenant } from "../services/tenantService";
 import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "./viz";
@@ -368,7 +369,11 @@ const secHdr = (text) => (
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function AdminCustomerEngagement() {
+export default function AdminCustomerEngagement({
+  tenantId: tenantIdProp,
+} = {}) {
+  const { tenantId: ctxTenantId } = useTenant();
+  const tenantId = tenantIdProp || ctxTenantId;
   const ctx = usePageContext("customers", null);
 
   const [customers, setCustomers] = useState([]);
@@ -430,7 +435,7 @@ export default function AdminCustomerEngagement() {
   const writeAlert = useCallback(async (alertType, severity, title, body) => {
     try {
       await supabase.from("system_alerts").insert({
-        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
+        tenant_id: tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3",
         alert_type: alertType,
         severity,
         status: "open",
@@ -449,6 +454,7 @@ export default function AdminCustomerEngagement() {
           .from("user_profiles")
           .select("*")
           .eq("role", "customer")
+          .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
           .order("created_at", { ascending: false }),
       ]);
       const custs = custRes.data || [];
@@ -728,7 +734,7 @@ export default function AdminCustomerEngagement() {
         subject: broadcastForm.subject.trim() || null,
         body: broadcastForm.body.trim(),
         sent_by: adminUser?.id || null,
-        sent_by_name: "Protea Botanicals",
+        sent_by_name: "Medi Recreational",
         metadata: {},
       });
       if (!error) sent++;

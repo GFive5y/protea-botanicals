@@ -3108,29 +3108,21 @@ const PRINT_LAYOUTS = [
 const CAT_ICON = {
   flower: "🌸",
   concentrate: "💎",
-  vape: "💨",
   edible: "🍬",
-  preroll: "🚬",
-  hash: "🟤",
-  accessories: "🔧",
   accessory: "🔧",
-  wellness: "💊",
   finished_product: "🌿",
-};
+  hardware: "⚙️",
+  raw_material: "🧪",
+}; // valid DB enums only
 const CAT_LABEL = {
   flower: "Flower",
   concentrate: "Concentrate",
-  vape: "Vape",
   edible: "Edible",
-  preroll: "Pre-Roll",
-  hash: "Hash",
-  accessories: "Accessories",
   accessory: "Accessory",
-  wellness: "Wellness",
-  finished_product: "Product",
+  finished_product: "Finished Product",
   hardware: "Hardware",
   raw_material: "Raw Material",
-};
+}; // valid DB enums only
 
 function PrintTab({ tenantId }) {
   const [items, setItems] = useState([]);
