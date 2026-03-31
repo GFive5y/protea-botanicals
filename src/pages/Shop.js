@@ -32,11 +32,16 @@ import { useTenant } from "../services/tenantService";
 import { useStorefront } from "../contexts/StorefrontContext"; // ✦ WP-MULTISITE
 
 // ── Public/anonymous client for storefront product queries ────────────────────
-// Does NOT carry a user JWT — queries as anon role, bypasses per-user RLS.
-// This allows the shop to show any tenant's products regardless of who is logged in.
-// Requires: Supabase RLS policy allowing anon SELECT on inventory_items WHERE is_active=true
-// SQL: CREATE POLICY "anon_read_active_inventory" ON inventory_items
-//      FOR SELECT TO anon, authenticated USING (is_active = true);
+// Uses a no-op storage adapter so it NEVER reads the logged-in user's session
+// from localStorage. Always runs as anon role regardless of who is logged in.
+// This allows the shop to show any tenant's products for any visitor.
+// Requires Supabase RLS: CREATE POLICY "anon_read_active_inventory"
+//   ON inventory_items FOR SELECT TO anon, authenticated USING (is_active = true);
+const _noopStorage = {
+  getItem: (_key) => null,
+  setItem: (_key, _value) => {},
+  removeItem: (_key) => {},
+};
 const storefrontDb = createClient(
   process.env.REACT_APP_SUPABASE_URL,
   process.env.REACT_APP_SUPABASE_ANON_KEY,
@@ -45,6 +50,7 @@ const storefrontDb = createClient(
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+      storage: _noopStorage, // never touch localStorage — always anon role
     },
   },
 );
@@ -2529,7 +2535,12 @@ export default function Shop() {
           .order("category")
           .order("name");
         if (error) {
-          console.error("[Shop] Inventory fetch error:", error);
+          console.error(
+            "[Shop] Inventory fetch error:",
+            error.message,
+            error.code,
+            error.details,
+          );
           setLiveProducts([]);
           return;
         }
