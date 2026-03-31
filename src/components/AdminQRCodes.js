@@ -217,22 +217,12 @@ function genPromoCode(type, campaign) {
 }
 async function fetchNextCode() {
   try {
-    const { data } = await supabase
+    const { count } = await supabase
       .from("qr_codes")
-      .select("qr_code")
-      .like("qr_code", "PB-001-2026-%")
-      .order("qr_code", { ascending: false })
-      .limit(50);
-    if (!data?.length) return "0001";
-    let max = 0;
-    for (const p of data) {
-      const parts = (p.qr_code || "").split(".")[0].split("-");
-      const n = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(n) && n > max) max = n;
-    }
-    return String(max + 1).padStart(4, "0");
+      .select("id", { count: "exact", head: true });
+    return String((count || 0) + 1).padStart(4, "0");
   } catch {
-    return "0001";
+    return String(Math.floor(Math.random() * 9000) + 1000);
   }
 }
 function fmtDate(d) {
@@ -758,10 +748,13 @@ function RegistryTab({ batches, tenantId }) {
 
   const fetchCodes = useCallback(async () => {
     setLoading(true);
+    const tid = tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3";
     const { data, error } = await supabase
       .from("qr_codes")
       .select("*, batches(batch_number, product_name, strain)")
-      .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
+      // Show codes for this tenant + legacy codes with no tenant assigned
+      // Use or() filter: tenant_id = tid OR tenant_id IS NULL
+      .or(`tenant_id.eq.${tid},tenant_id.is.null`)
       .order("created_at", { ascending: false });
     const { count: scanLogsCount } = await supabase
       .from("scan_logs")
@@ -3225,6 +3218,7 @@ function PrintTab({ tenantId }) {
           qr_type: "retail_display",
           inventory_item_id: item.id,
           tenant_id: tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3",
+          campaign_name: item.name,
           is_active: true,
           status: "in_stock",
           claimed: false,

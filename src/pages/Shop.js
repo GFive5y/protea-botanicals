@@ -904,6 +904,220 @@ const DEFAULT_STRAIN = {
   effects: [],
 };
 
+// ── Cannabis retail filter options ────────────────────────────────────────────
+const CANNABIS_FILTER_OPTIONS = [
+  { key: "all", label: "All Products", icon: "🌿" },
+  { key: "flower", label: "Flower", icon: "🌸", categories: ["flower"] },
+  {
+    key: "concentrate",
+    label: "Concentrates",
+    icon: "💎",
+    categories: ["concentrate", "hash"],
+  },
+  { key: "vapes", label: "Vapes", icon: "💨", categories: ["vape"] },
+  { key: "edibles", label: "Edibles", icon: "🍬", categories: ["edible"] },
+  { key: "prerolls", label: "Pre-Rolls", icon: "🚬", categories: ["preroll"] },
+  {
+    key: "accessories",
+    label: "Accessories",
+    icon: "🔧",
+    categories: ["accessories", "accessory"],
+  },
+  {
+    key: "wellness",
+    label: "Wellness",
+    icon: "💊",
+    categories: ["wellness", "finished_product"],
+  },
+];
+
+// ── Cannabis product builder ──────────────────────────────────────────────────
+const CATEGORY_ICON = {
+  flower: "🌸",
+  concentrate: "💎",
+  vape: "💨",
+  edible: "🍬",
+  preroll: "🚬",
+  hash: "🟤",
+  accessories: "🔧",
+  accessory: "🔧",
+  wellness: "💊",
+  finished_product: "🌿",
+};
+
+function buildCannabisProduct(item) {
+  return {
+    id: item.id,
+    inventory_item_id: item.id,
+    name: item.name,
+    sku: item.sku,
+    category: item.category,
+    price: parseFloat(item.sell_price) || 0,
+    unit: item.unit || "unit",
+    quantity_on_hand: item.quantity_on_hand,
+    description: item.description || null,
+    expiry_date: item.expiry_date || null,
+    icon: CATEGORY_ICON[item.category] || "🌿",
+  };
+}
+
+// ── Cannabis product card ─────────────────────────────────────────────────────
+function CannabisShopCard({ product, onAddToCart }) {
+  const [adding, setAdding] = useState(false);
+  const handleAdd = () => {
+    setAdding(true);
+    onAddToCart(product);
+    setTimeout(() => setAdding(false), 800);
+  };
+  const daysToExpiry = product.expiry_date
+    ? Math.ceil((new Date(product.expiry_date) - new Date()) / 86400000)
+    : null;
+  const expirySoon = daysToExpiry !== null && daysToExpiry < 30;
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #E8E8E4",
+        borderRadius: 12,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        transition: "box-shadow 0.2s",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      }}
+      onMouseOver={(e) =>
+        (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)")
+      }
+      onMouseOut={(e) =>
+        (e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)")
+      }
+    >
+      {/* Product hero */}
+      <div
+        style={{
+          height: 120,
+          background: "linear-gradient(135deg, #1A3D2B 0%, #2D6A4F 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 48,
+          position: "relative",
+        }}
+      >
+        {product.icon}
+        {expirySoon && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              background: "#FEF2F2",
+              color: "#991B1B",
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 7px",
+              borderRadius: 10,
+              letterSpacing: "0.08em",
+            }}
+          >
+            {daysToExpiry}d left
+          </div>
+        )}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            background: "rgba(0,0,0,0.4)",
+            color: "#fff",
+            fontSize: 9,
+            fontWeight: 600,
+            padding: "2px 8px",
+            borderRadius: 10,
+            letterSpacing: "0.07em",
+            textTransform: "uppercase",
+          }}
+        >
+          {product.category}
+        </div>
+      </div>
+      {/* Product info */}
+      <div
+        style={{
+          padding: "14px 16px",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#0D0D0D",
+            lineHeight: 1.3,
+          }}
+        >
+          {product.name}
+        </div>
+        {product.description && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "#666",
+              lineHeight: 1.5,
+              marginTop: 4,
+            }}
+          >
+            {product.description.slice(0, 80)}
+            {product.description.length > 80 ? "…" : ""}
+          </div>
+        )}
+        <div
+          style={{
+            marginTop: "auto",
+            paddingTop: 12,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#1A3D2B",
+              fontFamily: "'DM Mono', monospace",
+            }}
+          >
+            R{parseFloat(product.price).toFixed(2)}
+          </div>
+          <button
+            onClick={handleAdd}
+            disabled={adding}
+            style={{
+              padding: "8px 16px",
+              background: adding ? "#52b788" : "#1A3D2B",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "background 0.2s",
+              letterSpacing: "0.04em",
+            }}
+          >
+            {adding ? "✓ Added" : "+ Add"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function buildFoodProduct(item) {
   const allergens = item.allergen_flags
     ? Object.entries(item.allergen_flags)
@@ -2156,11 +2370,20 @@ export default function Shop() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { industryProfile } = useTenant();
-  const { storefrontTenantId, brandingConfig } = useStorefront(); // ✦ WP-MULTISITE
+  const {
+    storefrontTenantId,
+    brandingConfig,
+    industryProfile: sfProfile,
+  } = useStorefront(); // ✦ WP-MULTISITE
   const brandName = brandingConfig?.brand_name || "Pure Premium THC Vapes";
-  const isFoodBev = industryProfile === "food_beverage";
+  const effectiveProfile = sfProfile || industryProfile;
+  const isFoodBev = effectiveProfile === "food_beverage";
   const isGeneral =
-    industryProfile === "general_retail" || industryProfile === "mixed_retail";
+    effectiveProfile === "general_retail" ||
+    effectiveProfile === "mixed_retail";
+  const isCannabisRetail =
+    effectiveProfile === "cannabis_retail" ||
+    effectiveProfile === "cannabis_dispensary";
 
   const [filter, setFilter] = useState("all");
   const [cartToast, setCartToast] = useState(null);
@@ -2251,18 +2474,39 @@ export default function Shop() {
   // ── End WP-H ─────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!storefrontTenantId) return; // wait for storefront to resolve
     const fetchProducts = async () => {
       setLoadingInventory(true);
       try {
         const { data, error } = await supabase
           .from("inventory_items")
           .select(
+            // Only columns confirmed to exist in inventory_items
+            // subcategory, variant_value, brand omitted — not in base schema
             "id, name, sku, category, unit, quantity_on_hand, cost_price, sell_price, allergen_flags, ingredients_notes, shelf_life_days, storage_instructions, expiry_date, description",
           )
-          .eq("category", "finished_product")
+          .in(
+            "category",
+            isCannabisRetail
+              ? [
+                  "flower",
+                  "concentrate",
+                  "edible",
+                  "vape",
+                  "preroll",
+                  "hash",
+                  "finished_product",
+                  "accessories",
+                  "accessory",
+                  "wellness",
+                ]
+              : ["finished_product"],
+          )
           .eq("is_active", true)
           .gt("quantity_on_hand", 0)
+          .gt("sell_price", 0)
           .eq("tenant_id", storefrontTenantId) // ✦ WP-MULTISITE
+          .order("category")
           .order("name");
         if (error) {
           console.error("[Shop] Inventory fetch error:", error);
@@ -2271,12 +2515,13 @@ export default function Shop() {
         }
         setLiveProducts(
           (data || []).map(
-            industryProfile === "food_beverage"
+            isFoodBev
               ? buildFoodProduct
-              : industryProfile === "general_retail" ||
-                  industryProfile === "mixed_retail"
+              : isGeneral
                 ? buildGeneralProduct
-                : buildProductFromInventory,
+                : isCannabisRetail
+                  ? buildCannabisProduct
+                  : buildProductFromInventory,
           ),
         );
       } catch (err) {
@@ -2287,7 +2532,8 @@ export default function Shop() {
       }
     };
     fetchProducts();
-  }, [industryProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storefrontTenantId, isCannabisRetail]);
 
   const handleAddToCart = (product) => {
     addToCart(product);
@@ -2309,19 +2555,38 @@ export default function Shop() {
     setSelectedProduct(null);
   };
 
-  const showVapes =
-    filter === "all" ||
-    filter === "vapes" ||
-    FILTER_OPTIONS.find((f) => f.key === filter)?.line;
-  const showCS = filter === "all" || filter === "coming-soon";
-  const lineFilter = FILTER_OPTIONS.find((f) => f.key === filter)?.line;
-  const filteredVapes = lineFilter
-    ? liveProducts.filter((p) => p.strain.line === lineFilter)
-    : showVapes
+  // Cannabis retail: filter by category
+  const cannabisFilterDef = CANNABIS_FILTER_OPTIONS.find(
+    (f) => f.key === filter,
+  );
+  const filteredCannabis = isCannabisRetail
+    ? filter === "all"
       ? liveProducts
-      : [];
+      : liveProducts.filter((p) =>
+          cannabisFilterDef?.categories?.includes(p.category),
+        )
+    : [];
+
+  // Vape brand (Pure PTV) filter logic — unchanged
+  const showVapes =
+    !isCannabisRetail &&
+    (filter === "all" ||
+      filter === "vapes" ||
+      FILTER_OPTIONS.find((f) => f.key === filter)?.line);
+  const showCS =
+    !isCannabisRetail && (filter === "all" || filter === "coming-soon");
+  const lineFilter = FILTER_OPTIONS.find((f) => f.key === filter)?.line;
+  const filteredVapes = !isCannabisRetail
+    ? lineFilter
+      ? liveProducts.filter((p) => p.strain?.line === lineFilter)
+      : showVapes
+        ? liveProducts
+        : []
+    : [];
   const filteredCS = showCS ? COMING_SOON : [];
-  const totalShowing = filteredVapes.length + filteredCS.length;
+  const totalShowing = isCannabisRetail
+    ? filteredCannabis.length
+    : filteredVapes.length + filteredCS.length;
 
   return (
     <div
@@ -2491,7 +2756,9 @@ export default function Shop() {
               ? "Fresh ingredients · Allergen-aware · Traceable sourcing"
               : isGeneral
                 ? "Quality products · Verified stock · Fast delivery"
-                : "Premium cannabis vapes · 18 Eybna terpene strains · Lab verified"}
+                : isCannabisRetail
+                  ? "Flower · Concentrates · Edibles · Accessories · Lab verified"
+                  : "Premium cannabis vapes · 18 Eybna terpene strains · Lab verified"}
           </p>
           <div
             className="shop-stats-row"
@@ -2502,12 +2769,26 @@ export default function Shop() {
               flexWrap: "wrap",
             }}
           >
-            {[
-              { value: "18", label: "Strains" },
-              { value: "93.55%", label: "D9-THC" },
-              { value: "5", label: "Eybna Lines" },
-              { value: "R800+", label: "From" },
-            ].map((s) => (
+            {(isCannabisRetail
+              ? [
+                  {
+                    value:
+                      liveProducts.length > 0
+                        ? `${liveProducts.length}`
+                        : "182",
+                    label: "Products",
+                  },
+                  { value: "100%", label: "Lab Tested" },
+                  { value: "6", label: "Categories" },
+                  { value: "R180+", label: "From" },
+                ]
+              : [
+                  { value: "18", label: "Strains" },
+                  { value: "93.55%", label: "D9-THC" },
+                  { value: "5", label: "Eybna Lines" },
+                  { value: "R800+", label: "From" },
+                ]
+            ).map((s) => (
               <div
                 key={s.label}
                 style={{ display: "flex", flexDirection: "column" }}
@@ -2566,7 +2847,9 @@ export default function Shop() {
                   { key: "all", label: "All Products" },
                   { key: "coming-soon", label: "Coming Soon" },
                 ]
-              : FILTER_OPTIONS
+              : isCannabisRetail
+                ? CANNABIS_FILTER_OPTIONS
+                : FILTER_OPTIONS
           ).map((f) => (
             <button
               key={f.key}
@@ -2639,6 +2922,54 @@ export default function Shop() {
           </div>
         ) : (
           <>
+            {/* ── Cannabis Retail product grid ── */}
+            {isCannabisRetail &&
+              (filteredCannabis.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                  <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>
+                    🌿
+                  </div>
+                  <p
+                    className="body-font"
+                    style={{ color: "#888", fontSize: 15, fontWeight: 300 }}
+                  >
+                    {filter === "all"
+                      ? "No products in stock right now. Check back soon!"
+                      : `No ${cannabisFilterDef?.label || "products"} in stock right now.`}
+                  </p>
+                  {filter !== "all" && (
+                    <button
+                      className="shop-btn"
+                      style={{ marginTop: 16 }}
+                      onClick={() => setFilter("all")}
+                    >
+                      Show All Products
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(260px, 1fr))",
+                      gap: 20,
+                      marginBottom: 48,
+                    }}
+                  >
+                    {filteredCannabis.map((product) => (
+                      <CannabisShopCard
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                      />
+                    ))}
+                  </div>
+                </>
+              ))}
+
+            {/* ── Vape brand product grid (Pure PTV) — unchanged ── */}
             {filteredVapes.length > 0 && (
               <>
                 {filter === "all" && filteredCS.length > 0 && (
