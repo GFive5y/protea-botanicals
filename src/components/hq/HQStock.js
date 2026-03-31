@@ -3828,9 +3828,8 @@ export default function HQStock() {
         : activeItems.filter((i) => matchesGroup(i, group)).length;
 
     // ── Sub-type filter match (WP-SMARTSTOCK-UI Phase 2) ─────────────────────
-    // Maps catFilter + subTypeFilter.key to item field checks.
-    // No functions stored in state — resolved here at filter time.
-    const matchesSubType = (item, catId, subKey, subLabel) => {
+    // function declaration = hoisted — safe to reference in filtered above
+    function matchesSubType(item, catId, subKey, subLabel) {
       if (!subKey) return true;
       const lbl = (subLabel || subKey).toLowerCase();
       const vv = (item.variant_value || "").toLowerCase();
@@ -3875,7 +3874,7 @@ export default function HQStock() {
         default:
           return vv.includes(lbl) || nm.includes(lbl);
       }
-    };
+    }
 
     return (
       <div>
