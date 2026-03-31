@@ -5100,7 +5100,19 @@ export default function HQStock() {
           item={modalItem || null}
           defaults={modalDefaults}
           suppliers={suppliers}
-          visibleCategories={Object.keys(CATEGORY_LABELS)}
+          visibleCategories={
+            isCannabis
+              ? [
+                  "flower",
+                  "concentrate",
+                  "edible",
+                  "accessory",
+                  "finished_product",
+                  "hardware",
+                  "raw_material",
+                ]
+              : Object.keys(CATEGORY_LABELS)
+          }
           onSave={handleSave}
           onCancel={() => {
             setModalItem(undefined);
