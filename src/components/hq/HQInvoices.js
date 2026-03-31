@@ -1,12 +1,33 @@
-// src/components/hq/HQInvoices.js
-// WP-GEN Session 4: Invoice management UI
-// + Aged Debtors panel — per-dispensary 0/30/60/90+ day buckets
-// Tables: invoices, invoice_line_items, wholesale_partners
+// src/components/hq/HQInvoices.js v3.0
+// ─────────────────────────────────────────────────────────────────────────────
+// INVOICE MANAGEMENT — AR + AP
+//
+// v3.0:
+//   - useTenant() added — tenant_id filter on ALL queries (LL-160 fix)
+//   - Direction toggle: AR (Receivables) vs AP (Payables)
+//   - Name resolution: wholesale_partners (AR) + suppliers (AP)
+//   - AP aged suppliers panel — mirrors AR aged debtors
+//   - Manual invoice create: slide-in panel for AP invoices
+//   - Link to PO on AP create
+//   - tenant_id on all INSERTs
+//   - Type column: labelled badges
+//   - Empty states: actionable guidance per direction
+//
+// v2.0: Aged debtors panel + correct column mapping (WP-FIN S4)
+// v1.0: WP-GEN Session 4
+//
+// Tables: invoices, invoice_line_items, wholesale_partners, suppliers, purchase_orders
+// LL-116: invoices uses supplier_id for ALL partners (no customer_id)
+// LL-160: tenantId from useTenant() — never fetch without tenant filter
+// ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 
 const T = {
+  font: "'Inter','Helvetica Neue',Arial,sans-serif",
+  mono: "'DM Mono','Courier New',monospace",
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
   ink500: "#5A5A5A",
@@ -31,135 +52,710 @@ const T = {
   accentMid: "#2D6A4F",
   accentLit: "#E8F5EE",
   accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
   shadow: "0 1px 3px rgba(0,0,0,0.07)",
+  shadowLg: "0 8px 32px rgba(0,0,0,0.12)",
 };
 
-const sCard = {
-  background: "#fff",
-  border: `1px solid ${T.ink150}`,
-  borderRadius: "6px",
-  padding: "20px",
-  boxShadow: T.shadow,
-};
-const sBtn = (v = "primary") => ({
-  padding: "8px 16px",
-  background:
-    v === "primary" ? T.accent : v === "danger" ? T.danger : "transparent",
-  color: ["primary", "danger"].includes(v) ? "#fff" : T.accentMid,
-  border: ["primary", "danger"].includes(v)
-    ? "none"
-    : `1px solid ${T.accentBd}`,
-  borderRadius: "4px",
-  fontSize: "10px",
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  fontWeight: 600,
-  cursor: "pointer",
-  fontFamily: T.font,
-  transition: "all 0.15s",
-});
-const sInput = {
-  padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
-  borderRadius: "4px",
-  fontSize: "13px",
-  fontFamily: T.font,
-  background: "#fff",
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box",
-};
-const sLabel = {
-  fontSize: "10px",
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  color: T.ink400,
-  marginBottom: "6px",
-  fontFamily: T.font,
-  fontWeight: 700,
-};
-const sTh = {
-  textAlign: "left",
-  padding: "10px 12px",
-  fontSize: "9px",
-  letterSpacing: "0.15em",
-  textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
-  fontWeight: 700,
-};
-const sTd = {
-  padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink075}`,
-  color: T.ink700,
-  verticalAlign: "middle",
-};
-
-const STATUS_MAP = {
+const STATUS_META = {
   draft: { bg: T.ink075, color: T.ink500, label: "Draft" },
   pending: { bg: T.warningBg, color: T.warning, label: "Pending" },
   paid: { bg: T.successBg, color: T.success, label: "Paid" },
   overdue: { bg: T.dangerBg, color: T.danger, label: "Overdue" },
   cancelled: { bg: T.ink075, color: T.ink400, label: "Cancelled" },
 };
+const TYPE_LABEL = {
+  wholesale_order: "Wholesale",
+  sale: "Sale",
+  ar: "Receivable",
+  purchase: "Purchase",
+  supplier: "Supplier",
+  ap: "Payable",
+};
+
+const fmt = (n) =>
+  n != null
+    ? `R${parseFloat(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : "—";
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-ZA") : "—");
+const isOverdue = (inv) => {
+  if (inv.status === "paid" || inv.status === "cancelled") return false;
+  if (!inv.due_date) return false;
+  return new Date(inv.due_date) < new Date();
+};
+const daysOverdue = (inv) =>
+  inv.due_date
+    ? Math.floor((Date.now() - new Date(inv.due_date)) / 86400000)
+    : 0;
+const norm = (inv) => ({
+  ...inv,
+  _number: inv.invoice_number || inv.id?.slice(0, 8),
+  _date: inv.invoice_date,
+  _sub: parseFloat(inv.subtotal || 0),
+  _vat: parseFloat(inv.vat_amount || 0),
+  _total: parseFloat(inv.total_amount || 0),
+  _partner: inv.supplier_id,
+});
+const isAP = (inv) => ["purchase", "ap", "supplier"].includes(inv.invoice_type);
+
+const sBtn = (v = "outline") => ({
+  padding: "8px 16px",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontFamily: T.font,
+  fontSize: 12,
+  fontWeight: 600,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  border: ["primary", "danger"].includes(v)
+    ? "none"
+    : v === "ghost"
+      ? `1px solid ${T.ink150}`
+      : `1px solid ${T.accentBd}`,
+  background:
+    v === "primary" ? T.accent : v === "danger" ? T.danger : "transparent",
+  color: ["primary", "danger"].includes(v)
+    ? "#fff"
+    : v === "ghost"
+      ? T.ink500
+      : T.accentMid,
+});
+const sTh = {
+  padding: "8px 12px",
+  fontSize: 9,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: T.ink400,
+  fontWeight: 700,
+  fontFamily: T.font,
+  textAlign: "left",
+  borderBottom: `2px solid ${T.ink150}`,
+  background: T.ink050,
+};
+const sTd = {
+  padding: "10px 12px",
+  fontSize: 12,
+  fontFamily: T.font,
+  borderBottom: `1px solid ${T.ink075}`,
+};
 
 function StatusBadge({ status }) {
-  const s = STATUS_MAP[status] || STATUS_MAP.pending;
+  const s = STATUS_META[status] || STATUS_META.pending;
   return (
     <span
       style={{
-        fontSize: "9px",
+        fontSize: 9,
         padding: "2px 8px",
-        borderRadius: "3px",
+        borderRadius: 3,
         background: s.bg,
         color: s.color,
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         fontWeight: 700,
         fontFamily: T.font,
+        whiteSpace: "nowrap",
       }}
     >
       {s.label}
     </span>
   );
 }
+function TypeBadge({ type }) {
+  const label = TYPE_LABEL[type] || type || "Invoice";
+  const ap = isAP({ invoice_type: type });
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        padding: "2px 8px",
+        borderRadius: 3,
+        background: ap ? T.infoBg : T.accentLit,
+        color: ap ? T.info : T.accent,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        fontWeight: 700,
+        fontFamily: T.font,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
-function fmt(n) {
-  return n != null
-    ? `R${parseFloat(n).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : "—";
+function AgedPanel({ invoices, getName, direction }) {
+  const unpaid = invoices.filter(
+    (i) => i.status !== "paid" && i.status !== "cancelled",
+  );
+  if (!unpaid.length) return null;
+  const byP = {};
+  unpaid.forEach((inv) => {
+    const pid = inv.supplier_id || "unknown";
+    if (!byP[pid])
+      byP[pid] = { name: getName(pid), total: 0, buckets: [0, 0, 0, 0] };
+    const days = daysOverdue(inv),
+      amt = parseFloat(inv.total_amount || 0);
+    byP[pid].total += amt;
+    if (days <= 0) byP[pid].buckets[0] += amt;
+    else if (days <= 30) byP[pid].buckets[1] += amt;
+    else if (days <= 60) byP[pid].buckets[2] += amt;
+    else byP[pid].buckets[3] += amt;
+  });
+  const partners = Object.values(byP).sort((a, b) => b.total - a.total);
+  const grand = partners.reduce((s, p) => s + p.total, 0);
+  const isAR = direction === "ar";
+  return (
+    <div
+      style={{
+        border: `1px solid ${T.ink150}`,
+        borderRadius: 8,
+        overflow: "hidden",
+        boxShadow: T.shadow,
+      }}
+    >
+      <div
+        style={{
+          padding: "14px 18px",
+          background: T.ink050,
+          borderBottom: `1px solid ${T.ink150}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.ink400,
+              fontFamily: T.font,
+            }}
+          >
+            {isAR ? "Aged Debtors" : "Aged Payables"}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: T.ink500,
+              fontFamily: T.font,
+              marginTop: 2,
+            }}
+          >
+            {isAR
+              ? "What clients owe you, by age"
+              : "What you owe suppliers, by age"}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: T.ink400,
+              fontFamily: T.font,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Total Outstanding
+          </div>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: T.danger,
+              fontFamily: T.mono,
+              marginTop: 2,
+            }}
+          >
+            {fmt(grand)}
+          </div>
+        </div>
+      </div>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: 12,
+          fontFamily: T.font,
+        }}
+      >
+        <thead>
+          <tr style={{ background: T.ink050 }}>
+            {[
+              isAR ? "Client / Dispensary" : "Supplier",
+              "Current",
+              "1–30 days",
+              "31–60 days",
+              "60+ days",
+              "Total",
+            ].map((h, i) => (
+              <th
+                key={h}
+                style={{ ...sTh, textAlign: i === 0 ? "left" : "right" }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {partners.map((p, i) => (
+            <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}>
+              <td style={{ ...sTd, fontWeight: 600, color: T.ink900 }}>
+                {p.name}
+              </td>
+              {p.buckets.map((b, bi) => (
+                <td
+                  key={bi}
+                  style={{
+                    ...sTd,
+                    textAlign: "right",
+                    fontFamily: T.mono,
+                    color:
+                      b > 0
+                        ? bi >= 2
+                          ? T.danger
+                          : bi === 1
+                            ? T.warning
+                            : T.ink700
+                        : T.ink300,
+                  }}
+                >
+                  {b > 0 ? fmt(b) : "—"}
+                </td>
+              ))}
+              <td
+                style={{
+                  ...sTd,
+                  textAlign: "right",
+                  fontWeight: 700,
+                  color: T.accent,
+                  fontFamily: T.mono,
+                }}
+              >
+                {fmt(p.total)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr
+            style={{
+              background: T.accentLit,
+              borderTop: `2px solid ${T.accentBd}`,
+            }}
+          >
+            <td style={{ ...sTd, fontWeight: 700, color: T.accent }}>TOTAL</td>
+            {[0, 1, 2, 3].map((bi) => (
+              <td
+                key={bi}
+                style={{
+                  ...sTd,
+                  textAlign: "right",
+                  fontWeight: 700,
+                  fontFamily: T.mono,
+                  color: T.accent,
+                }}
+              >
+                {fmt(partners.reduce((s, p) => s + p.buckets[bi], 0))}
+              </td>
+            ))}
+            <td
+              style={{
+                ...sTd,
+                textAlign: "right",
+                fontWeight: 700,
+                fontFamily: T.mono,
+                color: T.accent,
+              }}
+            >
+              {fmt(grand)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
 }
-function fmtDate(d) {
-  return d ? new Date(d).toLocaleDateString("en-ZA") : "—";
-}
-function isOverdue(inv) {
-  if (inv.status === "paid" || inv.status === "cancelled") return false;
-  if (!inv.due_date) return false;
-  return new Date(inv.due_date) < new Date();
-}
-// Normalise to actual invoices table columns
-function norm(inv) {
-  return {
-    ...inv,
-    _number: inv.invoice_number || inv.id?.slice(0, 8),
-    _date: inv.invoice_date,
-    _subtotal: parseFloat(inv.subtotal || 0),
-    _vat: parseFloat(inv.vat_amount || 0),
-    _total: parseFloat(inv.total_amount || 0),
-    _partner: inv.supplier_id,
+
+function CreateInvoiceModal({
+  tenantId,
+  suppliers,
+  purchaseOrders,
+  onClose,
+  onSaved,
+}) {
+  const [form, setForm] = useState({
+    supplier_id: "",
+    invoice_number: "",
+    invoice_date: new Date().toISOString().split("T")[0],
+    due_date: "",
+    po_id: "",
+    subtotal: "",
+    vat_amount: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const total =
+    parseFloat(form.subtotal || 0) + parseFloat(form.vat_amount || 0);
+
+  const handleSave = async () => {
+    if (!form.supplier_id) {
+      setErr("Select a supplier.");
+      return;
+    }
+    if (!form.invoice_number.trim()) {
+      setErr("Enter the supplier invoice number.");
+      return;
+    }
+    if (!form.subtotal || parseFloat(form.subtotal) <= 0) {
+      setErr("Enter the invoice amount.");
+      return;
+    }
+    setSaving(true);
+    setErr("");
+    const { error } = await supabase.from("invoices").insert({
+      tenant_id: tenantId,
+      invoice_number: form.invoice_number.trim(),
+      invoice_type: "purchase",
+      supplier_id: form.supplier_id,
+      po_id: form.po_id || null,
+      invoice_date: form.invoice_date || new Date().toISOString().split("T")[0],
+      due_date: form.due_date || null,
+      currency: "ZAR",
+      subtotal: parseFloat(form.subtotal),
+      vat_amount: parseFloat(form.vat_amount || 0),
+      total_amount: total,
+      status: "pending",
+      notes: form.notes || null,
+    });
+    setSaving(false);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    onSaved(form.invoice_number.trim());
   };
-}
-function daysOverdue(inv) {
-  if (!inv.due_date) return 0;
-  return Math.floor((Date.now() - new Date(inv.due_date)) / 86400000);
+  const inp = {
+    width: "100%",
+    padding: "9px 12px",
+    border: `1px solid ${T.ink150}`,
+    borderRadius: 4,
+    fontFamily: T.font,
+    fontSize: 13,
+    color: T.ink900,
+    boxSizing: "border-box",
+    background: "#fff",
+  };
+  const lbl = {
+    display: "block",
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.1em",
+    textTransform: "uppercase",
+    color: T.ink400,
+    fontFamily: T.font,
+    marginBottom: 5,
+  };
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 900,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "flex-end",
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          width: "min(560px,100vw)",
+          height: "100vh",
+          background: "#fff",
+          overflowY: "auto",
+          boxShadow: T.shadowLg,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            padding: "20px 24px 16px",
+            borderBottom: `1px solid ${T.ink150}`,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            position: "sticky",
+            top: 0,
+            background: "#fff",
+            zIndex: 1,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: T.ink400,
+                fontFamily: T.font,
+                marginBottom: 4,
+              }}
+            >
+              ACCOUNTS PAYABLE
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 18,
+                fontFamily: T.font,
+                fontWeight: 600,
+                color: T.ink900,
+              }}
+            >
+              Record Supplier Invoice
+            </h3>
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: 12,
+                color: T.ink500,
+                fontFamily: T.font,
+              }}
+            >
+              Enter details from the supplier's invoice document
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 20,
+              color: T.ink400,
+              padding: "4px 8px",
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div
+          style={{
+            padding: 24,
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          {err && (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 6,
+                background: T.dangerBg,
+                border: `1px solid ${T.dangerBd}`,
+                fontSize: 12,
+                color: T.danger,
+                fontFamily: T.font,
+              }}
+            >
+              {err}
+            </div>
+          )}
+          <div>
+            <label style={lbl}>
+              Supplier <span style={{ color: T.danger }}>*</span>
+            </label>
+            <select
+              value={form.supplier_id}
+              onChange={(e) => set("supplier_id", e.target.value)}
+              style={inp}
+            >
+              <option value="">— Select supplier —</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.country ? ` (${s.country})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>
+              Supplier Invoice Number <span style={{ color: T.danger }}>*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. INV-2026-0042"
+              value={form.invoice_number}
+              onChange={(e) => set("invoice_number", e.target.value)}
+              style={inp}
+            />
+          </div>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+          >
+            <div>
+              <label style={lbl}>Invoice Date</label>
+              <input
+                type="date"
+                value={form.invoice_date}
+                onChange={(e) => set("invoice_date", e.target.value)}
+                style={inp}
+              />
+            </div>
+            <div>
+              <label style={lbl}>Due Date</label>
+              <input
+                type="date"
+                value={form.due_date}
+                onChange={(e) => set("due_date", e.target.value)}
+                style={inp}
+              />
+            </div>
+          </div>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+          >
+            <div>
+              <label style={lbl}>
+                Subtotal (ZAR) <span style={{ color: T.danger }}>*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={form.subtotal}
+                onChange={(e) => set("subtotal", e.target.value)}
+                style={inp}
+              />
+            </div>
+            <div>
+              <label style={lbl}>VAT (ZAR)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={form.vat_amount}
+                onChange={(e) => set("vat_amount", e.target.value)}
+                style={inp}
+              />
+            </div>
+          </div>
+          {parseFloat(form.subtotal || 0) > 0 && (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 6,
+                background: T.accentLit,
+                border: `1px solid ${T.accentBd}`,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{ fontSize: 12, color: T.accent, fontFamily: T.font }}
+              >
+                Total amount
+              </span>
+              <span
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: T.accent,
+                  fontFamily: T.mono,
+                }}
+              >
+                {fmt(total)}
+              </span>
+            </div>
+          )}
+          <div>
+            <label style={lbl}>Link to Purchase Order (optional)</label>
+            <select
+              value={form.po_id}
+              onChange={(e) => set("po_id", e.target.value)}
+              style={inp}
+            >
+              <option value="">— No PO link —</option>
+              {purchaseOrders
+                .filter(
+                  (po) =>
+                    !form.supplier_id || po.supplier_id === form.supplier_id,
+                )
+                .map((po) => (
+                  <option key={po.id} value={po.id}>
+                    {po.po_number} · {po.po_status || po.status} ·{" "}
+                    {po.currency === "ZAR"
+                      ? fmt(po.subtotal)
+                      : `$${po.subtotal}`}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Notes</label>
+            <input
+              type="text"
+              placeholder="e.g. delivery charges included"
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              style={inp}
+            />
+          </div>
+        </div>
+        <div
+          style={{
+            padding: "16px 24px",
+            borderTop: `1px solid ${T.ink150}`,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            position: "sticky",
+            bottom: 0,
+            background: "#fff",
+          }}
+        >
+          <button style={sBtn("ghost")} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            style={{ ...sBtn("primary"), opacity: saving ? 0.7 : 1 }}
+            disabled={saving}
+            onClick={handleSave}
+          >
+            {saving ? "Saving…" : "Record Invoice"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-export default function HQInvoices() {
+export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
+  const { tenantId: ctxId } = useTenant();
+  const tenantId = tenantIdProp || ctxId;
   const [invoices, setInvoices] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [purchaseOrders, setPOs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [direction, setDirection] = useState("ar");
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState(null);
   const [lineItems, setLineItems] = useState({});
@@ -167,6 +763,7 @@ export default function HQInvoices() {
   const [paying, setPaying] = useState(null);
   const [payRef, setPayRef] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = "success") => {
@@ -175,36 +772,59 @@ export default function HQInvoices() {
   };
 
   const fetchAll = useCallback(async () => {
+    if (!tenantId) return;
     setLoading(true);
     setError(null);
     try {
-      const [invR, supR] = await Promise.all([
+      const [invR, supR, partR, posR] = await Promise.all([
         supabase
           .from("invoices")
           .select(
             "id,invoice_number,invoice_type,po_id,supplier_id,invoice_date,due_date,currency,subtotal,vat_amount,total_amount,status,payment_date,payment_reference,notes",
           )
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
-          .limit(200),
+          .limit(300),
+        supabase.from("suppliers").select("id,name,country").order("name"),
         supabase.from("wholesale_partners").select("id,business_name"),
+        supabase
+          .from("purchase_orders")
+          .select("id,po_number,po_status,status,currency,subtotal,supplier_id")
+          .eq("tenant_id", tenantId)
+          .not("po_status", "in", "(complete,paid,cancelled)")
+          .order("created_at", { ascending: false }),
       ]);
       if (invR.error) throw invR.error;
-      const data = (invR.data || []).map((inv) => ({
-        ...inv,
-        status: isOverdue(inv) ? "overdue" : inv.status,
-      }));
-      setInvoices(data);
+      setInvoices(
+        (invR.data || []).map((inv) => ({
+          ...inv,
+          status: isOverdue(inv) ? "overdue" : inv.status,
+        })),
+      );
       setSuppliers(supR.data || []);
+      setPartners(partR.data || []);
+      setPOs(posR.data || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  const getName = useCallback(
+    (id) => {
+      const s = suppliers.find((x) => x.id === id);
+      if (s) return s.name;
+      const p = partners.find((x) => x.id === id);
+      if (p) return p.business_name;
+      return id ? id.slice(0, 8) + "…" : "—";
+    },
+    [suppliers, partners],
+  );
 
   const fetchLineItems = async (invoiceId) => {
     if (lineItems[invoiceId]) return;
@@ -237,7 +857,7 @@ export default function HQInvoices() {
 
   const handleMarkPaid = async (inv) => {
     if (!payRef.trim()) {
-      showToast("Enter a payment reference before saving.", "error");
+      showToast("Enter a payment reference.", "error");
       return;
     }
     setSaving(true);
@@ -251,9 +871,22 @@ export default function HQInvoices() {
         })
         .eq("id", inv.id);
       if (error) throw error;
+      if (inv.po_id) {
+        await supabase
+          .from("purchase_orders")
+          .update({
+            po_status: "paid",
+            status: "paid",
+            payment_date: new Date().toISOString().split("T")[0],
+            payment_reference: payRef.trim(),
+          })
+          .eq("id", inv.po_id);
+      }
       setPaying(null);
       setPayRef("");
-      showToast(`Invoice ${inv.invoice_number} marked paid.`);
+      showToast(
+        `${inv.invoice_number} marked paid${inv.po_id ? " — PO also updated" : ""}`,
+      );
       fetchAll();
     } catch (err) {
       showToast("Update failed: " + err.message, "error");
@@ -262,139 +895,56 @@ export default function HQInvoices() {
     }
   };
 
-  const supName = (id) =>
-    suppliers.find((s) => s.id === id)?.business_name || id?.slice(0, 8) || "—";
-
-  const filtered =
-    filter === "all"
-      ? invoices
-      : filter === "outstanding"
-        ? invoices.filter((i) =>
-            ["pending", "overdue", "draft"].includes(i.status),
-          )
-        : invoices.filter((i) => i.status === filter);
-
-  const totalOutstanding = invoices
-    .filter((i) => ["pending", "overdue"].includes(i.status))
-    .reduce((s, i) => s + parseFloat(i.total_amount || 0), 0);
-  const totalPaidMonth = invoices
-    .filter((i) => {
-      if (i.status !== "paid" || !i.payment_date) return false;
-      const d = new Date(i.payment_date),
-        now = new Date();
-      return (
-        d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      );
-    })
-    .reduce((s, i) => s + parseFloat(i.total_amount || 0), 0);
-  const overdueCount = invoices.filter((i) => i.status === "overdue").length;
-  const pendingCount = invoices.filter((i) => i.status === "pending").length;
-
+  const dirInvoices = invoices.filter((inv) =>
+    direction === "ap" ? isAP(inv) : !isAP(inv),
+  );
   const FILTERS = [
-    { id: "all", label: `All (${invoices.length})` },
-    {
-      id: "outstanding",
-      label: `Outstanding (${pendingCount + overdueCount})`,
-      alert: overdueCount > 0,
-    },
+    { id: "all", label: `All (${dirInvoices.length})` },
     {
       id: "overdue",
-      label: `Overdue (${overdueCount})`,
-      alert: overdueCount > 0,
+      label: `Overdue (${dirInvoices.filter((i) => i.status === "overdue").length})`,
+      alert: true,
     },
-    { id: "pending", label: `Pending (${pendingCount})` },
+    {
+      id: "pending",
+      label: `Pending (${dirInvoices.filter((i) => i.status === "pending").length})`,
+    },
     {
       id: "paid",
-      label: `Paid (${invoices.filter((i) => i.status === "paid").length})`,
+      label: `Paid (${dirInvoices.filter((i) => i.status === "paid").length})`,
     },
     {
       id: "draft",
-      label: `Draft (${invoices.filter((i) => i.status === "draft").length})`,
+      label: `Draft (${dirInvoices.filter((i) => i.status === "draft").length})`,
     },
   ];
-
-  if (loading)
-    return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "60px",
-          color: T.ink500,
-          fontFamily: T.font,
-        }}
-      >
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            border: `2px solid ${T.ink150}`,
-            borderTopColor: T.accent,
-            borderRadius: "50%",
-            animation: "spin 0.8s linear infinite",
-            margin: "0 auto 12px",
-          }}
-        />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        Loading invoices...
-      </div>
-    );
-
-  if (error)
-    return (
-      <div
-        style={{
-          ...sCard,
-          border: `1px solid ${T.dangerBd}`,
-          borderLeft: `3px solid ${T.danger}`,
-        }}
-      >
-        <div style={sLabel}>Error</div>
-        <p
-          style={{
-            fontSize: "13px",
-            color: T.danger,
-            margin: "8px 0 0",
-            fontFamily: T.font,
-          }}
-        >
-          {error}
-        </p>
-        <button onClick={fetchAll} style={{ ...sBtn(), marginTop: "12px" }}>
-          Retry
-        </button>
-      </div>
-    );
-
-  // ── Aged Debtors calculation ──────────────────────────────────────────────
-  const outstanding = invoices
-    .map(norm)
-    .filter((i) => !["paid", "cancelled"].includes(i.status) && i._total > 0);
-  const byPartner = {};
-  outstanding.forEach((inv) => {
-    const pid = inv._partner || "unknown";
-    const name =
-      suppliers.find((s) => s.id === pid)?.business_name || "Unknown";
-    if (!byPartner[pid])
-      byPartner[pid] = { name, buckets: [0, 0, 0, 0], total: 0 };
-    const days = daysOverdue(inv);
-    const amt = inv._total;
-    byPartner[pid].total += amt;
-    if (days <= 0) byPartner[pid].buckets[0] += amt;
-    else if (days <= 30) byPartner[pid].buckets[1] += amt;
-    else if (days <= 60) byPartner[pid].buckets[2] += amt;
-    else byPartner[pid].buckets[3] += amt;
-  });
-  const agedPartners = Object.values(byPartner);
-  const grandTotal = agedPartners.reduce((s, p) => s + p.total, 0);
+  const filtered =
+    filter === "all"
+      ? dirInvoices
+      : dirInvoices.filter((i) => i.status === filter);
+  const totalOut = dirInvoices
+    .filter((i) => i.status !== "paid" && i.status !== "cancelled")
+    .reduce((s, i) => s + parseFloat(i.total_amount || 0), 0);
+  const overdueCount = dirInvoices.filter((i) => i.status === "overdue").length;
+  const totalPaidMo = dirInvoices
+    .filter((i) => {
+      if (i.status !== "paid" || !i.payment_date) return false;
+      const pd = new Date(i.payment_date),
+        n = new Date();
+      return (
+        pd.getMonth() === n.getMonth() && pd.getFullYear() === n.getFullYear()
+      );
+    })
+    .reduce((s, i) => s + parseFloat(i.total_amount || 0), 0);
 
   return (
-    <div style={{ fontFamily: T.font, display: "grid", gap: "20px" }}>
+    <div style={{ fontFamily: T.font, display: "grid", gap: 20 }}>
       {toast && (
         <div
           style={{
             padding: "10px 16px",
-            borderRadius: "4px",
-            fontSize: "12px",
+            borderRadius: 4,
+            fontSize: 12,
             fontFamily: T.font,
             fontWeight: 500,
             background: toast.type === "error" ? T.dangerBg : T.successBg,
@@ -407,860 +957,779 @@ export default function HQInvoices() {
         </div>
       )}
 
-      {/* ── Metric strip ── */}
+      {/* Direction tabs */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
-          gap: "1px",
-          background: T.ink150,
-          borderRadius: "6px",
-          overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          display: "flex",
+          borderBottom: `2px solid ${T.ink150}`,
+          justifyContent: "space-between",
+          alignItems: "flex-end",
         }}
       >
-        {[
-          { label: "Total Invoices", value: invoices.length, color: T.ink900 },
-          {
-            label: "Outstanding",
-            value: fmt(totalOutstanding),
-            color: pendingCount > 0 ? T.warning : T.ink900,
-          },
-          {
-            label: "Overdue",
-            value: overdueCount,
-            color: overdueCount > 0 ? T.danger : T.ink900,
-          },
-          {
-            label: "Paid This Month",
-            value: fmt(totalPaidMonth),
-            color: T.success,
-          },
-        ].map((m) => (
-          <div
-            key={m.label}
-            style={{ background: "#fff", padding: "16px 18px" }}
-          >
-            <div
+        <div style={{ display: "flex", gap: 0 }}>
+          {[
+            {
+              id: "ar",
+              label: "Receivables (AR)",
+              sub: "What clients owe you",
+            },
+            { id: "ap", label: "Payables (AP)", sub: "What you owe suppliers" },
+          ].map((d) => (
+            <button
+              key={d.id}
+              onClick={() => {
+                setDirection(d.id);
+                setFilter("all");
+                setExpanded(null);
+              }}
               style={{
-                fontSize: "10px",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: T.ink400,
-                marginBottom: "6px",
-                fontFamily: T.font,
-                fontWeight: 700,
+                padding: "12px 24px",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                borderBottom:
+                  direction === d.id
+                    ? `2px solid ${T.accent}`
+                    : "2px solid transparent",
+                marginBottom: -2,
               }}
             >
-              {m.label}
-            </div>
-            <div
-              style={{
-                fontFamily: T.font,
-                fontSize: "22px",
-                fontWeight: 400,
-                color: m.color,
-                lineHeight: 1,
-                letterSpacing: "-0.02em",
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {m.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Overdue alert ── */}
-      {overdueCount > 0 && (
-        <div
-          style={{
-            background: T.dangerBg,
-            border: `1px solid ${T.dangerBd}`,
-            borderRadius: "6px",
-            padding: "14px 18px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              color: T.danger,
-              fontFamily: T.font,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-            }}
-          >
-            {overdueCount} invoice{overdueCount > 1 ? "s" : ""} overdue — action
-            required
-          </div>
-        </div>
-      )}
-
-      {/* ── Aged Debtors Panel ── */}
-      {agedPartners.length > 0 && (
-        <div
-          style={{
-            ...sCard,
-            border: `1px solid ${T.dangerBd}`,
-            borderLeft: `4px solid ${T.danger}`,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 16,
-            }}
-          >
-            <div>
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: T.danger,
+                  fontSize: 13,
+                  fontWeight: direction === d.id ? 700 : 400,
+                  color: direction === d.id ? T.accent : T.ink500,
                   fontFamily: T.font,
                 }}
               >
-                Aged Debtors
+                {d.label}
               </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: T.ink500,
-                  marginTop: 3,
-                  fontFamily: T.font,
-                }}
-              >
-                Outstanding balances by dispensary
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
               <div
                 style={{
                   fontSize: 10,
                   color: T.ink400,
                   fontFamily: T.font,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
+                  marginTop: 2,
                 }}
               >
-                Total Outstanding
+                {d.sub}
               </div>
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: T.danger,
-                  fontFamily: T.font,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {fmt(grandTotal)}
-              </div>
-            </div>
-          </div>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 12,
-              fontFamily: T.font,
-            }}
-          >
-            <thead>
-              <tr style={{ background: T.ink075 }}>
-                {[
-                  "Dispensary",
-                  "Current",
-                  "1–30 days",
-                  "31–60 days",
-                  "60+ days",
-                  "Total",
-                ].map((h, i) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: "8px 12px",
-                      fontSize: 9,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      color: T.ink400,
-                      fontWeight: 700,
-                      textAlign: i === 0 ? "left" : "right",
-                      borderBottom: `2px solid ${T.ink150}`,
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {agedPartners.map((p, i) => (
-                <tr
-                  key={i}
-                  style={{ background: i % 2 === 0 ? "#fff" : T.ink050 }}
-                >
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      fontWeight: 600,
-                      color: T.ink900,
-                    }}
-                  >
-                    {p.name}
-                  </td>
-                  {p.buckets.map((b, bi) => (
-                    <td
-                      key={bi}
-                      style={{
-                        padding: "10px 12px",
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                        color:
-                          b > 0
-                            ? bi >= 2
-                              ? T.danger
-                              : bi === 1
-                                ? T.warning
-                                : T.ink700
-                            : T.ink300,
-                      }}
-                    >
-                      {b > 0 ? fmt(b) : "—"}
-                    </td>
-                  ))}
-                  <td
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      fontWeight: 700,
-                      color: T.accent,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {fmt(p.total)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr
-                style={{
-                  background: T.accentLit,
-                  borderTop: `2px solid ${T.accentBd}`,
-                }}
-              >
-                <td
-                  style={{
-                    padding: "10px 12px",
-                    fontWeight: 700,
-                    color: T.accent,
-                  }}
-                >
-                  TOTAL
-                </td>
-                {[0, 1, 2, 3].map((bi) => (
-                  <td
-                    key={bi}
-                    style={{
-                      padding: "10px 12px",
-                      textAlign: "right",
-                      fontWeight: 700,
-                      fontVariantNumeric: "tabular-nums",
-                      color: T.accent,
-                    }}
-                  >
-                    {fmt(agedPartners.reduce((s, p) => s + p.buckets[bi], 0))}
-                  </td>
-                ))}
-                <td
-                  style={{
-                    padding: "10px 12px",
-                    textAlign: "right",
-                    fontWeight: 700,
-                    color: T.danger,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {fmt(grandTotal)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+            </button>
+          ))}
         </div>
-      )}
-
-      {/* ── Filter bar ── */}
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        {FILTERS.map((f) => (
+        <div style={{ display: "flex", gap: 8, paddingBottom: 8 }}>
+          {direction === "ap" && (
+            <button
+              style={{ ...sBtn("primary"), fontSize: 12 }}
+              onClick={() => setShowCreate(true)}
+            >
+              + Record Invoice
+            </button>
+          )}
           <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            style={{
-              padding: "6px 14px",
-              background: filter === f.id ? T.accent : "#fff",
-              color: filter === f.id ? "#fff" : f.alert ? T.danger : T.ink500,
-              border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.dangerBd : T.ink150}`,
-              borderRadius: "4px",
-              fontSize: "9px",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              fontFamily: T.font,
-              fontWeight: filter === f.id ? 700 : 400,
-            }}
+            style={{ ...sBtn("ghost"), fontSize: 11, padding: "6px 12px" }}
+            onClick={fetchAll}
           >
-            {f.label}
+            Refresh
           </button>
-        ))}
-        <button
-          onClick={fetchAll}
-          style={{
-            ...sBtn("outline"),
-            padding: "6px 12px",
-            fontSize: "9px",
-            marginLeft: "auto",
-          }}
-        >
-          Refresh
-        </button>
+        </div>
       </div>
 
-      {/* ── Invoice list ── */}
-      <div style={sCard}>
-        {filtered.length === 0 ? (
+      {loading ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: 60,
+            color: T.ink400,
+            fontFamily: T.font,
+            fontSize: 13,
+          }}
+        >
+          Loading invoices…
+        </div>
+      ) : error ? (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 6,
+            background: T.dangerBg,
+            color: T.danger,
+            fontFamily: T.font,
+            fontSize: 13,
+            border: `1px solid ${T.dangerBd}`,
+          }}
+        >
+          {error}
+        </div>
+      ) : (
+        <>
+          {/* Metric strip */}
           <div
-            style={{ textAlign: "center", padding: "60px", color: T.ink500 }}
-          >
-            <div style={{ fontSize: "32px", marginBottom: "12px" }}>🧾</div>
-            <p style={{ fontFamily: T.font, fontSize: "14px" }}>
-              No invoices found.
-            </p>
-          </div>
-        ) : (
-          <table
             style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "12px",
-              fontFamily: T.font,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+              gap: 1,
+              background: T.ink150,
+              borderRadius: 6,
+              overflow: "hidden",
+              border: `1px solid ${T.ink150}`,
+              boxShadow: T.shadow,
             }}
           >
-            <thead>
-              <tr>
-                <th style={sTh}>Invoice #</th>
-                <th style={sTh}>Type</th>
-                <th style={sTh}>Partner</th>
-                <th style={sTh}>Invoice Date</th>
-                <th style={sTh}>Due Date</th>
-                <th style={{ ...sTh, textAlign: "right" }}>Subtotal</th>
-                <th style={{ ...sTh, textAlign: "right" }}>VAT</th>
-                <th style={{ ...sTh, textAlign: "right" }}>Total</th>
-                <th style={sTh}>Status</th>
-                <th style={sTh}>PO</th>
-                <th style={sTh}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((inv) => {
-                const n = norm(inv);
-                const isOpen = expanded === inv.id;
-                const isPaying = paying === inv.id;
-                const lines = lineItems[inv.id] || [];
-                return (
-                  <React.Fragment key={inv.id}>
-                    <tr
-                      style={{
-                        background: isOpen
-                          ? T.accentLit
-                          : inv.status === "overdue"
-                            ? T.dangerBg
-                            : "transparent",
-                      }}
-                    >
-                      <td
-                        style={{
-                          ...sTd,
-                          fontFamily: T.font,
-                          fontWeight: 600,
-                          color: T.accent,
-                        }}
-                      >
-                        {n._number}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          fontSize: "11px",
-                          color: T.ink500,
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        {inv.invoice_type || "—"}
-                      </td>
-                      <td style={sTd}>{supName(n._partner)}</td>
-                      <td style={{ ...sTd, color: T.ink500, fontSize: "11px" }}>
-                        {fmtDate(inv.invoice_date)}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          fontSize: "11px",
-                          color: inv.status === "overdue" ? T.danger : T.ink500,
-                          fontWeight: inv.status === "overdue" ? 600 : 400,
-                        }}
-                      >
-                        {fmtDate(inv.due_date)}
-                        {inv.status === "overdue" && (
-                          <div
-                            style={{
-                              fontSize: 9,
-                              color: T.danger,
-                              marginTop: 2,
-                            }}
-                          >
-                            {daysOverdue(inv)}d overdue
-                          </div>
-                        )}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          textAlign: "right",
-                          fontFamily: T.font,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {fmt(n._subtotal)}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          textAlign: "right",
-                          fontFamily: T.font,
-                          fontVariantNumeric: "tabular-nums",
-                          color: T.ink500,
-                        }}
-                      >
-                        {fmt(n._vat)}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          textAlign: "right",
-                          fontFamily: T.font,
-                          fontWeight: 600,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {fmt(n._total)}
-                      </td>
-                      <td style={sTd}>
-                        <StatusBadge status={inv.status} />
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          fontSize: "11px",
-                          fontFamily: T.font,
-                          color: T.ink500,
-                        }}
-                      >
-                        {inv.po_id ? (
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              padding: "2px 6px",
-                              borderRadius: "3px",
-                              background: T.infoBg,
-                              color: T.info,
-                              fontWeight: 600,
-                            }}
-                          >
-                            PO linked
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          textAlign: "right",
-                          display: "flex",
-                          gap: 4,
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        {inv.status !== "paid" &&
-                          inv.status !== "cancelled" && (
-                            <button
-                              onClick={() => {
-                                setPaying(isPaying ? null : inv.id);
-                                setPayRef("");
-                              }}
-                              style={{
-                                ...sBtn(isPaying ? "outline" : "primary"),
-                                padding: "4px 10px",
-                                fontSize: "9px",
-                              }}
-                            >
-                              {isPaying ? "✕" : "Pay"}
-                            </button>
-                          )}
-                        <button
-                          onClick={() => handleExpand(inv.id)}
+            {[
+              {
+                label: "Total Invoices",
+                value: dirInvoices.length,
+                color: T.ink900,
+              },
+              {
+                label: "Outstanding",
+                value: fmt(totalOut),
+                color: totalOut > 0 ? T.warning : T.ink900,
+              },
+              {
+                label: "Overdue",
+                value: overdueCount,
+                color: overdueCount > 0 ? T.danger : T.ink900,
+              },
+              {
+                label:
+                  direction === "ar"
+                    ? "Collected This Month"
+                    : "Paid This Month",
+                value: fmt(totalPaidMo),
+                color: T.success,
+              },
+            ].map((m) => (
+              <div
+                key={m.label}
+                style={{ background: "#fff", padding: "16px 18px" }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: T.ink400,
+                    marginBottom: 6,
+                    fontFamily: T.font,
+                    fontWeight: 700,
+                  }}
+                >
+                  {m.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.mono,
+                    fontSize: 22,
+                    fontWeight: 400,
+                    color: m.color,
+                    lineHeight: 1,
+                  }}
+                >
+                  {m.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Overdue alert */}
+          {overdueCount > 0 && (
+            <div
+              style={{
+                background: T.dangerBg,
+                border: `1px solid ${T.dangerBd}`,
+                borderRadius: 6,
+                padding: "12px 16px",
+                display: "flex",
+                gap: 12,
+                alignItems: "flex-start",
+              }}
+            >
+              <span style={{ color: T.danger, fontSize: 16, flexShrink: 0 }}>
+                ⚠
+              </span>
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: T.danger,
+                    fontFamily: T.font,
+                  }}
+                >
+                  {overdueCount} overdue invoice{overdueCount !== 1 ? "s" : ""}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: T.danger,
+                    opacity: 0.85,
+                    fontFamily: T.font,
+                    marginTop: 2,
+                  }}
+                >
+                  {direction === "ar"
+                    ? "These clients have not paid within the agreed terms. Follow up immediately."
+                    : "These supplier invoices are past due. Record payment to maintain supplier relationships."}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Aged panel */}
+          {dirInvoices.some(
+            (i) => i.status !== "paid" && i.status !== "cancelled",
+          ) && (
+            <AgedPanel
+              invoices={dirInvoices}
+              getName={getName}
+              direction={direction}
+            />
+          )}
+
+          {/* Filter chips */}
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                style={{
+                  padding: "6px 14px",
+                  cursor: "pointer",
+                  fontFamily: T.font,
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  fontWeight: filter === f.id ? 700 : 400,
+                  borderRadius: 4,
+                  background: filter === f.id ? T.accent : "#fff",
+                  color:
+                    filter === f.id ? "#fff" : f.alert ? T.danger : T.ink500,
+                  border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.dangerBd : T.ink150}`,
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Invoice table */}
+          <div
+            style={{
+              border: `1px solid ${T.ink150}`,
+              borderRadius: 8,
+              overflow: "hidden",
+              boxShadow: T.shadow,
+            }}
+          >
+            {filtered.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "60px 24px",
+                  color: T.ink500,
+                }}
+              >
+                <div style={{ fontSize: 36, marginBottom: 14 }}>
+                  {direction === "ar" ? "🧾" : "📋"}
+                </div>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: T.ink700,
+                    fontFamily: T.font,
+                    marginBottom: 8,
+                  }}
+                >
+                  {direction === "ar"
+                    ? "No receivable invoices yet"
+                    : "No supplier invoices recorded"}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: T.ink400,
+                    fontFamily: T.font,
+                    maxWidth: 360,
+                    margin: "0 auto",
+                  }}
+                >
+                  {direction === "ar"
+                    ? "Invoices are auto-generated when you ship a wholesale order. Go to Wholesale Orders to get started."
+                    : "When a supplier sends you an invoice after delivery, record it here. Link it to the purchase order for full traceability."}
+                </div>
+                {direction === "ap" && (
+                  <button
+                    style={{ ...sBtn("primary"), marginTop: 20 }}
+                    onClick={() => setShowCreate(true)}
+                  >
+                    + Record Supplier Invoice
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12,
+                    fontFamily: T.font,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      {[
+                        "Invoice #",
+                        "Type",
+                        direction === "ar" ? "Client" : "Supplier",
+                        "Invoice Date",
+                        "Due Date",
+                        "Subtotal",
+                        "VAT",
+                        "Total",
+                        "Status",
+                        "PO",
+                        "",
+                      ].map((h, i) => (
+                        <th
+                          key={h + i}
                           style={{
-                            ...sBtn("outline"),
-                            padding: "4px 10px",
-                            fontSize: "9px",
+                            ...sTh,
+                            textAlign: ["Subtotal", "VAT", "Total"].includes(h)
+                              ? "right"
+                              : "left",
                           }}
                         >
-                          {isOpen ? "▲" : "▼"}
-                        </button>
-                      </td>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-
-                    {isPaying && (
-                      <tr>
-                        <td
-                          colSpan={11}
-                          style={{
-                            padding: "12px 16px",
-                            background: T.accentLit,
-                            borderBottom: `1px solid ${T.accentBd}`,
-                          }}
-                        >
-                          <div
+                  </thead>
+                  <tbody>
+                    {filtered.map((inv) => {
+                      const n = norm(inv);
+                      const isOpen = expanded === inv.id;
+                      const isPaying = paying === inv.id;
+                      const lines = lineItems[inv.id] || [];
+                      return (
+                        <React.Fragment key={inv.id}>
+                          <tr
                             style={{
-                              display: "flex",
-                              gap: "12px",
-                              alignItems: "flex-end",
-                              flexWrap: "wrap",
+                              background: isOpen
+                                ? T.accentLit
+                                : inv.status === "overdue"
+                                  ? T.dangerBg
+                                  : "transparent",
+                              cursor: "pointer",
                             }}
+                            onClick={() => handleExpand(inv.id)}
                           >
-                            <div style={{ flex: "1 1 280px" }}>
-                              <label style={{ ...sLabel, marginBottom: 4 }}>
-                                Bank / EFT Reference *
-                              </label>
-                              <input
-                                style={{ ...sInput, maxWidth: "360px" }}
-                                placeholder="e.g. FNB EFT 2026/03/21 REF12345"
-                                value={payRef}
-                                onChange={(e) => setPayRef(e.target.value)}
-                              />
-                            </div>
-                            <div style={{ display: "flex", gap: "8px" }}>
-                              <button
-                                onClick={() => handleMarkPaid(inv)}
-                                disabled={saving}
-                                style={{ ...sBtn(), padding: "8px 20px" }}
-                              >
-                                {saving
-                                  ? "Saving..."
-                                  : `Mark Paid — ${fmt(n._total)}`}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setPaying(null);
-                                  setPayRef("");
-                                }}
-                                style={{
-                                  ...sBtn("outline"),
-                                  padding: "8px 14px",
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                          {inv.payment_reference && (
-                            <p
+                            <td
                               style={{
-                                fontSize: "11px",
-                                color: T.ink500,
-                                margin: "8px 0 0",
-                                fontFamily: T.font,
+                                ...sTd,
+                                fontWeight: 600,
+                                color: T.accent,
+                                fontFamily: T.mono,
                               }}
                             >
-                              Last reference: {inv.payment_reference}
-                            </p>
-                          )}
-                        </td>
-                      </tr>
-                    )}
+                              {n._number}
+                            </td>
+                            <td style={sTd}>
+                              <TypeBadge type={inv.invoice_type} />
+                            </td>
+                            <td
+                              style={{
+                                ...sTd,
+                                fontWeight: 500,
+                                color: T.ink900,
+                              }}
+                            >
+                              {getName(n._partner)}
+                            </td>
+                            <td
+                              style={{ ...sTd, color: T.ink500, fontSize: 11 }}
+                            >
+                              {fmtDate(inv.invoice_date)}
+                            </td>
+                            <td
+                              style={{
+                                ...sTd,
+                                fontSize: 11,
+                                color:
+                                  inv.status === "overdue"
+                                    ? T.danger
+                                    : T.ink500,
+                                fontWeight:
+                                  inv.status === "overdue" ? 600 : 400,
+                              }}
+                            >
+                              {fmtDate(inv.due_date)}
+                              {inv.status === "overdue" && (
+                                <div
+                                  style={{
+                                    fontSize: 9,
+                                    color: T.danger,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {daysOverdue(inv)}d overdue
+                                </div>
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                ...sTd,
+                                textAlign: "right",
+                                fontFamily: T.mono,
+                              }}
+                            >
+                              {fmt(n._sub)}
+                            </td>
+                            <td
+                              style={{
+                                ...sTd,
+                                textAlign: "right",
+                                fontFamily: T.mono,
+                                color: T.ink500,
+                              }}
+                            >
+                              {fmt(n._vat)}
+                            </td>
+                            <td
+                              style={{
+                                ...sTd,
+                                textAlign: "right",
+                                fontFamily: T.mono,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {fmt(n._total)}
+                            </td>
+                            <td style={sTd}>
+                              <StatusBadge status={inv.status} />
+                            </td>
+                            <td style={sTd}>
+                              {inv.po_id ? (
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    padding: "2px 6px",
+                                    borderRadius: 3,
+                                    background: T.infoBg,
+                                    color: T.info,
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Linked
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td
+                              style={{ ...sTd, textAlign: "right" }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 4,
+                                  justifyContent: "flex-end",
+                                }}
+                              >
+                                {inv.status !== "paid" &&
+                                  inv.status !== "cancelled" && (
+                                    <button
+                                      onClick={() => {
+                                        setPaying(isPaying ? null : inv.id);
+                                        setPayRef("");
+                                      }}
+                                      style={{
+                                        ...sBtn(isPaying ? "ghost" : "primary"),
+                                        padding: "4px 10px",
+                                        fontSize: 9,
+                                      }}
+                                    >
+                                      {isPaying ? "✕" : "Pay"}
+                                    </button>
+                                  )}
+                                <button
+                                  onClick={() => handleExpand(inv.id)}
+                                  style={{
+                                    ...sBtn("ghost"),
+                                    padding: "4px 10px",
+                                    fontSize: 9,
+                                  }}
+                                >
+                                  {isOpen ? "▲" : "▼"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
 
-                    {isOpen && (
-                      <tr>
-                        <td
-                          colSpan={11}
-                          style={{
-                            padding: "0 0 0 32px",
-                            background: T.ink050,
-                            borderBottom: `1px solid ${T.ink150}`,
-                          }}
-                        >
-                          <div style={{ padding: "16px 16px 16px 0" }}>
-                            {lineLoading === inv.id ? (
-                              <p
+                          {isPaying && (
+                            <tr>
+                              <td
+                                colSpan={11}
                                 style={{
-                                  fontSize: "12px",
-                                  color: T.ink500,
-                                  fontFamily: T.font,
+                                  padding: "12px 16px",
+                                  background: T.accentLit,
+                                  borderBottom: `1px solid ${T.accentBd}`,
                                 }}
                               >
-                                Loading line items...
-                              </p>
-                            ) : lines.length === 0 ? (
-                              <p
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 12,
+                                    alignItems: "center",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      color: T.accent,
+                                      fontFamily: T.font,
+                                    }}
+                                  >
+                                    Recording payment for {n._number} ·{" "}
+                                    {fmt(n._total)}
+                                  </div>
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="Payment reference (EFT ref, cheque no)"
+                                    value={payRef}
+                                    onChange={(e) => setPayRef(e.target.value)}
+                                    onKeyDown={(e) =>
+                                      e.key === "Enter" && handleMarkPaid(inv)
+                                    }
+                                    style={{
+                                      flex: 1,
+                                      minWidth: 200,
+                                      padding: "8px 12px",
+                                      border: `1px solid ${T.accentBd}`,
+                                      borderRadius: 4,
+                                      fontFamily: T.font,
+                                      fontSize: 12,
+                                      color: T.ink900,
+                                    }}
+                                  />
+                                  <button
+                                    style={{
+                                      ...sBtn("primary"),
+                                      opacity: saving ? 0.7 : 1,
+                                    }}
+                                    onClick={() => handleMarkPaid(inv)}
+                                    disabled={saving}
+                                  >
+                                    {saving ? "Saving…" : "Confirm Payment"}
+                                  </button>
+                                  <button
+                                    style={sBtn("ghost")}
+                                    onClick={() => {
+                                      setPaying(null);
+                                      setPayRef("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+
+                          {isOpen && (
+                            <tr>
+                              <td
+                                colSpan={11}
                                 style={{
-                                  fontSize: "12px",
-                                  color: T.ink500,
-                                  fontFamily: T.font,
+                                  padding: 16,
+                                  background: T.ink050,
+                                  borderBottom: `1px solid ${T.ink150}`,
                                 }}
                               >
-                                No line items recorded.
-                              </p>
-                            ) : (
-                              <table
-                                style={{
-                                  width: "100%",
-                                  borderCollapse: "collapse",
-                                  fontSize: "11px",
-                                  fontFamily: T.font,
-                                }}
-                              >
-                                <thead>
-                                  <tr>
-                                    {[
-                                      "Description",
-                                      "SKU",
-                                      "Qty",
-                                      "Unit Price",
-                                      "Disc %",
-                                      "Line Total",
-                                      "VAT",
-                                      "Batch Ref",
-                                      "Licence #",
-                                    ].map((h, i) => (
-                                      <th
-                                        key={h}
+                                {lineLoading === inv.id ? (
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      color: T.ink400,
+                                      fontFamily: T.font,
+                                    }}
+                                  >
+                                    Loading line items…
+                                  </div>
+                                ) : lines.length === 0 ? (
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      color: T.ink400,
+                                      fontFamily: T.font,
+                                    }}
+                                  >
+                                    No line items recorded.
+                                    {inv.notes && (
+                                      <span
                                         style={{
-                                          ...sTh,
-                                          fontSize: "9px",
-                                          padding: "6px 10px",
-                                          textAlign:
-                                            i >= 2 && i <= 5 ? "right" : "left",
-                                        }}
-                                      >
-                                        {h}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {lines.map((l) => (
-                                    <tr key={l.id}>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          fontWeight: 500,
-                                        }}
-                                      >
-                                        {l.description ||
-                                          l.inventory_items?.name ||
-                                          "—"}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          fontSize: "10px",
+                                          marginLeft: 8,
                                           color: T.ink500,
                                         }}
                                       >
-                                        {l.inventory_items?.sku || "—"}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          textAlign: "right",
-                                          fontVariantNumeric: "tabular-nums",
-                                        }}
-                                      >
-                                        {parseFloat(l.quantity || 0).toFixed(2)}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          textAlign: "right",
-                                          fontVariantNumeric: "tabular-nums",
-                                        }}
-                                      >
-                                        {fmt(l.unit_price)}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          textAlign: "right",
-                                          color: T.ink500,
-                                        }}
-                                      >
-                                        {l.discount_pct
-                                          ? `${parseFloat(l.discount_pct).toFixed(1)}%`
-                                          : "—"}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          textAlign: "right",
-                                          fontWeight: 600,
-                                          fontVariantNumeric: "tabular-nums",
-                                        }}
-                                      >
-                                        {fmt(l.line_total)}
-                                      </td>
-                                      <td
-                                        style={{ ...sTd, padding: "8px 10px" }}
-                                      >
-                                        {l.vat_applicable ? (
-                                          <span
+                                        Note: {inv.notes}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <table
+                                    style={{
+                                      width: "100%",
+                                      borderCollapse: "collapse",
+                                      fontSize: 11,
+                                      fontFamily: T.font,
+                                    }}
+                                  >
+                                    <thead>
+                                      <tr>
+                                        {[
+                                          "Description",
+                                          "Item",
+                                          "Qty",
+                                          "Unit Price",
+                                          "Total",
+                                          "VAT",
+                                        ].map((h) => (
+                                          <th
+                                            key={h}
                                             style={{
-                                              fontSize: "9px",
-                                              padding: "1px 6px",
-                                              borderRadius: "3px",
-                                              background: T.infoBg,
-                                              color: T.info,
+                                              ...sTh,
+                                              fontSize: 9,
+                                              padding: "5px 8px",
+                                            }}
+                                          >
+                                            {h}
+                                          </th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {lines.map((l) => (
+                                        <tr key={l.id}>
+                                          <td
+                                            style={{
+                                              ...sTd,
+                                              padding: "6px 8px",
+                                            }}
+                                          >
+                                            {l.description || "—"}
+                                          </td>
+                                          <td
+                                            style={{
+                                              ...sTd,
+                                              padding: "6px 8px",
+                                              color: T.ink500,
+                                            }}
+                                          >
+                                            {l.inventory_items?.name || "—"}
+                                          </td>
+                                          <td
+                                            style={{
+                                              ...sTd,
+                                              padding: "6px 8px",
+                                              fontFamily: T.mono,
+                                            }}
+                                          >
+                                            {l.quantity}
+                                          </td>
+                                          <td
+                                            style={{
+                                              ...sTd,
+                                              padding: "6px 8px",
+                                              fontFamily: T.mono,
+                                            }}
+                                          >
+                                            {fmt(l.unit_price)}
+                                          </td>
+                                          <td
+                                            style={{
+                                              ...sTd,
+                                              padding: "6px 8px",
+                                              fontFamily: T.mono,
                                               fontWeight: 700,
                                             }}
                                           >
-                                            VAT
-                                          </span>
-                                        ) : (
-                                          <span
+                                            {fmt(l.line_total)}
+                                          </td>
+                                          <td
                                             style={{
-                                              fontSize: "9px",
-                                              color: T.ink400,
+                                              ...sTd,
+                                              padding: "6px 8px",
+                                              fontSize: 10,
+                                              color: l.vat_applicable
+                                                ? T.success
+                                                : T.ink300,
                                             }}
                                           >
-                                            Exempt
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          fontSize: "10px",
-                                          color: T.ink500,
-                                        }}
-                                      >
-                                        {l.batch_reference || "—"}
-                                      </td>
-                                      <td
-                                        style={{
-                                          ...sTd,
-                                          padding: "8px 10px",
-                                          fontSize: "10px",
-                                          color: T.ink500,
-                                        }}
-                                      >
-                                        {l.licence_number || "—"}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr>
-                                    <td
-                                      colSpan={5}
-                                      style={{
-                                        padding: "8px 10px",
-                                        fontSize: "10px",
-                                        color: T.ink500,
-                                        textAlign: "right",
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      Invoice Total:
-                                    </td>
-                                    <td
-                                      style={{
-                                        padding: "8px 10px",
-                                        textAlign: "right",
-                                        fontWeight: 700,
-                                        fontVariantNumeric: "tabular-nums",
-                                        color: T.accent,
-                                      }}
-                                    >
-                                      {fmt(n._total)}
-                                    </td>
-                                    <td
-                                      colSpan={3}
-                                      style={{ padding: "8px 10px" }}
-                                    >
-                                      {inv.status === "paid" &&
-                                        inv.payment_date && (
-                                          <span
-                                            style={{
-                                              fontSize: "10px",
-                                              color: T.success,
-                                              fontWeight: 600,
-                                            }}
-                                          >
-                                            ✓ Paid {fmtDate(inv.payment_date)}
-                                            {inv.payment_reference
-                                              ? ` · ${inv.payment_reference}`
-                                              : ""}
-                                          </span>
-                                        )}
-                                    </td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            )}
-                            {inv.notes && (
-                              <p
-                                style={{
-                                  fontSize: "11px",
-                                  color: T.ink500,
-                                  fontStyle: "italic",
-                                  margin: "10px 0 0",
-                                  fontFamily: T.font,
-                                }}
-                              >
-                                Notes: {inv.notes}
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                                            {l.vat_applicable
+                                              ? "15%"
+                                              : "Exempt"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                                {inv.payment_date && (
+                                  <div
+                                    style={{
+                                      marginTop: 10,
+                                      fontSize: 11,
+                                      color: T.success,
+                                      fontFamily: T.font,
+                                    }}
+                                  >
+                                    ✓ Paid {fmtDate(inv.payment_date)}
+                                    {inv.payment_reference &&
+                                      ` · Ref: ${inv.payment_reference}`}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {showCreate && (
+        <CreateInvoiceModal
+          tenantId={tenantId}
+          suppliers={suppliers}
+          purchaseOrders={purchaseOrders}
+          onClose={() => setShowCreate(false)}
+          onSaved={(num) => {
+            setShowCreate(false);
+            showToast(`Invoice ${num} recorded`);
+            fetchAll();
+          }}
+        />
+      )}
     </div>
   );
 }

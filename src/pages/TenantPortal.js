@@ -272,7 +272,7 @@ function renderTab(tabId, tenantId, industryProfile) {
     case "wholesale-orders":
       return <HQWholesaleOrders />;
     case "invoices":
-      return <HQInvoices />;
+      return <HQInvoices tenantId={tenantId} />;
     case "retailer-health":
       return <RetailerHealth />;
     case "transfers":
