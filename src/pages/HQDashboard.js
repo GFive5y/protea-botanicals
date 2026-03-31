@@ -142,6 +142,7 @@ const TABS = [
 export default function HQDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const navigate = useNavigate();
+  // eslint-disable-next-line no-unused-vars -- isHQ kept for future HQ-only feature gates (LL-172)
   const { tenant, allTenants, tenantName, isHQ, isOperator, switchTenant } =
     useTenant();
   const location = useLocation();
