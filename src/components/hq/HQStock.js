@@ -371,6 +371,7 @@ export default function HQStock() {
   const { industryProfile, tenantId } = useTenant();
 
   const [items, setItems] = useState([]);
+  const [qrMap, setQrMap] = useState({}); // item_id → qr_codes[]
   const [suppliers, setSuppliers] = useState([]);
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -406,6 +407,20 @@ export default function HQStock() {
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+    // Background QR status fetch — non-blocking
+    supabase
+      .from("qr_codes")
+      .select("inventory_item_id,qr_code,is_active,scan_count,claimed")
+      .eq("tenant_id", tenantId)
+      .not("inventory_item_id", "is", null)
+      .then(({ data }) => {
+        const m = {};
+        (data || []).forEach((q) => {
+          if (!m[q.inventory_item_id]) m[q.inventory_item_id] = [];
+          m[q.inventory_item_id].push(q);
+        });
+        setQrMap(m);
+      });
     setLoading(true);
     setError(null);
     try {
@@ -1552,6 +1567,7 @@ export default function HQStock() {
                 <th style={{ ...sTh, textAlign: "right" }}>AVCO / unit</th>
                 <th style={sTh}>Expiry</th>
                 <th style={{ ...sTh, textAlign: "center" }}>⚠</th>
+                <th style={{ ...sTh, textAlign: "center" }}>QR</th>
                 <th style={sTh}>Lot / Batch</th>
                 <th style={sTh}>Reorder</th>
                 <th style={sTh}>Supplier</th>
@@ -1742,6 +1758,69 @@ export default function HQStock() {
                           ) : (
                             <span style={{ color: T.ink300 }}>—</span>
                           )}
+                        </td>
+                        {/* QR status cell — shows code count and scan activity */}
+                        <td
+                          style={{
+                            ...sTd,
+                            textAlign: "center",
+                            padding: "6px 8px",
+                          }}
+                        >
+                          {(() => {
+                            const codes = qrMap[item.id] || [];
+                            const active = codes.filter((q) => q.is_active);
+                            const scans = codes.reduce(
+                              (s, q) => s + (q.scan_count || 0),
+                              0,
+                            );
+                            if (codes.length === 0)
+                              return (
+                                <span
+                                  style={{
+                                    fontSize: 9,
+                                    color: T.ink300,
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  —
+                                </span>
+                              );
+                            return (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: 2,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    padding: "1px 6px",
+                                    borderRadius: 8,
+                                    background:
+                                      active.length > 0
+                                        ? T.successBg
+                                        : T.warningBg,
+                                    color:
+                                      active.length > 0 ? T.success : T.warning,
+                                  }}
+                                >
+                                  {active.length} QR
+                                </span>
+                                {scans > 0 && (
+                                  <span
+                                    style={{ fontSize: 8, color: T.ink400 }}
+                                  >
+                                    {scans} scans
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td
                           style={{

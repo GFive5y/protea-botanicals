@@ -1598,11 +1598,25 @@ function CodeRow({ code, onSelect, selected, onTogglePause, onDelete }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERATE TAB — 3-step wizard
 // ═══════════════════════════════════════════════════════════════════════════════
-function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
+function GenerateTab({
+  batches,
+  banners,
+  onGenerated,
+  initialBatchId,
+  tenantId,
+}) {
   const [step, setStep] = useState(1);
-  const [selectedType, setSelectedType] = useState("product_insert");
+  const [selectedType, setSelectedType] = useState("retail_display");
   const [campaignName, setCampaignName] = useState("");
   const [selectedBatchId, setSelectedBatchId] = useState(batches[0]?.id || "");
+  // Inventory item link (dispensary model — no batches needed)
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [selectedItemId, setSelectedItemId] = useState("");
+  const [itemSearch, setItemSearch] = useState("");
+  const [showItemSearch, setShowItemSearch] = useState(false);
+  const selectedInventoryItem = inventoryItems.find(
+    (i) => i.id === selectedItemId,
+  );
   const [isBulk, setIsBulk] = useState(false);
   const [bulkQty, setBulkQty] = useState("10");
   const [doPoints, setDoPoints] = useState(true);
@@ -1639,6 +1653,21 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
     if (batches.length) setSelectedBatchId(batches[0].id);
     if (banners.length) setBannerId(banners[0].id);
   }, [batches, banners]);
+
+  // Fetch inventory items for dispensary-model linking
+  useEffect(() => {
+    const tid = tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3";
+    supabase
+      .from("inventory_items")
+      .select("id,name,sku,category,sell_price,brand,quantity_on_hand")
+      .eq("tenant_id", tid)
+      .eq("is_active", true)
+      .gt("sell_price", 0)
+      .order("category")
+      .order("name")
+      .limit(300)
+      .then(({ data }) => setInventoryItems(data || []));
+  }, [tenantId]);
 
   useEffect(() => {
     if (initialBatchId && batches.length > 0) {
@@ -1705,7 +1734,9 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
       qr_code: qrCode,
       qr_type: selectedType,
       batch_id: batchId || null,
-      campaign_name: campaignName || null,
+      inventory_item_id: selectedItemId || null,
+      tenant_id: tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3",
+      campaign_name: campaignName || selectedInventoryItem?.name || null,
       scan_actions: actions,
       points_value: pointsVal,
       is_active: true,
@@ -1862,6 +1893,168 @@ function GenerateTab({ batches, banners, onGenerated, initialBatchId }) {
                 </div>
               </div>
             ))}
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <span style={sectionLabel}>
+              Link to Inventory Item{" "}
+              <span
+                style={{ fontSize: 9, color: T.accentMid, fontWeight: 500 }}
+              >
+                (dispensary — optional)
+              </span>
+            </span>
+            {selectedInventoryItem ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  background: T.accentLit,
+                  border: `1px solid ${T.accentBd}`,
+                  borderRadius: 7,
+                }}
+              >
+                <span style={{ fontSize: 20 }}>
+                  {CAT_ICON[selectedInventoryItem.category] || "🌿"}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{ fontSize: 12, fontWeight: 600, color: T.accent }}
+                  >
+                    {selectedInventoryItem.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: T.accentMid }}>
+                    {CAT_LABEL[selectedInventoryItem.category] ||
+                      selectedInventoryItem.category}{" "}
+                    · {selectedInventoryItem.sku} · R
+                    {parseFloat(selectedInventoryItem.sell_price).toFixed(2)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedItemId("");
+                    setItemSearch("");
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: T.ink400,
+                    fontSize: 16,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: "relative" }}>
+                <input
+                  style={{ ...inputStyle, paddingRight: 32 }}
+                  placeholder="Search products to link… (type name or SKU)"
+                  value={itemSearch}
+                  onFocus={() => setShowItemSearch(true)}
+                  onBlur={() => setTimeout(() => setShowItemSearch(false), 180)}
+                  onChange={(e) => {
+                    setItemSearch(e.target.value);
+                    setShowItemSearch(true);
+                  }}
+                />
+                {showItemSearch && itemSearch.length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 6,
+                      boxShadow: T.shadowMd,
+                      zIndex: 50,
+                      maxHeight: 200,
+                      overflowY: "auto",
+                    }}
+                  >
+                    {inventoryItems
+                      .filter(
+                        (i) =>
+                          i.name
+                            .toLowerCase()
+                            .includes(itemSearch.toLowerCase()) ||
+                          (i.sku || "")
+                            .toLowerCase()
+                            .includes(itemSearch.toLowerCase()),
+                      )
+                      .slice(0, 12)
+                      .map((i) => (
+                        <div
+                          key={i.id}
+                          onMouseDown={() => {
+                            setSelectedItemId(i.id);
+                            setItemSearch("");
+                            setShowItemSearch(false);
+                            if (!campaignName) setCampaignName(i.name);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "8px 12px",
+                            cursor: "pointer",
+                            borderBottom: `1px solid ${T.ink075}`,
+                          }}
+                          onMouseOver={(e) =>
+                            (e.currentTarget.style.background = T.accentLit)
+                          }
+                          onMouseOut={(e) =>
+                            (e.currentTarget.style.background = "transparent")
+                          }
+                        >
+                          <span style={{ fontSize: 14 }}>
+                            {CAT_ICON[i.category] || "🌿"}
+                          </span>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 500,
+                                color: T.ink900,
+                              }}
+                            >
+                              {i.name}
+                            </div>
+                            <div style={{ fontSize: 10, color: T.ink400 }}>
+                              {CAT_LABEL[i.category] || i.category} · {i.sku} ·
+                              R{parseFloat(i.sell_price).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    {inventoryItems.filter(
+                      (i) =>
+                        i.name
+                          .toLowerCase()
+                          .includes(itemSearch.toLowerCase()) ||
+                        (i.sku || "")
+                          .toLowerCase()
+                          .includes(itemSearch.toLowerCase()),
+                    ).length === 0 && (
+                      <div
+                        style={{
+                          padding: "12px",
+                          fontSize: 11,
+                          color: T.ink400,
+                          textAlign: "center",
+                        }}
+                      >
+                        No items found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div style={{ marginBottom: 16 }}>
             <span style={sectionLabel}>Campaign Name (optional)</span>
@@ -4556,6 +4749,7 @@ export default function AdminQRCodes({
         <GenerateTab
           batches={batches}
           banners={banners}
+          tenantId={tenantId}
           onGenerated={() => setTab("registry")}
           initialBatchId={initialBatchId}
         />
