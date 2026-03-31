@@ -8,6 +8,7 @@ import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import StockItemModal from "../StockItemModal";
 import StockItemPanel from "./StockItemPanel";
+import CannabisDetailView from "./CannabisDetailView";
 import StockReceiveModal from "./StockReceiveModal";
 import StockOpeningCalibration from "./StockOpeningCalibration";
 import StockPricingPanel from "./StockPricingPanel";
@@ -3777,6 +3778,9 @@ export default function HQStock() {
     const [brandFilter, setBrandFilter] = useState("all");
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState("list");
+    // subTypeFilter: { key, label } | null — Tier 2 pill selection
+    // Replaces the old setSearch(label) pill pattern (WP-SMARTSTOCK-UI Phase 2)
+    const [subTypeFilter, setSubTypeFilter] = useState(null);
 
     const brands = [
       ...new Set(items.map((i) => i.brand).filter(Boolean)),
@@ -3792,6 +3796,12 @@ export default function HQStock() {
       const group = CAT_GROUPS.find((g) => g.id === catFilter);
       if (group && !matchesGroup(item, group)) return false;
       if (brandFilter !== "all" && item.brand !== brandFilter) return false;
+      // Sub-type filter (Tier 2 pill — WP-SMARTSTOCK-UI Phase 2)
+      if (
+        subTypeFilter &&
+        !matchesSubType(item, catFilter, subTypeFilter.key, subTypeFilter.label)
+      )
+        return false;
       if (search) {
         const s = search.toLowerCase();
         if (
@@ -3816,6 +3826,56 @@ export default function HQStock() {
       group.id === "all"
         ? activeItems.length
         : activeItems.filter((i) => matchesGroup(i, group)).length;
+
+    // ── Sub-type filter match (WP-SMARTSTOCK-UI Phase 2) ─────────────────────
+    // Maps catFilter + subTypeFilter.key to item field checks.
+    // No functions stored in state — resolved here at filter time.
+    const matchesSubType = (item, catId, subKey, subLabel) => {
+      if (!subKey) return true;
+      const lbl = (subLabel || subKey).toLowerCase();
+      const vv = (item.variant_value || "").toLowerCase();
+      const nm = (item.name || "").toLowerCase();
+      const sc = (item.subcategory || "").toLowerCase();
+      switch (catId) {
+        // Flower: strain pills use strain_type field
+        case "flower":
+        case "preroll":
+          if (
+            ["indica", "sativa", "hybrid", "cbd", "auto"].includes(
+              subKey.toLowerCase(),
+            )
+          ) {
+            return (
+              (item.strain_type || "").toLowerCase() === subKey.toLowerCase()
+            );
+          }
+          // Weight pills (1g, 3.5g, 7g, etc.)
+          return (
+            parseFloat(item.weight_grams) === parseFloat(subKey) ||
+            vv.startsWith(subKey) ||
+            nm.includes(subKey)
+          );
+        // DB subcategory field for most worlds
+        case "concentrate":
+        case "hash":
+        case "vape":
+        case "papers":
+        case "accessories":
+        case "equipment":
+        case "edible":
+        case "seeds":
+        case "substrate":
+        case "nutrients":
+        case "wellness":
+        case "merch":
+          // Direct subcategory match first
+          if (sc === subKey) return true;
+          // Fall back to name/variant label match
+          return vv.includes(lbl) || nm.includes(lbl);
+        default:
+          return vv.includes(lbl) || nm.includes(lbl);
+      }
+    };
 
     return (
       <div>
@@ -3893,6 +3953,7 @@ export default function HQStock() {
                   onClick={() => {
                     setCatFilter(group.id);
                     setBrandFilter("all");
+                    setSubTypeFilter(null); // reset Tier 2 on world change
                   }}
                   style={{
                     width: "100%",
@@ -3980,6 +4041,7 @@ export default function HQStock() {
                 {[
                   { id: "list", label: "☰" },
                   { id: "grid", label: "⊞" },
+                  { id: "detail", label: "⊟" },
                 ].map((v) => (
                   <button
                     key={v.id}
@@ -4017,6 +4079,11 @@ export default function HQStock() {
                   const activeGroup = CAT_GROUPS.find(
                     (g) => g.id === catFilter,
                   );
+                  // Build a human-readable label for the button
+                  const subLabel = subTypeFilter?.label;
+                  const btnLabel = subLabel
+                    ? `+ Add ${subLabel}`
+                    : `+ Add ${activeGroup?.label || "Item"}`;
                   return (
                     <button
                       style={sBtn()}
@@ -4024,14 +4091,17 @@ export default function HQStock() {
                         setModalDefaults({
                           category:
                             activeGroup?.enums?.[0] || "finished_product",
-                          subcategory: "",
+                          // Pass sub-type context — StockItemModal reads defaults.subcategory
+                          subcategory: subTypeFilter?.key || "",
+                          // Pass brand context if at Tier 3
+                          brand: brandFilter !== "all" ? brandFilter : "",
                           world: catFilter,
                           worldLabel: activeGroup?.label || catFilter,
                         });
                         setModalItem(null);
                       }}
                     >
-                      + Add {activeGroup?.label || "Item"}
+                      {btnLabel}
                     </button>
                   );
                 })()
@@ -4090,6 +4160,8 @@ export default function HQStock() {
 
                 const PillBlock = ({ label, note, pills }) => {
                   const hasAny = pills.some((p) => p.count > 0);
+                  // Which pill in this block is active?
+                  const activeKey = subTypeFilter?.key;
                   return (
                     <div style={{ marginBottom: 10 }}>
                       <div
@@ -4139,20 +4211,34 @@ export default function HQStock() {
                       >
                         {pills.map(({ key, label: lbl, count }) => {
                           const inStock = count > 0;
+                          const isActive = activeKey === key;
                           return (
                             <button
                               key={key}
                               onClick={() => {
-                                if (inStock) setSearch(lbl);
+                                // Toggle: click active pill to deselect
+                                if (isActive) {
+                                  setSubTypeFilter(null);
+                                } else {
+                                  setSubTypeFilter({ key, label: lbl });
+                                }
                               }}
                               style={{
                                 padding: "6px 12px",
                                 borderRadius: 6,
-                                cursor: inStock ? "pointer" : "default",
+                                cursor: "pointer",
                                 border:
                                   "1.5px solid " +
-                                  (inStock ? T.accentBd : T.ink150),
-                                background: inStock ? T.accentLit : T.ink050,
+                                  (isActive
+                                    ? T.accentMid
+                                    : inStock
+                                      ? T.accentBd
+                                      : T.ink150),
+                                background: isActive
+                                  ? T.accentMid
+                                  : inStock
+                                    ? T.accentLit
+                                    : T.ink050,
                                 fontFamily: T.font,
                                 display: "flex",
                                 flexDirection: "column",
@@ -4160,14 +4246,18 @@ export default function HQStock() {
                                 gap: 1,
                                 minWidth: 72,
                                 opacity: inStock ? 1 : 0.4,
-                                transition: "opacity .15s",
+                                transition: "all .15s",
                               }}
                             >
                               <span
                                 style={{
                                   fontSize: 11,
                                   fontWeight: 700,
-                                  color: inStock ? T.accentMid : T.ink400,
+                                  color: isActive
+                                    ? "#fff"
+                                    : inStock
+                                      ? T.accentMid
+                                      : T.ink400,
                                 }}
                               >
                                 {lbl}
@@ -4175,7 +4265,11 @@ export default function HQStock() {
                               <span
                                 style={{
                                   fontSize: 10,
-                                  color: inStock ? T.ink500 : T.ink300,
+                                  color: isActive
+                                    ? "rgba(255,255,255,0.75)"
+                                    : inStock
+                                      ? T.ink500
+                                      : T.ink300,
                                 }}
                               >
                                 {count > 0
@@ -4551,38 +4645,56 @@ export default function HQStock() {
                       marginBottom: 14,
                     }}
                   >
-                    {subCounts.map(({ sub, count }) => (
-                      <button
-                        key={sub}
-                        onClick={() => setSearch(subLabels[sub] || sub)}
-                        style={{
-                          padding: "8px 14px",
-                          borderRadius: 6,
-                          cursor: "pointer",
-                          border: "1.5px solid " + T.accentBd,
-                          background: T.accentLit,
-                          fontFamily: T.font,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "flex-start",
-                          gap: 2,
-                          minWidth: 80,
-                        }}
-                      >
-                        <span
+                    {subCounts.map(({ sub, count }) => {
+                      const dispLabel = subLabels[sub] || sub;
+                      const isActive = subTypeFilter?.key === sub;
+                      return (
+                        <button
+                          key={sub}
+                          onClick={() => {
+                            if (isActive) setSubTypeFilter(null);
+                            else
+                              setSubTypeFilter({ key: sub, label: dispLabel });
+                          }}
                           style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: T.accentMid,
+                            padding: "8px 14px",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            border:
+                              "1.5px solid " +
+                              (isActive ? T.accentMid : T.accentBd),
+                            background: isActive ? T.accentMid : T.accentLit,
+                            fontFamily: T.font,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                            gap: 2,
+                            minWidth: 80,
+                            transition: "all .15s",
                           }}
                         >
-                          {subLabels[sub] || sub}
-                        </span>
-                        <span style={{ fontSize: 10, color: T.ink400 }}>
-                          {count} items
-                        </span>
-                      </button>
-                    ))}
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: isActive ? "#fff" : T.accentMid,
+                            }}
+                          >
+                            {subLabels[sub] || sub}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: isActive
+                                ? "rgba(255,255,255,0.65)"
+                                : T.ink400,
+                            }}
+                          >
+                            {count} items
+                          </span>
+                        </button>
+                      );
+                    })}
                     <button
                       onClick={() => {
                         setModalDefaults({
@@ -4886,6 +4998,68 @@ export default function HQStock() {
                   })
                 )}
               </div>
+            )}
+
+            {/* ── Active sub-type filter chip ───────────────────────── */}
+            {subTypeFilter && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ fontSize: 11, color: T.ink400 }}>
+                  Filtered by:
+                </span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "3px 10px",
+                    borderRadius: 99,
+                    background: T.accentMid,
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {subTypeFilter.label}
+                  <button
+                    onClick={() => setSubTypeFilter(null)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "rgba(255,255,255,0.75)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      padding: 0,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+                <span style={{ fontSize: 11, color: T.ink400 }}>
+                  {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+
+            {/* ── Detail / Excel view — WP-SMARTSTOCK-UI ─────────────────── */}
+            {viewMode === "detail" && (
+              <CannabisDetailView
+                items={filtered}
+                allItems={activeItems}
+                tenantId={tenantId}
+                onOpenPanel={setPanelItem}
+                onOpenEdit={(item) => {
+                  setModalItem(item);
+                }}
+                onRefresh={load}
+              />
             )}
 
             {/* List view */}
