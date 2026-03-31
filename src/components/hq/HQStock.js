@@ -388,6 +388,7 @@ export default function HQStock() {
   const [movLoading, setMovLoading] = useState(false);
   const [modalItem, setModalItem] = useState(undefined);
   const [modalSaving, setModalSaving] = useState(false);
+  const [showWorldPicker, setShowWorldPicker] = useState(false);
   const [panelItem, setPanelItem] = useState(null);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [calibOpen, setCalibOpen] = useState(false);
@@ -3544,8 +3545,12 @@ export default function HQStock() {
                 <button
                   style={sBtn()}
                   onClick={() => {
-                    setModalDefaults({});
-                    setModalItem(null);
+                    if (isCannabis) {
+                      setShowWorldPicker(true);
+                    } else {
+                      setModalDefaults({});
+                      setModalItem(null);
+                    }
                   }}
                 >
                   + Add Item
@@ -5095,6 +5100,131 @@ export default function HQStock() {
           }}
         />
       )}
+      {/* ── World Picker — cannabis retail "Add Item" entry point ── */}
+      {showWorldPicker && isCannabis && (
+        <div
+          onClick={() => setShowWorldPicker(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 400,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              padding: 28,
+              width: 580,
+              maxWidth: "95vw",
+              fontFamily: T.font,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 20,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: T.ink900,
+                    marginBottom: 4,
+                  }}
+                >
+                  What are you adding?
+                </div>
+                <div style={{ fontSize: 12, color: T.ink400 }}>
+                  Choose a product type — the form adapts with the right fields
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWorldPicker(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: T.ink400,
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 10,
+              }}
+            >
+              {PRODUCT_WORLDS.filter((w) => w.id !== "all").map((world) => (
+                <div
+                  key={world.id}
+                  onClick={() => {
+                    setShowWorldPicker(false);
+                    setModalDefaults({
+                      category: world.enums?.[0] || "finished_product",
+                      subcategory: world.subs?.[0] || "",
+                      world: world.id,
+                      worldLabel: world.label,
+                    });
+                    setModalItem(null);
+                  }}
+                  style={{
+                    padding: "14px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${T.ink150}`,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    background: "#fff",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = T.accent;
+                    e.currentTarget.style.background = T.accentLit;
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = T.ink150;
+                    e.currentTarget.style.background = "#fff";
+                  }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>
+                    {world.icon || "📦"}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: T.ink900,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {world.label}
+                  </div>
+                  <div
+                    style={{ fontSize: 10, color: T.ink400, lineHeight: 1.4 }}
+                  >
+                    {world.desc || world.enums?.[0]?.replace(/_/g, " ") || ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalItem !== undefined && (
         <StockItemModal
           item={modalItem || null}
