@@ -13,6 +13,7 @@ import StockOpeningCalibration from "./StockOpeningCalibration";
 import StockPricingPanel from "./StockPricingPanel";
 import StockChannelPanel from "./StockChannelPanel";
 import StockReceiveHistoryPanel from "./StockReceiveHistoryPanel";
+import HQPurchaseOrders from "./HQPurchaseOrders";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { SparkLine, BulletChart } from "../viz";
 import StockIntelPanel from "./StockIntelPanel";
@@ -2475,6 +2476,67 @@ export default function HQStock() {
         cta: "Set opening AVCO",
         action: () => setCalibOpen(true),
       });
+
+    // Expiry alerts — cannabis compliance (items with expiry_date set)
+    const now = new Date();
+    const expired = activeItems.filter(
+      (i) =>
+        i.expiry_date &&
+        new Date(i.expiry_date) < now &&
+        (i.quantity_on_hand || 0) > 0,
+    );
+    const expiring7 = activeItems.filter((i) => {
+      if (!i.expiry_date || (i.quantity_on_hand || 0) <= 0) return false;
+      const d = Math.ceil((new Date(i.expiry_date) - now) / 86400000);
+      return d >= 0 && d < 7;
+    });
+    const expiring30 = activeItems.filter((i) => {
+      if (!i.expiry_date || (i.quantity_on_hand || 0) <= 0) return false;
+      const d = Math.ceil((new Date(i.expiry_date) - now) / 86400000);
+      return d >= 7 && d < 30;
+    });
+    if (expired.length > 0)
+      queueActions.push({
+        severity: "critical",
+        text: `${expired.length} item${expired.length !== 1 ? "s" : ""} EXPIRED — must not be sold`,
+        sub: expired
+          .slice(0, 3)
+          .map(
+            (i) =>
+              `${i.name} (exp. ${new Date(i.expiry_date).toLocaleDateString("en-ZA")})`,
+          )
+          .join(" · "),
+        cta: "View items",
+        action: () => setSubTab("items"),
+      });
+    if (expiring7.length > 0)
+      queueActions.push({
+        severity: "critical",
+        text: `${expiring7.length} item${expiring7.length !== 1 ? "s" : ""} expiring within 7 days — use or remove`,
+        sub: expiring7
+          .slice(0, 3)
+          .map(
+            (i) =>
+              `${i.name} (${Math.ceil((new Date(i.expiry_date) - now) / 86400000)}d left)`,
+          )
+          .join(" · "),
+        cta: "View items",
+        action: () => setSubTab("items"),
+      });
+    if (expiring30.length > 0)
+      queueActions.push({
+        severity: "warning",
+        text: `${expiring30.length} item${expiring30.length !== 1 ? "s" : ""} expiring within 30 days — prioritise sales`,
+        sub: expiring30
+          .slice(0, 3)
+          .map(
+            (i) =>
+              `${i.name} (${Math.ceil((new Date(i.expiry_date) - now) / 86400000)}d left)`,
+          )
+          .join(" · "),
+        cta: "View items",
+        action: () => setSubTab("items"),
+      });
     if (inStockLow.length > 0)
       queueActions.push({
         severity: "info",
@@ -4760,12 +4822,7 @@ export default function HQStock() {
             { id: "movements", label: "Movements" },
             { id: "pricing", label: "💰 Pricing" },
             { id: "receipts", label: "📦 Receipts" },
-            {
-              id: "purchase-orders",
-              label: "🛒 Purchase Orders",
-              disabled: true,
-              soon: true,
-            },
+            { id: "purchase-orders", label: "🛒 Purchase Orders" },
           ].map((t) => (
             <button
               key={t.id}
@@ -4835,6 +4892,12 @@ export default function HQStock() {
           <StockReceiveHistoryPanel
             tenantId={tenantId}
             onReviewPrices={() => setSubTab("pricing")}
+          />
+        )}
+        {subTab === "purchase-orders" && (
+          <HQPurchaseOrders
+            tenantId={tenantId}
+            industryProfile={industryProfile}
           />
         )}
 

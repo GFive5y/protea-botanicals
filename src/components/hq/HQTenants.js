@@ -1189,17 +1189,23 @@ export default function HQTenants() {
           { label: "Active", value: activeTenants.length, color: T.success },
           {
             label: "Enterprise",
-            value: tenants.filter((t) => t.tier === "enterprise").length,
+            value: tenants.filter(
+              (t) => (t.tier || configs[t.id]?.tier) === "enterprise",
+            ).length,
             color: T.accent,
           },
           {
             label: "Pro",
-            value: tenants.filter((t) => t.tier === "pro").length,
+            value: tenants.filter(
+              (t) => (t.tier || configs[t.id]?.tier) === "pro",
+            ).length,
             color: T.info,
           },
           {
             label: "Entry",
-            value: tenants.filter((t) => t.tier === "entry").length,
+            value: tenants.filter(
+              (t) => (t.tier || configs[t.id]?.tier) === "entry",
+            ).length,
             color: T.ink500,
           },
         ].map((m) => (
@@ -1506,13 +1512,63 @@ export default function HQTenants() {
                     {Object.keys(cfg).length === 0 ? (
                       <div
                         style={{
-                          fontSize: 12,
-                          color: T.warning,
+                          padding: "12px 14px",
+                          borderRadius: 6,
+                          background: T.ink050,
+                          border: `1px solid ${T.ink150}`,
                           fontFamily: T.font,
                         }}
                       >
-                        No tenant_config row found. Create one in Supabase with
-                        tenant_id = {tenant.id}
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: T.ink500,
+                            marginBottom: 10,
+                          }}
+                        >
+                          No feature config found for this tenant. This is
+                          normal for newly added tenants — create a default
+                          config to enable feature flags.
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const { error } =
+                              await import("../../services/supabaseClient").then(
+                                (m) =>
+                                  m.supabase.from("tenant_config").insert({
+                                    tenant_id: tenant.id,
+                                    tier: "entry",
+                                    feature_hq: false,
+                                    feature_ai_basic: false,
+                                    feature_ai_full: false,
+                                    feature_medical: false,
+                                    feature_white_label: false,
+                                    feature_wholesale: false,
+                                    feature_hr: false,
+                                    ai_queries_daily: 50,
+                                    staff_seats: 5,
+                                  }),
+                              );
+                            if (!error) {
+                              showToast("Default config created");
+                              fetchAll();
+                            } else
+                              showToast("Error: " + error.message, "error");
+                          }}
+                          style={{
+                            padding: "6px 14px",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            fontFamily: T.font,
+                            background: T.accent,
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Create default config
+                        </button>
                       </div>
                     ) : (
                       <FlagEditor

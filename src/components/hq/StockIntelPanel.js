@@ -110,6 +110,8 @@ function IntelPanel({
   badgeColor,
   rows,
   emptyMsg,
+  emptyCta,
+  onEmptyCta,
   footerLabel,
   onFooter,
 }) {
@@ -172,6 +174,27 @@ function IntelPanel({
             }}
           >
             {emptyMsg}
+            {emptyCta && onEmptyCta && (
+              <div style={{ marginTop: 10 }}>
+                <button
+                  onClick={onEmptyCta}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fontFamily: T.font,
+                    background: T.accent,
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {emptyCta} →
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           rows.map((row, idx) => (
@@ -1474,9 +1497,11 @@ export default function StockIntelPanel({
             rows={bestSellers}
             emptyMsg={
               saleOuts.length === 0
-                ? "No sales recorded yet — process your first sale to see best sellers"
+                ? "No sales recorded yet — your top sellers will appear here"
                 : "No sales in this category"
             }
+            emptyCta={saleOuts.length === 0 ? "Open shop to sell" : null}
+            onEmptyCta={() => window.open("/shop", "_blank")}
             footerLabel="View movements"
             onFooter={() => onNavigate("movements")}
           />
@@ -1499,7 +1524,9 @@ export default function StockIntelPanel({
             icon="⚡"
             badge={fastMovers.length > 0 ? "days remaining" : null}
             rows={fastMovers}
-            emptyMsg="No sales velocity data — process sales to see stock runway"
+            emptyMsg="Once sales come through, you'll see how many days of stock remain per item"
+            emptyCta="Open shop to sell"
+            onEmptyCta={() => window.open("/shop", "_blank")}
             footerLabel="View movements"
             onFooter={() => onNavigate("movements")}
           />
@@ -1527,7 +1554,9 @@ export default function StockIntelPanel({
           badge={revenueLeaders.length > 0 ? "last 30 days" : null}
           badgeColor={{ color: T.success, bg: T.successBg, bd: T.successBd }}
           rows={revenueLeaders}
-          emptyMsg="No sales yet — your revenue leaders will appear here once you process sales"
+          emptyMsg="Your top revenue items will appear here after your first sale"
+          emptyCta="Open shop to sell"
+          onEmptyCta={() => window.open("/shop", "_blank")}
           footerLabel="View all sales"
           onFooter={() => onNavigate("movements")}
         />

@@ -153,7 +153,6 @@ const STATUS_META = {
 };
 
 // ZAR local status progression
-// eslint-disable-next-line no-unused-vars -- planned for partial delivery status progression (future WP)
 const NEXT_STATUS_ZAR = {
   draft: "sent",
   sent: "awaiting_delivery",
@@ -1256,11 +1255,15 @@ export default function HQPurchaseOrders({
                     "PO Number",
                     "Supplier",
                     "Status",
-                    "Shipping",
-                    "Subtotal (USD)",
-                    "Landed Cost (ZAR)",
-                    "FX Rate",
-                    "Expected Arrival",
+                    ...(filteredPos.some((p) => p.currency !== "ZAR")
+                      ? [
+                          "Shipping",
+                          "Subtotal (USD)",
+                          "Landed Cost (ZAR)",
+                          "FX Rate",
+                        ]
+                      : ["Total (ZAR)"]),
+                    "Expected",
                     "Actions",
                   ].map((h) => (
                     <th key={h} style={sTh}>
@@ -1276,7 +1279,10 @@ export default function HQPurchaseOrders({
                   const shipMeta =
                     SHIPPING_MODES.find((m) => m.id === po.shipping_mode) ||
                     SHIPPING_MODES[0];
-                  const nextStatus = NEXT_STATUS[status];
+                  const nextStatus =
+                    po.currency === "ZAR"
+                      ? NEXT_STATUS_ZAR[status]
+                      : NEXT_STATUS[status]; // eslint-disable-line no-unused-vars -- NEXT_STATUS_ZAR used here
                   return (
                     <tr
                       key={po.id}
@@ -1317,32 +1323,50 @@ export default function HQPurchaseOrders({
                       <td style={sTd}>
                         <StatusBadge status={status} />
                       </td>
-                      <td style={{ ...sTd, fontSize: 12 }}>{shipMeta.label}</td>
-                      <td style={{ ...sTd, fontFamily: T.fontData }}>
-                        {fmtUsd(po.subtotal)}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          fontFamily: T.fontData,
-                          fontWeight: 600,
-                          color: T.accent,
-                        }}
-                      >
-                        {fmtZar(po.landed_cost_zar)}
-                      </td>
-                      <td
-                        style={{
-                          ...sTd,
-                          fontFamily: T.fontData,
-                          fontSize: 12,
-                          color: T.ink500,
-                        }}
-                      >
-                        {po.usd_zar_rate
-                          ? `R${parseFloat(po.usd_zar_rate).toFixed(4)}`
-                          : "—"}
-                      </td>
+                      {/* Currency-aware cells — ZAR local vs USD import */}
+                      {po.currency === "ZAR" ? (
+                        <td
+                          style={{
+                            ...sTd,
+                            fontFamily: T.fontData,
+                            fontWeight: 600,
+                            color: T.accent,
+                          }}
+                        >
+                          {fmtZar(po.subtotal || po.landed_cost_zar)}
+                        </td>
+                      ) : (
+                        <>
+                          <td style={{ ...sTd, fontSize: 12 }}>
+                            {shipMeta.label}
+                          </td>
+                          <td style={{ ...sTd, fontFamily: T.fontData }}>
+                            {fmtUsd(po.subtotal)}
+                          </td>
+                          <td
+                            style={{
+                              ...sTd,
+                              fontFamily: T.fontData,
+                              fontWeight: 600,
+                              color: T.accent,
+                            }}
+                          >
+                            {fmtZar(po.landed_cost_zar)}
+                          </td>
+                          <td
+                            style={{
+                              ...sTd,
+                              fontFamily: T.fontData,
+                              fontSize: 12,
+                              color: T.ink500,
+                            }}
+                          >
+                            {po.usd_zar_rate
+                              ? `R${parseFloat(po.usd_zar_rate).toFixed(4)}`
+                              : "—"}
+                          </td>
+                        </>
+                      )}
                       <td style={sTd}>
                         {po.expected_arrival || po.expected_date || "—"}
                         {overdue && (
@@ -2751,7 +2775,10 @@ export default function HQPurchaseOrders({
             {(() => {
               const po = selectedPo;
               const status = po.po_status || po.status || "draft";
-              const nextStatus = NEXT_STATUS[status];
+              const nextStatus =
+                po.currency === "ZAR"
+                  ? NEXT_STATUS_ZAR[status]
+                  : NEXT_STATUS[status];
               const overdue = isOverdue(po);
               const shipMeta =
                 SHIPPING_MODES.find((m) => m.id === po.shipping_mode) ||
