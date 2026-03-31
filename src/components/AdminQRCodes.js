@@ -2882,6 +2882,1565 @@ function BannerPreview({ banner, compact = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PRINT SHEET TAB — smart multi-product label designer + print engine
+// ═══════════════════════════════════════════════════════════════════════════════
+const PRINT_LAYOUTS = [
+  {
+    key: "shelf_3x3",
+    label: "Shelf Labels",
+    icon: "🏷",
+    desc: "9 per A4 — category · name · price · QR",
+    cols: 3,
+    rows: 3,
+  },
+  {
+    key: "insert_1",
+    label: "Product Insert",
+    icon: "📦",
+    desc: "1 per A4 — full info, brand, COA link",
+    cols: 1,
+    rows: 1,
+  },
+  {
+    key: "promo_4x2",
+    label: "Promo Strip",
+    icon: "🎯",
+    desc: "8 per A4 — campaign name, points, QR",
+    cols: 4,
+    rows: 2,
+  },
+  {
+    key: "batch_sheet",
+    label: "Delivery Batch",
+    icon: "📋",
+    desc: "All codes for one delivery on one sheet",
+    cols: 3,
+    rows: 4,
+  },
+];
+
+const CAT_ICON = {
+  flower: "🌸",
+  concentrate: "💎",
+  vape: "💨",
+  edible: "🍬",
+  preroll: "🚬",
+  hash: "🟤",
+  accessories: "🔧",
+  accessory: "🔧",
+  wellness: "💊",
+  finished_product: "🌿",
+};
+const CAT_LABEL = {
+  flower: "Flower",
+  concentrate: "Concentrate",
+  vape: "Vape",
+  edible: "Edible",
+  preroll: "Pre-Roll",
+  hash: "Hash",
+  accessories: "Accessories",
+  accessory: "Accessory",
+  wellness: "Wellness",
+  finished_product: "Product",
+  hardware: "Hardware",
+  raw_material: "Raw Material",
+};
+
+function PrintTab({ tenantId }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(new Set());
+  const [layout, setLayout] = useState("shelf_3x3");
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("all");
+  const [generating, setGenerating] = useState(false);
+  const [printItems, setPrintItems] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showOnlyNoQr, setShowOnlyNoQr] = useState(false);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [invRes, qrRes] = await Promise.all([
+        supabase
+          .from("inventory_items")
+          .select(
+            "id,name,sku,category,sell_price,brand,quantity_on_hand,description",
+          )
+          .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
+          .eq("is_active", true)
+          .gt("sell_price", 0)
+          .order("category")
+          .order("name"),
+        supabase
+          .from("qr_codes")
+          .select("inventory_item_id,qr_code,is_active,scan_count")
+          .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
+          .not("inventory_item_id", "is", null),
+      ]);
+      const qrMap = {};
+      (qrRes.data || []).forEach((q) => {
+        if (!qrMap[q.inventory_item_id]) qrMap[q.inventory_item_id] = [];
+        qrMap[q.inventory_item_id].push(q);
+      });
+      setItems(
+        (invRes.data || []).map((i) => ({ ...i, qrCodes: qrMap[i.id] || [] })),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  const cats = [...new Set(items.map((i) => i.category).filter(Boolean))];
+  const filtered = items.filter((i) => {
+    if (catFilter !== "all" && i.category !== catFilter) return false;
+    if (showOnlyNoQr && i.qrCodes.length > 0) return false;
+    if (search && !i.name.toLowerCase().includes(search.toLowerCase()))
+      return false;
+    return true;
+  });
+
+  const toggle = (id) =>
+    setSelected((p) => {
+      const n = new Set(p);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  const toggleAll = () => {
+    if (filtered.every((i) => selected.has(i.id))) setSelected(new Set());
+    else setSelected(new Set(filtered.map((i) => i.id)));
+  };
+  const selectedItems = items.filter((i) => selected.has(i.id));
+
+  const handleGenerate = async () => {
+    if (!selectedItems.length) return;
+    setGenerating(true);
+    const domain = window.location.origin;
+    const out = [];
+    for (const item of selectedItems) {
+      let qrCode = item.qrCodes.find((q) => q.is_active)?.qr_code;
+      if (!qrCode) {
+        const prefix = tenantId?.slice(0, 2)?.toUpperCase() || "MR";
+        const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+        qrCode = `${prefix}-${item.sku || rand}-${Date.now().toString(36).toUpperCase()}`;
+        await supabase.from("qr_codes").insert({
+          qr_code: qrCode,
+          qr_type: "retail_display",
+          inventory_item_id: item.id,
+          tenant_id: tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3",
+          is_active: true,
+          status: "in_stock",
+          claimed: false,
+          scan_count: 0,
+          scan_actions: JSON.stringify([
+            { action: "award_points", points: 10, one_time: false },
+          ]),
+          points_value: 10,
+          hmac_signed: false,
+          source_label: "print_sheet",
+        });
+      }
+      out.push({ ...item, qrCode, scanUrl: `${domain}/scan/${qrCode}` });
+    }
+    setPrintItems(out);
+    setShowPreview(true);
+    setGenerating(false);
+    fetchItems();
+  };
+
+  const lyt = PRINT_LAYOUTS.find((l) => l.key === layout) || PRINT_LAYOUTS[0];
+  const perPage = lyt.cols * lyt.rows;
+
+  const triggerPrint = () => {
+    const printWin = window.open("", "_blank");
+    const gridCols =
+      layout === "insert_1"
+        ? 1
+        : layout === "promo_4x2"
+          ? 4
+          : layout === "batch_sheet"
+            ? 3
+            : 3;
+    const qrSize =
+      layout === "insert_1" ? 180 : layout === "promo_4x2" ? 72 : 88;
+    const minH =
+      layout === "insert_1"
+        ? "260px"
+        : layout === "promo_4x2"
+          ? "120px"
+          : "150px";
+    const gap = layout === "insert_1" ? "0" : "6px";
+
+    const pages = [];
+    for (let p = 0; p < printItems.length; p += perPage) {
+      const chunk = printItems.slice(p, p + perPage);
+      pages.push(
+        chunk
+          .map((item) => {
+            const svgEl = document.querySelector(`#print-qr-${item.id}`);
+            const svgStr = svgEl
+              ? new XMLSerializer().serializeToString(svgEl)
+              : "";
+            const descHtml =
+              layout === "insert_1" && item.description
+                ? `<div class="desc">${item.description.slice(0, 160)}</div>`
+                : "";
+            const brandHtml = item.brand
+              ? `<div class="brand">${item.brand}</div>`
+              : "";
+            return `<div class="card">
+          <div class="cat">${(item.category || "").replace(/_/g, " ").toUpperCase()}</div>
+          ${brandHtml}
+          <div class="qr">${svgStr.replace(/width="[^"]*"/, `width="${qrSize}"`).replace(/height="[^"]*"/, `height="${qrSize}"`)}</div>
+          <div class="name">${item.name}</div>
+          <div class="price">R${parseFloat(item.sell_price).toFixed(2)}</div>
+          ${descHtml}
+          <div class="scan-hint">Scan to earn points</div>
+          <div class="url">${item.scanUrl}</div>
+        </div>`;
+          })
+          .join(""),
+      );
+    }
+
+    printWin.document
+      .write(`<!DOCTYPE html><html><head><title>QR Labels — ${lyt.label}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}
+  @page{size:A4 portrait;margin:10mm}
+  body{background:#fff}
+  .page{
+    display:grid;
+    grid-template-columns:repeat(${gridCols},1fr);
+    gap:${gap};
+    page-break-after:always;
+    align-items:start;
+  }
+  .page:last-child{page-break-after:auto}
+  .card{
+    border:1px solid #d0d0c8;
+    border-radius:6px;
+    padding:8px 6px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+    background:#fff;
+    min-height:${minH};
+    overflow:hidden;
+  }
+  .cat{font-size:7px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#2D6A4F;margin-bottom:1px}
+  .brand{font-size:8px;font-weight:600;color:#52b788;letter-spacing:.06em;text-transform:uppercase}
+  .qr{margin:3px 0;line-height:0}
+  .qr svg{display:block}
+  .name{font-size:${gridCols === 1 ? "13px" : gridCols === 4 ? "8px" : "10px"};font-weight:600;text-align:center;color:#111;line-height:1.3;max-width:100%}
+  .price{font-size:${gridCols === 1 ? "18px" : gridCols === 4 ? "11px" : "13px"};font-weight:700;color:#1A3D2B}
+  .desc{font-size:8px;color:#555;text-align:center;line-height:1.4;margin-top:2px}
+  .scan-hint{font-size:7px;color:#aaa;margin-top:auto;padding-top:3px}
+  .url{font-size:6px;color:#bbb;word-break:break-all;text-align:center}
+  @media print{
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{page-break-after:always}
+    .page:last-child{page-break-after:auto}
+  }
+</style></head><body>${pages.map((p) => `<div class="page">${p}</div>`).join("")}</body></html>`);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+    }, 800);
+  };
+
+  const sCard = {
+    background: "#fff",
+    border: `1px solid ${T.ink150}`,
+    borderRadius: 10,
+    overflow: "hidden",
+    fontFamily: T.font,
+  };
+  const sBtnSm = (bg = T.accent, col = "#fff") => ({
+    padding: "6px 14px",
+    fontSize: 11,
+    fontWeight: 600,
+    background: bg,
+    color: col,
+    border: "none",
+    borderRadius: 5,
+    cursor: "pointer",
+    fontFamily: T.font,
+    letterSpacing: "0.04em",
+  });
+
+  return (
+    <div
+      style={{ display: "flex", gap: 20, fontFamily: T.font, minHeight: 600 }}
+    >
+      {/* LEFT — item selector */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products…"
+            style={{
+              flex: 1,
+              minWidth: 160,
+              padding: "7px 10px",
+              border: `1px solid ${T.ink150}`,
+              borderRadius: 6,
+              fontSize: 12,
+              fontFamily: T.font,
+            }}
+          />
+          <select
+            value={catFilter}
+            onChange={(e) => setCatFilter(e.target.value)}
+            style={{
+              padding: "7px 10px",
+              border: `1px solid ${T.ink150}`,
+              borderRadius: 6,
+              fontSize: 12,
+              fontFamily: T.font,
+            }}
+          >
+            <option value="all">All categories</option>
+            {cats.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 11,
+              color: T.ink500,
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showOnlyNoQr}
+              onChange={(e) => setShowOnlyNoQr(e.target.checked)}
+            />
+            No QR yet
+          </label>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontSize: 11, color: T.ink400 }}>
+            {filtered.length} products · {selected.size} selected
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={toggleAll} style={sBtnSm(T.ink150, T.ink700)}>
+              {filtered.every((i) => selected.has(i.id))
+                ? "Deselect all"
+                : "Select all"}
+            </button>
+          </div>
+        </div>
+        <div style={{ ...sCard, maxHeight: 520, overflowY: "auto" }}>
+          {loading ? (
+            <div
+              style={{
+                padding: 40,
+                textAlign: "center",
+                color: T.ink300,
+                fontSize: 12,
+              }}
+            >
+              Loading inventory…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div
+              style={{
+                padding: 40,
+                textAlign: "center",
+                color: T.ink300,
+                fontSize: 12,
+              }}
+            >
+              No products match
+            </div>
+          ) : (
+            filtered.map((item) => {
+              const sel = selected.has(item.id);
+              const hasQr = item.qrCodes.length > 0;
+              const activeQr = item.qrCodes.find((q) => q.is_active);
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => toggle(item.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 14px",
+                    borderBottom: `1px solid ${T.ink075}`,
+                    cursor: "pointer",
+                    background: sel ? T.accentLit : "transparent",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      border: `2px solid ${sel ? T.accent : T.ink300}`,
+                      borderRadius: 4,
+                      background: sel ? T.accent : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {sel && (
+                      <span
+                        style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 16, flexShrink: 0 }}>
+                    {CAT_ICON[item.category] || "🌿"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: sel ? 600 : 400,
+                        color: T.ink900,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {item.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.ink400 }}>
+                      {CAT_LABEL[item.category] || item.category} · {item.sku}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: T.accent,
+                      fontFamily: "monospace",
+                      flexShrink: 0,
+                    }}
+                  >
+                    R{parseFloat(item.sell_price).toFixed(0)}
+                  </div>
+                  <div style={{ flexShrink: 0 }}>
+                    {hasQr ? (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: 8,
+                          background: activeQr ? T.successBg : T.warningBg,
+                          color: activeQr ? T.success : T.warning,
+                        }}
+                      >
+                        {activeQr ? `${item.qrCodes.length} QR` : "PAUSED"}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "2px 7px",
+                          borderRadius: 8,
+                          background: T.ink075,
+                          color: T.ink400,
+                        }}
+                      >
+                        NO QR
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT — layout picker + preview + actions */}
+      <div
+        style={{
+          width: 300,
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        {/* Layout picker */}
+        <div style={sCard}>
+          <div
+            style={{
+              padding: "12px 14px",
+              borderBottom: `1px solid ${T.ink150}`,
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: T.ink500,
+            }}
+          >
+            Print layout
+          </div>
+          {PRINT_LAYOUTS.map((l) => (
+            <div
+              key={l.key}
+              onClick={() => setLayout(l.key)}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: "10px 14px",
+                borderBottom: `1px solid ${T.ink075}`,
+                cursor: "pointer",
+                background: layout === l.key ? T.accentLit : "transparent",
+              }}
+            >
+              <div style={{ fontSize: 18, flexShrink: 0 }}>{l.icon}</div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: layout === l.key ? 600 : 400,
+                    color: layout === l.key ? T.accent : T.ink700,
+                  }}
+                >
+                  {l.label}
+                </div>
+                <div style={{ fontSize: 10, color: T.ink400, lineHeight: 1.4 }}>
+                  {l.desc}
+                </div>
+              </div>
+              {layout === l.key && (
+                <div
+                  style={{ marginLeft: "auto", fontSize: 14, color: T.accent }}
+                >
+                  ✓
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Stats */}
+        <div style={{ ...sCard, padding: 14 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
+          >
+            {[
+              ["Selected", selected.size],
+              ["Per page", lyt.cols * lyt.rows],
+              [
+                "New QR to generate",
+                selectedItems.filter((i) => !i.qrCodes.find((q) => q.is_active))
+                  .length,
+              ],
+              [
+                "Existing QR reused",
+                selectedItems.filter((i) => i.qrCodes.find((q) => q.is_active))
+                  .length,
+              ],
+            ].map(([k, v]) => (
+              <div
+                key={k}
+                style={{
+                  background: T.ink050,
+                  borderRadius: 6,
+                  padding: "8px 10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 300,
+                    color: T.accent,
+                    lineHeight: 1,
+                  }}
+                >
+                  {v}
+                </div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: T.ink400,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    marginTop: 3,
+                  }}
+                >
+                  {k}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button
+            onClick={handleGenerate}
+            disabled={!selected.size || generating}
+            style={{
+              ...sBtnSm(
+                selected.size ? T.accent : T.ink150,
+                selected.size ? "#fff" : T.ink400,
+              ),
+              padding: "12px 16px",
+              fontSize: 13,
+              borderRadius: 8,
+            }}
+          >
+            {generating
+              ? "Generating QR codes…"
+              : `Generate & Preview (${selected.size})`}
+          </button>
+          {/* Hidden full-resolution QRs for print — all items, off-screen */}
+          {showPreview && printItems.length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                left: -9999,
+                top: -9999,
+                pointerEvents: "none",
+              }}
+              aria-hidden="true"
+            >
+              {printItems.map((item) => (
+                <div key={`fullqr-${item.id}`} id={`print-qr-${item.id}`}>
+                  <QRCodeSVG
+                    value={item.scanUrl}
+                    size={200}
+                    level="H"
+                    bgColor="#fff"
+                    fgColor={T.accent}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {showPreview && printItems.length > 0 && (
+            <button
+              onClick={triggerPrint}
+              style={{
+                ...sBtnSm("#b5935a"),
+                padding: "12px 16px",
+                fontSize: 13,
+                borderRadius: 8,
+              }}
+            >
+              🖨 Print / Save as PDF
+            </button>
+          )}
+          {showPreview && (
+            <button
+              onClick={() => setShowPreview(false)}
+              style={{
+                ...sBtnSm(T.ink050, T.ink500),
+                padding: "10px 16px",
+                fontSize: 11,
+                borderRadius: 8,
+              }}
+            >
+              ← Back to selector
+            </button>
+          )}
+        </div>
+
+        {/* Live preview */}
+        {showPreview && printItems.length > 0 && (
+          <div style={{ ...sCard, overflow: "hidden" }}>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderBottom: `1px solid ${T.ink150}`,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: T.ink500,
+              }}
+            >
+              Preview — {lyt.label}
+            </div>
+            <div
+              style={{
+                padding: 10,
+                background: T.ink050,
+                display: "grid",
+                gridTemplateColumns: `repeat(${Math.min(lyt.cols, 3)},1fr)`,
+                gap: 6,
+              }}
+            >
+              {printItems
+                .slice(0, lyt.cols * Math.min(lyt.rows, 2))
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: "#fff",
+                      border: `1px solid ${T.ink150}`,
+                      borderRadius: 6,
+                      padding: "8px 6px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 3,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 8,
+                        fontWeight: 700,
+                        color: T.accentMid,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {CAT_LABEL[item.category] || item.category}
+                    </div>
+                    <div id={`print-qr-${item.id}`}>
+                      <QRCodeSVG
+                        value={item.scanUrl}
+                        size={52}
+                        level="H"
+                        bgColor="#fff"
+                        fgColor={T.accent}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 600,
+                        textAlign: "center",
+                        color: T.ink900,
+                        lineHeight: 1.3,
+                        maxWidth: 72,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.name}
+                    </div>
+                    <div
+                      style={{ fontSize: 11, fontWeight: 700, color: T.accent }}
+                    >
+                      R{parseFloat(item.sell_price).toFixed(0)}
+                    </div>
+                  </div>
+                ))}
+              {printItems.length > lyt.cols * 2 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 10,
+                    color: T.ink400,
+                    fontStyle: "italic",
+                  }}
+                >
+                  +{printItems.length - lyt.cols * 2} more
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECURITY & SETTINGS TAB — surfaces ALL hidden QR system functionality
+// ═══════════════════════════════════════════════════════════════════════════════
+function SecurityTab({ tenantId }) {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [flaggedUsers, setFlaggedUsers] = useState([]);
+  const [resolving, setResolving] = useState(null);
+
+  const DEFAULT_SETTINGS = {
+    velocity_window_seconds: 60,
+    velocity_scan_threshold: 3,
+    velocity_anomaly_increment: 20,
+    max_anomaly_score: 100,
+    fraud_flag_threshold: 70,
+    pool_low_threshold: 10,
+    pool_critical_threshold: 0,
+    default_max_scans: null,
+    default_cooldown_hrs: 0,
+    default_points: 10,
+    default_one_time: true,
+    gps_prompt_enabled: true,
+    gps_prompt_delay_ms: 2500,
+    tier_upgrade_whatsapp: true,
+    tier_upgrade_message: true,
+    streak_bonus_enabled: true,
+    pts_streak_bonus: 200,
+    streak_interval: 5,
+    mult_cat_flower: 2.0,
+    mult_cat_vape: 1.75,
+    mult_cat_edible: 1.5,
+    mult_cat_seeds: 3.0,
+    mult_cat_accessories: 0.75,
+    mult_cat_wellness: 1.5,
+    mult_cat_merch: 2.0,
+  };
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cfgRes, alertRes, usersRes] = await Promise.all([
+        supabase
+          .from("qr_security_settings")
+          .select("*")
+          .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
+          .single(),
+        supabase
+          .from("system_alerts")
+          .select("*")
+          .in("alert_type", [
+            "velocity_flag",
+            "scan_abuse",
+            "suspended_scan",
+            "qr_pool_low",
+          ])
+          .order("created_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("user_profiles")
+          .select(
+            "id,full_name,email,anomaly_score,is_suspended,loyalty_points,last_active_at",
+          )
+          .gt("anomaly_score", 0)
+          .order("anomaly_score", { ascending: false })
+          .limit(10),
+      ]);
+      setSettings(cfgRes.data || DEFAULT_SETTINGS);
+      setAlerts(alertRes.data || []);
+      setFlaggedUsers(usersRes.data || []);
+    } catch (_) {
+      setSettings(DEFAULT_SETTINGS);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const { data: existing } = await supabase
+        .from("qr_security_settings")
+        .select("id")
+        .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
+        .single();
+      if (existing?.id) {
+        await supabase
+          .from("qr_security_settings")
+          .update({ ...settings, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("qr_security_settings")
+          .insert({
+            ...settings,
+            tenant_id: tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3",
+          });
+      }
+    } catch (_) {
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleSuspend = async (user) => {
+    setResolving(user.id);
+    await supabase
+      .from("user_profiles")
+      .update({
+        is_suspended: !user.is_suspended,
+        anomaly_score: user.is_suspended ? 0 : user.anomaly_score,
+      })
+      .eq("id", user.id);
+    fetchAll();
+    setResolving(null);
+  };
+
+  const resetScore = async (user) => {
+    setResolving(user.id);
+    await supabase
+      .from("user_profiles")
+      .update({ anomaly_score: 0 })
+      .eq("id", user.id);
+    fetchAll();
+    setResolving(null);
+  };
+
+  const resolveAlert = async (alert) => {
+    await supabase
+      .from("system_alerts")
+      .update({ status: "resolved" })
+      .eq("id", alert.id);
+    setAlerts((p) => p.filter((a) => a.id !== alert.id));
+  };
+
+  const upd = (k, v) => setSettings((p) => ({ ...p, [k]: v }));
+
+  if (loading)
+    return (
+      <div
+        style={{
+          padding: 40,
+          textAlign: "center",
+          color: T.ink300,
+          fontSize: 12,
+        }}
+      >
+        Loading security settings…
+      </div>
+    );
+
+  const sSec = {
+    background: "#fff",
+    border: `1px solid ${T.ink150}`,
+    borderRadius: 10,
+    marginBottom: 20,
+    overflow: "hidden",
+    fontFamily: T.font,
+  };
+  const sSecH = {
+    padding: "12px 16px",
+    borderBottom: `1px solid ${T.ink150}`,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  };
+  const sSecHT = {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    color: T.ink700,
+  };
+  const sRow = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10px 16px",
+    borderBottom: `1px solid ${T.ink075}`,
+  };
+  const sLabel = { fontSize: 12, color: T.ink700, fontWeight: 500 };
+  const sSub = { fontSize: 10, color: T.ink400, marginTop: 2 };
+  const sNum = {
+    width: 72,
+    padding: "5px 8px",
+    border: `1px solid ${T.ink150}`,
+    borderRadius: 5,
+    fontSize: 12,
+    fontFamily: "monospace",
+    textAlign: "right",
+  };
+  const sToggle = (on) => ({
+    width: 36,
+    height: 20,
+    borderRadius: 10,
+    background: on ? T.accent : T.ink150,
+    position: "relative",
+    cursor: "pointer",
+    transition: "background 0.2s",
+    border: "none",
+    flexShrink: 0,
+  });
+  const sDot = (on) => ({
+    position: "absolute",
+    top: 3,
+    left: on ? 17 : 3,
+    width: 14,
+    height: 14,
+    borderRadius: "50%",
+    background: "#fff",
+    transition: "left 0.2s",
+  });
+
+  const Toggle = ({ val, onChange }) => (
+    <button onClick={() => onChange(!val)} style={sToggle(val)}>
+      <div style={sDot(val)} />
+    </button>
+  );
+
+  return (
+    <div style={{ fontFamily: T.font }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* LEFT COLUMN */}
+        <div>
+          {/* Fraud detection */}
+          <div style={sSec}>
+            <div style={sSecH}>
+              <span style={sSecHT}>🛡 Fraud & Velocity Detection</span>
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 8,
+                  background: T.dangerBg,
+                  color: T.danger,
+                }}
+              >
+                LIVE
+              </span>
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Velocity window</div>
+                <div style={sSub}>
+                  Scan count is measured within this window
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={settings.velocity_window_seconds}
+                  onChange={(e) =>
+                    upd("velocity_window_seconds", +e.target.value)
+                  }
+                  style={sNum}
+                />
+                <span style={{ fontSize: 10, color: T.ink400 }}>seconds</span>
+              </div>
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Rapid scan threshold</div>
+                <div style={sSub}>Scans within window before anomaly flags</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={settings.velocity_scan_threshold}
+                  onChange={(e) =>
+                    upd("velocity_scan_threshold", +e.target.value)
+                  }
+                  style={sNum}
+                />
+                <span style={{ fontSize: 10, color: T.ink400 }}>scans</span>
+              </div>
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Anomaly score increment</div>
+                <div style={sSub}>
+                  Added to user score per velocity flag (max 100)
+                </div>
+              </div>
+              <input
+                type="number"
+                value={settings.velocity_anomaly_increment}
+                onChange={(e) =>
+                  upd("velocity_anomaly_increment", +e.target.value)
+                }
+                style={sNum}
+              />
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Flag threshold</div>
+                <div style={sSub}>
+                  Score at which user appears in fraud dashboard
+                </div>
+              </div>
+              <input
+                type="number"
+                value={settings.fraud_flag_threshold}
+                onChange={(e) => upd("fraud_flag_threshold", +e.target.value)}
+                style={sNum}
+              />
+            </div>
+            <div style={sRow}>
+              <div>
+                <div style={sLabel}>Pool low alert</div>
+                <div style={sSub}>
+                  Alert fires when unclaimed codes drop below
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={settings.pool_low_threshold}
+                  onChange={(e) => upd("pool_low_threshold", +e.target.value)}
+                  style={sNum}
+                />
+                <span style={{ fontSize: 10, color: T.ink400 }}>codes</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Streak & Notifications */}
+          <div style={sSec}>
+            <div style={sSecH}>
+              <span style={sSecHT}>🔥 Streak Bonus</span>
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Streak bonus enabled</div>
+                <div style={sSub}>
+                  Award bonus points for weekly scan streaks
+                </div>
+              </div>
+              <Toggle
+                val={settings.streak_bonus_enabled}
+                onChange={(v) => upd("streak_bonus_enabled", v)}
+              />
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Streak interval</div>
+                <div style={sSub}>Scans per week to trigger bonus</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={settings.streak_interval}
+                  onChange={(e) => upd("streak_interval", +e.target.value)}
+                  style={sNum}
+                />
+                <span style={{ fontSize: 10, color: T.ink400 }}>scans</span>
+              </div>
+            </div>
+            <div style={sRow}>
+              <div>
+                <div style={sLabel}>Streak bonus points</div>
+                <div style={sSub}>Points awarded on streak trigger</div>
+              </div>
+              <input
+                type="number"
+                value={settings.pts_streak_bonus}
+                onChange={(e) => upd("pts_streak_bonus", +e.target.value)}
+                style={sNum}
+              />
+            </div>
+          </div>
+
+          {/* Notifications */}
+          <div style={sSec}>
+            <div style={sSecH}>
+              <span style={sSecHT}>📲 Automated Notifications</span>
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>WhatsApp on tier upgrade</div>
+                <div style={sSub}>
+                  Fires send-notification EF when tier changes
+                </div>
+              </div>
+              <Toggle
+                val={settings.tier_upgrade_whatsapp}
+                onChange={(v) => upd("tier_upgrade_whatsapp", v)}
+              />
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>In-app tier upgrade message</div>
+                <div style={sSub}>
+                  Writes to customer_messages on tier change
+                </div>
+              </div>
+              <Toggle
+                val={settings.tier_upgrade_message}
+                onChange={(v) => upd("tier_upgrade_message", v)}
+              />
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>GPS location prompt</div>
+                <div style={sSub}>Ask mobile users for GPS 2.5s after scan</div>
+              </div>
+              <Toggle
+                val={settings.gps_prompt_enabled}
+                onChange={(v) => upd("gps_prompt_enabled", v)}
+              />
+            </div>
+            <div style={sRow}>
+              <div>
+                <div style={sLabel}>GPS prompt delay</div>
+                <div style={sSub}>
+                  Milliseconds after scan before GPS prompt
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={settings.gps_prompt_delay_ms}
+                  onChange={(e) => upd("gps_prompt_delay_ms", +e.target.value)}
+                  style={sNum}
+                />
+                <span style={{ fontSize: 10, color: T.ink400 }}>ms</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div>
+          {/* Category multipliers */}
+          <div style={sSec}>
+            <div style={sSecH}>
+              <span style={sSecHT}>✨ Category Point Multipliers</span>
+              <span style={{ fontSize: 9, color: T.ink400 }}>
+                Applied silently at scan time
+              </span>
+            </div>
+            {[
+              ["flower", "🌸 Flower", "mult_cat_flower"],
+              ["vape", "💨 Vape", "mult_cat_vape"],
+              ["edible", "🍬 Edible", "mult_cat_edible"],
+              ["seeds_clones", "🌱 Seeds / Clones", "mult_cat_seeds"],
+              ["accessories", "🔧 Accessories", "mult_cat_accessories"],
+              ["wellness", "💊 Wellness", "mult_cat_wellness"],
+              ["merch", "👕 Merch / Lifestyle", "mult_cat_merch"],
+            ].map(([, label, key]) => {
+              const val = settings[key] || 1.0;
+              const color =
+                val >= 2
+                  ? T.success
+                  : val >= 1.25
+                    ? T.warning
+                    : val < 1
+                      ? T.danger
+                      : T.ink400;
+              return (
+                <div
+                  key={key}
+                  style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}
+                >
+                  <div style={sLabel}>{label}</div>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="5"
+                      step="0.25"
+                      value={val}
+                      onChange={(e) => upd(key, parseFloat(e.target.value))}
+                      style={{ width: 80, accentColor: T.accent }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color,
+                        fontFamily: "monospace",
+                        width: 36,
+                        textAlign: "right",
+                      }}
+                    >
+                      {val}×
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Scan defaults */}
+          <div style={sSec}>
+            <div style={sSecH}>
+              <span style={sSecHT}>⚙️ Scan Defaults</span>
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Default points per scan</div>
+                <div style={sSub}>
+                  Used when code has no explicit points_value
+                </div>
+              </div>
+              <input
+                type="number"
+                value={settings.default_points}
+                onChange={(e) => upd("default_points", +e.target.value)}
+                style={sNum}
+              />
+            </div>
+            <div style={{ ...sRow, borderBottom: `1px solid ${T.ink075}` }}>
+              <div>
+                <div style={sLabel}>Default one-time scan</div>
+                <div style={sSub}>New codes default to single-use</div>
+              </div>
+              <Toggle
+                val={settings.default_one_time}
+                onChange={(v) => upd("default_one_time", v)}
+              />
+            </div>
+            <div style={sRow}>
+              <div>
+                <div style={sLabel}>Default cooldown</div>
+                <div style={sSub}>Hours between repeat scans (0 = none)</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="number"
+                  value={settings.default_cooldown_hrs}
+                  onChange={(e) => upd("default_cooldown_hrs", +e.target.value)}
+                  style={sNum}
+                />
+                <span style={{ fontSize: 10, color: T.ink400 }}>hrs</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Save button */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 24,
+        }}
+      >
+        <button
+          onClick={save}
+          disabled={saving}
+          style={{
+            padding: "10px 28px",
+            background: T.accent,
+            color: "#fff",
+            border: "none",
+            borderRadius: 7,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.font,
+          }}
+        >
+          {saving ? "Saving…" : "Save settings"}
+        </button>
+      </div>
+
+      {/* Active alerts */}
+      {alerts.length > 0 && (
+        <div style={sSec}>
+          <div style={sSecH}>
+            <span style={sSecHT}>🚨 Recent Security Alerts</span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 8,
+                background: T.dangerBg,
+                color: T.danger,
+              }}
+            >
+              {alerts.length}
+            </span>
+          </div>
+          {alerts.map((a) => (
+            <div key={a.id} style={{ ...sRow, alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: a.severity === "critical" ? T.danger : T.warning,
+                  }}
+                >
+                  {a.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: T.ink400,
+                    marginTop: 2,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {a.body?.slice(0, 120)}
+                </div>
+                <div style={{ fontSize: 9, color: T.ink300, marginTop: 3 }}>
+                  {new Date(a.created_at).toLocaleString("en-ZA")}
+                </div>
+              </div>
+              <button
+                onClick={() => resolveAlert(a)}
+                style={{
+                  marginLeft: 12,
+                  padding: "4px 10px",
+                  fontSize: 10,
+                  background: T.ink075,
+                  border: "none",
+                  borderRadius: 5,
+                  cursor: "pointer",
+                  color: T.ink500,
+                  flexShrink: 0,
+                }}
+              >
+                Resolve
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Flagged users */}
+      {flaggedUsers.length > 0 && (
+        <div style={sSec}>
+          <div style={sSecH}>
+            <span style={sSecHT}>⚠ Anomaly Scores — Flagged Users</span>
+            <span style={{ fontSize: 10, color: T.ink400 }}>
+              Score &gt; 0 · sorted highest first
+            </span>
+          </div>
+          {flaggedUsers.map((u) => {
+            const score = u.anomaly_score || 0;
+            const color =
+              score >= 70 ? T.danger : score >= 40 ? T.warning : T.ink400;
+            return (
+              <div key={u.id} style={{ ...sRow, alignItems: "center" }}>
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{ fontSize: 12, fontWeight: 500, color: T.ink900 }}
+                  >
+                    {u.full_name || u.email || u.id.slice(0, 8)}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 4,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 120,
+                        height: 6,
+                        background: T.ink150,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${Math.min(score, 100)}%`,
+                          height: "100%",
+                          background: color,
+                          borderRadius: 3,
+                        }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color,
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {score}/100
+                    </span>
+                    {u.is_suspended && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "1px 6px",
+                          borderRadius: 8,
+                          background: T.dangerBg,
+                          color: T.danger,
+                        }}
+                      >
+                        SUSPENDED
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => resetScore(u)}
+                    disabled={resolving === u.id}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 10,
+                      background: T.infoBg,
+                      border: `1px solid ${T.infoBd}`,
+                      borderRadius: 5,
+                      cursor: "pointer",
+                      color: T.info,
+                    }}
+                  >
+                    Reset score
+                  </button>
+                  <button
+                    onClick={() => toggleSuspend(u)}
+                    disabled={resolving === u.id}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 10,
+                      background: u.is_suspended ? T.successBg : T.dangerBg,
+                      border: `1px solid ${u.is_suspended ? T.successBd : T.dangerBd}`,
+                      borderRadius: 5,
+                      cursor: "pointer",
+                      color: u.is_suspended ? T.success : T.danger,
+                    }}
+                  >
+                    {u.is_suspended ? "Unsuspend" : "Suspend"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminQRCodes({
@@ -2919,6 +4478,8 @@ export default function AdminQRCodes({
   const TABS = [
     { key: "registry", label: "QR Registry" },
     { key: "generate", label: "Generate" },
+    { key: "print", label: "🖨 Print Sheet" },
+    { key: "security", label: "🛡 Security & Settings" },
     { key: "banners", label: "Banners" },
   ];
 
@@ -2946,8 +4507,9 @@ export default function AdminQRCodes({
           QR Engine v2.0
         </h2>
         <div style={{ fontSize: 13, color: T.ink400, marginBottom: 24 }}>
-          6 QR types · Scan action stack · Banner library · HMAC-signed product
-          codes
+          6 QR types · HMAC-signed · Action stack · Smart print · Fraud
+          detection · Velocity anomaly scoring · Category multipliers · Streak
+          engine
         </div>
       </div>
 
@@ -2998,6 +4560,8 @@ export default function AdminQRCodes({
           initialBatchId={initialBatchId}
         />
       )}
+      {tab === "print" && <PrintTab tenantId={tenantId} />}
+      {tab === "security" && <SecurityTab tenantId={tenantId} />}
       {tab === "banners" && (
         <BannersTab banners={banners} onRefresh={fetchBanners} />
       )}
