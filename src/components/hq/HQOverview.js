@@ -19,6 +19,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
+import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
@@ -208,6 +209,14 @@ const GUIDE_TIPS = [
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function HQOverview({ onNavigate }) {
   const ctx = usePageContext("overview", null);
+  const { tenantId, industryProfile } = useTenant();
+  const isCannabisRetail =
+    industryProfile === "cannabis_retail" ||
+    industryProfile === "cannabis_dispensary";
+
+  // Cannabis retail: stock intelligence state
+  const [cannabisStock, setCannabisStock] = useState(null);
+  const [cannabisPOs, setCannabisPOs] = useState(null);
 
   const [scanTrend, setScanTrend] = useState([]);
   const [revenueTrend, setRevenueTrend] = useState([]);
@@ -707,6 +716,152 @@ export default function HQOverview({ onNavigate }) {
     fetchStats();
   }, [fetchStats]);
 
+  // ── Cannabis retail: dedicated stock intelligence fetch ─────────────────────
+  const fetchCannabisData = useCallback(async () => {
+    if (!isCannabisRetail || !tenantId) return;
+    try {
+      const now = new Date();
+      const in30 = new Date(now.getTime() + 30 * 86400000)
+        .toISOString()
+        .split("T")[0];
+      const in7 = new Date(now.getTime() + 7 * 86400000)
+        .toISOString()
+        .split("T")[0];
+      const today = now.toISOString().split("T")[0];
+
+      const [itemsRes, poisRes] = await Promise.all([
+        supabase
+          .from("inventory_items")
+          .select(
+            "id,category,quantity_on_hand,sell_price,weighted_avg_cost,reorder_level,expiry_date,is_active",
+          )
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true),
+        supabase
+          .from("purchase_orders")
+          .select(
+            "id,po_status,currency,subtotal,landed_cost_zar,expected_arrival,expected_date",
+          )
+          .eq("tenant_id", tenantId)
+          .not("po_status", "in", '("complete","paid","cancelled","received")'),
+      ]);
+
+      const items = itemsRes.data || [];
+      const pos = poisRes.data || [];
+
+      // Stock health metrics
+      const inStock = items.filter((i) => (i.quantity_on_hand || 0) > 0);
+      const outOfStock = items.filter((i) => (i.quantity_on_hand || 0) <= 0);
+      const belowReorder = items.filter(
+        (i) =>
+          i.reorder_level > 0 && (i.quantity_on_hand || 0) <= i.reorder_level,
+      );
+      const expiredItems = items.filter(
+        (i) =>
+          i.expiry_date &&
+          i.expiry_date < today &&
+          (i.quantity_on_hand || 0) > 0,
+      );
+      const expiring7 = items.filter(
+        (i) =>
+          i.expiry_date &&
+          i.expiry_date >= today &&
+          i.expiry_date <= in7 &&
+          (i.quantity_on_hand || 0) > 0,
+      );
+      const expiring30 = items.filter(
+        (i) =>
+          i.expiry_date &&
+          i.expiry_date > in7 &&
+          i.expiry_date <= in30 &&
+          (i.quantity_on_hand || 0) > 0,
+      );
+
+      // Stock value + margin from AVCO (correct for retail)
+      const stockValue = items.reduce(
+        (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+        0,
+      );
+      const pricedItems = items.filter(
+        (i) => i.sell_price > 0 && i.weighted_avg_cost > 0,
+      );
+      const margins = pricedItems.map(
+        (i) => ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100,
+      );
+      const avgMargin =
+        margins.length > 0
+          ? margins.reduce((s, m) => s + m, 0) / margins.length
+          : null;
+      const healthyItems = pricedItems.filter(
+        (i) =>
+          ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 >= 40,
+      );
+
+      // Category breakdown
+      const byCat = {};
+      items.forEach((i) => {
+        const c = i.category || "other";
+        if (!byCat[c]) byCat[c] = { count: 0, inStock: 0 };
+        byCat[c].count++;
+        if ((i.quantity_on_hand || 0) > 0) byCat[c].inStock++;
+      });
+
+      setCannabisStock({
+        total: items.length,
+        inStock: inStock.length,
+        outOfStock: outOfStock.length,
+        belowReorder: belowReorder.length,
+        expired: expiredItems.length,
+        expiring7: expiring7.length,
+        expiring30: expiring30.length,
+        stockValue,
+        avgMargin,
+        healthyCount: healthyItems.length,
+        totalPriced: pricedItems.length,
+        byCat,
+        expiryAlert:
+          expiredItems.length > 0
+            ? "critical"
+            : expiring7.length > 0
+              ? "critical"
+              : expiring30.length > 0
+                ? "warning"
+                : "success",
+        expiryLabel:
+          expiredItems.length > 0
+            ? `${expiredItems.length} EXPIRED — remove now`
+            : expiring7.length > 0
+              ? `${expiring7.length} expiring this week`
+              : expiring30.length > 0
+                ? `${expiring30.length} expiring in 30 days`
+                : "all clear",
+      });
+
+      // ZAR POs only for cannabis retail
+      const zarPOs = pos.filter((p) => p.currency === "ZAR");
+      const usdPOs = pos.filter((p) => p.currency !== "ZAR");
+      setCannabisPOs({
+        openZAR: zarPOs.length,
+        openUSD: usdPOs.length,
+        total: pos.length,
+        nextDelivery: zarPOs
+          .filter((p) => p.expected_arrival || p.expected_date)
+          .sort((a, b) =>
+            (a.expected_arrival || a.expected_date || "") <
+            (b.expected_arrival || b.expected_date || "")
+              ? -1
+              : 1,
+          )[0],
+      });
+    } catch (err) {
+      console.error("[HQOverview] Cannabis fetch:", err);
+    }
+  }, [isCannabisRetail, tenantId]);
+
+  useEffect(() => {
+    fetchCannabisData();
+  }, [fetchCannabisData]);
+
   // GAP-02: realtime subscriptions — stock + batches → refresh overview
   useEffect(() => {
     const stockSub = supabase
@@ -892,30 +1047,78 @@ export default function HQOverview({ onNavigate }) {
       )}
 
       {/* ── ROW 1: OPERATIONS HEALTH ── */}
-      <SectionLabel label="Operations Health" />
+      <SectionLabel
+        label={isCannabisRetail ? "Stock & Operations" : "Operations Health"}
+      />
       <div style={tileGrid}>
-        <MetricTile
-          label="Production"
-          value={productionStats?.activeBatches ?? "—"}
-          subLabel="active batches"
-          sub={
-            lowFinishedCount > 0
-              ? `${lowFinishedCount} finished goods low`
-              : "all batches healthy"
-          }
-          semantic={lowFinishedCount > 0 ? "warning" : "success"}
-          onClick={() => nav("hq-production")}
-          hint="HQ Production"
-        />
-        <MetricTile
-          label="Import POs"
-          value={erpStats?.activeImportPOs ?? "—"}
-          subLabel="open orders"
-          sub="in transit / pending"
-          semantic="info"
-          onClick={() => nav("procurement")}
-          hint="Procurement"
-        />
+        {isCannabisRetail ? (
+          <>
+            {/* Cannabis: Stock Health */}
+            <MetricTile
+              label="Stock Health"
+              value={cannabisStock ? `${cannabisStock.inStock}` : "—"}
+              subLabel={
+                cannabisStock
+                  ? `of ${cannabisStock.total} SKUs in stock`
+                  : "loading…"
+              }
+              sub={
+                cannabisStock
+                  ? cannabisStock.outOfStock > 0
+                    ? `${cannabisStock.outOfStock} out of stock · ${cannabisStock.belowReorder} below reorder`
+                    : "all items stocked"
+                  : "…"
+              }
+              semantic={cannabisStock?.outOfStock > 0 ? "warning" : "success"}
+              onClick={() => nav("stock")}
+              hint="Stock"
+            />
+            {/* Cannabis: Purchase Orders (local ZAR) */}
+            <MetricTile
+              label="Purchase Orders"
+              value={cannabisPOs ? `${cannabisPOs.total}` : "—"}
+              subLabel="open orders"
+              sub={
+                cannabisPOs
+                  ? cannabisPOs.nextDelivery
+                    ? `next delivery ${cannabisPOs.nextDelivery.expected_arrival || cannabisPOs.nextDelivery.expected_date}`
+                    : cannabisPOs.total > 0
+                      ? "awaiting delivery"
+                      : "no open POs"
+                  : "…"
+              }
+              semantic={cannabisPOs?.total > 0 ? "info" : null}
+              onClick={() => nav("stock")}
+              hint="Purchase Orders"
+            />
+          </>
+        ) : (
+          <>
+            {/* Manufacturer: Production */}
+            <MetricTile
+              label="Production"
+              value={productionStats?.activeBatches ?? "—"}
+              subLabel="active batches"
+              sub={
+                lowFinishedCount > 0
+                  ? `${lowFinishedCount} finished goods low`
+                  : "all batches healthy"
+              }
+              semantic={lowFinishedCount > 0 ? "warning" : "success"}
+              onClick={() => nav("hq-production")}
+              hint="HQ Production"
+            />
+            <MetricTile
+              label="Import POs"
+              value={erpStats?.activeImportPOs ?? "—"}
+              subLabel="open orders"
+              sub="in transit / pending"
+              semantic="info"
+              onClick={() => nav("procurement")}
+              hint="Procurement"
+            />
+          </>
+        )}
         <MetricTile
           label="Revenue MTD"
           value={
@@ -925,14 +1128,20 @@ export default function HQOverview({ onNavigate }) {
           }
           subLabel="this month"
           sub={
-            erpStats?.avgMarginPct != null
-              ? `${erpStats.avgMarginPct.toFixed(1)}% avg margin`
-              : "margin loading…"
+            isCannabisRetail && cannabisStock?.avgMargin != null
+              ? `${cannabisStock.avgMargin.toFixed(1)}% avg margin`
+              : erpStats?.avgMarginPct != null
+                ? `${erpStats.avgMarginPct.toFixed(1)}% avg margin`
+                : "margin loading…"
           }
           semantic={
-            erpStats?.avgMarginPct >= 35
+            (isCannabisRetail
+              ? cannabisStock?.avgMargin
+              : erpStats?.avgMarginPct) >= 35
               ? "success"
-              : erpStats?.avgMarginPct >= 20
+              : (isCannabisRetail
+                    ? cannabisStock?.avgMargin
+                    : erpStats?.avgMarginPct) >= 20
                 ? "warning"
                 : "danger"
           }
@@ -941,16 +1150,186 @@ export default function HQOverview({ onNavigate }) {
         />
         <MetricTile
           label="Reorder Alerts"
-          value={erpStats?.reorderCount ?? "—"}
+          value={
+            isCannabisRetail
+              ? (cannabisStock?.belowReorder ?? "—")
+              : (erpStats?.reorderCount ?? "—")
+          }
           subLabel="below threshold"
           sub={
-            erpStats?.reorderCount > 0 ? "items need reorder" : "all stocked"
+            (isCannabisRetail
+              ? cannabisStock?.belowReorder
+              : erpStats?.reorderCount) > 0
+              ? "items need reorder"
+              : "all stocked"
           }
-          semantic={erpStats?.reorderCount > 0 ? "danger" : "success"}
+          semantic={
+            (isCannabisRetail
+              ? cannabisStock?.belowReorder
+              : erpStats?.reorderCount) > 0
+              ? "danger"
+              : "success"
+          }
           onClick={() => nav("reorder")}
           hint="Reorder"
         />
       </div>
+
+      {/* ── CANNABIS ROW 1.5: STOCK INTELLIGENCE ─────────────────────────── */}
+      {isCannabisRetail && cannabisStock && (
+        <>
+          <SectionLabel label="Stock Intelligence" />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+              gap: 12,
+              marginBottom: 28,
+            }}
+          >
+            {/* Stock Value */}
+            <MetricTile
+              label="Stock Value"
+              value={`R${Math.round(cannabisStock.stockValue).toLocaleString("en-ZA")}`}
+              subLabel="AVCO-weighted"
+              sub={`${cannabisStock.inStock} SKUs in stock`}
+              semantic="success"
+              onClick={() => nav("stock")}
+              hint="Stock"
+            />
+            {/* Margin Health */}
+            <MetricTile
+              label="Margin Health"
+              value={
+                cannabisStock.avgMargin != null
+                  ? `${cannabisStock.avgMargin.toFixed(1)}%`
+                  : "—"
+              }
+              subLabel="avg across priced items"
+              sub={`${cannabisStock.healthyCount} of ${cannabisStock.totalPriced} healthy (>40%)`}
+              semantic={
+                cannabisStock.avgMargin >= 50
+                  ? "success"
+                  : cannabisStock.avgMargin >= 35
+                    ? "warning"
+                    : "danger"
+              }
+              onClick={() => nav("pricing")}
+              hint="Pricing"
+            />
+            {/* Expiry Alert */}
+            <MetricTile
+              label="Expiry Status"
+              value={
+                cannabisStock.expired > 0
+                  ? cannabisStock.expired
+                  : cannabisStock.expiring7 > 0
+                    ? cannabisStock.expiring7
+                    : cannabisStock.expiring30 > 0
+                      ? cannabisStock.expiring30
+                      : "✓"
+              }
+              subLabel={
+                cannabisStock.expired > 0
+                  ? "items expired"
+                  : cannabisStock.expiring7 > 0
+                    ? "expiring this week"
+                    : cannabisStock.expiring30 > 0
+                      ? "expiring in 30 days"
+                      : "all clear"
+              }
+              sub={cannabisStock.expiryLabel}
+              semantic={cannabisStock.expiryAlert}
+              onClick={() => nav("stock")}
+              hint="Stock → Items"
+            />
+          </div>
+
+          {/* Category health mini-bars */}
+          {Object.keys(cannabisStock.byCat).length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <ChartCard title="Stock by Category" height={180}>
+                <div
+                  style={{
+                    padding: "8px 16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    height: "100%",
+                    justifyContent: "center",
+                  }}
+                >
+                  {Object.entries(cannabisStock.byCat)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .slice(0, 6)
+                    .map(([cat, data]) => {
+                      const pct =
+                        data.count > 0 ? (data.inStock / data.count) * 100 : 0;
+                      return (
+                        <div
+                          key={cat}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 100,
+                              fontSize: 11,
+                              color: T.ink500,
+                              fontFamily: T.font,
+                              textTransform: "capitalize",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {cat}
+                          </div>
+                          <div
+                            style={{
+                              flex: 1,
+                              height: 8,
+                              background: T.ink075,
+                              borderRadius: 4,
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: `${pct}%`,
+                                height: "100%",
+                                background:
+                                  pct === 100
+                                    ? T.accentMid
+                                    : pct > 50
+                                      ? T.warning
+                                      : T.danger,
+                                borderRadius: 4,
+                                transition: "width 0.5s",
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              width: 50,
+                              fontSize: 10,
+                              color: T.ink400,
+                              fontFamily: T.fontData,
+                              textAlign: "right",
+                            }}
+                          >
+                            {data.inStock}/{data.count}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </ChartCard>
+            </div>
+          )}
+        </>
+      )}
 
       {/* ── CHART: Scan Activity — Area (secondary, below ops) ── */}
       {scanTrend.length > 0 && (
