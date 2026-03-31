@@ -26,9 +26,28 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { supabase } from "../services/supabaseClient";
+import { createClient } from "@supabase/supabase-js";
 import ClientHeader from "../components/ClientHeader";
 import { useTenant } from "../services/tenantService";
 import { useStorefront } from "../contexts/StorefrontContext"; // ✦ WP-MULTISITE
+
+// ── Public/anonymous client for storefront product queries ────────────────────
+// Does NOT carry a user JWT — queries as anon role, bypasses per-user RLS.
+// This allows the shop to show any tenant's products regardless of who is logged in.
+// Requires: Supabase RLS policy allowing anon SELECT on inventory_items WHERE is_active=true
+// SQL: CREATE POLICY "anon_read_active_inventory" ON inventory_items
+//      FOR SELECT TO anon, authenticated USING (is_active = true);
+const storefrontDb = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  },
+);
 
 // ── Distillate COA ────────────────────────────────────────────────────────────
 const DISTILLATE_COA = {
@@ -2478,7 +2497,8 @@ export default function Shop() {
     const fetchProducts = async () => {
       setLoadingInventory(true);
       try {
-        const { data, error } = await supabase
+        // Use storefrontDb (no user JWT) so RLS doesn't block cross-tenant reads
+        const { data, error } = await storefrontDb
           .from("inventory_items")
           .select(
             // Only columns confirmed to exist in inventory_items
