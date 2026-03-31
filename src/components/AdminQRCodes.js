@@ -25,6 +25,7 @@ import WorkflowGuide from "./WorkflowGuide";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
 import { ChartCard, ChartTooltip } from "./viz";
+import { useTenant } from "../services/tenantService";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -722,7 +723,7 @@ function DetailPanel({
 // ═══════════════════════════════════════════════════════════════════════════════
 // REGISTRY TAB
 // ═══════════════════════════════════════════════════════════════════════════════
-function RegistryTab({ batches }) {
+function RegistryTab({ batches, tenantId }) {
   const [codes, setCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scanLogsTotal, setScanLogsTotal] = useState(0);
@@ -737,25 +738,30 @@ function RegistryTab({ batches }) {
   const domain = window.location.origin;
 
   // GAP-02: write a system_alert (non-blocking, fire-and-forget)
-  const writeAlert = useCallback(async (alertType, severity, title, body) => {
-    try {
-      await supabase.from("system_alerts").insert({
-        tenant_id: "43b34c33-6864-4f02-98dd-df1d340475c3",
-        alert_type: alertType,
-        severity,
-        status: "open",
-        title,
-        body: body || null,
-        source_table: "qr_codes",
-      });
-    } catch (_) {}
-  }, []);
+  const writeAlert = useCallback(
+    async (alertType, severity, title, body) => {
+      try {
+        await supabase.from("system_alerts").insert({
+          tenant_id: tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3",
+          alert_type: alertType,
+          severity,
+          status: "open",
+          title,
+          body: body || null,
+          source_table: "qr_codes",
+        });
+      } catch (_) {}
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [tenantId],
+  );
 
   const fetchCodes = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("qr_codes")
       .select("*, batches(batch_number, product_name, strain)")
+      .eq("tenant_id", tenantId || "43b34c33-6864-4f02-98dd-df1d340475c3")
       .order("created_at", { ascending: false });
     const { count: scanLogsCount } = await supabase
       .from("scan_logs")
@@ -2878,7 +2884,13 @@ function BannerPreview({ banner, compact = false }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function AdminQRCodes({ initialBatchId, initialTab }) {
+export default function AdminQRCodes({
+  initialBatchId,
+  initialTab,
+  tenantId: tenantIdProp,
+}) {
+  const { tenantId: ctxTenantId } = useTenant();
+  const tenantId = tenantIdProp || ctxTenantId;
   const [tab, setTab] = useState(initialTab || "registry");
   const [batches, setBatches] = useState([]);
   const [banners, setBanners] = useState([]);
@@ -2975,7 +2987,9 @@ export default function AdminQRCodes({ initialBatchId, initialTab }) {
         ))}
       </div>
 
-      {tab === "registry" && <RegistryTab batches={batches} />}
+      {tab === "registry" && (
+        <RegistryTab batches={batches} tenantId={tenantId} />
+      )}
       {tab === "generate" && (
         <GenerateTab
           batches={batches}
