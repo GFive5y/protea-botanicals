@@ -758,46 +758,61 @@ export default function TenantPortal() {
               style={{
                 background: "#fff",
                 borderBottom: `1px solid ${T.border}`,
-                padding: "0 28px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                height: 48,
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {activeSection && (
-                  <>
-                    <span style={{ fontSize: 12, color: T.ink300 }}>
-                      {activeSection.emoji} {activeSection.label}
-                    </span>
-                    <span style={{ color: T.ink150 }}>›</span>
-                  </>
-                )}
-                <span
-                  style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}
-                >
-                  {activeTabDef?.label || activeTab}
-                </span>
-                {activeTabDef?.desc && (
+              <div
+                style={{
+                  maxWidth: 1400,
+                  width: "100%",
+                  margin: "0 auto",
+                  padding: "0 28px",
+                  height: 48,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {activeSection && (
+                    <>
+                      <span style={{ fontSize: 12, color: T.ink300 }}>
+                        {activeSection.emoji} {activeSection.label}
+                      </span>
+                      <span style={{ color: T.ink150 }}>›</span>
+                    </>
+                  )}
                   <span
-                    style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}
+                    style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}
                   >
-                    · {activeTabDef.desc}
+                    {activeTabDef?.label || activeTab}
                   </span>
-                )}
+                  {activeTabDef?.desc && (
+                    <span
+                      style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}
+                    >
+                      · {activeTabDef.desc}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div style={{ maxWidth: 1400, width: "100%", margin: "0 auto" }}>
+            <div
+              style={{
+                maxWidth: 1400,
+                width: "100%",
+                margin: "0 auto",
+                overflow: "hidden",
+              }}
+            >
               <LiveFXBar />
+              <PlatformBar
+                role="tenant"
+                tenantId={tenantId}
+                onNavigate={() => {}}
+              />
             </div>
-            <PlatformBar
-              role="tenant"
-              tenantId={tenantId}
-              onNavigate={() => {}}
-            />
 
             {/* Content area — full-bleed for catalog/stock, padded for everything else */}
             {(() => {
@@ -812,6 +827,7 @@ export default function TenantPortal() {
                     width: "100%",
                     margin: "0 auto",
                     boxSizing: "border-box",
+                    background: "#faf9f6",
                     display: fullBleed ? "flex" : "block",
                     flexDirection: fullBleed ? "column" : undefined,
                   }}
@@ -827,7 +843,7 @@ export default function TenantPortal() {
                 height: 28,
                 flexShrink: 0,
                 borderTop: `1px solid ${T.border}`,
-                background: "#FAFAF9",
+                background: "#faf9f6",
                 display: "flex",
                 alignItems: "center",
                 padding: "0 20px",
