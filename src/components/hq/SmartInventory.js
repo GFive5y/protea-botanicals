@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
+import StockItemModal from "../StockItemModal";
 import {
   PRODUCT_WORLDS,
   itemMatchesWorld,
@@ -1001,18 +1002,22 @@ export default function SmartInventory({ tenantId }) {
   const [colPickerOpen, setColPickerOpen] = useState(false);
   const colPickerRef = useRef(null);
 
-  // ── Edit panel state ─────────────────────────────────────────────────────
-  const [editItem, setEditItem] = useState(null); // item being edited
+  // ── Edit/delete state ─────────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars -- kept: closeEdit references setEditItem/setEditDraft
+  const [editItem, setEditItem] = useState(null);
+  // eslint-disable-next-line no-unused-vars -- kept: ItemForm still references editDraft in EditPanel
   const [editDraft, setEditDraft] = useState({});
+  // eslint-disable-next-line no-unused-vars -- kept: ItemForm saving prop
   const [saving, setSaving] = useState(false);
+  // eslint-disable-next-line no-unused-vars -- kept: error display in ItemForm
   const [saveError, setSaveError] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
 
-  // ── Add new ──────────────────────────────────────────────────────────────
-  const [addOpen, setAddOpen] = useState(false);
-  const [addDraft, setAddDraft] = useState({});
-  const [addSaving, setAddSaving] = useState(false);
-  const [addError, setAddError] = useState(null);
+  // ── Add / Edit — StockItemModal pattern (same as HQStock) ────────────────
+  const [modalItem, setModalItem] = useState(undefined); // undefined=closed, null=new, obj=edit
+  const [modalDefaults, setModalDefaults] = useState({});
+  const [modalSaving, setModalSaving] = useState(false);
+  const [showWorldPicker, setShowWorldPicker] = useState(false);
 
   const searchRef = useRef(null);
 
@@ -1043,6 +1048,53 @@ export default function SmartInventory({ tenantId }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  const selectCat = useCallback((catId) => {
+    setCatFilter(catId);
+    setGroupFilter(null);
+    setSubFilter(null);
+    setSearch("");
+  }, []);
+
+  // ── Global dismiss — Escape + outside-click for dropdowns/panels ─────────
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      // Collapse in priority order (innermost first)
+      if (colPickerOpen) {
+        setColPickerOpen(false);
+        return;
+      }
+      if (subFilter) {
+        setSubFilter(null);
+        return;
+      }
+      if (groupFilter) {
+        setGroupFilter(null);
+        return;
+      }
+      if (catFilter !== "all") {
+        selectCat("all");
+        return;
+      }
+    };
+    const onMouse = (e) => {
+      // Close col picker when clicking outside its ref
+      if (
+        colPickerOpen &&
+        colPickerRef.current &&
+        !colPickerRef.current.contains(e.target)
+      ) {
+        setColPickerOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onMouse);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onMouse);
+    };
+  }, [colPickerOpen, subFilter, groupFilter, catFilter, selectCat]);
 
   // ── Filtered + sorted items ─────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -1147,46 +1199,15 @@ export default function SmartInventory({ tenantId }) {
     });
   }, []);
 
-  // ── Edit panel ──────────────────────────────────────────────────────────
+  // ── Edit panel — now routed through StockItemModal ──────────────────────
   function openEdit(item) {
-    setEditItem(item);
-    setEditDraft({ ...item });
-    setSaveError(null);
+    setModalDefaults({});
+    setModalItem(item); // non-null = editing existing item
   }
+
   function closeEdit() {
     setEditItem(null);
     setEditDraft({});
-    setSaveError(null);
-  }
-
-  async function saveEdit() {
-    if (!editItem) return;
-    setSaving(true);
-    setSaveError(null);
-    const payload = {
-      name: editDraft.name,
-      category: editDraft.category,
-      loyalty_category: editDraft.loyalty_category,
-      sell_price: parseFloat(editDraft.sell_price) || 0,
-      weighted_avg_cost: parseFloat(editDraft.weighted_avg_cost) || 0,
-      quantity_on_hand: parseFloat(editDraft.quantity_on_hand) || 0,
-      display_order: parseInt(editDraft.display_order) || 0,
-      is_active: Boolean(editDraft.is_active),
-      is_featured: Boolean(editDraft.is_featured),
-      image_url: editDraft.image_url || null,
-      updated_at: new Date().toISOString(),
-    };
-    const { error: err } = await supabase
-      .from("inventory_items")
-      .update(payload)
-      .eq("id", editItem.id);
-    if (err) {
-      setSaveError(err.message);
-    } else {
-      closeEdit();
-      load();
-    }
-    setSaving(false);
   }
 
   async function deleteItem(item) {
@@ -1203,81 +1224,53 @@ export default function SmartInventory({ tenantId }) {
     load();
   }
 
-  // ── Add new item ─────────────────────────────────────────────────────────
+  // ── Add item — context-aware world routing (same pattern as HQStock) ────
   function openAdd() {
-    // Derive DB enum category from the active world
-    const world = PRODUCT_WORLDS.find(
-      (w) => w.id === catFilter && w.id !== "all",
-    );
-    const dbCategory = world?.enums?.[0] || "finished_product";
-
-    // Loyalty category mapping for all 14 worlds
-    const loyaltyMap = {
-      flower: "cannabis_flower",
-      hash: "cannabis_flower",
-      concentrate: "cannabis_flower",
-      vape: "cannabis_flower",
-      preroll: "cannabis_flower",
-      edible: "cannabis_edible",
-      seeds: "grow_supplies",
-      substrate: "grow_supplies",
-      nutrients: "grow_supplies",
-      equipment: "grow_supplies",
-      papers: "accessories",
-      accessories: "accessories",
-      wellness: "health_wellness",
-      merch: "health_wellness",
-    };
-    const loyaltyCat =
-      catFilter !== "all"
-        ? loyaltyMap[catFilter] || "health_wellness"
-        : "cannabis_flower";
-
-    setAddDraft({
-      name: "",
-      category: dbCategory,
-      sell_price: "",
-      weighted_avg_cost: "",
-      quantity_on_hand: 0,
-      is_active: true,
-      is_featured: false,
-      loyalty_category: loyaltyCat,
-    });
-    setAddError(null);
-    setAddOpen(true);
-  }
-
-  async function saveAdd() {
-    if (!addDraft.name?.trim()) {
-      setAddError("Name is required.");
-      return;
-    }
-    setAddSaving(true);
-    setAddError(null);
-    const { error: err } = await supabase.from("inventory_items").insert({
-      id: crypto.randomUUID(),
-      tenant_id: tenantId, // Rule 0F
-      name: addDraft.name.trim(),
-      category: addDraft.category || "finished_product",
-      loyalty_category: addDraft.loyalty_category || null,
-      sell_price: parseFloat(addDraft.sell_price) || 0,
-      weighted_avg_cost: parseFloat(addDraft.weighted_avg_cost) || 0,
-      quantity_on_hand: parseFloat(addDraft.quantity_on_hand) || 0,
-      display_order: 0,
-      is_active: Boolean(addDraft.is_active),
-      is_featured: false,
-      image_url: addDraft.image_url || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-    if (err) {
-      setAddError(err.message);
+    if (catFilter === "all") {
+      // No world selected — show world picker
+      setShowWorldPicker(true);
     } else {
-      setAddOpen(false);
-      load();
+      // World is active — open StockItemModal with world + pill context pre-set
+      const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
+      // Map subFilter to the right field key for StockItemModal
+      const subcatKey = subFilter || "";
+      setModalDefaults({
+        category: world?.enums?.[0] || "finished_product",
+        subcategory: subcatKey,
+        world: catFilter,
+        worldLabel: world?.label || catFilter,
+      });
+      setModalItem(null); // null = new item
     }
-    setAddSaving(false);
   }
+
+  // ── Save handler for StockItemModal (insert or update) ──────────────────
+  const handleModalSave = async (payload) => {
+    setModalSaving(true);
+    try {
+      if (modalItem && modalItem.id) {
+        // Editing existing item
+        const { error: e } = await supabase
+          .from("inventory_items")
+          .update(payload)
+          .eq("id", modalItem.id);
+        if (e) throw e;
+      } else {
+        // Creating new item — StockItemModal builds the full payload
+        const { error: e } = await supabase
+          .from("inventory_items")
+          .insert(payload);
+        if (e) throw e;
+      }
+      setModalItem(undefined);
+      setModalDefaults({});
+      load();
+    } catch (err) {
+      console.error("Save error:", err);
+    } finally {
+      setModalSaving(false);
+    }
+  };
 
   // ── Quick inline toggle (detail view) ───────────────────────────────────
   async function quickToggle(item, field) {
@@ -1289,13 +1282,6 @@ export default function SmartInventory({ tenantId }) {
   }
 
   // ── Pill cascade ────────────────────────────────────────────────────────
-  function selectCat(catId) {
-    setCatFilter(catId);
-    setGroupFilter(null);
-    setSubFilter(null);
-    setSearch("");
-  }
-
   function selectGroup(groupId) {
     // Toggle group — clicking active group collapses back to group row
     if (groupFilter === groupId) {
@@ -1329,14 +1315,32 @@ export default function SmartInventory({ tenantId }) {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div
+      className="nuai-catalog"
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 120px)",
+        height: "100%",
         fontFamily: T.font,
         background: T.bg,
       }}
     >
+      {/* Global cursor + interaction polish for this screen */}
+      <style>{`
+        .nuai-catalog button, .nuai-catalog [role="button"],
+        .nuai-catalog label, .nuai-catalog [onClick] { cursor: pointer; }
+        .nuai-catalog input[type="text"],
+        .nuai-catalog input[type="number"],
+        .nuai-catalog input[type="search"],
+        .nuai-catalog textarea { cursor: text; }
+        .nuai-catalog input[type="range"] { cursor: ew-resize; }
+        .nuai-catalog input[type="checkbox"],
+        .nuai-catalog input[type="radio"]  { cursor: pointer; }
+        .nuai-catalog [data-resize]        { cursor: col-resize; }
+        .nuai-catalog a                    { cursor: pointer; }
+        .nuai-catalog [aria-disabled="true"],
+        .nuai-catalog button:disabled      { cursor: not-allowed; opacity: 0.5; }
+      `}</style>
+
       {/* ── TOP TOOLBAR ─────────────────────────────────────────────────── */}
       <div
         style={{
@@ -1682,49 +1686,155 @@ export default function SmartInventory({ tenantId }) {
             />
           )}
         </div>
-
-        {/* Edit panel (right slide-in) */}
-        {editItem && (
-          <EditPanel
-            item={editItem}
-            draft={editDraft}
-            onDraftChange={(key, val) =>
-              setEditDraft((prev) => ({ ...prev, [key]: val }))
-            }
-            onSave={saveEdit}
-            onClose={closeEdit}
-            onDelete={() => setDelConfirm(editItem)}
-            saving={saving}
-            error={saveError}
-            suppliers={suppliers}
-            T={T}
-          />
-        )}
       </div>
 
-      {/* ── ADD MODAL ───────────────────────────────────────────────────── */}
-      {addOpen && (
-        <Modal
-          onClose={() => setAddOpen(false)}
-          title={(() => {
-            if (catFilter === "all") return "+ Add Inventory Item";
-            const w = PRODUCT_WORLDS.find((pw) => pw.id === catFilter);
-            return `+ Add ${w?.icon || ""} ${w?.label || catFilter} Item`;
-          })()}
-          T={T}
+      {/* ── WORLD PICKER — shown when Add Item clicked from "All Products" ── */}
+      {showWorldPicker && (
+        <div
+          onClick={() => setShowWorldPicker(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 400,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <ItemForm
-            draft={addDraft}
-            onChange={(k, v) => setAddDraft((p) => ({ ...p, [k]: v }))}
-            error={addError}
-            saving={addSaving}
-            onSave={saveAdd}
-            onCancel={() => setAddOpen(false)}
-            suppliers={suppliers}
-            T={T}
-            isNew
-          />
-        </Modal>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              padding: 28,
+              width: 580,
+              maxWidth: "95vw",
+              fontFamily: T.font,
+              boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 20,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: T.ink900,
+                    marginBottom: 4,
+                  }}
+                >
+                  What are you adding?
+                </div>
+                <div style={{ fontSize: 12, color: T.ink400 }}>
+                  Choose a product type — the form adapts with the right fields
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWorldPicker(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: T.ink400,
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 10,
+              }}
+            >
+              {PRODUCT_WORLDS.filter((w) => w.id !== "all").map((world) => (
+                <div
+                  key={world.id}
+                  onClick={() => {
+                    setShowWorldPicker(false);
+                    setModalDefaults({
+                      category: world.enums?.[0] || "finished_product",
+                      subcategory: world.subs?.[0] || "",
+                      world: world.id,
+                      worldLabel: world.label,
+                    });
+                    setModalItem(null);
+                  }}
+                  style={{
+                    padding: "14px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${T.ink150}`,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    background: "#fff",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = T.accent;
+                    e.currentTarget.style.background = T.accentLit;
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = T.ink150;
+                    e.currentTarget.style.background = "#fff";
+                  }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>
+                    {world.icon || "📦"}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: T.ink900,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {world.label}
+                  </div>
+                  <div
+                    style={{ fontSize: 10, color: T.ink400, lineHeight: 1.4 }}
+                  >
+                    {world.desc || world.enums?.[0]?.replace(/_/g, " ") || ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STOCKITEMMODAL — world-specific add / edit form ──────────────── */}
+      {modalItem !== undefined && (
+        <StockItemModal
+          item={modalItem || null}
+          defaults={modalDefaults}
+          suppliers={suppliers}
+          visibleCategories={[
+            "flower",
+            "concentrate",
+            "edible",
+            "accessory",
+            "finished_product",
+            "hardware",
+            "raw_material",
+          ]}
+          onSave={handleModalSave}
+          onCancel={() => {
+            setModalItem(undefined);
+            setModalDefaults({});
+          }}
+          saving={modalSaving}
+        />
       )}
 
       {/* ── DELETE CONFIRM ──────────────────────────────────────────────── */}
@@ -1734,6 +1844,7 @@ export default function SmartInventory({ tenantId }) {
           title="Delete Item"
           T={T}
           width={380}
+          preventBackdropDismiss
         >
           <div style={{ fontSize: 14, color: T.ink500, marginBottom: 20 }}>
             Permanently delete <strong>{delConfirm.name}</strong>? This removes
@@ -2928,6 +3039,7 @@ function DetailView({
 // ─────────────────────────────────────────────────────────────────────────
 // EDIT PANEL (right side slide-in)
 // ─────────────────────────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars -- kept: fallback form (ItemForm uses EditPanel internals)
 function EditPanel({
   item,
   draft,
@@ -3249,7 +3361,14 @@ function ViewToggle({ current, onChange, T }) {
 // ─────────────────────────────────────────────────────────────────────────
 // MODAL wrapper
 // ─────────────────────────────────────────────────────────────────────────
-function Modal({ children, onClose, title, T, width = 480 }) {
+function Modal({
+  children,
+  onClose,
+  title,
+  T,
+  width = 480,
+  preventBackdropDismiss = false,
+}) {
   return (
     <div
       style={{
@@ -3261,7 +3380,7 @@ function Modal({ children, onClose, title, T, width = 480 }) {
         justifyContent: "center",
         zIndex: 2000,
       }}
-      onClick={onClose}
+      onClick={preventBackdropDismiss ? undefined : onClose}
     >
       <div
         style={{
