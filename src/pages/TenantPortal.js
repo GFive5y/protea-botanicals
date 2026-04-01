@@ -758,80 +758,129 @@ export default function TenantPortal() {
               style={{
                 background: "#fff",
                 borderBottom: `1px solid ${T.border}`,
-                padding: "0 28px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                height: 48,
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {activeSection && (
-                  <>
-                    <span style={{ fontSize: 12, color: T.ink300 }}>
-                      {activeSection.emoji} {activeSection.label}
-                    </span>
-                    <span style={{ color: T.ink150 }}>›</span>
-                  </>
-                )}
-                <span
-                  style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}
-                >
-                  {activeTabDef?.label || activeTab}
-                </span>
-                {activeTabDef?.desc && (
+              <div
+                style={{
+                  maxWidth: 1400,
+                  width: "100%",
+                  margin: "0 auto",
+                  padding: "0 24px",
+                  height: 48,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {activeSection && (
+                    <>
+                      <span style={{ fontSize: 12, color: T.ink300 }}>
+                        {activeSection.emoji} {activeSection.label}
+                      </span>
+                      <span style={{ color: T.ink150 }}>›</span>
+                    </>
+                  )}
                   <span
-                    style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}
+                    style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}
                   >
-                    · {activeTabDef.desc}
+                    {activeTabDef?.label || activeTab}
                   </span>
-                )}
+                  {activeTabDef?.desc && (
+                    <span
+                      style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}
+                    >
+                      · {activeTabDef.desc}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <LiveFXBar />
-            <PlatformBar
-              role="tenant"
-              tenantId={tenantId}
-              onNavigate={() => {}}
-            />
+            <div
+              style={{
+                maxWidth: 1400,
+                width: "100%",
+                margin: "0 auto",
+                overflow: "hidden",
+                padding: "0 24px",
+              }}
+            >
+              <LiveFXBar />
+              <PlatformBar
+                role="tenant"
+                tenantId={tenantId}
+                onNavigate={() => {}}
+              />
+            </div>
 
             {/* Content area — full-bleed for catalog/stock, padded for everything else */}
             {(() => {
               const fullBleed = ["catalog", "stock"].includes(activeTab);
               return (
-                <div style={{
-                  flex: 1,
-                  overflow: fullBleed ? "hidden" : "auto",
-                  padding: fullBleed ? 0 : "24px 28px",
-                  maxWidth: fullBleed ? "none" : 1400,
-                  width: "100%",
-                  margin: "0 auto",
-                  boxSizing: "border-box",
-                  display: fullBleed ? "flex" : "block",
-                  flexDirection: fullBleed ? "column" : undefined,
-                }}>
+                <div
+                  style={{
+                    flex: 1,
+                    overflow: fullBleed ? "hidden" : "auto",
+                    padding: fullBleed ? "12px 24px 0 24px" : "24px 28px",
+                    maxWidth: 1400,
+                    width: "100%",
+                    margin: "0 auto",
+                    boxSizing: "border-box",
+                    background: "#faf9f6",
+                    display: fullBleed ? "flex" : "block",
+                    flexDirection: fullBleed ? "column" : undefined,
+                  }}
+                >
                   {renderTab(activeTab, tenantId, industryProfile)}
                 </div>
               );
             })()}
 
             {/* System footer — always pinned */}
-            <div style={{
-              height: 28, flexShrink: 0,
-              borderTop: `1px solid ${T.border}`,
-              background: "#FAFAF9",
-              display: "flex", alignItems: "center",
-              padding: "0 20px", gap: 16,
-            }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", letterSpacing: "0.08em", textTransform: "uppercase" }}>NuAi</span>
+            <div
+              style={{
+                height: 28,
+                flexShrink: 0,
+                borderTop: `1px solid ${T.border}`,
+                background: "#faf9f6",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 20px",
+                gap: 16,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#2D6A4F",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                NuAi
+              </span>
               <span style={{ fontSize: 10, color: "#999" }}>v0.1 · dev</span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 10, color: "#999" }}>
-                {new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                {new Date().toLocaleDateString("en-ZA", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
               </span>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#2D6A4F", display: "inline-block" }} title="Connected" />
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#2D6A4F",
+                  display: "inline-block",
+                }}
+                title="Connected"
+              />
             </div>
           </div>
 
