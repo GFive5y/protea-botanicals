@@ -2202,6 +2202,7 @@ export default function SmartInventory({ tenantId }) {
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
               hiddenCols={hiddenCols}
+              onOpenPanel={setPanelItem}
               T={T}
             />
           )}
