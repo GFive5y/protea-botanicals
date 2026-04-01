@@ -1626,6 +1626,27 @@ export default function SmartInventory({ tenantId }) {
             📦 Inventory
           </span>
 
+          {/* Search — promoted to toolbar level */}
+          <div style={{ marginLeft: 12 }}>
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search items…"
+              style={{
+                padding: "5px 12px",
+                border: `1.5px solid ${search ? T.accent : T.border}`,
+                borderRadius: 99,
+                fontSize: 12.5,
+                fontFamily: T.font,
+                color: T.ink900,
+                outline: "none",
+                width: 200,
+                background: T.white,
+              }}
+            />
+          </div>
+
           <div
             style={{
               marginLeft: "auto",
@@ -2124,9 +2145,6 @@ export default function SmartInventory({ tenantId }) {
           onSelectCat={selectCat}
           onSelectGroup={selectGroup}
           onSelectSub={selectSub}
-          search={search}
-          onSearch={setSearch}
-          searchRef={searchRef}
           items={items}
           T={T}
           pillExpanded={pillExpanded}
@@ -2886,9 +2904,6 @@ function SmartPillBox({
   onSelectCat,
   onSelectGroup,
   onSelectSub,
-  search,
-  onSearch,
-  searchRef,
   items,
   T,
   pillExpanded,
@@ -3006,7 +3021,8 @@ function SmartPillBox({
         style={{
           display: "flex",
           gap: 6,
-          overflowX: "auto",
+          flexWrap: navLevel === 1 ? "wrap" : "nowrap",
+          overflowX: navLevel === 1 ? "visible" : "auto",
           paddingBottom: 6,
           alignItems: "center",
         }}
@@ -3092,53 +3108,27 @@ function SmartPillBox({
             );
           })()}
 
-        {/* Search + × close — right side */}
-        <div
-          style={{
-            marginLeft: "auto",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search items…"
-            style={{
-              padding: "5px 12px",
-              border: `1.5px solid ${search ? T.accent : T.border}`,
-              borderRadius: 99,
-              fontSize: 12.5,
-              fontFamily: T.font,
-              color: T.ink900,
-              outline: "none",
-              width: 180,
-              background: T.white,
+        {/* × close — right side */}
+        {navLevel > 0 && (
+          <button
+            onClick={() => {
+              onSelectCat("all");
+              onCollapsePills();
             }}
-          />
-          {navLevel > 0 && (
-            <button
-              onClick={() => {
-                onSelectCat("all");
-                onCollapsePills();
-              }}
-              style={{
-                ...navBtnStyle,
-                padding: "3px 9px",
-                fontSize: 15,
-                color: T.ink400,
-                fontWeight: 400,
-                border: `1.5px solid ${T.border}`,
-              }}
-              title="Close — back to All"
-            >
-              ×
-            </button>
-          )}
-        </div>
+            style={{
+              ...navBtnStyle,
+              padding: "3px 9px",
+              fontSize: 15,
+              color: T.ink400,
+              fontWeight: 400,
+              border: `1.5px solid ${T.border}`,
+              marginLeft: "auto",
+            }}
+            title="Close — back to All"
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {/* ── TIER 2: All group subs shown inline when a world is selected ── */}
