@@ -1051,10 +1051,13 @@ export default function SmartInventory({ tenantId }) {
 
   // ── SC-01: Action panel state ────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState(null); // 'soldout'|'reorder'|'noprice'
-  const [noPriceDraft, setNoPriceDraft] = useState({}); // { [itemId]: priceString }
+  const [noPriceDraft, setNoPriceDraft] = useState({});
   const [noPriceFixed, setNoPriceFixed] = useState(new Set());
   const [noPriceSaving, setNoPriceSaving] = useState(new Set());
   const [flaggedReorder, setFlaggedReorder] = useState(new Set());
+  // On Order — marks a sold-out item as awaiting delivery (handoff to WP-REORDER)
+  const [onOrderSet, setOnOrderSet] = useState(new Set());
+  const [onOrderSaving, setOnOrderSaving] = useState(new Set());
 
   const selectCat = useCallback((catId) => {
     setCatFilter(catId);
@@ -1284,6 +1287,23 @@ export default function SmartInventory({ tenantId }) {
         .eq("id", itemId);
     } catch {}
     setFlaggedReorder((prev) => new Set([...prev, itemId]));
+  };
+
+  // ── SC-01: Mark item as On Order (PO placed, awaiting delivery) ──────────
+  const markOnOrder = async (itemId) => {
+    setOnOrderSaving((prev) => new Set([...prev, itemId]));
+    try {
+      await supabase
+        .from("inventory_items")
+        .update({ on_order: true, updated_at: new Date().toISOString() })
+        .eq("id", itemId);
+    } catch {} // graceful — on_order column may not exist yet (run SQL migration)
+    setOnOrderSet((prev) => new Set([...prev, itemId]));
+    setOnOrderSaving((prev) => {
+      const n = new Set(prev);
+      n.delete(itemId);
+      return n;
+    });
   };
 
   // Column visibility toggle
@@ -1880,7 +1900,7 @@ export default function SmartInventory({ tenantId }) {
           style={{
             flex: 1,
             overflow: viewMode === VIEW_DETAIL ? "hidden" : "auto",
-            padding: viewMode === VIEW_DETAIL ? 0 : 16,
+            padding: viewMode === VIEW_DETAIL ? "0 0 0 16px" : 16,
           }}
         >
           {loading ? (
@@ -2022,6 +2042,8 @@ export default function SmartInventory({ tenantId }) {
                       const world = PRODUCT_WORLDS.find(
                         (w) => w.id !== "all" && itemMatchesWorld(item, w),
                       );
+                      const isOnOrder = onOrderSet.has(item.id);
+                      const isSavingOrder = onOrderSaving.has(item.id);
                       return (
                         <div
                           key={item.id}
@@ -2031,6 +2053,8 @@ export default function SmartInventory({ tenantId }) {
                             display: "flex",
                             alignItems: "center",
                             gap: 10,
+                            background: isOnOrder ? "#FFFBEB" : T.white,
+                            transition: "background 0.2s",
                           }}
                         >
                           <span style={{ fontSize: 18 }}>
@@ -2063,23 +2087,65 @@ export default function SmartInventory({ tenantId }) {
                                 : ""}
                             </div>
                           </div>
-                          <button
-                            onClick={() => openEdit(item)}
-                            style={{
-                              padding: "5px 12px",
-                              borderRadius: 6,
-                              flexShrink: 0,
-                              border: `1px solid ${T.accentBd}`,
-                              background: T.accentLit,
-                              color: T.accentMid,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              fontFamily: T.font,
-                            }}
-                          >
-                            Receive Stock
-                          </button>
+                          {isOnOrder ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: T.amber,
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                background: T.amberLit,
+                                border: `1px solid ${T.amber}40`,
+                                flexShrink: 0,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              📦 On Order
+                            </span>
+                          ) : (
+                            <div
+                              style={{ display: "flex", gap: 6, flexShrink: 0 }}
+                            >
+                              <button
+                                onClick={() =>
+                                  !isSavingOrder && markOnOrder(item.id)
+                                }
+                                disabled={isSavingOrder}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 6,
+                                  border: `1px solid ${T.amber}60`,
+                                  background: T.amberLit,
+                                  color: T.amber,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  fontFamily: T.font,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {isSavingOrder ? "…" : "On Order"}
+                              </button>
+                              <button
+                                onClick={() => openEdit(item)}
+                                style={{
+                                  padding: "5px 12px",
+                                  borderRadius: 6,
+                                  border: `1px solid ${T.accentBd}`,
+                                  background: T.accentLit,
+                                  color: T.accentMid,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                  fontFamily: T.font,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                Receive Stock
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })
