@@ -106,6 +106,30 @@ const DETAIL_COLS = [
     align: "center",
   },
   { key: "loyalty_category", label: "Loyalty Cat", width: 130, sortable: true },
+  { key: "sku", label: "SKU", width: 100, sortable: true, defaultHidden: true },
+  {
+    key: "reorder_level",
+    label: "Reorder Lvl",
+    width: 90,
+    sortable: true,
+    align: "right",
+    defaultHidden: true,
+  },
+  {
+    key: "max_stock_level",
+    label: "Max Stock",
+    width: 85,
+    sortable: true,
+    align: "right",
+    defaultHidden: true,
+  },
+  {
+    key: "supplier",
+    label: "Supplier",
+    width: 130,
+    sortable: true,
+    defaultHidden: true,
+  },
   { key: "_actions", label: "", width: 80, sortable: false, align: "center" },
 ];
 
@@ -998,7 +1022,9 @@ export default function SmartInventory({ tenantId }) {
   const [hiddenCols, setHiddenCols] = useState(() => {
     try {
       const s = sessionStorage.getItem("nuai_detail_hidden_cols");
-      return s ? new Set(JSON.parse(s)) : new Set();
+      return s
+        ? new Set(JSON.parse(s))
+        : new Set(["sku", "reorder_level", "max_stock_level", "supplier"]);
     } catch {
       return new Set();
     }
@@ -4160,6 +4186,38 @@ function DetailView({
                     {col.key === "loyalty_category" && (
                       <span style={{ fontSize: 11, color: T.ink400 }}>
                         {item.loyalty_category || "—"}
+                      </span>
+                    )}
+                    {col.key === "sku" && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {item.sku || "—"}
+                      </span>
+                    )}
+                    {col.key === "reorder_level" && (
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color:
+                            (item.reorder_level || 0) > 0 ? T.ink700 : T.ink300,
+                        }}
+                      >
+                        {item.reorder_level || "—"}
+                      </span>
+                    )}
+                    {col.key === "max_stock_level" && (
+                      <span style={{ color: T.ink400 }}>
+                        {item.max_stock_level || "—"}
+                      </span>
+                    )}
+                    {col.key === "supplier" && (
+                      <span style={{ fontSize: 11, color: T.ink500 }}>
+                        {item.suppliers?.name || "—"}
                       </span>
                     )}
                     {col.key === "_actions" && (
