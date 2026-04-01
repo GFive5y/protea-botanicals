@@ -12,6 +12,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import {
+  PRODUCT_WORLDS,
+  itemMatchesWorld,
   CANNABIS_CATEGORIES,
   CATEGORY_LABELS,
   CATEGORY_ICONS,
@@ -105,25 +107,84 @@ const DETAIL_COLS = [
 // ── Sub-category keywords (derived from name — no sub_category column) ───
 // ── 3-tier pill hierarchy: category → sub-group → brand/detail ───────────
 // keywords[] matched against item.name (case-insensitive)
+// ── Full 14-world pill hierarchy ─────────────────────────────────────────
+// Tier 1: Product world (matches PRODUCT_WORLDS from ProductWorlds.js)
+// Tier 2: Sub-type / attribute (SA-market priority order per world)
+// Tier 3: Brand (derived from live data)
+// Flower order: Cultivation → Grade → Strain Type (SA market reality)
 const PILL_HIERARCHY = {
+  // ── FLOWER ──────────────────────────────────────────────────────────────
   flower: {
     subs: [
+      // 1. Cultivation method — determines price point in SA market
+      {
+        id: "outdoor",
+        label: "Outdoor / Sun-grown",
+        keywords: ["outdoor", "sun-grown", "sun grown"],
+        brands: [],
+      },
+      {
+        id: "greenhouse",
+        label: "Greenhouse",
+        keywords: ["greenhouse"],
+        brands: [],
+      },
+      { id: "indoor", label: "Indoor", keywords: ["indoor"], brands: [] },
+      {
+        id: "hydro",
+        label: "Hydroponic",
+        keywords: ["hydro", "hydroponic"],
+        brands: [],
+      },
+      {
+        id: "organic",
+        label: "Organic / Living Soil",
+        keywords: ["organic", "living soil"],
+        brands: [],
+      },
+      // 2. Grade — quality indicator
+      { id: "budget", label: "Budget", keywords: ["budget"], brands: [] },
+      {
+        id: "commercial",
+        label: "Commercial",
+        keywords: ["commercial"],
+        brands: [],
+      },
+      {
+        id: "a_grade",
+        label: "A Grade",
+        keywords: ["a grade", "a-grade"],
+        brands: [],
+      },
+      { id: "aa_grade", label: "AA Grade", keywords: ["aa grade"], brands: [] },
+      {
+        id: "aaa_grade",
+        label: "AAA Grade",
+        keywords: ["aaa grade"],
+        brands: [],
+      },
+      { id: "craft", label: "Craft", keywords: ["craft"], brands: [] },
+      {
+        id: "top_shelf",
+        label: "Top Shelf",
+        keywords: ["top shelf"],
+        brands: [],
+      },
+      { id: "exotic", label: "Exotic", keywords: ["exotic"], brands: [] },
+      // 3. Strain type — genetics label
       { id: "indica", label: "Indica", keywords: ["indica"], brands: [] },
       { id: "sativa", label: "Sativa", keywords: ["sativa"], brands: [] },
       { id: "hybrid", label: "Hybrid", keywords: ["hybrid"], brands: [] },
       { id: "cbd", label: "CBD", keywords: ["cbd"], brands: [] },
-      {
-        id: "preroll",
-        label: "Pre-Rolls",
-        keywords: ["pre-roll", "pre roll"],
-        brands: [
-          { id: "house", label: "House", keywords: ["house pre-roll"] },
-          { id: "infused", label: "Infused", keywords: ["infused pre-roll"] },
-        ],
-      },
+      { id: "auto", label: "Auto", keywords: ["auto"], brands: [] },
+      // 4. Weight
+      { id: "0.5g", label: "0.5g", keywords: ["0.5g"], brands: [] },
       { id: "1g", label: "1g", keywords: ["1g"], brands: [] },
+      { id: "2g", label: "2g", keywords: ["2g"], brands: [] },
       { id: "3.5g", label: "3.5g", keywords: ["3.5g"], brands: [] },
+      { id: "5g", label: "5g", keywords: ["5g"], brands: [] },
       { id: "7g", label: "7g", keywords: ["7g"], brands: [] },
+      { id: "14g", label: "14g", keywords: ["14g"], brands: [] },
       {
         id: "28g",
         label: "28g / Oz",
@@ -132,8 +193,51 @@ const PILL_HIERARCHY = {
       },
     ],
   },
+  // ── HASH & KIEF ──────────────────────────────────────────────────────────
+  hash: {
+    subs: [
+      { id: "kief", label: "Kief", keywords: ["kief"], brands: [] },
+      { id: "bubble", label: "Bubble Hash", keywords: ["bubble"], brands: [] },
+      { id: "dry_sift", label: "Dry Sift", keywords: ["dry sift"], brands: [] },
+      {
+        id: "pressed",
+        label: "Pressed Hash",
+        keywords: ["pressed"],
+        brands: [],
+      },
+      { id: "lebanese", label: "Lebanese", keywords: ["lebanese"], brands: [] },
+      { id: "moroccan", label: "Moroccan", keywords: ["moroccan"], brands: [] },
+      { id: "afghani", label: "Afghani", keywords: ["afghani"], brands: [] },
+      { id: "charas", label: "Charas", keywords: ["charas"], brands: [] },
+      {
+        id: "temple_ball",
+        label: "Temple Ball",
+        keywords: ["temple ball"],
+        brands: [],
+      },
+      {
+        id: "moon_rock",
+        label: "Moon Rock",
+        keywords: ["moon rock"],
+        brands: [],
+      },
+    ],
+  },
+  // ── CONCENTRATES ─────────────────────────────────────────────────────────
   concentrate: {
     subs: [
+      {
+        id: "rosin",
+        label: "Rosin (solventless)",
+        keywords: ["rosin"],
+        brands: [],
+      },
+      {
+        id: "live_resin",
+        label: "Live Resin",
+        keywords: ["live resin"],
+        brands: [],
+      },
       {
         id: "badder",
         label: "Badder / Wax",
@@ -143,28 +247,82 @@ const PILL_HIERARCHY = {
       { id: "shatter", label: "Shatter", keywords: ["shatter"], brands: [] },
       { id: "crumble", label: "Crumble", keywords: ["crumble"], brands: [] },
       {
+        id: "diamonds",
+        label: "THCA Diamonds",
+        keywords: ["diamonds"],
+        brands: [],
+      },
+      {
         id: "terpsauce",
         label: "Terp Sauce",
         keywords: ["terp sauce"],
         brands: [],
       },
       {
-        id: "diamonds",
-        label: "THCA Diamonds",
-        keywords: ["diamonds"],
-        brands: [],
-      },
-      { id: "kief", label: "Kief", keywords: ["kief"], brands: [] },
-      { id: "rso", label: "RSO", keywords: ["rso"], brands: [] },
-      {
         id: "distillate",
         label: "Distillate",
         keywords: ["distillate"],
         brands: [],
       },
-      { id: "hash", label: "Hash", keywords: ["hash"], brands: [] },
+      { id: "rso", label: "RSO", keywords: ["rso"], brands: [] },
+      { id: "feco", label: "FECO", keywords: ["feco"], brands: [] },
+      { id: "bho", label: "BHO", keywords: ["bho"], brands: [] },
+      { id: "co2", label: "CO2 Extract", keywords: ["co2"], brands: [] },
     ],
   },
+  // ── VAPES ────────────────────────────────────────────────────────────────
+  vape: {
+    subs: [
+      {
+        id: "cartridge",
+        label: "Cartridges",
+        keywords: ["cartridge", "cart"],
+        brands: [],
+      },
+      {
+        id: "disposable",
+        label: "Disposables",
+        keywords: ["disposable"],
+        brands: [],
+      },
+      {
+        id: "battery",
+        label: "Batteries",
+        keywords: ["battery", "510"],
+        brands: [],
+      },
+      { id: "0.5ml", label: "0.5ml", keywords: ["0.5ml"], brands: [] },
+      { id: "1ml", label: "1ml", keywords: ["1ml"], brands: [] },
+      { id: "2ml", label: "2ml", keywords: ["2ml"], brands: [] },
+      { id: "indica_vape", label: "Indica", keywords: ["indica"], brands: [] },
+      { id: "sativa_vape", label: "Sativa", keywords: ["sativa"], brands: [] },
+      { id: "hybrid_vape", label: "Hybrid", keywords: ["hybrid"], brands: [] },
+    ],
+  },
+  // ── PRE-ROLLS ────────────────────────────────────────────────────────────
+  preroll: {
+    subs: [
+      { id: "single", label: "Singles", keywords: ["single"], brands: [] },
+      {
+        id: "pack",
+        label: "3-Pack",
+        keywords: ["3-pack", "3 pack"],
+        brands: [],
+      },
+      { id: "infused", label: "Infused", keywords: ["infused"], brands: [] },
+      { id: "house", label: "House Brand", keywords: ["house"], brands: [] },
+      { id: "indica_pr", label: "Indica", keywords: ["indica"], brands: [] },
+      { id: "sativa_pr", label: "Sativa", keywords: ["sativa"], brands: [] },
+      {
+        id: "hybrid_pr",
+        label: "Hybrid / Mixed",
+        keywords: ["hybrid", "mixed"],
+        brands: [],
+      },
+      { id: "cbd_pr", label: "CBD", keywords: ["cbd"], brands: [] },
+    ],
+  },
+  // ── EDIBLES ──────────────────────────────────────────────────────────────
   edible: {
     subs: [
       {
@@ -174,9 +332,15 @@ const PILL_HIERARCHY = {
         brands: [
           { id: "10mg", label: "10mg THC", keywords: ["10mg"] },
           { id: "20mg", label: "20mg THC", keywords: ["20mg"] },
+          { id: "5mg", label: "5mg THC", keywords: ["5mg"] },
         ],
       },
-      { id: "chocolate", label: "Chocolate", keywords: ["choc"], brands: [] },
+      {
+        id: "chocolate",
+        label: "Chocolate",
+        keywords: ["choc", "chocolate"],
+        brands: [],
+      },
       {
         id: "tincture",
         label: "Tinctures",
@@ -184,19 +348,260 @@ const PILL_HIERARCHY = {
         brands: [],
       },
       { id: "capsule", label: "Capsules", keywords: ["capsule"], brands: [] },
+      {
+        id: "beverage",
+        label: "Beverages",
+        keywords: ["drink", "tea", "beverage"],
+        brands: [],
+      },
+      {
+        id: "cookie",
+        label: "Baked Goods",
+        keywords: ["cookie", "brownie", "biscuit"],
+        brands: [],
+      },
+      {
+        id: "lozenge",
+        label: "Lozenges",
+        keywords: ["lozenge", "lozenge"],
+        brands: [],
+      },
     ],
   },
-  accessory: {
+  // ── SEEDS & CLONES ───────────────────────────────────────────────────────
+  seeds: {
+    subs: [
+      { id: "feminised", label: "Feminised", keywords: ["femin"], brands: [] },
+      {
+        id: "autoflower",
+        label: "Auto-Flower",
+        keywords: ["auto"],
+        brands: [],
+      },
+      { id: "regular", label: "Regular", keywords: ["regular"], brands: [] },
+      { id: "clone", label: "Clones", keywords: ["clone"], brands: [] },
+      {
+        id: "seedling",
+        label: "Seedlings",
+        keywords: ["seedling"],
+        brands: [],
+      },
+      { id: "indica_s", label: "Indica", keywords: ["indica"], brands: [] },
+      { id: "sativa_s", label: "Sativa", keywords: ["sativa"], brands: [] },
+      { id: "hybrid_s", label: "Hybrid", keywords: ["hybrid"], brands: [] },
+      {
+        id: "cbd_s",
+        label: "CBD / Hemp",
+        keywords: ["cbd", "hemp"],
+        brands: [],
+      },
+    ],
+  },
+  // ── SUBSTRATE ────────────────────────────────────────────────────────────
+  substrate: {
+    subs: [
+      {
+        id: "coco",
+        label: "Coco Peat",
+        keywords: ["coco peat", "coco"],
+        brands: [],
+      },
+      { id: "rockwool", label: "Rockwool", keywords: ["rockwool"], brands: [] },
+      {
+        id: "soil",
+        label: "Potting Mix",
+        keywords: ["mix", "plagron universal"],
+        brands: [
+          { id: "biobizz_soil", label: "BioBizz", keywords: ["biobizz"] },
+          { id: "plagron_soil", label: "Plagron", keywords: ["plagron"] },
+        ],
+      },
+      { id: "perlite", label: "Perlite", keywords: ["perlite"], brands: [] },
+      {
+        id: "vermiculite",
+        label: "Vermiculite",
+        keywords: ["vermiculite"],
+        brands: [],
+      },
+      {
+        id: "leca",
+        label: "Clay Pebbles / LECA",
+        keywords: ["clay", "leca"],
+        brands: [],
+      },
+    ],
+  },
+  // ── NUTRIENTS ────────────────────────────────────────────────────────────
+  nutrients: {
+    subs: [
+      {
+        id: "biobizz",
+        label: "BioBizz",
+        keywords: ["biobizz"],
+        brands: [
+          { id: "bb_all", label: "All·Mix", keywords: ["all mix"] },
+          { id: "bb_light", label: "Light·Mix", keywords: ["light mix"] },
+          { id: "bb_grow", label: "Bio·Grow", keywords: ["bio-grow"] },
+          { id: "bb_bloom", label: "Bio·Bloom", keywords: ["bio-bloom"] },
+          { id: "bb_top", label: "Top·Max", keywords: ["top-max"] },
+          { id: "bb_root", label: "Root·Juice", keywords: ["root-juice"] },
+        ],
+      },
+      {
+        id: "canna",
+        label: "Canna",
+        keywords: ["canna ", "cannazym"],
+        brands: [
+          { id: "canna_a", label: "Coco A", keywords: ["coco a"] },
+          { id: "canna_b", label: "Coco B", keywords: ["coco b"] },
+          { id: "canna_pk", label: "PK 13/14", keywords: ["pk 13"] },
+          { id: "canna_rh", label: "Rhizotonic", keywords: ["rhizotonic"] },
+          { id: "cannazym", label: "Cannazym", keywords: ["cannazym"] },
+        ],
+      },
+      {
+        id: "base",
+        label: "Base Nutrients",
+        keywords: ["base", "grow", "bloom"],
+        brands: [],
+      },
+      {
+        id: "booster",
+        label: "Bloom Booster",
+        keywords: ["booster", "pk", "bloom boost"],
+        brands: [],
+      },
+      { id: "root", label: "Root Stimulant", keywords: ["root"], brands: [] },
+      { id: "calmag", label: "CalMag", keywords: ["calmag"], brands: [] },
+      {
+        id: "enzyme",
+        label: "Enzymes",
+        keywords: ["enzyme", "cannazym"],
+        brands: [],
+      },
+      {
+        id: "ph",
+        label: "pH Management",
+        keywords: ["ph up", "ph down", "ph meter"],
+        brands: [],
+      },
+    ],
+  },
+  // ── GROW EQUIPMENT ───────────────────────────────────────────────────────
+  equipment: {
+    subs: [
+      {
+        id: "lighting",
+        label: "Lighting",
+        keywords: ["led", "light", "t5", "fluorescent"],
+        brands: [
+          { id: "led_100", label: "LED 100W", keywords: ["100w"] },
+          { id: "led_240", label: "LED 240W", keywords: ["240w"] },
+          { id: "t5", label: "T5", keywords: ["t5"] },
+        ],
+      },
+      {
+        id: "tents",
+        label: "Grow Tents",
+        keywords: ["tent"],
+        brands: [
+          { id: "tent_60", label: "60×60cm", keywords: ["60x60"] },
+          { id: "tent_80", label: "80×80cm", keywords: ["80x80"] },
+          { id: "tent_120", label: "120×120cm", keywords: ["120x120"] },
+        ],
+      },
+      {
+        id: "fans",
+        label: "Fans & Filters",
+        keywords: ["fan", "inline", "carbon filter"],
+        brands: [],
+      },
+      {
+        id: "pots",
+        label: "Fabric Pots",
+        keywords: ["fabric pot"],
+        brands: [
+          { id: "pot_5", label: "5L", keywords: ["pot 5l", "5l pot"] },
+          { id: "pot_10", label: "10L", keywords: ["pot 10l", "10l pot"] },
+          { id: "pot_20", label: "20L", keywords: ["pot 20l", "20l pot"] },
+          { id: "pot_25", label: "25L", keywords: ["pot 25l", "25l pot"] },
+        ],
+      },
+      {
+        id: "meters",
+        label: "Meters / Sensors",
+        keywords: ["meter", "thermometer", "ec/tds", "hygrometer"],
+        brands: [],
+      },
+      {
+        id: "propagation",
+        label: "Propagation",
+        keywords: ["heat mat", "rockwool", "propagation"],
+        brands: [],
+      },
+      {
+        id: "training",
+        label: "Training / SCROG",
+        keywords: ["trellis", "scrog", "net"],
+        brands: [],
+      },
+      {
+        id: "climate",
+        label: "Climate Control",
+        keywords: ["humidifier", "dehumidifier", "ac", "heater"],
+        brands: [],
+      },
+    ],
+  },
+  // ── WELLNESS ─────────────────────────────────────────────────────────────
+  wellness: {
+    subs: [
+      {
+        id: "mushroom",
+        label: "Functional Mushrooms",
+        keywords: ["mushroom", "lions mane", "reishi", "chaga"],
+        brands: [],
+      },
+      {
+        id: "adaptogen",
+        label: "Adaptogens",
+        keywords: ["adaptogen", "ashwagandha"],
+        brands: [],
+      },
+      { id: "cbd_well", label: "CBD Wellness", keywords: ["cbd"], brands: [] },
+      {
+        id: "pet",
+        label: "Pet Products",
+        keywords: ["pet", "dog", "cat"],
+        brands: [],
+      },
+      {
+        id: "topical",
+        label: "Topicals",
+        keywords: ["topical", "cream", "balm", "salve"],
+        brands: [],
+      },
+      {
+        id: "supplement",
+        label: "Supplements",
+        keywords: ["capsule", "supplement", "powder"],
+        brands: [],
+      },
+    ],
+  },
+  // ── ROLLING PAPERS ───────────────────────────────────────────────────────
+  papers: {
     subs: [
       {
         id: "rolling_papers",
         label: "Rolling Papers",
-        keywords: ["rolling paper", "1.25", "slim pap"],
+        keywords: ["rolling paper", "1.25", "slim pap", "king size rolling"],
         brands: [
           { id: "raw", label: "RAW", keywords: ["raw "] },
           { id: "ocb", label: "OCB", keywords: ["ocb"] },
           { id: "gizeh", label: "Gizeh", keywords: ["gizeh"] },
           { id: "elements", label: "Elements", keywords: ["elements"] },
+          { id: "rizla", label: "Rizla", keywords: ["rizla"] },
         ],
       },
       {
@@ -233,7 +638,7 @@ const PILL_HIERARCHY = {
         ],
       },
       {
-        id: "rolling_machines",
+        id: "machines",
         label: "Rolling Machines",
         keywords: ["rolling machine"],
         brands: [
@@ -241,23 +646,38 @@ const PILL_HIERARCHY = {
           { id: "raw_79", label: "RAW 79mm", keywords: ["79mm"] },
         ],
       },
-      { id: "grinders", label: "Grinders", keywords: ["grinder"], brands: [] },
+      {
+        id: "hemp_wick",
+        label: "Hemp Wick",
+        keywords: ["hemp wick"],
+        brands: [],
+      },
+      { id: "tray", label: "Trays", keywords: ["tray"], brands: [] },
+    ],
+  },
+  // ── ACCESSORIES ──────────────────────────────────────────────────────────
+  accessories: {
+    subs: [
+      { id: "grinder", label: "Grinders", keywords: ["grinder"], brands: [] },
       {
         id: "pipes",
         label: "Pipes & Bongs",
-        keywords: ["pipe", "bong", "dab rig"],
-        brands: [{ id: "dab_rig", label: "Dab Rigs", keywords: ["dab rig"] }],
+        keywords: ["pipe", "bong"],
+        brands: [
+          { id: "glass", label: "Glass", keywords: ["glass"] },
+          { id: "acrylic", label: "Acrylic", keywords: ["acrylic"] },
+        ],
       },
       {
-        id: "dab_tools",
-        label: "Dab Tools",
-        keywords: ["dab tool", "quartz banger", "fullmelt"],
+        id: "dab_rig",
+        label: "Dab Rigs",
+        keywords: ["dab rig", "rig"],
         brands: [],
       },
       {
-        id: "storage",
-        label: "Storage Jars",
-        keywords: ["jar", "uv glass"],
+        id: "dab_tool",
+        label: "Dab Tools",
+        keywords: ["dab tool", "quartz banger", "fullmelt"],
         brands: [],
       },
       {
@@ -270,141 +690,52 @@ const PILL_HIERARCHY = {
         ],
       },
       {
-        id: "hemp_wick",
-        label: "Hemp Wick",
-        keywords: ["hemp wick"],
+        id: "storage",
+        label: "Storage Jars",
+        keywords: ["jar", "uv glass"],
+        brands: [],
+      },
+      {
+        id: "lighter",
+        label: "Lighters",
+        keywords: ["lighter", "clipper"],
+        brands: [],
+      },
+      {
+        id: "odour",
+        label: "Odour Control",
+        keywords: ["odour", "smell", "carbon bag"],
         brands: [],
       },
     ],
   },
-  hardware: {
+  // ── MERCH ────────────────────────────────────────────────────────────────
+  merch: {
     subs: [
       {
-        id: "lighting",
-        label: "Lighting",
-        keywords: ["led", "light", "t5", "fluorescent"],
+        id: "tshirt",
+        label: "T-Shirts",
+        keywords: ["t-shirt", "tshirt"],
         brands: [
-          { id: "led_100", label: "LED 100W", keywords: ["100w"] },
-          { id: "led_240", label: "LED 240W", keywords: ["240w"] },
-          { id: "t5", label: "T5 Propagation", keywords: ["t5"] },
+          { id: "size_s", label: "Small", keywords: ["small"] },
+          { id: "size_m", label: "Medium", keywords: ["medium"] },
+          { id: "size_l", label: "Large", keywords: ["large"] },
+          { id: "size_xl", label: "XL", keywords: ["xl"] },
         ],
       },
       {
-        id: "tents",
-        label: "Grow Tents",
-        keywords: ["tent"],
+        id: "hoodie",
+        label: "Hoodies",
+        keywords: ["hoodie"],
         brands: [
-          { id: "tent_60", label: "60×60cm", keywords: ["60x60"] },
-          { id: "tent_80", label: "80×80cm", keywords: ["80x80"] },
-          { id: "tent_120", label: "120×120cm", keywords: ["120x120"] },
+          { id: "h_s", label: "Small", keywords: ["small"] },
+          { id: "h_m", label: "Medium", keywords: ["medium"] },
+          { id: "h_l", label: "Large", keywords: ["large"] },
+          { id: "h_xl", label: "XL", keywords: ["xl"] },
         ],
       },
-      {
-        id: "fans",
-        label: "Fans & Filters",
-        keywords: ["fan", "filter", "inline", "carbon"],
-        brands: [],
-      },
-      {
-        id: "pots",
-        label: "Fabric Pots",
-        keywords: ["fabric pot"],
-        brands: [
-          { id: "pot_5", label: "5L", keywords: ["pot 5l"] },
-          { id: "pot_10", label: "10L", keywords: ["pot 10l"] },
-          { id: "pot_20", label: "20L", keywords: ["pot 20l"] },
-          { id: "pot_25", label: "25L", keywords: ["pot 25l"] },
-        ],
-      },
-      {
-        id: "meters",
-        label: "Meters",
-        keywords: ["meter", "ph meter", "ec/tds", "thermometer"],
-        brands: [],
-      },
-      {
-        id: "propagation",
-        label: "Propagation",
-        keywords: ["heat mat", "rockwool", "propagation"],
-        brands: [],
-      },
-      {
-        id: "training",
-        label: "Training",
-        keywords: ["trellis", "scrog"],
-        brands: [],
-      },
-    ],
-  },
-  raw_material: {
-    subs: [
-      {
-        id: "biobizz",
-        label: "BioBizz",
-        keywords: ["biobizz"],
-        brands: [
-          { id: "bb_all", label: "All·Mix", keywords: ["all mix"] },
-          { id: "bb_light", label: "Light·Mix", keywords: ["light mix"] },
-          { id: "bb_grow", label: "Bio·Grow", keywords: ["bio-grow"] },
-          { id: "bb_bloom", label: "Bio·Bloom", keywords: ["bio-bloom"] },
-          { id: "bb_top", label: "Top·Max", keywords: ["top-max"] },
-          { id: "bb_root", label: "Root·Juice", keywords: ["root-juice"] },
-        ],
-      },
-      {
-        id: "canna",
-        label: "Canna",
-        keywords: ["canna ", "cannazym"],
-        brands: [
-          { id: "canna_coco_a", label: "Coco A", keywords: ["coco a"] },
-          { id: "canna_coco_b", label: "Coco B", keywords: ["coco b"] },
-          { id: "canna_pk", label: "PK 13/14", keywords: ["pk 13"] },
-          { id: "canna_rhizo", label: "Rhizotonic", keywords: ["rhizotonic"] },
-          { id: "cannazym", label: "Cannazym", keywords: ["cannazym"] },
-        ],
-      },
-      { id: "plagron", label: "Plagron", keywords: ["plagron"], brands: [] },
-      { id: "calmag", label: "CalMag", keywords: ["calmag"], brands: [] },
-      {
-        id: "soil",
-        label: "Soil & Coco",
-        keywords: ["coco peat", "plagron universal"],
-        brands: [],
-      },
-      {
-        id: "amendments",
-        label: "Amendments",
-        keywords: [
-          "perlite",
-          "vermiculite",
-          "clay pebble",
-          "leca",
-          "mycorrhizae",
-        ],
-        brands: [],
-      },
-      {
-        id: "prop_media",
-        label: "Propagation",
-        keywords: ["rockwool", "seedling"],
-        brands: [],
-      },
-    ],
-  },
-  finished_product: {
-    subs: [
-      {
-        id: "merch",
-        label: "Merch",
-        keywords: ["medi recreational"],
-        brands: [],
-      },
-      {
-        id: "wellness",
-        label: "Wellness",
-        keywords: ["lions mane"],
-        brands: [],
-      },
+      { id: "cap", label: "Caps / Hats", keywords: ["cap", "hat"], brands: [] },
+      { id: "bag", label: "Bags", keywords: ["bag"], brands: [] },
     ],
   },
 };
@@ -534,9 +865,10 @@ export default function SmartInventory({ tenantId }) {
   const filtered = useMemo(() => {
     let list = items;
 
-    // Category pill filter
+    // World filter — use itemMatchesWorld for all 14 worlds
     if (catFilter !== "all") {
-      list = list.filter((i) => i.category === catFilter);
+      const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
+      if (world) list = list.filter((i) => itemMatchesWorld(i, world));
     }
 
     // Sub-category filter (tier 2 — keyword match on name)
@@ -688,28 +1020,43 @@ export default function SmartInventory({ tenantId }) {
 
   // ── Add new item ─────────────────────────────────────────────────────────
   function openAdd() {
+    // Derive DB enum category from the active world
+    const world = PRODUCT_WORLDS.find(
+      (w) => w.id === catFilter && w.id !== "all",
+    );
+    const dbCategory = world?.enums?.[0] || "finished_product";
+
+    // Loyalty category mapping for all 14 worlds
+    const loyaltyMap = {
+      flower: "cannabis_flower",
+      hash: "cannabis_flower",
+      concentrate: "cannabis_flower",
+      vape: "cannabis_flower",
+      preroll: "cannabis_flower",
+      edible: "cannabis_edible",
+      seeds: "grow_supplies",
+      substrate: "grow_supplies",
+      nutrients: "grow_supplies",
+      equipment: "grow_supplies",
+      papers: "accessories",
+      accessories: "accessories",
+      wellness: "health_wellness",
+      merch: "health_wellness",
+    };
+    const loyaltyCat =
+      catFilter !== "all"
+        ? loyaltyMap[catFilter] || "health_wellness"
+        : "cannabis_flower";
+
     setAddDraft({
       name: "",
-      category: catFilter !== "all" ? catFilter : "flower",
+      category: dbCategory,
       sell_price: "",
       weighted_avg_cost: "",
       quantity_on_hand: 0,
       is_active: true,
       is_featured: false,
-      loyalty_category:
-        catFilter !== "all"
-          ? PILL_HIERARCHY[catFilter]
-            ? catFilter === "flower" || catFilter === "concentrate"
-              ? "cannabis_flower"
-              : catFilter === "edible"
-                ? "cannabis_edible"
-                : catFilter === "accessory" || catFilter === "hardware"
-                  ? "accessories"
-                  : catFilter === "raw_material"
-                    ? "grow_supplies"
-                    : "health_wellness"
-            : "health_wellness"
-          : "cannabis_flower",
+      loyalty_category: loyaltyCat,
     });
     setAddError(null);
     setAddOpen(true);
@@ -983,7 +1330,11 @@ export default function SmartInventory({ tenantId }) {
       {addOpen && (
         <Modal
           onClose={() => setAddOpen(false)}
-          title={`+ Add ${catFilter !== "all" ? CATEGORY_ICONS[catFilter] + " " + CATEGORY_LABELS[catFilter] : "Inventory"} Item`}
+          title={(() => {
+            if (catFilter === "all") return "+ Add Inventory Item";
+            const w = PRODUCT_WORLDS.find((pw) => pw.id === catFilter);
+            return `+ Add ${w?.icon || ""} ${w?.label || catFilter} Item`;
+          })()}
           T={T}
         >
           <ItemForm
@@ -1049,19 +1400,22 @@ function SmartPillBox({
   items,
   T,
 }) {
-  // Live item counts per category
+  // Live item counts per world using itemMatchesWorld (same logic as filtering)
   const counts = useMemo(() => {
     const m = { all: items.length };
-    items.forEach((i) => {
-      m[i.category] = (m[i.category] || 0) + 1;
+    PRODUCT_WORLDS.filter((w) => w.id !== "all").forEach((w) => {
+      m[w.id] = items.filter((i) => itemMatchesWorld(i, w)).length;
     });
     return m;
   }, [items]);
 
-  // Per sub-category counts (keyword match against name within the active category)
+  // Per sub-category counts (keyword match against name within active world)
   const subCounts = useMemo(() => {
     if (catFilter === "all" || !PILL_HIERARCHY[catFilter]) return {};
-    const catItems = items.filter((i) => i.category === catFilter);
+    const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
+    const catItems = world
+      ? items.filter((i) => itemMatchesWorld(i, world))
+      : [];
     const m = {};
     PILL_HIERARCHY[catFilter].subs.forEach((sub) => {
       m[sub.id] = catItems.filter((i) =>
@@ -1078,9 +1432,10 @@ function SmartPillBox({
     if (!subFilter || !PILL_HIERARCHY[catFilter]) return {};
     const sub = PILL_HIERARCHY[catFilter].subs.find((s) => s.id === subFilter);
     if (!sub?.brands?.length) return {};
+    const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
     const subItems = items.filter(
       (i) =>
-        i.category === catFilter &&
+        (world ? itemMatchesWorld(i, world) : true) &&
         sub.keywords.some((kw) =>
           i.name.toLowerCase().includes(kw.toLowerCase()),
         ),
@@ -1096,13 +1451,14 @@ function SmartPillBox({
     return m;
   }, [items, catFilter, subFilter]);
 
+  // Use all 14 PRODUCT_WORLDS (not just 7 DB enum values)
   const allCats = [
     { id: "all", label: "All", icon: "🔍" },
-    ...CANNABIS_CATEGORIES.map((c) => ({
-      id: c,
-      label: CATEGORY_LABELS[c] || c,
-      icon: CATEGORY_ICONS[c] || "📦",
-      hasSub: Boolean(PILL_HIERARCHY[c]?.subs?.length),
+    ...PRODUCT_WORLDS.filter((w) => w.id !== "all").map((w) => ({
+      id: w.id,
+      label: w.label,
+      icon: w.icon || "📦",
+      hasSub: Boolean(PILL_HIERARCHY[w.id]?.subs?.length),
     })),
   ];
 
@@ -1230,7 +1586,8 @@ function SmartPillBox({
               flexShrink: 0,
             }}
           >
-            {CATEGORY_ICONS[catFilter]} {CATEGORY_LABELS[catFilter]}:
+            {PRODUCT_WORLDS.find((w) => w.id === catFilter)?.icon}{" "}
+            {PRODUCT_WORLDS.find((w) => w.id === catFilter)?.label}:
           </span>
 
           {activeSubs.map((sub) => {
@@ -2464,15 +2821,18 @@ function EmptyState({ catFilter, search, onAdd, T }) {
           marginBottom: 6,
         }}
       >
-        {search
-          ? `No items match "${search}"`
-          : catFilter !== "all"
-            ? `No ${CATEGORY_LABELS[catFilter] || catFilter} items yet`
-            : "No inventory items"}
+        {(() => {
+          const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
+          return search
+            ? `No items match "${search}"`
+            : catFilter !== "all"
+              ? `No ${world?.label || catFilter} items yet`
+              : "No inventory items";
+        })()}
       </div>
       <div style={{ fontSize: 13, marginBottom: 20 }}>
         {catFilter !== "all" && !search
-          ? "Items show here once their category is set correctly in the database."
+          ? "Items show here once tagged to this world in HQStock."
           : "Add your first item to get started."}
       </div>
       <button
