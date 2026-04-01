@@ -34,6 +34,9 @@ import HRStaffDirectory from "../components/hq/HRStaffDirectory";
 import AdminQRCodes from "../components/AdminQRCodes";
 import AdminCustomerEngagement from "../components/AdminCustomerEngagement";
 import AdminCommsCenter from "../components/AdminCommsCenter";
+import POSScreen from "../components/hq/POSScreen";
+import ExpenseManager from "../components/hq/ExpenseManager";
+import SmartInventory from "../components/hq/SmartInventory";
 
 // ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
@@ -235,6 +238,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Stock",
         desc: "Inventory · movements · AVCO · margins",
       },
+      {
+        id: "catalog",
+        label: "Smart Catalog",
+        desc: "Tile · list · detail view · cascading filters",
+      },
     ],
   },
   {
@@ -266,6 +274,11 @@ const CANNABIS_RETAIL_WATERFALL = [
     emoji: "💰",
     color: "#065F46",
     tabs: [
+      {
+        id: "pos",
+        label: "POS Till",
+        desc: "Budtender till · cash · card · online sales",
+      },
       {
         id: "pricing",
         label: "Pricing",
@@ -316,6 +329,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         id: "pl",
         label: "Profit & Loss",
         desc: "Live revenue · COGS · net margin",
+      },
+      {
+        id: "expenses",
+        label: "Expenses",
+        desc: "OPEX tracking · categories · P&L feed",
       },
       {
         id: "analytics",
@@ -423,6 +441,8 @@ function renderTab(tabId, tenantId, industryProfile) {
       return <HQProduction />;
     case "stock":
       return <HQStock />;
+    case "catalog":
+      return <SmartInventory tenantId={tenantId} />;
     case "wholesale-orders":
       return <HQWholesaleOrders />;
     case "invoices":
@@ -435,6 +455,10 @@ function renderTab(tabId, tenantId, industryProfile) {
       return <HQPricing />;
     case "loyalty":
       return <HQLoyalty />;
+    case "pos":
+      return <POSScreen tenantId={tenantId} />;
+    case "expenses":
+      return <ExpenseManager tenantId={tenantId} />;
     case "pl":
       return <HQProfitLoss />;
     case "costing":
@@ -725,7 +749,7 @@ export default function TenantPortal() {
           <div
             style={{
               flex: 1,
-              overflowY: "auto",
+              overflow: "hidden",
               display: "flex",
               flexDirection: "column",
             }}
@@ -773,17 +797,71 @@ export default function TenantPortal() {
               onNavigate={() => {}}
             />
 
+            {/* Content area — full-bleed for catalog/stock, padded for everything else */}
+            {(() => {
+              const fullBleed = ["catalog", "stock"].includes(activeTab);
+              return (
+                <div
+                  style={{
+                    flex: 1,
+                    overflow: fullBleed ? "hidden" : "auto",
+                    padding: fullBleed ? 0 : "24px 28px",
+                    maxWidth: fullBleed ? "none" : 1400,
+                    width: "100%",
+                    margin: "0 auto",
+                    boxSizing: "border-box",
+                    display: fullBleed ? "flex" : "block",
+                    flexDirection: fullBleed ? "column" : undefined,
+                  }}
+                >
+                  {renderTab(activeTab, tenantId, industryProfile)}
+                </div>
+              );
+            })()}
+
+            {/* System footer — always pinned */}
             <div
               style={{
-                flex: 1,
-                padding: "24px 28px",
-                maxWidth: 1400,
-                width: "100%",
-                margin: "0 auto",
-                boxSizing: "border-box",
+                height: 28,
+                flexShrink: 0,
+                borderTop: `1px solid ${T.border}`,
+                background: "#FAFAF9",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 20px",
+                gap: 16,
               }}
             >
-              {renderTab(activeTab, tenantId, industryProfile)}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#2D6A4F",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                NuAi
+              </span>
+              <span style={{ fontSize: 10, color: "#999" }}>v0.1 · dev</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 10, color: "#999" }}>
+                {new Date().toLocaleDateString("en-ZA", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#2D6A4F",
+                  display: "inline-block",
+                }}
+                title="Connected"
+              />
             </div>
           </div>
 
