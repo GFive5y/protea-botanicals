@@ -982,6 +982,7 @@ export default function SmartInventory({ tenantId }) {
 
   // ── View + filter state ─────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState(VIEW_TILE);
+  const [tileSize, setTileSize] = useState("M");
   const [catFilter, setCatFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState(null); // tier-2 header (e.g. "cultivation")
   const [subFilter, setSubFilter] = useState(null); // tier-3 item  (e.g. "indoor")
@@ -1581,6 +1582,44 @@ export default function SmartInventory({ tenantId }) {
           >
             {/* View switcher */}
             <ViewToggle current={viewMode} onChange={setViewMode} T={T} />
+            {viewMode === VIEW_TILE && (
+              <div
+                style={{
+                  display: "flex",
+                  border: `1.5px solid ${T.border}`,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                }}
+              >
+                {["S", "M", "L"].map((s, i) => (
+                  <button
+                    key={s}
+                    onClick={() => setTileSize(s)}
+                    title={
+                      s === "S"
+                        ? "Small tiles"
+                        : s === "M"
+                          ? "Medium tiles"
+                          : "Large tiles"
+                    }
+                    style={{
+                      padding: "5px 10px",
+                      border: "none",
+                      borderRight: i < 2 ? `1px solid ${T.border}` : "none",
+                      background: tileSize === s ? T.accent : T.white,
+                      color: tileSize === s ? T.white : T.ink500,
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      fontFamily: T.font,
+                      transition: "all 0.12s",
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Filters toggle — visible in all view modes */}
             <button
@@ -2062,6 +2101,8 @@ export default function SmartInventory({ tenantId }) {
               onEdit={openEdit}
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
+              onOpenPanel={setPanelItem}
+              tileSize={tileSize}
               T={T}
             />
           ) : viewMode === VIEW_LIST ? (
@@ -2070,6 +2111,8 @@ export default function SmartInventory({ tenantId }) {
               onEdit={openEdit}
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
+              onOpenPanel={setPanelItem}
+              tileSize={tileSize}
               T={T}
             />
           ) : (
@@ -3213,19 +3256,61 @@ function StockChip({ type, T }) {
   );
 }
 
-function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
+// ── Smart tag extractor (SC-05) ──────────────────────────────────────────────
+function getSmartTags(item) {
+  const vv = (item.variant_value || "").trim();
+  const brand = (item.brand || "").trim();
+  const sub = (item.subcategory || "").trim();
+  const tags = [];
+  const world = PRODUCT_WORLDS.find(
+    (pw) => pw.id !== "all" && itemMatchesWorld(item, pw),
+  );
+  const worldId = world?.id || "";
+  const parts = vv.split(/\s+/).filter(Boolean);
+  const weightPart = parts.find((p) => /^\d+(\.\d+)?(g|mg|ml|L)$/i.test(p));
+  const strainPart = parts.find((p) =>
+    /^(indica|sativa|hybrid|cbd|auto)$/i.test(p),
+  );
+  if (["flower", "concentrate", "hash", "vape", "preroll"].includes(worldId)) {
+    if (strainPart) tags.push(strainPart);
+    else if (sub) tags.push(sub);
+    if (weightPart) tags.push(weightPart);
+    else if (brand && tags.length < 2) tags.push(brand);
+  } else {
+    if (brand) tags.push(brand);
+    if (sub && sub !== brand) tags.push(sub);
+  }
+  return tags.slice(0, 2);
+}
+
+function TileView({
+  items,
+  onEdit,
+  onDelete,
+  onToggle,
+  onOpenPanel,
+  tileSize,
+  T,
+}) {
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
+  const minW = tileSize === "S" ? 155 : tileSize === "L" ? 270 : 200;
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+        gridTemplateColumns: `repeat(auto-fill, minmax(${minW}px, 1fr))`,
         gap: 12,
       }}
+      onClick={() => setMenuOpenId(null)}
     >
       {items.map((item) => {
         const m = margin(item.sell_price, item.weighted_avg_cost);
         const soldOut = isSoldOut(item);
         const lowStock = isLowStock(item);
+        const isHovered = hoveredId === item.id;
+        const menuOpen = menuOpenId === item.id;
+        const tags = getSmartTags(item);
         const statusBorder = soldOut
           ? T.danger
           : lowStock
@@ -3247,17 +3332,23 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
               borderRadius: T.radius,
               overflow: "hidden",
               opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
-              boxShadow: T.shadow,
+              boxShadow: isHovered ? "0 4px 14px rgba(0,0,0,0.13)" : T.shadow,
               cursor: "pointer",
               transition: "box-shadow 0.15s, border-color 0.15s",
+              position: "relative",
             }}
-            onClick={() => onOpenPanel(item)}
+            onMouseEnter={() => setHoveredId(item.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            onClick={() => {
+              if (!menuOpen) onOpenPanel(item);
+            }}
           >
             {/* Category banner */}
             <div
               style={{
                 background: T.accentLit,
                 padding: "8px 12px",
+                display: "flex",
                 alignItems: "center",
                 gap: 6,
                 borderBottom: `1px solid ${T.border}`,
@@ -3285,19 +3376,106 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 );
               })()}
               {item.is_featured && (
-                <span style={{ marginLeft: "auto", fontSize: 10 }}>⭐</span>
+                <span style={{ marginLeft: "auto", fontSize: 10 }}>★</span>
               )}
               {soldOut && (
-                <span style={{ marginLeft: "auto" }}>
+                <span style={{ marginLeft: item.is_featured ? 4 : "auto" }}>
                   <StockChip type="out" T={T} />
                 </span>
               )}
               {lowStock && !soldOut && (
-                <span style={{ marginLeft: "auto" }}>
+                <span style={{ marginLeft: item.is_featured ? 4 : "auto" }}>
                   <StockChip type="low" T={T} />
                 </span>
               )}
             </div>
+
+            {/* ⋯ hover action trigger */}
+            {isHovered && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpenId(menuOpen ? null : item.id);
+                }}
+                style={{
+                  position: "absolute",
+                  top: 7,
+                  right: 8,
+                  zIndex: 10,
+                  background: menuOpen ? T.accent : "rgba(255,255,255,0.92)",
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 6,
+                  padding: "1px 8px",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  color: menuOpen ? T.white : T.ink500,
+                  lineHeight: 1.6,
+                  transition: "all 0.1s",
+                  letterSpacing: 1,
+                }}
+              >
+                ···
+              </button>
+            )}
+
+            {/* Action footer — opens on ··· click */}
+            {menuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  display: "flex",
+                  borderTop: `1px solid ${T.border}`,
+                  background: T.white,
+                  zIndex: 5,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {[
+                  {
+                    label: "✏ Edit",
+                    action: () => onEdit(item),
+                    color: T.accent,
+                  },
+                  {
+                    label: item.is_active ? "👁 Hide" : "👁 Show",
+                    action: () => onToggle(item, "is_active"),
+                    color: T.amber,
+                  },
+                  {
+                    label: "🗑 Del",
+                    action: () => onDelete(item),
+                    color: T.danger,
+                  },
+                ].map((a, i) => (
+                  <button
+                    key={a.label}
+                    onClick={() => {
+                      a.action();
+                      setMenuOpenId(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px 0",
+                      border: "none",
+                      borderRight: i < 2 ? `1px solid ${T.border}` : "none",
+                      background: "transparent",
+                      color: a.color,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: T.font,
+                      transition: "background 0.1s",
+                    }}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Body */}
             <div style={{ padding: "12px 14px" }}>
@@ -3306,13 +3484,44 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                   fontWeight: 700,
                   fontSize: 13,
                   color: T.ink900,
-                  marginBottom: 10,
+                  marginBottom: tags.length ? 6 : 10,
                   lineHeight: 1.3,
                   minHeight: 32,
                 }}
               >
                 {item.name}
               </div>
+
+              {/* Smart tags */}
+              {tags.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 4,
+                    flexWrap: "wrap",
+                    marginBottom: 8,
+                  }}
+                >
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: T.accentMid,
+                        background: T.accentXlit || T.accentLit,
+                        border: `1px solid ${T.accentBd || T.border}`,
+                        borderRadius: 4,
+                        padding: "2px 6px",
+                        textTransform: "capitalize",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Price + margin */}
               <div
@@ -3371,35 +3580,6 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 </div>
               )}
             </div>
-
-            {/* Footer actions */}
-            <div
-              style={{
-                display: "flex",
-                borderTop: `1px solid ${T.border}`,
-                overflow: "hidden",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <TileAction
-                label="Edit"
-                onClick={() => onEdit(item)}
-                color={T.accent}
-                T={T}
-              />
-              <TileAction
-                label={item.is_active ? "Hide" : "Show"}
-                onClick={() => onToggle(item, "is_active")}
-                color={T.amber}
-                T={T}
-              />
-              <TileAction
-                label="Del"
-                onClick={() => onDelete(item)}
-                color={T.danger}
-                T={T}
-              />
-            </div>
           </div>
         );
       })}
@@ -3407,35 +3587,6 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   );
 }
 
-function TileAction({ label, onClick, color, T }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        flex: 1,
-        padding: "7px 0",
-        border: "none",
-        background: hover ? color + "18" : "transparent",
-        color: hover ? color : T.ink300,
-        fontSize: 11,
-        fontWeight: 600,
-        cursor: "pointer",
-        fontFamily: T.font,
-        transition: "all 0.12s",
-        borderRight: `1px solid ${T.border}`,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// LIST VIEW (compact rows)
-// ─────────────────────────────────────────────────────────────────────────
 function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   return (
     <div
