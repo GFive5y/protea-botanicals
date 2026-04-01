@@ -1006,6 +1006,7 @@ export default function SmartInventory({ tenantId }) {
 
   // ── View + filter state ─────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState(VIEW_DETAIL);
+  const [pillExpanded, setPillExpanded] = useState(false);
   const [tileSize, setTileSize] = useState("M");
   const [catFilter, setCatFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState(null); // tier-2 header (e.g. "cultivation")
@@ -2136,6 +2137,9 @@ export default function SmartInventory({ tenantId }) {
           searchRef={searchRef}
           items={items}
           T={T}
+          pillExpanded={pillExpanded}
+          onExpandPills={() => setPillExpanded(true)}
+          onCollapsePills={() => setPillExpanded(false)}
         />
       </div>
 
@@ -2895,6 +2899,9 @@ function SmartPillBox({
   searchRef,
   items,
   T,
+  pillExpanded,
+  onExpandPills,
+  onCollapsePills,
 }) {
   // ── Live counts ──────────────────────────────────────────────────────────
   const counts = useMemo(() => {
@@ -2905,7 +2912,6 @@ function SmartPillBox({
     return m;
   }, [items]);
 
-  // Group counts — items matching each group's combined keywords
   const groupCounts = useMemo(() => {
     if (catFilter === "all" || !PILL_HIERARCHY[catFilter]) return {};
     const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
@@ -2925,7 +2931,6 @@ function SmartPillBox({
     return m;
   }, [items, catFilter]);
 
-  // Sub counts — items matching each sub-item's keywords within active group
   const subCounts = useMemo(() => {
     if (!groupFilter || !PILL_HIERARCHY[catFilter]) return {};
     const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
@@ -2946,22 +2951,14 @@ function SmartPillBox({
     return m;
   }, [items, catFilter, groupFilter]);
 
-  const allCats = [
-    { id: "all", label: "All", icon: "🔍" },
-    ...PRODUCT_WORLDS.filter((w) => w.id !== "all").map((w) => ({
-      id: w.id,
-      label: w.label,
-      icon: w.icon || "📦",
-      hasSub: Boolean(PILL_HIERARCHY[w.id]?.groups?.length),
-    })),
-  ];
-
   const activeGroups =
     catFilter !== "all" ? PILL_HIERARCHY[catFilter]?.groups || [] : [];
   const activeGroup = activeGroups.find((g) => g.id === groupFilter);
   const activeSubs = activeGroup?.subs || [];
 
-  // Pill style helpers
+  // 0 = home, 1 = categories open, 2 = world selected
+  const navLevel = !pillExpanded ? 0 : catFilter === "all" ? 1 : 2;
+
   const pillBase = (active, accent, T) => ({
     padding: "4px 12px",
     borderRadius: 99,
@@ -2990,101 +2987,175 @@ function SmartPillBox({
     display: "inline-block",
   });
 
+  const navBtnStyle = {
+    padding: "4px 11px",
+    borderRadius: 99,
+    border: `1.5px solid ${T.borderDark}`,
+    background: T.white,
+    color: T.ink500,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    fontFamily: T.font,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 0,
+    transition: "all 0.12s",
+    whiteSpace: "nowrap",
+  };
+
   return (
     <div style={{ paddingBottom: 4 }}>
-      {/* ── SC-06: Pill row with fade-edge gradient (no native scrollbar arrows) ── */}
       <style>{`
         .nuai-pill-row::-webkit-scrollbar { display: none; }
         .nuai-pill-row { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-      <div style={{ position: "relative" }}>
-        {/* Left fade */}
-        <div
-          style={{
-            pointerEvents: "none",
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 6,
-            width: 28,
-            zIndex: 2,
-            background: `linear-gradient(to right, ${T.white}, transparent)`,
-          }}
-        />
-        {/* Right fade */}
-        <div
-          style={{
-            pointerEvents: "none",
-            position: "absolute",
-            right: 0,
-            top: 0,
-            bottom: 6,
-            width: 40,
-            zIndex: 2,
-            background: `linear-gradient(to left, ${T.white}, transparent)`,
-          }}
-        />
 
-        {/* ── TIER 1: World pills ─────────────────────────────────────────── */}
+      {/* ── MAIN PILL ROW ─────────────────────────────────────────────────── */}
+      <div
+        className="nuai-pill-row"
+        style={{
+          display: "flex",
+          gap: 6,
+          overflowX: "auto",
+          paddingBottom: 6,
+          alignItems: "center",
+        }}
+      >
+        {/* All — always visible, always resets */}
+        <button
+          onClick={() => {
+            onSelectCat("all");
+            onCollapsePills();
+          }}
+          style={pillBase(navLevel === 0, T.accent, T)}
+        >
+          <span>●</span>
+          <span>All</span>
+          <span style={countBadge(counts.all, navLevel === 0)}>
+            {counts.all}
+          </span>
+        </button>
+
+        {/* Level 0: Categories gateway pill */}
+        {navLevel === 0 && (
+          <button onClick={onExpandPills} style={pillBase(false, T.accent, T)}>
+            <span>🗂</span>
+            <span>Categories</span>
+            <span style={countBadge(14, false)}>14</span>
+            <span style={{ fontSize: 8, opacity: 0.4 }}>▼</span>
+          </button>
+        )}
+
+        {/* Level 1: back + 14 world pills */}
+        {navLevel === 1 && (
+          <>
+            <button
+              onClick={onCollapsePills}
+              style={navBtnStyle}
+              title="Back to home"
+            >
+              ‹ Back
+            </button>
+            {PRODUCT_WORLDS.filter((w) => w.id !== "all").map((w) => {
+              const cnt = counts[w.id] || 0;
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => onSelectCat(w.id)}
+                  style={pillBase(false, T.accent, T)}
+                >
+                  <span>{w.icon || "📦"}</span>
+                  <span>{w.label}</span>
+                  <span style={countBadge(cnt, false)}>{cnt}</span>
+                </button>
+              );
+            })}
+          </>
+        )}
+
+        {/* Level 2: back + active world breadcrumb */}
+        {navLevel === 2 &&
+          (() => {
+            const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
+            return (
+              <>
+                <button
+                  onClick={() => {
+                    onSelectCat("all");
+                    onExpandPills();
+                  }}
+                  style={navBtnStyle}
+                  title="Back to categories"
+                >
+                  ‹ Back
+                </button>
+                <button
+                  style={{ ...pillBase(true, T.accent, T), cursor: "default" }}
+                >
+                  <span>{world?.icon || "📦"}</span>
+                  <span>{world?.label || catFilter}</span>
+                  <span style={countBadge(counts[catFilter] || 0, true)}>
+                    {counts[catFilter] || 0}
+                  </span>
+                </button>
+              </>
+            );
+          })()}
+
+        {/* Search + × close — right side */}
         <div
-          className="nuai-pill-row"
           style={{
+            marginLeft: "auto",
+            flexShrink: 0,
             display: "flex",
-            gap: 6,
-            overflowX: "auto",
-            paddingBottom: 6,
             alignItems: "center",
+            gap: 6,
           }}
         >
-          {allCats.map((cat) => {
-            const active = catFilter === cat.id;
-            const cnt = counts[cat.id] || 0;
-            const isExpanded = active && groupFilter && catFilter !== "all";
-            return (
-              <button
-                key={cat.id}
-                onClick={() => onSelectCat(cat.id)}
-                style={pillBase(active, T.accent, T)}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-                <span style={countBadge(cnt, active)}>{cnt}</span>
-                {cat.hasSub && (
-                  <span style={{ fontSize: 8, opacity: active ? 0.8 : 0.4 }}>
-                    {isExpanded ? "▲" : "▼"}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          {/* Search — right-aligned */}
-          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-            <input
-              ref={searchRef}
-              value={search}
-              onChange={(e) => onSearch(e.target.value)}
-              placeholder="Search items…"
-              style={{
-                padding: "5px 12px",
-                border: `1.5px solid ${search ? T.accent : T.border}`,
-                borderRadius: 99,
-                fontSize: 12.5,
-                fontFamily: T.font,
-                color: T.ink900,
-                outline: "none",
-                width: 180,
-                background: T.white,
+          <input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search items…"
+            style={{
+              padding: "5px 12px",
+              border: `1.5px solid ${search ? T.accent : T.border}`,
+              borderRadius: 99,
+              fontSize: 12.5,
+              fontFamily: T.font,
+              color: T.ink900,
+              outline: "none",
+              width: 180,
+              background: T.white,
+            }}
+          />
+          {navLevel > 0 && (
+            <button
+              onClick={() => {
+                onSelectCat("all");
+                onCollapsePills();
               }}
-            />
-          </div>
+              style={{
+                ...navBtnStyle,
+                padding: "3px 9px",
+                fontSize: 15,
+                color: T.ink400,
+                fontWeight: 400,
+                border: `1.5px solid ${T.border}`,
+              }}
+              title="Close — back to All"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
-      {/* end fade-edge wrapper */}
 
-      {/* ── TIER 2: Group pills OR Sub-item pills (never both at once) ────── */}
-      {catFilter !== "all" && activeGroups.length > 0 && (
+      {/* ── TIER 2: Group pills (Level 2 only) ────────────────────────────── */}
+      {navLevel === 2 && activeGroups.length > 0 && (
         <>
-          {/* ── GROUP pills row — always visible when world is selected ── */}
           <div
             style={{
               display: "flex",
@@ -3166,7 +3237,7 @@ function SmartPillBox({
             })}
           </div>
 
-          {/* ── SUB-ITEM pills row — appears below when a group is clicked ── */}
+          {/* Sub-item pills */}
           {groupFilter && activeSubs.length > 0 && (
             <div
               style={{
@@ -3245,7 +3316,7 @@ function SmartPillBox({
         </>
       )}
 
-      {/* ── Active filter chip ──────────────────────────────────────────── */}
+      {/* ── Active filter chip ─────────────────────────────────────────────── */}
       {subFilter && activeGroup && (
         <div
           style={{
@@ -3294,9 +3365,6 @@ function SmartPillBox({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// TILE VIEW
-// ─────────────────────────────────────────────────────────────────────────
 // SC-03: stock status helpers (used in all 3 views)
 const isSoldOut = (item) => (item.quantity_on_hand || 0) === 0;
 const isLowStock = (item) =>
@@ -4757,16 +4825,59 @@ function SmallBtn({ label, onClick, color, T, title }) {
 }
 
 function LoadingState({ T }) {
+  const shimmer = {
+    background: `linear-gradient(90deg, ${T.ink50} 25%, ${T.ink150}40 50%, ${T.ink50} 75%)`,
+    backgroundSize: "200% 100%",
+    animation: "nuai-shimmer 1.4s ease-in-out infinite",
+    borderRadius: 6,
+  };
   return (
-    <div
-      style={{
-        textAlign: "center",
-        padding: 64,
-        color: T.ink400,
-        fontSize: 14,
-      }}
-    >
-      <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>Loading inventory…
+    <div style={{ padding: "4px 0" }}>
+      <style>{`@keyframes nuai-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+      {/* Skeleton header row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "8px 4px",
+          borderBottom: `1px solid ${T.border}`,
+          marginBottom: 2,
+        }}
+      >
+        {[220, 120, 130, 110, 80, 95, 90, 85, 70].map((w, i) => (
+          <div
+            key={i}
+            style={{ ...shimmer, width: w, height: 12, flexShrink: 0 }}
+          />
+        ))}
+      </div>
+      {/* Skeleton rows */}
+      {Array.from({ length: 10 }).map((_, row) => (
+        <div
+          key={row}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "14px 4px",
+            borderBottom: `1px solid ${T.border}`,
+            opacity: 1 - row * 0.07,
+          }}
+        >
+          {[220, 120, 130, 110, 80, 95, 90, 85, 70].map((w, i) => (
+            <div
+              key={i}
+              style={{
+                ...shimmer,
+                width: i === 0 ? w : w * 0.6,
+                height: i === 0 ? 14 : 12,
+                flexShrink: 0,
+              }}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
