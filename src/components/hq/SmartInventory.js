@@ -1560,19 +1560,11 @@ export default function SmartInventory({ tenantId }) {
 
   // ── Pill cascade ────────────────────────────────────────────────────────
   function selectGroup(groupId) {
-    // Toggle group — clicking active group collapses back to group row
-    if (groupFilter === groupId) {
-      setGroupFilter(null);
-      setSubFilter(null);
-    } else {
-      setGroupFilter(groupId);
-      setSubFilter(null);
-    }
+    setGroupFilter(groupId);
   }
 
   function selectSub(subId) {
-    if (subFilter === subId) setSubFilter(null);
-    else setSubFilter(subId);
+    setSubFilter(subId);
   }
 
   // eslint-disable-next-line no-unused-vars -- kept for future brand-level tier 4
@@ -2932,30 +2924,26 @@ function SmartPillBox({
   }, [items, catFilter]);
 
   const subCounts = useMemo(() => {
-    if (!groupFilter || !PILL_HIERARCHY[catFilter]) return {};
+    if (catFilter === "all" || !PILL_HIERARCHY[catFilter]) return {};
     const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
     const catItems = world
       ? items.filter((i) => itemMatchesWorld(i, world))
       : [];
-    const group = PILL_HIERARCHY[catFilter].groups?.find(
-      (g) => g.id === groupFilter,
-    );
     const m = {};
-    (group?.subs || []).forEach((sub) => {
-      m[sub.id] = catItems.filter((item) =>
-        sub.keywords.some((kw) =>
-          item.name.toLowerCase().includes(kw.toLowerCase()),
-        ),
-      ).length;
+    (PILL_HIERARCHY[catFilter].groups || []).forEach((group) => {
+      (group.subs || []).forEach((sub) => {
+        m[sub.id] = catItems.filter((item) =>
+          sub.keywords.some((kw) =>
+            item.name.toLowerCase().includes(kw.toLowerCase()),
+          ),
+        ).length;
+      });
     });
     return m;
-  }, [items, catFilter, groupFilter]);
+  }, [items, catFilter]);
 
   const activeGroups =
     catFilter !== "all" ? PILL_HIERARCHY[catFilter]?.groups || [] : [];
-  const activeGroup = activeGroups.find((g) => g.id === groupFilter);
-  const activeSubs = activeGroup?.subs || [];
-
   // 0 = home, 1 = categories open, 2 = world selected
   const navLevel = !pillExpanded ? 0 : catFilter === "all" ? 1 : 2;
 
@@ -3153,171 +3141,111 @@ function SmartPillBox({
         </div>
       </div>
 
-      {/* ── TIER 2: Group pills (Level 2 only) ────────────────────────────── */}
+      {/* ── TIER 2: All group subs shown inline when a world is selected ── */}
       {navLevel === 2 && activeGroups.length > 0 && (
-        <>
-          <div
-            style={{
-              display: "flex",
-              gap: 5,
-              overflowX: "auto",
-              paddingBottom: 5,
-              paddingTop: 5,
-              paddingLeft: 4,
-              borderTop: `1px solid ${T.border}`,
-              alignItems: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10.5,
-                color: T.ink300,
-                fontWeight: 700,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-                marginRight: 2,
-                flexShrink: 0,
-              }}
-            >
-              {PRODUCT_WORLDS.find((w) => w.id === catFilter)?.icon}{" "}
-              {PRODUCT_WORLDS.find((w) => w.id === catFilter)?.label}:
-            </span>
-            {activeGroups.map((group) => {
-              const cnt = groupCounts[group.id] || 0;
-              const active = groupFilter === group.id;
-              return (
-                <button
-                  key={group.id}
-                  onClick={() => onSelectGroup(group.id)}
-                  style={{
-                    padding: "4px 12px",
-                    borderRadius: 99,
-                    cursor: "pointer",
-                    border: `1.5px solid ${active ? T.accentMid : cnt > 0 ? T.accentLit : T.ink150}`,
-                    background: active
-                      ? T.accentMid
-                      : cnt > 0
-                        ? T.accentXlit
-                        : T.ink50,
-                    color: active ? "#fff" : cnt > 0 ? T.accentMid : T.ink300,
-                    fontWeight: active ? 700 : 400,
-                    fontSize: 12.5,
-                    fontFamily: T.font,
-                    flexShrink: 0,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    opacity: cnt > 0 ? 1 : 0.5,
-                    transition: "all 0.12s",
-                  }}
-                >
-                  <span>{group.icon}</span>
-                  <span>{group.label}</span>
-                  <span
-                    style={{
-                      background: active
-                        ? "rgba(255,255,255,0.28)"
-                        : cnt > 0
-                          ? T.accentLit
-                          : T.ink50,
-                      color: active ? "#fff" : cnt > 0 ? T.accentMid : T.ink300,
-                      borderRadius: 99,
-                      padding: "0 6px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {cnt}
-                  </span>
-                  <span style={{ fontSize: 8, opacity: active ? 0.9 : 0.4 }}>
-                    {active ? "▼" : "▶"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Sub-item pills */}
-          {groupFilter && activeSubs.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                gap: 4,
-                overflowX: "auto",
-                paddingBottom: 5,
-                paddingTop: 5,
-                paddingLeft: 20,
-                borderTop: `1px dashed ${T.border}`,
-                alignItems: "center",
-              }}
-            >
-              <span
+        <div
+          style={{
+            borderTop: `1px solid ${T.border}`,
+            paddingTop: 6,
+            paddingBottom: 2,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
+          {activeGroups.map((group) => {
+            const subs = group.subs || [];
+            if (subs.length === 0) return null;
+            return (
+              <div
+                key={group.id}
                 style={{
-                  fontSize: 10,
-                  color: T.ink300,
-                  fontWeight: 700,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  marginRight: 4,
-                  flexShrink: 0,
+                  display: "flex",
+                  gap: 5,
+                  overflowX: "auto",
+                  alignItems: "center",
+                  paddingLeft: 4,
+                  paddingBottom: 2,
                 }}
               >
-                {activeGroup?.icon} {activeGroup?.label}:
-              </span>
-              {activeSubs.map((sub) => {
-                const active = subFilter === sub.id;
-                const cnt = subCounts[sub.id] || 0;
-                return (
-                  <button
-                    key={sub.id}
-                    onClick={() => onSelectSub(sub.id)}
-                    style={{
-                      padding: "3px 11px",
-                      borderRadius: 99,
-                      border: `1.5px solid ${active ? T.blue : cnt > 0 ? T.borderDark : T.ink150}`,
-                      background: active
-                        ? T.blueLit
-                        : cnt > 0
-                          ? T.white
-                          : T.ink50,
-                      color: active ? T.blue : cnt > 0 ? T.ink700 : T.ink300,
-                      fontWeight: active ? 700 : 400,
-                      fontSize: 12,
-                      cursor: cnt > 0 ? "pointer" : "default",
-                      fontFamily: T.font,
-                      flexShrink: 0,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                      opacity: cnt > 0 ? 1 : 0.45,
-                      transition: "all 0.12s",
-                    }}
-                  >
-                    <span>{sub.label}</span>
-                    {cnt > 0 && (
-                      <span
-                        style={{
-                          background: active ? T.blue + "20" : T.ink50,
-                          color: active ? T.blue : T.ink400,
-                          borderRadius: 99,
-                          padding: "0 5px",
-                          fontSize: 9.5,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {cnt}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: T.ink300,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    marginRight: 2,
+                    flexShrink: 0,
+                    minWidth: 80,
+                  }}
+                >
+                  {group.icon} {group.label}:
+                </span>
+                {subs.map((sub) => {
+                  const active =
+                    subFilter === sub.id && groupFilter === group.id;
+                  const cnt = subCounts[sub.id] || 0;
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => {
+                        if (active) {
+                          onSelectGroup(null);
+                          onSelectSub(null);
+                        } else {
+                          onSelectGroup(group.id);
+                          onSelectSub(sub.id);
+                        }
+                      }}
+                      style={{
+                        padding: "3px 11px",
+                        borderRadius: 99,
+                        border: `1.5px solid ${active ? T.blue : cnt > 0 ? T.borderDark : T.ink150}`,
+                        background: active
+                          ? T.blueLit
+                          : cnt > 0
+                            ? T.white
+                            : T.ink50,
+                        color: active ? T.blue : cnt > 0 ? T.ink700 : T.ink300,
+                        fontWeight: active ? 700 : 400,
+                        fontSize: 12,
+                        cursor: cnt > 0 ? "pointer" : "default",
+                        fontFamily: T.font,
+                        flexShrink: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        opacity: cnt > 0 ? 1 : 0.45,
+                        transition: "all 0.12s",
+                      }}
+                    >
+                      <span>{sub.label}</span>
+                      {cnt > 0 && (
+                        <span
+                          style={{
+                            background: active ? T.blue + "20" : T.ink50,
+                            color: active ? T.blue : T.ink400,
+                            borderRadius: 99,
+                            padding: "0 5px",
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {cnt}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* ── Active filter chip ─────────────────────────────────────────────── */}
-      {subFilter && activeGroup && (
+      {subFilter && groupFilter && (
         <div
           style={{
             display: "flex",
@@ -3342,10 +3270,18 @@ function SmartPillBox({
               fontWeight: 700,
             }}
           >
-            {activeGroup.icon} {activeGroup.label} →{" "}
-            {activeSubs.find((s) => s.id === subFilter)?.label}
+            {activeGroups.find((g) => g.id === groupFilter)?.icon}{" "}
+            {activeGroups.find((g) => g.id === groupFilter)?.label} →{" "}
+            {
+              activeGroups
+                .find((g) => g.id === groupFilter)
+                ?.subs?.find((s) => s.id === subFilter)?.label
+            }
             <button
-              onClick={() => onSelectSub(subFilter)}
+              onClick={() => {
+                onSelectGroup(null);
+                onSelectSub(null);
+              }}
               style={{
                 background: "none",
                 border: "none",
