@@ -1005,7 +1005,7 @@ export default function SmartInventory({ tenantId }) {
   const [error, setError] = useState(null);
 
   // ── View + filter state ─────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState(VIEW_TILE);
+  const [viewMode, setViewMode] = useState(VIEW_DETAIL);
   const [tileSize, setTileSize] = useState("M");
   const [catFilter, setCatFilter] = useState("all");
   const [groupFilter, setGroupFilter] = useState(null); // tier-2 header (e.g. "cultivation")
