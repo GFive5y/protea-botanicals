@@ -989,6 +989,17 @@ export default function SmartInventory({ tenantId }) {
   const [sortDir, setSortDir] = useState("asc");
   const [colFilters, setColFilters] = useState({}); // {col: value}
   const [filterRowOpen, setFilterRowOpen] = useState(false);
+  // Column visibility — persisted in sessionStorage
+  const [hiddenCols, setHiddenCols] = useState(() => {
+    try {
+      const s = sessionStorage.getItem("nuai_detail_hidden_cols");
+      return s ? new Set(JSON.parse(s)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [colPickerOpen, setColPickerOpen] = useState(false);
+  const colPickerRef = useRef(null);
 
   // ── Edit panel state ─────────────────────────────────────────────────────
   const [editItem, setEditItem] = useState(null); // item being edited
@@ -1119,6 +1130,22 @@ export default function SmartInventory({ tenantId }) {
       setSortDir("asc");
     }
   }
+
+  // Column visibility toggle
+  const toggleCol = useCallback((key) => {
+    setHiddenCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        sessionStorage.setItem(
+          "nuai_detail_hidden_cols",
+          JSON.stringify([...next]),
+        );
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // ── Edit panel ──────────────────────────────────────────────────────────
   function openEdit(item) {
@@ -1373,6 +1400,191 @@ export default function SmartInventory({ tenantId }) {
               </button>
             )}
 
+            {/* Column picker (detail only) */}
+            {viewMode === VIEW_DETAIL && (
+              <div style={{ position: "relative" }} ref={colPickerRef}>
+                <button
+                  onClick={() => setColPickerOpen((v) => !v)}
+                  style={btnStyle(
+                    colPickerOpen ? T.accent : T.white,
+                    colPickerOpen ? T.white : T.ink500,
+                    T.border,
+                    T,
+                  )}
+                >
+                  Columns{" "}
+                  {hiddenCols.size > 0
+                    ? `(${DETAIL_COLS.length - 1 - hiddenCols.size} shown)`
+                    : ""}
+                </button>
+                {colPickerOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      right: 0,
+                      background: T.white,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 10,
+                      boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+                      zIndex: 500,
+                      padding: "6px 0",
+                      minWidth: 210,
+                    }}
+                    // Close on outside click via blur chain
+                    onMouseLeave={() => {}}
+                  >
+                    <div
+                      style={{
+                        padding: "4px 14px 6px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: T.ink400,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Show / hide columns
+                    </div>
+                    {DETAIL_COLS.filter((c) => c.key !== "_actions").map(
+                      (col) => {
+                        const isHidden = hiddenCols.has(col.key);
+                        // Detect if this column has any data in current items
+                        const hasData = items.some((i) => {
+                          if (col.key.startsWith("_")) return true;
+                          const v = i[col.key];
+                          return (
+                            v !== null &&
+                            v !== undefined &&
+                            v !== "" &&
+                            v !== false &&
+                            v !== 0
+                          );
+                        });
+                        return (
+                          <label
+                            key={col.key}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "5px 14px",
+                              cursor: "pointer",
+                              fontSize: 13,
+                              color: T.ink700,
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = T.accentXlit)
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background = "transparent")
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!isHidden}
+                              onChange={() => toggleCol(col.key)}
+                              style={{ accentColor: T.accent, flexShrink: 0 }}
+                            />
+                            <span style={{ flex: 1 }}>
+                              {col.label || col.key}
+                            </span>
+                            {!hasData && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: T.amber,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                no data
+                              </span>
+                            )}
+                          </label>
+                        );
+                      },
+                    )}
+                    <div
+                      style={{
+                        borderTop: `1px solid ${T.border}`,
+                        margin: "4px 0",
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        // Auto-hide columns with no data
+                        const emptyKeys = DETAIL_COLS.filter((c) => {
+                          if (
+                            c.key.startsWith("_") ||
+                            c.key === "name" ||
+                            c.key === "category"
+                          )
+                            return false;
+                          return !items.some((i) => {
+                            const v = i[c.key];
+                            return (
+                              v !== null &&
+                              v !== undefined &&
+                              v !== "" &&
+                              v !== false &&
+                              v !== 0
+                            );
+                          });
+                        }).map((c) => c.key);
+                        setHiddenCols((prev) => {
+                          const next = new Set([...prev, ...emptyKeys]);
+                          try {
+                            sessionStorage.setItem(
+                              "nuai_detail_hidden_cols",
+                              JSON.stringify([...next]),
+                            );
+                          } catch {}
+                          return next;
+                        });
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "5px 14px",
+                        border: "none",
+                        background: "none",
+                        textAlign: "left",
+                        fontSize: 12,
+                        color: T.amber,
+                        cursor: "pointer",
+                        fontFamily: T.font,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Hide columns with no data
+                    </button>
+                    <button
+                      onClick={() => {
+                        setHiddenCols(new Set());
+                        try {
+                          sessionStorage.removeItem("nuai_detail_hidden_cols");
+                        } catch {}
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "5px 14px",
+                        border: "none",
+                        background: "none",
+                        textAlign: "left",
+                        fontSize: 12,
+                        color: T.ink400,
+                        cursor: "pointer",
+                        fontFamily: T.font,
+                      }}
+                    >
+                      Show all columns
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Refresh */}
             <button
               onClick={load}
@@ -1465,6 +1677,7 @@ export default function SmartInventory({ tenantId }) {
               onEdit={openEdit}
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
+              hiddenCols={hiddenCols}
               T={T}
             />
           )}
@@ -2308,6 +2521,7 @@ function DetailView({
   onEdit,
   onDelete,
   onToggle,
+  hiddenCols = new Set(),
   T,
 }) {
   // ── Resizable columns — drag the border between headers ───────────────
@@ -2357,7 +2571,9 @@ function DetailView({
     document.addEventListener("mouseup", onUp);
   };
 
-  const totalWidth = DETAIL_COLS.reduce(
+  // Only show columns that aren't hidden
+  const visibleCols = DETAIL_COLS.filter((c) => !hiddenCols.has(c.key));
+  const totalWidth = visibleCols.reduce(
     (s, c) => s + (colWidths[c.key] || c.width),
     0,
   );
@@ -2374,14 +2590,13 @@ function DetailView({
       <table
         style={{
           borderCollapse: "collapse",
-          width: "100%",
-          minWidth: totalWidth,
+          width: totalWidth,
           fontSize: 12.5,
           tableLayout: "fixed",
         }}
       >
         <colgroup>
-          {DETAIL_COLS.map((col) => (
+          {visibleCols.map((col) => (
             <col
               key={col.key}
               style={{ width: colWidths[col.key] || col.width }}
@@ -2396,7 +2611,7 @@ function DetailView({
               borderBottom: `2px solid ${T.borderDark}`,
             }}
           >
-            {DETAIL_COLS.map((col) => (
+            {visibleCols.map((col) => (
               <th
                 key={col.key}
                 onClick={() => col.sortable && onSort(col.key)}
@@ -2483,7 +2698,7 @@ function DetailView({
                 borderBottom: `1px solid ${T.border}`,
               }}
             >
-              {DETAIL_COLS.map((col) => (
+              {visibleCols.map((col) => (
                 <th
                   key={col.key}
                   style={{
@@ -2533,7 +2748,7 @@ function DetailView({
                 }}
                 onDoubleClick={() => onEdit(item)}
               >
-                {DETAIL_COLS.map((col) => (
+                {visibleCols.map((col) => (
                   <td
                     key={col.key}
                     style={{
