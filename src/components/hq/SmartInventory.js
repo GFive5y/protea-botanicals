@@ -1970,11 +1970,24 @@ function TileView({ items, onEdit, onDelete, onToggle, T }) {
               <span style={{ fontSize: 16 }}>
                 {CATEGORY_ICONS[item.category] || "📦"}
               </span>
-              <span
-                style={{ fontSize: 11, fontWeight: 600, color: T.accentMid }}
-              >
-                {CATEGORY_LABELS[item.category] || item.category}
-              </span>
+              {(() => {
+                const w = PRODUCT_WORLDS.find(
+                  (pw) => pw.id !== "all" && itemMatchesWorld(item, pw),
+                );
+                return (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: T.accentMid,
+                    }}
+                  >
+                    {w
+                      ? w.label
+                      : CATEGORY_LABELS[item.category] || item.category}
+                  </span>
+                );
+              })()}
               {item.is_featured && (
                 <span style={{ marginLeft: "auto", fontSize: 10 }}>⭐</span>
               )}
@@ -2196,10 +2209,24 @@ function ListView({ items, onEdit, onDelete, onToggle, T }) {
                 borderRadius: 99,
                 fontWeight: 600,
                 whiteSpace: "nowrap",
-                display: "inline-block",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
               }}
             >
-              {CATEGORY_LABELS[item.category] || item.category}
+              {(() => {
+                const w = PRODUCT_WORLDS.find(
+                  (pw) => pw.id !== "all" && itemMatchesWorld(item, pw),
+                );
+                return w ? (
+                  <>
+                    <span style={{ fontSize: 12 }}>{w.icon}</span>
+                    {w.label}
+                  </>
+                ) : (
+                  CATEGORY_LABELS[item.category] || item.category
+                );
+              })()}
             </span>
 
             {/* Qty */}
@@ -2432,20 +2459,36 @@ function DetailView({
                         )}
                       </div>
                     )}
-                    {col.key === "category" && (
-                      <span
-                        style={{
-                          background: T.accentLit,
-                          color: T.accentMid,
-                          padding: "2px 8px",
-                          borderRadius: 99,
-                          fontSize: 11,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {CATEGORY_LABELS[item.category] || item.category}
-                      </span>
-                    )}
+                    {col.key === "category" &&
+                      (() => {
+                        const w = PRODUCT_WORLDS.find(
+                          (pw) => pw.id !== "all" && itemMatchesWorld(item, pw),
+                        );
+                        return (
+                          <span
+                            style={{
+                              background: T.accentLit,
+                              color: T.accentMid,
+                              padding: "2px 8px",
+                              borderRadius: 99,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            {w ? (
+                              <>
+                                <span style={{ fontSize: 13 }}>{w.icon}</span>
+                                {w.label}
+                              </>
+                            ) : (
+                              CATEGORY_LABELS[item.category] || item.category
+                            )}
+                          </span>
+                        );
+                      })()}
                     {col.key === "quantity_on_hand" && (
                       <span
                         style={{
