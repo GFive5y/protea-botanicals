@@ -4,6 +4,7 @@
 import React from "react";
 import NavSidebar from "../components/NavSidebar";
 import DevErrorCapture from "../components/DevErrorCapture";
+import ToastContainer from "./ToastContainer";
 import "./AppShell.css";
 import { useTenant } from "../services/tenantService"; // ✦ WP-MULTISITE
 
@@ -67,6 +68,7 @@ export default function AppShell({ children, maxWidth = 1400 }) {
           }}
         >
           <DevErrorCapture>{children}</DevErrorCapture>
+          <ToastContainer />
         </div>
       </main>
     </div>

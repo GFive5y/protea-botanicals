@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import StockItemModal from "../StockItemModal";
+import toast from "../../services/toast";
 import StockItemPanel from "./StockItemPanel";
 import {
   PRODUCT_WORLDS,
@@ -1305,6 +1306,8 @@ export default function SmartInventory({ tenantId }) {
       return n;
     });
     load();
+    const item = items.find((i) => i.id === itemId);
+    toast.success(`Sell price set${item ? ` — R${price}` : ""}`);
   };
 
   // ── SC-02: Refresh panel item after in-panel save ───────────────────────────
@@ -1329,6 +1332,25 @@ export default function SmartInventory({ tenantId }) {
         .eq("id", itemId);
     } catch {}
     setFlaggedReorder((prev) => new Set([...prev, itemId]));
+    toast.info("⚑ Flagged for reorder", {
+      duration: 5000,
+      undo: async () => {
+        try {
+          await supabase
+            .from("inventory_items")
+            .update({
+              needs_reorder: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", itemId);
+        } catch {}
+        setFlaggedReorder((prev) => {
+          const n = new Set(prev);
+          n.delete(itemId);
+          return n;
+        });
+      },
+    });
   };
 
   // ── SC-01: Mark item as On Order (PO placed, awaiting delivery) ──────────
@@ -1346,6 +1368,7 @@ export default function SmartInventory({ tenantId }) {
       n.delete(itemId);
       return n;
     });
+    toast.info("📦 Marked as On Order");
   };
 
   // Column visibility toggle
@@ -1376,17 +1399,25 @@ export default function SmartInventory({ tenantId }) {
   }
 
   async function deleteItem(item) {
+    const saved = { ...item };
     const { error: err } = await supabase
       .from("inventory_items")
       .delete()
       .eq("id", item.id);
     if (err) {
-      alert("Delete failed: " + err.message);
+      toast.error(`Delete failed: ${err.message}`);
       return;
     }
     setDelConfirm(null);
     closeEdit();
     load();
+    toast.warning(`"${item.name}" deleted`, {
+      duration: 5000,
+      undo: async () => {
+        await supabase.from("inventory_items").insert(saved);
+        load();
+      },
+    });
   }
 
   // ── Add item — context-aware world routing (same pattern as HQStock) ────
@@ -1414,24 +1445,25 @@ export default function SmartInventory({ tenantId }) {
     setModalSaving(true);
     try {
       if (modalItem && modalItem.id) {
-        // Editing existing item
         const { error: e } = await supabase
           .from("inventory_items")
           .update(payload)
           .eq("id", modalItem.id);
         if (e) throw e;
+        toast.success(`"${modalItem.name}" updated`);
       } else {
-        // Creating new item — StockItemModal builds the full payload
         const { error: e } = await supabase
           .from("inventory_items")
           .insert(payload);
         if (e) throw e;
+        toast.success(`"${payload.name || "Item"}" added to catalogue`);
       }
       setModalItem(undefined);
       setModalDefaults({});
       load();
     } catch (err) {
       console.error("Save error:", err);
+      toast.error("Save failed — check your connection");
     } finally {
       setModalSaving(false);
     }
@@ -1439,11 +1471,28 @@ export default function SmartInventory({ tenantId }) {
 
   // ── Quick inline toggle (detail view) ───────────────────────────────────
   async function quickToggle(item, field) {
+    const newVal = !item[field];
     await supabase
       .from("inventory_items")
-      .update({ [field]: !item[field], updated_at: new Date().toISOString() })
+      .update({ [field]: newVal, updated_at: new Date().toISOString() })
       .eq("id", item.id);
     load();
+    if (field === "is_active") {
+      if (!newVal) {
+        toast.warning(`"${item.name}" hidden from shop`, {
+          duration: 5000,
+          undo: async () => {
+            await supabase
+              .from("inventory_items")
+              .update({ is_active: true, updated_at: new Date().toISOString() })
+              .eq("id", item.id);
+            load();
+          },
+        });
+      } else {
+        toast.success(`"${item.name}" visible in shop`);
+      }
+    }
   }
 
   // ── Pill cascade ────────────────────────────────────────────────────────

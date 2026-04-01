@@ -11,6 +11,7 @@ import ProteaAI from "../components/ProteaAI";
 import DevErrorCapture from "../components/DevErrorCapture";
 import { PlatformBarProvider } from "../contexts/PlatformBarContext";
 import LiveFXBar from "../components/hq/LiveFXBar";
+import ToastContainer from "../components/ToastContainer";
 
 // ── Tab components ────────────────────────────────────────────────────────
 import HQOverview from "../components/hq/HQOverview";
@@ -886,6 +887,7 @@ export default function TenantPortal() {
 
           <ProteaAI />
         </div>
+        <ToastContainer />
       </PlatformBarProvider>
     </DevErrorCapture>
   );
