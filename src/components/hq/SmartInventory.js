@@ -1049,6 +1049,13 @@ export default function SmartInventory({ tenantId }) {
     load();
   }, [load]);
 
+  // ── SC-01: Action panel state ────────────────────────────────────────────
+  const [activePanel, setActivePanel] = useState(null); // 'soldout'|'reorder'|'noprice'
+  const [noPriceDraft, setNoPriceDraft] = useState({}); // { [itemId]: priceString }
+  const [noPriceFixed, setNoPriceFixed] = useState(new Set());
+  const [noPriceSaving, setNoPriceSaving] = useState(new Set());
+  const [flaggedReorder, setFlaggedReorder] = useState(new Set());
+
   const selectCat = useCallback((catId) => {
     setCatFilter(catId);
     setGroupFilter(null);
@@ -1061,6 +1068,10 @@ export default function SmartInventory({ tenantId }) {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       // Collapse in priority order (innermost first)
+      if (activePanel) {
+        setActivePanel(null);
+        return;
+      }
       if (colPickerOpen) {
         setColPickerOpen(false);
         return;
@@ -1094,7 +1105,14 @@ export default function SmartInventory({ tenantId }) {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onMouse);
     };
-  }, [colPickerOpen, subFilter, groupFilter, catFilter, selectCat]);
+  }, [
+    colPickerOpen,
+    activePanel,
+    subFilter,
+    groupFilter,
+    catFilter,
+    selectCat,
+  ]);
 
   // ── Filtered + sorted items ─────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -1182,6 +1200,91 @@ export default function SmartInventory({ tenantId }) {
       setSortDir("asc");
     }
   }
+
+  // ── SC-01: Global KPI stats (always from full items array) ───────────────
+  const gTotal = items.length;
+  const gActive = items.filter((i) => i.is_active).length;
+  const gSoldOut = items.filter((i) => (i.quantity_on_hand || 0) === 0).length;
+  const gStockValue = items.reduce(
+    (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+    0,
+  );
+  const gBelowReorder = items.filter(
+    (i) =>
+      (i.reorder_level || 0) > 0 &&
+      (i.quantity_on_hand || 0) > 0 &&
+      (i.quantity_on_hand || 0) <= (i.reorder_level || 0),
+  ).length;
+  const gNoPrice = items.filter(
+    (i) => !i.sell_price || i.sell_price <= 0,
+  ).length;
+
+  // ── SC-01: Filtered KPI stats (from current pill/search filter) ──────────
+  const fTotal = filtered.length;
+  const fActive = filtered.filter((i) => i.is_active).length;
+  const fSoldOut = filtered.filter(
+    (i) => (i.quantity_on_hand || 0) === 0,
+  ).length;
+  const fStockValue = filtered.reduce(
+    (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
+    0,
+  );
+  const fBelowReorder = filtered.filter(
+    (i) =>
+      (i.reorder_level || 0) > 0 &&
+      (i.quantity_on_hand || 0) > 0 &&
+      (i.quantity_on_hand || 0) <= (i.reorder_level || 0),
+  ).length;
+  const fNoPrice = filtered.filter(
+    (i) => !i.sell_price || i.sell_price <= 0,
+  ).length;
+  const isFiltered =
+    catFilter !== "all" || groupFilter || subFilter || search.trim();
+
+  // ── SC-01: Panel item lists ──────────────────────────────────────────────
+  const soldOutItems = items
+    .filter((i) => (i.quantity_on_hand || 0) === 0)
+    .sort(
+      (a, b) =>
+        (b.sell_price || 0) * (b.weighted_avg_cost || 0) -
+        (a.sell_price || 0) * (a.weighted_avg_cost || 0),
+    );
+  const belowReorderItems = items.filter(
+    (i) =>
+      (i.reorder_level || 0) > 0 &&
+      (i.quantity_on_hand || 0) > 0 &&
+      (i.quantity_on_hand || 0) <= (i.reorder_level || 0),
+  );
+  const noPriceItems = items.filter((i) => !i.sell_price || i.sell_price <= 0);
+
+  // ── SC-01: Save no-price fix ─────────────────────────────────────────────
+  const saveNoPrice = async (itemId) => {
+    const price = parseFloat(noPriceDraft[itemId]);
+    if (!price || price <= 0) return;
+    setNoPriceSaving((prev) => new Set([...prev, itemId]));
+    await supabase
+      .from("inventory_items")
+      .update({ sell_price: price, updated_at: new Date().toISOString() })
+      .eq("id", itemId);
+    setNoPriceFixed((prev) => new Set([...prev, itemId]));
+    setNoPriceSaving((prev) => {
+      const n = new Set(prev);
+      n.delete(itemId);
+      return n;
+    });
+    load();
+  };
+
+  // ── SC-01: Flag item for reorder ─────────────────────────────────────────
+  const flagForReorder = async (itemId) => {
+    try {
+      await supabase
+        .from("inventory_items")
+        .update({ needs_reorder: true, updated_at: new Date().toISOString() })
+        .eq("id", itemId);
+    } catch {}
+    setFlaggedReorder((prev) => new Set([...prev, itemId]));
+  };
 
   // Column visibility toggle
   const toggleCol = useCallback((key) => {
@@ -1301,14 +1404,7 @@ export default function SmartInventory({ tenantId }) {
   // eslint-disable-next-line no-unused-vars -- kept for future brand-level tier 4
   function selectBrand(brandId) {}
 
-  // ── Stats strip ─────────────────────────────────────────────────────────
-  const totalItems = items.length;
-  const activeItems = items.filter((i) => i.is_active).length;
-  const soldOut = items.filter((i) => (i.quantity_on_hand || 0) === 0).length;
-  const stockValue = items.reduce(
-    (s, i) => s + (i.quantity_on_hand || 0) * (i.weighted_avg_cost || 0),
-    0,
-  );
+  // ── Stats: moved to gTotal/gActive/etc. above (SC-01) ───────────────────
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1350,33 +1446,18 @@ export default function SmartInventory({ tenantId }) {
           flexShrink: 0,
         }}
       >
-        {/* Row 1: title + stats + actions */}
+        {/* Row 1: title + actions */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 12,
             marginBottom: 8,
-            flexWrap: "wrap",
           }}
         >
           <span style={{ fontWeight: 800, fontSize: 17, color: T.ink900 }}>
             📦 Inventory
           </span>
-
-          {/* Stats pills */}
-          <StatPill label="Total" value={totalItems} />
-          <StatPill label="Active" value={activeItems} color={T.accentMid} />
-          <StatPill
-            label="Sold Out"
-            value={soldOut}
-            color={soldOut > 0 ? T.danger : T.ink300}
-          />
-          <StatPill
-            label="Stock Value"
-            value={`R${(stockValue / 1000).toFixed(0)}k`}
-            color={T.blue}
-          />
 
           <div
             style={{
@@ -1607,6 +1688,168 @@ export default function SmartInventory({ tenantId }) {
           </div>
         </div>
 
+        {/* Row 1.5: SC-01 KPI Cards — adaptive 6-card grid */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 10,
+            marginTop: 2,
+          }}
+        >
+          {[
+            {
+              key: "total",
+              label: "Total Items",
+              global: gTotal,
+              filtered: fTotal,
+              color: T.ink700,
+              bg: T.ink50,
+              border: T.border,
+              onClick: () => {
+                selectCat("all");
+                setGroupFilter(null);
+                setSubFilter(null);
+                setSearch("");
+              },
+              title: "Click to clear all filters",
+            },
+            {
+              key: "value",
+              label: "Stock Value",
+              global: `R${gStockValue >= 1000000 ? (gStockValue / 1000000).toFixed(1) + "m" : (gStockValue / 1000).toFixed(0) + "k"}`,
+              filtered: `R${fStockValue >= 1000000 ? (fStockValue / 1000000).toFixed(1) + "m" : (fStockValue / 1000).toFixed(0) + "k"}`,
+              color: T.blue,
+              bg: T.blueLit,
+              border: T.blue + "30",
+            },
+            {
+              key: "active",
+              label: "Active",
+              global: gActive,
+              filtered: fActive,
+              color: T.accentMid,
+              bg: T.accentLit,
+              border: T.accentBd,
+            },
+            {
+              key: "soldout",
+              label: "Sold Out",
+              global: gSoldOut,
+              filtered: fSoldOut,
+              color: gSoldOut > 0 ? T.danger : T.ink300,
+              bg: gSoldOut > 0 ? T.dangerLit : T.ink50,
+              border: gSoldOut > 0 ? T.danger + "30" : T.border,
+              urgent: gSoldOut > 0,
+              onClick:
+                gSoldOut > 0 ? () => setActivePanel("soldout") : undefined,
+              title: "View sold-out items",
+            },
+            {
+              key: "reorder",
+              label: "Below Reorder",
+              global: gBelowReorder,
+              filtered: fBelowReorder,
+              color: gBelowReorder > 0 ? T.amber : T.ink300,
+              bg: gBelowReorder > 0 ? T.amberLit : T.ink50,
+              border: gBelowReorder > 0 ? T.amber + "40" : T.border,
+              urgent: gBelowReorder > 0,
+              onClick:
+                gBelowReorder > 0 ? () => setActivePanel("reorder") : undefined,
+              title: "Flag items for reorder",
+            },
+            {
+              key: "noprice",
+              label: "No Price",
+              global: gNoPrice,
+              filtered: fNoPrice,
+              color: gNoPrice > 0 ? T.danger : T.ink300,
+              bg: gNoPrice > 0 ? T.dangerLit : T.ink50,
+              border: gNoPrice > 0 ? T.danger + "30" : T.border,
+              urgent: gNoPrice > 0,
+              onClick:
+                gNoPrice > 0 ? () => setActivePanel("noprice") : undefined,
+              title: "Add prices to hidden items",
+            },
+          ].map((card) => (
+            <div
+              key={card.key}
+              onClick={card.onClick}
+              title={card.onClick ? card.title : undefined}
+              style={{
+                flex: "1 1 120px",
+                minWidth: 110,
+                maxWidth: 200,
+                background: card.bg,
+                border: `1.5px solid ${card.border}`,
+                borderRadius: 10,
+                padding: "10px 14px",
+                cursor: card.onClick ? "pointer" : "default",
+                transition: "all 0.12s",
+                position: "relative",
+              }}
+              onMouseEnter={(e) => {
+                if (card.onClick) e.currentTarget.style.opacity = "0.85";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  color: card.color,
+                  letterSpacing: card.urgent ? "-0.5px" : "0",
+                }}
+              >
+                {card.global}
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: T.ink400,
+                  marginTop: 4,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontWeight: 600,
+                }}
+              >
+                {card.label}
+              </div>
+              {isFiltered && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: card.color,
+                    marginTop: 3,
+                    fontWeight: 700,
+                    opacity: 0.85,
+                  }}
+                >
+                  {card.filtered} in filter
+                </div>
+              )}
+              {card.onClick && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 8,
+                    right: 10,
+                    fontSize: 14,
+                    color: card.color,
+                    opacity: 0.5,
+                  }}
+                >
+                  ›
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
         {/* Row 2: Smart PillBox */}
         <SmartPillBox
           catFilter={catFilter}
@@ -1687,6 +1930,416 @@ export default function SmartInventory({ tenantId }) {
           )}
         </div>
       </div>
+
+      {/* ── SC-01 ACTION PANELS ──────────────────────────────────────────── */}
+      {activePanel && (
+        <div
+          onClick={() => setActivePanel(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 350,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 420,
+              background: T.white,
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "-4px 0 24px rgba(0,0,0,0.14)",
+              fontFamily: T.font,
+            }}
+          >
+            {/* Panel header */}
+            <div
+              style={{
+                padding: "18px 20px 14px",
+                borderBottom: `1px solid ${T.border}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: T.ink900 }}>
+                  {activePanel === "soldout" &&
+                    `Sold Out · ${soldOutItems.length} items`}
+                  {activePanel === "reorder" &&
+                    `Below Reorder · ${belowReorderItems.length} items`}
+                  {activePanel === "noprice" &&
+                    `No Sell Price · ${noPriceItems.length} items`}
+                </div>
+                <div style={{ fontSize: 11, color: T.ink400, marginTop: 3 }}>
+                  {activePanel === "soldout" &&
+                    "Sorted by potential revenue lost"}
+                  {activePanel === "reorder" &&
+                    "Items running below minimum stock level"}
+                  {activePanel === "noprice" &&
+                    "These items are hidden from your shop"}
+                </div>
+              </div>
+              <button
+                onClick={() => setActivePanel(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: T.ink400,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Panel body */}
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {/* ── SOLD OUT PANEL ── */}
+              {activePanel === "soldout" && (
+                <>
+                  {soldOutItems.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 32,
+                        textAlign: "center",
+                        color: T.ink300,
+                        fontSize: 13,
+                      }}
+                    >
+                      🎉 No sold-out items
+                    </div>
+                  ) : (
+                    soldOutItems.map((item) => {
+                      const world = PRODUCT_WORLDS.find(
+                        (w) => w.id !== "all" && itemMatchesWorld(item, w),
+                      );
+                      return (
+                        <div
+                          key={item.id}
+                          style={{
+                            padding: "12px 20px",
+                            borderBottom: `1px solid ${T.border}`,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <span style={{ fontSize: 18 }}>
+                            {world?.icon || "📦"}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: T.ink900,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: T.ink400,
+                                marginTop: 2,
+                              }}
+                            >
+                              Sell:{" "}
+                              {item.sell_price ? `R${item.sell_price}` : "—"}
+                              {item.sell_price && item.weighted_avg_cost
+                                ? ` · Cost: R${item.weighted_avg_cost}`
+                                : ""}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => openEdit(item)}
+                            style={{
+                              padding: "5px 12px",
+                              borderRadius: 6,
+                              flexShrink: 0,
+                              border: `1px solid ${T.accentBd}`,
+                              background: T.accentLit,
+                              color: T.accentMid,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              fontFamily: T.font,
+                            }}
+                          >
+                            Receive Stock
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </>
+              )}
+
+              {/* ── BELOW REORDER PANEL ── */}
+              {activePanel === "reorder" && (
+                <>
+                  {belowReorderItems.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 32,
+                        textAlign: "center",
+                        color: T.ink300,
+                        fontSize: 13,
+                      }}
+                    >
+                      ✓ All items above reorder level
+                    </div>
+                  ) : (
+                    belowReorderItems.map((item) => {
+                      const world = PRODUCT_WORLDS.find(
+                        (w) => w.id !== "all" && itemMatchesWorld(item, w),
+                      );
+                      const isFlagged = flaggedReorder.has(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          style={{
+                            padding: "12px 20px",
+                            borderBottom: `1px solid ${T.border}`,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                          }}
+                        >
+                          <span style={{ fontSize: 18 }}>
+                            {world?.icon || "📦"}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: T.ink900,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.name}
+                            </div>
+                            <div style={{ fontSize: 11, marginTop: 2 }}>
+                              <span style={{ color: T.amber, fontWeight: 700 }}>
+                                {item.quantity_on_hand || 0} remaining
+                              </span>
+                              <span style={{ color: T.ink400 }}>
+                                {" "}
+                                · reorder at {item.reorder_level}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() =>
+                              !isFlagged && flagForReorder(item.id)
+                            }
+                            style={{
+                              padding: "5px 12px",
+                              borderRadius: 6,
+                              flexShrink: 0,
+                              border: `1px solid ${isFlagged ? T.accentBd : T.amber + "60"}`,
+                              background: isFlagged ? T.accentLit : T.amberLit,
+                              color: isFlagged ? T.accentMid : T.amber,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: isFlagged ? "default" : "pointer",
+                              fontFamily: T.font,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {isFlagged ? "✓ Flagged" : "⚑ Flag for Reorder"}
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                  {belowReorderItems.length > 0 && (
+                    <div
+                      style={{
+                        padding: "12px 20px",
+                        fontSize: 11,
+                        color: T.ink400,
+                        borderTop: `1px solid ${T.border}`,
+                      }}
+                    >
+                      Flagged items are grouped by supplier in the Reorder Queue
+                      (WP-REORDER — coming soon)
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── NO PRICE PANEL ── */}
+              {activePanel === "noprice" && (
+                <>
+                  {noPriceItems.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 32,
+                        textAlign: "center",
+                        color: T.ink300,
+                        fontSize: 13,
+                      }}
+                    >
+                      ✓ All items have a sell price
+                    </div>
+                  ) : (
+                    noPriceItems.map((item) => {
+                      const world = PRODUCT_WORLDS.find(
+                        (w) => w.id !== "all" && itemMatchesWorld(item, w),
+                      );
+                      const isFixed = noPriceFixed.has(item.id);
+                      const isSaving = noPriceSaving.has(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          style={{
+                            padding: "12px 20px",
+                            borderBottom: `1px solid ${T.border}`,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            background: isFixed ? "#F0FDF4" : T.white,
+                            transition: "background 0.3s",
+                          }}
+                        >
+                          <span style={{ fontSize: 18 }}>
+                            {world?.icon || "📦"}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: T.ink900,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.name}
+                            </div>
+                            {item.weighted_avg_cost > 0 && (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: T.ink400,
+                                  marginTop: 2,
+                                }}
+                              >
+                                Avg cost: R{item.weighted_avg_cost} (reference)
+                              </div>
+                            )}
+                          </div>
+                          {isFixed ? (
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#2D6A4F",
+                                flexShrink: 0,
+                              }}
+                            >
+                              ✓ Fixed
+                            </span>
+                          ) : (
+                            <div
+                              style={{ display: "flex", gap: 4, flexShrink: 0 }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  border: `1px solid ${T.border}`,
+                                  borderRadius: 6,
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    padding: "5px 6px 5px 8px",
+                                    fontSize: 12,
+                                    color: T.ink400,
+                                    background: T.ink50,
+                                  }}
+                                >
+                                  R
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={noPriceDraft[item.id] || ""}
+                                  onChange={(e) =>
+                                    setNoPriceDraft((p) => ({
+                                      ...p,
+                                      [item.id]: e.target.value,
+                                    }))
+                                  }
+                                  onKeyDown={(e) =>
+                                    e.key === "Enter" && saveNoPrice(item.id)
+                                  }
+                                  style={{
+                                    width: 72,
+                                    padding: "5px 6px",
+                                    border: "none",
+                                    fontSize: 12,
+                                    outline: "none",
+                                    fontFamily: T.font,
+                                  }}
+                                />
+                              </div>
+                              <button
+                                onClick={() => saveNoPrice(item.id)}
+                                disabled={!noPriceDraft[item.id] || isSaving}
+                                style={{
+                                  padding: "5px 10px",
+                                  borderRadius: 6,
+                                  border: "none",
+                                  background: noPriceDraft[item.id]
+                                    ? T.accent
+                                    : T.ink150,
+                                  color: noPriceDraft[item.id]
+                                    ? "#fff"
+                                    : T.ink300,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: noPriceDraft[item.id]
+                                    ? "pointer"
+                                    : "not-allowed",
+                                  fontFamily: T.font,
+                                }}
+                              >
+                                {isSaving ? "…" : "Save"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── WORLD PICKER — shown when Add Item clicked from "All Products" ── */}
       {showWorldPicker && (
@@ -3432,6 +4085,7 @@ function Modal({
 // ─────────────────────────────────────────────────────────────────────────
 // MICRO COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars -- kept: may be reused in future panels
 function StatPill({ label, value, color }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>

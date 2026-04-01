@@ -790,7 +790,9 @@ export default function TenantPortal() {
               </div>
             </div>
 
-            <LiveFXBar />
+            <div style={{ maxWidth: 1400, width: "100%", margin: "0 auto" }}>
+              <LiveFXBar />
+            </div>
             <PlatformBar
               role="tenant"
               tenantId={tenantId}
