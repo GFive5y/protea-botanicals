@@ -1628,11 +1628,11 @@ export default function SmartInventory({ tenantId }) {
           position: "relative",
         }}
       >
-        {/* Main view */}
+        {/* Main view — detail mode clips to viewport, other modes scroll freely */}
         <div
           style={{
             flex: 1,
-            overflowY: "auto",
+            overflow: viewMode === VIEW_DETAIL ? "hidden" : "auto",
             padding: viewMode === VIEW_DETAIL ? 0 : 16,
           }}
         >
