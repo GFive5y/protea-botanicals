@@ -1463,7 +1463,7 @@ export default function SmartInventory({ tenantId }) {
         flexDirection: "column",
         height: "100%",
         fontFamily: T.font,
-        background: T.bg,
+        background: "transparent",
       }}
     >
       {/* Global cursor + interaction polish for this screen */}
@@ -1488,8 +1488,9 @@ export default function SmartInventory({ tenantId }) {
         style={{
           background: T.white,
           borderBottom: `1px solid ${T.border}`,
-          padding: "10px 18px 0",
+          padding: "10px 0 0",
           flexShrink: 0,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         }}
       >
         {/* Row 1: title + actions */}
@@ -1926,7 +1927,7 @@ export default function SmartInventory({ tenantId }) {
           style={{
             flex: 1,
             overflow: viewMode === VIEW_DETAIL ? "hidden" : "auto",
-            padding: viewMode === VIEW_DETAIL ? "0 0 0 16px" : 16,
+            padding: viewMode === VIEW_DETAIL ? "12px 0 0 0" : "16px 0",
           }}
         >
           {loading ? (
