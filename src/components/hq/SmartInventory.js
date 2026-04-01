@@ -1497,6 +1497,41 @@ export default function SmartInventory({ tenantId }) {
   };
 
   // ── Quick inline toggle (detail view) ───────────────────────────────────
+  function exportCSV() {
+    const visibleCols = DETAIL_COLS.filter(
+      (c) => c.key !== "_actions" && !hiddenCols.has(c.key),
+    );
+    const headers = visibleCols.map((c) => c.label || c.key);
+    const rows = filtered.map((item) =>
+      visibleCols.map((c) => {
+        if (c.key === "_margin") {
+          const m = margin(item.sell_price, item.weighted_avg_cost);
+          return m !== null ? m.toFixed(1) + "%" : "";
+        }
+        if (c.key === "supplier") return item.suppliers?.name || "";
+        if (c.key === "is_active") return item.is_active ? "Active" : "Hidden";
+        if (c.key === "is_featured") return item.is_featured ? "Yes" : "No";
+        const val = item[c.key];
+        if (val === null || val === undefined) return "";
+        if (typeof val === "string" && val.includes(","))
+          return `"${val.replace(/"/g, '""')}"`;
+        return val;
+      }),
+    );
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const world = catFilter !== "all" ? `-${catFilter}` : "";
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `inventory${world}-${date}.csv`;
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filtered.length} items → ${filename}`);
+  }
+
   async function quickToggle(item, field) {
     const newVal = !item[field];
     await supabase
@@ -1659,6 +1694,17 @@ export default function SmartInventory({ tenantId }) {
             >
               🔽 Filters{sortByIssues ? " ·⚠" : ""}
             </button>
+
+            {/* Export CSV (detail only) */}
+            {viewMode === VIEW_DETAIL && (
+              <button
+                onClick={exportCSV}
+                style={btnStyle(T.white, T.ink500, T.border, T)}
+                title="Export visible columns to CSV"
+              >
+                ↓ CSV
+              </button>
+            )}
 
             {/* Column picker (detail only) */}
             {viewMode === VIEW_DETAIL && (
