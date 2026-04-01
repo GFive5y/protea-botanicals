@@ -991,6 +991,7 @@ export default function SmartInventory({ tenantId }) {
   const [sortDir, setSortDir] = useState("asc");
   const [colFilters, setColFilters] = useState({}); // {col: value}
   const [filterRowOpen, setFilterRowOpen] = useState(false);
+  const [sortByIssues, setSortByIssues] = useState(false); // SC-03: issues-first sort
   // Column visibility — persisted in sessionStorage
   const [hiddenCols, setHiddenCols] = useState(() => {
     try {
@@ -1195,6 +1196,20 @@ export default function SmartInventory({ tenantId }) {
       return 0;
     });
 
+    // SC-03: Issues-first secondary sort (sold-out at top, then low-stock, then healthy)
+    if (sortByIssues) {
+      const score = (i) => {
+        if ((i.quantity_on_hand || 0) === 0) return 2;
+        if (
+          (i.reorder_level || 0) > 0 &&
+          (i.quantity_on_hand || 0) <= (i.reorder_level || 0)
+        )
+          return 1;
+        return 0;
+      };
+      list.sort((a, b) => score(b) - score(a));
+    }
+
     return list;
   }, [
     items,
@@ -1205,6 +1220,7 @@ export default function SmartInventory({ tenantId }) {
     colFilters,
     sortKey,
     sortDir,
+    sortByIssues,
   ]);
 
   // ── Sort column toggle ──────────────────────────────────────────────────
@@ -1517,20 +1533,18 @@ export default function SmartInventory({ tenantId }) {
             {/* View switcher */}
             <ViewToggle current={viewMode} onChange={setViewMode} T={T} />
 
-            {/* Column filters toggle (detail only) */}
-            {viewMode === VIEW_DETAIL && (
-              <button
-                onClick={() => setFilterRowOpen((v) => !v)}
-                style={btnStyle(
-                  filterRowOpen ? T.accent : T.white,
-                  filterRowOpen ? T.white : T.ink500,
-                  T.border,
-                  T,
-                )}
-              >
-                🔽 Filters
-              </button>
-            )}
+            {/* Filters toggle — visible in all view modes */}
+            <button
+              onClick={() => setFilterRowOpen((v) => !v)}
+              style={btnStyle(
+                filterRowOpen || sortByIssues ? T.accent : T.white,
+                filterRowOpen || sortByIssues ? T.white : T.ink500,
+                T.border,
+                T,
+              )}
+            >
+              🔽 Filters{sortByIssues ? " ·⚠" : ""}
+            </button>
 
             {/* Column picker (detail only) */}
             {viewMode === VIEW_DETAIL && (
@@ -1896,6 +1910,58 @@ export default function SmartInventory({ tenantId }) {
             </div>
           ))}
         </div>
+
+        {/* SC-03: Filters panel — issues-first toggle + (detail) column filter notice */}
+        {filterRowOpen && (
+          <div
+            style={{
+              padding: "8px 0 10px",
+              borderTop: `1px solid ${T.border}`,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                cursor: "pointer",
+                fontSize: 12,
+                color: T.ink700,
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={sortByIssues}
+                onChange={() => setSortByIssues((v) => !v)}
+                style={{ accentColor: T.accent, width: 14, height: 14 }}
+              />
+              <span>⚠ Issues first</span>
+              <span style={{ fontSize: 10.5, color: T.ink300 }}>
+                sold out + low stock at top
+              </span>
+            </label>
+            {sortByIssues && (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  background: T.amberLit,
+                  color: T.amber,
+                  padding: "2px 8px",
+                  borderRadius: 99,
+                  border: `1px solid ${T.amber}40`,
+                }}
+              >
+                ⚠ Active — {gSoldOut + gBelowReorder} items flagged
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Row 2: Smart PillBox */}
         <SmartPillBox
@@ -2761,58 +2827,94 @@ function SmartPillBox({
 
   return (
     <div style={{ paddingBottom: 4 }}>
-      {/* ── TIER 1: World pills ─────────────────────────────────────────── */}
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          overflowX: "auto",
-          paddingBottom: 6,
-          alignItems: "center",
-        }}
-      >
-        {allCats.map((cat) => {
-          const active = catFilter === cat.id;
-          const cnt = counts[cat.id] || 0;
-          const isExpanded = active && groupFilter && catFilter !== "all";
-          return (
-            <button
-              key={cat.id}
-              onClick={() => onSelectCat(cat.id)}
-              style={pillBase(active, T.accent, T)}
-            >
-              <span>{cat.icon}</span>
-              <span>{cat.label}</span>
-              <span style={countBadge(cnt, active)}>{cnt}</span>
-              {cat.hasSub && (
-                <span style={{ fontSize: 8, opacity: active ? 0.8 : 0.4 }}>
-                  {isExpanded ? "▲" : "▼"}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {/* Search — right-aligned */}
-        <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search items…"
-            style={{
-              padding: "5px 12px",
-              border: `1.5px solid ${search ? T.accent : T.border}`,
-              borderRadius: 99,
-              fontSize: 12.5,
-              fontFamily: T.font,
-              color: T.ink900,
-              outline: "none",
-              width: 180,
-              background: T.white,
-            }}
-          />
+      {/* ── SC-06: Pill row with fade-edge gradient (no native scrollbar arrows) ── */}
+      <style>{`
+        .nuai-pill-row::-webkit-scrollbar { display: none; }
+        .nuai-pill-row { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+      <div style={{ position: "relative" }}>
+        {/* Left fade */}
+        <div
+          style={{
+            pointerEvents: "none",
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 6,
+            width: 28,
+            zIndex: 2,
+            background: `linear-gradient(to right, ${T.white}, transparent)`,
+          }}
+        />
+        {/* Right fade */}
+        <div
+          style={{
+            pointerEvents: "none",
+            position: "absolute",
+            right: 0,
+            top: 0,
+            bottom: 6,
+            width: 40,
+            zIndex: 2,
+            background: `linear-gradient(to left, ${T.white}, transparent)`,
+          }}
+        />
+
+        {/* ── TIER 1: World pills ─────────────────────────────────────────── */}
+        <div
+          className="nuai-pill-row"
+          style={{
+            display: "flex",
+            gap: 6,
+            overflowX: "auto",
+            paddingBottom: 6,
+            alignItems: "center",
+          }}
+        >
+          {allCats.map((cat) => {
+            const active = catFilter === cat.id;
+            const cnt = counts[cat.id] || 0;
+            const isExpanded = active && groupFilter && catFilter !== "all";
+            return (
+              <button
+                key={cat.id}
+                onClick={() => onSelectCat(cat.id)}
+                style={pillBase(active, T.accent, T)}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+                <span style={countBadge(cnt, active)}>{cnt}</span>
+                {cat.hasSub && (
+                  <span style={{ fontSize: 8, opacity: active ? 0.8 : 0.4 }}>
+                    {isExpanded ? "▲" : "▼"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {/* Search — right-aligned */}
+          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder="Search items…"
+              style={{
+                padding: "5px 12px",
+                border: `1.5px solid ${search ? T.accent : T.border}`,
+                borderRadius: 99,
+                fontSize: 12.5,
+                fontFamily: T.font,
+                color: T.ink900,
+                outline: "none",
+                width: 180,
+                background: T.white,
+              }}
+            />
+          </div>
         </div>
       </div>
+      {/* end fade-edge wrapper */}
 
       {/* ── TIER 2: Group pills OR Sub-item pills (never both at once) ────── */}
       {catFilter !== "all" && activeGroups.length > 0 && (
@@ -3030,6 +3132,38 @@ function SmartPillBox({
 // ─────────────────────────────────────────────────────────────────────────
 // TILE VIEW
 // ─────────────────────────────────────────────────────────────────────────
+// SC-03: stock status helpers (used in all 3 views)
+const isSoldOut = (item) => (item.quantity_on_hand || 0) === 0;
+const isLowStock = (item) =>
+  (item.reorder_level || 0) > 0 &&
+  (item.quantity_on_hand || 0) > 0 &&
+  (item.quantity_on_hand || 0) <= (item.reorder_level || 0);
+
+function StockChip({ type, T }) {
+  const styles = {
+    out: { bg: T.danger, color: "#fff", label: "OUT OF STOCK" },
+    low: { bg: T.amber, color: "#fff", label: "LOW" },
+  }[type];
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        background: styles.bg,
+        color: styles.color,
+        padding: "2px 6px",
+        borderRadius: 4,
+        display: "inline-block",
+        flexShrink: 0,
+        textTransform: "uppercase",
+      }}
+    >
+      {styles.label}
+    </span>
+  );
+}
+
 function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   return (
     <div
@@ -3041,17 +3175,29 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
     >
       {items.map((item) => {
         const m = margin(item.sell_price, item.weighted_avg_cost);
-        const soldOut = (item.quantity_on_hand || 0) === 0;
-        const lowStock = !soldOut && (item.quantity_on_hand || 0) <= 3;
+        const soldOut = isSoldOut(item);
+        const lowStock = isLowStock(item);
+        const statusBorder = soldOut
+          ? T.danger
+          : lowStock
+            ? T.amber
+            : item.is_active
+              ? T.border
+              : T.ink150;
         return (
           <div
             key={item.id}
             style={{
               background: T.white,
-              border: `1.5px solid ${item.is_active ? T.border : T.ink150}`,
+              border: `1.5px solid ${statusBorder}`,
+              borderLeft: soldOut
+                ? `3px solid ${T.danger}`
+                : lowStock
+                  ? `3px solid ${T.amber}`
+                  : `1.5px solid ${statusBorder}`,
               borderRadius: T.radius,
               overflow: "hidden",
-              opacity: item.is_active ? 1 : 0.6,
+              opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
               boxShadow: T.shadow,
               cursor: "pointer",
               transition: "box-shadow 0.15s, border-color 0.15s",
@@ -3091,6 +3237,16 @@ function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
               })()}
               {item.is_featured && (
                 <span style={{ marginLeft: "auto", fontSize: 10 }}>⭐</span>
+              )}
+              {soldOut && (
+                <span style={{ marginLeft: "auto" }}>
+                  <StockChip type="out" T={T} />
+                </span>
+              )}
+              {lowStock && !soldOut && (
+                <span style={{ marginLeft: "auto" }}>
+                  <StockChip type="low" T={T} />
+                </span>
               )}
             </div>
 
@@ -3267,19 +3423,26 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
 
       {items.map((item, idx) => {
         const m = margin(item.sell_price, item.weighted_avg_cost);
-        const soldOut = (item.quantity_on_hand || 0) === 0;
+        const soldOut = isSoldOut(item);
+        const lowStock = isLowStock(item);
         return (
           <div
             key={item.id}
             style={{
               display: "grid",
               gridTemplateColumns: "40px 1fr 110px 90px 90px 80px 90px",
-              padding: "9px 14px",
+              padding: "9px 11px 9px 14px",
               alignItems: "center",
               background: idx % 2 === 0 ? T.white : T.bg,
               borderBottom: `1px solid ${T.border}`,
-              opacity: item.is_active ? 1 : 0.55,
+              borderLeft: soldOut
+                ? `3px solid ${T.danger}`
+                : lowStock
+                  ? `3px solid ${T.amber}`
+                  : "3px solid transparent",
+              opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
               cursor: "pointer",
+              transition: "border-color 0.12s",
             }}
             onClick={() => onOpenPanel(item)}
           >
@@ -3288,10 +3451,21 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
               {CATEGORY_ICONS[item.category] || "📦"}
             </span>
 
-            {/* Name */}
+            {/* Name + stock chip */}
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}>
-                {item.name}
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: T.ink900,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>{item.name}</span>
+                {soldOut && <StockChip type="out" T={T} />}
+                {lowStock && <StockChip type="low" T={T} />}
               </div>
               {item.is_featured && (
                 <span style={{ fontSize: 10, color: T.amber }}>
@@ -3625,7 +3799,8 @@ function DetailView({
         <tbody>
           {items.map((item, idx) => {
             const m = margin(item.sell_price, item.weighted_avg_cost);
-            const soldOut = (item.quantity_on_hand || 0) === 0;
+            const soldOut = isSoldOut(item);
+            const lowStock = isLowStock(item);
             const rowBg = idx % 2 === 0 ? T.white : "#FCFCFB";
             return (
               <tr
@@ -3633,7 +3808,12 @@ function DetailView({
                 style={{
                   background: rowBg,
                   borderBottom: `1px solid ${T.border}`,
-                  opacity: item.is_active ? 1 : 0.55,
+                  borderLeft: soldOut
+                    ? `3px solid ${T.danger}`
+                    : lowStock
+                      ? `3px solid ${T.amber}`
+                      : "3px solid transparent",
+                  opacity: item.is_active ? (soldOut ? 0.85 : 1) : 0.55,
                 }}
                 onClick={() => onOpenPanel(item)}
                 onDoubleClick={() => onEdit(item)}
@@ -3666,6 +3846,8 @@ function DetailView({
                         <span style={{ fontWeight: 600, color: T.ink900 }}>
                           {item.name}
                         </span>
+                        {soldOut && <StockChip type="out" T={T} />}
+                        {lowStock && <StockChip type="low" T={T} />}
                         {item.is_featured && (
                           <span style={{ fontSize: 10 }}>⭐</span>
                         )}
