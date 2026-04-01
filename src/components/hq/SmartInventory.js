@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 import StockItemModal from "../StockItemModal";
+import StockItemPanel from "./StockItemPanel";
 import {
   PRODUCT_WORLDS,
   itemMatchesWorld,
@@ -1013,6 +1014,9 @@ export default function SmartInventory({ tenantId }) {
   const [saveError, setSaveError] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
 
+  // ── SC-02: Item detail panel state ──────────────────────────────────────────
+  const [panelItem, setPanelItem] = useState(null); // item whose panel is open
+
   // ── Add / Edit — StockItemModal pattern (same as HQStock) ────────────────
   const [modalItem, setModalItem] = useState(undefined); // undefined=closed, null=new, obj=edit
   const [modalDefaults, setModalDefaults] = useState({});
@@ -1071,6 +1075,13 @@ export default function SmartInventory({ tenantId }) {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       // Collapse in priority order (innermost first)
+      if (modalItem !== undefined) {
+        return;
+      } // StockItemModal handles its own Escape
+      if (panelItem) {
+        setPanelItem(null);
+        return;
+      }
       if (activePanel) {
         setActivePanel(null);
         return;
@@ -1110,7 +1121,9 @@ export default function SmartInventory({ tenantId }) {
     };
   }, [
     colPickerOpen,
+    panelItem,
     activePanel,
+    modalItem,
     subFilter,
     groupFilter,
     catFilter,
@@ -1276,6 +1289,19 @@ export default function SmartInventory({ tenantId }) {
       return n;
     });
     load();
+  };
+
+  // ── SC-02: Refresh panel item after in-panel save ───────────────────────────
+  const handlePanelRefresh = async () => {
+    load();
+    if (panelItem) {
+      const { data } = await supabase
+        .from("inventory_items")
+        .select("*, suppliers(name)")
+        .eq("id", panelItem.id)
+        .single();
+      if (data) setPanelItem(data);
+    }
   };
 
   // ── SC-01: Flag item for reorder ─────────────────────────────────────────
@@ -2532,28 +2558,60 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* ── STOCKITEMMODAL — world-specific add / edit form ──────────────── */}
-      {modalItem !== undefined && (
-        <StockItemModal
-          item={modalItem || null}
-          defaults={modalDefaults}
-          suppliers={suppliers}
-          visibleCategories={[
-            "flower",
-            "concentrate",
-            "edible",
-            "accessory",
-            "finished_product",
-            "hardware",
-            "raw_material",
-          ]}
-          onSave={handleModalSave}
-          onCancel={() => {
-            setModalItem(undefined);
-            setModalDefaults({});
+      {/* ── SC-02: STOCK ITEM PANEL — slide-in on single click ──────────────── */}
+      {panelItem && (
+        <StockItemPanel
+          item={panelItem}
+          onClose={() => setPanelItem(null)}
+          onEdit={() => {
+            // Opens StockItemModal on top of panel — panel stays behind
+            openEdit(panelItem);
           }}
-          saving={modalSaving}
+          onRefresh={handlePanelRefresh}
         />
+      )}
+
+      {/* ── STOCKITEMMODAL — world-specific add / edit form ──────────────── */}
+      {/* z-index wrapper ensures modal appears above StockItemPanel (z:1051) */}
+      {modalItem !== undefined && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1200,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              pointerEvents: "all",
+            }}
+          >
+            <StockItemModal
+              item={modalItem || null}
+              defaults={modalDefaults}
+              suppliers={suppliers}
+              visibleCategories={[
+                "flower",
+                "concentrate",
+                "edible",
+                "accessory",
+                "finished_product",
+                "hardware",
+                "raw_material",
+              ]}
+              onSave={handleModalSave}
+              onCancel={() => {
+                setModalItem(undefined);
+                setModalDefaults({});
+              }}
+              saving={modalSaving}
+            />
+          </div>
+        </div>
       )}
 
       {/* ── DELETE CONFIRM ──────────────────────────────────────────────── */}
@@ -2971,7 +3029,7 @@ function SmartPillBox({
 // ─────────────────────────────────────────────────────────────────────────
 // TILE VIEW
 // ─────────────────────────────────────────────────────────────────────────
-function TileView({ items, onEdit, onDelete, onToggle, T }) {
+function TileView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   return (
     <div
       style={{
@@ -2997,14 +3055,13 @@ function TileView({ items, onEdit, onDelete, onToggle, T }) {
               cursor: "pointer",
               transition: "box-shadow 0.15s, border-color 0.15s",
             }}
-            onClick={() => onEdit(item)}
+            onClick={() => onOpenPanel(item)}
           >
             {/* Category banner */}
             <div
               style={{
                 background: T.accentLit,
                 padding: "8px 12px",
-                display: "flex",
                 alignItems: "center",
                 gap: 6,
                 borderBottom: `1px solid ${T.border}`,
@@ -3173,7 +3230,7 @@ function TileAction({ label, onClick, color, T }) {
 // ─────────────────────────────────────────────────────────────────────────
 // LIST VIEW (compact rows)
 // ─────────────────────────────────────────────────────────────────────────
-function ListView({ items, onEdit, onDelete, onToggle, T }) {
+function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   return (
     <div
       style={{
@@ -3223,7 +3280,7 @@ function ListView({ items, onEdit, onDelete, onToggle, T }) {
               opacity: item.is_active ? 1 : 0.55,
               cursor: "pointer",
             }}
-            onClick={() => onEdit(item)}
+            onClick={() => onOpenPanel(item)}
           >
             {/* Icon */}
             <span style={{ fontSize: 18, textAlign: "center" }}>
@@ -3352,6 +3409,7 @@ function DetailView({
   onDelete,
   onToggle,
   hiddenCols = new Set(),
+  onOpenPanel,
   T,
 }) {
   // ── Resizable columns — drag the border between headers ───────────────
@@ -3576,6 +3634,7 @@ function DetailView({
                   borderBottom: `1px solid ${T.border}`,
                   opacity: item.is_active ? 1 : 0.55,
                 }}
+                onClick={() => onOpenPanel(item)}
                 onDoubleClick={() => onEdit(item)}
               >
                 {visibleCols.map((col) => (
