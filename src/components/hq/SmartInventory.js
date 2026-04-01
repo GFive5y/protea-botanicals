@@ -2310,7 +2310,57 @@ function DetailView({
   onToggle,
   T,
 }) {
-  const totalWidth = DETAIL_COLS.reduce((s, c) => s + c.width, 0);
+  // ── Resizable columns — drag the border between headers ───────────────
+  const [colWidths, setColWidths] = useState(() => {
+    try {
+      const s = sessionStorage.getItem("nuai_detail_col_widths");
+      return s
+        ? JSON.parse(s)
+        : Object.fromEntries(DETAIL_COLS.map((c) => [c.key, c.width]));
+    } catch {
+      return Object.fromEntries(DETAIL_COLS.map((c) => [c.key, c.width]));
+    }
+  });
+  const resizing = useRef(null);
+
+  const startResize = (e, colKey) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizing.current = {
+      key: colKey,
+      startX: e.clientX,
+      startWidth: colWidths[colKey] || 120,
+    };
+    const onMove = (ev) => {
+      if (!resizing.current) return;
+      const newW = Math.max(
+        50,
+        resizing.current.startWidth + ev.clientX - resizing.current.startX,
+      );
+      setColWidths((prev) => {
+        const next = { ...prev, [resizing.current.key]: newW };
+        try {
+          sessionStorage.setItem(
+            "nuai_detail_col_widths",
+            JSON.stringify(next),
+          );
+        } catch {}
+        return next;
+      });
+    };
+    const onUp = () => {
+      resizing.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
+  const totalWidth = DETAIL_COLS.reduce(
+    (s, c) => s + (colWidths[c.key] || c.width),
+    0,
+  );
 
   return (
     <div
@@ -2327,8 +2377,17 @@ function DetailView({
           width: "100%",
           minWidth: totalWidth,
           fontSize: 12.5,
+          tableLayout: "fixed",
         }}
       >
+        <colgroup>
+          {DETAIL_COLS.map((col) => (
+            <col
+              key={col.key}
+              style={{ width: colWidths[col.key] || col.width }}
+            />
+          ))}
+        </colgroup>
         {/* Header */}
         <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
           <tr
@@ -2351,16 +2410,65 @@ function DetailView({
                   letterSpacing: "0.05em",
                   cursor: col.sortable ? "pointer" : "default",
                   userSelect: "none",
-                  borderRight: `1px solid ${T.border}`,
-                  width: col.width,
-                  whiteSpace: "nowrap",
                   background: sortKey === col.key ? T.accentXlit : T.ink50,
+                  position: "relative",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
                 }}
               >
-                {col.label}
-                {col.sortable && sortKey === col.key && (
-                  <span style={{ marginLeft: 4 }}>
-                    {sortDir === "asc" ? "↑" : "↓"}
+                <span
+                  style={{
+                    display: "block",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    paddingRight: col.key !== "_actions" ? 8 : 0,
+                  }}
+                >
+                  {col.label}
+                  {col.sortable && sortKey === col.key && (
+                    <span style={{ marginLeft: 4 }}>
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </span>
+                {/* Resize handle */}
+                {col.key !== "_actions" && (
+                  <span
+                    onMouseDown={(e) => startResize(e, col.key)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Drag to resize column"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      width: 8,
+                      height: "100%",
+                      cursor: "col-resize",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 2,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.querySelector("i").style.background =
+                        T.accentMid;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.querySelector("i").style.background =
+                        T.borderDark;
+                    }}
+                  >
+                    <i
+                      style={{
+                        display: "block",
+                        width: 2,
+                        height: "55%",
+                        background: T.borderDark,
+                        borderRadius: 1,
+                        pointerEvents: "none",
+                        transition: "background 0.12s",
+                      }}
+                    />
                   </span>
                 )}
               </th>
@@ -2436,7 +2544,6 @@ function DetailView({
                       verticalAlign: "middle",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
-                      maxWidth: col.width,
                       textOverflow: "ellipsis",
                     }}
                   >
