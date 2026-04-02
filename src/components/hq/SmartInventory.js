@@ -1013,6 +1013,133 @@ export default function SmartInventory({ tenantId }) {
   const [showWorldPicker, setShowWorldPicker] = useState(false);
   const searchRef = useRef(null);
 
+  // ── SC-08: Bulk selection state ─────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
+  const [bulkPrice, setBulkPrice] = useState("");
+  const [bulkDelConfirm, setBulkDelConfirm] = useState(false);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const selectAll = () => {
+    setSelectedIds(new Set(filtered.map((i) => i.id)));
+  };
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setBulkPriceOpen(false);
+    setBulkPrice("");
+    setBulkDelConfirm(false);
+  };
+
+  const bulkHide = async () => {
+    const ids = [...selectedIds];
+    const count = ids.length;
+    await Promise.all(
+      ids.map((id) =>
+        supabase
+          .from("inventory_items")
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq("id", id),
+      ),
+    );
+    load();
+    clearSelection();
+    toast.warning(`${count} items hidden from shop`, {
+      duration: 5000,
+      undo: async () => {
+        await Promise.all(
+          ids.map((id) =>
+            supabase
+              .from("inventory_items")
+              .update({ is_active: true, updated_at: new Date().toISOString() })
+              .eq("id", id),
+          ),
+        );
+        load();
+      },
+    });
+  };
+
+  const bulkShow = async () => {
+    const ids = [...selectedIds];
+    const count = ids.length;
+    await Promise.all(
+      ids.map((id) =>
+        supabase
+          .from("inventory_items")
+          .update({ is_active: true, updated_at: new Date().toISOString() })
+          .eq("id", id),
+      ),
+    );
+    load();
+    clearSelection();
+    toast.success(`${count} items now visible in shop`);
+  };
+
+  const bulkDelete = async () => {
+    const ids = [...selectedIds];
+    const count = ids.length;
+    const savedItems = items.filter((i) => ids.includes(i.id));
+    await Promise.all(
+      ids.map((id) => supabase.from("inventory_items").delete().eq("id", id)),
+    );
+    load();
+    clearSelection();
+    toast.warning(`${count} items deleted`, {
+      duration: 5000,
+      undo: async () => {
+        await Promise.all(
+          savedItems.map((item) =>
+            supabase.from("inventory_items").insert(item),
+          ),
+        );
+        load();
+      },
+    });
+  };
+
+  const bulkSetPrice = async () => {
+    const price = parseFloat(bulkPrice);
+    if (!price || price <= 0) return;
+    const ids = [...selectedIds];
+    const count = ids.length;
+    await Promise.all(
+      ids.map((id) =>
+        supabase
+          .from("inventory_items")
+          .update({ sell_price: price, updated_at: new Date().toISOString() })
+          .eq("id", id),
+      ),
+    );
+    load();
+    clearSelection();
+    toast.success(`Price set to R${price.toFixed(2)} on ${count} items`);
+  };
+
+  const bulkFlagReorder = async () => {
+    const ids = [...selectedIds];
+    const count = ids.length;
+    await Promise.all(
+      ids.map((id) =>
+        supabase
+          .from("inventory_items")
+          .update({ needs_reorder: true, updated_at: new Date().toISOString() })
+          .eq("id", id),
+      ),
+    );
+    load();
+    clearSelection();
+    toast.info(`${count} items flagged for reorder`);
+  };
+
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
@@ -1605,6 +1732,37 @@ export default function SmartInventory({ tenantId }) {
             >
               🔽 Filters{sortByIssues ? " ·⚠" : ""}
             </button>
+
+            {/* SC-08: Select mode toggle */}
+            <button
+              onClick={() => {
+                if (selectMode) clearSelection();
+                else setSelectMode(true);
+              }}
+              style={btnStyle(
+                selectMode ? T.blue : T.white,
+                selectMode ? T.white : T.ink500,
+                selectMode ? T.blue : T.border,
+                T,
+              )}
+            >
+              {selectMode ? `✓ ${selectedIds.size} selected` : "☐ Select"}
+            </button>
+            {selectMode && filtered.length > 0 && (
+              <button
+                onClick={
+                  selectedIds.size === filtered.length
+                    ? () => setSelectedIds(new Set())
+                    : selectAll
+                }
+                style={btnStyle(T.white, T.ink500, T.border, T)}
+              >
+                {selectedIds.size === filtered.length
+                  ? "Deselect all"
+                  : "Select all"}
+              </button>
+            )}
+
             {viewMode === VIEW_DETAIL && (
               <button
                 onClick={exportCSV}
@@ -2063,6 +2221,9 @@ export default function SmartInventory({ tenantId }) {
               onToggle={quickToggle}
               onOpenPanel={setPanelItem}
               tileSize={tileSize}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
               T={T}
             />
           ) : viewMode === VIEW_LIST ? (
@@ -2072,6 +2233,9 @@ export default function SmartInventory({ tenantId }) {
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
               onOpenPanel={setPanelItem}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
               T={T}
             />
           ) : (
@@ -2090,6 +2254,9 @@ export default function SmartInventory({ tenantId }) {
               onToggle={quickToggle}
               hiddenCols={hiddenCols}
               onOpenPanel={setPanelItem}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
               T={T}
             />
           )}
@@ -2689,6 +2856,249 @@ export default function SmartInventory({ tenantId }) {
             />
           </div>
         </div>
+      )}
+      {/* ── SC-08: BULK ACTION BAR ─────────────────────────────────────── */}
+      {selectMode && selectedIds.size > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 40,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: T.ink900,
+            color: T.white,
+            borderRadius: 12,
+            padding: "10px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+            zIndex: 8000,
+            fontFamily: T.font,
+            fontSize: 13,
+          }}
+        >
+          <span style={{ fontWeight: 700, marginRight: 4 }}>
+            {selectedIds.size} selected
+          </span>
+          <div
+            style={{
+              width: 1,
+              height: 20,
+              background: "rgba(255,255,255,0.2)",
+            }}
+          />
+          <button
+            onClick={bulkShow}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "none",
+              color: T.white,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: T.font,
+            }}
+          >
+            👁 Show
+          </button>
+          <button
+            onClick={bulkHide}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "none",
+              color: T.white,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: T.font,
+            }}
+          >
+            🙈 Hide
+          </button>
+          <button
+            onClick={() => setBulkPriceOpen(true)}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "none",
+              color: T.white,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: T.font,
+            }}
+          >
+            💰 Set Price
+          </button>
+          <button
+            onClick={bulkFlagReorder}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "none",
+              color: T.white,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: T.font,
+            }}
+          >
+            ⚑ Reorder
+          </button>
+          <button
+            onClick={() => setBulkDelConfirm(true)}
+            style={{
+              background: T.danger,
+              border: "none",
+              color: T.white,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: T.font,
+            }}
+          >
+            🗑 Delete
+          </button>
+          <div
+            style={{
+              width: 1,
+              height: 20,
+              background: "rgba(255,255,255,0.2)",
+            }}
+          />
+          <button
+            onClick={clearSelection}
+            style={{
+              background: "none",
+              border: "1px solid rgba(255,255,255,0.3)",
+              color: T.white,
+              padding: "6px 14px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontFamily: T.font,
+            }}
+          >
+            ✕ Cancel
+          </button>
+        </div>
+      )}
+
+      {/* SC-08: Bulk price modal */}
+      {bulkPriceOpen && (
+        <Modal
+          onClose={() => setBulkPriceOpen(false)}
+          title={`Set Price — ${selectedIds.size} items`}
+          T={T}
+          width={340}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <label
+              style={{
+                fontSize: 12,
+                color: T.ink400,
+                fontWeight: 600,
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              New sell price (ZAR)
+            </label>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                border: `1.5px solid ${T.border}`,
+                borderRadius: 7,
+                overflow: "hidden",
+              }}
+            >
+              <span
+                style={{
+                  padding: "8px 8px 8px 12px",
+                  color: T.ink400,
+                  background: T.ink50,
+                }}
+              >
+                R
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={bulkPrice}
+                onChange={(e) => setBulkPrice(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && bulkSetPrice()}
+                autoFocus
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  border: "none",
+                  fontSize: 14,
+                  outline: "none",
+                  fontFamily: T.font,
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setBulkPriceOpen(false)}
+              style={btnStyle(T.white, T.ink500, T.border, T, false, true)}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={bulkSetPrice}
+              disabled={!bulkPrice}
+              style={btnStyle(T.accent, T.white, T.accent, T, true, true)}
+            >
+              Apply to {selectedIds.size} items
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* SC-08: Bulk delete confirm */}
+      {bulkDelConfirm && (
+        <Modal
+          onClose={() => setBulkDelConfirm(false)}
+          title="Delete Items"
+          T={T}
+          width={380}
+          preventBackdropDismiss
+        >
+          <div style={{ fontSize: 14, color: T.ink500, marginBottom: 20 }}>
+            Permanently delete <strong>{selectedIds.size} items</strong>? Stock
+            movements are preserved for audit.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setBulkDelConfirm(false)}
+              style={btnStyle(T.white, T.ink500, T.border, T, false, true)}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setBulkDelConfirm(false);
+                bulkDelete();
+              }}
+              style={btnStyle(T.danger, T.white, T.danger, T, true, true)}
+            >
+              Delete {selectedIds.size} items
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* ── DELETE CONFIRM ────────────────────────────────────────────── */}
