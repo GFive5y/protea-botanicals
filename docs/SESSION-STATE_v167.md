@@ -2,7 +2,7 @@
 
 ## Version: v167 · April 2, 2026
 
-## HEAD: 97627a0
+## HEAD: bfae7c5
 
 ## THIS FILE IS THE SINGLE SOURCE OF TRUTH FOR NEXT SESSION AGENTS
 
@@ -74,7 +74,9 @@ acf6eba  fix(catalog): drag-reorder live on dragOver
 db5c286  fix(catalog): SC-08 wire select mode into all 3 views
 d4283cb  feat(catalog): SC-10 smart search + UX fixes
 6cb6f88  fix(catalog): clear all filters — stuck filter bug
-97627a0  docs: update CLAUDE.md — all 10 SCs complete
+97627a0  docs: update CLAUDE.md — all 10 SCs complete cc3cd26  docs: session state final
+bfae7c5  fix(catalog): empty state Clear Filters button
+
 ```
 
 ---
@@ -376,6 +378,6 @@ KEEP UNCHANGED:
 
 ---
 
-_SESSION-STATE v168 · NuAi · April 2, 2026 · HEAD: 97627a0_
+_SESSION-STATE v168 · NuAi · April 2, 2026 · HEAD: bfae7c5_
 _Smart Catalog SC-01 through SC-10 ALL COMPLETE_
 _Next: WP-REORDER → WP-STOCK-MERGE_
