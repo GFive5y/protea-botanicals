@@ -33,7 +33,7 @@ Git: owner runs git commands manually in VS Code terminal
 ## CURRENT HEAD
 
 ```
-Commit:  6cb6f88 (verify with git log --oneline -1)
+Commit:  ed91443 (verify with git log --oneline -1)
 Branch:  main
 Build:   CI=false npm run build (Vercel env var set)
 ```
