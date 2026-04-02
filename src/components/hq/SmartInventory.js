@@ -2385,6 +2385,17 @@ export default function SmartInventory({ tenantId }) {
               catFilter={catFilter}
               search={search}
               onAdd={openAdd}
+              isFiltered={isFiltered}
+              onClearAll={() => {
+                selectCat("all");
+                setGroupFilter(null);
+                setSubFilter(null);
+                setSearch("");
+                setColFilters({});
+                setFilterRowOpen(false);
+                setSortByIssues(false);
+                setPillExpanded(false);
+              }}
               T={T}
             />
           ) : viewMode === VIEW_TILE ? (
@@ -5189,10 +5200,12 @@ function ErrorState({ msg, T }) {
   );
 }
 
-function EmptyState({ catFilter, search, onAdd, T }) {
+function EmptyState({ catFilter, search, onAdd, isFiltered, onClearAll, T }) {
   return (
     <div style={{ textAlign: "center", padding: 64, color: T.ink400 }}>
-      <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
+      <div style={{ fontSize: 40, marginBottom: 10 }}>
+        {isFiltered ? "🔍" : "📦"}
+      </div>
       <div
         style={{
           fontWeight: 700,
@@ -5201,26 +5214,35 @@ function EmptyState({ catFilter, search, onAdd, T }) {
           marginBottom: 6,
         }}
       >
-        {(() => {
-          const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
-          return search
+        {isFiltered
+          ? search
             ? `No items match "${search}"`
-            : catFilter !== "all"
-              ? `No ${world?.label || catFilter} items yet`
-              : "No inventory items";
-        })()}
+            : "No items match the current filters"
+          : catFilter !== "all"
+            ? `No ${PRODUCT_WORLDS.find((w) => w.id === catFilter)?.label || catFilter} items yet`
+            : "No inventory items"}
       </div>
       <div style={{ fontSize: 13, marginBottom: 20 }}>
-        {catFilter !== "all" && !search
-          ? "Items show here once tagged to this world in HQStock."
+        {isFiltered
+          ? "Try adjusting your search or filters to see results."
           : "Add your first item to get started."}
       </div>
-      <button
-        onClick={onAdd}
-        style={btnStyle("#1A3D2B", "#fff", "#1A3D2B", T, true)}
-      >
-        + Add Item
-      </button>
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        {isFiltered && onClearAll && (
+          <button
+            onClick={onClearAll}
+            style={btnStyle(T.white, T.danger, T.danger, T, true)}
+          >
+            ✕ Clear all filters
+          </button>
+        )}
+        <button
+          onClick={onAdd}
+          style={btnStyle("#1A3D2B", "#fff", "#1A3D2B", T, true)}
+        >
+          + Add Item
+        </button>
+      </div>
     </div>
   );
 }
