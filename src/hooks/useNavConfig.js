@@ -39,6 +39,18 @@ const HQ_PAGES = [
   },
   {
     group: "Operations",
+    icon: "📊",
+    label: "Daily Trading",
+    path: "/hq?tab=hq-trading",
+  },
+  {
+    group: "Operations",
+    icon: "🛒",
+    label: "POS Till",
+    path: "/hq?tab=hq-pos",
+  },
+  {
+    group: "Operations",
     icon: "=",
     label: "Transfers",
     path: "/hq?tab=hq-transfers",

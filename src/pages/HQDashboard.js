@@ -47,6 +47,8 @@ import HQWholesaleOrders from "../components/hq/HQWholesaleOrders";
 import HQProduction from "../components/hq/HQProduction";
 import HQStock from "../components/hq/HQStock";
 import HQTransfer from "../components/hq/HQTransfer";
+import HQTradingDashboard from "../components/hq/HQTradingDashboard";
+import POSScreen from "../components/hq/POSScreen";
 import HQFoodIngredients from "../components/hq/HQFoodIngredients";
 import HQRecipeEngine from "../components/hq/HQRecipeEngine";
 import HQHaccp from "../components/hq/HQHaccp";
@@ -100,6 +102,8 @@ const TABS = [
   { id: "hq-production", label: "Production", icon: "⚗️", ready: true },
   { id: "hq-stock", label: "HQ Stock", icon: "=", ready: true },
   { id: "hq-transfers", label: "Transfers", icon: "=", ready: true },
+  { id: "hq-trading", label: "Daily Trading", icon: "📊", ready: true },
+  { id: "hq-pos", label: "POS Till", icon: "🛒", ready: true },
   { id: "hq-ingredients", label: "Ingredients", icon: "=", ready: true },
   { id: "hq-recipes", label: "Recipes", icon: "=", ready: true },
   { id: "hq-haccp", label: "HACCP", icon: "=", ready: true },
@@ -306,6 +310,8 @@ export default function HQDashboard() {
           {activeTab === "hq-production" && <HQProduction />}
           {activeTab === "hq-stock" && <HQStock />}
           {activeTab === "hq-transfers" && <HQTransfer />}
+          {activeTab === "hq-trading" && <HQTradingDashboard />}
+          {activeTab === "hq-pos" && <POSScreen tenantId={tenant?.id} />}
           {activeTab === "hq-ingredients" && <HQFoodIngredients />}
           {activeTab === "hq-recipes" && <HQRecipeEngine />}
           {activeTab === "hq-haccp" && <HQHaccp />}
