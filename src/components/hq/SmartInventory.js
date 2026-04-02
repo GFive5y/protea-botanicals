@@ -1346,7 +1346,11 @@ export default function SmartInventory({ tenantId }) {
     (i) => !i.sell_price || i.sell_price <= 0,
   ).length;
   const isFiltered =
-    catFilter !== "all" || groupFilter || subFilter || search.trim();
+    catFilter !== "all" ||
+    groupFilter ||
+    subFilter ||
+    search.trim() ||
+    Object.values(colFilters).some((v) => v);
 
   const soldOutItems = items
     .filter((i) => (i.quantity_on_hand || 0) === 0)
@@ -1734,6 +1738,9 @@ export default function SmartInventory({ tenantId }) {
                   setGroupFilter(null);
                   setSubFilter(null);
                   setSearch("");
+                  setColFilters({});
+                  setFilterRowOpen(false);
+                  setSortByIssues(false);
                   setPillExpanded(false);
                 }}
                 style={{
@@ -2144,6 +2151,9 @@ export default function SmartInventory({ tenantId }) {
                   setGroupFilter(null);
                   setSubFilter(null);
                   setSearch("");
+                  setColFilters({});
+                  setFilterRowOpen(false);
+                  setPillExpanded(false);
                 },
                 title: "Click to clear all filters",
               },
