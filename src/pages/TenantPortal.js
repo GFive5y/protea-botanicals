@@ -1,7 +1,10 @@
-// src/pages/TenantPortal.js — v2.1 SmartBar
-// Manufacturer/Distributor model: Procurement → Production → Distribution → Sales → Intelligence → People
-// Collapsible sections · Role-adaptive · Cannabis/Nicotine/General profiles
-// DO NOT MODIFY HQDashboard.js — this is a separate file.
+// src/pages/TenantPortal.js — v2.4 ScrollFix (definitive)
+// CHANGES FROM v2.1 — exactly 3:
+//   1. FX wrapper: + flexShrink: 0
+//   2. fullBleed: "catalog" only (not "stock")
+//   3. ALL content areas use two-div pattern:
+//      outer = full-width flex (scrollbar at screen edge / overflow:hidden for catalog)
+//      inner = maxWidth:1400 + margin:"0 auto" → aligns with FX bar on ANY screen width
 
 import { useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -13,7 +16,6 @@ import { PlatformBarProvider } from "../contexts/PlatformBarContext";
 import LiveFXBar from "../components/hq/LiveFXBar";
 import ToastContainer from "../components/ToastContainer";
 
-// ── Tab components ────────────────────────────────────────────────────────
 import HQOverview from "../components/hq/HQOverview";
 import SupplyChain from "../components/hq/SupplyChain";
 import HQSuppliers from "../components/hq/HQSuppliers";
@@ -39,7 +41,6 @@ import POSScreen from "../components/hq/POSScreen";
 import ExpenseManager from "../components/hq/ExpenseManager";
 import SmartInventory from "../components/hq/SmartInventory";
 
-// ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
   bg: "#FAFAF9",
   sidebar: "#ffffff",
@@ -55,9 +56,12 @@ const T = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-// ── Waterfall — Manufacturer/Distributor model ────────────────────────────
-// Buy → Make → Distribute → Sell → Understand → People
-// No duplicates. No retail-specific tabs. Pure vape brand model.
+// Shared inner constraint — matches FX bar exactly
+const INNER = {
+  maxWidth: 1400,
+  width: "100%",
+  margin: "0 auto",
+};
 
 const WATERFALL = [
   {
@@ -207,11 +211,6 @@ const WATERFALL = [
     ],
   },
 ];
-
-// ── Cannabis Retail Waterfall ─────────────────────────────────────────────
-// Used when industryProfile === 'cannabis_retail' or 'cannabis_dispensary'
-// Retailer model: Buy stock → Price it → Sell it → Understand the numbers
-// No Production Runs. No Material Pipeline. No Retailer Health (they ARE the retailer).
 
 const CANNABIS_RETAIL_WATERFALL = [
   {
@@ -363,7 +362,6 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
 ];
 
-// Profile → which waterfall to use
 function getWaterfall(industryProfile) {
   if (
     industryProfile === "cannabis_retail" ||
@@ -374,7 +372,6 @@ function getWaterfall(industryProfile) {
   return WATERFALL;
 }
 
-// Role → visible sections
 const ROLE_SECTIONS = {
   owner: [
     "home",
@@ -397,7 +394,6 @@ const ROLE_SECTIONS = {
   staff: ["home", "sales"],
 };
 
-// Profile badge config
 const PROFILE_BADGE = {
   cannabis_retail: {
     label: "Cannabis Retail",
@@ -420,7 +416,6 @@ const PROFILE_BADGE = {
   operator: { label: "Operator", color: "#991B1B", bg: "#FEF2F2" },
 };
 
-// ── Tab renderer ──────────────────────────────────────────────────────────
 function renderTab(tabId, tenantId, industryProfile) {
   switch (tabId) {
     case "overview":
@@ -470,7 +465,6 @@ function renderTab(tabId, tenantId, industryProfile) {
       return <HQReorderScoring />;
     case "staff":
       return <HRStaffDirectory />;
-    // ── Customer operations — ported with tenantId prop ──────────────────
     case "qr-codes":
       return <AdminQRCodes tenantId={tenantId} />;
     case "customers":
@@ -506,7 +500,6 @@ function renderTab(tabId, tenantId, industryProfile) {
   }
 }
 
-// ── Sidebar section ───────────────────────────────────────────────────────
 function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
   const isActiveSection = section.tabs.some((t) => t.id === activeTab);
   const [open, setOpen] = useState(
@@ -559,7 +552,6 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
           </span>
         </button>
       )}
-
       {effectiveOpen && (
         <div style={{ paddingBottom: section.alwaysOpen ? 0 : 4 }}>
           {section.tabs.map((tab) => {
@@ -609,14 +601,12 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────
 export default function TenantPortal() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenant, tenantId, industryProfile, isOperator } = useTenant();
 
   const activeTab = searchParams.get("tab") || "overview";
-
   const setActiveTab = useCallback(
     (tabId) => {
       setSearchParams({ tab: tabId }, { replace: true });
@@ -627,7 +617,6 @@ export default function TenantPortal() {
   const role = "owner";
   const activeWaterfall = getWaterfall(industryProfile);
   const visibleSectionIds = ROLE_SECTIONS[role] || ROLE_SECTIONS.owner;
-  // Cannabis retail waterfall has its own sections — show all for owner role
   const visibleSections =
     activeWaterfall === CANNABIS_RETAIL_WATERFALL
       ? activeWaterfall
@@ -636,11 +625,13 @@ export default function TenantPortal() {
   const profileBadge =
     PROFILE_BADGE[industryProfile] || PROFILE_BADGE.general_retail;
   const tenantName = tenant?.name || "My Business";
-
   const activeSection = activeWaterfall.find((s) =>
     s.tabs.some((t) => t.id === activeTab),
   );
   const activeTabDef = activeSection?.tabs.find((t) => t.id === activeTab);
+
+  // Only catalog needs fullBleed (SmartInventory manages its own internal scroll)
+  const fullBleed = activeTab === "catalog";
 
   return (
     <DevErrorCapture>
@@ -654,7 +645,7 @@ export default function TenantPortal() {
             background: T.bg,
           }}
         >
-          {/* ── SIDEBAR ─────────────────────────────────────────── */}
+          {/* ── SIDEBAR — unchanged ───────────────────────────── */}
           <div
             style={{
               width: 220,
@@ -721,7 +712,6 @@ export default function TenantPortal() {
                 </button>
               )}
             </div>
-
             <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
               {visibleSections.map((section, i) => (
                 <SidebarSection
@@ -733,7 +723,6 @@ export default function TenantPortal() {
                 />
               ))}
             </div>
-
             <div
               style={{
                 padding: "10px 16px 14px",
@@ -755,6 +744,7 @@ export default function TenantPortal() {
               flexDirection: "column",
             }}
           >
+            {/* Breadcrumb — unchanged */}
             <div
               style={{
                 background: "#fff",
@@ -764,9 +754,7 @@ export default function TenantPortal() {
             >
               <div
                 style={{
-                  maxWidth: 1400,
-                  width: "100%",
-                  margin: "0 auto",
+                  ...INNER,
                   padding: "0 24px",
                   height: 48,
                   display: "flex",
@@ -799,13 +787,13 @@ export default function TenantPortal() {
               </div>
             </div>
 
+            {/* FX + Platform bar — CHANGE 1: + flexShrink:0 */}
             <div
               style={{
-                maxWidth: 1400,
-                width: "100%",
-                margin: "0 auto",
+                ...INNER,
                 overflow: "hidden",
                 padding: "0 24px",
+                flexShrink: 0,
               }}
             >
               <LiveFXBar />
@@ -816,30 +804,53 @@ export default function TenantPortal() {
               />
             </div>
 
-            {/* Content area — full-bleed for catalog/stock, padded for everything else */}
-            {(() => {
-              const fullBleed = ["catalog", "stock"].includes(activeTab);
-              return (
+            {/* ── CONTENT — CHANGE 2+3 ─────────────────────────
+                Both modes use same INNER constraint (maxWidth:1400 margin:0 auto)
+                so content ALWAYS aligns with FX bar on any screen width.
+                Catalog: outer overflow:hidden, inner flex column fills height
+                Others:  outer overflowY:auto (scrollbar at screen edge), inner just pads
+            */}
+            {fullBleed ? (
+              <div
+                style={{
+                  flex: 1,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  background: "#faf9f6",
+                }}
+              >
                 <div
                   style={{
+                    ...INNER,
                     flex: 1,
-                    overflow: fullBleed ? "hidden" : "auto",
-                    padding: fullBleed ? "12px 24px 0 24px" : "24px 28px",
-                    maxWidth: 1400,
-                    width: "100%",
-                    margin: "0 auto",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    padding: "12px 24px 0",
                     boxSizing: "border-box",
-                    background: "#faf9f6",
-                    display: fullBleed ? "flex" : "block",
-                    flexDirection: fullBleed ? "column" : undefined,
                   }}
                 >
                   {renderTab(activeTab, tenantId, industryProfile)}
                 </div>
-              );
-            })()}
+              </div>
+            ) : (
+              <div
+                style={{ flex: 1, overflowY: "auto", background: "#faf9f6" }}
+              >
+                <div
+                  style={{
+                    ...INNER,
+                    padding: "24px 28px",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {renderTab(activeTab, tenantId, industryProfile)}
+                </div>
+              </div>
+            )}
 
-            {/* System footer — always pinned */}
+            {/* Footer — unchanged */}
             <div
               style={{
                 height: 28,

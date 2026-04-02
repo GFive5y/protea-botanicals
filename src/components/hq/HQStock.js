@@ -5444,7 +5444,7 @@ export default function HQStock() {
   );
 
   return (
-    <div style={{ fontFamily: T.font, color: T.ink700, maxWidth: "1100px" }}>
+    <div style={{ fontFamily: T.font, color: T.ink700 }}>
       <div
         style={{
           display: "flex",
