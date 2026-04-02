@@ -1,11 +1,11 @@
-// src/components/hq/SmartInventory.js — v1.0
+﻿// src/components/hq/SmartInventory.js â€” v1.0
 // Next-gen universal inventory screen for NuAi cannabis retail
-// Three views: Tile · List · Detail (Excel-style sortable/filterable table)
-// Smart cascading PillBox: Category → Sub-category → search
+// Three views: Tile Â· List Â· Detail (Excel-style sortable/filterable table)
+// Smart cascading PillBox: Category â†’ Sub-category â†’ search
 // Full CRUD: inline edit, save to Supabase, delete with confirm
 // Add New item with full field set
 //
-// LL-131: tenantId as prop only — never hardcoded
+// LL-131: tenantId as prop only â€” never hardcoded
 // LL-174: CATEGORY_LABELS, CATEGORY_ICONS from ProductWorlds.js
 // Rule 0F: tenant_id on every INSERT/UPDATE
 
@@ -22,7 +22,7 @@ import {
   CATEGORY_ICONS,
 } from "./ProductWorlds";
 
-// ── Design tokens ─────────────────────────────────────────────────────────
+// â”€â”€ Design tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const T = {
   bg: "#FAFAF9",
   white: "#ffffff",
@@ -52,12 +52,12 @@ const T = {
   shadowLg: "0 12px 40px rgba(0,0,0,0.14)",
 };
 
-// ── View modes ────────────────────────────────────────────────────────────
+// â”€â”€ View modes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const VIEW_TILE = "tile";
 const VIEW_LIST = "list";
 const VIEW_DETAIL = "detail";
 
-// ── Detail view column definitions ────────────────────────────────────────
+// â”€â”€ Detail view column definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DETAIL_COLS = [
   { key: "name", label: "Name", width: 220, sortable: true },
   { key: "category", label: "Category", width: 120, sortable: true },
@@ -133,26 +133,26 @@ const DETAIL_COLS = [
   { key: "_actions", label: "", width: 80, sortable: false, align: "center" },
 ];
 
-// ── Sub-category keywords (derived from name — no sub_category column) ───
-// ── 3-tier pill hierarchy: category → sub-group → brand/detail ───────────
+// â”€â”€ Sub-category keywords (derived from name â€” no sub_category column) â”€â”€â”€
+// â”€â”€ 3-tier pill hierarchy: category â†’ sub-group â†’ brand/detail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // keywords[] matched against item.name (case-insensitive)
-// ── World pill hierarchy v2 — grouped cascading drill-down ──────────────
+// â”€â”€ World pill hierarchy v2 â€” grouped cascading drill-down â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Each world has "groups" (Tier 2 headers) containing "subs" (Tier 3 items)
-// Click world → see group pills only
-// Click group → see sub-item pills (replaces group row, back arrow to return)
+// Click world â†’ see group pills only
+// Click group â†’ see sub-item pills (replaces group row, back arrow to return)
 // Keywords matched case-insensitively against item.name
 //
 // Two patterns:
-//   attribute-grouped  (Flower, Vapes, Edibles…) — groups are attributes
-//   brand-grouped      (Rolling Papers, Nutrients…) — groups are brands
+//   attribute-grouped  (Flower, Vapes, Ediblesâ€¦) â€” groups are attributes
+//   brand-grouped      (Rolling Papers, Nutrientsâ€¦) â€” groups are brands
 const PILL_HIERARCHY = {
-  // ── FLOWER — attribute-grouped: Cultivation > Grade > Strain > Weight ────
+  // â”€â”€ FLOWER â€” attribute-grouped: Cultivation > Grade > Strain > Weight â”€â”€â”€â”€
   flower: {
     groups: [
       {
         id: "cultivation",
         label: "Cultivation",
-        icon: "🌱",
+        icon: "ðŸŒ±",
         subs: [
           {
             id: "outdoor",
@@ -176,7 +176,7 @@ const PILL_HIERARCHY = {
       {
         id: "grade",
         label: "Grade",
-        icon: "⭐",
+        icon: "â­",
         subs: [
           { id: "budget", label: "Budget", keywords: ["budget"] },
           { id: "commercial", label: "Commercial", keywords: ["commercial"] },
@@ -191,7 +191,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain",
         label: "Strain Type",
-        icon: "🧬",
+        icon: "ðŸ§¬",
         subs: [
           { id: "indica", label: "Indica", keywords: ["indica"] },
           { id: "sativa", label: "Sativa", keywords: ["sativa"] },
@@ -203,7 +203,7 @@ const PILL_HIERARCHY = {
       {
         id: "weight",
         label: "Weight",
-        icon: "⚖️",
+        icon: "âš–ï¸",
         subs: [
           { id: "0.5g", label: "0.5g", keywords: ["0.5g"] },
           { id: "1g", label: "1g", keywords: ["1g"] },
@@ -218,13 +218,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── HASH & KIEF — attribute-grouped: Origin > Type ───────────────────────
+  // â”€â”€ HASH & KIEF â€” attribute-grouped: Origin > Type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   hash: {
     groups: [
       {
         id: "type",
         label: "Type",
-        icon: "🟤",
+        icon: "ðŸŸ¤",
         subs: [
           { id: "kief", label: "Kief", keywords: ["kief"] },
           { id: "bubble", label: "Bubble Hash", keywords: ["bubble"] },
@@ -241,7 +241,7 @@ const PILL_HIERARCHY = {
       {
         id: "origin",
         label: "Origin / Region",
-        icon: "🌍",
+        icon: "ðŸŒ",
         subs: [
           { id: "lebanese", label: "Lebanese", keywords: ["lebanese"] },
           { id: "moroccan", label: "Moroccan", keywords: ["moroccan"] },
@@ -257,7 +257,7 @@ const PILL_HIERARCHY = {
       {
         id: "weight_h",
         label: "Weight",
-        icon: "⚖️",
+        icon: "âš–ï¸",
         subs: [
           { id: "1g_h", label: "1g", keywords: ["1g"] },
           { id: "2g_h", label: "2g", keywords: ["2g"] },
@@ -268,13 +268,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── CONCENTRATES — attribute-grouped: Solvent type > Form > Weight ────────
+  // â”€â”€ CONCENTRATES â€” attribute-grouped: Solvent type > Form > Weight â”€â”€â”€â”€â”€â”€â”€â”€
   concentrate: {
     groups: [
       {
         id: "solventless",
         label: "Solventless (Premium)",
-        icon: "💎",
+        icon: "ðŸ’Ž",
         subs: [
           { id: "rosin", label: "Rosin", keywords: ["rosin"] },
           { id: "live_rosin", label: "Live Rosin", keywords: ["live rosin"] },
@@ -286,7 +286,7 @@ const PILL_HIERARCHY = {
       {
         id: "solvent",
         label: "Solvent-based",
-        icon: "🔬",
+        icon: "ðŸ”¬",
         subs: [
           { id: "shatter", label: "Shatter", keywords: ["shatter"] },
           { id: "badder", label: "Badder / Wax", keywords: ["badder", "wax"] },
@@ -300,7 +300,7 @@ const PILL_HIERARCHY = {
       {
         id: "distillate_type",
         label: "Distillate / Oil",
-        icon: "💧",
+        icon: "ðŸ’§",
         subs: [
           { id: "distillate", label: "Distillate", keywords: ["distillate"] },
           { id: "rso", label: "RSO", keywords: ["rso"] },
@@ -311,7 +311,7 @@ const PILL_HIERARCHY = {
       {
         id: "weight_c",
         label: "Weight",
-        icon: "⚖️",
+        icon: "âš–ï¸",
         subs: [
           { id: "0.5g_c", label: "0.5g", keywords: ["0.5g"] },
           { id: "1g_c", label: "1g", keywords: ["1g"] },
@@ -322,13 +322,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── VAPES — attribute-grouped: Device Type > Strain > Volume ─────────────
+  // â”€â”€ VAPES â€” attribute-grouped: Device Type > Strain > Volume â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   vape: {
     groups: [
       {
         id: "device",
         label: "Device Type",
-        icon: "💨",
+        icon: "ðŸ’¨",
         subs: [
           {
             id: "cartridge",
@@ -346,7 +346,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain_v",
         label: "Strain",
-        icon: "🧬",
+        icon: "ðŸ§¬",
         subs: [
           { id: "indica_v", label: "Indica", keywords: ["indica"] },
           { id: "sativa_v", label: "Sativa", keywords: ["sativa"] },
@@ -357,7 +357,7 @@ const PILL_HIERARCHY = {
       {
         id: "volume",
         label: "Volume",
-        icon: "📐",
+        icon: "ðŸ“",
         subs: [
           { id: "0.5ml", label: "0.5ml", keywords: ["0.5ml"] },
           { id: "1ml", label: "1ml", keywords: ["1ml"] },
@@ -367,13 +367,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── PRE-ROLLS — attribute-grouped: Format > Strain ───────────────────────
+  // â”€â”€ PRE-ROLLS â€” attribute-grouped: Format > Strain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   preroll: {
     groups: [
       {
         id: "format",
         label: "Format",
-        icon: "🚬",
+        icon: "ðŸš¬",
         subs: [
           { id: "single", label: "Singles", keywords: ["single"] },
           { id: "pack3", label: "3-Pack", keywords: ["3-pack", "3 pack"] },
@@ -385,7 +385,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain_pr",
         label: "Strain",
-        icon: "🧬",
+        icon: "ðŸ§¬",
         subs: [
           { id: "indica_pr", label: "Indica", keywords: ["indica"] },
           { id: "sativa_pr", label: "Sativa", keywords: ["sativa"] },
@@ -396,13 +396,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── EDIBLES — attribute-grouped: Format > Potency ────────────────────────
+  // â”€â”€ EDIBLES â€” attribute-grouped: Format > Potency â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   edible: {
     groups: [
       {
         id: "format_e",
         label: "Format",
-        icon: "🍬",
+        icon: "ðŸ¬",
         subs: [
           { id: "gummies", label: "Gummies", keywords: ["gumm"] },
           {
@@ -427,7 +427,7 @@ const PILL_HIERARCHY = {
       {
         id: "potency",
         label: "Potency / Dose",
-        icon: "💊",
+        icon: "ðŸ’Š",
         subs: [
           { id: "5mg", label: "5mg THC", keywords: ["5mg"] },
           { id: "10mg", label: "10mg THC", keywords: ["10mg"] },
@@ -440,13 +440,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── SEEDS & CLONES — attribute-grouped: Genetics > Strain ────────────────
+  // â”€â”€ SEEDS & CLONES â€” attribute-grouped: Genetics > Strain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   seeds: {
     groups: [
       {
         id: "genetics",
         label: "Genetics Type",
-        icon: "🌱",
+        icon: "ðŸŒ±",
         subs: [
           { id: "feminised", label: "Feminised", keywords: ["femin"] },
           { id: "autoflower", label: "Auto-Flower", keywords: ["auto"] },
@@ -459,7 +459,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain_s",
         label: "Strain",
-        icon: "🧬",
+        icon: "ðŸ§¬",
         subs: [
           { id: "indica_s", label: "Indica", keywords: ["indica"] },
           { id: "sativa_s", label: "Sativa", keywords: ["sativa"] },
@@ -469,7 +469,7 @@ const PILL_HIERARCHY = {
       {
         id: "pack_size",
         label: "Pack Size",
-        icon: "📦",
+        icon: "ðŸ“¦",
         subs: [
           {
             id: "1pk",
@@ -484,13 +484,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── SUBSTRATE — attribute-grouped: Type > Brand ──────────────────────────
+  // â”€â”€ SUBSTRATE â€” attribute-grouped: Type > Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   substrate: {
     groups: [
       {
         id: "medium",
         label: "Growing Medium",
-        icon: "🪨",
+        icon: "ðŸª¨",
         subs: [
           { id: "coco", label: "Coco Peat", keywords: ["coco peat", "coco"] },
           { id: "soil", label: "Potting Mix", keywords: ["mix", "universal"] },
@@ -507,7 +507,7 @@ const PILL_HIERARCHY = {
       {
         id: "brand_sub",
         label: "Brand",
-        icon: "🏷️",
+        icon: "ðŸ·ï¸",
         subs: [
           { id: "biobizz_s", label: "BioBizz", keywords: ["biobizz"] },
           { id: "plagron_s", label: "Plagron", keywords: ["plagron"] },
@@ -517,7 +517,7 @@ const PILL_HIERARCHY = {
       {
         id: "volume_sub",
         label: "Volume / Size",
-        icon: "📐",
+        icon: "ðŸ“",
         subs: [
           { id: "5L_s", label: "5L", keywords: ["5l"] },
           { id: "10L_s", label: "10L", keywords: ["10l"] },
@@ -528,22 +528,22 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── NUTRIENTS — brand-grouped: Brand > Product Line ──────────────────────
+  // â”€â”€ NUTRIENTS â€” brand-grouped: Brand > Product Line â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   nutrients: {
     groups: [
       {
         id: "biobizz",
         label: "BioBizz",
-        icon: "🌿",
+        icon: "ðŸŒ¿",
         subs: [
-          { id: "bb_all_mix", label: "All·Mix", keywords: ["all mix"] },
-          { id: "bb_light_mix", label: "Light·Mix", keywords: ["light mix"] },
-          { id: "bb_bio_grow", label: "Bio·Grow", keywords: ["bio-grow"] },
-          { id: "bb_bio_bloom", label: "Bio·Bloom", keywords: ["bio-bloom"] },
-          { id: "bb_top_max", label: "Top·Max", keywords: ["top-max"] },
+          { id: "bb_all_mix", label: "AllÂ·Mix", keywords: ["all mix"] },
+          { id: "bb_light_mix", label: "LightÂ·Mix", keywords: ["light mix"] },
+          { id: "bb_bio_grow", label: "BioÂ·Grow", keywords: ["bio-grow"] },
+          { id: "bb_bio_bloom", label: "BioÂ·Bloom", keywords: ["bio-bloom"] },
+          { id: "bb_top_max", label: "TopÂ·Max", keywords: ["top-max"] },
           {
             id: "bb_root_juice",
-            label: "Root·Juice",
+            label: "RootÂ·Juice",
             keywords: ["root-juice"],
           },
         ],
@@ -551,7 +551,7 @@ const PILL_HIERARCHY = {
       {
         id: "canna",
         label: "Canna",
-        icon: "🌿",
+        icon: "ðŸŒ¿",
         subs: [
           { id: "canna_coco_a", label: "Coco A", keywords: ["coco a"] },
           { id: "canna_coco_b", label: "Coco B", keywords: ["coco b"] },
@@ -563,7 +563,7 @@ const PILL_HIERARCHY = {
       {
         id: "plagron_n",
         label: "Plagron",
-        icon: "🌿",
+        icon: "ðŸŒ¿",
         subs: [
           { id: "plag_uni", label: "Universal Mix", keywords: ["universal"] },
         ],
@@ -571,7 +571,7 @@ const PILL_HIERARCHY = {
       {
         id: "generic_n",
         label: "Other / Generic",
-        icon: "🧪",
+        icon: "ðŸ§ª",
         subs: [
           { id: "calmag", label: "CalMag", keywords: ["calmag"] },
           { id: "ph_up", label: "pH Up", keywords: ["ph up"] },
@@ -581,13 +581,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── GROW EQUIPMENT — type-grouped: Category > Brand/Size ─────────────────
+  // â”€â”€ GROW EQUIPMENT â€” type-grouped: Category > Brand/Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   equipment: {
     groups: [
       {
         id: "lighting",
         label: "Lighting",
-        icon: "💡",
+        icon: "ðŸ’¡",
         subs: [
           {
             id: "led",
@@ -602,17 +602,17 @@ const PILL_HIERARCHY = {
       {
         id: "tents_e",
         label: "Grow Tents",
-        icon: "⛺",
+        icon: "â›º",
         subs: [
-          { id: "tent_60", label: "60×60cm", keywords: ["60x60"] },
-          { id: "tent_80", label: "80×80cm", keywords: ["80x80"] },
-          { id: "tent_120", label: "120×120cm", keywords: ["120x120"] },
+          { id: "tent_60", label: "60Ã—60cm", keywords: ["60x60"] },
+          { id: "tent_80", label: "80Ã—80cm", keywords: ["80x80"] },
+          { id: "tent_120", label: "120Ã—120cm", keywords: ["120x120"] },
         ],
       },
       {
         id: "airflow",
         label: "Air & Filtration",
-        icon: "💨",
+        icon: "ðŸ’¨",
         subs: [
           { id: "inline_fan", label: "Inline Fans", keywords: ["inline"] },
           { id: "clip_fan", label: "Clip Fans", keywords: ["clip fan"] },
@@ -626,7 +626,7 @@ const PILL_HIERARCHY = {
       {
         id: "containers",
         label: "Pots & Containers",
-        icon: "🪣",
+        icon: "ðŸª£",
         subs: [
           {
             id: "fab_5l",
@@ -653,7 +653,7 @@ const PILL_HIERARCHY = {
       {
         id: "meters_e",
         label: "Meters & Tools",
-        icon: "📊",
+        icon: "ðŸ“Š",
         subs: [
           { id: "ph_meter", label: "pH Meter", keywords: ["ph meter"] },
           { id: "ec_tds", label: "EC/TDS Meter", keywords: ["ec/tds"] },
@@ -668,7 +668,7 @@ const PILL_HIERARCHY = {
       {
         id: "propagation_e",
         label: "Propagation",
-        icon: "🌿",
+        icon: "ðŸŒ¿",
         subs: [
           { id: "heat_mat", label: "Heat Mats", keywords: ["heat mat"] },
           { id: "rockwool_e", label: "Rockwool", keywords: ["rockwool"] },
@@ -682,13 +682,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── WELLNESS — attribute-grouped: Category > Brand ───────────────────────
+  // â”€â”€ WELLNESS â€” attribute-grouped: Category > Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   wellness: {
     groups: [
       {
         id: "functional",
         label: "Functional Mushrooms",
-        icon: "🍄",
+        icon: "ðŸ„",
         subs: [
           { id: "lions_mane", label: "Lion's Mane", keywords: ["lions mane"] },
           { id: "reishi", label: "Reishi", keywords: ["reishi"] },
@@ -704,7 +704,7 @@ const PILL_HIERARCHY = {
       {
         id: "adaptogens_w",
         label: "Adaptogens",
-        icon: "🌿",
+        icon: "ðŸŒ¿",
         subs: [
           {
             id: "ashwagandha",
@@ -717,7 +717,7 @@ const PILL_HIERARCHY = {
       {
         id: "cbd_wellness",
         label: "CBD Products",
-        icon: "💚",
+        icon: "ðŸ’š",
         subs: [
           { id: "cbd_oil", label: "CBD Oil", keywords: ["cbd oil"] },
           { id: "cbd_capsule", label: "CBD Capsules", keywords: ["cbd cap"] },
@@ -731,7 +731,7 @@ const PILL_HIERARCHY = {
       {
         id: "pet_well",
         label: "Pet Products",
-        icon: "🐾",
+        icon: "ðŸ¾",
         subs: [
           { id: "pet_drops", label: "Pet Drops", keywords: ["pet", "dog"] },
           { id: "pet_treats", label: "Pet Treats", keywords: ["treat"] },
@@ -740,13 +740,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── ROLLING PAPERS — brand-grouped (brand is the primary navigator) ───────
+  // â”€â”€ ROLLING PAPERS â€” brand-grouped (brand is the primary navigator) â”€â”€â”€â”€â”€â”€â”€
   papers: {
     groups: [
       {
         id: "raw_brand",
         label: "RAW",
-        icon: "📄",
+        icon: "ðŸ“„",
         subs: [
           {
             id: "raw_classic_cones",
@@ -790,13 +790,13 @@ const PILL_HIERARCHY = {
       {
         id: "ocb_brand",
         label: "OCB",
-        icon: "📄",
+        icon: "ðŸ“„",
         subs: [{ id: "ocb_all", label: "OCB (all)", keywords: ["ocb"] }],
       },
       {
         id: "gizeh_brand",
         label: "Gizeh",
-        icon: "📄",
+        icon: "ðŸ“„",
         subs: [
           { id: "gizeh_cones", label: "Gizeh Cones", keywords: ["gizeh cone"] },
           { id: "gizeh_tips", label: "Gizeh Tips", keywords: ["gizeh tip"] },
@@ -806,7 +806,7 @@ const PILL_HIERARCHY = {
       {
         id: "elements_brand",
         label: "Elements",
-        icon: "📄",
+        icon: "ðŸ“„",
         subs: [
           {
             id: "elements_all",
@@ -818,7 +818,7 @@ const PILL_HIERARCHY = {
       {
         id: "generic_papers",
         label: "Other Brands",
-        icon: "📄",
+        icon: "ðŸ“„",
         subs: [
           { id: "hemp_wick", label: "Hemp Wick", keywords: ["hemp wick"] },
         ],
@@ -826,13 +826,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── ACCESSORIES — type-grouped: Category > Brand/Size ────────────────────
+  // â”€â”€ ACCESSORIES â€” type-grouped: Category > Brand/Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   accessories: {
     groups: [
       {
         id: "grinders_a",
         label: "Grinders",
-        icon: "⚙️",
+        icon: "âš™ï¸",
         subs: [
           {
             id: "grinder_2pc",
@@ -856,7 +856,7 @@ const PILL_HIERARCHY = {
       {
         id: "pipes_a",
         label: "Pipes & Bongs",
-        icon: "🪧",
+        icon: "ðŸª§",
         subs: [
           { id: "glass_pipe", label: "Glass Pipes", keywords: ["glass pipe"] },
           { id: "acrylic_pipe", label: "Acrylic", keywords: ["acrylic"] },
@@ -867,7 +867,7 @@ const PILL_HIERARCHY = {
       {
         id: "dab_a",
         label: "Dab Accessories",
-        icon: "💎",
+        icon: "ðŸ’Ž",
         subs: [
           {
             id: "dab_tool_set",
@@ -885,7 +885,7 @@ const PILL_HIERARCHY = {
       {
         id: "humidity_a",
         label: "Humidity Control",
-        icon: "💧",
+        icon: "ðŸ’§",
         subs: [
           {
             id: "bovida_58",
@@ -898,7 +898,7 @@ const PILL_HIERARCHY = {
       {
         id: "storage_a",
         label: "Storage",
-        icon: "🫙",
+        icon: "ðŸ«™",
         subs: [
           { id: "uv_jar_100", label: "UV Jar 100ml", keywords: ["100ml"] },
           { id: "uv_jar_250", label: "UV Jar 250ml", keywords: ["250ml"] },
@@ -907,13 +907,13 @@ const PILL_HIERARCHY = {
     ],
   },
 
-  // ── MERCH — type-grouped: Category > Size ────────────────────────────────
+  // â”€â”€ MERCH â€” type-grouped: Category > Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   merch: {
     groups: [
       {
         id: "clothing_m",
         label: "Clothing",
-        icon: "👕",
+        icon: "ðŸ‘•",
         subs: [
           {
             id: "tshirt_m",
@@ -927,7 +927,7 @@ const PILL_HIERARCHY = {
       {
         id: "size_m",
         label: "Size",
-        icon: "📐",
+        icon: "ðŸ“",
         subs: [
           { id: "small_m", label: "Small", keywords: ["small"] },
           { id: "medium_m", label: "Medium", keywords: ["medium"] },
@@ -939,7 +939,7 @@ const PILL_HIERARCHY = {
   },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const zar = (n) => `R${(Number(n) || 0).toFixed(2)}`;
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 const margin = (sell, cost) => {
@@ -954,7 +954,7 @@ function marginColor(m) {
   return T.danger;
 }
 
-// ── Field definitions for edit panel ─────────────────────────────────────
+// â”€â”€ Field definitions for edit panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const EDIT_FIELDS = [
   { key: "name", label: "Name", type: "text", required: true },
   {
@@ -994,17 +994,17 @@ const EDIT_FIELDS = [
   { key: "image_url", label: "Image URL", type: "text" },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function SmartInventory({ tenantId }) {
-  // ── Data state ──────────────────────────────────────────────────────────
+  // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ── View + filter state ─────────────────────────────────────────────────
+  // â”€â”€ View + filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [viewMode, setViewMode] = useState(VIEW_DETAIL);
   const [pillExpanded, setPillExpanded] = useState(false);
   const [tileSize, setTileSize] = useState("M");
@@ -1013,16 +1013,16 @@ export default function SmartInventory({ tenantId }) {
   const [subFilter, setSubFilter] = useState(null); // tier-3 item  (e.g. "indoor")
   const [search, setSearch] = useState("");
 
-  // ── Sort state (detail view) ─────────────────────────────────────────────
+  // â”€â”€ Sort state (detail view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
   const [colFilters, setColFilters] = useState({}); // {col: value}
   const [filterRowOpen, setFilterRowOpen] = useState(false);
   const [sortByIssues, setSortByIssues] = useState(false); // SC-03: issues-first sort
-  // Column visibility — persisted in sessionStorage
+  // Column visibility â€” persisted in localStorage
   const [hiddenCols, setHiddenCols] = useState(() => {
     try {
-      const s = sessionStorage.getItem("nuai_detail_hidden_cols");
+      const s = localStorage.getItem("nuai_detail_hidden_cols");
       return s
         ? new Set(JSON.parse(s))
         : new Set(["sku", "reorder_level", "max_stock_level", "supplier"]);
@@ -1033,7 +1033,7 @@ export default function SmartInventory({ tenantId }) {
   const [colPickerOpen, setColPickerOpen] = useState(false);
   const colPickerRef = useRef(null);
 
-  // ── Edit/delete state ─────────────────────────────────────────────────────
+  // â”€â”€ Edit/delete state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // eslint-disable-next-line no-unused-vars -- kept: closeEdit references setEditItem/setEditDraft
   const [editItem, setEditItem] = useState(null);
   // eslint-disable-next-line no-unused-vars -- kept: ItemForm still references editDraft in EditPanel
@@ -1044,10 +1044,10 @@ export default function SmartInventory({ tenantId }) {
   const [saveError, setSaveError] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
 
-  // ── SC-02: Item detail panel state ──────────────────────────────────────────
+  // â”€â”€ SC-02: Item detail panel state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [panelItem, setPanelItem] = useState(null); // item whose panel is open
 
-  // ── Add / Edit — StockItemModal pattern (same as HQStock) ────────────────
+  // â”€â”€ Add / Edit â€” StockItemModal pattern (same as HQStock) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [modalItem, setModalItem] = useState(undefined); // undefined=closed, null=new, obj=edit
   const [modalDefaults, setModalDefaults] = useState({});
   const [modalSaving, setModalSaving] = useState(false);
@@ -1055,7 +1055,7 @@ export default function SmartInventory({ tenantId }) {
 
   const searchRef = useRef(null);
 
-  // ── Load ────────────────────────────────────────────────────────────────
+  // â”€â”€ Load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
@@ -1083,13 +1083,13 @@ export default function SmartInventory({ tenantId }) {
     load();
   }, [load]);
 
-  // ── SC-01: Action panel state ────────────────────────────────────────────
+  // â”€â”€ SC-01: Action panel state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [activePanel, setActivePanel] = useState(null); // 'soldout'|'reorder'|'noprice'
   const [noPriceDraft, setNoPriceDraft] = useState({});
   const [noPriceFixed, setNoPriceFixed] = useState(new Set());
   const [noPriceSaving, setNoPriceSaving] = useState(new Set());
   const [flaggedReorder, setFlaggedReorder] = useState(new Set());
-  // On Order — marks a sold-out item as awaiting delivery (handoff to WP-REORDER)
+  // On Order â€” marks a sold-out item as awaiting delivery (handoff to WP-REORDER)
   const [onOrderSet, setOnOrderSet] = useState(new Set());
   const [onOrderSaving, setOnOrderSaving] = useState(new Set());
 
@@ -1100,7 +1100,7 @@ export default function SmartInventory({ tenantId }) {
     setSearch("");
   }, []);
 
-  // ── Global dismiss — Escape + outside-click for dropdowns/panels ─────────
+  // â”€â”€ Global dismiss â€” Escape + outside-click for dropdowns/panels â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
@@ -1160,17 +1160,17 @@ export default function SmartInventory({ tenantId }) {
     selectCat,
   ]);
 
-  // ── Filtered + sorted items ─────────────────────────────────────────────
+  // â”€â”€ Filtered + sorted items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
     let list = items;
 
-    // World filter — use itemMatchesWorld for all 14 worlds
+    // World filter â€” use itemMatchesWorld for all 14 worlds
     if (catFilter !== "all") {
       const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
       if (world) list = list.filter((i) => itemMatchesWorld(i, world));
     }
 
-    // Sub-type filter — grouped hierarchy: groupFilter selects the group, subFilter the item
+    // Sub-type filter â€” grouped hierarchy: groupFilter selects the group, subFilter the item
     if (subFilter && groupFilter && PILL_HIERARCHY[catFilter]) {
       const group = PILL_HIERARCHY[catFilter].groups?.find(
         (g) => g.id === groupFilter,
@@ -1252,7 +1252,7 @@ export default function SmartInventory({ tenantId }) {
     sortByIssues,
   ]);
 
-  // ── Sort column toggle ──────────────────────────────────────────────────
+  // â”€â”€ Sort column toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function handleSort(key) {
     if (!key || key === "_actions") return;
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -1262,7 +1262,7 @@ export default function SmartInventory({ tenantId }) {
     }
   }
 
-  // ── SC-01: Global KPI stats (always from full items array) ───────────────
+  // â”€â”€ SC-01: Global KPI stats (always from full items array) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const gTotal = items.length;
   const gActive = items.filter((i) => i.is_active).length;
   const gSoldOut = items.filter((i) => (i.quantity_on_hand || 0) === 0).length;
@@ -1280,7 +1280,7 @@ export default function SmartInventory({ tenantId }) {
     (i) => !i.sell_price || i.sell_price <= 0,
   ).length;
 
-  // ── SC-01: Filtered KPI stats (from current pill/search filter) ──────────
+  // â”€â”€ SC-01: Filtered KPI stats (from current pill/search filter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fTotal = filtered.length;
   const fActive = filtered.filter((i) => i.is_active).length;
   const fSoldOut = filtered.filter(
@@ -1302,7 +1302,7 @@ export default function SmartInventory({ tenantId }) {
   const isFiltered =
     catFilter !== "all" || groupFilter || subFilter || search.trim();
 
-  // ── SC-01: Panel item lists ──────────────────────────────────────────────
+  // â”€â”€ SC-01: Panel item lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const soldOutItems = items
     .filter((i) => (i.quantity_on_hand || 0) === 0)
     .sort(
@@ -1318,7 +1318,7 @@ export default function SmartInventory({ tenantId }) {
   );
   const noPriceItems = items.filter((i) => !i.sell_price || i.sell_price <= 0);
 
-  // ── SC-01: Save no-price fix ─────────────────────────────────────────────
+  // â”€â”€ SC-01: Save no-price fix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const saveNoPrice = async (itemId) => {
     const price = parseFloat(noPriceDraft[itemId]);
     if (!price || price <= 0) return;
@@ -1335,10 +1335,10 @@ export default function SmartInventory({ tenantId }) {
     });
     load();
     const item = items.find((i) => i.id === itemId);
-    toast.success(`Sell price set${item ? ` — R${price}` : ""}`);
+    toast.success(`Sell price set${item ? ` â€” R${price}` : ""}`);
   };
 
-  // ── SC-02: Refresh panel item after in-panel save ───────────────────────────
+  // â”€â”€ SC-02: Refresh panel item after in-panel save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePanelRefresh = async () => {
     load();
     if (panelItem) {
@@ -1351,7 +1351,7 @@ export default function SmartInventory({ tenantId }) {
     }
   };
 
-  // ── SC-01: Flag item for reorder ─────────────────────────────────────────
+  // â”€â”€ SC-01: Flag item for reorder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const flagForReorder = async (itemId) => {
     try {
       await supabase
@@ -1360,7 +1360,7 @@ export default function SmartInventory({ tenantId }) {
         .eq("id", itemId);
     } catch {}
     setFlaggedReorder((prev) => new Set([...prev, itemId]));
-    toast.info("⚑ Flagged for reorder", {
+    toast.info("âš‘ Flagged for reorder", {
       duration: 5000,
       undo: async () => {
         try {
@@ -1381,7 +1381,7 @@ export default function SmartInventory({ tenantId }) {
     });
   };
 
-  // ── SC-01: Mark item as On Order (PO placed, awaiting delivery) ──────────
+  // â”€â”€ SC-01: Mark item as On Order (PO placed, awaiting delivery) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const markOnOrder = async (itemId) => {
     setOnOrderSaving((prev) => new Set([...prev, itemId]));
     try {
@@ -1389,14 +1389,14 @@ export default function SmartInventory({ tenantId }) {
         .from("inventory_items")
         .update({ on_order: true, updated_at: new Date().toISOString() })
         .eq("id", itemId);
-    } catch {} // graceful — on_order column may not exist yet (run SQL migration)
+    } catch {} // graceful â€” on_order column may not exist yet (run SQL migration)
     setOnOrderSet((prev) => new Set([...prev, itemId]));
     setOnOrderSaving((prev) => {
       const n = new Set(prev);
       n.delete(itemId);
       return n;
     });
-    toast.info("📦 Marked as On Order");
+    toast.info("ðŸ“¦ Marked as On Order");
   };
 
   // Column visibility toggle
@@ -1406,7 +1406,7 @@ export default function SmartInventory({ tenantId }) {
       if (next.has(key)) next.delete(key);
       else next.add(key);
       try {
-        sessionStorage.setItem(
+        localStorage.setItem(
           "nuai_detail_hidden_cols",
           JSON.stringify([...next]),
         );
@@ -1415,7 +1415,7 @@ export default function SmartInventory({ tenantId }) {
     });
   }, []);
 
-  // ── Edit panel — now routed through StockItemModal ──────────────────────
+  // â”€â”€ Edit panel â€” now routed through StockItemModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function openEdit(item) {
     setModalDefaults({});
     setModalItem(item); // non-null = editing existing item
@@ -1448,13 +1448,13 @@ export default function SmartInventory({ tenantId }) {
     });
   }
 
-  // ── Add item — context-aware world routing (same pattern as HQStock) ────
+  // â”€â”€ Add item â€” context-aware world routing (same pattern as HQStock) â”€â”€â”€â”€
   function openAdd() {
     if (catFilter === "all") {
-      // No world selected — show world picker
+      // No world selected â€” show world picker
       setShowWorldPicker(true);
     } else {
-      // World is active — open StockItemModal with world + pill context pre-set
+      // World is active â€” open StockItemModal with world + pill context pre-set
       const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
       // Map subFilter to the right field key for StockItemModal
       const subcatKey = subFilter || "";
@@ -1468,7 +1468,7 @@ export default function SmartInventory({ tenantId }) {
     }
   }
 
-  // ── Save handler for StockItemModal (insert or update) ──────────────────
+  // â”€â”€ Save handler for StockItemModal (insert or update) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleModalSave = async (payload) => {
     setModalSaving(true);
     try {
@@ -1491,13 +1491,13 @@ export default function SmartInventory({ tenantId }) {
       load();
     } catch (err) {
       console.error("Save error:", err);
-      toast.error("Save failed — check your connection");
+      toast.error("Save failed â€” check your connection");
     } finally {
       setModalSaving(false);
     }
   };
 
-  // ── Quick inline toggle (detail view) ───────────────────────────────────
+  // â”€â”€ Quick inline toggle (detail view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function exportCSV() {
     const visibleCols = DETAIL_COLS.filter(
       (c) => c.key !== "_actions" && !hiddenCols.has(c.key),
@@ -1530,7 +1530,7 @@ export default function SmartInventory({ tenantId }) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${filtered.length} items → ${filename}`);
+    toast.success(`Exported ${filtered.length} items â†’ ${filename}`);
   }
 
   async function quickToggle(item, field) {
@@ -1558,7 +1558,7 @@ export default function SmartInventory({ tenantId }) {
     }
   }
 
-  // ── Pill cascade ────────────────────────────────────────────────────────
+  // â”€â”€ Pill cascade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function selectGroup(groupId) {
     setGroupFilter(groupId);
   }
@@ -1570,11 +1570,11 @@ export default function SmartInventory({ tenantId }) {
   // eslint-disable-next-line no-unused-vars -- kept for future brand-level tier 4
   function selectBrand(brandId) {}
 
-  // ── Stats: moved to gTotal/gActive/etc. above (SC-01) ───────────────────
+  // â”€â”€ Stats: moved to gTotal/gActive/etc. above (SC-01) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div
       className="nuai-catalog"
@@ -1603,7 +1603,7 @@ export default function SmartInventory({ tenantId }) {
         .nuai-catalog button:disabled      { cursor: not-allowed; opacity: 0.5; }
       `}</style>
 
-      {/* ── TOP TOOLBAR ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ TOP TOOLBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         style={{
           background: T.white,
@@ -1623,16 +1623,16 @@ export default function SmartInventory({ tenantId }) {
           }}
         >
           <span style={{ fontWeight: 800, fontSize: 17, color: T.ink900 }}>
-            📦 Inventory
+            ðŸ“¦ Inventory
           </span>
 
-          {/* Search — promoted to toolbar level */}
+          {/* Search â€” promoted to toolbar level */}
           <div style={{ marginLeft: 12 }}>
             <input
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search items…"
+              placeholder="Search itemsâ€¦"
               style={{
                 padding: "5px 12px",
                 border: `1.5px solid ${search ? T.accent : T.border}`,
@@ -1696,7 +1696,7 @@ export default function SmartInventory({ tenantId }) {
               </div>
             )}
 
-            {/* Filters toggle — visible in all view modes */}
+            {/* Filters toggle â€” visible in all view modes */}
             <button
               onClick={() => setFilterRowOpen((v) => !v)}
               style={btnStyle(
@@ -1706,7 +1706,7 @@ export default function SmartInventory({ tenantId }) {
                 T,
               )}
             >
-              🔽 Filters{sortByIssues ? " ·⚠" : ""}
+              ðŸ”½ Filters{sortByIssues ? " Â·âš " : ""}
             </button>
 
             {/* Export CSV (detail only) */}
@@ -1716,7 +1716,7 @@ export default function SmartInventory({ tenantId }) {
                 style={btnStyle(T.white, T.ink500, T.border, T)}
                 title="Export visible columns to CSV"
               >
-                ↓ CSV
+                â†“ CSV
               </button>
             )}
 
@@ -1854,7 +1854,7 @@ export default function SmartInventory({ tenantId }) {
                         setHiddenCols((prev) => {
                           const next = new Set([...prev, ...emptyKeys]);
                           try {
-                            sessionStorage.setItem(
+                            localStorage.setItem(
                               "nuai_detail_hidden_cols",
                               JSON.stringify([...next]),
                             );
@@ -1882,7 +1882,7 @@ export default function SmartInventory({ tenantId }) {
                       onClick={() => {
                         setHiddenCols(new Set());
                         try {
-                          sessionStorage.removeItem("nuai_detail_hidden_cols");
+                          localStorage.removeItem("nuai_detail_hidden_cols");
                         } catch {}
                       }}
                       style={{
@@ -1910,7 +1910,7 @@ export default function SmartInventory({ tenantId }) {
               onClick={load}
               style={btnStyle(T.white, T.ink500, T.border, T)}
             >
-              ↺
+              â†º
             </button>
 
             {/* Add new */}
@@ -1923,7 +1923,7 @@ export default function SmartInventory({ tenantId }) {
           </div>
         </div>
 
-        {/* Row 1.5: SC-01 KPI Cards — adaptive 6-card grid */}
+        {/* Row 1.5: SC-01 KPI Cards â€” adaptive 6-card grid */}
         <div
           style={{
             display: "flex",
@@ -2078,14 +2078,14 @@ export default function SmartInventory({ tenantId }) {
                     opacity: 0.5,
                   }}
                 >
-                  ›
+                  â€º
                 </span>
               )}
             </div>
           ))}
         </div>
 
-        {/* SC-03: Filters panel — issues-first toggle + (detail) column filter notice */}
+        {/* SC-03: Filters panel â€” issues-first toggle + (detail) column filter notice */}
         {filterRowOpen && (
           <div
             style={{
@@ -2114,7 +2114,7 @@ export default function SmartInventory({ tenantId }) {
                 onChange={() => setSortByIssues((v) => !v)}
                 style={{ accentColor: T.accent, width: 14, height: 14 }}
               />
-              <span>⚠ Issues first</span>
+              <span>âš  Issues first</span>
               <span style={{ fontSize: 10.5, color: T.ink300 }}>
                 sold out + low stock at top
               </span>
@@ -2131,7 +2131,7 @@ export default function SmartInventory({ tenantId }) {
                   border: `1px solid ${T.amber}40`,
                 }}
               >
-                ⚠ Active — {gSoldOut + gBelowReorder} items flagged
+                âš  Active â€” {gSoldOut + gBelowReorder} items flagged
               </span>
             )}
           </div>
@@ -2153,7 +2153,7 @@ export default function SmartInventory({ tenantId }) {
         />
       </div>
 
-      {/* ── CONTENT AREA ────────────────────────────────────────────────── */}
+      {/* â”€â”€ CONTENT AREA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         style={{
           flex: 1,
@@ -2162,7 +2162,7 @@ export default function SmartInventory({ tenantId }) {
           position: "relative",
         }}
       >
-        {/* Main view — detail mode clips to viewport, other modes scroll freely */}
+        {/* Main view â€” detail mode clips to viewport, other modes scroll freely */}
         <div
           style={{
             flex: 1,
@@ -2223,7 +2223,7 @@ export default function SmartInventory({ tenantId }) {
         </div>
       </div>
 
-      {/* ── SC-01 ACTION PANELS ──────────────────────────────────────────── */}
+      {/* â”€â”€ SC-01 ACTION PANELS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {activePanel && (
         <div
           onClick={() => setActivePanel(null)}
@@ -2263,11 +2263,11 @@ export default function SmartInventory({ tenantId }) {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: T.ink900 }}>
                   {activePanel === "soldout" &&
-                    `Sold Out · ${soldOutItems.length} items`}
+                    `Sold Out Â· ${soldOutItems.length} items`}
                   {activePanel === "reorder" &&
-                    `Below Reorder · ${belowReorderItems.length} items`}
+                    `Below Reorder Â· ${belowReorderItems.length} items`}
                   {activePanel === "noprice" &&
-                    `No Sell Price · ${noPriceItems.length} items`}
+                    `No Sell Price Â· ${noPriceItems.length} items`}
                 </div>
                 <div style={{ fontSize: 11, color: T.ink400, marginTop: 3 }}>
                   {activePanel === "soldout" &&
@@ -2289,13 +2289,13 @@ export default function SmartInventory({ tenantId }) {
                   lineHeight: 1,
                 }}
               >
-                ×
+                Ã—
               </button>
             </div>
 
             {/* Panel body */}
             <div style={{ flex: 1, overflowY: "auto" }}>
-              {/* ── SOLD OUT PANEL ── */}
+              {/* â”€â”€ SOLD OUT PANEL â”€â”€ */}
               {activePanel === "soldout" && (
                 <>
                   {soldOutItems.length === 0 ? (
@@ -2307,7 +2307,7 @@ export default function SmartInventory({ tenantId }) {
                         fontSize: 13,
                       }}
                     >
-                      🎉 No sold-out items
+                      ðŸŽ‰ No sold-out items
                     </div>
                   ) : (
                     soldOutItems.map((item) => {
@@ -2330,7 +2330,7 @@ export default function SmartInventory({ tenantId }) {
                           }}
                         >
                           <span style={{ fontSize: 18 }}>
-                            {world?.icon || "📦"}
+                            {world?.icon || "ðŸ“¦"}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div
@@ -2353,9 +2353,9 @@ export default function SmartInventory({ tenantId }) {
                               }}
                             >
                               Sell:{" "}
-                              {item.sell_price ? `R${item.sell_price}` : "—"}
+                              {item.sell_price ? `R${item.sell_price}` : "â€”"}
                               {item.sell_price && item.weighted_avg_cost
-                                ? ` · Cost: R${item.weighted_avg_cost}`
+                                ? ` Â· Cost: R${item.weighted_avg_cost}`
                                 : ""}
                             </div>
                           </div>
@@ -2373,7 +2373,7 @@ export default function SmartInventory({ tenantId }) {
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              📦 On Order
+                              ðŸ“¦ On Order
                             </span>
                           ) : (
                             <div
@@ -2397,7 +2397,7 @@ export default function SmartInventory({ tenantId }) {
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                {isSavingOrder ? "…" : "On Order"}
+                                {isSavingOrder ? "â€¦" : "On Order"}
                               </button>
                               <button
                                 onClick={() => openEdit(item)}
@@ -2425,7 +2425,7 @@ export default function SmartInventory({ tenantId }) {
                 </>
               )}
 
-              {/* ── BELOW REORDER PANEL ── */}
+              {/* â”€â”€ BELOW REORDER PANEL â”€â”€ */}
               {activePanel === "reorder" && (
                 <>
                   {belowReorderItems.length === 0 ? (
@@ -2437,7 +2437,7 @@ export default function SmartInventory({ tenantId }) {
                         fontSize: 13,
                       }}
                     >
-                      ✓ All items above reorder level
+                      âœ“ All items above reorder level
                     </div>
                   ) : (
                     belowReorderItems.map((item) => {
@@ -2457,7 +2457,7 @@ export default function SmartInventory({ tenantId }) {
                           }}
                         >
                           <span style={{ fontSize: 18 }}>
-                            {world?.icon || "📦"}
+                            {world?.icon || "ðŸ“¦"}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div
@@ -2478,7 +2478,7 @@ export default function SmartInventory({ tenantId }) {
                               </span>
                               <span style={{ color: T.ink400 }}>
                                 {" "}
-                                · reorder at {item.reorder_level}
+                                Â· reorder at {item.reorder_level}
                               </span>
                             </div>
                           </div>
@@ -2500,7 +2500,7 @@ export default function SmartInventory({ tenantId }) {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {isFlagged ? "✓ Flagged" : "⚑ Flag for Reorder"}
+                            {isFlagged ? "âœ“ Flagged" : "âš‘ Flag for Reorder"}
                           </button>
                         </div>
                       );
@@ -2516,13 +2516,13 @@ export default function SmartInventory({ tenantId }) {
                       }}
                     >
                       Flagged items are grouped by supplier in the Reorder Queue
-                      (WP-REORDER — coming soon)
+                      (WP-REORDER â€” coming soon)
                     </div>
                   )}
                 </>
               )}
 
-              {/* ── NO PRICE PANEL ── */}
+              {/* â”€â”€ NO PRICE PANEL â”€â”€ */}
               {activePanel === "noprice" && (
                 <>
                   {noPriceItems.length === 0 ? (
@@ -2534,7 +2534,7 @@ export default function SmartInventory({ tenantId }) {
                         fontSize: 13,
                       }}
                     >
-                      ✓ All items have a sell price
+                      âœ“ All items have a sell price
                     </div>
                   ) : (
                     noPriceItems.map((item) => {
@@ -2557,7 +2557,7 @@ export default function SmartInventory({ tenantId }) {
                           }}
                         >
                           <span style={{ fontSize: 18 }}>
-                            {world?.icon || "📦"}
+                            {world?.icon || "ðŸ“¦"}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div
@@ -2593,7 +2593,7 @@ export default function SmartInventory({ tenantId }) {
                                 flexShrink: 0,
                               }}
                             >
-                              ✓ Fixed
+                              âœ“ Fixed
                             </span>
                           ) : (
                             <div
@@ -2664,7 +2664,7 @@ export default function SmartInventory({ tenantId }) {
                                   fontFamily: T.font,
                                 }}
                               >
-                                {isSaving ? "…" : "Save"}
+                                {isSaving ? "â€¦" : "Save"}
                               </button>
                             </div>
                           )}
@@ -2679,7 +2679,7 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* ── WORLD PICKER — shown when Add Item clicked from "All Products" ── */}
+      {/* â”€â”€ WORLD PICKER â€” shown when Add Item clicked from "All Products" â”€â”€ */}
       {showWorldPicker && (
         <div
           onClick={() => setShowWorldPicker(false)}
@@ -2725,7 +2725,7 @@ export default function SmartInventory({ tenantId }) {
                   What are you adding?
                 </div>
                 <div style={{ fontSize: 12, color: T.ink400 }}>
-                  Choose a product type — the form adapts with the right fields
+                  Choose a product type â€” the form adapts with the right fields
                 </div>
               </div>
               <button
@@ -2738,7 +2738,7 @@ export default function SmartInventory({ tenantId }) {
                   color: T.ink400,
                 }}
               >
-                ×
+                Ã—
               </button>
             </div>
             <div
@@ -2780,7 +2780,7 @@ export default function SmartInventory({ tenantId }) {
                   }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 6 }}>
-                    {world.icon || "📦"}
+                    {world.icon || "ðŸ“¦"}
                   </div>
                   <div
                     style={{
@@ -2804,20 +2804,20 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* ── SC-02: STOCK ITEM PANEL — slide-in on single click ──────────────── */}
+      {/* â”€â”€ SC-02: STOCK ITEM PANEL â€” slide-in on single click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {panelItem && (
         <StockItemPanel
           item={panelItem}
           onClose={() => setPanelItem(null)}
           onEdit={() => {
-            // Opens StockItemModal on top of panel — panel stays behind
+            // Opens StockItemModal on top of panel â€” panel stays behind
             openEdit(panelItem);
           }}
           onRefresh={handlePanelRefresh}
         />
       )}
 
-      {/* ── STOCKITEMMODAL — world-specific add / edit form ──────────────── */}
+      {/* â”€â”€ STOCKITEMMODAL â€” world-specific add / edit form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {/* z-index wrapper ensures modal appears above StockItemPanel (z:1051) */}
       {modalItem !== undefined && (
         <div
@@ -2860,7 +2860,7 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* ── DELETE CONFIRM ──────────────────────────────────────────────── */}
+      {/* â”€â”€ DELETE CONFIRM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {delConfirm && (
         <Modal
           onClose={() => setDelConfirm(null)}
@@ -2893,10 +2893,10 @@ export default function SmartInventory({ tenantId }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // SMART PILL BOX
-// Category pills → sub-category pills cascade → search bar
-// ─────────────────────────────────────────────────────────────────────────
+// Category pills â†’ sub-category pills cascade â†’ search bar
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SmartPillBox({
   catFilter,
   groupFilter,
@@ -2910,7 +2910,7 @@ function SmartPillBox({
   onExpandPills,
   onCollapsePills,
 }) {
-  // ── Live counts ──────────────────────────────────────────────────────────
+  // â”€â”€ Live counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const counts = useMemo(() => {
     const m = { all: items.length };
     PRODUCT_WORLDS.filter((w) => w.id !== "all").forEach((w) => {
@@ -3015,7 +3015,7 @@ function SmartPillBox({
         .nuai-pill-row { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* ── MAIN PILL ROW ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ MAIN PILL ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         className="nuai-pill-row"
         style={{
@@ -3027,7 +3027,7 @@ function SmartPillBox({
           alignItems: "center",
         }}
       >
-        {/* All — always visible, always resets */}
+        {/* All â€” always visible, always resets */}
         <button
           onClick={() => {
             onSelectCat("all");
@@ -3035,7 +3035,7 @@ function SmartPillBox({
           }}
           style={pillBase(navLevel === 0, T.accent, T)}
         >
-          <span>●</span>
+          <span>â—</span>
           <span>All</span>
           <span style={countBadge(counts.all, navLevel === 0)}>
             {counts.all}
@@ -3045,10 +3045,10 @@ function SmartPillBox({
         {/* Level 0: Categories gateway pill */}
         {navLevel === 0 && (
           <button onClick={onExpandPills} style={pillBase(false, T.accent, T)}>
-            <span>🗂</span>
+            <span>ðŸ—‚</span>
             <span>Categories</span>
             <span style={countBadge(14, false)}>14</span>
-            <span style={{ fontSize: 8, opacity: 0.4 }}>▼</span>
+            <span style={{ fontSize: 8, opacity: 0.4 }}>â–¼</span>
           </button>
         )}
 
@@ -3060,7 +3060,7 @@ function SmartPillBox({
               style={navBtnStyle}
               title="Back to home"
             >
-              ‹ Back
+              â€¹ Back
             </button>
             {PRODUCT_WORLDS.filter((w) => w.id !== "all").map((w) => {
               const cnt = counts[w.id] || 0;
@@ -3070,7 +3070,7 @@ function SmartPillBox({
                   onClick={() => onSelectCat(w.id)}
                   style={pillBase(false, T.accent, T)}
                 >
-                  <span>{w.icon || "📦"}</span>
+                  <span>{w.icon || "ðŸ“¦"}</span>
                   <span>{w.label}</span>
                   <span style={countBadge(cnt, false)}>{cnt}</span>
                 </button>
@@ -3093,12 +3093,12 @@ function SmartPillBox({
                   style={navBtnStyle}
                   title="Back to categories"
                 >
-                  ‹ Back
+                  â€¹ Back
                 </button>
                 <button
                   style={{ ...pillBase(true, T.accent, T), cursor: "default" }}
                 >
-                  <span>{world?.icon || "📦"}</span>
+                  <span>{world?.icon || "ðŸ“¦"}</span>
                   <span>{world?.label || catFilter}</span>
                   <span style={countBadge(counts[catFilter] || 0, true)}>
                     {counts[catFilter] || 0}
@@ -3108,7 +3108,7 @@ function SmartPillBox({
             );
           })()}
 
-        {/* × close — right side */}
+        {/* Ã— close â€” right side */}
         {navLevel > 0 && (
           <button
             onClick={() => {
@@ -3124,14 +3124,14 @@ function SmartPillBox({
               border: `1.5px solid ${T.border}`,
               marginLeft: "auto",
             }}
-            title="Close — back to All"
+            title="Close â€” back to All"
           >
-            ×
+            Ã—
           </button>
         )}
       </div>
 
-      {/* ── TIER 2: All group subs shown inline when a world is selected ── */}
+      {/* â”€â”€ TIER 2: All group subs shown inline when a world is selected â”€â”€ */}
       {navLevel === 2 && activeGroups.length > 0 && (
         <div
           style={{
@@ -3234,7 +3234,7 @@ function SmartPillBox({
         </div>
       )}
 
-      {/* ── Active filter chip ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Active filter chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {subFilter && groupFilter && (
         <div
           style={{
@@ -3261,7 +3261,7 @@ function SmartPillBox({
             }}
           >
             {activeGroups.find((g) => g.id === groupFilter)?.icon}{" "}
-            {activeGroups.find((g) => g.id === groupFilter)?.label} →{" "}
+            {activeGroups.find((g) => g.id === groupFilter)?.label} â†’{" "}
             {
               activeGroups
                 .find((g) => g.id === groupFilter)
@@ -3282,7 +3282,7 @@ function SmartPillBox({
                 opacity: 0.6,
               }}
             >
-              ×
+              Ã—
             </button>
           </span>
         </div>
@@ -3323,7 +3323,7 @@ function StockChip({ type, T }) {
   );
 }
 
-// ── Smart tag extractor (SC-05) ──────────────────────────────────────────────
+// â”€â”€ Smart tag extractor (SC-05) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getSmartTags(item) {
   const vv = (item.variant_value || "").trim();
   const brand = (item.brand || "").trim();
@@ -3422,7 +3422,7 @@ function TileView({
               }}
             >
               <span style={{ fontSize: 16 }}>
-                {CATEGORY_ICONS[item.category] || "📦"}
+                {CATEGORY_ICONS[item.category] || "ðŸ“¦"}
               </span>
               {(() => {
                 const w = PRODUCT_WORLDS.find(
@@ -3443,7 +3443,7 @@ function TileView({
                 );
               })()}
               {item.is_featured && (
-                <span style={{ marginLeft: "auto", fontSize: 10 }}>★</span>
+                <span style={{ marginLeft: "auto", fontSize: 10 }}>â˜…</span>
               )}
               {soldOut && (
                 <span style={{ marginLeft: item.is_featured ? 4 : "auto" }}>
@@ -3457,7 +3457,7 @@ function TileView({
               )}
             </div>
 
-            {/* ⋯ hover action trigger */}
+            {/* â‹¯ hover action trigger */}
             {isHovered && (
               <button
                 onClick={(e) => {
@@ -3482,11 +3482,11 @@ function TileView({
                   letterSpacing: 1,
                 }}
               >
-                ···
+                Â·Â·Â·
               </button>
             )}
 
-            {/* Action footer — opens on ··· click */}
+            {/* Action footer â€” opens on Â·Â·Â· click */}
             {menuOpen && (
               <div
                 style={{
@@ -3503,17 +3503,17 @@ function TileView({
               >
                 {[
                   {
-                    label: "✏ Edit",
+                    label: "âœ Edit",
                     action: () => onEdit(item),
                     color: T.accent,
                   },
                   {
-                    label: item.is_active ? "👁 Hide" : "👁 Show",
+                    label: item.is_active ? "ðŸ‘ Hide" : "ðŸ‘ Show",
                     action: () => onToggle(item, "is_active"),
                     color: T.amber,
                   },
                   {
-                    label: "🗑 Del",
+                    label: "ðŸ—‘ Del",
                     action: () => onDelete(item),
                     color: T.danger,
                   },
@@ -3602,7 +3602,7 @@ function TileView({
                 <span
                   style={{ fontWeight: 800, fontSize: 15, color: T.accentMid }}
                 >
-                  {item.sell_price ? zar(item.sell_price) : "—"}
+                  {item.sell_price ? zar(item.sell_price) : "â€”"}
                 </span>
                 {m !== null && (
                   <span
@@ -3715,7 +3715,7 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
           >
             {/* Icon */}
             <span style={{ fontSize: 18, textAlign: "center" }}>
-              {CATEGORY_ICONS[item.category] || "📦"}
+              {CATEGORY_ICONS[item.category] || "ðŸ“¦"}
             </span>
 
             {/* Name + stock chip */}
@@ -3736,7 +3736,7 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
               </div>
               {item.is_featured && (
                 <span style={{ fontSize: 10, color: T.amber }}>
-                  ⭐ Featured
+                  â­ Featured
                 </span>
               )}
             </div>
@@ -3796,7 +3796,7 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 color: T.ink900,
               }}
             >
-              {item.sell_price ? zar(item.sell_price) : "—"}
+              {item.sell_price ? zar(item.sell_price) : "â€”"}
             </span>
 
             {/* Margin */}
@@ -3808,7 +3808,7 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 color: m !== null ? marginColor(m) : T.ink300,
               }}
             >
-              {m !== null ? pct(m) : "—"}
+              {m !== null ? pct(m) : "â€”"}
             </span>
 
             {/* Actions */}
@@ -3836,9 +3836,9 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DETAIL VIEW (Excel-style sortable + filterable table)
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function DetailView({
   items,
   sortKey,
@@ -3854,10 +3854,10 @@ function DetailView({
   onOpenPanel,
   T,
 }) {
-  // ── Resizable columns — drag the border between headers ───────────────
+  // â”€â”€ Resizable columns â€” drag the border between headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [colWidths, setColWidths] = useState(() => {
     try {
-      const s = sessionStorage.getItem("nuai_detail_col_widths");
+      const s = localStorage.getItem("nuai_detail_col_widths");
       return s
         ? JSON.parse(s)
         : Object.fromEntries(DETAIL_COLS.map((c) => [c.key, c.width]));
@@ -3884,7 +3884,7 @@ function DetailView({
       setColWidths((prev) => {
         const next = { ...prev, [resizing.current.key]: newW };
         try {
-          sessionStorage.setItem(
+          localStorage.setItem(
             "nuai_detail_col_widths",
             JSON.stringify(next),
           );
@@ -3972,7 +3972,7 @@ function DetailView({
                   {col.label}
                   {col.sortable && sortKey === col.key && (
                     <span style={{ marginLeft: 4 }}>
-                      {sortDir === "asc" ? "↑" : "↓"}
+                      {sortDir === "asc" ? "â†‘" : "â†“"}
                     </span>
                   )}
                 </span>
@@ -4043,7 +4043,7 @@ function DetailView({
                     <input
                       value={colFilters[col.key] || ""}
                       onChange={(e) => onColFilter(col.key, e.target.value)}
-                      placeholder="Filter…"
+                      placeholder="Filterâ€¦"
                       style={{
                         width: "100%",
                         padding: "3px 6px",
@@ -4108,7 +4108,7 @@ function DetailView({
                         }}
                       >
                         <span style={{ fontSize: 14 }}>
-                          {CATEGORY_ICONS[item.category] || "📦"}
+                          {CATEGORY_ICONS[item.category] || "ðŸ“¦"}
                         </span>
                         <span style={{ fontWeight: 600, color: T.ink900 }}>
                           {item.name}
@@ -4116,7 +4116,7 @@ function DetailView({
                         {soldOut && <StockChip type="out" T={T} />}
                         {lowStock && <StockChip type="low" T={T} />}
                         {item.is_featured && (
-                          <span style={{ fontSize: 10 }}>⭐</span>
+                          <span style={{ fontSize: 10 }}>â­</span>
                         )}
                       </div>
                     )}
@@ -4166,14 +4166,14 @@ function DetailView({
                     )}
                     {col.key === "sell_price" && (
                       <span style={{ fontWeight: 600 }}>
-                        {item.sell_price ? zar(item.sell_price) : "—"}
+                        {item.sell_price ? zar(item.sell_price) : "â€”"}
                       </span>
                     )}
                     {col.key === "weighted_avg_cost" && (
                       <span>
                         {item.weighted_avg_cost
                           ? zar(item.weighted_avg_cost)
-                          : "—"}
+                          : "â€”"}
                       </span>
                     )}
                     {col.key === "_margin" && (
@@ -4183,7 +4183,7 @@ function DetailView({
                           color: m !== null ? marginColor(m) : T.ink300,
                         }}
                       >
-                        {m !== null ? pct(m) : "—"}
+                        {m !== null ? pct(m) : "â€”"}
                       </span>
                     )}
                     {col.key === "is_active" && (
@@ -4221,12 +4221,12 @@ function DetailView({
                           fontFamily: T.font,
                         }}
                       >
-                        {item.is_featured ? "⭐ Yes" : "No"}
+                        {item.is_featured ? "â­ Yes" : "No"}
                       </button>
                     )}
                     {col.key === "loyalty_category" && (
                       <span style={{ fontSize: 11, color: T.ink400 }}>
-                        {item.loyalty_category || "—"}
+                        {item.loyalty_category || "â€”"}
                       </span>
                     )}
                     {col.key === "sku" && (
@@ -4237,7 +4237,7 @@ function DetailView({
                           fontFamily: "monospace",
                         }}
                       >
-                        {item.sku || "—"}
+                        {item.sku || "â€”"}
                       </span>
                     )}
                     {col.key === "reorder_level" && (
@@ -4248,17 +4248,17 @@ function DetailView({
                             (item.reorder_level || 0) > 0 ? T.ink700 : T.ink300,
                         }}
                       >
-                        {item.reorder_level || "—"}
+                        {item.reorder_level || "â€”"}
                       </span>
                     )}
                     {col.key === "max_stock_level" && (
                       <span style={{ color: T.ink400 }}>
-                        {item.max_stock_level || "—"}
+                        {item.max_stock_level || "â€”"}
                       </span>
                     )}
                     {col.key === "supplier" && (
                       <span style={{ fontSize: 11, color: T.ink500 }}>
-                        {item.suppliers?.name || "—"}
+                        {item.suppliers?.name || "â€”"}
                       </span>
                     )}
                     {col.key === "_actions" && (
@@ -4270,14 +4270,14 @@ function DetailView({
                         }}
                       >
                         <SmallBtn
-                          label="✎"
+                          label="âœŽ"
                           onClick={() => onEdit(item)}
                           color={T.accent}
                           T={T}
                           title="Edit"
                         />
                         <SmallBtn
-                          label="✕"
+                          label="âœ•"
                           onClick={() => onDelete(item)}
                           color={T.danger}
                           T={T}
@@ -4296,9 +4296,9 @@ function DetailView({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // EDIT PANEL (right side slide-in)
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // eslint-disable-next-line no-unused-vars -- kept: fallback form (ItemForm uses EditPanel internals)
 function EditPanel({
   item,
@@ -4337,10 +4337,10 @@ function EditPanel({
       >
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: T.ink900 }}>
-            {CATEGORY_ICONS[item.category] || "📦"} Edit Item
+            {CATEGORY_ICONS[item.category] || "ðŸ“¦"} Edit Item
           </div>
           <div style={{ fontSize: 11, color: T.ink400, marginTop: 1 }}>
-            ID: {item.id?.slice(0, 8)}…
+            ID: {item.id?.slice(0, 8)}â€¦
           </div>
         </div>
         <button
@@ -4353,7 +4353,7 @@ function EditPanel({
             color: T.ink400,
           }}
         >
-          ×
+          Ã—
         </button>
       </div>
 
@@ -4375,9 +4375,9 @@ function EditPanel({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ITEM FORM (shared between edit panel + add modal)
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ItemForm({
   draft,
   onChange,
@@ -4415,7 +4415,7 @@ function ItemForm({
               onChange={(e) => onChange(field.key, e.target.value)}
               style={inputStyle(T)}
             >
-              <option value="">— Select —</option>
+              <option value="">â€” Select â€”</option>
               {field.options.map((opt) => (
                 <option key={opt} value={opt}>
                   {field.key === "category"
@@ -4483,7 +4483,7 @@ function ItemForm({
             onChange={(e) => onChange("supplier_id", e.target.value)}
             style={inputStyle(T)}
           >
-            <option value="">— No supplier —</option>
+            <option value="">â€” No supplier â€”</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -4536,7 +4536,7 @@ function ItemForm({
             marginBottom: 12,
           }}
         >
-          ⚠️ {error}
+          âš ï¸ {error}
         </div>
       )}
 
@@ -4568,21 +4568,21 @@ function ItemForm({
             opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? "Saving…" : isNew ? "Add Item" : "Save Changes"}
+          {saving ? "Savingâ€¦" : isNew ? "Add Item" : "Save Changes"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // VIEW TOGGLE
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ViewToggle({ current, onChange, T }) {
   const views = [
-    { id: VIEW_TILE, label: "⊞", title: "Tile view" },
-    { id: VIEW_LIST, label: "☰", title: "List view" },
-    { id: VIEW_DETAIL, label: "⊟", title: "Detail / Excel view" },
+    { id: VIEW_TILE, label: "âŠž", title: "Tile view" },
+    { id: VIEW_LIST, label: "â˜°", title: "List view" },
+    { id: VIEW_DETAIL, label: "âŠŸ", title: "Detail / Excel view" },
   ];
   return (
     <div
@@ -4618,9 +4618,9 @@ function ViewToggle({ current, onChange, T }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MODAL wrapper
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Modal({
   children,
   onClose,
@@ -4678,7 +4678,7 @@ function Modal({
               color: T.ink400,
             }}
           >
-            ×
+            Ã—
           </button>
         </div>
         <div style={{ overflowY: "auto", padding: "18px 20px" }}>
@@ -4689,9 +4689,9 @@ function Modal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MICRO COMPONENTS
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // eslint-disable-next-line no-unused-vars -- kept: may be reused in future panels
 function StatPill({ label, value, color }) {
   return (
@@ -4821,7 +4821,7 @@ function ErrorState({ msg, T }) {
         fontSize: 13,
       }}
     >
-      ⚠️ {msg}
+      âš ï¸ {msg}
     </div>
   );
 }
@@ -4829,7 +4829,7 @@ function ErrorState({ msg, T }) {
 function EmptyState({ catFilter, search, onAdd, T }) {
   return (
     <div style={{ textAlign: "center", padding: 64, color: T.ink400 }}>
-      <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
+      <div style={{ fontSize: 40, marginBottom: 10 }}>ðŸ“¦</div>
       <div
         style={{
           fontWeight: 700,
@@ -4862,9 +4862,9 @@ function EmptyState({ catFilter, search, onAdd, T }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // STYLE HELPERS
-// ─────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function inputStyle(T) {
   return {
     width: "100%",
@@ -4895,3 +4895,4 @@ function btnStyle(bg, color, borderColor, T, bold = false, full = false) {
     whiteSpace: "nowrap",
   };
 }
+
