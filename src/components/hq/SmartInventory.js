@@ -1,11 +1,10 @@
-﻿// src/components/hq/SmartInventory.js â€” v1.0
+﻿// src/components/hq/SmartInventory.js — v1.1
 // Next-gen universal inventory screen for NuAi cannabis retail
-// Three views: Tile Â· List Â· Detail (Excel-style sortable/filterable table)
-// Smart cascading PillBox: Category â†’ Sub-category â†’ search
+// Three views: Tile · List · Detail (Excel-style sortable/filterable table)
+// Smart cascading PillBox: Category → Sub-category → search
 // Full CRUD: inline edit, save to Supabase, delete with confirm
-// Add New item with full field set
 //
-// LL-131: tenantId as prop only â€” never hardcoded
+// LL-131: tenantId as prop only — never hardcoded
 // LL-174: CATEGORY_LABELS, CATEGORY_ICONS from ProductWorlds.js
 // Rule 0F: tenant_id on every INSERT/UPDATE
 
@@ -22,7 +21,7 @@ import {
   CATEGORY_ICONS,
 } from "./ProductWorlds";
 
-// â”€â”€ Design tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
   bg: "#FAFAF9",
   white: "#ffffff",
@@ -52,14 +51,24 @@ const T = {
   shadowLg: "0 12px 40px rgba(0,0,0,0.14)",
 };
 
-// â”€â”€ View modes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const VIEW_TILE = "tile";
 const VIEW_LIST = "list";
 const VIEW_DETAIL = "detail";
 
-// â”€â”€ Detail view column definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Detail view column definitions ────────────────────────────────────────
+// system:true  → excluded from column picker and CSV export
+// defaultHidden:true → hidden by default, user can turn on via Columns picker
 const DETAIL_COLS = [
+  {
+    key: "_row",
+    label: "#",
+    width: 45,
+    sortable: false,
+    align: "center",
+    system: true,
+  },
   { key: "name", label: "Name", width: 220, sortable: true },
+  { key: "sku", label: "SKU", width: 100, sortable: true, defaultHidden: true },
   { key: "category", label: "Category", width: 120, sortable: true },
   { key: "variant_value", label: "Sub-type", width: 130, sortable: true },
   { key: "brand", label: "Brand", width: 110, sortable: true },
@@ -106,7 +115,6 @@ const DETAIL_COLS = [
     align: "center",
   },
   { key: "loyalty_category", label: "Loyalty Cat", width: 130, sortable: true },
-  { key: "sku", label: "SKU", width: 100, sortable: true, defaultHidden: true },
   {
     key: "reorder_level",
     label: "Reorder Lvl",
@@ -133,26 +141,13 @@ const DETAIL_COLS = [
   { key: "_actions", label: "", width: 80, sortable: false, align: "center" },
 ];
 
-// â”€â”€ Sub-category keywords (derived from name â€” no sub_category column) â”€â”€â”€
-// â”€â”€ 3-tier pill hierarchy: category â†’ sub-group â†’ brand/detail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// keywords[] matched against item.name (case-insensitive)
-// â”€â”€ World pill hierarchy v2 â€” grouped cascading drill-down â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Each world has "groups" (Tier 2 headers) containing "subs" (Tier 3 items)
-// Click world â†’ see group pills only
-// Click group â†’ see sub-item pills (replaces group row, back arrow to return)
-// Keywords matched case-insensitively against item.name
-//
-// Two patterns:
-//   attribute-grouped  (Flower, Vapes, Ediblesâ€¦) â€” groups are attributes
-//   brand-grouped      (Rolling Papers, Nutrientsâ€¦) â€” groups are brands
 const PILL_HIERARCHY = {
-  // â”€â”€ FLOWER â€” attribute-grouped: Cultivation > Grade > Strain > Weight â”€â”€â”€â”€
   flower: {
     groups: [
       {
         id: "cultivation",
         label: "Cultivation",
-        icon: "ðŸŒ±",
+        icon: "🌱",
         subs: [
           {
             id: "outdoor",
@@ -176,7 +171,7 @@ const PILL_HIERARCHY = {
       {
         id: "grade",
         label: "Grade",
-        icon: "â­",
+        icon: "⭐",
         subs: [
           { id: "budget", label: "Budget", keywords: ["budget"] },
           { id: "commercial", label: "Commercial", keywords: ["commercial"] },
@@ -191,7 +186,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain",
         label: "Strain Type",
-        icon: "ðŸ§¬",
+        icon: "🧬",
         subs: [
           { id: "indica", label: "Indica", keywords: ["indica"] },
           { id: "sativa", label: "Sativa", keywords: ["sativa"] },
@@ -203,7 +198,7 @@ const PILL_HIERARCHY = {
       {
         id: "weight",
         label: "Weight",
-        icon: "âš–ï¸",
+        icon: "⚖️",
         subs: [
           { id: "0.5g", label: "0.5g", keywords: ["0.5g"] },
           { id: "1g", label: "1g", keywords: ["1g"] },
@@ -217,14 +212,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ HASH & KIEF â€” attribute-grouped: Origin > Type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   hash: {
     groups: [
       {
         id: "type",
         label: "Type",
-        icon: "ðŸŸ¤",
+        icon: "🟤",
         subs: [
           { id: "kief", label: "Kief", keywords: ["kief"] },
           { id: "bubble", label: "Bubble Hash", keywords: ["bubble"] },
@@ -241,7 +234,7 @@ const PILL_HIERARCHY = {
       {
         id: "origin",
         label: "Origin / Region",
-        icon: "ðŸŒ",
+        icon: "🌍",
         subs: [
           { id: "lebanese", label: "Lebanese", keywords: ["lebanese"] },
           { id: "moroccan", label: "Moroccan", keywords: ["moroccan"] },
@@ -257,7 +250,7 @@ const PILL_HIERARCHY = {
       {
         id: "weight_h",
         label: "Weight",
-        icon: "âš–ï¸",
+        icon: "⚖️",
         subs: [
           { id: "1g_h", label: "1g", keywords: ["1g"] },
           { id: "2g_h", label: "2g", keywords: ["2g"] },
@@ -267,14 +260,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ CONCENTRATES â€” attribute-grouped: Solvent type > Form > Weight â”€â”€â”€â”€â”€â”€â”€â”€
   concentrate: {
     groups: [
       {
         id: "solventless",
         label: "Solventless (Premium)",
-        icon: "ðŸ’Ž",
+        icon: "💎",
         subs: [
           { id: "rosin", label: "Rosin", keywords: ["rosin"] },
           { id: "live_rosin", label: "Live Rosin", keywords: ["live rosin"] },
@@ -286,7 +277,7 @@ const PILL_HIERARCHY = {
       {
         id: "solvent",
         label: "Solvent-based",
-        icon: "ðŸ”¬",
+        icon: "🔬",
         subs: [
           { id: "shatter", label: "Shatter", keywords: ["shatter"] },
           { id: "badder", label: "Badder / Wax", keywords: ["badder", "wax"] },
@@ -300,7 +291,7 @@ const PILL_HIERARCHY = {
       {
         id: "distillate_type",
         label: "Distillate / Oil",
-        icon: "ðŸ’§",
+        icon: "💧",
         subs: [
           { id: "distillate", label: "Distillate", keywords: ["distillate"] },
           { id: "rso", label: "RSO", keywords: ["rso"] },
@@ -311,7 +302,7 @@ const PILL_HIERARCHY = {
       {
         id: "weight_c",
         label: "Weight",
-        icon: "âš–ï¸",
+        icon: "⚖️",
         subs: [
           { id: "0.5g_c", label: "0.5g", keywords: ["0.5g"] },
           { id: "1g_c", label: "1g", keywords: ["1g"] },
@@ -321,14 +312,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ VAPES â€” attribute-grouped: Device Type > Strain > Volume â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   vape: {
     groups: [
       {
         id: "device",
         label: "Device Type",
-        icon: "ðŸ’¨",
+        icon: "💨",
         subs: [
           {
             id: "cartridge",
@@ -346,7 +335,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain_v",
         label: "Strain",
-        icon: "ðŸ§¬",
+        icon: "🧬",
         subs: [
           { id: "indica_v", label: "Indica", keywords: ["indica"] },
           { id: "sativa_v", label: "Sativa", keywords: ["sativa"] },
@@ -357,7 +346,7 @@ const PILL_HIERARCHY = {
       {
         id: "volume",
         label: "Volume",
-        icon: "ðŸ“",
+        icon: "📐",
         subs: [
           { id: "0.5ml", label: "0.5ml", keywords: ["0.5ml"] },
           { id: "1ml", label: "1ml", keywords: ["1ml"] },
@@ -366,14 +355,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ PRE-ROLLS â€” attribute-grouped: Format > Strain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   preroll: {
     groups: [
       {
         id: "format",
         label: "Format",
-        icon: "ðŸš¬",
+        icon: "🚬",
         subs: [
           { id: "single", label: "Singles", keywords: ["single"] },
           { id: "pack3", label: "3-Pack", keywords: ["3-pack", "3 pack"] },
@@ -385,7 +372,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain_pr",
         label: "Strain",
-        icon: "ðŸ§¬",
+        icon: "🧬",
         subs: [
           { id: "indica_pr", label: "Indica", keywords: ["indica"] },
           { id: "sativa_pr", label: "Sativa", keywords: ["sativa"] },
@@ -395,14 +382,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ EDIBLES â€” attribute-grouped: Format > Potency â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   edible: {
     groups: [
       {
         id: "format_e",
         label: "Format",
-        icon: "ðŸ¬",
+        icon: "🍬",
         subs: [
           { id: "gummies", label: "Gummies", keywords: ["gumm"] },
           {
@@ -427,7 +412,7 @@ const PILL_HIERARCHY = {
       {
         id: "potency",
         label: "Potency / Dose",
-        icon: "ðŸ’Š",
+        icon: "💊",
         subs: [
           { id: "5mg", label: "5mg THC", keywords: ["5mg"] },
           { id: "10mg", label: "10mg THC", keywords: ["10mg"] },
@@ -439,14 +424,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ SEEDS & CLONES â€” attribute-grouped: Genetics > Strain â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   seeds: {
     groups: [
       {
         id: "genetics",
         label: "Genetics Type",
-        icon: "ðŸŒ±",
+        icon: "🌱",
         subs: [
           { id: "feminised", label: "Feminised", keywords: ["femin"] },
           { id: "autoflower", label: "Auto-Flower", keywords: ["auto"] },
@@ -459,7 +442,7 @@ const PILL_HIERARCHY = {
       {
         id: "strain_s",
         label: "Strain",
-        icon: "ðŸ§¬",
+        icon: "🧬",
         subs: [
           { id: "indica_s", label: "Indica", keywords: ["indica"] },
           { id: "sativa_s", label: "Sativa", keywords: ["sativa"] },
@@ -469,7 +452,7 @@ const PILL_HIERARCHY = {
       {
         id: "pack_size",
         label: "Pack Size",
-        icon: "ðŸ“¦",
+        icon: "📦",
         subs: [
           {
             id: "1pk",
@@ -483,14 +466,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ SUBSTRATE â€” attribute-grouped: Type > Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   substrate: {
     groups: [
       {
         id: "medium",
         label: "Growing Medium",
-        icon: "ðŸª¨",
+        icon: "🪨",
         subs: [
           { id: "coco", label: "Coco Peat", keywords: ["coco peat", "coco"] },
           { id: "soil", label: "Potting Mix", keywords: ["mix", "universal"] },
@@ -507,7 +488,7 @@ const PILL_HIERARCHY = {
       {
         id: "brand_sub",
         label: "Brand",
-        icon: "ðŸ·ï¸",
+        icon: "🏷️",
         subs: [
           { id: "biobizz_s", label: "BioBizz", keywords: ["biobizz"] },
           { id: "plagron_s", label: "Plagron", keywords: ["plagron"] },
@@ -517,7 +498,7 @@ const PILL_HIERARCHY = {
       {
         id: "volume_sub",
         label: "Volume / Size",
-        icon: "ðŸ“",
+        icon: "📐",
         subs: [
           { id: "5L_s", label: "5L", keywords: ["5l"] },
           { id: "10L_s", label: "10L", keywords: ["10l"] },
@@ -527,23 +508,21 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ NUTRIENTS â€” brand-grouped: Brand > Product Line â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   nutrients: {
     groups: [
       {
         id: "biobizz",
         label: "BioBizz",
-        icon: "ðŸŒ¿",
+        icon: "🌿",
         subs: [
-          { id: "bb_all_mix", label: "AllÂ·Mix", keywords: ["all mix"] },
-          { id: "bb_light_mix", label: "LightÂ·Mix", keywords: ["light mix"] },
-          { id: "bb_bio_grow", label: "BioÂ·Grow", keywords: ["bio-grow"] },
-          { id: "bb_bio_bloom", label: "BioÂ·Bloom", keywords: ["bio-bloom"] },
-          { id: "bb_top_max", label: "TopÂ·Max", keywords: ["top-max"] },
+          { id: "bb_all_mix", label: "All·Mix", keywords: ["all mix"] },
+          { id: "bb_light_mix", label: "Light·Mix", keywords: ["light mix"] },
+          { id: "bb_bio_grow", label: "Bio·Grow", keywords: ["bio-grow"] },
+          { id: "bb_bio_bloom", label: "Bio·Bloom", keywords: ["bio-bloom"] },
+          { id: "bb_top_max", label: "Top·Max", keywords: ["top-max"] },
           {
             id: "bb_root_juice",
-            label: "RootÂ·Juice",
+            label: "Root·Juice",
             keywords: ["root-juice"],
           },
         ],
@@ -551,7 +530,7 @@ const PILL_HIERARCHY = {
       {
         id: "canna",
         label: "Canna",
-        icon: "ðŸŒ¿",
+        icon: "🌿",
         subs: [
           { id: "canna_coco_a", label: "Coco A", keywords: ["coco a"] },
           { id: "canna_coco_b", label: "Coco B", keywords: ["coco b"] },
@@ -563,7 +542,7 @@ const PILL_HIERARCHY = {
       {
         id: "plagron_n",
         label: "Plagron",
-        icon: "ðŸŒ¿",
+        icon: "🌿",
         subs: [
           { id: "plag_uni", label: "Universal Mix", keywords: ["universal"] },
         ],
@@ -571,7 +550,7 @@ const PILL_HIERARCHY = {
       {
         id: "generic_n",
         label: "Other / Generic",
-        icon: "ðŸ§ª",
+        icon: "🧪",
         subs: [
           { id: "calmag", label: "CalMag", keywords: ["calmag"] },
           { id: "ph_up", label: "pH Up", keywords: ["ph up"] },
@@ -580,14 +559,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ GROW EQUIPMENT â€” type-grouped: Category > Brand/Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   equipment: {
     groups: [
       {
         id: "lighting",
         label: "Lighting",
-        icon: "ðŸ’¡",
+        icon: "💡",
         subs: [
           {
             id: "led",
@@ -602,17 +579,17 @@ const PILL_HIERARCHY = {
       {
         id: "tents_e",
         label: "Grow Tents",
-        icon: "â›º",
+        icon: "⛺",
         subs: [
-          { id: "tent_60", label: "60Ã—60cm", keywords: ["60x60"] },
-          { id: "tent_80", label: "80Ã—80cm", keywords: ["80x80"] },
-          { id: "tent_120", label: "120Ã—120cm", keywords: ["120x120"] },
+          { id: "tent_60", label: "60×60cm", keywords: ["60x60"] },
+          { id: "tent_80", label: "80×80cm", keywords: ["80x80"] },
+          { id: "tent_120", label: "120×120cm", keywords: ["120x120"] },
         ],
       },
       {
         id: "airflow",
         label: "Air & Filtration",
-        icon: "ðŸ’¨",
+        icon: "💨",
         subs: [
           { id: "inline_fan", label: "Inline Fans", keywords: ["inline"] },
           { id: "clip_fan", label: "Clip Fans", keywords: ["clip fan"] },
@@ -626,7 +603,7 @@ const PILL_HIERARCHY = {
       {
         id: "containers",
         label: "Pots & Containers",
-        icon: "ðŸª£",
+        icon: "🪣",
         subs: [
           {
             id: "fab_5l",
@@ -653,7 +630,7 @@ const PILL_HIERARCHY = {
       {
         id: "meters_e",
         label: "Meters & Tools",
-        icon: "ðŸ“Š",
+        icon: "📊",
         subs: [
           { id: "ph_meter", label: "pH Meter", keywords: ["ph meter"] },
           { id: "ec_tds", label: "EC/TDS Meter", keywords: ["ec/tds"] },
@@ -668,7 +645,7 @@ const PILL_HIERARCHY = {
       {
         id: "propagation_e",
         label: "Propagation",
-        icon: "ðŸŒ¿",
+        icon: "🌿",
         subs: [
           { id: "heat_mat", label: "Heat Mats", keywords: ["heat mat"] },
           { id: "rockwool_e", label: "Rockwool", keywords: ["rockwool"] },
@@ -681,14 +658,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ WELLNESS â€” attribute-grouped: Category > Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   wellness: {
     groups: [
       {
         id: "functional",
         label: "Functional Mushrooms",
-        icon: "ðŸ„",
+        icon: "🍄",
         subs: [
           { id: "lions_mane", label: "Lion's Mane", keywords: ["lions mane"] },
           { id: "reishi", label: "Reishi", keywords: ["reishi"] },
@@ -704,7 +679,7 @@ const PILL_HIERARCHY = {
       {
         id: "adaptogens_w",
         label: "Adaptogens",
-        icon: "ðŸŒ¿",
+        icon: "🌿",
         subs: [
           {
             id: "ashwagandha",
@@ -717,7 +692,7 @@ const PILL_HIERARCHY = {
       {
         id: "cbd_wellness",
         label: "CBD Products",
-        icon: "ðŸ’š",
+        icon: "💚",
         subs: [
           { id: "cbd_oil", label: "CBD Oil", keywords: ["cbd oil"] },
           { id: "cbd_capsule", label: "CBD Capsules", keywords: ["cbd cap"] },
@@ -731,7 +706,7 @@ const PILL_HIERARCHY = {
       {
         id: "pet_well",
         label: "Pet Products",
-        icon: "ðŸ¾",
+        icon: "🐾",
         subs: [
           { id: "pet_drops", label: "Pet Drops", keywords: ["pet", "dog"] },
           { id: "pet_treats", label: "Pet Treats", keywords: ["treat"] },
@@ -739,14 +714,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ ROLLING PAPERS â€” brand-grouped (brand is the primary navigator) â”€â”€â”€â”€â”€â”€â”€
   papers: {
     groups: [
       {
         id: "raw_brand",
         label: "RAW",
-        icon: "ðŸ“„",
+        icon: "📄",
         subs: [
           {
             id: "raw_classic_cones",
@@ -790,13 +763,13 @@ const PILL_HIERARCHY = {
       {
         id: "ocb_brand",
         label: "OCB",
-        icon: "ðŸ“„",
+        icon: "📄",
         subs: [{ id: "ocb_all", label: "OCB (all)", keywords: ["ocb"] }],
       },
       {
         id: "gizeh_brand",
         label: "Gizeh",
-        icon: "ðŸ“„",
+        icon: "📄",
         subs: [
           { id: "gizeh_cones", label: "Gizeh Cones", keywords: ["gizeh cone"] },
           { id: "gizeh_tips", label: "Gizeh Tips", keywords: ["gizeh tip"] },
@@ -806,7 +779,7 @@ const PILL_HIERARCHY = {
       {
         id: "elements_brand",
         label: "Elements",
-        icon: "ðŸ“„",
+        icon: "📄",
         subs: [
           {
             id: "elements_all",
@@ -818,21 +791,19 @@ const PILL_HIERARCHY = {
       {
         id: "generic_papers",
         label: "Other Brands",
-        icon: "ðŸ“„",
+        icon: "📄",
         subs: [
           { id: "hemp_wick", label: "Hemp Wick", keywords: ["hemp wick"] },
         ],
       },
     ],
   },
-
-  // â”€â”€ ACCESSORIES â€” type-grouped: Category > Brand/Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   accessories: {
     groups: [
       {
         id: "grinders_a",
         label: "Grinders",
-        icon: "âš™ï¸",
+        icon: "⚙️",
         subs: [
           {
             id: "grinder_2pc",
@@ -856,7 +827,7 @@ const PILL_HIERARCHY = {
       {
         id: "pipes_a",
         label: "Pipes & Bongs",
-        icon: "ðŸª§",
+        icon: "🪧",
         subs: [
           { id: "glass_pipe", label: "Glass Pipes", keywords: ["glass pipe"] },
           { id: "acrylic_pipe", label: "Acrylic", keywords: ["acrylic"] },
@@ -867,7 +838,7 @@ const PILL_HIERARCHY = {
       {
         id: "dab_a",
         label: "Dab Accessories",
-        icon: "ðŸ’Ž",
+        icon: "💎",
         subs: [
           {
             id: "dab_tool_set",
@@ -885,7 +856,7 @@ const PILL_HIERARCHY = {
       {
         id: "humidity_a",
         label: "Humidity Control",
-        icon: "ðŸ’§",
+        icon: "💧",
         subs: [
           {
             id: "bovida_58",
@@ -898,7 +869,7 @@ const PILL_HIERARCHY = {
       {
         id: "storage_a",
         label: "Storage",
-        icon: "ðŸ«™",
+        icon: "🫙",
         subs: [
           { id: "uv_jar_100", label: "UV Jar 100ml", keywords: ["100ml"] },
           { id: "uv_jar_250", label: "UV Jar 250ml", keywords: ["250ml"] },
@@ -906,14 +877,12 @@ const PILL_HIERARCHY = {
       },
     ],
   },
-
-  // â”€â”€ MERCH â€” type-grouped: Category > Size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   merch: {
     groups: [
       {
         id: "clothing_m",
         label: "Clothing",
-        icon: "ðŸ‘•",
+        icon: "👕",
         subs: [
           {
             id: "tshirt_m",
@@ -927,7 +896,7 @@ const PILL_HIERARCHY = {
       {
         id: "size_m",
         label: "Size",
-        icon: "ðŸ“",
+        icon: "📐",
         subs: [
           { id: "small_m", label: "Small", keywords: ["small"] },
           { id: "medium_m", label: "Medium", keywords: ["medium"] },
@@ -939,14 +908,13 @@ const PILL_HIERARCHY = {
   },
 };
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ───────────────────────────────────────────────────────────────
 const zar = (n) => `R${(Number(n) || 0).toFixed(2)}`;
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 const margin = (sell, cost) => {
   if (!sell || !cost || sell <= 0) return null;
   return ((sell - cost) / sell) * 100;
 };
-
 function marginColor(m) {
   if (m === null) return T.ink300;
   if (m >= 50) return T.accentMid;
@@ -954,7 +922,6 @@ function marginColor(m) {
   return T.danger;
 }
 
-// â”€â”€ Field definitions for edit panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const EDIT_FIELDS = [
   { key: "name", label: "Name", type: "text", required: true },
   {
@@ -994,32 +961,29 @@ const EDIT_FIELDS = [
   { key: "image_url", label: "Image URL", type: "text" },
 ];
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────
 export default function SmartInventory({ tenantId }) {
-  // â”€â”€ Data state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // â”€â”€ View + filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [viewMode, setViewMode] = useState(VIEW_DETAIL);
   const [pillExpanded, setPillExpanded] = useState(false);
   const [tileSize, setTileSize] = useState("M");
   const [catFilter, setCatFilter] = useState("all");
-  const [groupFilter, setGroupFilter] = useState(null); // tier-2 header (e.g. "cultivation")
-  const [subFilter, setSubFilter] = useState(null); // tier-3 item  (e.g. "indoor")
+  const [groupFilter, setGroupFilter] = useState(null);
+  const [subFilter, setSubFilter] = useState(null);
   const [search, setSearch] = useState("");
 
-  // â”€â”€ Sort state (detail view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
-  const [colFilters, setColFilters] = useState({}); // {col: value}
+  const [colFilters, setColFilters] = useState({});
   const [filterRowOpen, setFilterRowOpen] = useState(false);
-  const [sortByIssues, setSortByIssues] = useState(false); // SC-03: issues-first sort
-  // Column visibility â€” persisted in localStorage
+  const [sortByIssues, setSortByIssues] = useState(false);
+
   const [hiddenCols, setHiddenCols] = useState(() => {
     try {
       const s = localStorage.getItem("nuai_detail_hidden_cols");
@@ -1027,35 +991,28 @@ export default function SmartInventory({ tenantId }) {
         ? new Set(JSON.parse(s))
         : new Set(["sku", "reorder_level", "max_stock_level", "supplier"]);
     } catch {
-      return new Set();
+      return new Set(["sku", "reorder_level", "max_stock_level", "supplier"]);
     }
   });
   const [colPickerOpen, setColPickerOpen] = useState(false);
   const colPickerRef = useRef(null);
 
-  // â”€â”€ Edit/delete state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // eslint-disable-next-line no-unused-vars -- kept: closeEdit references setEditItem/setEditDraft
+  // eslint-disable-next-line no-unused-vars
   const [editItem, setEditItem] = useState(null);
-  // eslint-disable-next-line no-unused-vars -- kept: ItemForm still references editDraft in EditPanel
+  // eslint-disable-next-line no-unused-vars
   const [editDraft, setEditDraft] = useState({});
-  // eslint-disable-next-line no-unused-vars -- kept: ItemForm saving prop
+  // eslint-disable-next-line no-unused-vars
   const [saving, setSaving] = useState(false);
-  // eslint-disable-next-line no-unused-vars -- kept: error display in ItemForm
+  // eslint-disable-next-line no-unused-vars
   const [saveError, setSaveError] = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
-
-  // â”€â”€ SC-02: Item detail panel state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [panelItem, setPanelItem] = useState(null); // item whose panel is open
-
-  // â”€â”€ Add / Edit â€” StockItemModal pattern (same as HQStock) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [modalItem, setModalItem] = useState(undefined); // undefined=closed, null=new, obj=edit
+  const [panelItem, setPanelItem] = useState(null);
+  const [modalItem, setModalItem] = useState(undefined);
   const [modalDefaults, setModalDefaults] = useState({});
   const [modalSaving, setModalSaving] = useState(false);
   const [showWorldPicker, setShowWorldPicker] = useState(false);
-
   const searchRef = useRef(null);
 
-  // â”€â”€ Load â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
@@ -1083,13 +1040,11 @@ export default function SmartInventory({ tenantId }) {
     load();
   }, [load]);
 
-  // â”€â”€ SC-01: Action panel state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const [activePanel, setActivePanel] = useState(null); // 'soldout'|'reorder'|'noprice'
+  const [activePanel, setActivePanel] = useState(null);
   const [noPriceDraft, setNoPriceDraft] = useState({});
   const [noPriceFixed, setNoPriceFixed] = useState(new Set());
   const [noPriceSaving, setNoPriceSaving] = useState(new Set());
   const [flaggedReorder, setFlaggedReorder] = useState(new Set());
-  // On Order â€” marks a sold-out item as awaiting delivery (handoff to WP-REORDER)
   const [onOrderSet, setOnOrderSet] = useState(new Set());
   const [onOrderSaving, setOnOrderSaving] = useState(new Set());
 
@@ -1100,14 +1055,10 @@ export default function SmartInventory({ tenantId }) {
     setSearch("");
   }, []);
 
-  // â”€â”€ Global dismiss â€” Escape + outside-click for dropdowns/panels â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
-      // Collapse in priority order (innermost first)
-      if (modalItem !== undefined) {
-        return;
-      } // StockItemModal handles its own Escape
+      if (modalItem !== undefined) return;
       if (panelItem) {
         setPanelItem(null);
         return;
@@ -1134,14 +1085,12 @@ export default function SmartInventory({ tenantId }) {
       }
     };
     const onMouse = (e) => {
-      // Close col picker when clicking outside its ref
       if (
         colPickerOpen &&
         colPickerRef.current &&
         !colPickerRef.current.contains(e.target)
-      ) {
+      )
         setColPickerOpen(false);
-      }
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onMouse);
@@ -1160,32 +1109,26 @@ export default function SmartInventory({ tenantId }) {
     selectCat,
   ]);
 
-  // â”€â”€ Filtered + sorted items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
     let list = items;
-
-    // World filter â€” use itemMatchesWorld for all 14 worlds
     if (catFilter !== "all") {
       const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
       if (world) list = list.filter((i) => itemMatchesWorld(i, world));
     }
-
-    // Sub-type filter â€” grouped hierarchy: groupFilter selects the group, subFilter the item
-    if (subFilter && groupFilter && PILL_HIERARCHY[catFilter]) {
-      const group = PILL_HIERARCHY[catFilter].groups?.find(
-        (g) => g.id === groupFilter,
-      );
-      const sub = group?.subs?.find((s) => s.id === subFilter);
-      if (sub) {
-        list = list.filter((i) =>
-          sub.keywords.some((kw) =>
-            i.name.toLowerCase().includes(kw.toLowerCase()),
-          ),
-        );
+    // Sub-type filter — searches all groups for matching sub
+    if (subFilter && catFilter !== "all" && PILL_HIERARCHY[catFilter]) {
+      for (const group of PILL_HIERARCHY[catFilter].groups || []) {
+        const sub = group.subs?.find((s) => s.id === subFilter);
+        if (sub) {
+          list = list.filter((i) =>
+            sub.keywords.some((kw) =>
+              i.name.toLowerCase().includes(kw.toLowerCase()),
+            ),
+          );
+          break;
+        }
       }
     }
-
-    // Text search
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -1195,18 +1138,15 @@ export default function SmartInventory({ tenantId }) {
           i.loyalty_category?.toLowerCase().includes(q),
       );
     }
-
-    // Column filters (detail view)
     Object.entries(colFilters).forEach(([col, val]) => {
       if (!val) return;
       const v = val.toLowerCase();
-      list = list.filter((i) => {
-        const cell = String(i[col] ?? "").toLowerCase();
-        return cell.includes(v);
-      });
+      list = list.filter((i) =>
+        String(i[col] ?? "")
+          .toLowerCase()
+          .includes(v),
+      );
     });
-
-    // Sort
     list = [...list].sort((a, b) => {
       let av =
         sortKey === "_margin"
@@ -1224,8 +1164,6 @@ export default function SmartInventory({ tenantId }) {
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-
-    // SC-03: Issues-first secondary sort (sold-out at top, then low-stock, then healthy)
     if (sortByIssues) {
       const score = (i) => {
         if ((i.quantity_on_hand || 0) === 0) return 2;
@@ -1238,7 +1176,6 @@ export default function SmartInventory({ tenantId }) {
       };
       list.sort((a, b) => score(b) - score(a));
     }
-
     return list;
   }, [
     items,
@@ -1252,9 +1189,8 @@ export default function SmartInventory({ tenantId }) {
     sortByIssues,
   ]);
 
-  // â”€â”€ Sort column toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function handleSort(key) {
-    if (!key || key === "_actions") return;
+    if (!key || key === "_actions" || key === "_row") return;
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(key);
@@ -1262,7 +1198,6 @@ export default function SmartInventory({ tenantId }) {
     }
   }
 
-  // â”€â”€ SC-01: Global KPI stats (always from full items array) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const gTotal = items.length;
   const gActive = items.filter((i) => i.is_active).length;
   const gSoldOut = items.filter((i) => (i.quantity_on_hand || 0) === 0).length;
@@ -1279,8 +1214,6 @@ export default function SmartInventory({ tenantId }) {
   const gNoPrice = items.filter(
     (i) => !i.sell_price || i.sell_price <= 0,
   ).length;
-
-  // â”€â”€ SC-01: Filtered KPI stats (from current pill/search filter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const fTotal = filtered.length;
   const fActive = filtered.filter((i) => i.is_active).length;
   const fSoldOut = filtered.filter(
@@ -1302,7 +1235,6 @@ export default function SmartInventory({ tenantId }) {
   const isFiltered =
     catFilter !== "all" || groupFilter || subFilter || search.trim();
 
-  // â”€â”€ SC-01: Panel item lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const soldOutItems = items
     .filter((i) => (i.quantity_on_hand || 0) === 0)
     .sort(
@@ -1318,7 +1250,6 @@ export default function SmartInventory({ tenantId }) {
   );
   const noPriceItems = items.filter((i) => !i.sell_price || i.sell_price <= 0);
 
-  // â”€â”€ SC-01: Save no-price fix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const saveNoPrice = async (itemId) => {
     const price = parseFloat(noPriceDraft[itemId]);
     if (!price || price <= 0) return;
@@ -1335,10 +1266,9 @@ export default function SmartInventory({ tenantId }) {
     });
     load();
     const item = items.find((i) => i.id === itemId);
-    toast.success(`Sell price set${item ? ` â€” R${price}` : ""}`);
+    toast.success(`Sell price set${item ? ` — R${price}` : ""}`);
   };
 
-  // â”€â”€ SC-02: Refresh panel item after in-panel save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handlePanelRefresh = async () => {
     load();
     if (panelItem) {
@@ -1351,7 +1281,6 @@ export default function SmartInventory({ tenantId }) {
     }
   };
 
-  // â”€â”€ SC-01: Flag item for reorder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const flagForReorder = async (itemId) => {
     try {
       await supabase
@@ -1360,7 +1289,7 @@ export default function SmartInventory({ tenantId }) {
         .eq("id", itemId);
     } catch {}
     setFlaggedReorder((prev) => new Set([...prev, itemId]));
-    toast.info("âš‘ Flagged for reorder", {
+    toast.info("⚑ Flagged for reorder", {
       duration: 5000,
       undo: async () => {
         try {
@@ -1381,7 +1310,6 @@ export default function SmartInventory({ tenantId }) {
     });
   };
 
-  // â”€â”€ SC-01: Mark item as On Order (PO placed, awaiting delivery) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const markOnOrder = async (itemId) => {
     setOnOrderSaving((prev) => new Set([...prev, itemId]));
     try {
@@ -1389,17 +1317,16 @@ export default function SmartInventory({ tenantId }) {
         .from("inventory_items")
         .update({ on_order: true, updated_at: new Date().toISOString() })
         .eq("id", itemId);
-    } catch {} // graceful â€” on_order column may not exist yet (run SQL migration)
+    } catch {}
     setOnOrderSet((prev) => new Set([...prev, itemId]));
     setOnOrderSaving((prev) => {
       const n = new Set(prev);
       n.delete(itemId);
       return n;
     });
-    toast.info("ðŸ“¦ Marked as On Order");
+    toast.info("📦 Marked as On Order");
   };
 
-  // Column visibility toggle
   const toggleCol = useCallback((key) => {
     setHiddenCols((prev) => {
       const next = new Set(prev);
@@ -1415,12 +1342,10 @@ export default function SmartInventory({ tenantId }) {
     });
   }, []);
 
-  // â”€â”€ Edit panel â€” now routed through StockItemModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function openEdit(item) {
     setModalDefaults({});
-    setModalItem(item); // non-null = editing existing item
+    setModalItem(item);
   }
-
   function closeEdit() {
     setEditItem(null);
     setEditDraft({});
@@ -1448,27 +1373,21 @@ export default function SmartInventory({ tenantId }) {
     });
   }
 
-  // â”€â”€ Add item â€” context-aware world routing (same pattern as HQStock) â”€â”€â”€â”€
   function openAdd() {
     if (catFilter === "all") {
-      // No world selected â€” show world picker
       setShowWorldPicker(true);
     } else {
-      // World is active â€” open StockItemModal with world + pill context pre-set
       const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
-      // Map subFilter to the right field key for StockItemModal
-      const subcatKey = subFilter || "";
       setModalDefaults({
         category: world?.enums?.[0] || "finished_product",
-        subcategory: subcatKey,
+        subcategory: subFilter || "",
         world: catFilter,
         worldLabel: world?.label || catFilter,
       });
-      setModalItem(null); // null = new item
+      setModalItem(null);
     }
   }
 
-  // â”€â”€ Save handler for StockItemModal (insert or update) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleModalSave = async (payload) => {
     setModalSaving(true);
     try {
@@ -1491,16 +1410,16 @@ export default function SmartInventory({ tenantId }) {
       load();
     } catch (err) {
       console.error("Save error:", err);
-      toast.error("Save failed â€” check your connection");
+      toast.error("Save failed — check your connection");
     } finally {
       setModalSaving(false);
     }
   };
 
-  // â”€â”€ Quick inline toggle (detail view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // SC-09: CSV export — excludes _row (UI-only) and _actions
   function exportCSV() {
     const visibleCols = DETAIL_COLS.filter(
-      (c) => c.key !== "_actions" && !hiddenCols.has(c.key),
+      (c) => c.key !== "_actions" && c.key !== "_row" && !hiddenCols.has(c.key),
     );
     const headers = visibleCols.map((c) => c.label || c.key);
     const rows = filtered.map((item) =>
@@ -1530,7 +1449,7 @@ export default function SmartInventory({ tenantId }) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${filtered.length} items â†’ ${filename}`);
+    toast.success(`Exported ${filtered.length} items → ${filename}`);
   }
 
   async function quickToggle(item, field) {
@@ -1558,23 +1477,22 @@ export default function SmartInventory({ tenantId }) {
     }
   }
 
-  // â”€â”€ Pill cascade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function selectGroup(groupId) {
     setGroupFilter(groupId);
   }
-
   function selectSub(subId) {
     setSubFilter(subId);
   }
-
-  // eslint-disable-next-line no-unused-vars -- kept for future brand-level tier 4
+  // eslint-disable-next-line no-unused-vars
   function selectBrand(brandId) {}
 
-  // â”€â”€ Stats: moved to gTotal/gActive/etc. above (SC-01) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Column picker: only non-system, non-actions cols
+  const pickerCols = DETAIL_COLS.filter(
+    (c) => c.key !== "_actions" && !c.system,
+  );
+  // Shown count: non-system non-actions visible
+  const shownCount = pickerCols.filter((c) => !hiddenCols.has(c.key)).length;
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // RENDER
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div
       className="nuai-catalog"
@@ -1586,24 +1504,16 @@ export default function SmartInventory({ tenantId }) {
         background: "transparent",
       }}
     >
-      {/* Global cursor + interaction polish for this screen */}
       <style>{`
-        .nuai-catalog button, .nuai-catalog [role="button"],
-        .nuai-catalog label, .nuai-catalog [onClick] { cursor: pointer; }
-        .nuai-catalog input[type="text"],
-        .nuai-catalog input[type="number"],
-        .nuai-catalog input[type="search"],
-        .nuai-catalog textarea { cursor: text; }
-        .nuai-catalog input[type="range"] { cursor: ew-resize; }
-        .nuai-catalog input[type="checkbox"],
-        .nuai-catalog input[type="radio"]  { cursor: pointer; }
-        .nuai-catalog [data-resize]        { cursor: col-resize; }
-        .nuai-catalog a                    { cursor: pointer; }
-        .nuai-catalog [aria-disabled="true"],
-        .nuai-catalog button:disabled      { cursor: not-allowed; opacity: 0.5; }
+        .nuai-catalog button, .nuai-catalog [role="button"], .nuai-catalog label { cursor: pointer; }
+        .nuai-catalog input[type="text"], .nuai-catalog input[type="number"], .nuai-catalog input[type="search"], .nuai-catalog textarea { cursor: text; }
+        .nuai-catalog input[type="checkbox"], .nuai-catalog input[type="radio"] { cursor: pointer; }
+        .nuai-catalog [data-resize] { cursor: col-resize; }
+        .nuai-catalog [aria-disabled="true"], .nuai-catalog button:disabled { cursor: not-allowed; opacity: 0.5; }
+        .nuai-col-drag-over { background: #E8F5EE !important; }
       `}</style>
 
-      {/* â”€â”€ TOP TOOLBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── TOP TOOLBAR ───────────────────────────────────────────────── */}
       <div
         style={{
           background: T.white,
@@ -1613,7 +1523,6 @@ export default function SmartInventory({ tenantId }) {
           boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         }}
       >
-        {/* Row 1: title + actions */}
         <div
           style={{
             display: "flex",
@@ -1623,16 +1532,14 @@ export default function SmartInventory({ tenantId }) {
           }}
         >
           <span style={{ fontWeight: 800, fontSize: 17, color: T.ink900 }}>
-            ðŸ“¦ Inventory
+            📦 Inventory
           </span>
-
-          {/* Search â€” promoted to toolbar level */}
           <div style={{ marginLeft: 12 }}>
             <input
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search itemsâ€¦"
+              placeholder="Search items…"
               style={{
                 padding: "5px 12px",
                 border: `1.5px solid ${search ? T.accent : T.border}`,
@@ -1646,7 +1553,6 @@ export default function SmartInventory({ tenantId }) {
               }}
             />
           </div>
-
           <div
             style={{
               marginLeft: "auto",
@@ -1655,7 +1561,6 @@ export default function SmartInventory({ tenantId }) {
               alignItems: "center",
             }}
           >
-            {/* View switcher */}
             <ViewToggle current={viewMode} onChange={setViewMode} T={T} />
             {viewMode === VIEW_TILE && (
               <div
@@ -1670,13 +1575,7 @@ export default function SmartInventory({ tenantId }) {
                   <button
                     key={s}
                     onClick={() => setTileSize(s)}
-                    title={
-                      s === "S"
-                        ? "Small tiles"
-                        : s === "M"
-                          ? "Medium tiles"
-                          : "Large tiles"
-                    }
+                    title={s === "S" ? "Small" : s === "M" ? "Medium" : "Large"}
                     style={{
                       padding: "5px 10px",
                       border: "none",
@@ -1695,8 +1594,6 @@ export default function SmartInventory({ tenantId }) {
                 ))}
               </div>
             )}
-
-            {/* Filters toggle â€” visible in all view modes */}
             <button
               onClick={() => setFilterRowOpen((v) => !v)}
               style={btnStyle(
@@ -1706,21 +1603,17 @@ export default function SmartInventory({ tenantId }) {
                 T,
               )}
             >
-              ðŸ”½ Filters{sortByIssues ? " Â·âš " : ""}
+              🔽 Filters{sortByIssues ? " ·⚠" : ""}
             </button>
-
-            {/* Export CSV (detail only) */}
             {viewMode === VIEW_DETAIL && (
               <button
                 onClick={exportCSV}
                 style={btnStyle(T.white, T.ink500, T.border, T)}
                 title="Export visible columns to CSV"
               >
-                â†“ CSV
+                ↓ CSV
               </button>
             )}
-
-            {/* Column picker (detail only) */}
             {viewMode === VIEW_DETAIL && (
               <div style={{ position: "relative" }} ref={colPickerRef}>
                 <button
@@ -1732,10 +1625,7 @@ export default function SmartInventory({ tenantId }) {
                     T,
                   )}
                 >
-                  Columns{" "}
-                  {hiddenCols.size > 0
-                    ? `(${DETAIL_COLS.length - 1 - hiddenCols.size} shown)`
-                    : ""}
+                  Columns ({shownCount} shown)
                 </button>
                 {colPickerOpen && (
                   <div
@@ -1751,8 +1641,6 @@ export default function SmartInventory({ tenantId }) {
                       padding: "6px 0",
                       minWidth: 210,
                     }}
-                    // Close on outside click via blur chain
-                    onMouseLeave={() => {}}
                   >
                     <div
                       style={{
@@ -1766,64 +1654,61 @@ export default function SmartInventory({ tenantId }) {
                     >
                       Show / hide columns
                     </div>
-                    {DETAIL_COLS.filter((c) => c.key !== "_actions").map(
-                      (col) => {
-                        const isHidden = hiddenCols.has(col.key);
-                        // Detect if this column has any data in current items
-                        const hasData = items.some((i) => {
-                          if (col.key.startsWith("_")) return true;
-                          const v = i[col.key];
-                          return (
-                            v !== null &&
-                            v !== undefined &&
-                            v !== "" &&
-                            v !== false &&
-                            v !== 0
-                          );
-                        });
+                    {pickerCols.map((col) => {
+                      const isHidden = hiddenCols.has(col.key);
+                      const hasData = items.some((i) => {
+                        if (col.key.startsWith("_")) return true;
+                        const v = i[col.key];
                         return (
-                          <label
-                            key={col.key}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "5px 14px",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              color: T.ink700,
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.background = T.accentXlit)
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.background = "transparent")
-                            }
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!isHidden}
-                              onChange={() => toggleCol(col.key)}
-                              style={{ accentColor: T.accent, flexShrink: 0 }}
-                            />
-                            <span style={{ flex: 1 }}>
-                              {col.label || col.key}
-                            </span>
-                            {!hasData && (
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: T.amber,
-                                  fontWeight: 600,
-                                }}
-                              >
-                                no data
-                              </span>
-                            )}
-                          </label>
+                          v !== null &&
+                          v !== undefined &&
+                          v !== "" &&
+                          v !== false &&
+                          v !== 0
                         );
-                      },
-                    )}
+                      });
+                      return (
+                        <label
+                          key={col.key}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "5px 14px",
+                            cursor: "pointer",
+                            fontSize: 13,
+                            color: T.ink700,
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = T.accentXlit)
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = "transparent")
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!isHidden}
+                            onChange={() => toggleCol(col.key)}
+                            style={{ accentColor: T.accent, flexShrink: 0 }}
+                          />
+                          <span style={{ flex: 1 }}>
+                            {col.label || col.key}
+                          </span>
+                          {!hasData && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: T.amber,
+                                fontWeight: 600,
+                              }}
+                            >
+                              no data
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                     <div
                       style={{
                         borderTop: `1px solid ${T.border}`,
@@ -1832,25 +1717,21 @@ export default function SmartInventory({ tenantId }) {
                     />
                     <button
                       onClick={() => {
-                        // Auto-hide columns with no data
-                        const emptyKeys = DETAIL_COLS.filter((c) => {
-                          if (
-                            c.key.startsWith("_") ||
-                            c.key === "name" ||
-                            c.key === "category"
+                        const emptyKeys = pickerCols
+                          .filter(
+                            (c) =>
+                              !items.some((i) => {
+                                const v = i[c.key];
+                                return (
+                                  v !== null &&
+                                  v !== undefined &&
+                                  v !== "" &&
+                                  v !== false &&
+                                  v !== 0
+                                );
+                              }),
                           )
-                            return false;
-                          return !items.some((i) => {
-                            const v = i[c.key];
-                            return (
-                              v !== null &&
-                              v !== undefined &&
-                              v !== "" &&
-                              v !== false &&
-                              v !== 0
-                            );
-                          });
-                        }).map((c) => c.key);
+                          .map((c) => c.key);
                         setHiddenCols((prev) => {
                           const next = new Set([...prev, ...emptyKeys]);
                           try {
@@ -1904,16 +1785,12 @@ export default function SmartInventory({ tenantId }) {
                 )}
               </div>
             )}
-
-            {/* Refresh */}
             <button
               onClick={load}
               style={btnStyle(T.white, T.ink500, T.border, T)}
             >
-              â†º
+              ↺
             </button>
-
-            {/* Add new */}
             <button
               onClick={openAdd}
               style={btnStyle(T.accent, T.white, T.accent, T, true)}
@@ -1923,7 +1800,7 @@ export default function SmartInventory({ tenantId }) {
           </div>
         </div>
 
-        {/* Row 1.5: SC-01 KPI Cards â€” adaptive 6-card grid */}
+        {/* KPI Cards */}
         <div
           style={{
             display: "flex",
@@ -2078,14 +1955,13 @@ export default function SmartInventory({ tenantId }) {
                     opacity: 0.5,
                   }}
                 >
-                  â€º
+                  ›
                 </span>
               )}
             </div>
           ))}
         </div>
 
-        {/* SC-03: Filters panel â€” issues-first toggle + (detail) column filter notice */}
         {filterRowOpen && (
           <div
             style={{
@@ -2114,7 +1990,7 @@ export default function SmartInventory({ tenantId }) {
                 onChange={() => setSortByIssues((v) => !v)}
                 style={{ accentColor: T.accent, width: 14, height: 14 }}
               />
-              <span>âš  Issues first</span>
+              <span>⚠ Issues first</span>
               <span style={{ fontSize: 10.5, color: T.ink300 }}>
                 sold out + low stock at top
               </span>
@@ -2131,13 +2007,12 @@ export default function SmartInventory({ tenantId }) {
                   border: `1px solid ${T.amber}40`,
                 }}
               >
-                âš  Active â€” {gSoldOut + gBelowReorder} items flagged
+                ⚠ Active — {gSoldOut + gBelowReorder} items flagged
               </span>
             )}
           </div>
         )}
 
-        {/* Row 2: Smart PillBox */}
         <SmartPillBox
           catFilter={catFilter}
           groupFilter={groupFilter}
@@ -2153,7 +2028,7 @@ export default function SmartInventory({ tenantId }) {
         />
       </div>
 
-      {/* â”€â”€ CONTENT AREA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── CONTENT AREA ──────────────────────────────────────────────── */}
       <div
         style={{
           flex: 1,
@@ -2162,7 +2037,6 @@ export default function SmartInventory({ tenantId }) {
           position: "relative",
         }}
       >
-        {/* Main view â€” detail mode clips to viewport, other modes scroll freely */}
         <div
           style={{
             flex: 1,
@@ -2198,7 +2072,6 @@ export default function SmartInventory({ tenantId }) {
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
               onOpenPanel={setPanelItem}
-              tileSize={tileSize}
               T={T}
             />
           ) : (
@@ -2223,7 +2096,7 @@ export default function SmartInventory({ tenantId }) {
         </div>
       </div>
 
-      {/* â”€â”€ SC-01 ACTION PANELS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── SC-01 ACTION PANELS ──────────────────────────────────────── */}
       {activePanel && (
         <div
           onClick={() => setActivePanel(null)}
@@ -2249,7 +2122,6 @@ export default function SmartInventory({ tenantId }) {
               fontFamily: T.font,
             }}
           >
-            {/* Panel header */}
             <div
               style={{
                 padding: "18px 20px 14px",
@@ -2263,11 +2135,11 @@ export default function SmartInventory({ tenantId }) {
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: T.ink900 }}>
                   {activePanel === "soldout" &&
-                    `Sold Out Â· ${soldOutItems.length} items`}
+                    `Sold Out · ${soldOutItems.length} items`}
                   {activePanel === "reorder" &&
-                    `Below Reorder Â· ${belowReorderItems.length} items`}
+                    `Below Reorder · ${belowReorderItems.length} items`}
                   {activePanel === "noprice" &&
-                    `No Sell Price Â· ${noPriceItems.length} items`}
+                    `No Sell Price · ${noPriceItems.length} items`}
                 </div>
                 <div style={{ fontSize: 11, color: T.ink400, marginTop: 3 }}>
                   {activePanel === "soldout" &&
@@ -2289,62 +2161,255 @@ export default function SmartInventory({ tenantId }) {
                   lineHeight: 1,
                 }}
               >
-                Ã—
+                ×
               </button>
             </div>
-
-            {/* Panel body */}
             <div style={{ flex: 1, overflowY: "auto" }}>
-              {/* â”€â”€ SOLD OUT PANEL â”€â”€ */}
-              {activePanel === "soldout" && (
-                <>
-                  {soldOutItems.length === 0 ? (
-                    <div
-                      style={{
-                        padding: 32,
-                        textAlign: "center",
-                        color: T.ink300,
-                        fontSize: 13,
-                      }}
-                    >
-                      ðŸŽ‰ No sold-out items
-                    </div>
-                  ) : (
-                    soldOutItems.map((item) => {
-                      const world = PRODUCT_WORLDS.find(
-                        (w) => w.id !== "all" && itemMatchesWorld(item, w),
-                      );
-                      const isOnOrder = onOrderSet.has(item.id);
-                      const isSavingOrder = onOrderSaving.has(item.id);
-                      return (
-                        <div
-                          key={item.id}
-                          style={{
-                            padding: "12px 20px",
-                            borderBottom: `1px solid ${T.border}`,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            background: isOnOrder ? "#FFFBEB" : T.white,
-                            transition: "background 0.2s",
-                          }}
-                        >
-                          <span style={{ fontSize: 18 }}>
-                            {world?.icon || "ðŸ“¦"}
+              {activePanel === "soldout" &&
+                (soldOutItems.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 32,
+                      textAlign: "center",
+                      color: T.ink300,
+                      fontSize: 13,
+                    }}
+                  >
+                    🎉 No sold-out items
+                  </div>
+                ) : (
+                  soldOutItems.map((item) => {
+                    const world = PRODUCT_WORLDS.find(
+                      (w) => w.id !== "all" && itemMatchesWorld(item, w),
+                    );
+                    const isOnOrder = onOrderSet.has(item.id);
+                    const isSavingOrder = onOrderSaving.has(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: "12px 20px",
+                          borderBottom: `1px solid ${T.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          background: isOnOrder ? "#FFFBEB" : T.white,
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>
+                          {world?.icon || "📦"}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: T.ink900,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: T.ink400,
+                              marginTop: 2,
+                            }}
+                          >
+                            Sell:{" "}
+                            {item.sell_price ? `R${item.sell_price}` : "—"}
+                            {item.sell_price && item.weighted_avg_cost
+                              ? ` · Cost: R${item.weighted_avg_cost}`
+                              : ""}
+                          </div>
+                        </div>
+                        {isOnOrder ? (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: T.amber,
+                              padding: "4px 10px",
+                              borderRadius: 6,
+                              background: T.amberLit,
+                              border: `1px solid ${T.amber}40`,
+                              flexShrink: 0,
+                            }}
+                          >
+                            📦 On Order
                           </span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
+                        ) : (
+                          <div
+                            style={{ display: "flex", gap: 6, flexShrink: 0 }}
+                          >
+                            <button
+                              onClick={() =>
+                                !isSavingOrder && markOnOrder(item.id)
+                              }
+                              disabled={isSavingOrder}
                               style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: T.ink900,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                padding: "5px 10px",
+                                borderRadius: 6,
+                                border: `1px solid ${T.amber}60`,
+                                background: T.amberLit,
+                                color: T.amber,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: T.font,
                               }}
                             >
-                              {item.name}
-                            </div>
+                              {isSavingOrder ? "…" : "On Order"}
+                            </button>
+                            <button
+                              onClick={() => openEdit(item)}
+                              style={{
+                                padding: "5px 12px",
+                                borderRadius: 6,
+                                border: `1px solid ${T.accentBd}`,
+                                background: T.accentLit,
+                                color: T.accentMid,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: T.font,
+                              }}
+                            >
+                              Receive Stock
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ))}
+              {activePanel === "reorder" &&
+                (belowReorderItems.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 32,
+                      textAlign: "center",
+                      color: T.ink300,
+                      fontSize: 13,
+                    }}
+                  >
+                    ✓ All items above reorder level
+                  </div>
+                ) : (
+                  belowReorderItems.map((item) => {
+                    const world = PRODUCT_WORLDS.find(
+                      (w) => w.id !== "all" && itemMatchesWorld(item, w),
+                    );
+                    const isFlagged = flaggedReorder.has(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: "12px 20px",
+                          borderBottom: `1px solid ${T.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>
+                          {world?.icon || "📦"}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: T.ink900,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: 11, marginTop: 2 }}>
+                            <span style={{ color: T.amber, fontWeight: 700 }}>
+                              {item.quantity_on_hand || 0} remaining
+                            </span>
+                            <span style={{ color: T.ink400 }}>
+                              {" "}
+                              · reorder at {item.reorder_level}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => !isFlagged && flagForReorder(item.id)}
+                          style={{
+                            padding: "5px 12px",
+                            borderRadius: 6,
+                            flexShrink: 0,
+                            border: `1px solid ${isFlagged ? T.accentBd : T.amber + "60"}`,
+                            background: isFlagged ? T.accentLit : T.amberLit,
+                            color: isFlagged ? T.accentMid : T.amber,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: isFlagged ? "default" : "pointer",
+                            fontFamily: T.font,
+                          }}
+                        >
+                          {isFlagged ? "✓ Flagged" : "⚑ Flag for Reorder"}
+                        </button>
+                      </div>
+                    );
+                  })
+                ))}
+              {activePanel === "noprice" &&
+                (noPriceItems.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 32,
+                      textAlign: "center",
+                      color: T.ink300,
+                      fontSize: 13,
+                    }}
+                  >
+                    ✓ All items have a sell price
+                  </div>
+                ) : (
+                  noPriceItems.map((item) => {
+                    const world = PRODUCT_WORLDS.find(
+                      (w) => w.id !== "all" && itemMatchesWorld(item, w),
+                    );
+                    const isFixed = noPriceFixed.has(item.id);
+                    const isSaving = noPriceSaving.has(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: "12px 20px",
+                          borderBottom: `1px solid ${T.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          background: isFixed ? "#F0FDF4" : T.white,
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>
+                          {world?.icon || "📦"}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: T.ink900,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.name}
+                          </div>
+                          {item.weighted_avg_cost > 0 && (
                             <div
                               style={{
                                 fontSize: 11,
@@ -2352,334 +2417,104 @@ export default function SmartInventory({ tenantId }) {
                                 marginTop: 2,
                               }}
                             >
-                              Sell:{" "}
-                              {item.sell_price ? `R${item.sell_price}` : "â€”"}
-                              {item.sell_price && item.weighted_avg_cost
-                                ? ` Â· Cost: R${item.weighted_avg_cost}`
-                                : ""}
-                            </div>
-                          </div>
-                          {isOnOrder ? (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: T.amber,
-                                padding: "4px 10px",
-                                borderRadius: 6,
-                                background: T.amberLit,
-                                border: `1px solid ${T.amber}40`,
-                                flexShrink: 0,
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              ðŸ“¦ On Order
-                            </span>
-                          ) : (
-                            <div
-                              style={{ display: "flex", gap: 6, flexShrink: 0 }}
-                            >
-                              <button
-                                onClick={() =>
-                                  !isSavingOrder && markOnOrder(item.id)
-                                }
-                                disabled={isSavingOrder}
-                                style={{
-                                  padding: "5px 10px",
-                                  borderRadius: 6,
-                                  border: `1px solid ${T.amber}60`,
-                                  background: T.amberLit,
-                                  color: T.amber,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  fontFamily: T.font,
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {isSavingOrder ? "â€¦" : "On Order"}
-                              </button>
-                              <button
-                                onClick={() => openEdit(item)}
-                                style={{
-                                  padding: "5px 12px",
-                                  borderRadius: 6,
-                                  border: `1px solid ${T.accentBd}`,
-                                  background: T.accentLit,
-                                  color: T.accentMid,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  fontFamily: T.font,
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                Receive Stock
-                              </button>
+                              Avg cost: R{item.weighted_avg_cost} (reference)
                             </div>
                           )}
                         </div>
-                      );
-                    })
-                  )}
-                </>
-              )}
-
-              {/* â”€â”€ BELOW REORDER PANEL â”€â”€ */}
-              {activePanel === "reorder" && (
-                <>
-                  {belowReorderItems.length === 0 ? (
-                    <div
-                      style={{
-                        padding: 32,
-                        textAlign: "center",
-                        color: T.ink300,
-                        fontSize: 13,
-                      }}
-                    >
-                      âœ“ All items above reorder level
-                    </div>
-                  ) : (
-                    belowReorderItems.map((item) => {
-                      const world = PRODUCT_WORLDS.find(
-                        (w) => w.id !== "all" && itemMatchesWorld(item, w),
-                      );
-                      const isFlagged = flaggedReorder.has(item.id);
-                      return (
-                        <div
-                          key={item.id}
-                          style={{
-                            padding: "12px 20px",
-                            borderBottom: `1px solid ${T.border}`,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                          }}
-                        >
-                          <span style={{ fontSize: 18 }}>
-                            {world?.icon || "ðŸ“¦"}
-                          </span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: T.ink900,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {item.name}
-                            </div>
-                            <div style={{ fontSize: 11, marginTop: 2 }}>
-                              <span style={{ color: T.amber, fontWeight: 700 }}>
-                                {item.quantity_on_hand || 0} remaining
-                              </span>
-                              <span style={{ color: T.ink400 }}>
-                                {" "}
-                                Â· reorder at {item.reorder_level}
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() =>
-                              !isFlagged && flagForReorder(item.id)
-                            }
+                        {isFixed ? (
+                          <span
                             style={{
-                              padding: "5px 12px",
-                              borderRadius: 6,
-                              flexShrink: 0,
-                              border: `1px solid ${isFlagged ? T.accentBd : T.amber + "60"}`,
-                              background: isFlagged ? T.accentLit : T.amberLit,
-                              color: isFlagged ? T.accentMid : T.amber,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: 700,
-                              cursor: isFlagged ? "default" : "pointer",
-                              fontFamily: T.font,
-                              whiteSpace: "nowrap",
+                              color: "#2D6A4F",
+                              flexShrink: 0,
                             }}
                           >
-                            {isFlagged ? "âœ“ Flagged" : "âš‘ Flag for Reorder"}
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                  {belowReorderItems.length > 0 && (
-                    <div
-                      style={{
-                        padding: "12px 20px",
-                        fontSize: 11,
-                        color: T.ink400,
-                        borderTop: `1px solid ${T.border}`,
-                      }}
-                    >
-                      Flagged items are grouped by supplier in the Reorder Queue
-                      (WP-REORDER â€” coming soon)
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* â”€â”€ NO PRICE PANEL â”€â”€ */}
-              {activePanel === "noprice" && (
-                <>
-                  {noPriceItems.length === 0 ? (
-                    <div
-                      style={{
-                        padding: 32,
-                        textAlign: "center",
-                        color: T.ink300,
-                        fontSize: 13,
-                      }}
-                    >
-                      âœ“ All items have a sell price
-                    </div>
-                  ) : (
-                    noPriceItems.map((item) => {
-                      const world = PRODUCT_WORLDS.find(
-                        (w) => w.id !== "all" && itemMatchesWorld(item, w),
-                      );
-                      const isFixed = noPriceFixed.has(item.id);
-                      const isSaving = noPriceSaving.has(item.id);
-                      return (
-                        <div
-                          key={item.id}
-                          style={{
-                            padding: "12px 20px",
-                            borderBottom: `1px solid ${T.border}`,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            background: isFixed ? "#F0FDF4" : T.white,
-                            transition: "background 0.3s",
-                          }}
-                        >
-                          <span style={{ fontSize: 18 }}>
-                            {world?.icon || "ðŸ“¦"}
+                            ✓ Fixed
                           </span>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                        ) : (
+                          <div
+                            style={{ display: "flex", gap: 4, flexShrink: 0 }}
+                          >
                             <div
                               style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: T.ink900,
+                                display: "flex",
+                                alignItems: "center",
+                                border: `1px solid ${T.border}`,
+                                borderRadius: 6,
                                 overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
                               }}
                             >
-                              {item.name}
-                            </div>
-                            {item.weighted_avg_cost > 0 && (
-                              <div
+                              <span
                                 style={{
-                                  fontSize: 11,
+                                  padding: "5px 6px 5px 8px",
+                                  fontSize: 12,
                                   color: T.ink400,
-                                  marginTop: 2,
+                                  background: T.ink50,
                                 }}
                               >
-                                Avg cost: R{item.weighted_avg_cost} (reference)
-                              </div>
-                            )}
-                          </div>
-                          {isFixed ? (
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: "#2D6A4F",
-                                flexShrink: 0,
-                              }}
-                            >
-                              âœ“ Fixed
-                            </span>
-                          ) : (
-                            <div
-                              style={{ display: "flex", gap: 4, flexShrink: 0 }}
-                            >
-                              <div
+                                R
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={noPriceDraft[item.id] || ""}
+                                onChange={(e) =>
+                                  setNoPriceDraft((p) => ({
+                                    ...p,
+                                    [item.id]: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) =>
+                                  e.key === "Enter" && saveNoPrice(item.id)
+                                }
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  border: `1px solid ${T.border}`,
-                                  borderRadius: 6,
-                                  overflow: "hidden",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    padding: "5px 6px 5px 8px",
-                                    fontSize: 12,
-                                    color: T.ink400,
-                                    background: T.ink50,
-                                  }}
-                                >
-                                  R
-                                </span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder="0.00"
-                                  value={noPriceDraft[item.id] || ""}
-                                  onChange={(e) =>
-                                    setNoPriceDraft((p) => ({
-                                      ...p,
-                                      [item.id]: e.target.value,
-                                    }))
-                                  }
-                                  onKeyDown={(e) =>
-                                    e.key === "Enter" && saveNoPrice(item.id)
-                                  }
-                                  style={{
-                                    width: 72,
-                                    padding: "5px 6px",
-                                    border: "none",
-                                    fontSize: 12,
-                                    outline: "none",
-                                    fontFamily: T.font,
-                                  }}
-                                />
-                              </div>
-                              <button
-                                onClick={() => saveNoPrice(item.id)}
-                                disabled={!noPriceDraft[item.id] || isSaving}
-                                style={{
-                                  padding: "5px 10px",
-                                  borderRadius: 6,
+                                  width: 72,
+                                  padding: "5px 6px",
                                   border: "none",
-                                  background: noPriceDraft[item.id]
-                                    ? T.accent
-                                    : T.ink150,
-                                  color: noPriceDraft[item.id]
-                                    ? "#fff"
-                                    : T.ink300,
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  cursor: noPriceDraft[item.id]
-                                    ? "pointer"
-                                    : "not-allowed",
+                                  fontSize: 12,
+                                  outline: "none",
                                   fontFamily: T.font,
                                 }}
-                              >
-                                {isSaving ? "â€¦" : "Save"}
-                              </button>
+                              />
                             </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </>
-              )}
+                            <button
+                              onClick={() => saveNoPrice(item.id)}
+                              disabled={!noPriceDraft[item.id] || isSaving}
+                              style={{
+                                padding: "5px 10px",
+                                borderRadius: 6,
+                                border: "none",
+                                background: noPriceDraft[item.id]
+                                  ? T.accent
+                                  : T.ink150,
+                                color: noPriceDraft[item.id]
+                                  ? "#fff"
+                                  : T.ink300,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: noPriceDraft[item.id]
+                                  ? "pointer"
+                                  : "not-allowed",
+                                fontFamily: T.font,
+                              }}
+                            >
+                              {isSaving ? "…" : "Save"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* â”€â”€ WORLD PICKER â€” shown when Add Item clicked from "All Products" â”€â”€ */}
+      {/* ── WORLD PICKER ─────────────────────────────────────────────── */}
       {showWorldPicker && (
         <div
           onClick={() => setShowWorldPicker(false)}
@@ -2725,7 +2560,7 @@ export default function SmartInventory({ tenantId }) {
                   What are you adding?
                 </div>
                 <div style={{ fontSize: 12, color: T.ink400 }}>
-                  Choose a product type â€” the form adapts with the right fields
+                  Choose a product type — the form adapts with the right fields
                 </div>
               </div>
               <button
@@ -2738,7 +2573,7 @@ export default function SmartInventory({ tenantId }) {
                   color: T.ink400,
                 }}
               >
-                Ã—
+                ×
               </button>
             </div>
             <div
@@ -2780,7 +2615,7 @@ export default function SmartInventory({ tenantId }) {
                   }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 6 }}>
-                    {world.icon || "ðŸ“¦"}
+                    {world.icon || "📦"}
                   </div>
                   <div
                     style={{
@@ -2804,21 +2639,17 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* â”€â”€ SC-02: STOCK ITEM PANEL â€” slide-in on single click â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── SC-02: STOCK ITEM PANEL ───────────────────────────────────── */}
       {panelItem && (
         <StockItemPanel
           item={panelItem}
           onClose={() => setPanelItem(null)}
-          onEdit={() => {
-            // Opens StockItemModal on top of panel â€” panel stays behind
-            openEdit(panelItem);
-          }}
+          onEdit={() => openEdit(panelItem)}
           onRefresh={handlePanelRefresh}
         />
       )}
 
-      {/* â”€â”€ STOCKITEMMODAL â€” world-specific add / edit form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      {/* z-index wrapper ensures modal appears above StockItemPanel (z:1051) */}
+      {/* ── STOCKITEMMODAL ────────────────────────────────────────────── */}
       {modalItem !== undefined && (
         <div
           style={{
@@ -2860,7 +2691,7 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* â”€â”€ DELETE CONFIRM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── DELETE CONFIRM ────────────────────────────────────────────── */}
       {delConfirm && (
         <Modal
           onClose={() => setDelConfirm(null)}
@@ -2893,10 +2724,9 @@ export default function SmartInventory({ tenantId }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// SMART PILL BOX
-// Category pills â†’ sub-category pills cascade â†’ search bar
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────
+// SMART PILL BOX — 3-level nesting doll navigation
+// ─────────────────────────────────────────────────────────────────────────
 function SmartPillBox({
   catFilter,
   groupFilter,
@@ -2910,7 +2740,6 @@ function SmartPillBox({
   onExpandPills,
   onCollapsePills,
 }) {
-  // â”€â”€ Live counts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const counts = useMemo(() => {
     const m = { all: items.length };
     PRODUCT_WORLDS.filter((w) => w.id !== "all").forEach((w) => {
@@ -2919,6 +2748,7 @@ function SmartPillBox({
     return m;
   }, [items]);
 
+  // eslint-disable-next-line no-unused-vars
   const groupCounts = useMemo(() => {
     if (catFilter === "all" || !PILL_HIERARCHY[catFilter]) return {};
     const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
@@ -2959,7 +2789,6 @@ function SmartPillBox({
 
   const activeGroups =
     catFilter !== "all" ? PILL_HIERARCHY[catFilter]?.groups || [] : [];
-  // 0 = home, 1 = categories open, 2 = world selected
   const navLevel = !pillExpanded ? 0 : catFilter === "all" ? 1 : 2;
 
   const pillBase = (active, accent, T) => ({
@@ -2979,7 +2808,6 @@ function SmartPillBox({
     transition: "all 0.12s",
     flexShrink: 0,
   });
-
   const countBadge = (n, active) => ({
     background: active ? "rgba(255,255,255,0.28)" : T.ink50,
     color: active ? "#fff" : T.ink400,
@@ -2989,7 +2817,6 @@ function SmartPillBox({
     fontWeight: 700,
     display: "inline-block",
   });
-
   const navBtnStyle = {
     padding: "4px 11px",
     borderRadius: 99,
@@ -3010,12 +2837,8 @@ function SmartPillBox({
 
   return (
     <div style={{ paddingBottom: 4 }}>
-      <style>{`
-        .nuai-pill-row::-webkit-scrollbar { display: none; }
-        .nuai-pill-row { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+      <style>{`.nuai-pill-row::-webkit-scrollbar { display: none; } .nuai-pill-row { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
 
-      {/* â”€â”€ MAIN PILL ROW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         className="nuai-pill-row"
         style={{
@@ -3027,7 +2850,7 @@ function SmartPillBox({
           alignItems: "center",
         }}
       >
-        {/* All â€” always visible, always resets */}
+        {/* All — always visible */}
         <button
           onClick={() => {
             onSelectCat("all");
@@ -3035,24 +2858,22 @@ function SmartPillBox({
           }}
           style={pillBase(navLevel === 0, T.accent, T)}
         >
-          <span>â—</span>
+          <span>●</span>
           <span>All</span>
           <span style={countBadge(counts.all, navLevel === 0)}>
             {counts.all}
           </span>
         </button>
 
-        {/* Level 0: Categories gateway pill */}
         {navLevel === 0 && (
           <button onClick={onExpandPills} style={pillBase(false, T.accent, T)}>
-            <span>ðŸ—‚</span>
+            <span>🗂</span>
             <span>Categories</span>
             <span style={countBadge(14, false)}>14</span>
-            <span style={{ fontSize: 8, opacity: 0.4 }}>â–¼</span>
+            <span style={{ fontSize: 8, opacity: 0.4 }}>▼</span>
           </button>
         )}
 
-        {/* Level 1: back + 14 world pills */}
         {navLevel === 1 && (
           <>
             <button
@@ -3060,7 +2881,7 @@ function SmartPillBox({
               style={navBtnStyle}
               title="Back to home"
             >
-              â€¹ Back
+              ‹ Back
             </button>
             {PRODUCT_WORLDS.filter((w) => w.id !== "all").map((w) => {
               const cnt = counts[w.id] || 0;
@@ -3070,7 +2891,7 @@ function SmartPillBox({
                   onClick={() => onSelectCat(w.id)}
                   style={pillBase(false, T.accent, T)}
                 >
-                  <span>{w.icon || "ðŸ“¦"}</span>
+                  <span>{w.icon || "📦"}</span>
                   <span>{w.label}</span>
                   <span style={countBadge(cnt, false)}>{cnt}</span>
                 </button>
@@ -3079,7 +2900,6 @@ function SmartPillBox({
           </>
         )}
 
-        {/* Level 2: back + active world breadcrumb */}
         {navLevel === 2 &&
           (() => {
             const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
@@ -3093,12 +2913,12 @@ function SmartPillBox({
                   style={navBtnStyle}
                   title="Back to categories"
                 >
-                  â€¹ Back
+                  ‹ Back
                 </button>
                 <button
                   style={{ ...pillBase(true, T.accent, T), cursor: "default" }}
                 >
-                  <span>{world?.icon || "ðŸ“¦"}</span>
+                  <span>{world?.icon || "📦"}</span>
                   <span>{world?.label || catFilter}</span>
                   <span style={countBadge(counts[catFilter] || 0, true)}>
                     {counts[catFilter] || 0}
@@ -3108,7 +2928,6 @@ function SmartPillBox({
             );
           })()}
 
-        {/* Ã— close â€” right side */}
         {navLevel > 0 && (
           <button
             onClick={() => {
@@ -3124,14 +2943,14 @@ function SmartPillBox({
               border: `1.5px solid ${T.border}`,
               marginLeft: "auto",
             }}
-            title="Close â€” back to All"
+            title="Close — back to All"
           >
-            Ã—
+            ×
           </button>
         )}
       </div>
 
-      {/* â”€â”€ TIER 2: All group subs shown inline when a world is selected â”€â”€ */}
+      {/* Sub-pills flat by group — Level 2 */}
       {navLevel === 2 && activeGroups.length > 0 && (
         <div
           style={{
@@ -3234,7 +3053,6 @@ function SmartPillBox({
         </div>
       )}
 
-      {/* â”€â”€ Active filter chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {subFilter && groupFilter && (
         <div
           style={{
@@ -3261,7 +3079,7 @@ function SmartPillBox({
             }}
           >
             {activeGroups.find((g) => g.id === groupFilter)?.icon}{" "}
-            {activeGroups.find((g) => g.id === groupFilter)?.label} â†’{" "}
+            {activeGroups.find((g) => g.id === groupFilter)?.label} →{" "}
             {
               activeGroups
                 .find((g) => g.id === groupFilter)
@@ -3282,7 +3100,7 @@ function SmartPillBox({
                 opacity: 0.6,
               }}
             >
-              Ã—
+              ×
             </button>
           </span>
         </div>
@@ -3291,7 +3109,7 @@ function SmartPillBox({
   );
 }
 
-// SC-03: stock status helpers (used in all 3 views)
+// SC-03 helpers
 const isSoldOut = (item) => (item.quantity_on_hand || 0) === 0;
 const isLowStock = (item) =>
   (item.reorder_level || 0) > 0 &&
@@ -3323,7 +3141,7 @@ function StockChip({ type, T }) {
   );
 }
 
-// â”€â”€ Smart tag extractor (SC-05) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SC-05 smart tags
 function getSmartTags(item) {
   const vv = (item.variant_value || "").trim();
   const brand = (item.brand || "").trim();
@@ -3410,7 +3228,6 @@ function TileView({
               if (!menuOpen) onOpenPanel(item);
             }}
           >
-            {/* Category banner */}
             <div
               style={{
                 background: T.accentLit,
@@ -3422,7 +3239,7 @@ function TileView({
               }}
             >
               <span style={{ fontSize: 16 }}>
-                {CATEGORY_ICONS[item.category] || "ðŸ“¦"}
+                {CATEGORY_ICONS[item.category] || "📦"}
               </span>
               {(() => {
                 const w = PRODUCT_WORLDS.find(
@@ -3443,7 +3260,7 @@ function TileView({
                 );
               })()}
               {item.is_featured && (
-                <span style={{ marginLeft: "auto", fontSize: 10 }}>â˜…</span>
+                <span style={{ marginLeft: "auto", fontSize: 10 }}>★</span>
               )}
               {soldOut && (
                 <span style={{ marginLeft: item.is_featured ? 4 : "auto" }}>
@@ -3456,8 +3273,6 @@ function TileView({
                 </span>
               )}
             </div>
-
-            {/* â‹¯ hover action trigger */}
             {isHovered && (
               <button
                 onClick={(e) => {
@@ -3482,11 +3297,9 @@ function TileView({
                   letterSpacing: 1,
                 }}
               >
-                Â·Â·Â·
+                ···
               </button>
             )}
-
-            {/* Action footer â€” opens on Â·Â·Â· click */}
             {menuOpen && (
               <div
                 style={{
@@ -3503,17 +3316,17 @@ function TileView({
               >
                 {[
                   {
-                    label: "âœ Edit",
+                    label: "✏ Edit",
                     action: () => onEdit(item),
                     color: T.accent,
                   },
                   {
-                    label: item.is_active ? "ðŸ‘ Hide" : "ðŸ‘ Show",
+                    label: item.is_active ? "👁 Hide" : "👁 Show",
                     action: () => onToggle(item, "is_active"),
                     color: T.amber,
                   },
                   {
-                    label: "ðŸ—‘ Del",
+                    label: "🗑 Del",
                     action: () => onDelete(item),
                     color: T.danger,
                   },
@@ -3543,8 +3356,6 @@ function TileView({
                 ))}
               </div>
             )}
-
-            {/* Body */}
             <div style={{ padding: "12px 14px" }}>
               <div
                 style={{
@@ -3558,8 +3369,6 @@ function TileView({
               >
                 {item.name}
               </div>
-
-              {/* Smart tags */}
               {tags.length > 0 && (
                 <div
                   style={{
@@ -3589,8 +3398,6 @@ function TileView({
                   ))}
                 </div>
               )}
-
-              {/* Price + margin */}
               <div
                 style={{
                   display: "flex",
@@ -3602,7 +3409,7 @@ function TileView({
                 <span
                   style={{ fontWeight: 800, fontSize: 15, color: T.accentMid }}
                 >
-                  {item.sell_price ? zar(item.sell_price) : "â€”"}
+                  {item.sell_price ? zar(item.sell_price) : "—"}
                 </span>
                 {m !== null && (
                   <span
@@ -3616,8 +3423,6 @@ function TileView({
                   </span>
                 )}
               </div>
-
-              {/* Stock indicator */}
               <div style={{ marginBottom: 10 }}>
                 {soldOut ? (
                   <StockBadge
@@ -3639,8 +3444,6 @@ function TileView({
                   />
                 )}
               </div>
-
-              {/* Cost */}
               {item.weighted_avg_cost > 0 && (
                 <div style={{ fontSize: 11, color: T.ink400 }}>
                   Cost: {zar(item.weighted_avg_cost)}
@@ -3664,7 +3467,6 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
         overflow: "hidden",
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: "grid",
@@ -3687,7 +3489,6 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
         <span style={{ textAlign: "right" }}>Margin</span>
         <span style={{ textAlign: "center" }}>Actions</span>
       </div>
-
       {items.map((item, idx) => {
         const m = margin(item.sell_price, item.weighted_avg_cost);
         const soldOut = isSoldOut(item);
@@ -3709,16 +3510,12 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                   : "3px solid transparent",
               opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
               cursor: "pointer",
-              transition: "border-color 0.12s",
             }}
             onClick={() => onOpenPanel(item)}
           >
-            {/* Icon */}
             <span style={{ fontSize: 18, textAlign: "center" }}>
-              {CATEGORY_ICONS[item.category] || "ðŸ“¦"}
+              {CATEGORY_ICONS[item.category] || "📦"}
             </span>
-
-            {/* Name + stock chip */}
             <div>
               <div
                 style={{
@@ -3736,12 +3533,10 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
               </div>
               {item.is_featured && (
                 <span style={{ fontSize: 10, color: T.amber }}>
-                  â­ Featured
+                  ⭐ Featured
                 </span>
               )}
             </div>
-
-            {/* Category */}
             <span
               style={{
                 fontSize: 11,
@@ -3770,8 +3565,6 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 );
               })()}
             </span>
-
-            {/* Qty */}
             <span
               style={{
                 textAlign: "right",
@@ -3786,8 +3579,6 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
             >
               {item.quantity_on_hand ?? 0}
             </span>
-
-            {/* Price */}
             <span
               style={{
                 textAlign: "right",
@@ -3796,10 +3587,8 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 color: T.ink900,
               }}
             >
-              {item.sell_price ? zar(item.sell_price) : "â€”"}
+              {item.sell_price ? zar(item.sell_price) : "—"}
             </span>
-
-            {/* Margin */}
             <span
               style={{
                 textAlign: "right",
@@ -3808,10 +3597,8 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
                 color: m !== null ? marginColor(m) : T.ink300,
               }}
             >
-              {m !== null ? pct(m) : "â€”"}
+              {m !== null ? pct(m) : "—"}
             </span>
-
-            {/* Actions */}
             <div
               style={{ display: "flex", gap: 4, justifyContent: "center" }}
               onClick={(e) => e.stopPropagation()}
@@ -3836,9 +3623,9 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// DETAIL VIEW (Excel-style sortable + filterable table)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────
+// DETAIL VIEW — with _row column + drag-to-reorder headers
+// ─────────────────────────────────────────────────────────────────────────
 function DetailView({
   items,
   sortKey,
@@ -3854,7 +3641,7 @@ function DetailView({
   onOpenPanel,
   T,
 }) {
-  // â”€â”€ Resizable columns â€” drag the border between headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Resizable columns
   const [colWidths, setColWidths] = useState(() => {
     try {
       const s = localStorage.getItem("nuai_detail_col_widths");
@@ -3866,6 +3653,63 @@ function DetailView({
     }
   });
   const resizing = useRef(null);
+
+  // Drag-to-reorder columns
+  const [colOrder, setColOrder] = useState(() => {
+    try {
+      const s = localStorage.getItem("nuai_col_order");
+      return s ? JSON.parse(s) : DETAIL_COLS.map((c) => c.key);
+    } catch {
+      return DETAIL_COLS.map((c) => c.key);
+    }
+  });
+  const dragCol = useRef(null);
+  const [dragOverKey, setDragOverKey] = useState(null);
+
+  const handleDragStart = (e, key) => {
+    if (key === "_row" || key === "_actions") {
+      e.preventDefault();
+      return;
+    }
+    dragCol.current = key;
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleDragOver = (e, key) => {
+    if (key === "_row" || key === "_actions" || !dragCol.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverKey(key);
+  };
+  const handleDrop = (e, targetKey) => {
+    e.preventDefault();
+    setDragOverKey(null);
+    if (
+      !dragCol.current ||
+      dragCol.current === targetKey ||
+      targetKey === "_row" ||
+      targetKey === "_actions"
+    ) {
+      dragCol.current = null;
+      return;
+    }
+    setColOrder((prev) => {
+      const next = [...prev];
+      const fromIdx = next.indexOf(dragCol.current);
+      const toIdx = next.indexOf(targetKey);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, dragCol.current);
+      try {
+        localStorage.setItem("nuai_col_order", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    dragCol.current = null;
+  };
+  const handleDragEnd = () => {
+    dragCol.current = null;
+    setDragOverKey(null);
+  };
 
   const startResize = (e, colKey) => {
     e.preventDefault();
@@ -3884,10 +3728,7 @@ function DetailView({
       setColWidths((prev) => {
         const next = { ...prev, [resizing.current.key]: newW };
         try {
-          localStorage.setItem(
-            "nuai_detail_col_widths",
-            JSON.stringify(next),
-          );
+          localStorage.setItem("nuai_detail_col_widths", JSON.stringify(next));
         } catch {}
         return next;
       });
@@ -3901,8 +3742,19 @@ function DetailView({
     document.addEventListener("mouseup", onUp);
   };
 
-  // Only show columns that aren't hidden
-  const visibleCols = DETAIL_COLS.filter((c) => !hiddenCols.has(c.key));
+  // Build ordered, visible columns using colOrder
+  const visibleCols = useMemo(() => {
+    // Ensure colOrder has all current keys, add any missing ones
+    const allKeys = DETAIL_COLS.map((c) => c.key);
+    const ordered = [
+      ...colOrder.filter((k) => allKeys.includes(k)),
+      ...allKeys.filter((k) => !colOrder.includes(k)),
+    ];
+    return ordered
+      .map((key) => DETAIL_COLS.find((c) => c.key === key))
+      .filter((c) => c && !hiddenCols.has(c.key));
+  }, [colOrder, hiddenCols]);
+
   const totalWidth = visibleCols.reduce(
     (s, c) => s + (colWidths[c.key] || c.width),
     0,
@@ -3933,7 +3785,6 @@ function DetailView({
             />
           ))}
         </colgroup>
-        {/* Header */}
         <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
           <tr
             style={{
@@ -3941,86 +3792,115 @@ function DetailView({
               borderBottom: `2px solid ${T.borderDark}`,
             }}
           >
-            {visibleCols.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => col.sortable && onSort(col.key)}
-                style={{
-                  padding: "9px 10px",
-                  textAlign: col.align || "left",
-                  fontWeight: 700,
-                  fontSize: 11,
-                  color: sortKey === col.key ? T.accent : T.ink400,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  cursor: col.sortable ? "pointer" : "default",
-                  userSelect: "none",
-                  background: sortKey === col.key ? T.accentXlit : T.ink50,
-                  position: "relative",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <span
+            {visibleCols.map((col) => {
+              const isDraggable = col.key !== "_row" && col.key !== "_actions";
+              const isOver = dragOverKey === col.key;
+              return (
+                <th
+                  key={col.key}
+                  draggable={isDraggable}
+                  onDragStart={
+                    isDraggable ? (e) => handleDragStart(e, col.key) : undefined
+                  }
+                  onDragOver={
+                    isDraggable ? (e) => handleDragOver(e, col.key) : undefined
+                  }
+                  onDrop={
+                    isDraggable ? (e) => handleDrop(e, col.key) : undefined
+                  }
+                  onDragEnd={handleDragEnd}
+                  onClick={() => col.sortable && onSort(col.key)}
                   style={{
-                    display: "block",
+                    padding: "9px 10px",
+                    textAlign: col.align || "left",
+                    fontWeight: 700,
+                    fontSize: 11,
+                    color: sortKey === col.key ? T.accent : T.ink400,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    cursor: col.sortable
+                      ? "pointer"
+                      : isDraggable
+                        ? "grab"
+                        : "default",
+                    userSelect: "none",
+                    background: isOver
+                      ? T.accentLit
+                      : sortKey === col.key
+                        ? T.accentXlit
+                        : T.ink50,
+                    position: "relative",
                     overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    paddingRight: col.key !== "_actions" ? 8 : 0,
+                    whiteSpace: "nowrap",
+                    transition: "background 0.1s",
+                    outline: isOver ? `2px solid ${T.accentMid}` : "none",
                   }}
                 >
-                  {col.label}
-                  {col.sortable && sortKey === col.key && (
-                    <span style={{ marginLeft: 4 }}>
-                      {sortDir === "asc" ? "â†‘" : "â†“"}
-                    </span>
-                  )}
-                </span>
-                {/* Resize handle */}
-                {col.key !== "_actions" && (
                   <span
-                    onMouseDown={(e) => startResize(e, col.key)}
-                    onClick={(e) => e.stopPropagation()}
-                    title="Drag to resize column"
                     style={{
-                      position: "absolute",
-                      top: 0,
-                      right: 0,
-                      width: 8,
-                      height: "100%",
-                      cursor: "col-resize",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      zIndex: 2,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.querySelector("i").style.background =
-                        T.accentMid;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.querySelector("i").style.background =
-                        T.borderDark;
+                      display: "block",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      paddingRight: col.key !== "_actions" ? 8 : 0,
                     }}
                   >
-                    <i
-                      style={{
-                        display: "block",
-                        width: 2,
-                        height: "55%",
-                        background: T.borderDark,
-                        borderRadius: 1,
-                        pointerEvents: "none",
-                        transition: "background 0.12s",
-                      }}
-                    />
+                    {col.label}
+                    {col.sortable && sortKey === col.key && (
+                      <span style={{ marginLeft: 4 }}>
+                        {sortDir === "asc" ? "↑" : "↓"}
+                      </span>
+                    )}
+                    {isDraggable && !col.sortable && (
+                      <span
+                        style={{ marginLeft: 4, opacity: 0.3, fontSize: 9 }}
+                      >
+                        ⠿
+                      </span>
+                    )}
                   </span>
-                )}
-              </th>
-            ))}
+                  {col.key !== "_actions" && col.key !== "_row" && (
+                    <span
+                      onMouseDown={(e) => startResize(e, col.key)}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Drag to resize"
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        width: 8,
+                        height: "100%",
+                        cursor: "col-resize",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 2,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.querySelector("i").style.background =
+                          T.accentMid;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.querySelector("i").style.background =
+                          T.borderDark;
+                      }}
+                    >
+                      <i
+                        style={{
+                          display: "block",
+                          width: 2,
+                          height: "55%",
+                          background: T.borderDark,
+                          borderRadius: 1,
+                          pointerEvents: "none",
+                          transition: "background 0.12s",
+                        }}
+                      />
+                    </span>
+                  )}
+                </th>
+              );
+            })}
           </tr>
-
-          {/* Column filter row */}
           {filterRowOpen && (
             <tr
               style={{
@@ -4039,11 +3919,12 @@ function DetailView({
                   {col.key !== "_actions" &&
                   col.key !== "_margin" &&
                   col.key !== "is_active" &&
-                  col.key !== "is_featured" ? (
+                  col.key !== "is_featured" &&
+                  col.key !== "_row" ? (
                     <input
                       value={colFilters[col.key] || ""}
                       onChange={(e) => onColFilter(col.key, e.target.value)}
-                      placeholder="Filterâ€¦"
+                      placeholder="Filter…"
                       style={{
                         width: "100%",
                         padding: "3px 6px",
@@ -4062,7 +3943,6 @@ function DetailView({
             </tr>
           )}
         </thead>
-
         <tbody>
           {items.map((item, idx) => {
             const m = margin(item.sell_price, item.weighted_avg_cost);
@@ -4099,6 +3979,19 @@ function DetailView({
                       textOverflow: "ellipsis",
                     }}
                   >
+                    {/* _row: row number */}
+                    {col.key === "_row" && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink300,
+                          fontWeight: 600,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {idx + 1}
+                      </span>
+                    )}
                     {col.key === "name" && (
                       <div
                         style={{
@@ -4108,7 +4001,7 @@ function DetailView({
                         }}
                       >
                         <span style={{ fontSize: 14 }}>
-                          {CATEGORY_ICONS[item.category] || "ðŸ“¦"}
+                          {CATEGORY_ICONS[item.category] || "📦"}
                         </span>
                         <span style={{ fontWeight: 600, color: T.ink900 }}>
                           {item.name}
@@ -4116,9 +4009,20 @@ function DetailView({
                         {soldOut && <StockChip type="out" T={T} />}
                         {lowStock && <StockChip type="low" T={T} />}
                         {item.is_featured && (
-                          <span style={{ fontSize: 10 }}>â­</span>
+                          <span style={{ fontSize: 10 }}>⭐</span>
                         )}
                       </div>
+                    )}
+                    {col.key === "sku" && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: T.ink500,
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {item.sku || "—"}
+                      </span>
                     )}
                     {col.key === "category" &&
                       (() => {
@@ -4166,14 +4070,14 @@ function DetailView({
                     )}
                     {col.key === "sell_price" && (
                       <span style={{ fontWeight: 600 }}>
-                        {item.sell_price ? zar(item.sell_price) : "â€”"}
+                        {item.sell_price ? zar(item.sell_price) : "—"}
                       </span>
                     )}
                     {col.key === "weighted_avg_cost" && (
                       <span>
                         {item.weighted_avg_cost
                           ? zar(item.weighted_avg_cost)
-                          : "â€”"}
+                          : "—"}
                       </span>
                     )}
                     {col.key === "_margin" && (
@@ -4183,7 +4087,7 @@ function DetailView({
                           color: m !== null ? marginColor(m) : T.ink300,
                         }}
                       >
-                        {m !== null ? pct(m) : "â€”"}
+                        {m !== null ? pct(m) : "—"}
                       </span>
                     )}
                     {col.key === "is_active" && (
@@ -4221,23 +4125,12 @@ function DetailView({
                           fontFamily: T.font,
                         }}
                       >
-                        {item.is_featured ? "â­ Yes" : "No"}
+                        {item.is_featured ? "⭐ Yes" : "No"}
                       </button>
                     )}
                     {col.key === "loyalty_category" && (
                       <span style={{ fontSize: 11, color: T.ink400 }}>
-                        {item.loyalty_category || "â€”"}
-                      </span>
-                    )}
-                    {col.key === "sku" && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: T.ink500,
-                          fontFamily: "monospace",
-                        }}
-                      >
-                        {item.sku || "â€”"}
+                        {item.loyalty_category || "—"}
                       </span>
                     )}
                     {col.key === "reorder_level" && (
@@ -4248,18 +4141,26 @@ function DetailView({
                             (item.reorder_level || 0) > 0 ? T.ink700 : T.ink300,
                         }}
                       >
-                        {item.reorder_level || "â€”"}
+                        {item.reorder_level || "—"}
                       </span>
                     )}
                     {col.key === "max_stock_level" && (
                       <span style={{ color: T.ink400 }}>
-                        {item.max_stock_level || "â€”"}
+                        {item.max_stock_level || "—"}
                       </span>
                     )}
                     {col.key === "supplier" && (
                       <span style={{ fontSize: 11, color: T.ink500 }}>
-                        {item.suppliers?.name || "â€”"}
+                        {item.suppliers?.name || "—"}
                       </span>
+                    )}
+                    {col.key === "variant_value" && (
+                      <span style={{ fontSize: 11, color: T.ink500 }}>
+                        {item.variant_value || "—"}
+                      </span>
+                    )}
+                    {col.key === "brand" && (
+                      <span style={{ fontSize: 11 }}>{item.brand || "—"}</span>
                     )}
                     {col.key === "_actions" && (
                       <div
@@ -4270,14 +4171,14 @@ function DetailView({
                         }}
                       >
                         <SmallBtn
-                          label="âœŽ"
+                          label="✎"
                           onClick={() => onEdit(item)}
                           color={T.accent}
                           T={T}
                           title="Edit"
                         />
                         <SmallBtn
-                          label="âœ•"
+                          label="✕"
                           onClick={() => onDelete(item)}
                           color={T.danger}
                           T={T}
@@ -4296,10 +4197,7 @@ function DetailView({
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// EDIT PANEL (right side slide-in)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// eslint-disable-next-line no-unused-vars -- kept: fallback form (ItemForm uses EditPanel internals)
+// eslint-disable-next-line no-unused-vars
 function EditPanel({
   item,
   draft,
@@ -4324,7 +4222,6 @@ function EditPanel({
         boxShadow: "-4px 0 16px rgba(0,0,0,0.06)",
       }}
     >
-      {/* Header */}
       <div
         style={{
           padding: "14px 18px",
@@ -4337,10 +4234,10 @@ function EditPanel({
       >
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: T.ink900 }}>
-            {CATEGORY_ICONS[item.category] || "ðŸ“¦"} Edit Item
+            {CATEGORY_ICONS[item.category] || "📦"} Edit Item
           </div>
           <div style={{ fontSize: 11, color: T.ink400, marginTop: 1 }}>
-            ID: {item.id?.slice(0, 8)}â€¦
+            ID: {item.id?.slice(0, 8)}…
           </div>
         </div>
         <button
@@ -4353,11 +4250,9 @@ function EditPanel({
             color: T.ink400,
           }}
         >
-          Ã—
+          ×
         </button>
       </div>
-
-      {/* Form body */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px" }}>
         <ItemForm
           draft={draft}
@@ -4375,9 +4270,6 @@ function EditPanel({
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// ITEM FORM (shared between edit panel + add modal)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ItemForm({
   draft,
   onChange,
@@ -4408,14 +4300,13 @@ function ItemForm({
             {field.label}
             {field.required && <span style={{ color: T.danger }}> *</span>}
           </label>
-
           {field.type === "select" ? (
             <select
               value={draft[field.key] || ""}
               onChange={(e) => onChange(field.key, e.target.value)}
               style={inputStyle(T)}
             >
-              <option value="">â€” Select â€”</option>
+              <option value="">— Select —</option>
               {field.options.map((opt) => (
                 <option key={opt} value={opt}>
                   {field.key === "category"
@@ -4443,13 +4334,6 @@ function ItemForm({
                 {Boolean(draft[field.key]) ? "Yes" : "No"}
               </span>
             </label>
-          ) : field.type === "textarea" ? (
-            <textarea
-              value={draft[field.key] || ""}
-              onChange={(e) => onChange(field.key, e.target.value)}
-              rows={3}
-              style={{ ...inputStyle(T), resize: "vertical", lineHeight: 1.5 }}
-            />
           ) : (
             <input
               type={field.type}
@@ -4461,8 +4345,6 @@ function ItemForm({
           )}
         </div>
       ))}
-
-      {/* Supplier selector */}
       {suppliers?.length > 0 && (
         <div style={{ marginBottom: 14 }}>
           <label
@@ -4483,7 +4365,7 @@ function ItemForm({
             onChange={(e) => onChange("supplier_id", e.target.value)}
             style={inputStyle(T)}
           >
-            <option value="">â€” No supplier â€”</option>
+            <option value="">— No supplier —</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -4492,8 +4374,6 @@ function ItemForm({
           </select>
         </div>
       )}
-
-      {/* Margin preview */}
       {draft.sell_price > 0 && draft.weighted_avg_cost > 0 && (
         <div
           style={{
@@ -4522,13 +4402,11 @@ function ItemForm({
           </span>
         </div>
       )}
-
-      {/* Error */}
       {error && (
         <div
           style={{
             background: T.dangerLit,
-            border: `1px solid #FCA5A5`,
+            border: "1px solid #FCA5A5",
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 12,
@@ -4536,11 +4414,9 @@ function ItemForm({
             marginBottom: 12,
           }}
         >
-          âš ï¸ {error}
+          ⚠️ {error}
         </div>
       )}
-
-      {/* Actions */}
       <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
         {onDelete && !isNew && (
           <button
@@ -4568,21 +4444,18 @@ function ItemForm({
             opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? "Savingâ€¦" : isNew ? "Add Item" : "Save Changes"}
+          {saving ? "Saving…" : isNew ? "Add Item" : "Save Changes"}
         </button>
       </div>
     </div>
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// VIEW TOGGLE
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ViewToggle({ current, onChange, T }) {
   const views = [
-    { id: VIEW_TILE, label: "âŠž", title: "Tile view" },
-    { id: VIEW_LIST, label: "â˜°", title: "List view" },
-    { id: VIEW_DETAIL, label: "âŠŸ", title: "Detail / Excel view" },
+    { id: VIEW_TILE, label: "⊞", title: "Tile view" },
+    { id: VIEW_LIST, label: "☰", title: "List view" },
+    { id: VIEW_DETAIL, label: "⊟", title: "Detail / Excel view" },
   ];
   return (
     <div
@@ -4618,9 +4491,6 @@ function ViewToggle({ current, onChange, T }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// MODAL wrapper
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Modal({
   children,
   onClose,
@@ -4678,7 +4548,7 @@ function Modal({
               color: T.ink400,
             }}
           >
-            Ã—
+            ×
           </button>
         </div>
         <div style={{ overflowY: "auto", padding: "18px 20px" }}>
@@ -4689,10 +4559,7 @@ function Modal({
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// MICRO COMPONENTS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// eslint-disable-next-line no-unused-vars -- kept: may be reused in future panels
+// eslint-disable-next-line no-unused-vars
 function StatPill({ label, value, color }) {
   return (
     <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
@@ -4760,7 +4627,6 @@ function LoadingState({ T }) {
   return (
     <div style={{ padding: "4px 0" }}>
       <style>{`@keyframes nuai-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
-      {/* Skeleton header row */}
       <div
         style={{
           display: "flex",
@@ -4771,14 +4637,13 @@ function LoadingState({ T }) {
           marginBottom: 2,
         }}
       >
-        {[220, 120, 130, 110, 80, 95, 90, 85, 70].map((w, i) => (
+        {[45, 220, 100, 120, 130, 110, 80, 95, 90, 85, 70].map((w, i) => (
           <div
             key={i}
             style={{ ...shimmer, width: w, height: 12, flexShrink: 0 }}
           />
         ))}
       </div>
-      {/* Skeleton rows */}
       {Array.from({ length: 10 }).map((_, row) => (
         <div
           key={row}
@@ -4791,13 +4656,13 @@ function LoadingState({ T }) {
             opacity: 1 - row * 0.07,
           }}
         >
-          {[220, 120, 130, 110, 80, 95, 90, 85, 70].map((w, i) => (
+          {[45, 220, 100, 120, 130, 110, 80, 95, 90, 85, 70].map((w, i) => (
             <div
               key={i}
               style={{
                 ...shimmer,
                 width: i === 0 ? w : w * 0.6,
-                height: i === 0 ? 14 : 12,
+                height: i === 1 ? 14 : 12,
                 flexShrink: 0,
               }}
             />
@@ -4821,7 +4686,7 @@ function ErrorState({ msg, T }) {
         fontSize: 13,
       }}
     >
-      âš ï¸ {msg}
+      ⚠️ {msg}
     </div>
   );
 }
@@ -4829,7 +4694,7 @@ function ErrorState({ msg, T }) {
 function EmptyState({ catFilter, search, onAdd, T }) {
   return (
     <div style={{ textAlign: "center", padding: 64, color: T.ink400 }}>
-      <div style={{ fontSize: 40, marginBottom: 10 }}>ðŸ“¦</div>
+      <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
       <div
         style={{
           fontWeight: 700,
@@ -4862,9 +4727,6 @@ function EmptyState({ catFilter, search, onAdd, T }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// STYLE HELPERS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function inputStyle(T) {
   return {
     width: "100%",
@@ -4895,4 +4757,3 @@ function btnStyle(bg, color, borderColor, T, bold = false, full = false) {
     whiteSpace: "nowrap",
   };
 }
-
