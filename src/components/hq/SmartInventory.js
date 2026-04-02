@@ -1,9 +1,4 @@
-﻿// src/components/hq/SmartInventory.js — v1.1
-// Next-gen universal inventory screen for NuAi cannabis retail
-// Three views: Tile · List · Detail (Excel-style sortable/filterable table)
-// Smart cascading PillBox: Category → Sub-category → search
-// Full CRUD: inline edit, save to Supabase, delete with confirm
-//
+﻿// src/components/hq/SmartInventory.js — v1.2 (SC-08 bulk select)
 // LL-131: tenantId as prop only — never hardcoded
 // LL-174: CATEGORY_LABELS, CATEGORY_ICONS from ProductWorlds.js
 // Rule 0F: tenant_id on every INSERT/UPDATE
@@ -21,7 +16,6 @@ import {
   CATEGORY_ICONS,
 } from "./ProductWorlds";
 
-// ── Design tokens ─────────────────────────────────────────────────────────
 const T = {
   bg: "#FAFAF9",
   white: "#ffffff",
@@ -37,6 +31,7 @@ const T = {
   amberLit: "#FFFBEB",
   blue: "#2563EB",
   blueLit: "#EFF6FF",
+  blueMid: "#1D4ED8",
   ink900: "#0D0D0D",
   ink700: "#2C2C2C",
   ink500: "#474747",
@@ -55,9 +50,6 @@ const VIEW_TILE = "tile";
 const VIEW_LIST = "list";
 const VIEW_DETAIL = "detail";
 
-// ── Detail view column definitions ────────────────────────────────────────
-// system:true  → excluded from column picker and CSV export
-// defaultHidden:true → hidden by default, user can turn on via Columns picker
 const DETAIL_COLS = [
   {
     key: "_row",
@@ -740,13 +732,7 @@ const PILL_HIERARCHY = {
           {
             id: "raw_papers",
             label: "Rolling Papers",
-            keywords: [
-              "raw classic king",
-              "raw black king",
-              "raw 1.25",
-              "raw classic king size rolling",
-              "raw classic kingsize slim",
-            ],
+            keywords: ["raw classic king", "raw black king", "raw 1.25"],
           },
           {
             id: "raw_tips",
@@ -908,7 +894,6 @@ const PILL_HIERARCHY = {
   },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────
 const zar = (n) => `R${(Number(n) || 0).toFixed(2)}`;
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 const margin = (sell, cost) => {
@@ -997,6 +982,28 @@ export default function SmartInventory({ tenantId }) {
   const [colPickerOpen, setColPickerOpen] = useState(false);
   const colPickerRef = useRef(null);
 
+  // SC-08 Bulk select
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const onToggleSelect = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(filtered.map((i) => i.id))); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // filtered injected below via ref
+
   // eslint-disable-next-line no-unused-vars
   const [editItem, setEditItem] = useState(null);
   // eslint-disable-next-line no-unused-vars
@@ -1012,133 +1019,6 @@ export default function SmartInventory({ tenantId }) {
   const [modalSaving, setModalSaving] = useState(false);
   const [showWorldPicker, setShowWorldPicker] = useState(false);
   const searchRef = useRef(null);
-
-  // ── SC-08: Bulk selection state ─────────────────────────────────────────
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [bulkPriceOpen, setBulkPriceOpen] = useState(false);
-  const [bulkPrice, setBulkPrice] = useState("");
-  const [bulkDelConfirm, setBulkDelConfirm] = useState(false);
-
-  const toggleSelect = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-  const selectAll = () => {
-    setSelectedIds(new Set(filtered.map((i) => i.id)));
-  };
-  const clearSelection = () => {
-    setSelectedIds(new Set());
-    setSelectMode(false);
-    setBulkPriceOpen(false);
-    setBulkPrice("");
-    setBulkDelConfirm(false);
-  };
-
-  const bulkHide = async () => {
-    const ids = [...selectedIds];
-    const count = ids.length;
-    await Promise.all(
-      ids.map((id) =>
-        supabase
-          .from("inventory_items")
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq("id", id),
-      ),
-    );
-    load();
-    clearSelection();
-    toast.warning(`${count} items hidden from shop`, {
-      duration: 5000,
-      undo: async () => {
-        await Promise.all(
-          ids.map((id) =>
-            supabase
-              .from("inventory_items")
-              .update({ is_active: true, updated_at: new Date().toISOString() })
-              .eq("id", id),
-          ),
-        );
-        load();
-      },
-    });
-  };
-
-  const bulkShow = async () => {
-    const ids = [...selectedIds];
-    const count = ids.length;
-    await Promise.all(
-      ids.map((id) =>
-        supabase
-          .from("inventory_items")
-          .update({ is_active: true, updated_at: new Date().toISOString() })
-          .eq("id", id),
-      ),
-    );
-    load();
-    clearSelection();
-    toast.success(`${count} items now visible in shop`);
-  };
-
-  const bulkDelete = async () => {
-    const ids = [...selectedIds];
-    const count = ids.length;
-    const savedItems = items.filter((i) => ids.includes(i.id));
-    await Promise.all(
-      ids.map((id) => supabase.from("inventory_items").delete().eq("id", id)),
-    );
-    load();
-    clearSelection();
-    toast.warning(`${count} items deleted`, {
-      duration: 5000,
-      undo: async () => {
-        await Promise.all(
-          savedItems.map((item) =>
-            supabase.from("inventory_items").insert(item),
-          ),
-        );
-        load();
-      },
-    });
-  };
-
-  const bulkSetPrice = async () => {
-    const price = parseFloat(bulkPrice);
-    if (!price || price <= 0) return;
-    const ids = [...selectedIds];
-    const count = ids.length;
-    await Promise.all(
-      ids.map((id) =>
-        supabase
-          .from("inventory_items")
-          .update({ sell_price: price, updated_at: new Date().toISOString() })
-          .eq("id", id),
-      ),
-    );
-    load();
-    clearSelection();
-    toast.success(`Price set to R${price.toFixed(2)} on ${count} items`);
-  };
-
-  const bulkFlagReorder = async () => {
-    const ids = [...selectedIds];
-    const count = ids.length;
-    await Promise.all(
-      ids.map((id) =>
-        supabase
-          .from("inventory_items")
-          .update({ needs_reorder: true, updated_at: new Date().toISOString() })
-          .eq("id", id),
-      ),
-    );
-    load();
-    clearSelection();
-    toast.info(`${count} items flagged for reorder`);
-  };
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -1186,6 +1066,10 @@ export default function SmartInventory({ tenantId }) {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       if (modalItem !== undefined) return;
+      if (selectMode) {
+        exitSelectMode();
+        return;
+      }
       if (panelItem) {
         setPanelItem(null);
         return;
@@ -1234,6 +1118,8 @@ export default function SmartInventory({ tenantId }) {
     groupFilter,
     catFilter,
     selectCat,
+    selectMode,
+    exitSelectMode,
   ]);
 
   const filtered = useMemo(() => {
@@ -1242,7 +1128,6 @@ export default function SmartInventory({ tenantId }) {
       const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
       if (world) list = list.filter((i) => itemMatchesWorld(i, world));
     }
-    // Sub-type filter — searches all groups for matching sub
     if (subFilter && catFilter !== "all" && PILL_HIERARCHY[catFilter]) {
       for (const group of PILL_HIERARCHY[catFilter].groups || []) {
         const sub = group.subs?.find((s) => s.id === subFilter);
@@ -1316,6 +1201,13 @@ export default function SmartInventory({ tenantId }) {
     sortByIssues,
   ]);
 
+  // Keep selectAll in sync with filtered
+  const filteredRef = useRef(filtered);
+  filteredRef.current = filtered;
+  const selectAllItems = useCallback(() => {
+    setSelectedIds(new Set(filteredRef.current.map((i) => i.id)));
+  }, []);
+
   function handleSort(key) {
     if (!key || key === "_actions" || key === "_row") return;
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -1325,6 +1217,7 @@ export default function SmartInventory({ tenantId }) {
     }
   }
 
+  // KPI stats
   const gTotal = items.length;
   const gActive = items.filter((i) => i.is_active).length;
   const gSoldOut = items.filter((i) => (i.quantity_on_hand || 0) === 0).length;
@@ -1500,6 +1393,55 @@ export default function SmartInventory({ tenantId }) {
     });
   }
 
+  // SC-08 Bulk actions
+  const bulkHide = async () => {
+    const ids = [...selectedIds];
+    await Promise.all(
+      ids.map((id) =>
+        supabase
+          .from("inventory_items")
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq("id", id),
+      ),
+    );
+    load();
+    exitSelectMode();
+    toast.warning(
+      `${ids.length} item${ids.length > 1 ? "s" : ""} hidden from shop`,
+    );
+  };
+  const bulkShow = async () => {
+    const ids = [...selectedIds];
+    await Promise.all(
+      ids.map((id) =>
+        supabase
+          .from("inventory_items")
+          .update({ is_active: true, updated_at: new Date().toISOString() })
+          .eq("id", id),
+      ),
+    );
+    load();
+    exitSelectMode();
+    toast.success(
+      `${ids.length} item${ids.length > 1 ? "s" : ""} made visible in shop`,
+    );
+  };
+  const bulkDelete = async () => {
+    const ids = [...selectedIds];
+    if (
+      !window.confirm(
+        `Delete ${ids.length} item${ids.length > 1 ? "s" : ""}? This cannot be undone.`,
+      )
+    )
+      return;
+    await Promise.all(
+      ids.map((id) => supabase.from("inventory_items").delete().eq("id", id)),
+    );
+    load();
+    exitSelectMode();
+    toast.warning(`${ids.length} item${ids.length > 1 ? "s" : ""} deleted`);
+  };
+
   function openAdd() {
     if (catFilter === "all") {
       setShowWorldPicker(true);
@@ -1543,13 +1485,16 @@ export default function SmartInventory({ tenantId }) {
     }
   };
 
-  // SC-09: CSV export — excludes _row (UI-only) and _actions
   function exportCSV() {
     const visibleCols = DETAIL_COLS.filter(
       (c) => c.key !== "_actions" && c.key !== "_row" && !hiddenCols.has(c.key),
     );
+    const sourceItems =
+      selectedIds.size > 0
+        ? filtered.filter((i) => selectedIds.has(i.id))
+        : filtered;
     const headers = visibleCols.map((c) => c.label || c.key);
-    const rows = filtered.map((item) =>
+    const rows = sourceItems.map((item) =>
       visibleCols.map((c) => {
         if (c.key === "_margin") {
           const m = margin(item.sell_price, item.weighted_avg_cost);
@@ -1576,7 +1521,7 @@ export default function SmartInventory({ tenantId }) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${filtered.length} items → ${filename}`);
+    toast.success(`Exported ${sourceItems.length} items → ${filename}`);
   }
 
   async function quickToggle(item, field) {
@@ -1587,7 +1532,7 @@ export default function SmartInventory({ tenantId }) {
       .eq("id", item.id);
     load();
     if (field === "is_active") {
-      if (!newVal) {
+      if (!newVal)
         toast.warning(`"${item.name}" hidden from shop`, {
           duration: 5000,
           undo: async () => {
@@ -1598,9 +1543,7 @@ export default function SmartInventory({ tenantId }) {
             load();
           },
         });
-      } else {
-        toast.success(`"${item.name}" visible in shop`);
-      }
+      else toast.success(`"${item.name}" visible in shop`);
     }
   }
 
@@ -1613,11 +1556,9 @@ export default function SmartInventory({ tenantId }) {
   // eslint-disable-next-line no-unused-vars
   function selectBrand(brandId) {}
 
-  // Column picker: only non-system, non-actions cols
   const pickerCols = DETAIL_COLS.filter(
     (c) => c.key !== "_actions" && !c.system,
   );
-  // Shown count: non-system non-actions visible
   const shownCount = pickerCols.filter((c) => !hiddenCols.has(c.key)).length;
 
   return (
@@ -1635,12 +1576,12 @@ export default function SmartInventory({ tenantId }) {
         .nuai-catalog button, .nuai-catalog [role="button"], .nuai-catalog label { cursor: pointer; }
         .nuai-catalog input[type="text"], .nuai-catalog input[type="number"], .nuai-catalog input[type="search"], .nuai-catalog textarea { cursor: text; }
         .nuai-catalog input[type="checkbox"], .nuai-catalog input[type="radio"] { cursor: pointer; }
-        .nuai-catalog [data-resize] { cursor: col-resize; }
         .nuai-catalog [aria-disabled="true"], .nuai-catalog button:disabled { cursor: not-allowed; opacity: 0.5; }
-        .nuai-col-drag-over { background: #E8F5EE !important; }
+        .nuai-select-tile { outline: 2.5px solid #2563EB !important; box-shadow: 0 0 0 4px #EFF6FF !important; }
+        .nuai-select-row  { background: #EFF6FF !important; }
       `}</style>
 
-      {/* ── TOP TOOLBAR ───────────────────────────────────────────────── */}
+      {/* ── TOP TOOLBAR ─────────────────────────────────────────────── */}
       <div
         style={{
           background: T.white,
@@ -1688,8 +1629,15 @@ export default function SmartInventory({ tenantId }) {
               alignItems: "center",
             }}
           >
-            <ViewToggle current={viewMode} onChange={setViewMode} T={T} />
-            {viewMode === VIEW_TILE && (
+            <ViewToggle
+              current={viewMode}
+              onChange={(v) => {
+                setViewMode(v);
+                exitSelectMode();
+              }}
+              T={T}
+            />
+            {viewMode === VIEW_TILE && !selectMode && (
               <div
                 style={{
                   display: "flex",
@@ -1702,7 +1650,6 @@ export default function SmartInventory({ tenantId }) {
                   <button
                     key={s}
                     onClick={() => setTileSize(s)}
-                    title={s === "S" ? "Small" : s === "M" ? "Medium" : "Large"}
                     style={{
                       padding: "5px 10px",
                       border: "none",
@@ -1721,49 +1668,20 @@ export default function SmartInventory({ tenantId }) {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => setFilterRowOpen((v) => !v)}
-              style={btnStyle(
-                filterRowOpen || sortByIssues ? T.accent : T.white,
-                filterRowOpen || sortByIssues ? T.white : T.ink500,
-                T.border,
-                T,
-              )}
-            >
-              🔽 Filters{sortByIssues ? " ·⚠" : ""}
-            </button>
-
-            {/* SC-08: Select mode toggle */}
-            <button
-              onClick={() => {
-                if (selectMode) clearSelection();
-                else setSelectMode(true);
-              }}
-              style={btnStyle(
-                selectMode ? T.blue : T.white,
-                selectMode ? T.white : T.ink500,
-                selectMode ? T.blue : T.border,
-                T,
-              )}
-            >
-              {selectMode ? `✓ ${selectedIds.size} selected` : "☐ Select"}
-            </button>
-            {selectMode && filtered.length > 0 && (
+            {!selectMode && (
               <button
-                onClick={
-                  selectedIds.size === filtered.length
-                    ? () => setSelectedIds(new Set())
-                    : selectAll
-                }
-                style={btnStyle(T.white, T.ink500, T.border, T)}
+                onClick={() => setFilterRowOpen((v) => !v)}
+                style={btnStyle(
+                  filterRowOpen || sortByIssues ? T.accent : T.white,
+                  filterRowOpen || sortByIssues ? T.white : T.ink500,
+                  T.border,
+                  T,
+                )}
               >
-                {selectedIds.size === filtered.length
-                  ? "Deselect all"
-                  : "Select all"}
+                🔽 Filters{sortByIssues ? " ·⚠" : ""}
               </button>
             )}
-
-            {viewMode === VIEW_DETAIL && (
+            {viewMode === VIEW_DETAIL && !selectMode && (
               <button
                 onClick={exportCSV}
                 style={btnStyle(T.white, T.ink500, T.border, T)}
@@ -1772,7 +1690,7 @@ export default function SmartInventory({ tenantId }) {
                 ↓ CSV
               </button>
             )}
-            {viewMode === VIEW_DETAIL && (
+            {viewMode === VIEW_DETAIL && !selectMode && (
               <div style={{ position: "relative" }} ref={colPickerRef}>
                 <button
                   onClick={() => setColPickerOpen((v) => !v)}
@@ -1949,178 +1867,291 @@ export default function SmartInventory({ tenantId }) {
             >
               ↺
             </button>
+            {/* SC-08: Select mode toggle */}
             <button
-              onClick={openAdd}
-              style={btnStyle(T.accent, T.white, T.accent, T, true)}
+              onClick={() => {
+                if (selectMode) exitSelectMode();
+                else setSelectMode(true);
+              }}
+              title={
+                selectMode ? "Exit selection mode" : "Select multiple items"
+              }
+              style={btnStyle(
+                selectMode ? T.blue : T.white,
+                selectMode ? T.white : T.ink500,
+                selectMode ? T.blue : T.border,
+                T,
+              )}
             >
-              + Add Item
+              {selectMode ? "✕ Cancel" : "☑ Select"}
             </button>
+            {!selectMode && (
+              <button
+                onClick={openAdd}
+                style={btnStyle(T.accent, T.white, T.accent, T, true)}
+              >
+                + Add Item
+              </button>
+            )}
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            marginBottom: 10,
-            marginTop: 2,
-          }}
-        >
-          {[
-            {
-              key: "total",
-              label: "Total Items",
-              global: gTotal,
-              filtered: fTotal,
-              color: T.ink700,
-              bg: T.ink50,
-              border: T.border,
-              onClick: () => {
-                selectCat("all");
-                setGroupFilter(null);
-                setSubFilter(null);
-                setSearch("");
-              },
-              title: "Click to clear all filters",
-            },
-            {
-              key: "value",
-              label: "Stock Value",
-              global: `R${gStockValue >= 1000000 ? (gStockValue / 1000000).toFixed(1) + "m" : (gStockValue / 1000).toFixed(0) + "k"}`,
-              filtered: `R${fStockValue >= 1000000 ? (fStockValue / 1000000).toFixed(1) + "m" : (fStockValue / 1000).toFixed(0) + "k"}`,
-              color: T.blue,
-              bg: T.blueLit,
-              border: T.blue + "30",
-            },
-            {
-              key: "active",
-              label: "Active",
-              global: gActive,
-              filtered: fActive,
-              color: T.accentMid,
-              bg: T.accentLit,
-              border: T.accentBd,
-            },
-            {
-              key: "soldout",
-              label: "Sold Out",
-              global: gSoldOut,
-              filtered: fSoldOut,
-              color: gSoldOut > 0 ? T.danger : T.ink300,
-              bg: gSoldOut > 0 ? T.dangerLit : T.ink50,
-              border: gSoldOut > 0 ? T.danger + "30" : T.border,
-              urgent: gSoldOut > 0,
-              onClick:
-                gSoldOut > 0 ? () => setActivePanel("soldout") : undefined,
-              title: "View sold-out items",
-            },
-            {
-              key: "reorder",
-              label: "Below Reorder",
-              global: gBelowReorder,
-              filtered: fBelowReorder,
-              color: gBelowReorder > 0 ? T.amber : T.ink300,
-              bg: gBelowReorder > 0 ? T.amberLit : T.ink50,
-              border: gBelowReorder > 0 ? T.amber + "40" : T.border,
-              urgent: gBelowReorder > 0,
-              onClick:
-                gBelowReorder > 0 ? () => setActivePanel("reorder") : undefined,
-              title: "Flag items for reorder",
-            },
-            {
-              key: "noprice",
-              label: "No Price",
-              global: gNoPrice,
-              filtered: fNoPrice,
-              color: gNoPrice > 0 ? T.danger : T.ink300,
-              bg: gNoPrice > 0 ? T.dangerLit : T.ink50,
-              border: gNoPrice > 0 ? T.danger + "30" : T.border,
-              urgent: gNoPrice > 0,
-              onClick:
-                gNoPrice > 0 ? () => setActivePanel("noprice") : undefined,
-              title: "Add prices to hidden items",
-            },
-          ].map((card) => (
-            <div
-              key={card.key}
-              onClick={card.onClick}
-              title={card.onClick ? card.title : undefined}
+        {/* SC-08 Bulk action bar */}
+        {selectMode && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 0 10px",
+              borderTop: `1px solid ${T.border}`,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
               style={{
-                flex: "1 1 120px",
-                minWidth: 110,
-                maxWidth: 200,
-                background: card.bg,
-                border: `1.5px solid ${card.border}`,
-                borderRadius: 10,
-                padding: "10px 14px",
-                cursor: card.onClick ? "pointer" : "default",
-                transition: "all 0.12s",
-                position: "relative",
-              }}
-              onMouseEnter={(e) => {
-                if (card.onClick) e.currentTarget.style.opacity = "0.85";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "1";
+                fontSize: 13,
+                fontWeight: 700,
+                color: selectedIds.size > 0 ? T.blue : T.ink400,
               }}
             >
+              {selectedIds.size > 0
+                ? `${selectedIds.size} selected`
+                : "Click items to select"}
+            </span>
+            <button
+              onClick={selectAllItems}
+              style={{
+                ...btnStyle(T.white, T.blue, T.blue + "60", T),
+                fontSize: 12,
+              }}
+            >
+              Select all ({fTotal})
+            </button>
+            {selectedIds.size > 0 && (
+              <>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  style={{
+                    ...btnStyle(T.white, T.ink400, T.border, T),
+                    fontSize: 12,
+                  }}
+                >
+                  Clear
+                </button>
+                <div style={{ width: 1, height: 20, background: T.border }} />
+                <button
+                  onClick={bulkShow}
+                  style={{
+                    ...btnStyle(
+                      T.accentLit,
+                      T.accentMid,
+                      T.accentMid + "40",
+                      T,
+                    ),
+                    fontSize: 12,
+                  }}
+                >
+                  👁 Show ({selectedIds.size})
+                </button>
+                <button
+                  onClick={bulkHide}
+                  style={{
+                    ...btnStyle(T.amberLit, T.amber, T.amber + "40", T),
+                    fontSize: 12,
+                  }}
+                >
+                  🚫 Hide ({selectedIds.size})
+                </button>
+                <button
+                  onClick={exportCSV}
+                  style={{
+                    ...btnStyle(T.white, T.ink500, T.border, T),
+                    fontSize: 12,
+                  }}
+                >
+                  ↓ Export ({selectedIds.size})
+                </button>
+                <button
+                  onClick={bulkDelete}
+                  style={{
+                    ...btnStyle(T.dangerLit, T.danger, T.danger + "40", T),
+                    fontSize: 12,
+                  }}
+                >
+                  🗑 Delete ({selectedIds.size})
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        {!selectMode && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginBottom: 10,
+              marginTop: 2,
+            }}
+          >
+            {[
+              {
+                key: "total",
+                label: "Total Items",
+                global: gTotal,
+                filtered: fTotal,
+                color: T.ink700,
+                bg: T.ink50,
+                border: T.border,
+                onClick: () => {
+                  selectCat("all");
+                  setGroupFilter(null);
+                  setSubFilter(null);
+                  setSearch("");
+                },
+                title: "Click to clear all filters",
+              },
+              {
+                key: "value",
+                label: "Stock Value",
+                global: `R${gStockValue >= 1000000 ? (gStockValue / 1000000).toFixed(1) + "m" : (gStockValue / 1000).toFixed(0) + "k"}`,
+                filtered: `R${fStockValue >= 1000000 ? (fStockValue / 1000000).toFixed(1) + "m" : (fStockValue / 1000).toFixed(0) + "k"}`,
+                color: T.blue,
+                bg: T.blueLit,
+                border: T.blue + "30",
+              },
+              {
+                key: "active",
+                label: "Active",
+                global: gActive,
+                filtered: fActive,
+                color: T.accentMid,
+                bg: T.accentLit,
+                border: T.accentBd,
+              },
+              {
+                key: "soldout",
+                label: "Sold Out",
+                global: gSoldOut,
+                filtered: fSoldOut,
+                color: gSoldOut > 0 ? T.danger : T.ink300,
+                bg: gSoldOut > 0 ? T.dangerLit : T.ink50,
+                border: gSoldOut > 0 ? T.danger + "30" : T.border,
+                urgent: gSoldOut > 0,
+                onClick:
+                  gSoldOut > 0 ? () => setActivePanel("soldout") : undefined,
+                title: "View sold-out items",
+              },
+              {
+                key: "reorder",
+                label: "Below Reorder",
+                global: gBelowReorder,
+                filtered: fBelowReorder,
+                color: gBelowReorder > 0 ? T.amber : T.ink300,
+                bg: gBelowReorder > 0 ? T.amberLit : T.ink50,
+                border: gBelowReorder > 0 ? T.amber + "40" : T.border,
+                urgent: gBelowReorder > 0,
+                onClick:
+                  gBelowReorder > 0
+                    ? () => setActivePanel("reorder")
+                    : undefined,
+                title: "Flag items for reorder",
+              },
+              {
+                key: "noprice",
+                label: "No Price",
+                global: gNoPrice,
+                filtered: fNoPrice,
+                color: gNoPrice > 0 ? T.danger : T.ink300,
+                bg: gNoPrice > 0 ? T.dangerLit : T.ink50,
+                border: gNoPrice > 0 ? T.danger + "30" : T.border,
+                urgent: gNoPrice > 0,
+                onClick:
+                  gNoPrice > 0 ? () => setActivePanel("noprice") : undefined,
+                title: "Add prices to hidden items",
+              },
+            ].map((card) => (
               <div
+                key={card.key}
+                onClick={card.onClick}
+                title={card.onClick ? card.title : undefined}
                 style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  lineHeight: 1,
-                  color: card.color,
-                  letterSpacing: card.urgent ? "-0.5px" : "0",
+                  flex: "1 1 120px",
+                  minWidth: 110,
+                  maxWidth: 200,
+                  background: card.bg,
+                  border: `1.5px solid ${card.border}`,
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  cursor: card.onClick ? "pointer" : "default",
+                  transition: "all 0.12s",
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => {
+                  if (card.onClick) e.currentTarget.style.opacity = "0.85";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = "1";
                 }}
               >
-                {card.global}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: T.ink400,
-                  marginTop: 4,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  fontWeight: 600,
-                }}
-              >
-                {card.label}
-              </div>
-              {isFiltered && (
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    color: card.color,
+                  }}
+                >
+                  {card.global}
+                </div>
                 <div
                   style={{
                     fontSize: 10,
-                    color: card.color,
-                    marginTop: 3,
-                    fontWeight: 700,
-                    opacity: 0.85,
+                    color: T.ink400,
+                    marginTop: 4,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    fontWeight: 600,
                   }}
                 >
-                  {card.filtered} in filter
+                  {card.label}
                 </div>
-              )}
-              {card.onClick && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: 8,
-                    right: 10,
-                    fontSize: 14,
-                    color: card.color,
-                    opacity: 0.5,
-                  }}
-                >
-                  ›
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
+                {isFiltered && (
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: card.color,
+                      marginTop: 3,
+                      fontWeight: 700,
+                      opacity: 0.85,
+                    }}
+                  >
+                    {card.filtered} in filter
+                  </div>
+                )}
+                {card.onClick && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 10,
+                      fontSize: 14,
+                      color: card.color,
+                      opacity: 0.5,
+                    }}
+                  >
+                    ›
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
-        {filterRowOpen && (
+        {filterRowOpen && !selectMode && (
           <div
             style={{
               padding: "8px 0 10px",
@@ -2186,7 +2217,7 @@ export default function SmartInventory({ tenantId }) {
         />
       </div>
 
-      {/* ── CONTENT AREA ──────────────────────────────────────────────── */}
+      {/* ── CONTENT AREA ─────────────────────────────────────────────── */}
       <div
         style={{
           flex: 1,
@@ -2221,10 +2252,10 @@ export default function SmartInventory({ tenantId }) {
               onToggle={quickToggle}
               onOpenPanel={setPanelItem}
               tileSize={tileSize}
+              T={T}
               selectMode={selectMode}
               selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              T={T}
+              onToggleSelect={onToggleSelect}
             />
           ) : viewMode === VIEW_LIST ? (
             <ListView
@@ -2233,10 +2264,10 @@ export default function SmartInventory({ tenantId }) {
               onDelete={(item) => setDelConfirm(item)}
               onToggle={quickToggle}
               onOpenPanel={setPanelItem}
+              T={T}
               selectMode={selectMode}
               selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              T={T}
+              onToggleSelect={onToggleSelect}
             />
           ) : (
             <DetailView
@@ -2254,16 +2285,16 @@ export default function SmartInventory({ tenantId }) {
               onToggle={quickToggle}
               hiddenCols={hiddenCols}
               onOpenPanel={setPanelItem}
+              T={T}
               selectMode={selectMode}
               selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              T={T}
+              onToggleSelect={onToggleSelect}
             />
           )}
         </div>
       </div>
 
-      {/* ── SC-01 ACTION PANELS ──────────────────────────────────────── */}
+      {/* ── SC-01 ACTION PANELS ───────────────────────────────────────── */}
       {activePanel && (
         <div
           onClick={() => setActivePanel(null)}
@@ -2681,7 +2712,7 @@ export default function SmartInventory({ tenantId }) {
         </div>
       )}
 
-      {/* ── WORLD PICKER ─────────────────────────────────────────────── */}
+      {/* ── WORLD PICKER ──────────────────────────────────────────────── */}
       {showWorldPicker && (
         <div
           onClick={() => setShowWorldPicker(false)}
@@ -2807,7 +2838,7 @@ export default function SmartInventory({ tenantId }) {
       )}
 
       {/* ── SC-02: STOCK ITEM PANEL ───────────────────────────────────── */}
-      {panelItem && (
+      {panelItem && !selectMode && (
         <StockItemPanel
           item={panelItem}
           onClose={() => setPanelItem(null)}
@@ -2857,249 +2888,6 @@ export default function SmartInventory({ tenantId }) {
           </div>
         </div>
       )}
-      {/* ── SC-08: BULK ACTION BAR ─────────────────────────────────────── */}
-      {selectMode && selectedIds.size > 0 && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 40,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: T.ink900,
-            color: T.white,
-            borderRadius: 12,
-            padding: "10px 20px",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
-            zIndex: 8000,
-            fontFamily: T.font,
-            fontSize: 13,
-          }}
-        >
-          <span style={{ fontWeight: 700, marginRight: 4 }}>
-            {selectedIds.size} selected
-          </span>
-          <div
-            style={{
-              width: 1,
-              height: 20,
-              background: "rgba(255,255,255,0.2)",
-            }}
-          />
-          <button
-            onClick={bulkShow}
-            style={{
-              background: "rgba(255,255,255,0.12)",
-              border: "none",
-              color: T.white,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: T.font,
-            }}
-          >
-            👁 Show
-          </button>
-          <button
-            onClick={bulkHide}
-            style={{
-              background: "rgba(255,255,255,0.12)",
-              border: "none",
-              color: T.white,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: T.font,
-            }}
-          >
-            🙈 Hide
-          </button>
-          <button
-            onClick={() => setBulkPriceOpen(true)}
-            style={{
-              background: "rgba(255,255,255,0.12)",
-              border: "none",
-              color: T.white,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: T.font,
-            }}
-          >
-            💰 Set Price
-          </button>
-          <button
-            onClick={bulkFlagReorder}
-            style={{
-              background: "rgba(255,255,255,0.12)",
-              border: "none",
-              color: T.white,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: T.font,
-            }}
-          >
-            ⚑ Reorder
-          </button>
-          <button
-            onClick={() => setBulkDelConfirm(true)}
-            style={{
-              background: T.danger,
-              border: "none",
-              color: T.white,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: T.font,
-            }}
-          >
-            🗑 Delete
-          </button>
-          <div
-            style={{
-              width: 1,
-              height: 20,
-              background: "rgba(255,255,255,0.2)",
-            }}
-          />
-          <button
-            onClick={clearSelection}
-            style={{
-              background: "none",
-              border: "1px solid rgba(255,255,255,0.3)",
-              color: T.white,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontFamily: T.font,
-            }}
-          >
-            ✕ Cancel
-          </button>
-        </div>
-      )}
-
-      {/* SC-08: Bulk price modal */}
-      {bulkPriceOpen && (
-        <Modal
-          onClose={() => setBulkPriceOpen(false)}
-          title={`Set Price — ${selectedIds.size} items`}
-          T={T}
-          width={340}
-        >
-          <div style={{ marginBottom: 16 }}>
-            <label
-              style={{
-                fontSize: 12,
-                color: T.ink400,
-                fontWeight: 600,
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              New sell price (ZAR)
-            </label>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                border: `1.5px solid ${T.border}`,
-                borderRadius: 7,
-                overflow: "hidden",
-              }}
-            >
-              <span
-                style={{
-                  padding: "8px 8px 8px 12px",
-                  color: T.ink400,
-                  background: T.ink50,
-                }}
-              >
-                R
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={bulkPrice}
-                onChange={(e) => setBulkPrice(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && bulkSetPrice()}
-                autoFocus
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  border: "none",
-                  fontSize: 14,
-                  outline: "none",
-                  fontFamily: T.font,
-                }}
-              />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => setBulkPriceOpen(false)}
-              style={btnStyle(T.white, T.ink500, T.border, T, false, true)}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={bulkSetPrice}
-              disabled={!bulkPrice}
-              style={btnStyle(T.accent, T.white, T.accent, T, true, true)}
-            >
-              Apply to {selectedIds.size} items
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* SC-08: Bulk delete confirm */}
-      {bulkDelConfirm && (
-        <Modal
-          onClose={() => setBulkDelConfirm(false)}
-          title="Delete Items"
-          T={T}
-          width={380}
-          preventBackdropDismiss
-        >
-          <div style={{ fontSize: 14, color: T.ink500, marginBottom: 20 }}>
-            Permanently delete <strong>{selectedIds.size} items</strong>? Stock
-            movements are preserved for audit.
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => setBulkDelConfirm(false)}
-              style={btnStyle(T.white, T.ink500, T.border, T, false, true)}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                setBulkDelConfirm(false);
-                bulkDelete();
-              }}
-              style={btnStyle(T.danger, T.white, T.danger, T, true, true)}
-            >
-              Delete {selectedIds.size} items
-            </button>
-          </div>
-        </Modal>
-      )}
 
       {/* ── DELETE CONFIRM ────────────────────────────────────────────── */}
       {delConfirm && (
@@ -3135,7 +2923,7 @@ export default function SmartInventory({ tenantId }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// SMART PILL BOX — 3-level nesting doll navigation
+// SMART PILL BOX
 // ─────────────────────────────────────────────────────────────────────────
 function SmartPillBox({
   catFilter,
@@ -3200,7 +2988,6 @@ function SmartPillBox({
   const activeGroups =
     catFilter !== "all" ? PILL_HIERARCHY[catFilter]?.groups || [] : [];
   const navLevel = !pillExpanded ? 0 : catFilter === "all" ? 1 : 2;
-
   const pillBase = (active, accent, T) => ({
     padding: "4px 12px",
     borderRadius: 99,
@@ -3247,8 +3034,7 @@ function SmartPillBox({
 
   return (
     <div style={{ paddingBottom: 4 }}>
-      <style>{`.nuai-pill-row::-webkit-scrollbar { display: none; } .nuai-pill-row { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
-
+      <style>{`.nuai-pill-row::-webkit-scrollbar{display:none;}.nuai-pill-row{-ms-overflow-style:none;scrollbar-width:none;}`}</style>
       <div
         className="nuai-pill-row"
         style={{
@@ -3260,7 +3046,6 @@ function SmartPillBox({
           alignItems: "center",
         }}
       >
-        {/* All — always visible */}
         <button
           onClick={() => {
             onSelectCat("all");
@@ -3274,7 +3059,6 @@ function SmartPillBox({
             {counts.all}
           </span>
         </button>
-
         {navLevel === 0 && (
           <button onClick={onExpandPills} style={pillBase(false, T.accent, T)}>
             <span>🗂</span>
@@ -3283,14 +3067,9 @@ function SmartPillBox({
             <span style={{ fontSize: 8, opacity: 0.4 }}>▼</span>
           </button>
         )}
-
         {navLevel === 1 && (
           <>
-            <button
-              onClick={onCollapsePills}
-              style={navBtnStyle}
-              title="Back to home"
-            >
+            <button onClick={onCollapsePills} style={navBtnStyle}>
               ‹ Back
             </button>
             {PRODUCT_WORLDS.filter((w) => w.id !== "all").map((w) => {
@@ -3309,7 +3088,6 @@ function SmartPillBox({
             })}
           </>
         )}
-
         {navLevel === 2 &&
           (() => {
             const world = PRODUCT_WORLDS.find((w) => w.id === catFilter);
@@ -3321,7 +3099,6 @@ function SmartPillBox({
                     onExpandPills();
                   }}
                   style={navBtnStyle}
-                  title="Back to categories"
                 >
                   ‹ Back
                 </button>
@@ -3337,7 +3114,6 @@ function SmartPillBox({
               </>
             );
           })()}
-
         {navLevel > 0 && (
           <button
             onClick={() => {
@@ -3359,8 +3135,6 @@ function SmartPillBox({
           </button>
         )}
       </div>
-
-      {/* Sub-pills flat by group — Level 2 */}
       {navLevel === 2 && activeGroups.length > 0 && (
         <div
           style={{
@@ -3462,7 +3236,6 @@ function SmartPillBox({
           })}
         </div>
       )}
-
       {subFilter && groupFilter && (
         <div
           style={{
@@ -3551,7 +3324,6 @@ function StockChip({ type, T }) {
   );
 }
 
-// SC-05 smart tags
 function getSmartTags(item) {
   const vv = (item.variant_value || "").trim();
   const brand = (item.brand || "").trim();
@@ -3578,6 +3350,9 @@ function getSmartTags(item) {
   return tags.slice(0, 2);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// TILE VIEW — SC-08: checkbox top-left, blue border when selected
+// ─────────────────────────────────────────────────────────────────────────
 function TileView({
   items,
   onEdit,
@@ -3586,6 +3361,9 @@ function TileView({
   onOpenPanel,
   tileSize,
   T,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
 }) {
   const [menuOpenId, setMenuOpenId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
@@ -3605,50 +3383,86 @@ function TileView({
         const lowStock = isLowStock(item);
         const isHovered = hoveredId === item.id;
         const menuOpen = menuOpenId === item.id;
+        const isSelected = selectMode && selectedIds.has(item.id);
         const tags = getSmartTags(item);
-        const statusBorder = soldOut
-          ? T.danger
-          : lowStock
-            ? T.amber
-            : item.is_active
-              ? T.border
-              : T.ink150;
+        const statusBorder = isSelected
+          ? T.blue
+          : soldOut
+            ? T.danger
+            : lowStock
+              ? T.amber
+              : item.is_active
+                ? T.border
+                : T.ink150;
         return (
           <div
             key={item.id}
+            className={isSelected ? "nuai-select-tile" : ""}
             style={{
               background: T.white,
               border: `1.5px solid ${statusBorder}`,
-              borderLeft: soldOut
-                ? `3px solid ${T.danger}`
-                : lowStock
-                  ? `3px solid ${T.amber}`
-                  : `1.5px solid ${statusBorder}`,
+              borderLeft: isSelected
+                ? `3px solid ${T.blue}`
+                : soldOut
+                  ? `3px solid ${T.danger}`
+                  : lowStock
+                    ? `3px solid ${T.amber}`
+                    : `1.5px solid ${statusBorder}`,
               borderRadius: T.radius,
               overflow: "hidden",
               opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
-              boxShadow: isHovered ? "0 4px 14px rgba(0,0,0,0.13)" : T.shadow,
-              cursor: "pointer",
+              boxShadow: isSelected
+                ? `0 0 0 3px ${T.blueLit}`
+                : isHovered
+                  ? "0 4px 14px rgba(0,0,0,0.13)"
+                  : T.shadow,
+              cursor: selectMode ? "pointer" : "pointer",
               transition: "box-shadow 0.15s, border-color 0.15s",
               position: "relative",
             }}
             onMouseEnter={() => setHoveredId(item.id)}
             onMouseLeave={() => setHoveredId(null)}
-            onClick={() => {
+            onClick={(e) => {
+              if (selectMode) {
+                onToggleSelect(item.id);
+                return;
+              }
               if (!menuOpen) onOpenPanel(item);
             }}
           >
+            {/* SC-08: Select checkbox top-left */}
+            {selectMode && (
+              <div
+                style={{ position: "absolute", top: 8, left: 8, zIndex: 20 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleSelect(item.id)}
+                  style={{
+                    width: 16,
+                    height: 16,
+                    accentColor: T.blue,
+                    cursor: "pointer",
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Category banner */}
             <div
               style={{
-                background: T.accentLit,
+                background: isSelected ? "#DBEAFE" : T.accentLit,
                 padding: "8px 12px",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
                 borderBottom: `1px solid ${T.border}`,
+                transition: "background 0.12s",
               }}
             >
-              <span style={{ fontSize: 16 }}>
+              <span style={{ fontSize: 16, marginLeft: selectMode ? 22 : 0 }}>
                 {CATEGORY_ICONS[item.category] || "📦"}
               </span>
               {(() => {
@@ -3660,7 +3474,7 @@ function TileView({
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: T.accentMid,
+                      color: isSelected ? T.blueMid : T.accentMid,
                     }}
                   >
                     {w
@@ -3683,7 +3497,9 @@ function TileView({
                 </span>
               )}
             </div>
-            {isHovered && (
+
+            {/* ··· menu — hidden in selectMode */}
+            {isHovered && !selectMode && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -3710,7 +3526,7 @@ function TileView({
                 ···
               </button>
             )}
-            {menuOpen && (
+            {menuOpen && !selectMode && (
               <div
                 style={{
                   position: "absolute",
@@ -3758,7 +3574,6 @@ function TileView({
                       fontWeight: 600,
                       cursor: "pointer",
                       fontFamily: T.font,
-                      transition: "background 0.1s",
                     }}
                   >
                     {a.label}
@@ -3766,6 +3581,8 @@ function TileView({
                 ))}
               </div>
             )}
+
+            {/* Body */}
             <div style={{ padding: "12px 14px" }}>
               <div
                 style={{
@@ -3800,7 +3617,6 @@ function TileView({
                         borderRadius: 4,
                         padding: "2px 6px",
                         textTransform: "capitalize",
-                        letterSpacing: "0.02em",
                       }}
                     >
                       {tag}
@@ -3867,7 +3683,20 @@ function TileView({
   );
 }
 
-function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
+// ─────────────────────────────────────────────────────────────────────────
+// LIST VIEW — SC-08: icon column → checkbox, blue row bg when selected
+// ─────────────────────────────────────────────────────────────────────────
+function ListView({
+  items,
+  onEdit,
+  onDelete,
+  onToggle,
+  onOpenPanel,
+  T,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
+}) {
   return (
     <div
       style={{
@@ -3891,7 +3720,7 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
           letterSpacing: "0.05em",
         }}
       >
-        <span></span>
+        <span>{selectMode ? "" : ""}</span>
         <span>Name</span>
         <span>Category</span>
         <span style={{ textAlign: "right" }}>On Hand</span>
@@ -3903,29 +3732,74 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
         const m = margin(item.sell_price, item.weighted_avg_cost);
         const soldOut = isSoldOut(item);
         const lowStock = isLowStock(item);
+        const isSelected = selectMode && selectedIds.has(item.id);
         return (
           <div
             key={item.id}
+            className={isSelected ? "nuai-select-row" : ""}
             style={{
               display: "grid",
               gridTemplateColumns: "40px 1fr 110px 90px 90px 80px 90px",
               padding: "9px 11px 9px 14px",
               alignItems: "center",
-              background: idx % 2 === 0 ? T.white : T.bg,
+              background: isSelected
+                ? "#EFF6FF"
+                : idx % 2 === 0
+                  ? T.white
+                  : T.bg,
               borderBottom: `1px solid ${T.border}`,
-              borderLeft: soldOut
-                ? `3px solid ${T.danger}`
-                : lowStock
-                  ? `3px solid ${T.amber}`
-                  : "3px solid transparent",
+              borderLeft: isSelected
+                ? `3px solid ${T.blue}`
+                : soldOut
+                  ? `3px solid ${T.danger}`
+                  : lowStock
+                    ? `3px solid ${T.amber}`
+                    : "3px solid transparent",
               opacity: item.is_active ? (soldOut ? 0.82 : 1) : 0.55,
               cursor: "pointer",
+              transition: "background 0.1s, border-color 0.12s",
             }}
-            onClick={() => onOpenPanel(item)}
+            onClick={() => {
+              if (selectMode) {
+                onToggleSelect(item.id);
+                return;
+              }
+              onOpenPanel(item);
+            }}
           >
-            <span style={{ fontSize: 18, textAlign: "center" }}>
-              {CATEGORY_ICONS[item.category] || "📦"}
-            </span>
+            {/* Icon col → checkbox in selectMode */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              onClick={(e) => {
+                if (selectMode) {
+                  e.stopPropagation();
+                  onToggleSelect(item.id);
+                }
+              }}
+            >
+              {selectMode ? (
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleSelect(item.id)}
+                  style={{
+                    width: 15,
+                    height: 15,
+                    accentColor: T.blue,
+                    cursor: "pointer",
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: 18 }}>
+                  {CATEGORY_ICONS[item.category] || "📦"}
+                </span>
+              )}
+            </div>
+
             <div>
               <div
                 style={{
@@ -4013,18 +3887,22 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
               style={{ display: "flex", gap: 4, justifyContent: "center" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <SmallBtn
-                label="Edit"
-                onClick={() => onEdit(item)}
-                color={T.accent}
-                T={T}
-              />
-              <SmallBtn
-                label="Del"
-                onClick={() => onDelete(item)}
-                color={T.danger}
-                T={T}
-              />
+              {!selectMode && (
+                <>
+                  <SmallBtn
+                    label="Edit"
+                    onClick={() => onEdit(item)}
+                    color={T.accent}
+                    T={T}
+                  />
+                  <SmallBtn
+                    label="Del"
+                    onClick={() => onDelete(item)}
+                    color={T.danger}
+                    T={T}
+                  />
+                </>
+              )}
             </div>
           </div>
         );
@@ -4034,7 +3912,7 @@ function ListView({ items, onEdit, onDelete, onToggle, onOpenPanel, T }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// DETAIL VIEW — with _row column + drag-to-reorder headers
+// DETAIL VIEW — SC-08: _row → checkbox, blue row bg when selected
 // ─────────────────────────────────────────────────────────────────────────
 function DetailView({
   items,
@@ -4050,8 +3928,10 @@ function DetailView({
   hiddenCols = new Set(),
   onOpenPanel,
   T,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
 }) {
-  // Resizable columns
   const [colWidths, setColWidths] = useState(() => {
     try {
       const s = localStorage.getItem("nuai_detail_col_widths");
@@ -4064,7 +3944,6 @@ function DetailView({
   });
   const resizing = useRef(null);
 
-  // Drag-to-reorder columns
   const [colOrder, setColOrder] = useState(() => {
     try {
       const s = localStorage.getItem("nuai_col_order");
@@ -4083,40 +3962,39 @@ function DetailView({
     }
     dragCol.current = key;
     e.dataTransfer.effectAllowed = "move";
-    // Make the drag ghost semi-transparent
-    if (e.target) e.target.style.opacity = "0.5";
   };
   const handleDragOver = (e, key) => {
     if (key === "_row" || key === "_actions" || !dragCol.current) return;
-    if (dragCol.current === key) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    // Reorder on dragOver for instant feedback (don't wait for drop)
-    setColOrder((prev) => {
-      const next = [...prev];
-      const fromIdx = next.indexOf(dragCol.current);
-      const toIdx = next.indexOf(key);
-      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return prev;
-      next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, dragCol.current);
-      return next;
-    });
+    setDragOverKey(key);
   };
   const handleDrop = (e, targetKey) => {
     e.preventDefault();
-    // Save to localStorage on drop (final position)
-    try {
-      localStorage.setItem("nuai_col_order", JSON.stringify(colOrder));
-    } catch {}
-    dragCol.current = null;
     setDragOverKey(null);
+    if (
+      !dragCol.current ||
+      dragCol.current === targetKey ||
+      targetKey === "_row" ||
+      targetKey === "_actions"
+    ) {
+      dragCol.current = null;
+      return;
+    }
+    setColOrder((prev) => {
+      const next = [...prev];
+      const fromIdx = next.indexOf(dragCol.current);
+      const toIdx = next.indexOf(targetKey);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, dragCol.current);
+      try {
+        localStorage.setItem("nuai_col_order", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    dragCol.current = null;
   };
-  const handleDragEnd = (e) => {
-    if (e.target) e.target.style.opacity = "1";
-    // Also save on dragEnd in case drop didn't fire
-    try {
-      localStorage.setItem("nuai_col_order", JSON.stringify(colOrder));
-    } catch {}
+  const handleDragEnd = () => {
     dragCol.current = null;
     setDragOverKey(null);
   };
@@ -4152,9 +4030,7 @@ function DetailView({
     document.addEventListener("mouseup", onUp);
   };
 
-  // Build ordered, visible columns using colOrder
   const visibleCols = useMemo(() => {
-    // Ensure colOrder has all current keys, add any missing ones
     const allKeys = DETAIL_COLS.map((c) => c.key);
     const ordered = [
       ...colOrder.filter((k) => allKeys.includes(k)),
@@ -4254,13 +4130,41 @@ function DetailView({
                       paddingRight: col.key !== "_actions" ? 8 : 0,
                     }}
                   >
-                    {col.label}
-                    {col.sortable && sortKey === col.key && (
+                    {/* In selectMode, _row header shows "select all" checkbox */}
+                    {col.key === "_row" && selectMode ? (
+                      <input
+                        type="checkbox"
+                        checked={
+                          selectedIds.size === items.length && items.length > 0
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            items.forEach((i) => {
+                              if (!selectedIds.has(i.id)) onToggleSelect(i.id);
+                            });
+                          } else {
+                            items.forEach((i) => {
+                              if (selectedIds.has(i.id)) onToggleSelect(i.id);
+                            });
+                          }
+                        }}
+                        style={{
+                          accentColor: T.blue,
+                          cursor: "pointer",
+                          width: 14,
+                          height: 14,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      col.label
+                    )}
+                    {col.sortable && sortKey === col.key && !selectMode && (
                       <span style={{ marginLeft: 4 }}>
                         {sortDir === "asc" ? "↑" : "↓"}
                       </span>
                     )}
-                    {isDraggable && !col.sortable && (
+                    {isDraggable && !col.sortable && !selectMode && (
                       <span
                         style={{ marginLeft: 4, opacity: 0.3, fontSize: 9 }}
                       >
@@ -4311,7 +4215,7 @@ function DetailView({
               );
             })}
           </tr>
-          {filterRowOpen && (
+          {filterRowOpen && !selectMode && (
             <tr
               style={{
                 background: T.white,
@@ -4358,22 +4262,39 @@ function DetailView({
             const m = margin(item.sell_price, item.weighted_avg_cost);
             const soldOut = isSoldOut(item);
             const lowStock = isLowStock(item);
-            const rowBg = idx % 2 === 0 ? T.white : "#FCFCFB";
+            const isSelected = selectMode && selectedIds.has(item.id);
+            const rowBg = isSelected
+              ? "#EFF6FF"
+              : idx % 2 === 0
+                ? T.white
+                : "#FCFCFB";
             return (
               <tr
                 key={item.id}
+                className={isSelected ? "nuai-select-row" : ""}
                 style={{
                   background: rowBg,
                   borderBottom: `1px solid ${T.border}`,
-                  borderLeft: soldOut
-                    ? `3px solid ${T.danger}`
-                    : lowStock
-                      ? `3px solid ${T.amber}`
-                      : "3px solid transparent",
+                  borderLeft: isSelected
+                    ? `3px solid ${T.blue}`
+                    : soldOut
+                      ? `3px solid ${T.danger}`
+                      : lowStock
+                        ? `3px solid ${T.amber}`
+                        : "3px solid transparent",
                   opacity: item.is_active ? (soldOut ? 0.85 : 1) : 0.55,
+                  transition: "background 0.1s",
                 }}
-                onClick={() => onOpenPanel(item)}
-                onDoubleClick={() => onEdit(item)}
+                onClick={() => {
+                  if (selectMode) {
+                    onToggleSelect(item.id);
+                    return;
+                  }
+                  onOpenPanel(item);
+                }}
+                onDoubleClick={() => {
+                  if (!selectMode) onEdit(item);
+                }}
               >
                 {visibleCols.map((col) => (
                   <td
@@ -4389,19 +4310,37 @@ function DetailView({
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {/* _row: row number */}
-                    {col.key === "_row" && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: T.ink300,
-                          fontWeight: 600,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {idx + 1}
-                      </span>
-                    )}
+                    {/* SC-08: _row → checkbox in selectMode */}
+                    {col.key === "_row" &&
+                      (selectMode ? (
+                        <div
+                          style={{ display: "flex", justifyContent: "center" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onToggleSelect(item.id)}
+                            style={{
+                              width: 14,
+                              height: 14,
+                              accentColor: T.blue,
+                              cursor: "pointer",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: T.ink300,
+                            fontWeight: 600,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                      ))}
                     {col.key === "name" && (
                       <div
                         style={{
@@ -4502,7 +4441,10 @@ function DetailView({
                     )}
                     {col.key === "is_active" && (
                       <button
-                        onClick={() => onToggle(item, "is_active")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggle(item, "is_active");
+                        }}
                         style={{
                           padding: "2px 8px",
                           borderRadius: 99,
@@ -4522,7 +4464,10 @@ function DetailView({
                     )}
                     {col.key === "is_featured" && (
                       <button
-                        onClick={() => onToggle(item, "is_featured")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggle(item, "is_featured");
+                        }}
                         style={{
                           padding: "2px 8px",
                           borderRadius: 99,
@@ -4572,7 +4517,7 @@ function DetailView({
                     {col.key === "brand" && (
                       <span style={{ fontSize: 11 }}>{item.brand || "—"}</span>
                     )}
-                    {col.key === "_actions" && (
+                    {col.key === "_actions" && !selectMode && (
                       <div
                         style={{
                           display: "flex",
@@ -5036,7 +4981,7 @@ function LoadingState({ T }) {
   };
   return (
     <div style={{ padding: "4px 0" }}>
-      <style>{`@keyframes nuai-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+      <style>{`@keyframes nuai-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
       <div
         style={{
           display: "flex",
