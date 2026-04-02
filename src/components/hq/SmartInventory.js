@@ -1038,8 +1038,41 @@ export default function SmartInventory({ tenantId }) {
         .order("name"),
     ]);
     if (iErr) setError(iErr.message);
-    setItems(iData || []);
+    const loadedItems = iData || [];
+    setItems(loadedItems);
     setSuppliers(sData || []);
+    // UX: Auto-hide empty columns on first load (only if no saved preference)
+    if (
+      !localStorage.getItem("nuai_detail_hidden_cols") &&
+      loadedItems.length > 0
+    ) {
+      const emptyKeys = DETAIL_COLS.filter((c) => {
+        if (c.key.startsWith("_") || c.key === "name" || c.key === "category")
+          return false;
+        return !loadedItems.some((i) => {
+          const v = i[c.key];
+          return (
+            v !== null && v !== undefined && v !== "" && v !== false && v !== 0
+          );
+        });
+      }).map((c) => c.key);
+      if (emptyKeys.length > 0) {
+        const defaultHidden = new Set([
+          "sku",
+          "reorder_level",
+          "max_stock_level",
+          "supplier",
+          ...emptyKeys,
+        ]);
+        setHiddenCols(defaultHidden);
+        try {
+          localStorage.setItem(
+            "nuai_detail_hidden_cols",
+            JSON.stringify([...defaultHidden]),
+          );
+        } catch {}
+      }
+    }
     setLoading(false);
   }, [tenantId]);
 
@@ -1141,14 +1174,74 @@ export default function SmartInventory({ tenantId }) {
         }
       }
     }
+    // SC-10: Smart search parser — supports tokens like price>500, qty:0, brand:RAW, cost<100, margin>50
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (i) =>
-          i.name?.toLowerCase().includes(q) ||
-          (CATEGORY_LABELS[i.category] || "").toLowerCase().includes(q) ||
-          i.loyalty_category?.toLowerCase().includes(q),
-      );
+      const q = search.trim();
+      const tokenRegex =
+        /^(price|sell_price|cost|avg_cost|qty|quantity|stock|margin|brand|category|world|sku|name|supplier)\s*([><=:!]+)\s*(.+)$/i;
+      const match = q.match(tokenRegex);
+      if (match) {
+        const [, rawField, op, rawVal] = match;
+        const val = rawVal.trim().toLowerCase();
+        const num = parseFloat(val);
+        const fieldMap = {
+          price: "sell_price",
+          sell_price: "sell_price",
+          cost: "weighted_avg_cost",
+          avg_cost: "weighted_avg_cost",
+          qty: "quantity_on_hand",
+          quantity: "quantity_on_hand",
+          stock: "quantity_on_hand",
+          margin: "_margin",
+          brand: "brand",
+          category: "category",
+          world: "category",
+          sku: "sku",
+          name: "name",
+          supplier: "supplier",
+        };
+        const field =
+          fieldMap[rawField.toLowerCase()] || rawField.toLowerCase();
+        list = list.filter((i) => {
+          if (field === "_margin") {
+            const m = margin(i.sell_price, i.weighted_avg_cost);
+            if (m === null) return false;
+            if (op.includes(">")) return m > num;
+            if (op.includes("<")) return m < num;
+            if (op === ":" || op === "=") return Math.abs(m - num) < 1;
+            return false;
+          }
+          if (field === "supplier") {
+            const sName = (i.suppliers?.name || "").toLowerCase();
+            return sName.includes(val);
+          }
+          const cellVal = i[field];
+          if (cellVal === undefined || cellVal === null) return false;
+          if (!isNaN(num) && typeof cellVal === "number") {
+            if (op.includes(">") && op.includes("=")) return cellVal >= num;
+            if (op.includes("<") && op.includes("=")) return cellVal <= num;
+            if (op.includes(">")) return cellVal > num;
+            if (op.includes("<")) return cellVal < num;
+            if (op === ":" || op === "=" || op === "==") return cellVal === num;
+            if (op === "!" || op === "!=") return cellVal !== num;
+          }
+          const str = String(cellVal).toLowerCase();
+          if (op === ":" || op === "=") return str.includes(val);
+          if (op === "!" || op === "!=") return !str.includes(val);
+          return str.includes(val);
+        });
+      } else {
+        const lq = q.toLowerCase();
+        list = list.filter(
+          (i) =>
+            i.name?.toLowerCase().includes(lq) ||
+            (CATEGORY_LABELS[i.category] || "").toLowerCase().includes(lq) ||
+            i.loyalty_category?.toLowerCase().includes(lq) ||
+            i.brand?.toLowerCase().includes(lq) ||
+            i.sku?.toLowerCase().includes(lq) ||
+            i.variant_value?.toLowerCase().includes(lq),
+        );
+      }
     }
     Object.entries(colFilters).forEach(([col, val]) => {
       if (!val) return;
@@ -1607,7 +1700,7 @@ export default function SmartInventory({ tenantId }) {
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search items…"
+              placeholder="Search… or try price>500, qty:0, brand:RAW"
               style={{
                 padding: "5px 12px",
                 border: `1.5px solid ${search ? T.accent : T.border}`,
@@ -1616,11 +1709,51 @@ export default function SmartInventory({ tenantId }) {
                 fontFamily: T.font,
                 color: T.ink900,
                 outline: "none",
-                width: 200,
+                width: 320,
                 background: T.white,
               }}
             />
           </div>
+
+          {/* UX: Showing X of Y count + Clear all filters */}
+          {isFiltered && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: T.ink400,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {filtered.length} of {items.length}
+              </span>
+              <button
+                onClick={() => {
+                  selectCat("all");
+                  setGroupFilter(null);
+                  setSubFilter(null);
+                  setSearch("");
+                  setPillExpanded(false);
+                }}
+                style={{
+                  fontSize: 10,
+                  color: T.danger,
+                  background: T.dangerLit,
+                  border: `1px solid ${T.danger}30`,
+                  borderRadius: 99,
+                  padding: "2px 8px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontFamily: T.font,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ✕ Clear
+              </button>
+            </div>
+          )}
+
           <div
             style={{
               marginLeft: "auto",
