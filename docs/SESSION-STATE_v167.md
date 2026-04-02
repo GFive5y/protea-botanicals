@@ -1,6 +1,9 @@
 # SESSION-STATE — NuAi Platform
+
 ## Version: v167 · April 2, 2026
-## HEAD: 7d9ea6a
+
+## HEAD: 97627a0
+
 ## THIS FILE IS THE SINGLE SOURCE OF TRUTH FOR NEXT SESSION AGENTS
 
 > Read order: SESSION-STATE.md → SESSION-CORE.md → SESSION-LOG.md → SESSION-BUGS.md
@@ -10,7 +13,10 @@
 ## ⚠ CRITICAL PENDING ACTIONS (do before any dev work)
 
 ```
-1. RLS FIX (Supabase SQL editor — URGENT):
+1. RLS FIX — RESOLVED (stock_receipt_lines migration applied)
+2. VERCEL — RESOLVED (auto-deploys from main, confirmed working)
+3. SUPABASE BACKUPS (owner action — still pending):
+   Settings → Add-ons → Point-in-Time Recovery
    ALTER TABLE public.stock_receipts ENABLE ROW LEVEL SECURITY;
    ALTER TABLE public.qr_security_settings ENABLE ROW LEVEL SECURITY;
    ALTER TABLE public.brand_image_library ENABLE ROW LEVEL SECURITY;
@@ -35,8 +41,8 @@
 ## CURRENT HEAD
 
 ```
-Commit:  7d9ea6a
-Message: fix(catalog): restore onOpenPanel prop to all 3 view calls
+Commit:  97627a0
+Message: docs: update CLAUDE.md — all 10 SCs complete
 Branch:  main
 Pushed:  YES ✅
 ```
@@ -57,7 +63,18 @@ e1be619  fix(shell): cream background #faf9f6 + toolbar card shadow
 9cd9e69  feat(catalog): SC-01 KPI cards + action panels + FX bar centering
 88f8001  feat(catalog): smart UX foundation — background dismiss + Escape + cursor
 18b72fd  feat(catalog): StockItemModal integration — world-specific add + edit
-e0766f0  fix(shell): proper app shell layout — bounded content, pinned footer
+--- Claude Code session (April 2, 2026) ---
+e2c28b2  feat(catalog): SC-07 loading skeleton
+59fe473  feat(catalog): flat pill groups — all subs on world click
+98b7c8d  feat(catalog): promote search above KPI + wrap pill row
+f4910bc  fix(catalog): localStorage for column settings
+e3af152  feat(catalog): row numbers + drag-reorder columns
+acf6eba  fix(catalog): drag-reorder live on dragOver
+21c1269  feat(catalog): SC-08 bulk actions
+db5c286  fix(catalog): SC-08 wire select mode into all 3 views
+d4283cb  feat(catalog): SC-10 smart search + UX fixes
+6cb6f88  fix(catalog): clear all filters — stuck filter bug
+97627a0  docs: update CLAUDE.md — all 10 SCs complete
 ```
 
 ---
@@ -151,16 +168,13 @@ SC-06 ✅  Pill row fade-edge scroll
 ### PENDING (next session):
 
 ```
-SC-05  Tile hover polish + world smart tags
-  Q1: Action buttons hover-only or always visible? → NOT YET SCOPED
-  Q2: World smart tags per tile (Flower: strain+weight, Papers: brand+format)
-  Q3: Tile grid density toggle?
-  Dependency: SC-02 + SC-03 done ✅
+SC-05 ✅  Tile hover + smart tags (commit 337385e)
+SC-07 ✅  Loading skeleton shimmer rows (commit e2c28b2)
+SC-08 ✅  Bulk actions — select mode, floating action bar (commit 21c1269)
+SC-09 ✅  CSV export (commit 6e7cdcd)
+SC-10 ✅  Smart search — price>500, qty:0, brand:RAW, margin>50 (commit d4283cb)
+UX: search promoted, pill wrap, flat groups, row numbers, drag-reorder, localStorage, clear button
 
-SC-07  Loading skeleton (initial load shimmer rows)
-SC-08  Bulk actions in Tile + List views
-SC-09  Export to CSV / Excel
-SC-10  Smart search parser (typed queries: price>500, qty:0, brand:RAW)
 ```
 
 ### ARCHITECTURAL DECISIONS LOCKED THIS SESSION:
@@ -280,7 +294,7 @@ WP-SMART-CATALOG SC-02          COMPLETE ✅
 WP-SMART-CATALOG SC-03          COMPLETE ✅
 WP-SMART-CATALOG SC-04          COMPLETE ✅
 WP-SMART-CATALOG SC-06          COMPLETE ✅
-WP-SMART-CATALOG SC-05,07-10    PENDING
+WP-SMART-CATALOG SC-01-10       COMPLETE ✅
 WP-REORDER                      SCOPED (spec in WP-REORDER_v1_0.md)
 WP-STOCK-MERGE                  PLACEHOLDER (spec in WP-STOCK-MERGE_v1_0.md)
 WP-MULTISITE S1                 CRITICAL — 1 SQL line still not run
@@ -317,12 +331,11 @@ GAPS vs competitors:
 ## NEXT SESSION PRIORITIES
 
 ```
-P0  RLS fix — run SQL above in Supabase (5 min, security critical)
-P1  Vercel fix — reconnect GitHub, trigger redeploy (10 min)
-P2  SC-05 scoping — tile hover polish + world smart tags
-P3  WP-MULTISITE S1 — domain routing (1 SQL line)
-P4  BUG-044 — HQCogs FX shipping (15 min)
-P5  First real sale — POS → cash sale → unlocks all intelligence panels
+P1  WP-REORDER — Smart procurement engine (spec ready)
+P2  WP-STOCK-MERGE — Integrate Smart Catalog into Stock tab
+P3  BUG-044 — HQCogs FX shipping (15 min)
+P4  First real sale — POS cash sale → unlocks intelligence panels
+NOTE: RLS fix DONE. Vercel DONE. All SCs DONE.
 ```
 
 ---
@@ -363,7 +376,6 @@ KEEP UNCHANGED:
 
 ---
 
-*SESSION-STATE v167 · NuAi · April 2, 2026 · HEAD: 7d9ea6a*
-*MAJOR SESSION: Smart Catalog SC-01 through SC-04 + SC-06 + shell layout system*
-*Security: RLS missing on 3 tables — fix immediately*
-*Deployment: Vercel stuck on old commit — reconnect GitHub*
+_SESSION-STATE v168 · NuAi · April 2, 2026 · HEAD: 97627a0_
+_Smart Catalog SC-01 through SC-10 ALL COMPLETE_
+_Next: WP-REORDER → WP-STOCK-MERGE_
