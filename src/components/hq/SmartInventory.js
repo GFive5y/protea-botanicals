@@ -3673,40 +3673,40 @@ function DetailView({
     }
     dragCol.current = key;
     e.dataTransfer.effectAllowed = "move";
+    // Make the drag ghost semi-transparent
+    if (e.target) e.target.style.opacity = "0.5";
   };
   const handleDragOver = (e, key) => {
     if (key === "_row" || key === "_actions" || !dragCol.current) return;
+    if (dragCol.current === key) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setDragOverKey(key);
-  };
-  const handleDrop = (e, targetKey) => {
-    e.preventDefault();
-    setDragOverKey(null);
-    if (
-      !dragCol.current ||
-      dragCol.current === targetKey ||
-      targetKey === "_row" ||
-      targetKey === "_actions"
-    ) {
-      dragCol.current = null;
-      return;
-    }
+    // Reorder on dragOver for instant feedback (don't wait for drop)
     setColOrder((prev) => {
       const next = [...prev];
       const fromIdx = next.indexOf(dragCol.current);
-      const toIdx = next.indexOf(targetKey);
-      if (fromIdx < 0 || toIdx < 0) return prev;
+      const toIdx = next.indexOf(key);
+      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return prev;
       next.splice(fromIdx, 1);
       next.splice(toIdx, 0, dragCol.current);
-      try {
-        localStorage.setItem("nuai_col_order", JSON.stringify(next));
-      } catch {}
       return next;
     });
-    dragCol.current = null;
   };
-  const handleDragEnd = () => {
+  const handleDrop = (e, targetKey) => {
+    e.preventDefault();
+    // Save to localStorage on drop (final position)
+    try {
+      localStorage.setItem("nuai_col_order", JSON.stringify(colOrder));
+    } catch {}
+    dragCol.current = null;
+    setDragOverKey(null);
+  };
+  const handleDragEnd = (e) => {
+    if (e.target) e.target.style.opacity = "1";
+    // Also save on dragEnd in case drop didn't fire
+    try {
+      localStorage.setItem("nuai_col_order", JSON.stringify(colOrder));
+    } catch {}
     dragCol.current = null;
     setDragOverKey(null);
   };
