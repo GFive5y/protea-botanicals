@@ -16,6 +16,7 @@ import {
   CATEGORY_ICONS,
 } from "./ProductWorlds";
 import InfoTooltip from "../InfoTooltip";
+import ReorderPanel from "./ReorderPanel";
 
 const T = {
   bg: "#FAFAF9",
@@ -1021,6 +1022,7 @@ export default function SmartInventory({ tenantId }) {
   const [modalDefaults, setModalDefaults] = useState({});
   const [modalSaving, setModalSaving] = useState(false);
   const [showWorldPicker, setShowWorldPicker] = useState(false);
+  const [showReorderPanel, setShowReorderPanel] = useState(false);
   const searchRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -2059,6 +2061,17 @@ export default function SmartInventory({ tenantId }) {
             {!selectMode && <InfoTooltip id="sc_bulk_select" size="sm" />}
             {!selectMode && (
               <button
+                onClick={() => setShowReorderPanel(true)}
+                style={btnStyle(T.white, T.amber, T.amber + "60", T)}
+              >
+                ⚑ Reorder
+                {gSoldOut + gBelowReorder > 0
+                  ? ` (${gSoldOut + gBelowReorder})`
+                  : ""}
+              </button>
+            )}
+            {!selectMode && (
+              <button
                 onClick={openAdd}
                 style={btnStyle(T.accent, T.white, T.accent, T, true)}
               >
@@ -3075,6 +3088,18 @@ export default function SmartInventory({ tenantId }) {
             />
           </div>
         </div>
+      )}
+
+      {/* ── REORDER PANEL ────────────────────────────────────────────── */}
+      {showReorderPanel && (
+        <ReorderPanel
+          tenantId={tenantId}
+          onClose={() => setShowReorderPanel(false)}
+          onComplete={() => {
+            load();
+            setShowReorderPanel(false);
+          }}
+        />
       )}
 
       {/* ── DELETE CONFIRM ────────────────────────────────────────────── */}
