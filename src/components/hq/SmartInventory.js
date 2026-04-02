@@ -15,6 +15,7 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ICONS,
 } from "./ProductWorlds";
+import InfoTooltip from "../InfoTooltip";
 
 const T = {
   bg: "#FAFAF9",
@@ -84,6 +85,7 @@ const DETAIL_COLS = [
     width: 90,
     sortable: true,
     align: "right",
+    tooltip: "sc_avg_cost",
   },
   {
     key: "_margin",
@@ -91,6 +93,7 @@ const DETAIL_COLS = [
     width: 85,
     sortable: true,
     align: "right",
+    tooltip: "sc_margin",
   },
   {
     key: "is_active",
@@ -1371,16 +1374,20 @@ export default function SmartInventory({ tenantId }) {
     const price = parseFloat(noPriceDraft[itemId]);
     if (!price || price <= 0) return;
     setNoPriceSaving((prev) => new Set([...prev, itemId]));
-    await supabase
+    const { error: priceErr } = await supabase
       .from("inventory_items")
       .update({ sell_price: price, updated_at: new Date().toISOString() })
       .eq("id", itemId);
-    setNoPriceFixed((prev) => new Set([...prev, itemId]));
     setNoPriceSaving((prev) => {
       const n = new Set(prev);
       n.delete(itemId);
       return n;
     });
+    if (priceErr) {
+      toast.error("Failed to save price — check your connection");
+      return;
+    }
+    setNoPriceFixed((prev) => new Set([...prev, itemId]));
     load();
     const item = items.find((i) => i.id === itemId);
     toast.success(`Sell price set${item ? ` — R${price}` : ""}`);
@@ -1404,7 +1411,10 @@ export default function SmartInventory({ tenantId }) {
         .from("inventory_items")
         .update({ needs_reorder: true, updated_at: new Date().toISOString() })
         .eq("id", itemId);
-    } catch {}
+    } catch {
+      toast.error("Failed to flag for reorder — check your connection");
+      return;
+    }
     setFlaggedReorder((prev) => new Set([...prev, itemId]));
     toast.info("⚑ Flagged for reorder", {
       duration: 5000,
@@ -1434,7 +1444,15 @@ export default function SmartInventory({ tenantId }) {
         .from("inventory_items")
         .update({ on_order: true, updated_at: new Date().toISOString() })
         .eq("id", itemId);
-    } catch {}
+    } catch {
+      toast.error("Failed to mark as On Order — check your connection");
+      setOnOrderSaving((prev) => {
+        const n = new Set(prev);
+        n.delete(itemId);
+        return n;
+      });
+      return;
+    }
     setOnOrderSet((prev) => new Set([...prev, itemId]));
     setOnOrderSaving((prev) => {
       const n = new Set(prev);
@@ -1493,7 +1511,7 @@ export default function SmartInventory({ tenantId }) {
   // SC-08 Bulk actions
   const bulkHide = async () => {
     const ids = [...selectedIds];
-    await Promise.all(
+    const results = await Promise.all(
       ids.map((id) =>
         supabase
           .from("inventory_items")
@@ -1501,15 +1519,19 @@ export default function SmartInventory({ tenantId }) {
           .eq("id", id),
       ),
     );
+    const failed = results.filter((r) => r.error).length;
     load();
     exitSelectMode();
-    toast.warning(
-      `${ids.length} item${ids.length > 1 ? "s" : ""} hidden from shop`,
-    );
+    if (failed > 0)
+      toast.error(`${failed} item${failed > 1 ? "s" : ""} failed to update`);
+    else
+      toast.warning(
+        `${ids.length} item${ids.length > 1 ? "s" : ""} hidden from shop`,
+      );
   };
   const bulkShow = async () => {
     const ids = [...selectedIds];
-    await Promise.all(
+    const results = await Promise.all(
       ids.map((id) =>
         supabase
           .from("inventory_items")
@@ -1517,11 +1539,15 @@ export default function SmartInventory({ tenantId }) {
           .eq("id", id),
       ),
     );
+    const failed = results.filter((r) => r.error).length;
     load();
     exitSelectMode();
-    toast.success(
-      `${ids.length} item${ids.length > 1 ? "s" : ""} made visible in shop`,
-    );
+    if (failed > 0)
+      toast.error(`${failed} item${failed > 1 ? "s" : ""} failed to update`);
+    else
+      toast.success(
+        `${ids.length} item${ids.length > 1 ? "s" : ""} made visible in shop`,
+      );
   };
   const bulkDelete = async () => {
     const ids = [...selectedIds];
@@ -1531,12 +1557,16 @@ export default function SmartInventory({ tenantId }) {
       )
     )
       return;
-    await Promise.all(
+    const results = await Promise.all(
       ids.map((id) => supabase.from("inventory_items").delete().eq("id", id)),
     );
+    const failed = results.filter((r) => r.error).length;
     load();
     exitSelectMode();
-    toast.warning(`${ids.length} item${ids.length > 1 ? "s" : ""} deleted`);
+    if (failed > 0)
+      toast.error(`${failed} item${failed > 1 ? "s" : ""} failed to delete`);
+    else
+      toast.warning(`${ids.length} item${ids.length > 1 ? "s" : ""} deleted`);
   };
 
   function openAdd() {
@@ -1717,6 +1747,7 @@ export default function SmartInventory({ tenantId }) {
                 background: T.white,
               }}
             />
+            <InfoTooltip id="sc_search" />
           </div>
 
           {/* UX: Showing X of Y count + Clear all filters */}
@@ -2025,6 +2056,7 @@ export default function SmartInventory({ tenantId }) {
             >
               {selectMode ? "✕ Cancel" : "☑ Select"}
             </button>
+            {!selectMode && <InfoTooltip id="sc_bulk_select" size="sm" />}
             {!selectMode && (
               <button
                 onClick={openAdd}
@@ -2160,6 +2192,7 @@ export default function SmartInventory({ tenantId }) {
               {
                 key: "value",
                 label: "Stock Value",
+                tooltip: "sc_stock_value",
                 global: `R${gStockValue >= 1000000 ? (gStockValue / 1000000).toFixed(1) + "m" : (gStockValue / 1000).toFixed(0) + "k"}`,
                 filtered: `R${fStockValue >= 1000000 ? (fStockValue / 1000000).toFixed(1) + "m" : (fStockValue / 1000).toFixed(0) + "k"}`,
                 color: T.blue,
@@ -2261,6 +2294,7 @@ export default function SmartInventory({ tenantId }) {
                   }}
                 >
                   {card.label}
+                  {card.tooltip && <InfoTooltip id={card.tooltip} />}
                 </div>
                 {isFiltered && (
                   <div
