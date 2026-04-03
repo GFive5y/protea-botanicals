@@ -536,7 +536,7 @@ export default function HQTradingDashboard() {
           .from("loyalty_transactions")
           .select("points")
           .eq("tenant_id", tenantId)
-          .ilike("type", "earned")
+          .ilike("transaction_type", "earned")
           .gte("created_at", ts.toISOString())
           .lt("created_at", te.toISOString()),
 
@@ -545,7 +545,7 @@ export default function HQTradingDashboard() {
           .from("loyalty_transactions")
           .select("points")
           .eq("tenant_id", tenantId)
-          .eq("type", "redeemed")
+          .ilike("transaction_type", "redeemed")
           .gte("created_at", ts.toISOString())
           .lt("created_at", te.toISOString()),
 
