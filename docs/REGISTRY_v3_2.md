@@ -1,4 +1,4 @@
-# REGISTRY.md — Protea Botanicals
+# REGISTRY.md — NuAi Platform
 ## Capability-Indexed Component Registry
 ## Version: v3.2 · April 4, 2026
 ## THIS IS THE MANDATORY FIRST READ. Before MANIFEST.md. Before anything.
@@ -79,15 +79,16 @@
 | Show QR code generation + pool management | ✅ BUILT | `AdminQRCodes.js` |
 | Show shipment tracking | ✅ BUILT | `AdminShipments.js` |
 | Show HR panel (admin / team-scoped view) | ✅ BUILT | `AdminHRPanel.js` |
-| Show loyalty programme configuration | ✅ BUILT | `HQLoyalty.js` |
+| Show loyalty programme configuration | ✅ BUILT | `HQLoyalty.js v4.0` |
 | Show live P&L with actual COGS + DB-backed OPEX | ✅ BUILT WP-FIN S1+S2 | `HQProfitLoss.js v3.2` |
 | Show expense manager (CRUD + bulk import + CSV export) | ✅ BUILT WP-FIN S1 | `ExpenseManager.js v1.0` |
 | Add CAPEX/OPEX expense from document ingestion | ✅ BUILT WP-FIN S3 | `HQDocuments.js v2.4 + process-document v1.9` |
 | Show wholesale revenue in P&L from sale_out movements | ✅ BUILT WP-FIN S4 | `HQProfitLoss.js v3.2` |
+| Show Balance Sheet + Cash Flow statement | ✅ BUILT WP-FIN S5+S6 | `HQBalanceSheet.js v1.0` |
 | Show COGS engine / DDP tiers / landed cost | ✅ BUILT | `HQCogs.js` |
 | Auto-apply shipping per-unit alloc to COGS form on input change | ✅ BUILT v130 | `HQCogs.js` |
 | Show shipping label scaled to batch qty in COGS card | ✅ BUILT v130 | `HQCogs.js` |
-| HQ Stock panels adapt category filters per industry profile | ✅ BUILT WP-STOCK-PRO S1 | `HQStock.js v3.0` |
+| HQ Stock panels adapt category filters per industry profile | ✅ BUILT WP-STOCK-PRO S1 | `HQStock.js v3.1` |
 | Save industry_profile via UI (HQTenants feature flags editor) | ✅ BUILT BUG-042 fix | `HQTenants.js` |
 | Show purchase orders (import ERP) | ✅ BUILT | `HQPurchaseOrders.js` |
 | Show production pipeline + batches + BOM | ✅ BUILT | `HQProduction.js` |
@@ -110,7 +111,7 @@
 | Show an age gate | ✅ BUILT | `AgeGate.js` |
 | Show customer loyalty page | ✅ BUILT | `Loyalty.js` |
 | Show a 5th-scan survey | ✅ BUILT | `SurveyWidget.js` |
-| Show a QR scan result | ✅ BUILT — COMPLEX | `ScanResult.js v4.8` |
+| Show a QR scan result | ✅ BUILT — COMPLEX | `ScanResult.js v4.9` |
 | Show the customer shop | ✅ BUILT | `Shop.js` |
 | Show checkout + PayFast + loyalty points | ✅ BUILT | `CheckoutPage.js` |
 | Show animated Lottie bot (customer-facing) | ✅ BUILT | `LottieCharacter.js` |
@@ -139,14 +140,14 @@
 | Show HR settings (leave types, work hours, templates) | ✅ BUILT | `HRSettings.js` |
 | Show HQ overview dashboard with live KPIs | ✅ BUILT | `HQOverview.js` |
 | Build page-level charts for HQ / Admin | 🔜 WP-VISUAL | spec ready, viz library ready |
-| Show HQ food_beverage stock as tabbed command centre | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0` |
-| Show food KPI strip in HQStock (expired/expiring/allergens/cold chain/low/value) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0` |
-| Show FEFO alert table in HQStock Overview (items sorted by nearest expiry) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0` |
-| Show cold chain panel in HQStock Overview (REF/FRZ items as cards) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0` |
-| Show AVCO cost drift panel in HQStock Overview (>5% deviation flagged) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0` |
-| Show food stock items table with search/filter/sort | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0 FoodItems` |
-| Quick stock adjustment with mandatory reason + audit trail | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0` |
-| Add/Edit inventory items directly from HQStock (all profiles) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.0 + StockItemModal` |
+| Show HQ food_beverage stock as tabbed command centre | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1` |
+| Show food KPI strip in HQStock (expired/expiring/allergens/cold chain/low/value) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1` |
+| Show FEFO alert table in HQStock Overview (items sorted by nearest expiry) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1` |
+| Show cold chain panel in HQStock Overview (REF/FRZ items as cards) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1` |
+| Show AVCO cost drift panel in HQStock Overview (>5% deviation flagged) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1` |
+| Show food stock items table with search/filter/sort | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1 FoodItems` |
+| Quick stock adjustment with mandatory reason + audit trail | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1` |
+| Add/Edit inventory items directly from HQStock (all profiles) | ✅ BUILT WP-STOCK-PRO S3 | `HQStock.js v3.1 + StockItemModal` |
 | Show expandable admin stock rows with AI analyse | ✅ BUILT WP-BIB S6 | `StockControl.js v2.4` |
 | Show AI stock intelligence per item (profile-adaptive) | ✅ BUILT WP-BIB S6 | `StockAIAnalysis.js v1.0` |
 | Show category-adaptive add/edit stock item modal | ✅ BUILT WP-BIB S4 + S3 | `StockItemModal.js v1.1` |
@@ -175,7 +176,7 @@
 | Apply stock take adjustment (writes stock_take_adjustment movement) | ✅ BUILT WP-STOCK-PRO S4 | `HRStockView.js v1.0 Review tab` |
 | Review and confirm AI document extraction per-line | ✅ BUILT WP-BIB S5 | `HQDocuments.js v2.4` |
 | Onboard a new tenant (5-step Business in a Box wizard) | ✅ BUILT WP-BIB S7 | `TenantSetupWizard.js v1.0` |
-| Show profile-adaptive QR scan result (food/general/cannabis) | ✅ BUILT WP-BIB S8 | `ScanResult.js v4.8` |
+| Show profile-adaptive QR scan result (food/general/cannabis) | ✅ BUILT WP-BIB S8 | `ScanResult.js v4.9` |
 | Show profile-adaptive shop product cards (food/general/cannabis) | ✅ BUILT WP-BIB S9 | `Shop.js v4.4` |
 | Show profile-adaptive platform alerts (expiry/reorder/stock) | ✅ BUILT WP-BIB S11 | `PlatformBar.js v1.2` |
 | Show profile-adaptive HQ analytics (tabs, KPIs, expiry alert) | ✅ BUILT WP-BIB S12 | `HQAnalytics.js` |
@@ -188,13 +189,7 @@
 | Receive a transfer at store — add shop stock + audit trail | ✅ BUILT WP-STOCK-PRO S5 | `HQTransfer.js v1.0` |
 | Cancel in-transit transfer + auto-reverse HQ stock | ✅ BUILT WP-STOCK-PRO S5 | `HQTransfer.js handleCancel()` |
 | Add a new HQ tab to the left nav sidebar | ✅ BUILT — add entry to Operations group | `src/hooks/useNavConfig.js` |
-| Show today's trading performance — KPIs, hourly chart, top sellers, payment split, loyalty | ✅ BUILT WP-DAILY-OPS Session B+C+D | `HQTradingDashboard.js v3.0` |
-| Show 30-day revenue bar chart with day-of-week labels (today highlighted) | ✅ BUILT WP-DAILY-OPS Session D | `HQTradingDashboard.js v3.0 ThirtyDayChart` |
-| Browse trading history by calendar month (Jan 2025 → present, prev/next navigation) | ✅ BUILT WP-DAILY-OPS Session D | `HQTradingDashboard.js v3.0 HistoryPanel (By Month mode)` |
-| Run a POS sale — product grid, cart, cash/card/online payment, stock deduction | ✅ BUILT WP-POS | `POSScreen.js v1.0` |
-| Run end-of-day cash reconciliation — denomination count, variance, reason, escalation, history | ✅ BUILT WP-EOD | `EODCashUp.js v1.0` |
-| Change EOD cash variance thresholds without a code change or redeploy | ✅ BUILT — DB config | `tenant_config.settings (eod_cash_variance_tolerance, eod_escalation_threshold, eod_default_float, eod_approver_role)` |
-| Show a multi-tenant client portal (manufacturer/distributor model) | ✅ BUILT WP-TENANT S3 | `TenantPortal.js v2.1` |
+| Show a multi-tenant client portal (manufacturer/distributor model) | ✅ BUILT WP-TENANT S3 | `TenantPortal.js v2.4` |
 | Switch portal view between operator and tenant | ✅ BUILT WP-TENANT S3 | `HQDashboard.js VIEWING dropdown` |
 | Capture React errors + console.error in a developer panel | ✅ BUILT WP-AI-UNIFIED | `DevErrorCapture.js v1.0` |
 | Build an ingredient encyclopedia with DAFF nutrition + HACCP risk | ✅ BUILT WP-FNB S1 | `HQFoodIngredients.js` |
@@ -206,6 +201,12 @@
 | Manage product recalls + lot traceability + FSCA letter | ✅ BUILT WP-FNB S7 | `HQRecall.js` |
 | Show food intelligence dashboard (allergen risk, compliance score, waste) | ✅ BUILT WP-FNB S8 | `HQFoodIntelligence.js` |
 | Fetch food_recipe_lines for a set of recipes | ✅ BUILT — use .in() NOT nested select | `HQRecipeEngine.js (LL-090)` |
+| Show SmartInventory tenant catalogue (drag-drop columns, pill filters, 14 worlds) | ✅ BUILT v1.5 (f6b065f) | `SmartInventory.js` |
+| Show live trading dashboard (daily sales, EOD summary, 30-day trends) | ✅ BUILT WP-DAILY-OPS C | `HQTradingDashboard.js v3.0` |
+| Show end-of-day cash reconciliation + variance escalation | ✅ BUILT WP-EOD | `EODCashUp.js v1.0` |
+| Show in-store POS sales screen | ✅ BUILT WP-POS | `POSScreen.js v1.0` |
+| Show Balance Sheet (assets, liabilities, equity, accounting equation badge) | ✅ BUILT WP-FIN S5 | `HQBalanceSheet.js v1.0` |
+| Show Cash Flow statement | ✅ BUILT WP-FIN S6 | `HQBalanceSheet.js v1.0 (Cash Flow sub-tab)` |
 
 ---
 
@@ -261,7 +262,7 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `HQWholesaleOrders.js` ✅ BUILT v2.0 (WP-FIN S4 — last session)
+### `HQWholesaleOrders.js` ✅ BUILT v2.0 (WP-FIN S4)
 **File:** `src/components/hq/HQWholesaleOrders.js`
 **What it does:** Full B2B wholesale order management with stock reservation lifecycle + SAGE-style invoice generation.
 **Tables:** wholesale_partners, inventory_items (reserved_qty), stock_reservations, stock_movements, invoices
@@ -293,6 +294,14 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
+### `HQBalanceSheet.js` ✅ BUILT v1.0 (WP-FIN S5+S6 — 29ecb89)
+**File:** `src/components/hq/HQBalanceSheet.js`
+**What it does:** Two sub-tabs: Balance Sheet + Cash Flow. Balance Sheet: inventory_items (AVCO × qty = assets), invoices (AR), expenses CAPEX (fixed assets), purchase_orders pending (AP). Equity = Assets − Liabilities (derived). Accounting equation check badge. CSV export. Cash Flow period selector.
+**Tables:** inventory_items, invoices, expenses, purchase_orders
+**DO NOT:** Store equity — always derive. Add a third sub-tab without owner confirmation.
+
+---
+
 ### `ExpenseManager.js` ✅ BUILT v1.0 (WP-FIN S1)
 **File:** `src/components/hq/ExpenseManager.js`
 **What it does:** Full expense CRUD — List, Add/Edit, Bulk Import (CSV), Export. Categories: opex/wages/capex/tax/other. Foreign currency support (USD/EUR/GBP/CNY/AED).
@@ -301,14 +310,51 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `TenantPortal.js` ✅ BUILT v2.1 (WP-TENANT S3)
+### `TenantPortal.js` ✅ BUILT v2.4 (WP-TENANT S3 + April 3, 2026)
 **File:** `src/pages/TenantPortal.js`
 **What it does:** Client-facing tenant portal with SmartBar waterfall sidebar. Pure Premium model: manufacturer/distributor, no Food & Bev, no Platform admin.
+**Layout:** `const INNER = { maxWidth: 1400, width: "100%", margin: "0 auto" }` applied to all wrappers. (LL-186)
 **Sidebar sections:** Home → Procurement → Production → Distribution → Sales → Intelligence → People
 **Login routing:** management role auto-redirects to /tenant-portal. is_operator=true auto-redirects to /hq.
-**VIEWING dropdown (in HQDashboard):** operator tenant stays /hq. any other tenant navigates to /tenant-portal.
-**Back button:** "← HQ Operator View" navigates to /hq.
 **DO NOT:** Modify HQDashboard.js to build new portals — build new file (LL-110). Import ShopManager if Shops tab removed (LL-118).
+
+---
+
+### `SmartInventory.js` ✅ BUILT v1.5 (f6b065f — April 4, 2026)
+**File:** `src/components/hq/SmartInventory.js`
+**What it does:** Tenant-portal smart inventory catalogue. Drag-drop column reordering. Pill category filters (14 product worlds). Per-tenant scoped. Column config persists to tenant_config. 3 view modes: Tile / List / Detail.
+**Drag-drop architecture (v1.5 fix — CRITICAL to understand):**
+- Root cause 1: setColOrder callback read dragCol.current AFTER set to null on next line. React batching → callback runs next render → ref already null → fromIdx = -1 → silent fail.
+- Root cause 2: dragend fires before drop in Chrome inside overflow:auto + sticky thead.
+- Fix: handleDragStart: `e.dataTransfer.setData("text/plain", key)`. handleDrop: `const sourceKey = e.dataTransfer.getData("text/plain") || dragCol.current`. setColOrder uses `sourceKey` (local var), NOT `dragCol.current` (mutable ref).
+**Tables:** inventory_items, tenant_config (column config persistence)
+**DO NOT:** Use dragCol.current inside setColOrder callback — it will be null. Build parallel inventory catalogue — extend this file.
+
+---
+
+### `HQTradingDashboard.js` ✅ BUILT v3.0 (a5340f8 — WP-DAILY-OPS Sessions A-C)
+**File:** `src/components/hq/HQTradingDashboard.js`
+**What it does:** Live daily trading intelligence. Today's revenue, unit count, top products. 30-day rolling chart. Month/year history. EOD reconciliation summary.
+**Tables:** pos_sessions, eod_cash_ups, daily_summaries, orders, stock_movements
+**Column trap:** orders.total (NOT total_amount)
+**DO NOT:** Query orders.total_amount — column does not exist.
+
+---
+
+### `EODCashUp.js` ✅ BUILT v1.0 (WP-EOD — 5249529)
+**File:** `src/components/hq/EODCashUp.js`
+**What it does:** End-of-day till cash reconciliation. Operator counts cash. System shows expected. Variance auto-calculated (GENERATED column). Status: balanced / flagged / escalated.
+**Tables:** eod_cash_ups (variance GENERATED, UNIQUE tenant_id+cashup_date, RLS enabled), pos_sessions
+**CRITICAL (LL-190):** All thresholds (variance_tolerance, escalation_threshold, default_float, approver_role) MUST come from tenant_config.settings JSONB. NEVER hardcode. Pattern: `const { variance_tolerance } = tenantConfig?.settings ?? {};`
+**DO NOT:** Hardcode any threshold value. Modify variance GENERATED column logic.
+
+---
+
+### `POSScreen.js` ✅ BUILT v1.0
+**File:** `src/components/hq/POSScreen.js`
+**What it does:** In-store point of sale screen. Product grid, cart, payment. Creates stock_movements + sale record.
+**CRITICAL (LL-189):** movement_type MUST be `'sale_pos'` for all POS transactions. NOT `'sale_out'` (wholesale/B2B only).
+**DO NOT:** Use movement_type='sale_out' for POS sales. Confuse with online checkout flow.
 
 ---
 
@@ -322,10 +368,10 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ### `HQRecipeEngine.js` ✅ BUILT v1.0 (WP-FNB S2 — 1075 lines)
 **File:** `src/components/hq/HQRecipeEngine.js`
-**What it does:** Food recipe BOM engine. Allergen auto-propagation from ingredient library. Nutrition per serve auto-computed from DAFF values × quantities. Cost per unit from weighted_avg_cost × BOM quantities.
+**What it does:** Food recipe BOM engine. Allergen auto-propagation from ingredient library. Nutrition per serve auto-computed. Cost per unit from weighted_avg_cost × BOM quantities.
 **Tables:** food_recipes, food_recipe_lines, food_recipe_versions
 **CRITICAL:** NEVER use nested select for food_recipe_lines. Fetch separately with .in("recipe_id", recipeIds) and attach manually (LL-090). Strip food_recipe_lines from UPDATE payload (LL-091).
-**Integration:** "▶ Start Batch" writes sessionStorage('fnb_start_batch') JSON → navigates to /hq?tab=hq-production for pre-fill.
+**Integration:** "▶ Start Batch" writes sessionStorage('fnb_start_batch') → navigates to /hq?tab=hq-production for pre-fill.
 **DO NOT:** Nested SELECT food_recipes with food_recipe_lines (LL-090). Include food_recipe_lines in UPDATE body (LL-091).
 
 ---
@@ -334,14 +380,14 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 **File:** `src/components/hq/HQHaccp.js`
 **What it does:** HACCP digital control point system. CCP deviation → NCR auto-raised. PlatformBar alert on deviation.
 **Tables:** haccp_control_points, haccp_log_entries, haccp_nonconformances
-**system_alerts INSERT:** requires tenant_id + alert_type + severity + message + created_at. No updated_at (LL-001/LL-094).
+**system_alerts INSERT:** requires tenant_id + alert_type + severity + message + created_at. No updated_at (LL-094).
 **DO NOT:** Add updated_at to system_alerts INSERT (LL-094).
 
 ---
 
 ### `HQFoodSafety.js` ✅ BUILT v1.0 (WP-FNB S4 — 632 lines)
 **File:** `src/components/hq/HQFoodSafety.js`
-**What it does:** Food safety certificate vault. Cert expiry fires PlatformBar alerts (critical/warning/info based on days remaining). Loads on every vault load.
+**What it does:** Food safety certificate vault. Cert expiry fires PlatformBar alerts (critical/warning/info based on days remaining).
 **Tables:** document_log (+9 food safety columns: food_doc_type, cert_expiry_date, etc.)
 **alert_type:** food_cert_expiry
 
@@ -363,7 +409,7 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ### `HQRecall.js` ✅ BUILT v1.0 (WP-FNB S7 — 791 lines)
 **File:** `src/components/hq/HQRecall.js`
-**What it does:** Product recall management + lot traceability. Forward/backward trace. FSCA notification letter auto-generated as downloadable .txt.
+**What it does:** Product recall management + lot traceability. FSCA notification letter auto-generated as .txt.
 **Tables:** recall_events (affected_batches JSONB, severity class)
 **Trace engine:** food_ingredients → food_recipe_lines → food_recipes → production_runs
 **alert_type:** product_recall
@@ -372,7 +418,7 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ### `HQFoodIntelligence.js` ✅ BUILT v1.0 (WP-FNB S8)
 **File:** `src/components/hq/HQFoodIntelligence.js`
-**What it does:** Food intelligence dashboard. Pure S1-S7 data aggregation: allergen risk map, compliance score, waste estimate, cost trends, cold chain health, recall readiness score.
+**What it does:** Food intelligence dashboard. S1-S7 data aggregation: allergen risk, compliance score, waste, cost trends, cold chain health, recall readiness.
 **Tables:** food_recipes, food_recipe_lines, food_ingredients, production_runs, haccp_log_entries, haccp_nonconformances, temperature_logs, recall_events
 **DO NOT:** Add new DB tables — pure aggregation only.
 
@@ -380,7 +426,7 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ### `StockControl.js` ✅ BUILT v2.4 (WP-STK Phase 3 Session 1 + WP-BIB S6)
 **File:** `src/components/StockControl.js`
-**What it does:** Admin stock management. Expandable rows with StockItemExpandedCard. AI Analyse button opens StockAIAnalysis drawer. available_qty = on_hand - reserved_qty computed live.
+**What it does:** Admin stock management. Expandable rows with StockItemExpandedCard. AI Analyse button. available_qty = on_hand - reserved_qty computed live.
 **Tables:** inventory_items (reserved_qty), stock_movements, qr_codes
 **Props:** `<StockControl tenantId={str} industryProfile={str} />`
 **DO NOT:** Store available_qty — always compute. Build another admin stock component.
@@ -392,7 +438,7 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 **What it does:** HQ→Shop transfer order management. 4 sub-tabs: Overview / New Transfer / Active / History.
 **Lifecycle:** draft → in_transit → received | draft|in_transit → cancelled
 **Ship:** deducts HQ on_hand + transfer_out movement per line.
-**Receive:** adds shop on_hand + transfer_in movement per line. Auto-creates shop item if not found (LL-024: sell_price=0).
+**Receive:** adds shop on_hand + transfer_in movement. Auto-creates shop item if not found (LL-024: sell_price=0).
 **Cancel in-transit:** reverses HQ stock + reversal movement. Reason mandatory.
 **Reference format:** TRF-YYYYMMDD-XXXX (DB UNIQUE constraint)
 **Tables:** stock_transfers, stock_transfer_items, inventory_items, stock_movements
@@ -417,12 +463,12 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `PlatformBar.js` ✅ BUILT v1.2 (WP-BIB S11)
+### `PlatformBar.js` ✅ BUILT v1.2 (WP-BIB S11) — LOCKED
 **File:** `src/components/PlatformBar.js`
 **What it does:** 40px platform intelligence bar. 4 icons: Alerts / Comms / Fraud / Actions. Profile-adaptive ActionsPanel.
 **Props:** `<PlatformBar role="admin|hq" tenantId={str} />`
 **Critical rules:** LL-041 — onNavigate MUST ALWAYS be `() => {}`. Never pass setTab. Never change font.
-**DO NOT:** Pass setTab callbacks. Touch CommsPanel internals. Merge with ProteaAI layer.
+**DO NOT:** Pass setTab callbacks. Touch CommsPanel internals. Merge with ProteaAI layer. Edit without explicit owner instruction.
 
 ---
 
@@ -456,10 +502,9 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `useNavConfig.js` ✅ BUILT (updated WP-EOD — 5249529)
+### `useNavConfig.js` ✅ BUILT (updated WP-STOCK-PRO S5 — 3ab7668)
 **File:** `src/hooks/useNavConfig.js`
 **RULE:** Every new HQDashboard tab needs a matching entry here or the tab is unreachable from nav.
-**Current Operations group:** Overview · Supply chain · Suppliers · Procurement · Production · HQ Stock · Daily Trading · POS Till · Cash-Up · Transfers · Distribution
 
 ---
 
@@ -470,7 +515,7 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `HQCogs.js` ✅ BUILT v4.1+shipping — COMPLEX
+### `HQCogs.js` ✅ BUILT v4.2 — COMPLEX
 **File:** `src/components/hq/HQCogs.js`
 **What it does:** COGS recipe engine. COMPLETELY SEPARATE from AVCO. Never wire weighted_avg_cost here.
 **⚠️ BUG-044:** shipping_alloc_zar stored as fixed ZAR — not live FX. Verify column shipping_alloc_usd exists.
@@ -478,15 +523,15 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `HQStock.js` ✅ BUILT v3.0 (WP-STOCK-PRO S3 — cf2ac53)
+### `HQStock.js` ✅ BUILT v3.1 (WP-STOCK-PRO S3) — PROTECTED
 **File:** `src/components/hq/HQStock.js`
 **Two modes:** food_beverage: tabbed command centre (Overview/Items/Movements). All other profiles: accordion.
-**PANEL_CATS_BY_PROFILE:** 5 profile maps.
+**PANEL_CATS_BY_PROFILE:** 5 profile maps. PROTECTED — read full file before any change (LL-180).
 **DO NOT:** Use static PANEL_CATS. Show sell price to HR staff.
 
 ---
 
-### `ScanResult.js` ✅ BUILT v4.8 — COMPLEX
+### `ScanResult.js` ✅ BUILT v4.9 — COMPLEX
 **File:** `src/pages/ScanResult.js`
 **COMPLEX — 1700+ lines.** Profile-adaptive product card (food/general/cannabis).
 **DO NOT:** Rewrite this file. Find/replace only. Never touch velocity check (LL-055). Never add tenant_id filter to scan_logs (LL-056).
@@ -498,8 +543,8 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 **Deploy:** `npx supabase functions deploy process-document --no-verify-jwt`
 **Module-level functions (MUST be outside serve() and try{} — LL-085):**
 ```typescript
-allocateLumpSumCosts(ext, pos)          // WP-FIN S0: lump-sum invoice cost allocation
-classifyExpenseDocument(proposed, body) // WP-FIN S3: CAPEX/OPEX detection
+allocateLumpSumCosts(ext, pos)
+classifyExpenseDocument(proposed, body)
 buildSystemPrompt(suppliers, products, inventory, pos, industryProfile)
 ```
 **Pipeline order:** parse → allocateLumpSum → classifyExpense → dedupGuard → log
@@ -530,11 +575,11 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 
 ---
 
-### `HQTenants.js` ✅ BUILT v1.1+BUG-042 (264a5cb)
+### `HQTenants.js` ✅ BUILT v1.1 (BUG-046 fixed — 7cd80ef)
 **File:** `src/components/hq/HQTenants.js`
-**Note:** Profile save does NOT call reload() — Ctrl+Shift+R still needed (backlog fix).
+**Note:** Reads tier from tenant_config (not tenants.tier — always 'starter'). BUG-046 fixed v176.
 **Tables:** tenants, tenant_config, tenant_usage_log
-**DO NOT:** upsert user_profiles — UPDATE only.
+**DO NOT:** upsert user_profiles — UPDATE only. Read tier from tenants.tier (always 'starter' — use tenant_config.tier).
 
 ---
 
@@ -546,120 +591,38 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 
 ---
 
-
----
-
-### `HQTradingDashboard.js` ✅ BUILT v3.0 (WP-DAILY-OPS Sessions B+C+D)
-**File:** `src/components/hq/HQTradingDashboard.js`
-**What it does:** Daily trading intelligence dashboard. Real-time + historical sales for Medi Rec operators.
-**v2.0 additions (Session C — d7c13ce):**
-- SAST timezone fix: all date windows use dayStartSAST()/dayEndSAST()/todayStrSAST() — never new Date()
-- Auto-refresh: 5-minute countdown (↻ 4:23) with setInterval, manual reset on Refresh click
-- resolveCategories(): fetches missing categories from inventory_items via product_metadata.inventory_item_id
-- EODStatusWidget: shows today's cash-up status (no session/open/balanced/flagged/escalated), links to Cash-Up and POS tabs via window.history.pushState + popstate
-- Projected revenue: 5th KPI card (accent green) — current revenue ÷ hours elapsed × trading hours, shown 08:00–20:00 SAST only
-**v3.0 additions (Session D — a5340f8 via Claude Code PR #1):**
-- ThirtyDayChart sub-component: full-width BarChart, day-of-week X-axis labels (Mon/Tue/Wed...), today in accentMid, revenue days in ink300, zero days in ink150, hover tooltip with date + revenue
-- buildThirtyDayData(): maps orders30 data to 30-day chart array with dateStr, dayLabel, revenue, isToday
-- monthRangeSAST(year, month): returns SAST-correct {start, end} UTC dates for a calendar month
-- DOW constant: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
-- MONTH_NAMES constant: ["January"..."December"]
-- HistoryPanel "By Month" mode: viewMode state ('preset'|'month'), selYear/selMonth state, prev/next navigation, min: Jan 2025, max: current SAST month
-**SAST timezone helpers (defined at top of file — reusable pattern):**
-```js
-const SAST_OFFSET_MS = 2 * 60 * 60 * 1000; // UTC+2
-nowSAST()                // Date where getUTCHours() = current SAST hour
-dayStartSAST(daysAgo)   // SAST midnight → UTC equivalent
-dayEndSAST(daysAgo)     // SAST end of day → UTC equivalent
-monthStartSAST()        // First day of current SAST month → UTC
-monthRangeSAST(y, m)    // {start, end} for any calendar month
-todayStrSAST()          // "YYYY-MM-DD" in SAST
-sastHour(isoString)     // UTC ISO → SAST hour (0-23)
-```
-**Critical rules:**
-- status = 'paid' ALWAYS — 'completed' does not exist in orders table
-- fetchItemsForOrders(): chunked .in() for orderIds >50 (CHUNK = 50)
-- resolveCategories(): always call after fetchItemsForOrders() to fix "Other" for sandbox/older POS data
-- usePageContext('hq-trading', null) as FIRST call — mandatory
-- loyalty_transactions: use transaction_type column (NOT 'type') — LL-191
-- SparkLine + DeltaBadge + Cell imported from recharts/viz
-- T token design system mirrors HQStock.js v3.1 exactly
-- REFRESH_INTERVAL_S = 300 (5 minutes) — do not reduce without owner approval
-- STORE_OPEN_HOUR = 8, STORE_CLOSE_HOUR = 20 (SAST) — projected revenue window
-**DB tables (read):** orders, order_items, loyalty_transactions, inventory_items (via resolveCategories), eod_cash_ups, pos_sessions
-**Nav:** HQ → Operations → Daily Trading (/hq?tab=hq-trading)
-**DO NOT:** Use status='completed'. Use new Date() for Supabase query windows (use dayStartSAST). Hardcode SAST offset anywhere except SAST_OFFSET_MS constant. Query loyalty_transactions.type (use transaction_type — LL-191).
-
----
-
-### `POSScreen.js` ✅ BUILT v1.0 (WP-POS — aa51b74)
-**File:** `src/components/hq/POSScreen.js`
-**What it does:** In-store POS till. Product grid with category filter + search. Cart with qty stepper. Payment selection and sale completion with receipt modal.
-**Workflow:** Browse products → tap to add to cart → adjust qty (stock guard) → select payment (Cash/Card/Online) → Complete Sale → receipt modal
-**Sale writes:** orders (status='paid') + order_items + stock_movements (movement_type='sale_pos')
-**Critical rules:**
-- movement_type = 'sale_pos' (NOT 'sale_out' — that is B2B wholesale, LL-189)
-- status = 'paid' on order INSERT
-- tenant_id on every INSERT (Rule 0F)
-**Props:** `<POSScreen tenantId={str} />`
-**DB tables:** inventory_items (read), orders (write), order_items (write), stock_movements (write)
-**Nav:** HQ → Operations → POS Till (/hq?tab=hq-pos) · Also in TenantPortal Sales & Customers
-**DO NOT:** Use movement_type='sale_out'. Omit tenant_id on any INSERT.
-
----
-
-### `EODCashUp.js` ✅ BUILT v1.0 (WP-EOD — 5249529)
-**File:** `src/components/hq/EODCashUp.js`
-**What it does:** End-of-day cash reconciliation. 3-step flow: set float → count cash → reconcile. Configurable thresholds from DB. 30-day history panel.
-**Step 1:** Set opening float — pre-filled from tenant_config.settings.eod_default_float, manager overrides
-**Step 2:** Count cash — SA denomination breakdown (R200/R100/R50/R20/R10 notes + R5/R2/R1 coins) OR lump sum toggle
-**Step 3:** Reconciliation — (system cash + float) vs counted cash
-- balanced (green): abs(variance) ≤ tolerance. No reason required.
-- flagged (amber): abs(variance) > tolerance. Reason required before close.
-- escalated (red): abs(variance) > escalation threshold. Owner approval required.
-**Config — ALL values from tenant_config.settings JSONB (NEVER hardcoded):**
-- eod_cash_variance_tolerance → amber flag (Medi Rec: 50)
-- eod_escalation_threshold → red escalation (Medi Rec: 200)
-- eod_default_float → pre-filled float (Medi Rec: 500)
-- eod_approver_role → approver (Medi Rec: 'owner')
-**To change threshold (no code change, no redeploy):**
-```sql
-UPDATE tenant_config SET settings = settings || '{"eod_cash_variance_tolerance": 100}'
-WHERE tenant_id = 'b1bad266-...';
-```
-**Props:** None. Reads tenantId from useTenant() internally.
-**DB tables:** tenant_config (settings read), orders (cash/card totals), pos_sessions (open/close), eod_cash_ups (reconciliation record)
-**Nav:** HQ → Operations → Cash-Up (/hq?tab=hq-eod)
-**DO NOT:** Hardcode any threshold value in the component. Omit tenant_id on INSERT (Rule 0F).
-
----
-
 # SECTION 3 — SAFE TO BUILD
-## Verified absent from disk as of March 27, 2026
+## Verified absent from disk — not yet implemented
 
 | Feature | WP Ref | What It Is |
 |---|---|---|
-| BUG-044: HQCogs shipping live FX | — | Verify shipping_alloc_usd column exists. If not: ALTER TABLE + ~6 find/replace ops in HQCogs.js |
-| BUG-043: Stock qty correction | — | Physical count 23 terpenes, then UPDATE quantity_on_hand per item |
-| Loyalty Economics Engine UI | WP-O | Full config panel — earning rates, multipliers, simulator. Spec ready. |
-| HQ/Admin page charts (20+) | WP-VISUAL | viz library ready, charts not yet built. Spec: WP-VISUAL-SYSTEM_v1.docx |
-| WP-FIN S5 | WP-FIN | Local input actual COGS tracking through production run inputs |
-| WP-FIN S6 | WP-FIN | Balance Sheet + CAPEX amortisation schedule |
-| HR sub-tabs in TenantPortal People section | — | Wire HRDashboard sub-tabs into People section (30 min) |
-| Client 2 tenant onboarding | — | Create tenant + management user |
+| BUG-044: HQCogs shipping live FX | — | Verify shipping_alloc_usd column. If missing: ALTER TABLE product_cogs ADD COLUMN shipping_alloc_usd NUMERIC, shipping_units INT. Then ~6 find/replace ops in HQCogs.js only. |
+| BUG-043: Stock qty correction (23 terpenes) | — | Physical count required FIRST. Then UPDATE quantity_on_hand per item. Do NOT patch without count. |
+| check_reorder() trigger | — | Status UNKNOWN. Verify: SELECT routine_name FROM information_schema.routines WHERE routine_schema='public' AND routine_name LIKE '%reorder%'. If broken: rebuild per WP-REORDER spec. |
+| HQ/Admin page charts (20+) | WP-VISUAL | viz library ready, charts not yet added to pages. Spec: WP-VISUAL-SYSTEM_v1.docx |
+| HR sub-tabs in TenantPortal People section | — | Wire HRDashboard sub-tabs into People section (est. 30 min) |
 | QR print sheet | — | Printable batch QR codes for packaging |
 | SaaS Revenue dashboard | — | Platform MRR tile |
 | ProteaAI Phase C | WP-AI-UNIFIED | Proactive PlatformBar triggers |
 | AdminQRCodes.js inventory_item_id link UI | — | Currently SQL-only |
-| HQTenants.js reload() after profile save | — | Ctrl+Shift+R workaround still needed |
-| create-admin-user Edge Function | — | STATUS UNKNOWN — TenantSetupWizard Step 5 needs it |
-| Batch ID stamping on movements | — | stock_movements.batch_id exists, never populated |
+| loyalty-ai Edge Function | WP-O v2.0 | Nightly cron: 7 jobs (churn rescue, birthday, expiry, streak, stock-boost, tier upgrade, weekly brief). Tables ready. Not yet deployed. |
+| create-admin-user Edge Function | — | STATUS UNKNOWN — TenantSetupWizard Step 5 needs it. Verify before building. |
+| Batch ID stamping on movements | — | stock_movements.batch_id exists, never populated by any UI path |
 | SimplePay API integration | WP-HR-11 ext. | Direct push from HRPayroll.js — decision pending |
 | Subdomain routing per client | — | Vercel wildcard config |
 | Self-service SaaS onboarding wizard | — | Stripe + auto-provision |
 | Stripe SaaS billing | — | Automated subscription management |
-| WP-REORDER Phase 2 | WP-REORDER | ProteaAI quantity suggestions based on sales velocity |
-| BUG-047: PlatformBar loyalty scope | — | ~30 min fix |
+| WP-PAY S1 | WP-PAY | Yoco online gateway. BLOCKED on Yoco sk_test_ keys. Orders table needs: yoco_checkout_id, yoco_payment_id, payment_method. tenant_config needs: yoco_secret_key. New table: payments. |
+| WP-PAY S2 | WP-PAY | In-store sale recording + reconciliation. Requires S1. |
+| WP-PAY S3 | WP-PAY | POS via Yoco in-person SDK. Android/iOS NATIVE only. Requires Yoco partner approval first. |
+| WP-SMART-CATALOG SC-01 | WP-SMART-CATALOG | Stats KPI Cards + action panels (Sold Out, Below Reorder, No Price). SmartInventory.js is foundation. |
+| WP-REORDER | WP-REORDER | Smart reorder queue slide-out from Smart Catalog. Groups by supplier → draft POs. Requires SC-01 first. |
+| WP-STOCK-RECEIVE-S3 | WP-STOCK-RECEIVE-S3 | Product World Item Picker for receive delivery modal. ProductWorlds.js as single source of truth. |
+| WP-STOCK-MERGE | WP-STOCK-MERGE | Merge Smart Catalog into HQStock nav as a tab. AFTER SC-01–SC-10 complete. |
+| CLAUDE.md in repo root | — | Claude Code reads this before every task — add critical SESSION-CORE rules here |
+| ProteaAI CODEBASE_FACTS update | — | String is stale (says "Vercel deploy pending"). Owner must update. Search: const CODEBASE_FACTS |
+| Medi Rec sell prices | — | 182 SKUs at R0. Gates shop, P&L, loyalty. Owner must set via HQPricing. |
+| Supabase backups | — | Enable via Settings → Add-ons. URGENT — no backups currently running. |
 
 ---
 
@@ -711,9 +674,8 @@ WHERE tenant_id = 'b1bad266-...';
 | v146 | invoked customer_id on invoices table — column does not exist | Column not verified before use | LL-116 |
 | v146 | Used reference column on invoices — column does not exist | Column not verified before use | LL-116 |
 | v146 | Called reserve_stock() — function did not exist yet | DB function not verified before call | LL-117 |
-| v173 | POSScreen.js fully built but not in REGISTRY, not wired to nav | Audit assumed state without reading disk | LL-075 |
-| v175 | loyalty_transactions queried with .eq("type",...) — 400 Bad Request | Column is transaction_type NOT type — schema not verified before use | LL-191 |
-| v175 | HQTradingDashboard v1.0 signature in REGISTRY while v3.0 was live | Docs not updated after multi-session build | Always update REGISTRY after every session |
+| v177 | SmartInventory column drag-drop silently failed on every attempt | setColOrder callback read dragCol.current after it was nulled on the same line. dataTransfer not used as backup data source. | Use dataTransfer.setData/getData — capture sourceKey in local var before any ref mutation. (f6b065f) |
+| v176-v177 | SESSION-BUGS showed BUG-045/046/047 as OPEN when all three CLOSED in v176 | Bugs resolved but SESSION-BUGS not updated same session | Update SESSION-BUGS immediately when a bug is resolved. Never leave open bugs unresolved in docs. |
 
 ---
 
@@ -764,12 +726,11 @@ Both must be read before any build. This one first.
 
 ---
 
-*REGISTRY.md v3.2 · Protea Botanicals · April 4, 2026*
+*REGISTRY.md v3.2 · NuAi · April 4, 2026*
+*v3.1: SmartInventory v1.5 · HQTradingDashboard v3.0 · EODCashUp v1.0 · POSScreen v1.0 · HQBalanceSheet v1.0 added*
+*v3.2: Section 3 corrected (completed items removed, new pending items added) · Section 5 two new postmortem rows*
 *One lookup. Every session. Before everything else.*
 *LL-075: Session docs can lie. Disk never does. Always verify.*
 *LL-083: Truncated reads drop data silently. Always confirm line count before updating.*
 *LL-089: product_formats column is label NOT name. Always verify DB column names before use.*
 *LL-116: invoices uses supplier_id for ALL partners, invoice_number not reference.*
-*LL-191: loyalty_transactions column = transaction_type (NOT type). Always use .ilike() — LL-077.*
-*v3.1: Added HQTradingDashboard.js v1.0, POSScreen.js v1.0, EODCashUp.js v1.0 + new DB tables*
-*v3.2: Updated HQTradingDashboard.js to v3.0 (SAST tz, auto-refresh, category fix, EOD widget, 30-day chart, month selector). LL-191 added.*

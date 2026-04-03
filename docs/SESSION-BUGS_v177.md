@@ -1,52 +1,12 @@
-# SESSION-BUGS.md — NexAI Platform Bug Log
+# SESSION-BUGS.md — NuAi Platform Bug Log
+## Updated: April 4, 2026 · v177 state
 ## Update only when a bug opens or closes. Never rewrite closed entries.
 
 ---
 
 ## OPEN BUGS
 
-### BUG-047 — PlatformBar/WorkflowGuide loyalty_config scope mismatch · OPEN cosmetic
-```
-Status:  OPEN — cosmetic only, non-blocking
-Added:   March 30, 2026 (WP-O v2.0 session)
-Symptom: Orange PlatformBar alert: "Loyalty configuration not found —
-         loyalty config table has no rows"
-Root:    PlatformBar.js or WorkflowGuideContent.js fetches loyalty_config
-         without .eq('tenant_id', tenantId). Now that loyalty_config has
-         multiple tenant rows (4), a global .single() fails with "multiple rows"
-         → triggers the "not found" alert even though the row exists.
-Fix:     Grep for: loyalty_config in PlatformBar.js + WorkflowGuideContent.js
-         Add .eq('tenant_id', tenantId) to the offending query.
-         Effort: ~15 min, 1-2 find/replace ops.
-Note:    HQLoyalty.js v4.0 is already correctly scoped. Bug is in the alert check only.
-```
-
-### BUG-046 — HQTenants tier counters show 0
-```
-Status:  OPEN — cosmetic only, non-blocking
-Root:    HQTenants.js reads tier from tenants.tier column, not tenant_config.tier
-         tenant_config.tier is where the real tier is set (via MANAGE button or SQL)
-         tenants.tier column defaults to 'starter' and is never updated
-Symptom: PRO counter shows 0 even though Medi Recreational is tier=pro in tenant_config
-Fix:     Update HQTenants.js to join tenant_config and read tier from there
-         OR: trigger that syncs tenant_config.tier → tenants.tier on update
-Effort:  Small — 1 file, 1 query change
-```
-
-### BUG-045 — HQTenants "No tenant_config row found" false positive
-```
-Status:  OPEN — cosmetic only, non-blocking
-Root:    HQTenants.js checks for tenant_config row using a query that doesn't
-         match the UUID format of rows created via direct INSERT
-Symptom: Shows red warning "No tenant_config row found. Create one in Supabase
-         with tenant_id = ..." even when the row exists and is correct
-Verify:  SELECT * FROM tenant_config WHERE tenant_id = 'b1bad266-...';
-         → returns row correctly
-Fix:     Debug HQTenants.js tenant_config fetch — likely a .eq() type mismatch
-Effort:  Small — 1 file, inspect fetchConfig() function
-```
-
-### BUG-043 — Stock quantity inflation (terpenes)
+### BUG-043 — Stock quantity inflation (terpenes) · OPEN
 ```
 Status:  OPEN — physical count required before any SQL fix
 Root:    PQG2600182 ingested 3 times → 57 movements → 23 terpenes 2-3x inflated
@@ -62,9 +22,9 @@ SQL to scope:
 Fix:     Physical count → UPDATE inventory_items SET quantity_on_hand = X per item.
 ```
 
-### BUG-044 — HQCogs shipping not live FX
+### BUG-044 — HQCogs shipping not live FX · OPEN
 ```
-Status:  OPEN — status ambiguous. v141/v142 marked RESOLVED, re-opened after WP-TENANT migration.
+Status:  OPEN — status ambiguous. Resolved v142, re-opened after WP-TENANT migration.
 Verify:  SELECT column_name FROM information_schema.columns
          WHERE table_name = 'product_cogs' AND column_name = 'shipping_alloc_usd';
          If MISSING → apply SQL below + ~6 find/replace in HQCogs.js
@@ -80,9 +40,59 @@ Effort:  ~6 find/replace ops in HQCogs.js only. No other files.
 Interim: Re-save all product_cogs recipes (all currently at shipping_alloc_zar = 0.00).
 ```
 
+### check_reorder() trigger — UNKNOWN STATUS
+```
+Status:  UNKNOWN — raised v139, never closed, never formally logged until now
+Symptom: check_reorder() trigger may not be functional after data migrations
+Root:    Trigger may reference old tenant structure or hardcoded HQ_TENANT_ID
+Verify:  SELECT routine_name FROM information_schema.routines
+         WHERE routine_schema = 'public' AND routine_name LIKE '%reorder%';
+         → Should return check_reorder
+         Then test: update an inventory_item qty below reorder_level → system_alert should appear
+If broken: Rebuild trigger per WP-STOCK or WP-REORDER spec.
+Note:    Also check: SELECT trigger_name FROM information_schema.triggers
+         WHERE event_object_table = 'inventory_items';
+```
+
 ---
 
 ## RESOLVED BUGS
+
+### BUG-047 — PlatformBar loyalty_config scope · RESOLVED 8c19990
+```
+Commit:  8c19990 — fix(loyalty): scope loyalty_config query to tenant_id in usePageContext
+Root:    loyalty_config fetched without .eq('tenant_id') — "multiple rows" error
+         with 4 tenant rows now existing.
+Fix:     Added .eq('tenant_id', tenantId) to loyalty_config query in usePageContext.js
+Session: v176
+```
+
+### BUG-046 — HQTenants tier from wrong column · RESOLVED 7cd80ef
+```
+Commit:  7cd80ef — fix(tenants): read tier from tenant_config not tenants table
+Root:    HQTenants.js read tier from tenants.tier (always 'starter')
+         instead of tenant_config.tier (the real tier set via UI/SQL)
+Fix:     Updated HQTenants.js to join tenant_config and read tier from there
+Session: v176
+```
+
+### BUG-045 — HQTenants "No tenant_config row found" false positive · RESOLVED
+```
+Status:  Self-healed after BUG-046 fix — the tenant_config join fix also resolved
+         the false positive warning
+Session: v176
+```
+
+### SmartInventory drag-drop silent fail · RESOLVED f6b065f
+```
+Commit:  f6b065f — fix(catalog): SmartInventory v1.5 — harden column drag with dataTransfer
+Root cause 1: setColOrder callback read dragCol.current AFTER it was set to null
+Root cause 2: dragend fires before drop in Chrome inside overflow:auto + sticky thead
+Fix 1:   handleDragStart: e.dataTransfer.setData("text/plain", key)
+Fix 2:   handleDrop: const sourceKey = e.dataTransfer.getData("text/plain") || dragCol.current
+         setColOrder callback uses sourceKey (local var) NOT dragCol.current (mutable ref)
+Session: v177
+```
 
 ### BUG-042 — HQTenants industry_profile save fail · RESOLVED 264a5cb
 ```
@@ -109,10 +119,10 @@ Fix:     SQL patch: 57 movements → unit_cost = 99.50 (Sample Pack) / 1.6667 (o
 
 ---
 
-## FAILURE LOG (non-bug architecture/process failures)
+## FAILURE LOG (architecture/process failures — permanent record)
 
 ```
-F1-F11:  Early sessions — unchanged from v94 SESSION.md.
+F1-F11:  Early sessions (v84-v94) — unchanged.
 F12:     v111 — Planned to rebuild WP-HR. All 12 already existed. → LL-075
 F13:     v112 — loyalty_transactions INSERT silent fail — missing tenant_id.
 F14:     v129 — allocateLumpSumCosts inside try{} — Deno error. → LL-085
@@ -126,19 +136,25 @@ F21:     v132 — product_formats.is_cannabis not set on non-vape cannabis. → 
 F22:     v133 — product_format_bom no RLS → 403. f.name not f.label. → LL-089
 F23:     v135 — OP-D7 duplicate const metrics + early undeclared block.
 F24:     v150 — HQOverview useTenant() called after early return → rules-of-hooks. → LL-127
-F25:     v150 — <a tags dropped in find/replace twice. → LL-128
+F25:     v150 — <a> tags dropped in find/replace twice. → LL-128
 F26:     v150 — nexai.vercel.app taken by LobeChat. Project renamed nexai-erp. → LL-129
 F27:     v150 — HQStock hardcoded HQ_TENANT_ID — VIEWING dropdown ignored. → LL-131
 F28:     v150 — user_profiles_role_check blocked 'management' role INSERT. → LL-132
 F29:     v152 — HQLoyalty.js v3.0 existed as 109KB file but MANIFEST said "—".
                 Build was planned as fresh write but was actually an upgrade. → LL-142
-F30:     v152 — WP-O v1.0 spec version numbers stale (HQDashboard v4.3 said,
-                actual v4.2; CheckoutPage v2.4 said, actual v2.3). → LL-138, LL-143
-F31:     v152 — loyalty_config ON CONFLICT failed — no UNIQUE(tenant_id) constraint.
-                Always verify constraint before using ON CONFLICT. → LL-139
+F30:     v152 — WP-O v1.0 spec version numbers stale. → LL-138, LL-143
+F31:     v152 — loyalty_config ON CONFLICT failed — no UNIQUE(tenant_id) constraint. → LL-139
+F32:     v171 — VL-001: LL-184 violated in the same message it was documented. → VL-001
+F33:     v174 — SmartInventory replaced HQStock in renderTab case swap. → RULE 0K, LL-178
+F34:     v174 — SmartInventory built without reading HQStock first. → RULE 0L, LL-180
+F35:     v177 — Full doc audit revealed: SESSION-BUGS showed BUG-045/046/047 as OPEN
+                when all three were CLOSED in session v176. Docs drifted from reality.
+                Fix: this update.
 ```
 
 ---
 
-*SESSION-BUGS.md · Update when bugs open (add to OPEN) or close (move to RESOLVED).*
+*SESSION-BUGS v177 · NuAi · April 4, 2026*
+*BUG-045/046/047 closed. SmartInventory drag-drop closed. check_reorder() added as unknown.*
+*F32-F35 added to failure log.*
 *Never rewrite resolved entries — they are architectural memory.*
