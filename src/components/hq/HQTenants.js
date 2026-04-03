@@ -1190,21 +1190,21 @@ export default function HQTenants() {
           {
             label: "Enterprise",
             value: tenants.filter(
-              (t) => (t.tier || configs[t.id]?.tier) === "enterprise",
+              (t) => (configs[t.id]?.tier || t.tier) === "enterprise",
             ).length,
             color: T.accent,
           },
           {
             label: "Pro",
             value: tenants.filter(
-              (t) => (t.tier || configs[t.id]?.tier) === "pro",
+              (t) => (configs[t.id]?.tier || t.tier) === "pro",
             ).length,
             color: T.info,
           },
           {
             label: "Entry",
             value: tenants.filter(
-              (t) => (t.tier || configs[t.id]?.tier) === "entry",
+              (t) => (configs[t.id]?.tier || t.tier) === "entry",
             ).length,
             color: T.ink500,
           },
@@ -1275,7 +1275,7 @@ export default function HQTenants() {
                 key={tenant.id}
                 style={{
                   ...sCard,
-                  borderLeft: `3px solid ${tenant.is_active === false ? T.ink300 : tenant.tier === "enterprise" ? T.accent : tenant.tier === "pro" ? T.info : T.ink400}`,
+                  borderLeft: `3px solid ${tenant.is_active === false ? T.ink300 : (configs[tenant.id]?.tier || tenant.tier) === "enterprise" ? T.accent : (configs[tenant.id]?.tier || tenant.tier) === "pro" ? T.info : T.ink400}`,
                   opacity: tenant.is_active === false ? 0.65 : 1,
                 }}
               >
@@ -1308,7 +1308,7 @@ export default function HQTenants() {
                       >
                         {tenant.name}
                       </div>
-                      <TierBadge tier={tenant.tier} />
+                      <TierBadge tier={configs[tenant.id]?.tier || tenant.tier} />
                       {tenant.industry_profile && (
                         <span
                           style={{
