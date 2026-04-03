@@ -1,6 +1,6 @@
 # REGISTRY.md — NuAi Platform
 ## Capability-Indexed Component Registry
-## Version: v3.2 · April 4, 2026
+## Version: v3.3 · April 4, 2026
 ## THIS IS THE MANDATORY FIRST READ. Before MANIFEST.md. Before anything.
 
 ---
@@ -615,7 +615,6 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 | WP-PAY S1 | WP-PAY | Yoco online gateway. BLOCKED on Yoco sk_test_ keys. Orders table needs: yoco_checkout_id, yoco_payment_id, payment_method. tenant_config needs: yoco_secret_key. New table: payments. |
 | WP-PAY S2 | WP-PAY | In-store sale recording + reconciliation. Requires S1. |
 | WP-PAY S3 | WP-PAY | POS via Yoco in-person SDK. Android/iOS NATIVE only. Requires Yoco partner approval first. |
-| WP-SMART-CATALOG SC-01 | WP-SMART-CATALOG | Stats KPI Cards + action panels (Sold Out, Below Reorder, No Price). SmartInventory.js is foundation. |
 | WP-REORDER | WP-REORDER | Smart reorder queue slide-out from Smart Catalog. Groups by supplier → draft POs. Requires SC-01 first. |
 | WP-STOCK-RECEIVE-S3 | WP-STOCK-RECEIVE-S3 | Product World Item Picker for receive delivery modal. ProductWorlds.js as single source of truth. |
 | WP-STOCK-MERGE | WP-STOCK-MERGE | Merge Smart Catalog into HQStock nav as a tab. AFTER SC-01–SC-10 complete. |
@@ -676,6 +675,7 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 | v146 | Called reserve_stock() — function did not exist yet | DB function not verified before call | LL-117 |
 | v177 | SmartInventory column drag-drop silently failed on every attempt | setColOrder callback read dragCol.current after it was nulled on the same line. dataTransfer not used as backup data source. | Use dataTransfer.setData/getData — capture sourceKey in local var before any ref mutation. (f6b065f) |
 | v176-v177 | SESSION-BUGS showed BUG-045/046/047 as OPEN when all three CLOSED in v176 | Bugs resolved but SESSION-BUGS not updated same session | Update SESSION-BUGS immediately when a bug is resolved. Never leave open bugs unresolved in docs. |
+| v177 (this session) | SC-01 listed in Section 3 as "Safe to Build" when already built in SmartInventory.js | REGISTRY produced without reading SmartInventory.js from disk first | LL-194: Never add Section 3 entry without disk verification. Always read the source file. |
 
 ---
 
@@ -729,6 +729,7 @@ Both must be read before any build. This one first.
 *REGISTRY.md v3.2 · NuAi · April 4, 2026*
 *v3.1: SmartInventory v1.5 · HQTradingDashboard v3.0 · EODCashUp v1.0 · POSScreen v1.0 · HQBalanceSheet v1.0 added*
 *v3.2: Section 3 corrected (completed items removed, new pending items added) · Section 5 two new postmortem rows*
+*v3.3: SC-01 removed from Section 3 (was incorrectly listed as pending — already built in SmartInventory.js)*
 *One lookup. Every session. Before everything else.*
 *LL-075: Session docs can lie. Disk never does. Always verify.*
 *LL-083: Truncated reads drop data silently. Always confirm line count before updating.*
