@@ -297,8 +297,9 @@ const CONTEXT_QUERIES = {
         .select(
           "active_schema, threshold_silver, threshold_gold, threshold_platinum, pts_per_r100_online, pts_qr_scan",
         )
+        .eq("tenant_id", tenantId)
         .single(),
-      sb.from("user_profiles").select("loyalty_tier, loyalty_points"),
+      sb.from("user_profiles").select("loyalty_tier, loyalty_points").eq("tenant_id", tenantId),
     ]);
 
     const config =
