@@ -312,7 +312,6 @@ async function main() {
       }
     }
 
-    // pos_sessions row (after computing total_sales)
     const dayTotalSales = round2(dayCashTotal + dayCardTotal);
     posSessions.push({
       id: sessionId,
@@ -321,7 +320,7 @@ async function main() {
       opening_float: openingFloat,
       status: "closed",
       closed_at: dayISO(d, 18, 0),
-      total_sales: dayTotalSales,
+      notes: SEED_TAG,
     });
 
     // eod_cash_ups: variance is GENERATED — never insert it
@@ -333,7 +332,7 @@ async function main() {
       cashup_date: date,
       opening_float: openingFloat,
       counted_cash: round2(expectedCash + varianceAmt),
-      expected_cash: expectedCash,
+      system_cash_total: expectedCash,
       status: varianceAmt === 0 ? "balanced" : Math.abs(varianceAmt) > 15 ? "escalated" : "flagged",
       notes: `EOD auto [${SEED_TAG}]`,
     });
