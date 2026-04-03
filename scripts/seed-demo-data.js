@@ -102,7 +102,7 @@ async function resetSeedData() {
   const taggedTables = [
     { table: "price_history", col: "source" },
     { table: "loyalty_transactions", col: "description" },
-    { table: "daily_summaries", col: "notes" },
+    // daily_summaries skipped — table does not exist yet
     { table: "orders", col: "notes" },
     { table: "stock_movements", col: "notes" },
     { table: "eod_cash_ups", col: "notes" },
@@ -193,7 +193,6 @@ async function main() {
     full_name: `${DEMO_NAMES[i]} Demo [${SEED_TAG}]`,
     loyalty_points: randomBetween(50, 500),
     loyalty_tier: pick(["Bronze", "Silver", "Gold"]),
-    last_purchase_at: dayISO(randomBetween(0, 14), 12, 0),
   }));
 
   {
@@ -218,7 +217,6 @@ async function main() {
   const eodCashUps = [];
   const stockMovements = [];
   const orderRows = [];
-  const dailySummaries = [];
   const loyaltyTxns = [];
   const priceHistoryRows = [];
 
@@ -336,7 +334,6 @@ async function main() {
       }
     }
 
-    const dayTotalSales = round2(dayCashTotal + dayCardTotal);
     posSessions.push({
       id: sessionId,
       tenant_id: TENANT_ID,
@@ -361,23 +358,6 @@ async function main() {
       notes: `EOD auto [${SEED_TAG}]`,
     });
 
-    // daily_summaries: top_products as jsonb array
-    const topProducts = Object.entries(dayProductCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([itemId, units]) => {
-        const item = seedItems.find((i) => i.id === itemId);
-        return { item_id: itemId, name: item?.name || "Unknown", units };
-      });
-
-    dailySummaries.push({
-      tenant_id: TENANT_ID,
-      summary_date: date,
-      total_revenue: dayTotalSales,
-      total_units: dayItemsSold,
-      top_products: topProducts,
-      notes: SEED_TAG,
-    });
   }
 
   // ── Price history — 3 price changes per hero over 90 days ─────────────
@@ -405,13 +385,7 @@ async function main() {
   totals.stock_movements = await insertBatch("stock_movements", stockMovements);
   totals.orders = await insertBatch("orders", orderRows);
 
-  // daily_summaries — may not exist or have different columns; don't block seed
-  try {
-    totals.daily_summaries = await insertBatch("daily_summaries", dailySummaries);
-  } catch (err) {
-    console.warn(`  WARN: daily_summaries insert failed: ${err.message}`);
-    totals.daily_summaries = 0;
-  }
+  console.log("  Seeding daily_summaries... SKIP (table does not exist yet)");
 
   totals.loyalty_transactions = await insertBatch("loyalty_transactions", loyaltyTxns);
   totals.price_history = await insertBatch("price_history", priceHistoryRows);
