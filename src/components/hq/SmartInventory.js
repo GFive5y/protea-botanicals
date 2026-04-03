@@ -1,4 +1,4 @@
-﻿// src/components/hq/SmartInventory.js — v1.2 (SC-08 bulk select)
+﻿// src/components/hq/SmartInventory.js — v1.3 (pill-scroll fix)
 // LL-131: tenantId as prop only — never hardcoded
 // LL-174: CATEGORY_LABELS, CATEGORY_ICONS from ProductWorlds.js
 // Rule 0F: tenant_id on every INSERT/UPDATE
@@ -3253,8 +3253,8 @@ function SmartPillBox({
         style={{
           display: "flex",
           gap: 6,
-          flexWrap: navLevel === 1 ? "wrap" : "nowrap",
-          overflowX: navLevel === 1 ? "visible" : "auto",
+          flexWrap: "nowrap",
+          overflowX: "auto",
           paddingBottom: 6,
           alignItems: "center",
         }}
