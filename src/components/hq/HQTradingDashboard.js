@@ -1,7 +1,12 @@
-// src/components/hq/HQTradingDashboard.js — v2.0
-// WP-DAILY-OPS Session C — Tier 1 Foundation Fixes
+// src/components/hq/HQTradingDashboard.js — v3.0
+// WP-DAILY-OPS Session D — Tier 2 History + 30-Day Chart
 //
-// CHANGES v2.0:
+// CHANGES v3.0:
+//   6. 30-DAY CHART: Full-width bar chart, day-of-week labels, today highlighted
+//   7. MONTH SELECTOR: History panel "By Month" mode with prev/next navigation
+//      Navigate to any month from Jan 2025 to present
+//
+// CHANGES v2.0 (retained):
 //   1. TIMEZONE: All date boundaries now SAST-correct (UTC+2) — fixes midnight mismatch
 //   2. AUTO-REFRESH: 5-minute interval with live countdown in header
 //   3. CATEGORY FIX: Resolves inventory_item_id → category from inventory_items
@@ -23,6 +28,7 @@ import React, {
 import {
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -185,6 +191,15 @@ function monthStartSAST() {
   );
   return new Date(utcFirst - SAST_OFFSET_MS);
 }
+function monthRangeSAST(year, month) {
+  // Returns SAST-correct {start, end} UTC dates for a given calendar month
+  const utcStart = Date.UTC(year, month, 1, 0, 0, 0, 0);
+  const utcEnd   = Date.UTC(year, month + 1, 1, 0, 0, 0, 0);
+  return {
+    start: new Date(utcStart - SAST_OFFSET_MS),
+    end:   new Date(utcEnd   - SAST_OFFSET_MS),
+  };
+}
 function todayStrSAST() {
   const sast = nowSAST();
   const y = sast.getUTCFullYear();
@@ -333,6 +348,34 @@ function buildPaymentSplit(orders) {
     .sort((a, b) => b[1].revenue - a[1].revenue)
     .map(([method, d]) => ({ method, ...d }));
 }
+// ── 30-day chart data — day-of-week labels, today highlighted ────────────────
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
+function buildThirtyDayData(orders30) {
+  const ts = dayStartSAST(0);
+  const todayStr = todayStrSAST();
+  const map = {};
+  orders30.forEach((o) => {
+    const day = o.created_at.slice(0, 10);
+    map[day] = (map[day] || 0) + (Number(o.total) || 0);
+  });
+  return Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(ts);
+    d.setDate(d.getDate() - (29 - i));
+    const key = d.toISOString().slice(0, 10);
+    const sastDate = new Date(d.getTime() + SAST_OFFSET_MS);
+    return {
+      dateStr: key,
+      dayLabel: DOW[sastDate.getUTCDay()],
+      revenue: map[key] || 0,
+      isToday: key === todayStr,
+    };
+  });
+}
+
 function buildSparkData(orders30) {
   const ts = dayStartSAST(0);
   const map = {};
@@ -433,6 +476,7 @@ export default function HQTradingDashboard() {
   const [loyaltyData, setLoyaltyData] = useState({ earned: 0, redeemed: 0 });
   const [isSandbox, setIsSandbox] = useState(false);
   const [sparkData30, setSparkData30] = useState([]);
+  const [thirtyDayData, setThirtyDayData] = useState([]);
   const [lastRefresh, setLastRefresh] = useState(null);
 
   // ── EOD status ────────────────────────────────────────────────────────────
@@ -576,6 +620,7 @@ export default function HQTradingDashboard() {
       setLastWeekRevenue(sumRevenue(lastWeekRes.data || []));
       setIsSandbox((sandboxRes.data?.length || 0) > 0);
       setSparkData30(buildSparkData(thirty));
+      setThirtyDayData(buildThirtyDayData(thirty));
 
       // Best day this month
       const byDay = {};
@@ -903,6 +948,9 @@ export default function HQTradingDashboard() {
           />
         )}
       </div>
+
+      {/* ── 30-day revenue chart ── */}
+      {thirtyDayData.length > 0 && <ThirtyDayChart data={thirtyDayData} />}
 
       {/* ── Comparison row ── */}
       <div
@@ -1605,6 +1653,63 @@ function ModeToggle({ active, onClick, label }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 30-DAY REVENUE CHART
+// ─────────────────────────────────────────────────────────────────────────────
+function ThirtyDayChart({ data }) {
+  if (!data || data.length === 0) return null;
+  const maxRev = Math.max(...data.map((d) => d.revenue), 1); // eslint-disable-line no-unused-vars
+  return (
+    <div style={{ ...sSection, marginBottom: 16 }}>
+      <div style={{ ...sSectionHead, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>Revenue — last 30 days</span>
+        <span style={{ fontSize: 10, color: T.ink400, fontWeight: 400, textTransform: "none", letterSpacing: 0, fontFamily: T.font }}>
+          today highlighted
+        </span>
+      </div>
+      <ResponsiveContainer width="100%" height={120}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={14}>
+          <XAxis
+            dataKey="dayLabel"
+            tick={{ fontSize: 9, fontFamily: T.font, fill: T.ink400 }}
+            axisLine={false}
+            tickLine={false}
+            interval={2}
+          />
+          <YAxis hide />
+          <Tooltip
+            contentStyle={{
+              fontFamily: T.font, fontSize: 11, background: T.ink050,
+              border: `1px solid ${T.ink150}`, borderRadius: 4, boxShadow: "none",
+            }}
+            formatter={(v) => [zar(v), "Revenue"]}
+            labelFormatter={(_, payload) =>
+              payload?.[0]?.payload?.dateStr
+                ? new Date(payload[0].payload.dateStr + "T12:00:00").toLocaleDateString("en-ZA", {
+                    weekday: "short", day: "numeric", month: "short",
+                  })
+                : ""
+            }
+            labelStyle={{ color: T.ink500, fontSize: 10 }}
+          />
+          <Bar
+            dataKey="revenue"
+            radius={[2, 2, 0, 0]}
+            isAnimationActive={false}
+          >
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.isToday ? T.accentMid : entry.revenue > 0 ? T.ink300 : T.ink150}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function EmptyState({ msg }) {
   return (
     <div
@@ -1632,19 +1737,47 @@ const HISTORY_PRESETS = [
 ];
 
 function HistoryPanel({ tenantId, onClose }) {
-  const [preset, setPreset] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [orders, setOrders] = useState([]);
-  const [items, setItems] = useState([]);
-  const [topMode, setTopMode] = useState("qty");
+  const now = nowSAST();
+  const [viewMode, setViewMode]   = useState("preset"); // 'preset' | 'month'
+  const [preset, setPreset]       = useState(1);
+  const [selYear, setSelYear]     = useState(now.getUTCFullYear());
+  const [selMonth, setSelMonth]   = useState(now.getUTCMonth());
+  const [loading, setLoading]     = useState(false);
+  const [orders, setOrders]       = useState([]);
+  const [items, setItems]         = useState([]);
+  const [topMode, setTopMode]     = useState("qty");
+
+  // Navigation guard — cannot go past current month
+  const currentYear  = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth();
+  const isAtMax = selYear === currentYear && selMonth === currentMonth;
+  const isAtMin = selYear === 2025 && selMonth === 0;
+
+  function prevMonth() {
+    if (isAtMin) return;
+    if (selMonth === 0) { setSelYear(y => y - 1); setSelMonth(11); }
+    else { setSelMonth(m => m - 1); }
+  }
+  function nextMonth() {
+    if (isAtMax) return;
+    if (selMonth === 11) { setSelYear(y => y + 1); setSelMonth(0); }
+    else { setSelMonth(m => m + 1); }
+  }
 
   const fetchHistory = useCallback(
     async (presetIdx) => {
       if (!tenantId) return;
       setLoading(true);
-      const p = HISTORY_PRESETS[presetIdx];
-      const ts = p.monthToDate ? monthStartSAST() : dayStartSAST(p.days);
-      const te = dayEndSAST(0);
+      let ts, te;
+      if (viewMode === "month") {
+        const { start, end } = monthRangeSAST(selYear, selMonth);
+        ts = start;
+        te = end;
+      } else {
+        const p = HISTORY_PRESETS[presetIdx];
+        ts = p.monthToDate ? monthStartSAST() : dayStartSAST(p.days);
+        te = dayEndSAST(0);
+      }
 
       const { data: ords } = await supabase
         .from("orders")
@@ -1661,12 +1794,12 @@ function HistoryPanel({ tenantId, onClose }) {
       setItems(its);
       setLoading(false);
     },
-    [tenantId],
+    [tenantId, viewMode, selYear, selMonth], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   useEffect(() => {
     fetchHistory(preset);
-  }, [preset, fetchHistory]);
+  }, [preset, fetchHistory, viewMode, selYear, selMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const histRevenue = sumRevenue(orders);
   const histTopSellers = useMemo(
@@ -1736,34 +1869,81 @@ function HistoryPanel({ tenantId, onClose }) {
           </button>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            marginBottom: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          {HISTORY_PRESETS.map((p, i) => (
+        {/* View mode toggle */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+          {["preset", "month"].map((mode) => (
             <button
-              key={p.label}
-              onClick={() => setPreset(i)}
+              key={mode}
+              onClick={() => setViewMode(mode)}
               style={{
-                padding: "6px 14px",
-                borderRadius: "3px",
-                border: `1px solid ${preset === i ? T.accentMid : T.ink150}`,
-                background: preset === i ? T.accentMid : "transparent",
-                color: preset === i ? "#fff" : T.ink500,
-                fontSize: "12px",
-                fontWeight: preset === i ? 600 : 400,
-                cursor: "pointer",
-                fontFamily: T.font,
+                padding: "4px 14px", borderRadius: "3px", cursor: "pointer",
+                fontFamily: T.font, fontSize: "10px", fontWeight: 700,
+                textTransform: "uppercase", letterSpacing: "0.08em",
+                border: `1px solid ${viewMode === mode ? T.accentMid : T.ink150}`,
+                background: viewMode === mode ? T.accentMid : "transparent",
+                color: viewMode === mode ? "#fff" : T.ink500,
               }}
             >
-              {p.label}
+              {mode === "preset" ? "Presets" : "By Month"}
             </button>
           ))}
         </div>
+
+        {/* Preset buttons */}
+        {viewMode === "preset" && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+            {HISTORY_PRESETS.map((p, i) => (
+              <button
+                key={p.label}
+                onClick={() => setPreset(i)}
+                style={{
+                  padding: "6px 14px", borderRadius: "3px", cursor: "pointer",
+                  fontFamily: T.font, fontSize: "12px",
+                  fontWeight: preset === i ? 600 : 400,
+                  border: `1px solid ${preset === i ? T.accentMid : T.ink150}`,
+                  background: preset === i ? T.accentMid : "transparent",
+                  color: preset === i ? "#fff" : T.ink500,
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Month navigation */}
+        {viewMode === "month" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+            <button
+              onClick={prevMonth}
+              disabled={isAtMin}
+              style={{
+                background: "none", border: `1px solid ${T.ink150}`, borderRadius: "3px",
+                padding: "4px 10px", cursor: isAtMin ? "not-allowed" : "pointer",
+                color: isAtMin ? T.ink300 : T.ink700, fontSize: 14, lineHeight: 1,
+              }}
+            >
+              ‹
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 600, color: T.ink900, fontFamily: T.font, minWidth: 130, textAlign: "center" }}>
+              {MONTH_NAMES[selMonth]} {selYear}
+            </span>
+            <button
+              onClick={nextMonth}
+              disabled={isAtMax}
+              style={{
+                background: "none", border: `1px solid ${T.ink150}`, borderRadius: "3px",
+                padding: "4px 10px", cursor: isAtMax ? "not-allowed" : "pointer",
+                color: isAtMax ? T.ink300 : T.ink700, fontSize: 14, lineHeight: 1,
+              }}
+            >
+              ›
+            </button>
+            <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+              all order data is stored permanently in Supabase
+            </span>
+          </div>
+        )}
 
         {loading ? (
           <div
@@ -1809,7 +1989,10 @@ function HistoryPanel({ tenantId, onClose }) {
                 }}
               >
                 <span>
-                  Top sellers — {HISTORY_PRESETS[preset].label.toLowerCase()}
+                  Top sellers —{" "}
+                  {viewMode === "month"
+                    ? `${MONTH_NAMES[selMonth]} ${selYear}`
+                    : HISTORY_PRESETS[preset].label.toLowerCase()}
                 </span>
                 <div style={{ display: "flex", gap: 4 }}>
                   <ModeToggle
@@ -1877,7 +2060,9 @@ function HistoryPanel({ tenantId, onClose }) {
               <div>
                 <div style={sSectionHead}>
                   Category breakdown —{" "}
-                  {HISTORY_PRESETS[preset].label.toLowerCase()}
+                  {viewMode === "month"
+                    ? `${MONTH_NAMES[selMonth]} ${selYear}`
+                    : HISTORY_PRESETS[preset].label.toLowerCase()}
                 </div>
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 8 }}
