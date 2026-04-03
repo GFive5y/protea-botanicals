@@ -8,6 +8,7 @@ require('dotenv').config();
  *   npm run seed:reset    — delete previous seed data, then re-insert
  */
 
+const crypto = require("crypto");
 const { createClient } = require("@supabase/supabase-js");
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
@@ -25,12 +26,13 @@ const SEED_TAG = "demo_seed_v1";
 const DAYS = 90;
 const RESET = process.argv.includes("--reset");
 
+// ── Fixed demo customer UUIDs (generated once, stable across runs) ──────────
+const DEMO_CUSTOMERS = Array.from({ length: 8 }, () => crypto.randomUUID());
+const DEMO_NAMES = ["Thabo", "Lerato", "Sipho", "Naledi", "Kagiso", "Zanele", "Bongani", "Palesa"];
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function uuid() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 function dayDate(daysAgo) {
@@ -116,19 +118,29 @@ async function resetSeedData() {
     else console.log(`  Deleted ${count ?? "?"} rows from ${table}`);
   }
 
-  // pos_sessions — tagged via notes, fallback to date range
+  // pos_sessions — tagged via notes
   {
-    const earliest = dayDate(DAYS + 1);
     const { error, count } = await supabase
       .from("pos_sessions")
       .delete({ count: "exact" })
       .eq("tenant_id", TENANT_ID)
-      .gte("session_date", earliest);
-    if (error) console.error(`  WARN: pos_sessions delete: ${error.message}`);
-    else console.log(`  Deleted ${count ?? "?"} rows from pos_sessions`);
+      .like("notes", `%${SEED_TAG}%`);
+    if (error) {
+      // Fallback to date range
+      const earliest = dayDate(DAYS + 1);
+      const { error: e2, count: c2 } = await supabase
+        .from("pos_sessions")
+        .delete({ count: "exact" })
+        .eq("tenant_id", TENANT_ID)
+        .gte("session_date", earliest);
+      if (e2) console.error(`  WARN: pos_sessions delete: ${e2.message}`);
+      else console.log(`  Deleted ${c2 ?? "?"} rows from pos_sessions (by date range)`);
+    } else {
+      console.log(`  Deleted ${count ?? "?"} rows from pos_sessions`);
+    }
   }
 
-  // user_profiles — seeded demo customers have SEED_TAG in full_name
+  // user_profiles — delete only seeded demo users by their known UUIDs
   {
     const { error, count } = await supabase
       .from("user_profiles")
@@ -174,8 +186,24 @@ async function main() {
   console.log(`    Dead:    ${deadItems.map((i) => i.name.slice(0, 30)).join(", ")}`);
   console.log(`    Regular: ${regularItems.length} items\n`);
 
-  // ── Generate demo customer UUIDs ───────────────────────────────────────
-  const demoCustomers = Array.from({ length: 8 }, () => uuid());
+  // ── 2. Seed user_profiles FIRST (orders.user_id is NOT NULL) ───────────
+  const userProfileRows = DEMO_CUSTOMERS.map((id, i) => ({
+    id,
+    tenant_id: TENANT_ID,
+    full_name: `${DEMO_NAMES[i]} Demo [${SEED_TAG}]`,
+    loyalty_points: randomBetween(50, 500),
+    loyalty_tier: pick(["Bronze", "Silver", "Gold"]),
+    last_purchase_at: dayISO(randomBetween(0, 14), 12, 0),
+  }));
+
+  {
+    const { error } = await supabase.from("user_profiles").upsert(userProfileRows, { onConflict: "id" });
+    if (error) {
+      console.error("  ERROR: user_profiles upsert:", error.message);
+      process.exit(1);
+    }
+    console.log(`  Seeding user_profiles... done (${userProfileRows.length} rows)`);
+  }
 
   // ── Month multipliers for ~15% MoM growth ─────────────────────────────
   const currentMonth = monthIndex(0);
@@ -194,7 +222,8 @@ async function main() {
   const loyaltyTxns = [];
   const priceHistoryRows = [];
 
-  const totals = {};
+  const totals = { user_profiles: userProfileRows.length };
+  let orderCustomerIdx = 0; // round-robin counter
 
   // ── Day-by-day generation ──────────────────────────────────────────────
   for (let d = DAYS; d >= 0; d--) {
@@ -245,6 +274,10 @@ async function main() {
       const minute = randomBetween(0, 59);
       const orderTime = dayISO(d, hour, minute);
 
+      // Round-robin assign demo customer (orders.user_id is NOT NULL)
+      const customerId = DEMO_CUSTOMERS[orderCustomerIdx % DEMO_CUSTOMERS.length];
+      orderCustomerIdx++;
+
       let orderTotal = 0;
       for (const item of uniqueItems) {
         const qty = randomBetween(1, 3);
@@ -269,9 +302,10 @@ async function main() {
 
       orderTotal = round2(orderTotal);
 
-      // orders: status='paid', total (not total_amount)
+      // orders: status='paid', total (not total_amount), user_id NOT NULL
       orderRows.push({
         id: orderId,
+        user_id: customerId,
         tenant_id: TENANT_ID,
         order_ref: orderRef,
         status: "paid",
@@ -289,12 +323,11 @@ async function main() {
       dayOrderCount++;
 
       // 30% chance of loyalty earn
-      const custId = Math.random() < 0.5 ? pick(demoCustomers) : null;
-      if (custId && Math.random() < 0.3) {
+      if (Math.random() < 0.3) {
         const pts = Math.round(orderTotal / 10);
         loyaltyTxns.push({
           tenant_id: TENANT_ID,
-          user_id: custId,
+          user_id: customerId,
           points: pts,
           transaction_type: "earn_purchase",
           description: `Purchase reward — ${orderRef} [${SEED_TAG}]`,
@@ -347,17 +380,6 @@ async function main() {
     });
   }
 
-  // ── User profiles (upsert demo customers) ─────────────────────────────
-  const firstNames = ["Thabo", "Lerato", "Sipho", "Naledi", "Kagiso", "Zanele", "Bongani", "Palesa"];
-  const userProfileRows = demoCustomers.map((id, i) => ({
-    id,
-    tenant_id: TENANT_ID,
-    full_name: `${firstNames[i]} Demo [${SEED_TAG}]`,
-    loyalty_points: randomBetween(50, 500),
-    loyalty_tier: pick(["Bronze", "Silver", "Gold"]),
-    last_purchase_at: dayISO(randomBetween(0, 14), 12, 0),
-  }));
-
   // ── Price history — 3 price changes per hero over 90 days ─────────────
   for (const item of heroItems) {
     const basePrice = item.sell_price || 100;
@@ -377,24 +399,21 @@ async function main() {
   }
 
   // ── Insert in FK order ─────────────────────────────────────────────────
+  // user_profiles already inserted above
   totals.pos_sessions = await insertBatch("pos_sessions", posSessions);
   totals.eod_cash_ups = await insertBatch("eod_cash_ups", eodCashUps);
   totals.stock_movements = await insertBatch("stock_movements", stockMovements);
   totals.orders = await insertBatch("orders", orderRows);
-  totals.daily_summaries = await insertBatch("daily_summaries", dailySummaries);
-  totals.loyalty_transactions = await insertBatch("loyalty_transactions", loyaltyTxns);
 
-  // user_profiles — upsert on id
-  {
-    const { error } = await supabase.from("user_profiles").upsert(userProfileRows, { onConflict: "id" });
-    if (error) {
-      console.error("  ERROR: user_profiles upsert:", error.message);
-      process.exit(1);
-    }
-    console.log(`  Seeding user_profiles... done (${userProfileRows.length} rows)`);
-    totals.user_profiles = userProfileRows.length;
+  // daily_summaries — may not exist or have different columns; don't block seed
+  try {
+    totals.daily_summaries = await insertBatch("daily_summaries", dailySummaries);
+  } catch (err) {
+    console.warn(`  WARN: daily_summaries insert failed: ${err.message}`);
+    totals.daily_summaries = 0;
   }
 
+  totals.loyalty_transactions = await insertBatch("loyalty_transactions", loyaltyTxns);
   totals.price_history = await insertBatch("price_history", priceHistoryRows);
 
   // ── Summary ────────────────────────────────────────────────────────────
