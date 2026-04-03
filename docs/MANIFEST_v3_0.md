@@ -1,7 +1,7 @@
 # MANIFEST.md
 ## Protea Botanicals — Complete File Inventory
-## Version: v3.1 · Updated: April 4, 2026
-## Source: v3.0 base · Updated for WP-DAILY-OPS Session B, WP-POS, WP-EOD
+## Version: v3.2 · Updated: April 4, 2026
+## Source: v3.1 base · Updated for WP-DAILY-OPS Session C+D (HQTradingDashboard v3.0)
 
 ---
 
@@ -87,7 +87,7 @@
 | HQSuppliers.js | Supplier management | — | ✅ |
 | HQTenants.js | Tenant management — TenantSetupWizard wired. industry_profile saves correctly (BUG-042 resolved). Profile save still needs Ctrl+Shift+R. | v1.1+BUG-042 | ✅ BUG-042 RESOLVED (264a5cb) |
 | HQTransfer.js | HQ→Shop transfer orders. draft→in_transit→received lifecycle. Ship deducts HQ stock + transfer_out movement. Receive adds shop stock + transfer_in movement. Auto-creates shop item if not found (sell_price=0, LL-024). Cancel in_transit reverses HQ deduction. 4 sub-tabs: Overview / New Transfer / Active / History. Reference: TRF-YYYYMMDD-XXXX (UNIQUE). | v1.0 | ✅ WP-STOCK-PRO S5 (c617f55) |
-| HQTradingDashboard.js | Daily trading intelligence — KPI strip (revenue/transactions/avg basket/units), hourly chart (today vs yesterday), top sellers, payment split, category breakdown, loyalty strip, history panel (4 presets). Sandbox banner. ALL queries status='paid'. usePageContext('hq-trading', null). SparkLine + DeltaBadge from viz/. | v1.0 | ✅ WP-DAILY-OPS Session B (aa51b74) |
+| HQTradingDashboard.js | Daily trading intelligence — v3.0. KPI strip (5 cards incl. projected revenue), 30-day revenue bar chart (day-of-week labels, today green), SAST-correct hourly chart, top sellers, payment split, category breakdown, loyalty strip, EODStatusWidget, 5-min auto-refresh. History panel: 4 presets + By Month mode (Jan 2025 → present). SAST helpers: dayStartSAST/dayEndSAST/todayStrSAST/sastHour. resolveCategories() fixes product_metadata?.category from inventory_items. ALL queries status='paid'. loyalty_transactions uses transaction_type (LL-191). | v3.0 | ✅ WP-DAILY-OPS Sessions B+C+D (a5340f8 via PR #1) |
 | POSScreen.js | POS till — product grid with category filter + search, qty modal with stock guard, cart with stepper, Cash/Card/Online payment, Complete Sale → receipt modal. Writes: orders (status='paid') + order_items + stock_movements (movement_type='sale_pos'). | v1.0 | ✅ WP-POS (aa51b74) |
 | EODCashUp.js | End-of-day cash reconciliation — 3 steps: set float, count cash (SA denominations or lump sum), reconcile. All thresholds from tenant_config.settings (never hardcoded). Status: balanced/flagged/escalated. Reason required if flagged. History panel 30 days. DB: pos_sessions + eod_cash_ups. | v1.0 | ✅ WP-EOD (5249529) |
 | HQWholesaleOrders.js | B2B wholesale orders — Draft/Confirm/Ship/Cancel reservation flow. v2.0: SAGE-style invoice modal (dark green toolbar, Print/Save PDF/Email), auto-generates invoice on ship. LL-115: stock_reservations uses inventory_item_id, quantity_reserved. LL-116: invoices uses supplier_id, invoice_number. | v2.0 | ✅ WP-FIN S4 |
@@ -372,6 +372,27 @@
 
 ## CUMULATIVE CHANGE LOG
 
+### v3.2 (April 4, 2026) — WP-DAILY-OPS Session C+D (HQTradingDashboard v3.0)
+```
+UPDATED FILES:
+  HQTradingDashboard.js v3.0 (a5340f8 via Claude Code PR #1)
+    Session C (d7c13ce): SAST timezone fix, auto-refresh countdown, resolveCategories(),
+                         EODStatusWidget (links Cash-Up + POS), projected revenue KPI
+    Session D (a5340f8): ThirtyDayChart (30-day bar chart + day-of-week labels),
+                         HistoryPanel By Month mode (monthRangeSAST, prev/next nav)
+
+NEW WORKFLOW ESTABLISHED:
+  Claude Code PR pattern — Claude.ai authors WP spec, Claude Code implements,
+  builds to verify (npm start), pushes branch, PR merged via GitHub.com.
+  First PR: #1 (claude/optimistic-roentgen → main, a5340f8)
+
+SCHEMA FIX CONFIRMED:
+  loyalty_transactions.transaction_type (NOT .type) — 400 error confirmed and fixed.
+  Documented as LL-191 in REGISTRY + SESSION-CORE.
+
+FINAL HEAD: merge commit from PR #1 into main
+```
+
 ### v3.1 (April 3–4, 2026) — WP-DAILY-OPS Session B, WP-POS, WP-EOD
 ```
 NEW FILES:
@@ -514,8 +535,10 @@ See git history for individual commits.
 
 ---
 
-*MANIFEST.md v3.1 · Protea Botanicals · April 4, 2026*
+*MANIFEST.md v3.2 · Protea Botanicals · April 4, 2026*
 *Always overwrite with higher version. Never delete entries — move dead ones to DEAD section.*
 *LL-075: Disk is source of truth. If file exists but docs say pending — docs are wrong.*
 *LL-083: Read the entire file before updating. A shorter output = data loss = hard failure.*
 *LL-116: invoices uses supplier_id for all partners, invoice_number not reference.*
+*v3.1: Added HQTradingDashboard, POSScreen, EODCashUp · pos_sessions + eod_cash_ups tables*
+*v3.2: HQTradingDashboard v1.0 → v3.0 · Claude Code PR workflow established · LL-191 confirmed*

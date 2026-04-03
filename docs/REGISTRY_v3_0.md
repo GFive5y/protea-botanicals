@@ -1,6 +1,6 @@
 # REGISTRY.md — Protea Botanicals
 ## Capability-Indexed Component Registry
-## Version: v3.1 · April 4, 2026
+## Version: v3.2 · April 4, 2026
 ## THIS IS THE MANDATORY FIRST READ. Before MANIFEST.md. Before anything.
 
 ---
@@ -188,7 +188,9 @@
 | Receive a transfer at store — add shop stock + audit trail | ✅ BUILT WP-STOCK-PRO S5 | `HQTransfer.js v1.0` |
 | Cancel in-transit transfer + auto-reverse HQ stock | ✅ BUILT WP-STOCK-PRO S5 | `HQTransfer.js handleCancel()` |
 | Add a new HQ tab to the left nav sidebar | ✅ BUILT — add entry to Operations group | `src/hooks/useNavConfig.js` |
-| Show today's trading performance — KPIs, hourly chart, top sellers, payment split, loyalty | ✅ BUILT WP-DAILY-OPS Session B | `HQTradingDashboard.js v1.0` |
+| Show today's trading performance — KPIs, hourly chart, top sellers, payment split, loyalty | ✅ BUILT WP-DAILY-OPS Session B+C+D | `HQTradingDashboard.js v3.0` |
+| Show 30-day revenue bar chart with day-of-week labels (today highlighted) | ✅ BUILT WP-DAILY-OPS Session D | `HQTradingDashboard.js v3.0 ThirtyDayChart` |
+| Browse trading history by calendar month (Jan 2025 → present, prev/next navigation) | ✅ BUILT WP-DAILY-OPS Session D | `HQTradingDashboard.js v3.0 HistoryPanel (By Month mode)` |
 | Run a POS sale — product grid, cart, cash/card/online payment, stock deduction | ✅ BUILT WP-POS | `POSScreen.js v1.0` |
 | Run end-of-day cash reconciliation — denomination count, variance, reason, escalation, history | ✅ BUILT WP-EOD | `EODCashUp.js v1.0` |
 | Change EOD cash variance thresholds without a code change or redeploy | ✅ BUILT — DB config | `tenant_config.settings (eod_cash_variance_tolerance, eod_escalation_threshold, eod_default_float, eod_approver_role)` |
@@ -547,20 +549,46 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 
 ---
 
-### `HQTradingDashboard.js` ✅ BUILT v1.0 (WP-DAILY-OPS Session B — aa51b74)
+### `HQTradingDashboard.js` ✅ BUILT v3.0 (WP-DAILY-OPS Sessions B+C+D)
 **File:** `src/components/hq/HQTradingDashboard.js`
-**What it does:** Daily trading intelligence dashboard. Real-time view of today's sales performance.
-**Panels:** Sandbox banner · KPI strip (Revenue/Transactions/Avg Basket/Units Sold vs yesterday) · vs last week + best day comparisons · Loyalty strip (points earned/redeemed) · Hourly chart (today vs yesterday, Recharts BarChart) · Top sellers (toggle units/revenue) · Payment methods (bar per method with %) · Category breakdown (from product_metadata?.category) · History panel (Yesterday/7d/30d/MTD presets)
+**What it does:** Daily trading intelligence dashboard. Real-time + historical sales for Medi Rec operators.
+**v2.0 additions (Session C — d7c13ce):**
+- SAST timezone fix: all date windows use dayStartSAST()/dayEndSAST()/todayStrSAST() — never new Date()
+- Auto-refresh: 5-minute countdown (↻ 4:23) with setInterval, manual reset on Refresh click
+- resolveCategories(): fetches missing categories from inventory_items via product_metadata.inventory_item_id
+- EODStatusWidget: shows today's cash-up status (no session/open/balanced/flagged/escalated), links to Cash-Up and POS tabs via window.history.pushState + popstate
+- Projected revenue: 5th KPI card (accent green) — current revenue ÷ hours elapsed × trading hours, shown 08:00–20:00 SAST only
+**v3.0 additions (Session D — a5340f8 via Claude Code PR #1):**
+- ThirtyDayChart sub-component: full-width BarChart, day-of-week X-axis labels (Mon/Tue/Wed...), today in accentMid, revenue days in ink300, zero days in ink150, hover tooltip with date + revenue
+- buildThirtyDayData(): maps orders30 data to 30-day chart array with dateStr, dayLabel, revenue, isToday
+- monthRangeSAST(year, month): returns SAST-correct {start, end} UTC dates for a calendar month
+- DOW constant: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+- MONTH_NAMES constant: ["January"..."December"]
+- HistoryPanel "By Month" mode: viewMode state ('preset'|'month'), selYear/selMonth state, prev/next navigation, min: Jan 2025, max: current SAST month
+**SAST timezone helpers (defined at top of file — reusable pattern):**
+```js
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000; // UTC+2
+nowSAST()                // Date where getUTCHours() = current SAST hour
+dayStartSAST(daysAgo)   // SAST midnight → UTC equivalent
+dayEndSAST(daysAgo)     // SAST end of day → UTC equivalent
+monthStartSAST()        // First day of current SAST month → UTC
+monthRangeSAST(y, m)    // {start, end} for any calendar month
+todayStrSAST()          // "YYYY-MM-DD" in SAST
+sastHour(isoString)     // UTC ISO → SAST hour (0-23)
+```
 **Critical rules:**
 - status = 'paid' ALWAYS — 'completed' does not exist in orders table
-- fetchItemsForOrders helper: chunked .in() for orderIds >50
-- T token design system mirrors HQStock.js v3.1
-- usePageContext('hq-trading', null) as first call (mandatory)
-- SparkLine + DeltaBadge imported from ../viz
-**Props:** None. Reads tenantId from useTenant() internally.
-**DB tables (read):** orders, order_items, loyalty_transactions
+- fetchItemsForOrders(): chunked .in() for orderIds >50 (CHUNK = 50)
+- resolveCategories(): always call after fetchItemsForOrders() to fix "Other" for sandbox/older POS data
+- usePageContext('hq-trading', null) as FIRST call — mandatory
+- loyalty_transactions: use transaction_type column (NOT 'type') — LL-191
+- SparkLine + DeltaBadge + Cell imported from recharts/viz
+- T token design system mirrors HQStock.js v3.1 exactly
+- REFRESH_INTERVAL_S = 300 (5 minutes) — do not reduce without owner approval
+- STORE_OPEN_HOUR = 8, STORE_CLOSE_HOUR = 20 (SAST) — projected revenue window
+**DB tables (read):** orders, order_items, loyalty_transactions, inventory_items (via resolveCategories), eod_cash_ups, pos_sessions
 **Nav:** HQ → Operations → Daily Trading (/hq?tab=hq-trading)
-**DO NOT:** Use status='completed'. Hardcode date windows without timezone awareness.
+**DO NOT:** Use status='completed'. Use new Date() for Supabase query windows (use dayStartSAST). Hardcode SAST offset anywhere except SAST_OFFSET_MS constant. Query loyalty_transactions.type (use transaction_type — LL-191).
 
 ---
 
@@ -630,7 +658,6 @@ WHERE tenant_id = 'b1bad266-...';
 | Subdomain routing per client | — | Vercel wildcard config |
 | Self-service SaaS onboarding wizard | — | Stripe + auto-provision |
 | Stripe SaaS billing | — | Automated subscription management |
-| WP-DAILY-OPS Session C | WP-DAILY-OPS | History panel custom date range + 30-day revenue chart w/ day-of-week labels |
 | WP-REORDER Phase 2 | WP-REORDER | ProteaAI quantity suggestions based on sales velocity |
 | BUG-047: PlatformBar loyalty scope | — | ~30 min fix |
 
@@ -685,6 +712,8 @@ WHERE tenant_id = 'b1bad266-...';
 | v146 | Used reference column on invoices — column does not exist | Column not verified before use | LL-116 |
 | v146 | Called reserve_stock() — function did not exist yet | DB function not verified before call | LL-117 |
 | v173 | POSScreen.js fully built but not in REGISTRY, not wired to nav | Audit assumed state without reading disk | LL-075 |
+| v175 | loyalty_transactions queried with .eq("type",...) — 400 Bad Request | Column is transaction_type NOT type — schema not verified before use | LL-191 |
+| v175 | HQTradingDashboard v1.0 signature in REGISTRY while v3.0 was live | Docs not updated after multi-session build | Always update REGISTRY after every session |
 
 ---
 
@@ -735,9 +764,12 @@ Both must be read before any build. This one first.
 
 ---
 
-*REGISTRY.md v3.1 · Protea Botanicals · April 4, 2026*
+*REGISTRY.md v3.2 · Protea Botanicals · April 4, 2026*
 *One lookup. Every session. Before everything else.*
 *LL-075: Session docs can lie. Disk never does. Always verify.*
 *LL-083: Truncated reads drop data silently. Always confirm line count before updating.*
 *LL-089: product_formats column is label NOT name. Always verify DB column names before use.*
 *LL-116: invoices uses supplier_id for ALL partners, invoice_number not reference.*
+*LL-191: loyalty_transactions column = transaction_type (NOT type). Always use .ilike() — LL-077.*
+*v3.1: Added HQTradingDashboard.js v1.0, POSScreen.js v1.0, EODCashUp.js v1.0 + new DB tables*
+*v3.2: Updated HQTradingDashboard.js to v3.0 (SAST tz, auto-refresh, category fix, EOD widget, 30-day chart, month selector). LL-191 added.*

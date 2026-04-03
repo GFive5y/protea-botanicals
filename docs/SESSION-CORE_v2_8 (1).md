@@ -1,6 +1,7 @@
 # SESSION-CORE.md — NuAi Platform Bible
-## Version: v2.8 · Updated: April 3, 2026
+## Version: v2.9 · Updated: April 4, 2026
 ## CRITICAL UPDATE: LL-184 strengthened after VL-001/VL-002. RULE 0O added (violation log).
+## v2.9: LL-189 (sale_pos), LL-190 (EOD config), LL-191 (loyalty column). Schema updated.
 ## Update: Only when new LLs added or schema changes confirmed.
 
 > READ THIS FILE ONCE PER SESSION. Invariant truth about this system.
@@ -264,6 +265,36 @@ BOM causes silent Python str.replace() failures.
 Fix: strip via VS Code status bar (encoding indicator → Save with UTF-8).
 ```
 
+## LL-189 — POSSCREEN MOVEMENT TYPE
+```
+movement_type = 'sale_pos' for in-store POS sales (NOT 'sale_out').
+'sale_out' = B2B wholesale only (HQWholesaleOrders.js).
+Using 'sale_out' from POS will corrupt wholesale analytics.
+```
+
+## LL-190 — EOD THRESHOLDS FROM DB ONLY (never hardcode)
+```
+All EODCashUp thresholds must come from tenant_config.settings:
+  eod_cash_variance_tolerance  (amber flag threshold)
+  eod_escalation_threshold     (red escalation threshold)
+  eod_default_float            (pre-filled opening float)
+  eod_approver_role            (who approves escalations)
+To change without code deploy:
+  UPDATE tenant_config SET settings = settings || '{"eod_cash_variance_tolerance": 100}'
+  WHERE tenant_id = '...';
+Never hardcode threshold values in EODCashUp.js or any component.
+```
+
+## LL-191 — LOYALTY_TRANSACTIONS COLUMN NAME (confirmed April 4 2026)
+```
+Column name is transaction_type (NOT 'type').
+Querying .eq("type", ...) or .ilike("type", ...) returns HTTP 400.
+ALWAYS use: .ilike("transaction_type", "earned")
+            .ilike("transaction_type", "redeemed")
+Use .ilike() not .eq() — casing is inconsistent in DB (LL-077 still applies).
+Confirmed via Supabase schema query April 4 2026.
+```
+
 ## LL-188 — REORDERPANEL PO STATUS
 ```
 ReorderPanel creates purchase_orders status='draft' ONLY. Never auto-submit.
@@ -302,7 +333,9 @@ HQStock.js          — PROTECTED. Read full file before any change.
 inventory_items: no 'notes' column · category is enum (::inventory_category in SQL)
 orders: status = pending/paid/failed/cancelled/refunded (NOT 'completed')
 order_items: no inventory_item_id FK — linked via product_metadata jsonb
-eod_cash_ups / pos_sessions / daily_summaries — NOT YET CREATED
+eod_cash_ups — ✅ LIVE (5249529). UNIQUE(tenant_id, cashup_date). variance GENERATED.
+pos_sessions — ✅ LIVE (5249529). (tenant_id, session_date, opening_float, status).
+loyalty_transactions — column is transaction_type (NOT type) — LL-191 confirmed April 4.
 purchase_orders + purchase_order_items + suppliers — confirmed correct
 ```
 
@@ -311,15 +344,24 @@ purchase_orders + purchase_order_items + suppliers — confirmed correct
 # THREE-CLAUDE ECOSYSTEM
 
 ```
-Claude.ai       — strategy, planning, Vercel/Supabase MCP
-Claude Code VS  — file edits, git push (local credentials)
-Claude Code DT  — complex multi-file (cannot push to GitHub)
-GitHub MCP      — NOT connected in Claude.ai sessions
+Claude.ai       — strategy, architecture, Supabase MCP, Vercel MCP, WP spec authoring
+Claude Code     — reads WP spec, implements, npm start verify, git commit, git push branch, PR
+GitHub MCP      — connected READ-ONLY via Copilot endpoint. Write operations return 403 (permanent).
+                  Use Claude Code for all git push operations.
+
+WP EXECUTION PATTERN (established PR #1, April 4 2026):
+  1. Claude.ai reads current files via GitHub MCP, authors executable WP spec
+  2. Claude.ai runs any DB migrations via Supabase MCP
+  3. Claude Code reads spec + reads files from disk (LL-185), implements, verifies (npm start)
+  4. Claude Code pushes branch, creates PR
+  5. Claude.ai monitors Vercel preview build via Vercel MCP, gives merge signal
+  6. PR merged → Vercel auto-deploys to production
 ```
 
 ---
 
-*SESSION-CORE v2.8 · NuAi · April 3, 2026*
+*SESSION-CORE v2.9 · NuAi · April 4, 2026*
 *New: RULE 0O (violation log), LL-184 strengthened after VL-001/VL-002*
+*v2.9: LL-189 (sale_pos movement type), LL-190 (EOD DB config), LL-191 (loyalty transaction_type)*
 *Read order now includes VIOLATION_LOG.md*
 *LL list is SACRED — never abbreviate, never skip, always write in full.*
