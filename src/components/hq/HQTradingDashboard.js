@@ -1,23 +1,25 @@
-// src/components/hq/HQTradingDashboard.js — v1.0
-// WP-DAILY-OPS Session B — Phase 1
-// Daily trading intelligence dashboard for NuAi / Medi Recreational
+// src/components/hq/HQTradingDashboard.js — v2.0
+// WP-DAILY-OPS Session C — Tier 1 Foundation Fixes
 //
-// Spec:    WP-DAILY-OPS_v2_0.md
-// Pattern: ReorderPanel.js — standalone, no props, reads tenantId internally
+// CHANGES v2.0:
+//   1. TIMEZONE: All date boundaries now SAST-correct (UTC+2) — fixes midnight mismatch
+//   2. AUTO-REFRESH: 5-minute interval with live countdown in header
+//   3. CATEGORY FIX: Resolves inventory_item_id → category from inventory_items
+//      when product_metadata lacks category (sandbox data + older POS sales)
+//   4. EOD STATUS WIDGET: Shows today's cash-up status with link to Cash-Up tab
+//   5. PROJECTED REVENUE: Real-time daily revenue projection based on trading pace
 //
-// Files read before build (LL-185, session v173):
-//   HQDashboard.js    SHA: a751fe3d  — nav wiring confirmed
-//   useNavConfig.js   SHA: 2af18ac0  — HQ_PAGES confirmed
-//   HQStock.js        v3.1           — T token system confirmed
-//   POSScreen.js      v1.0           — movement_type: 'sale_pos', product_metadata.category
-//   SparkLine.js                     — data:[{v}], positive, width, height
-//   DeltaBadge.js                    — value, suffix, decimals, forcePositive
-//
-// CRITICAL: all queries use status = 'paid' (NOT 'completed' — that value does not exist)
+// Critical: status = 'paid' always (NOT 'completed')
 // Rule 0F:  tenantId on every query
-// LL-185:   all touched files read this session
+// LL-190:   EOD thresholds from tenant_config.settings (never hardcoded)
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import {
   BarChart,
   Bar,
@@ -143,23 +145,57 @@ function pct(num, total) {
   return `${Math.round((num / total) * 100)}%`;
 }
 
-// ── Date helpers ──────────────────────────────────────────────────────────────
-function dayStart(daysAgo = 0) {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - daysAgo);
-  return d;
+// ── SAST timezone helpers (UTC+2) ─────────────────────────────────────────────
+// CRITICAL FIX: All date boundaries must be SAST-aware.
+// SAST midnight = 22:00 UTC on the previous calendar day.
+// Without this, a sale at 23:30 SAST falls into "tomorrow" UTC.
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000; // UTC+2
+
+function nowSAST() {
+  // Returns a Date object where getUTCHours() = current SAST hour
+  return new Date(Date.now() + SAST_OFFSET_MS);
 }
-function dayEnd(daysAgo = 0) {
-  const d = dayStart(daysAgo);
-  d.setDate(d.getDate() + 1);
-  return d;
+function dayStartSAST(daysAgo = 0) {
+  const sast = nowSAST();
+  // Construct midnight SAST as a UTC timestamp
+  const utcMidnightSAST = Date.UTC(
+    sast.getUTCFullYear(),
+    sast.getUTCMonth(),
+    sast.getUTCDate() - daysAgo,
+    0,
+    0,
+    0,
+    0,
+  );
+  // Subtract SAST offset to get the UTC moment that equals SAST midnight
+  return new Date(utcMidnightSAST - SAST_OFFSET_MS);
 }
-function monthStart() {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d;
+function dayEndSAST(daysAgo = 0) {
+  return new Date(dayStartSAST(daysAgo).getTime() + 24 * 60 * 60 * 1000);
+}
+function monthStartSAST() {
+  const sast = nowSAST();
+  const utcFirst = Date.UTC(
+    sast.getUTCFullYear(),
+    sast.getUTCMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
+  return new Date(utcFirst - SAST_OFFSET_MS);
+}
+function todayStrSAST() {
+  const sast = nowSAST();
+  const y = sast.getUTCFullYear();
+  const m = String(sast.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(sast.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function sastHour(isoString) {
+  // Convert a UTC ISO string to the SAST hour (0-23)
+  return (new Date(isoString).getUTCHours() + 2) % 24;
 }
 function formatDateLabel(d) {
   return d.toLocaleDateString("en-ZA", {
@@ -168,9 +204,13 @@ function formatDateLabel(d) {
     year: "numeric",
   });
 }
+function fmtCountdown(sec) {
+  const m = Math.floor(sec / 60);
+  const s = String(sec % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
 
-// ── Chunked .in() helper ─────────────────────────────────────────────────────
-// Supabase has a limit on .in() clause size — chunk large arrays
+// ── Chunked .in() helper ──────────────────────────────────────────────────────
 async function fetchItemsForOrders(orderIds) {
   if (!orderIds || orderIds.length === 0) return [];
   const CHUNK = 50;
@@ -186,24 +226,69 @@ async function fetchItemsForOrders(orderIds) {
   return results;
 }
 
+// ── Category resolver — fetches from inventory_items when metadata lacks it ───
+// Fixes sandbox data (metadata = {sandbox:true, inventory_item_id:"..."}) and
+// older POS sales that may not have stored category in product_metadata.
+async function resolveCategories(items) {
+  const needsResolution = items.filter(
+    (i) =>
+      !i.product_metadata?.category && i.product_metadata?.inventory_item_id,
+  );
+  if (needsResolution.length === 0) return items;
+
+  const invIds = [
+    ...new Set(
+      needsResolution.map((i) => i.product_metadata.inventory_item_id),
+    ),
+  ];
+  const CHUNK = 50;
+  const invMap = {};
+  for (let j = 0; j < invIds.length; j += CHUNK) {
+    const { data } = await supabase
+      .from("inventory_items")
+      .select("id, category")
+      .in("id", invIds.slice(j, j + CHUNK));
+    (data || []).forEach((ii) => {
+      invMap[ii.id] = ii.category;
+    });
+  }
+
+  return items.map((item) => {
+    if (!item.product_metadata?.category) {
+      const invId = item.product_metadata?.inventory_item_id;
+      if (invId && invMap[invId]) {
+        return {
+          ...item,
+          product_metadata: {
+            ...item.product_metadata,
+            category: invMap[invId],
+          },
+        };
+      }
+    }
+    return item;
+  });
+}
+
 // ── Aggregate helpers ─────────────────────────────────────────────────────────
 function sumRevenue(orders) {
   return orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
 }
 function buildHourly(todayOrds, yestOrds) {
-  const hours = Array.from({ length: 12 }, (_, i) => {
-    const h = i + 8; // 08:00 – 19:00
+  // FIXED: Uses SAST hours (8:00–20:00 SAST) — not UTC hours
+  const hours = Array.from({ length: 13 }, (_, i) => {
+    const h = i + 8; // 08:00–20:00 SAST
     return { hour: `${h}:00`, today: 0, yesterday: 0 };
   });
   todayOrds.forEach((o) => {
-    const h = new Date(o.created_at).getHours();
+    const h = sastHour(o.created_at); // SAST hour 0-23
     const idx = h - 8;
-    if (idx >= 0 && idx < 12) hours[idx].today += Number(o.total) || 0;
+    if (idx >= 0 && idx < 13) hours[idx].today += Number(o.total) || 0;
   });
   yestOrds.forEach((o) => {
-    const h = new Date(o.created_at).getHours();
+    const h = sastHour(o.created_at);
     const idx = h - 8;
-    if (idx >= 0 && idx < 12) hours[idx].yesterday += Number(o.total) || 0;
+    if (idx >= 0 && idx < 13) hours[idx].yesterday += Number(o.total) || 0;
   });
   return hours;
 }
@@ -249,22 +334,22 @@ function buildPaymentSplit(orders) {
     .sort((a, b) => b[1].revenue - a[1].revenue)
     .map(([method, d]) => ({ method, ...d }));
 }
-function buildSparkData(orders30, todayStart) {
+function buildSparkData(orders30) {
+  const ts = dayStartSAST(0);
   const map = {};
   orders30.forEach((o) => {
     const day = o.created_at.slice(0, 10);
     map[day] = (map[day] || 0) + (Number(o.total) || 0);
   });
-  // Build 30 days from 29 days ago to today
   return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(todayStart);
+    const d = new Date(ts);
     d.setDate(d.getDate() - (29 - i));
     const key = d.toISOString().slice(0, 10);
     return { v: map[key] || 0 };
   });
 }
 
-// ── CATEGORY LABELS — human readable ─────────────────────────────────────────
+// ── Label maps ────────────────────────────────────────────────────────────────
 const CAT_LABELS = {
   flower: "Flower",
   concentrate: "Concentrates",
@@ -282,16 +367,12 @@ const CAT_LABELS = {
   hash: "Hash",
   other: "Other",
 };
-
-// ── PAYMENT LABEL ─────────────────────────────────────────────────────────────
 const PAY_LABELS = {
   cash: "💵 Cash",
   card: "💳 Card",
   online: "📱 Online",
   payfast: "🔗 PayFast",
 };
-
-// ── CATEGORY COLOURS (for breakdown bars) ────────────────────────────────────
 const CAT_COLOURS = [
   T.accentMid,
   "#2563EB",
@@ -302,15 +383,47 @@ const CAT_COLOURS = [
   "#16A34A",
 ];
 
+// ── EOD status helpers ─────────────────────────────────────────────────────────
+const EOD_STATUS = {
+  balanced: {
+    icon: "✅",
+    label: "Balanced",
+    colour: T.success,
+    bg: T.successBg,
+    bd: T.successBd,
+  },
+  flagged: {
+    icon: "⚠️",
+    label: "Flagged",
+    colour: T.warning,
+    bg: T.warningBg,
+    bd: T.warningBd,
+  },
+  escalated: {
+    icon: "🚨",
+    label: "Escalated",
+    colour: T.danger,
+    bg: T.dangerBg,
+    bd: T.dangerBd,
+  },
+};
+
+// ── Auto-refresh interval (seconds) ───────────────────────────────────────────
+const REFRESH_INTERVAL_S = 300; // 5 minutes
+
+// ── Projected revenue constants ───────────────────────────────────────────────
+const STORE_OPEN_HOUR = 8; // 08:00 SAST
+const STORE_CLOSE_HOUR = 20; // 20:00 SAST
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function HQTradingDashboard() {
-  usePageContext("hq-trading", null); // ProteaAI tab context — MANDATORY, first call
+  usePageContext("hq-trading", null); // ProteaAI context — MANDATORY, first call
 
   const { tenantId } = useTenant();
 
-  // ── State ──────────────────────────────────────────────────────────────────
+  // ── Core data state ────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [todayOrders, setTodayOrders] = useState([]);
   const [yesterdayOrders, setYesterdayOrders] = useState([]);
@@ -318,36 +431,41 @@ export default function HQTradingDashboard() {
   const [bestDayRevenue, setBestDayRevenue] = useState(0);
   const [bestDayDate, setBestDayDate] = useState(null);
   const [todayItems, setTodayItems] = useState([]);
-  const [loyaltyData, setLoyaltyData] = useState({
-    earned: 0,
-    redeemed: 0,
-    newMembers: 0,
-  });
+  const [loyaltyData, setLoyaltyData] = useState({ earned: 0, redeemed: 0 });
   const [isSandbox, setIsSandbox] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [topSellersMode, setTopSellersMode] = useState("qty"); // 'qty' | 'revenue'
   const [sparkData30, setSparkData30] = useState([]);
   const [lastRefresh, setLastRefresh] = useState(null);
 
-  // ── Stable date refs — recalculated on each load ──────────────────────────
-  const today0 = useMemo(() => dayStart(0), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── EOD status ────────────────────────────────────────────────────────────
+  const [eodData, setEodData] = useState(null);
+  // { cashup: {status, variance, created_at} | null, sessionOpen: bool }
 
-  // ── Fetch everything ───────────────────────────────────────────────────────
+  // ── Auto-refresh countdown ────────────────────────────────────────────────
+  const [countdown, setCountdown] = useState(REFRESH_INTERVAL_S);
+  const countdownRef = useRef(countdown);
+  countdownRef.current = countdown;
+
+  // ── UI state ───────────────────────────────────────────────────────────────
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [topSellersMode, setTopSellersMode] = useState("qty");
+
+  // ── Fetch all data ─────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
 
-    const ts = dayStart(0);
-    const te = dayEnd(0);
-    const ys = dayStart(1);
-    const ye = dayEnd(1);
-    const lws = dayStart(8); // last week same day start
-    const lwe = dayEnd(8); // last week same day end
-    const ms = monthStart();
-    const thirtyAgo = dayStart(29);
+    // All date windows are SAST-correct
+    const ts = dayStartSAST(0);
+    const te = dayEndSAST(0);
+    const ys = dayStartSAST(1);
+    const ye = dayEndSAST(1);
+    const lws = dayStartSAST(8);
+    const lwe = dayEndSAST(8);
+    const ms = monthStartSAST();
+    const thirtyAgo = dayStartSAST(29);
+    const todayStr = todayStrSAST();
 
     try {
-      // Parallel fetches — all use status = 'paid'
       const [
         todayRes,
         yesterdayRes,
@@ -357,7 +475,10 @@ export default function HQTradingDashboard() {
         sandboxRes,
         earnedRes,
         redeemedRes,
+        eodRes,
+        sesRes,
       ] = await Promise.all([
+        // Today's orders
         supabase
           .from("orders")
           .select("id, total, items_count, payment_method, created_at")
@@ -366,6 +487,7 @@ export default function HQTradingDashboard() {
           .gte("created_at", ts.toISOString())
           .lt("created_at", te.toISOString()),
 
+        // Yesterday's orders
         supabase
           .from("orders")
           .select("id, total, payment_method, created_at")
@@ -374,6 +496,7 @@ export default function HQTradingDashboard() {
           .gte("created_at", ys.toISOString())
           .lt("created_at", ye.toISOString()),
 
+        // Last week same day
         supabase
           .from("orders")
           .select("total")
@@ -382,6 +505,7 @@ export default function HQTradingDashboard() {
           .gte("created_at", lws.toISOString())
           .lt("created_at", lwe.toISOString()),
 
+        // Month to date (for best day calc)
         supabase
           .from("orders")
           .select("total, created_at")
@@ -390,6 +514,7 @@ export default function HQTradingDashboard() {
           .gte("created_at", ms.toISOString())
           .lt("created_at", te.toISOString()),
 
+        // 30-day sparkline
         supabase
           .from("orders")
           .select("total, created_at")
@@ -398,6 +523,7 @@ export default function HQTradingDashboard() {
           .gte("created_at", thirtyAgo.toISOString())
           .lt("created_at", te.toISOString()),
 
+        // Sandbox check
         supabase
           .from("orders")
           .select("id")
@@ -405,6 +531,7 @@ export default function HQTradingDashboard() {
           .eq("notes", "SANDBOX")
           .limit(1),
 
+        // Loyalty earned today
         supabase
           .from("loyalty_transactions")
           .select("points")
@@ -413,6 +540,7 @@ export default function HQTradingDashboard() {
           .gte("created_at", ts.toISOString())
           .lt("created_at", te.toISOString()),
 
+        // Loyalty redeemed today
         supabase
           .from("loyalty_transactions")
           .select("points")
@@ -420,6 +548,23 @@ export default function HQTradingDashboard() {
           .eq("type", "redeemed")
           .gte("created_at", ts.toISOString())
           .lt("created_at", te.toISOString()),
+
+        // EOD cash-up for today (LL-190: uses cashup_date, not created_at)
+        supabase
+          .from("eod_cash_ups")
+          .select("status, variance, created_at")
+          .eq("tenant_id", tenantId)
+          .eq("cashup_date", todayStr)
+          .maybeSingle(),
+
+        // Open POS session for today
+        supabase
+          .from("pos_sessions")
+          .select("id, opening_float")
+          .eq("tenant_id", tenantId)
+          .eq("session_date", todayStr)
+          .eq("status", "open")
+          .maybeSingle(),
       ]);
 
       const tod = todayRes.data || [];
@@ -431,6 +576,7 @@ export default function HQTradingDashboard() {
       setYesterdayOrders(yest);
       setLastWeekRevenue(sumRevenue(lastWeekRes.data || []));
       setIsSandbox((sandboxRes.data?.length || 0) > 0);
+      setSparkData30(buildSparkData(thirty));
 
       // Best day this month
       const byDay = {};
@@ -444,12 +590,10 @@ export default function HQTradingDashboard() {
         setBestDayDate(bestEntry[0]);
       }
 
-      // 30-day sparkline data
-      setSparkData30(buildSparkData(thirty, ts));
-
-      // Order items for top sellers and category breakdown
+      // Fetch + resolve item categories
       const orderIds = tod.map((o) => o.id);
-      const items = await fetchItemsForOrders(orderIds);
+      let items = await fetchItemsForOrders(orderIds);
+      items = await resolveCategories(items); // ← NEW: fix "Other" for sandbox data
       setTodayItems(items);
 
       // Loyalty
@@ -461,7 +605,13 @@ export default function HQTradingDashboard() {
         (s, t) => s + (Number(t.points) || 0),
         0,
       );
-      setLoyaltyData({ earned, redeemed, newMembers: 0 });
+      setLoyaltyData({ earned, redeemed });
+
+      // EOD status
+      setEodData({
+        cashup: eodRes.data || null,
+        sessionOpen: !!sesRes.data,
+      });
 
       setLastRefresh(new Date());
     } catch (err) {
@@ -469,13 +619,32 @@ export default function HQTradingDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // ── Derived data ───────────────────────────────────────────────────────────
+  // ── Auto-refresh: 5-minute countdown, auto-reload ─────────────────────────
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          load();
+          return REFRESH_INTERVAL_S;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [load]);
+
+  const handleRefresh = useCallback(() => {
+    setCountdown(REFRESH_INTERVAL_S);
+    load();
+  }, [load]);
+
+  // ── Derived values ─────────────────────────────────────────────────────────
   const todayRevenue = useMemo(() => sumRevenue(todayOrders), [todayOrders]);
   const todayTxCount = todayOrders.length;
   const todayAvgBasket = todayTxCount > 0 ? todayRevenue / todayTxCount : 0;
@@ -511,6 +680,18 @@ export default function HQTradingDashboard() {
   const bestDayPct =
     bestDayRevenue > 0 ? (todayRevenue / bestDayRevenue) * 100 : 0;
 
+  // Projected daily revenue based on trading pace
+  const currentSASTHour = nowSAST().getUTCHours();
+  const hoursElapsed = Math.max(0.5, currentSASTHour - STORE_OPEN_HOUR);
+  const projectedRevenue =
+    currentSASTHour >= STORE_OPEN_HOUR &&
+    currentSASTHour < STORE_CLOSE_HOUR &&
+    todayRevenue > 0
+      ? Math.round(
+          (todayRevenue / hoursElapsed) * (STORE_CLOSE_HOUR - STORE_OPEN_HOUR),
+        )
+      : null;
+
   const hourlyData = useMemo(
     () => buildHourly(todayOrders, yesterdayOrders),
     [todayOrders, yesterdayOrders],
@@ -527,14 +708,18 @@ export default function HQTradingDashboard() {
     () => buildPaymentSplit(todayOrders),
     [todayOrders],
   );
-
   const sparkPositive =
     sparkData30.length >= 2
       ? sparkData30[sparkData30.length - 1].v >=
         sparkData30[sparkData30.length - 2].v
       : true;
 
-  // ── Loading state ──────────────────────────────────────────────────────────
+  // ── Navigate to another tab via URL ──────────────────────────────────────
+  const navToTab = (tab) => {
+    window.history.pushState({}, "", `/hq?tab=${tab}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+
   if (loading) {
     return (
       <div
@@ -590,7 +775,7 @@ export default function HQTradingDashboard() {
         </div>
       )}
 
-      {/* ── Page header ─────────────────────────────────────────────── */}
+      {/* ── Page header ── */}
       <div
         style={{
           display: "flex",
@@ -635,7 +820,6 @@ export default function HQTradingDashboard() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* 30-day sparkline */}
           {sparkData30.length >= 2 && (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span
@@ -658,8 +842,11 @@ export default function HQTradingDashboard() {
               <DeltaBadge value={revDelta} suffix="%" decimals={1} />
             </div>
           )}
+          <span style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+            ↻ {fmtCountdown(countdown)}
+          </span>
           <button
-            onClick={load}
+            onClick={handleRefresh}
             style={{
               padding: "6px 14px",
               background: "transparent",
@@ -674,12 +861,12 @@ export default function HQTradingDashboard() {
               fontFamily: T.font,
             }}
           >
-            ↻ Refresh
+            Refresh
           </button>
         </div>
       </div>
 
-      {/* ── KPI strip ───────────────────────────────────────────────── */}
+      {/* ── KPI strip (5 cards — revenue, transactions, avg basket, units, projected) ── */}
       <div
         style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}
       >
@@ -707,9 +894,18 @@ export default function HQTradingDashboard() {
           sub={`${todaySkus} SKU${todaySkus !== 1 ? "s" : ""} sold today`}
           deltaVal={null}
         />
+        {projectedRevenue !== null && (
+          <KPICard
+            label="Projected Daily"
+            value={zar(projectedRevenue)}
+            sub={`At current pace · ${STORE_CLOSE_HOUR - currentSASTHour}h remaining`}
+            deltaVal={null}
+            accent
+          />
+        )}
       </div>
 
-      {/* ── Comparison row ──────────────────────────────────────────── */}
+      {/* ── Comparison row ── */}
       <div
         style={{
           display: "flex",
@@ -738,11 +934,11 @@ export default function HQTradingDashboard() {
           }
           pctOf={bestDayPct}
           bestVal={zar(bestDayRevenue)}
-          isBest={todayRevenue >= bestDayRevenue}
+          isBest={todayRevenue >= bestDayRevenue && todayRevenue > 0}
         />
       </div>
 
-      {/* ── Loyalty strip ───────────────────────────────────────────── */}
+      {/* ── Loyalty strip ── */}
       <div
         style={{
           display: "flex",
@@ -785,7 +981,16 @@ export default function HQTradingDashboard() {
         )}
       </div>
 
-      {/* ── Hourly chart ────────────────────────────────────────────── */}
+      {/* ── EOD Status widget ── */}
+      {eodData && (
+        <EODStatusWidget
+          data={eodData}
+          onNavigateCashUp={() => navToTab("hq-eod")}
+          onNavigatePOS={() => navToTab("hq-pos")}
+        />
+      )}
+
+      {/* ── Hourly chart (SAST hours) ── */}
       <div style={{ ...sSection, marginBottom: 16 }}>
         <div
           style={{
@@ -795,50 +1000,23 @@ export default function HQTradingDashboard() {
             justifyContent: "space-between",
           }}
         >
-          <span>Revenue by hour</span>
+          <span>
+            Revenue by hour{" "}
+            <span
+              style={{
+                fontWeight: 400,
+                color: T.ink400,
+                fontSize: 10,
+                textTransform: "none",
+                letterSpacing: 0,
+              }}
+            >
+              (SAST)
+            </span>
+          </span>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 11,
-                color: T.ink500,
-                fontFamily: T.font,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 10,
-                  height: 10,
-                  background: T.accentMid,
-                  borderRadius: 2,
-                }}
-              />{" "}
-              Today
-            </span>
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 11,
-                color: T.ink500,
-                fontFamily: T.font,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 10,
-                  height: 10,
-                  background: T.ink150,
-                  borderRadius: 2,
-                }}
-              />{" "}
-              Yesterday
-            </span>
+            <LegendDot colour={T.accentMid} label="Today" />
+            <LegendDot colour={T.ink150} label="Yesterday" />
           </div>
         </div>
         <ResponsiveContainer width="100%" height={200}>
@@ -884,7 +1062,7 @@ export default function HQTradingDashboard() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Two-column row: top sellers + payment split ─────────────── */}
+      {/* ── Top sellers + Payment split ── */}
       <div
         style={{
           display: "grid",
@@ -1072,7 +1250,7 @@ export default function HQTradingDashboard() {
         </div>
       </div>
 
-      {/* ── Category breakdown ──────────────────────────────────────── */}
+      {/* ── Category breakdown ── */}
       {catBreakdown.length > 0 && (
         <div style={sSection}>
           <div style={sSectionHead}>Category breakdown — today</div>
@@ -1154,7 +1332,7 @@ export default function HQTradingDashboard() {
         </div>
       )}
 
-      {/* ── History panel ───────────────────────────────────────────── */}
+      {/* ── History panel ── */}
       {historyOpen && (
         <HistoryPanel
           tenantId={tenantId}
@@ -1166,21 +1344,137 @@ export default function HQTradingDashboard() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EOD STATUS WIDGET
+// ─────────────────────────────────────────────────────────────────────────────
+function EODStatusWidget({ data, onNavigateCashUp, onNavigatePOS }) {
+  const { cashup, sessionOpen } = data;
+
+  // Determine display state
+  let icon, message, colour, bg, bd, actionLabel, onAction;
+
+  if (cashup) {
+    const s = EOD_STATUS[cashup.status] || EOD_STATUS.balanced;
+    icon = s.icon;
+    colour = s.colour;
+    bg = s.bg;
+    bd = s.bd;
+    const variance = Number(cashup.variance);
+    message = `Day closed — ${s.label}${variance !== 0 ? ` · ${variance > 0 ? "+" : ""}R${Math.abs(variance).toLocaleString("en-ZA")} variance` : ""}`;
+    actionLabel = "View cash-up";
+    onAction = onNavigateCashUp;
+  } else if (sessionOpen) {
+    icon = "🟢";
+    colour = T.success;
+    bg = T.successBg;
+    bd = T.successBd;
+    message = "Till open · cash-up pending";
+    actionLabel = "Close day →";
+    onAction = onNavigateCashUp;
+  } else {
+    icon = "⚪";
+    colour = T.ink500;
+    bg = T.ink075;
+    bd = T.ink150;
+    message = "No session open today";
+    actionLabel = "Open till →";
+    onAction = onNavigatePOS;
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 16,
+        padding: "10px 14px",
+        background: bg,
+        border: `1px solid ${bd}`,
+        borderRadius: "4px",
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ fontSize: 15 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: colour,
+            fontFamily: "'Inter',sans-serif",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
+          CASH-UP
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            color: colour,
+            fontFamily: "'Inter',sans-serif",
+            marginLeft: 10,
+          }}
+        >
+          {message}
+        </span>
+      </div>
+      {onAction && (
+        <button
+          onClick={onAction}
+          style={{
+            padding: "4px 12px",
+            background: "transparent",
+            border: `1px solid ${colour}`,
+            borderRadius: "3px",
+            color: colour,
+            fontSize: "10px",
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Inter',sans-serif",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
-
-function KPICard({ label, value, sub, deltaVal }) {
+function KPICard({ label, value, sub, deltaVal, accent }) {
   return (
-    <div style={sKPICard}>
-      <div style={sKPILabel}>{label}</div>
-      <div style={sKPIValue}>{value}</div>
+    <div
+      style={{
+        ...sKPICard,
+        ...(accent
+          ? {
+              background: T.accentLit,
+              border: `1px solid ${T.accentBd}`,
+            }
+          : {}),
+      }}
+    >
+      <div style={{ ...sKPILabel, ...(accent ? { color: T.accentMid } : {}) }}>
+        {label}
+      </div>
+      <div style={{ ...sKPIValue, ...(accent ? { color: T.accent } : {}) }}>
+        {value}
+      </div>
       <div
         style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}
       >
         {deltaVal !== null && (
           <DeltaBadge value={deltaVal} suffix="%" decimals={1} />
         )}
-        <span style={sKPISub}>{sub}</span>
+        <span style={{ ...sKPISub, ...(accent ? { color: T.accentMid } : {}) }}>
+          {sub}
+        </span>
       </div>
     </div>
   );
@@ -1263,6 +1557,32 @@ function LoyaltyKPI({ label, value }) {
   );
 }
 
+function LegendDot({ colour, label }) {
+  return (
+    <span
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 11,
+        color: T.ink500,
+        fontFamily: T.font,
+      }}
+    >
+      <span
+        style={{
+          display: "inline-block",
+          width: 10,
+          height: 10,
+          background: colour,
+          borderRadius: 2,
+        }}
+      />
+      {label}
+    </span>
+  );
+}
+
 function ModeToggle({ active, onClick, label }) {
   return (
     <button
@@ -1303,7 +1623,7 @@ function EmptyState({ msg }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HISTORY PANEL — slide-in overlay with date range selector
+// HISTORY PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 const HISTORY_PRESETS = [
   { label: "Yesterday", days: 1 },
@@ -1313,7 +1633,7 @@ const HISTORY_PRESETS = [
 ];
 
 function HistoryPanel({ tenantId, onClose }) {
-  const [preset, setPreset] = useState(1); // index into HISTORY_PRESETS
+  const [preset, setPreset] = useState(1);
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [items, setItems] = useState([]);
@@ -1324,19 +1644,20 @@ function HistoryPanel({ tenantId, onClose }) {
       if (!tenantId) return;
       setLoading(true);
       const p = HISTORY_PRESETS[presetIdx];
-      const ts = p.monthToDate ? monthStart() : dayStart(p.days);
-      const te = dayEnd(0);
+      const ts = p.monthToDate ? monthStartSAST() : dayStartSAST(p.days);
+      const te = dayEndSAST(0);
 
       const { data: ords } = await supabase
         .from("orders")
         .select("id, total, payment_method, created_at")
         .eq("tenant_id", tenantId)
-        .eq("status", "paid") // 'paid' not 'completed'
+        .eq("status", "paid")
         .gte("created_at", ts.toISOString())
         .lt("created_at", te.toISOString());
 
       const orderIds = (ords || []).map((o) => o.id);
-      const its = await fetchItemsForOrders(orderIds);
+      let its = await fetchItemsForOrders(orderIds);
+      its = await resolveCategories(its); // resolve categories for history too
       setOrders(ords || []);
       setItems(its);
       setLoading(false);
@@ -1382,7 +1703,6 @@ function HistoryPanel({ tenantId, onClose }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -1417,7 +1737,6 @@ function HistoryPanel({ tenantId, onClose }) {
           </button>
         </div>
 
-        {/* Preset buttons */}
         <div
           style={{
             display: "flex",
@@ -1460,7 +1779,6 @@ function HistoryPanel({ tenantId, onClose }) {
           </div>
         ) : (
           <>
-            {/* Period summary */}
             <div
               style={{
                 display: "flex",
@@ -1528,7 +1846,7 @@ function HistoryPanel({ tenantId, onClose }) {
                         <td style={{ ...sTd, color: T.ink300, fontSize: 11 }}>
                           {i + 1}
                         </td>
-                        <td style={{ ...sTd }}>{s.name}</td>
+                        <td style={sTd}>{s.name}</td>
                         <td
                           style={{
                             ...sTd,
