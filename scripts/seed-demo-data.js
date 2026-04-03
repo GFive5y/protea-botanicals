@@ -215,15 +215,17 @@ async function main() {
   let orderCustomerIdx = 0; // round-robin counter
 
   // ── Day-by-day generation ──────────────────────────────────────────────
-  for (let d = DAYS; d >= 0; d--) {
+  for (let d = DAYS - 1; d >= 0; d--) {
     const date = dayDate(d);
     const weekend = isWeekend(d);
     const mMult = monthMultiplier(d);
     const wMult = weekend ? 1.4 : 1.0;
+    const isToday = d === 0;
 
-    // Base transactions per day: 3-6, scaled
+    // Base transactions per day: 3-6, scaled; today = partial day (~40%)
     const baseTxns = randomBetween(3, 6);
-    const txnCount = Math.max(1, Math.round(baseTxns * mMult * wMult));
+    const fullCount = Math.max(1, Math.round(baseTxns * mMult * wMult));
+    const txnCount = isToday ? Math.max(1, Math.round(fullCount * 0.4)) : fullCount;
 
     // ── pos_sessions ─────────────────────────────────────────────────
     const sessionId = uuid();
@@ -259,7 +261,8 @@ async function main() {
       const payMethod = Math.random() < 0.6 ? "cash" : "card";
       const orderId = uuid();
       const orderRef = `SEED-${date.replace(/-/g, "")}-${String(t + 1).padStart(3, "0")}`;
-      const hour = randomBetween(9, 17);
+      const maxHour = isToday ? Math.max(8, new Date().getHours()) : 17;
+      const hour = randomBetween(8, maxHour);
       const minute = randomBetween(0, 59);
       const orderTime = dayISO(d, hour, minute);
 
