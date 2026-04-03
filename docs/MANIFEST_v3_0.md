@@ -1,7 +1,7 @@
 # MANIFEST.md
 ## Protea Botanicals — Complete File Inventory
-## Version: v3.0 · Updated: March 27, 2026
-## Source: v2.9 base · Updated for WP-FNB S1-S8, WP-AI-UNIFIED, WP-TENANT S3, WP-FIN S1-S4
+## Version: v3.1 · Updated: April 4, 2026
+## Source: v3.0 base · Updated for WP-DAILY-OPS Session B, WP-POS, WP-EOD
 
 ---
 
@@ -35,8 +35,8 @@
 | File | What It Does | Version | State |
 |---|---|---|---|
 | App.js | Router, RoleContext provider, all route definitions. /tenant-portal route added WP-TENANT S3. Smart login redirect: is_operator→/hq, management→/tenant-portal. | v6.4 | ✅ LOCKED |
-| HQDashboard.js | HQ shell — 21+ tabs, full ERP command centre. Transfers tab added S5. VIEWING dropdown navigates portals (WP-TENANT S3). WP-FNB S8: Food Intelligence tab wired. | v4.3 | ⚠️ READ BEFORE TOUCHING |
-| TenantPortal.js | Client-facing tenant portal — SmartBar waterfall sidebar (7 sections). Manufacturer/distributor model. Pure Premium scoped. Back button → /hq. | v2.1 | ✅ WP-TENANT S3 |
+| HQDashboard.js | HQ shell — 34 tabs, full ERP command centre. Transfers tab added S5. VIEWING dropdown navigates portals (WP-TENANT S3). WP-FNB S8: Food Intelligence tab. WP-DAILY-OPS: Daily Trading + POS Till. WP-EOD: Cash-Up. | v4.3 | ⚠️ READ BEFORE TOUCHING |
+| TenantPortal.js | Client-facing tenant portal — SmartBar waterfall sidebar (7 sections). Manufacturer/distributor model. Pure Premium scoped. Back button → /hq. | v2.4 | ✅ WP-TENANT S3 |
 | HRDashboard.js | HR portal shell — 13-tab container + Stock tab (WP-STOCK-PRO S4). Route: /hr | v1.3 | ✅ WP-STOCK-PRO S4 (063f7dc) |
 | AdminDashboard.js | Admin portal shell — 12+ tabs, commsBadge, realtime alerts. AIAssist removed WP-AI-UNIFIED. | v6.7 | ⚠️ READ BEFORE TOUCHING |
 | StaffPortal.js | Staff self-service portal. Route: /staff | v1.0 | ✅ |
@@ -87,6 +87,9 @@
 | HQSuppliers.js | Supplier management | — | ✅ |
 | HQTenants.js | Tenant management — TenantSetupWizard wired. industry_profile saves correctly (BUG-042 resolved). Profile save still needs Ctrl+Shift+R. | v1.1+BUG-042 | ✅ BUG-042 RESOLVED (264a5cb) |
 | HQTransfer.js | HQ→Shop transfer orders. draft→in_transit→received lifecycle. Ship deducts HQ stock + transfer_out movement. Receive adds shop stock + transfer_in movement. Auto-creates shop item if not found (sell_price=0, LL-024). Cancel in_transit reverses HQ deduction. 4 sub-tabs: Overview / New Transfer / Active / History. Reference: TRF-YYYYMMDD-XXXX (UNIQUE). | v1.0 | ✅ WP-STOCK-PRO S5 (c617f55) |
+| HQTradingDashboard.js | Daily trading intelligence — KPI strip (revenue/transactions/avg basket/units), hourly chart (today vs yesterday), top sellers, payment split, category breakdown, loyalty strip, history panel (4 presets). Sandbox banner. ALL queries status='paid'. usePageContext('hq-trading', null). SparkLine + DeltaBadge from viz/. | v1.0 | ✅ WP-DAILY-OPS Session B (aa51b74) |
+| POSScreen.js | POS till — product grid with category filter + search, qty modal with stock guard, cart with stepper, Cash/Card/Online payment, Complete Sale → receipt modal. Writes: orders (status='paid') + order_items + stock_movements (movement_type='sale_pos'). | v1.0 | ✅ WP-POS (aa51b74) |
+| EODCashUp.js | End-of-day cash reconciliation — 3 steps: set float, count cash (SA denominations or lump sum), reconcile. All thresholds from tenant_config.settings (never hardcoded). Status: balanced/flagged/escalated. Reason required if flagged. History panel 30 days. DB: pos_sessions + eod_cash_ups. | v1.0 | ✅ WP-EOD (5249529) |
 | HQWholesaleOrders.js | B2B wholesale orders — Draft/Confirm/Ship/Cancel reservation flow. v2.0: SAGE-style invoice modal (dark green toolbar, Print/Save PDF/Email), auto-generates invoice on ship. LL-115: stock_reservations uses inventory_item_id, quantity_reserved. LL-116: invoices uses supplier_id, invoice_number. | v2.0 | ✅ WP-FIN S4 |
 | TenantSetupWizard.js | 5-step Business in a Box onboarding — Identity / Industry / Tier+Flags / Catalogue / Admin user | v1.0 | ✅ WP-BIB S7 (2d01a40) |
 | StockAIAnalysis.js | AI stock intelligence drawer — profile-adaptive system prompt. Now routes through ProteaAI. | v1.0 | ✅ WP-BIB S6 (ec28500) |
@@ -216,7 +219,7 @@
 | File | What It Does | State |
 |---|---|---|
 | usePageContext.js | ⚠️ Tab context for WorkflowGuide + ProteaAI. ALWAYS two args: usePageContext("id", null). | ✅ DO NOT CHANGE SIGNATURE |
-| useNavConfig.js | Navigation configuration hook — groups, icons, paths. S5: Transfers entry added. FNB S1-S8: Food & Bev group added. | ✅ WP-STOCK-PRO S5 + WP-FNB |
+| useNavConfig.js | Navigation configuration hook — groups, icons, paths. S5: Transfers entry added. FNB S1-S8: Food & Bev group added. WP-EOD: Daily Trading + POS Till + Cash-Up added. | ✅ WP-EOD (5249529) |
 | useTenantConfig.js | Reads tenant_config feature flags. Returns: canUseAI, canUseSonnet, dailyLimit, tier. | ✅ |
 | useAIUsage.js | Daily AI usage counter. ⚠️ Pass dailyLimit NUMBER not tenantId (LL-095). | ✅ |
 
@@ -271,10 +274,10 @@
 |---|---|---|
 | tenants | industry_profile drives ALL profile-adaptive UI. HQ tenant = operator profile (43b34c33). Pure Premium = cannabis_retail (f8ff8d07). BUG-042 RESOLVED. | ✅ |
 | user_profiles | hq_access, role, tenant_id, is_operator, loyalty_points, anomaly_score. UPDATE only — never upsert. | ✅ |
-| tenant_config | 7 feature flags per tenant | ✅ |
+| tenant_config | 7 feature flags per tenant + settings JSONB column (eod thresholds, float, approver_role — added WP-EOD). | ✅ |
 | tenant_usage_log | Per-tenant usage metrics | ✅ |
 | inventory_items | allergen_flags (JSONB 14-key R638) · shelf_life_days · expiry_date · reserved_qty · weighted_avg_cost · temperature_zone · batch_lot_number · country_of_origin · reorder_qty · ⚠️ BUG-043: 23 terpenes qty inflated — physical count required | ✅ |
-| stock_movements | movement_type, unit_cost (NOT unit_cost_zar — LL-111). AVCO trigger on INSERT. Types: purchase_in, production_out, production_in, sale_out, transfer_out, transfer_in, stock_take_adjustment. | ✅ |
+| stock_movements | movement_type, unit_cost (NOT unit_cost_zar — LL-111). AVCO trigger on INSERT. Types: purchase_in, production_out, production_in, sale_out, sale_pos, transfer_out, transfer_in, stock_take_adjustment. | ✅ |
 | stock_reservations | Soft holds — inventory_item_id (NOT item_id), quantity_reserved (NOT quantity), reserved_by (LL-115). Does NOT trigger AVCO. | ✅ |
 | stock_transfers | Transfer order header — from_tenant_id, to_tenant_id, status (draft/in_transit/received/cancelled), reference (UNIQUE), shipped_at, received_at. | ✅ WP-STOCK-PRO S5 |
 | stock_transfer_items | Transfer lines — qty_requested, qty_confirmed, unit_cost_zar at time of ship. CASCADE on transfer delete. | ✅ WP-STOCK-PRO S5 |
@@ -299,7 +302,7 @@
 | qr_codes | inventory_item_id UUID — links to inventory_items for food/general profile QR cards | ✅ |
 | invoices | supplier_id for ALL partners (no customer_id — LL-116). invoice_number is the reference string (no reference column — LL-116). Status: draft/pending/paid/overdue. | ✅ WP-FIN S4 |
 | invoice_line_items | Linked to invoices | ✅ |
-| orders | total (NOT total_amount — LL-006) | ✅ |
+| orders | total (NOT total_amount — LL-006). status = pending/paid/failed/cancelled/refunded (NOT 'completed'). | ✅ |
 | wholesale_partners | business_name (NOT name — LL-009). No is_active column. | ✅ |
 | wholesale_orders | B2B order header | ✅ |
 | customer_messages | body (NOT content — LL-003). read_at = TIMESTAMPTZ (NOT boolean). | ✅ |
@@ -309,6 +312,9 @@
 | system_alerts | id = UUID — use self-join DELETE for dedup (LL-027). alert_type values: food_cert_expiry, cold_chain_breach, product_recall. No updated_at (LL-094). | ✅ |
 | ai_usage_log | Daily AI call log per tenant | ✅ |
 | user_profiles | hq_access, role, tenant_id. UPDATE only — never upsert. | ✅ |
+
+| pos_sessions | Till open/close per day. Columns: id, tenant_id, operator_id, session_date, opened_at, closed_at, opening_float, status (open/closed), notes, created_at. RLS enabled. Index: (tenant_id, session_date DESC). | ✅ WP-EOD (5249529) |
+| eod_cash_ups | Daily cash reconciliation. Columns: id, tenant_id, pos_session_id, operator_id, cashup_date, system_cash_total, opening_float, net_expected (GENERATED), counted_cash, variance (GENERATED), status (balanced/flagged/escalated), reason, approved_by, approved_at, notes, created_at. UNIQUE(tenant_id, cashup_date). RLS enabled. | ✅ WP-EOD (5249529) |
 
 ---
 
@@ -365,6 +371,40 @@
 ---
 
 ## CUMULATIVE CHANGE LOG
+
+### v3.1 (April 3–4, 2026) — WP-DAILY-OPS Session B, WP-POS, WP-EOD
+```
+NEW FILES:
+  HQTradingDashboard.js v1.0 (aa51b74) — daily trading intelligence dashboard
+  POSScreen.js v1.0 (aa51b74) — in-store POS till (was built, not in REGISTRY or wired)
+  EODCashUp.js v1.0 (5249529) — end-of-day cash reconciliation
+
+UPDATED FILES:
+  HQDashboard.js v4.3 — EODCashUp + HQTradingDashboard + POSScreen imports + TABS + render cases
+  useNavConfig.js — Daily Trading (📊) + POS Till (🛒) + Cash-Up (💰) in Operations group
+
+NEW DB TABLES:
+  pos_sessions — till open/close, opening_float, session_date (RLS enabled)
+  eod_cash_ups — daily reconciliation, GENERATED variance, UNIQUE(tenant_id, cashup_date) (RLS enabled)
+
+DB COLUMN ADDITIONS:
+  tenant_config.settings JSONB — eod_cash_variance_tolerance, eod_escalation_threshold,
+                                  eod_default_float, eod_approver_role
+  stock_movements.movement_type — sale_pos added (in-store POS, distinct from sale_out B2B)
+
+MEDI REC CONFIG (tenant b1bad266):
+  eod_cash_variance_tolerance: 50  (±R50 amber flag)
+  eod_escalation_threshold: 200    (±R200 red escalation)
+  eod_default_float: 500           (R500 opening float)
+  eod_approver_role: 'owner'
+
+CRITICAL LESSON:
+  POSScreen.js was fully built but not in REGISTRY and not wired to nav.
+  Audit flagged "No POS interface" as P1 — this was wrong.
+  Lesson: always check disk before concluding something doesn't exist (LL-075).
+
+FINAL HEAD: 5249529
+```
 
 ### v3.0 (March 27, 2026) — WP-FNB S1-S8, WP-AI-UNIFIED, WP-TENANT S3, WP-FIN S1-S4
 ```
@@ -474,7 +514,7 @@ See git history for individual commits.
 
 ---
 
-*MANIFEST.md v3.0 · Protea Botanicals · March 27, 2026*
+*MANIFEST.md v3.1 · Protea Botanicals · April 4, 2026*
 *Always overwrite with higher version. Never delete entries — move dead ones to DEAD section.*
 *LL-075: Disk is source of truth. If file exists but docs say pending — docs are wrong.*
 *LL-083: Read the entire file before updating. A shorter output = data loss = hard failure.*

@@ -1,6 +1,6 @@
 # REGISTRY.md — Protea Botanicals
 ## Capability-Indexed Component Registry
-## Version: v3.0 · March 27, 2026
+## Version: v3.1 · April 4, 2026
 ## THIS IS THE MANDATORY FIRST READ. Before MANIFEST.md. Before anything.
 
 ---
@@ -188,6 +188,10 @@
 | Receive a transfer at store — add shop stock + audit trail | ✅ BUILT WP-STOCK-PRO S5 | `HQTransfer.js v1.0` |
 | Cancel in-transit transfer + auto-reverse HQ stock | ✅ BUILT WP-STOCK-PRO S5 | `HQTransfer.js handleCancel()` |
 | Add a new HQ tab to the left nav sidebar | ✅ BUILT — add entry to Operations group | `src/hooks/useNavConfig.js` |
+| Show today's trading performance — KPIs, hourly chart, top sellers, payment split, loyalty | ✅ BUILT WP-DAILY-OPS Session B | `HQTradingDashboard.js v1.0` |
+| Run a POS sale — product grid, cart, cash/card/online payment, stock deduction | ✅ BUILT WP-POS | `POSScreen.js v1.0` |
+| Run end-of-day cash reconciliation — denomination count, variance, reason, escalation, history | ✅ BUILT WP-EOD | `EODCashUp.js v1.0` |
+| Change EOD cash variance thresholds without a code change or redeploy | ✅ BUILT — DB config | `tenant_config.settings (eod_cash_variance_tolerance, eod_escalation_threshold, eod_default_float, eod_approver_role)` |
 | Show a multi-tenant client portal (manufacturer/distributor model) | ✅ BUILT WP-TENANT S3 | `TenantPortal.js v2.1` |
 | Switch portal view between operator and tenant | ✅ BUILT WP-TENANT S3 | `HQDashboard.js VIEWING dropdown` |
 | Capture React errors + console.error in a developer panel | ✅ BUILT WP-AI-UNIFIED | `DevErrorCapture.js v1.0` |
@@ -450,9 +454,10 @@ stats.alerts       -> { lowStockItems[], outOfStockItems[], openPOCount }
 
 ---
 
-### `useNavConfig.js` ✅ BUILT (updated WP-STOCK-PRO S5 — 3ab7668)
+### `useNavConfig.js` ✅ BUILT (updated WP-EOD — 5249529)
 **File:** `src/hooks/useNavConfig.js`
 **RULE:** Every new HQDashboard tab needs a matching entry here or the tab is unreachable from nav.
+**Current Operations group:** Overview · Supply chain · Suppliers · Procurement · Production · HQ Stock · Daily Trading · POS Till · Cash-Up · Transfers · Distribution
 
 ---
 
@@ -539,6 +544,68 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 
 ---
 
+
+---
+
+### `HQTradingDashboard.js` ✅ BUILT v1.0 (WP-DAILY-OPS Session B — aa51b74)
+**File:** `src/components/hq/HQTradingDashboard.js`
+**What it does:** Daily trading intelligence dashboard. Real-time view of today's sales performance.
+**Panels:** Sandbox banner · KPI strip (Revenue/Transactions/Avg Basket/Units Sold vs yesterday) · vs last week + best day comparisons · Loyalty strip (points earned/redeemed) · Hourly chart (today vs yesterday, Recharts BarChart) · Top sellers (toggle units/revenue) · Payment methods (bar per method with %) · Category breakdown (from product_metadata?.category) · History panel (Yesterday/7d/30d/MTD presets)
+**Critical rules:**
+- status = 'paid' ALWAYS — 'completed' does not exist in orders table
+- fetchItemsForOrders helper: chunked .in() for orderIds >50
+- T token design system mirrors HQStock.js v3.1
+- usePageContext('hq-trading', null) as first call (mandatory)
+- SparkLine + DeltaBadge imported from ../viz
+**Props:** None. Reads tenantId from useTenant() internally.
+**DB tables (read):** orders, order_items, loyalty_transactions
+**Nav:** HQ → Operations → Daily Trading (/hq?tab=hq-trading)
+**DO NOT:** Use status='completed'. Hardcode date windows without timezone awareness.
+
+---
+
+### `POSScreen.js` ✅ BUILT v1.0 (WP-POS — aa51b74)
+**File:** `src/components/hq/POSScreen.js`
+**What it does:** In-store POS till. Product grid with category filter + search. Cart with qty stepper. Payment selection and sale completion with receipt modal.
+**Workflow:** Browse products → tap to add to cart → adjust qty (stock guard) → select payment (Cash/Card/Online) → Complete Sale → receipt modal
+**Sale writes:** orders (status='paid') + order_items + stock_movements (movement_type='sale_pos')
+**Critical rules:**
+- movement_type = 'sale_pos' (NOT 'sale_out' — that is B2B wholesale, LL-189)
+- status = 'paid' on order INSERT
+- tenant_id on every INSERT (Rule 0F)
+**Props:** `<POSScreen tenantId={str} />`
+**DB tables:** inventory_items (read), orders (write), order_items (write), stock_movements (write)
+**Nav:** HQ → Operations → POS Till (/hq?tab=hq-pos) · Also in TenantPortal Sales & Customers
+**DO NOT:** Use movement_type='sale_out'. Omit tenant_id on any INSERT.
+
+---
+
+### `EODCashUp.js` ✅ BUILT v1.0 (WP-EOD — 5249529)
+**File:** `src/components/hq/EODCashUp.js`
+**What it does:** End-of-day cash reconciliation. 3-step flow: set float → count cash → reconcile. Configurable thresholds from DB. 30-day history panel.
+**Step 1:** Set opening float — pre-filled from tenant_config.settings.eod_default_float, manager overrides
+**Step 2:** Count cash — SA denomination breakdown (R200/R100/R50/R20/R10 notes + R5/R2/R1 coins) OR lump sum toggle
+**Step 3:** Reconciliation — (system cash + float) vs counted cash
+- balanced (green): abs(variance) ≤ tolerance. No reason required.
+- flagged (amber): abs(variance) > tolerance. Reason required before close.
+- escalated (red): abs(variance) > escalation threshold. Owner approval required.
+**Config — ALL values from tenant_config.settings JSONB (NEVER hardcoded):**
+- eod_cash_variance_tolerance → amber flag (Medi Rec: 50)
+- eod_escalation_threshold → red escalation (Medi Rec: 200)
+- eod_default_float → pre-filled float (Medi Rec: 500)
+- eod_approver_role → approver (Medi Rec: 'owner')
+**To change threshold (no code change, no redeploy):**
+```sql
+UPDATE tenant_config SET settings = settings || '{"eod_cash_variance_tolerance": 100}'
+WHERE tenant_id = 'b1bad266-...';
+```
+**Props:** None. Reads tenantId from useTenant() internally.
+**DB tables:** tenant_config (settings read), orders (cash/card totals), pos_sessions (open/close), eod_cash_ups (reconciliation record)
+**Nav:** HQ → Operations → Cash-Up (/hq?tab=hq-eod)
+**DO NOT:** Hardcode any threshold value in the component. Omit tenant_id on INSERT (Rule 0F).
+
+---
+
 # SECTION 3 — SAFE TO BUILD
 ## Verified absent from disk as of March 27, 2026
 
@@ -563,6 +630,9 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 | Subdomain routing per client | — | Vercel wildcard config |
 | Self-service SaaS onboarding wizard | — | Stripe + auto-provision |
 | Stripe SaaS billing | — | Automated subscription management |
+| WP-DAILY-OPS Session C | WP-DAILY-OPS | History panel custom date range + 30-day revenue chart w/ day-of-week labels |
+| WP-REORDER Phase 2 | WP-REORDER | ProteaAI quantity suggestions based on sales velocity |
+| BUG-047: PlatformBar loyalty scope | — | ~30 min fix |
 
 ---
 
@@ -614,6 +684,7 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 | v146 | invoked customer_id on invoices table — column does not exist | Column not verified before use | LL-116 |
 | v146 | Used reference column on invoices — column does not exist | Column not verified before use | LL-116 |
 | v146 | Called reserve_stock() — function did not exist yet | DB function not verified before call | LL-117 |
+| v173 | POSScreen.js fully built but not in REGISTRY, not wired to nav | Audit assumed state without reading disk | LL-075 |
 
 ---
 
@@ -664,7 +735,7 @@ Both must be read before any build. This one first.
 
 ---
 
-*REGISTRY.md v3.0 · Protea Botanicals · March 27, 2026*
+*REGISTRY.md v3.1 · Protea Botanicals · April 4, 2026*
 *One lookup. Every session. Before everything else.*
 *LL-075: Session docs can lie. Disk never does. Always verify.*
 *LL-083: Truncated reads drop data silently. Always confirm line count before updating.*
