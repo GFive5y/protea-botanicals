@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('dotenv').config();
 /**
  * seed-demo-data.js — Generate 90 days of realistic demo data for Medi Recreational.
  *
@@ -8,16 +9,6 @@
  */
 
 const { createClient } = require("@supabase/supabase-js");
-const path = require("path");
-const fs = require("fs");
-
-// ── Load .env manually (no dotenv dependency) ──────────────────────────────
-const envPath = path.resolve(__dirname, "..", ".env");
-const envContent = fs.readFileSync(envPath, "utf8");
-envContent.split("\n").forEach((line) => {
-  const match = line.match(/^([^#=]+)=(.*)$/);
-  if (match) process.env[match[1].trim()] = match[2].trim();
-});
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
