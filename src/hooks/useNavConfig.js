@@ -49,6 +49,7 @@ const HQ_PAGES = [
     label: "POS Till",
     path: "/hq?tab=hq-pos",
   },
+  { group: "Operations", icon: "💰", label: "Cash-Up", path: "/hq?tab=hq-eod" },
   {
     group: "Operations",
     icon: "=",
@@ -188,7 +189,6 @@ const HQ_PAGES = [
 
 // ─── Admin: all 13 AdminDashboard tabs — grouped operational order ────────────
 const ADMIN_PAGES = [
-  // ── Operations ──────────────────────────────────────────────────────────────
   { group: "Operations", icon: "⌂", label: "Overview", path: "/admin" },
   {
     group: "Operations",
@@ -203,7 +203,6 @@ const ADMIN_PAGES = [
     label: "Shipments",
     path: "/admin?tab=shipments",
   },
-  // ── Customers ────────────────────────────────────────────────────────────────
   {
     group: "Customers",
     icon: "◉",
@@ -223,7 +222,6 @@ const ADMIN_PAGES = [
     label: "QR Codes",
     path: "/admin?tab=qr_codes",
   },
-  // ── Intelligence ─────────────────────────────────────────────────────────────
   {
     group: "Intelligence",
     icon: "▲",
@@ -242,7 +240,6 @@ const ADMIN_PAGES = [
     label: "Users",
     path: "/admin?tab=users",
   },
-  // ── Platform ─────────────────────────────────────────────────────────────────
   {
     group: "Platform",
     icon: "📄",
@@ -306,15 +303,11 @@ export function useNavConfig() {
   const initials = getInitialsFromEmail(userEmail);
   const displayName = userEmail || "User";
 
-  // ── Route-aware config ──
-  // Determine which section the user is currently in
   const path = location.pathname;
   const onAdmin = path.startsWith("/admin");
   const onHR = path.startsWith("/hr");
   const onStaff = path.startsWith("/staff");
-  // onHQ = anything else for HQ/hr users
 
-  // HQ users get route-specific nav so ALL sections remain accessible
   if (isHQ) {
     if (onAdmin) {
       return {
@@ -349,7 +342,6 @@ export function useNavConfig() {
         showDesktopBanner: false,
       };
     }
-    // Default: /hq and everything else
     return {
       pages: HQ_PAGES,
       title: "Protea HQ",
@@ -361,7 +353,6 @@ export function useNavConfig() {
     };
   }
 
-  // HR role (non-HQ)
   if (role === "hr") {
     if (onAdmin) {
       return {
@@ -385,7 +376,6 @@ export function useNavConfig() {
     };
   }
 
-  // Admin role
   if (role === "admin") {
     if (onHR) {
       return {
@@ -409,7 +399,6 @@ export function useNavConfig() {
     };
   }
 
-  // Staff / customer / retailer
   return {
     pages: STAFF_PAGES,
     title: "My Portal",

@@ -1,40 +1,20 @@
-// src/pages/HQDashboard.js v4.2
+// src/pages/HQDashboard.js v4.3
+// WP-EOD: EODCashUp tab added (hq-eod)
+// WP-DAILY-OPS: HQTradingDashboard + POSScreen wired (aa51b74)
 // WP-FNB S8: HQFoodIntelligence tab added
 // WP-Z: PlatformBar replaces AlertsBar — wired below LiveFXBar
-// ★ v4.0: WP-NAV Sub-B
-//   - useLocation + useEffect: reads ?tab= query param → syncs activeTab
-//   - Header simplified — h1 + "All Tabs Live" badge removed, sidebar provides context
-//   - Horizontal tab bar removed — sidebar handles all tab routing
-//   - Tenant switcher retained in header
-// v3.8: WP-X — LiveFXBar injected above tab content on every tab
-// v3.7: Removed "Production" tab — "HQ Production" is the canonical tab
-// v3.6: Tab 3 now renders HQProduction
-// v3.5: WP-8 Fraud tab added (17th tab)
-// v3.4: Loyalty tab added (WP-O)
-// v3.3: All ERP tabs — procurement, costing, pricing, p&l, reorder, documents
-// v3.1: Supply Chain + Production + Distribution + Shops
+// ★ v4.0: WP-NAV Sub-B — sidebar handles all tab routing
 
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 
-// ── Phase 2B ──────────────────────────────────────────────────────────────────
 import HQOverview from "../components/hq/HQOverview";
 import ShopManager from "../components/hq/ShopManager";
-
-// ── Phase 2C ──────────────────────────────────────────────────────────────────
 import SupplyChain from "../components/hq/SupplyChain";
-
-// ── Phase 2D ──────────────────────────────────────────────────────────────────
 import Distribution from "../components/hq/Distribution";
-
-// ── Phase 2E ──────────────────────────────────────────────────────────────────
 import HQAnalytics from "../components/hq/HQAnalytics";
-
-// ── Phase 2F ──────────────────────────────────────────────────────────────────
 import RetailerHealth from "../components/hq/RetailerHealth";
-
-// ── Import ERP (WP-A through WP-H) ───────────────────────────────────────────
 import HQSuppliers from "../components/hq/HQSuppliers";
 import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
 import HQCogs from "../components/hq/HQCogs";
@@ -49,6 +29,7 @@ import HQStock from "../components/hq/HQStock";
 import HQTransfer from "../components/hq/HQTransfer";
 import HQTradingDashboard from "../components/hq/HQTradingDashboard";
 import POSScreen from "../components/hq/POSScreen";
+import EODCashUp from "../components/hq/EODCashUp";
 import HQFoodIngredients from "../components/hq/HQFoodIngredients";
 import HQRecipeEngine from "../components/hq/HQRecipeEngine";
 import HQHaccp from "../components/hq/HQHaccp";
@@ -57,26 +38,15 @@ import HQNutritionLabel from "../components/hq/HQNutritionLabel";
 import HQColdChain from "../components/hq/HQColdChain";
 import HQRecall from "../components/hq/HQRecall";
 import HQFoodIntelligence from "../components/hq/HQFoodIntelligence";
-
-// ── WP-O ─────────────────────────────────────────────────────────────────────
 import HQLoyalty from "../components/hq/HQLoyalty";
-
-// ── WP-FIN S5+S6 ─────────────────────────────────────────────────────────────
 import HQBalanceSheet from "../components/hq/HQBalanceSheet";
-
-// ── WP-8 ─────────────────────────────────────────────────────────────────────
 import HQFraud from "../components/hq/HQFraud";
 import HQInvoices from "../components/hq/HQInvoices";
 import HQTenants from "../components/hq/HQTenants";
-
-// ── WP-X: Live FX Bar (untouched — permanent) ────────────────────────────────
 import LiveFXBar from "../components/hq/LiveFXBar";
-
-// ── WP-Z: Platform Intelligence Bar ──────────────────────────────────────────
 import PlatformBar from "../components/PlatformBar";
 import { PlatformBarProvider } from "../contexts/PlatformBarContext";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
   bg: "#faf9f6",
   warmBg: "#f4f0e8",
@@ -92,7 +62,6 @@ const C = {
 };
 
 const TABS = [
-  // Operations
   { id: "overview", label: "Overview", icon: "📊", ready: true },
   { id: "supply-chain", label: "Supply Chain", icon: "📦", ready: true },
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
@@ -104,6 +73,7 @@ const TABS = [
   { id: "hq-transfers", label: "Transfers", icon: "=", ready: true },
   { id: "hq-trading", label: "Daily Trading", icon: "📊", ready: true },
   { id: "hq-pos", label: "POS Till", icon: "🛒", ready: true },
+  { id: "hq-eod", label: "Cash-Up", icon: "💰", ready: true },
   { id: "hq-ingredients", label: "Ingredients", icon: "=", ready: true },
   { id: "hq-recipes", label: "Recipes", icon: "=", ready: true },
   { id: "hq-haccp", label: "HACCP", icon: "=", ready: true },
@@ -118,16 +88,13 @@ const TABS = [
     ready: true,
   },
   { id: "distribution", label: "Distribution", icon: "🚚", ready: true },
-  // Finance
   { id: "pricing", label: "Pricing", icon: "💲", ready: true },
   { id: "costing", label: "Costing", icon: "🧮", ready: true },
   { id: "pl", label: "P&L", icon: "📉", ready: true },
   { id: "balance-sheet", label: "Balance Sheet", icon: "⚖️", ready: true },
-  // Intelligence
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
   { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
   { id: "reorder", label: "Reorder", icon: "🔔", ready: true },
-  // Platform
   { id: "loyalty", label: "Loyalty", icon: "💎", ready: true },
   {
     id: "fraud",
@@ -139,7 +106,6 @@ const TABS = [
   { id: "documents", label: "Documents", icon: "📄", ready: true },
   { id: "medical", label: "Medical", ready: true },
   { id: "wholesale-orders", label: "Wholesale Orders", ready: true },
-  // People
   { id: "shops", label: "Shops", icon: "🏪", ready: true },
 ];
 
@@ -151,7 +117,6 @@ export default function HQDashboard() {
     useTenant();
   const location = useLocation();
 
-  // ★ v4.0: sync ?tab= query param from sidebar navigation
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
@@ -169,7 +134,6 @@ export default function HQDashboard() {
   return (
     <PlatformBarProvider>
       <div style={{ fontFamily: "Jost, sans-serif", color: C.text }}>
-        {/* ── Header — simplified, sidebar provides tier/role context ── */}
         <div
           style={{
             display: "flex",
@@ -199,12 +163,10 @@ export default function HQDashboard() {
               }}
             >
               {tenantName || "Protea Botanicals HQ"} — {allTenants.length}{" "}
-              tenant
-              {allTenants.length !== 1 ? "s" : ""} registered
+              tenant{allTenants.length !== 1 ? "s" : ""} registered
             </p>
           </div>
 
-          {/* Tenant Switcher — operator only (LL-173: isOperator not isHQ) */}
           {isOperator && allTenants.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span
@@ -278,13 +240,8 @@ export default function HQDashboard() {
           )}
         </div>
 
-        {/* ★ v4.0: Tab navigation removed — sidebar handles all tab routing */}
-
-        {/* ── Tab Content ── */}
         <div>
-          {/* v3.8: LiveFXBar — UNTOUCHED, permanent, never in scope */}
           <LiveFXBar />
-          {/* WP-Z: PlatformBar — replaces AlertsBar, wired immediately below LiveFXBar */}
           <PlatformBar role="hq" tenantId={tenant?.id} onNavigate={() => {}} />
 
           {activeTab === "overview" && (
@@ -312,6 +269,7 @@ export default function HQDashboard() {
           {activeTab === "hq-transfers" && <HQTransfer />}
           {activeTab === "hq-trading" && <HQTradingDashboard />}
           {activeTab === "hq-pos" && <POSScreen tenantId={tenant?.id} />}
+          {activeTab === "hq-eod" && <EODCashUp />}
           {activeTab === "hq-ingredients" && <HQFoodIngredients />}
           {activeTab === "hq-recipes" && <HQRecipeEngine />}
           {activeTab === "hq-haccp" && <HQHaccp />}
