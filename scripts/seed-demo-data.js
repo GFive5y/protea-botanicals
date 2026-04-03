@@ -252,11 +252,11 @@ async function main() {
         const lineTotal = round2(qty * price);
         orderTotal += lineTotal;
 
-        // stock_movements: quantity NEGATIVE for sales, movement_type = 'sale_pos'
+        // stock_movements: quantity NEGATIVE for sales, movement_type = 'sale_out'
         stockMovements.push({
           item_id: item.id,
           tenant_id: TENANT_ID,
-          movement_type: "sale_pos",
+          movement_type: "sale_out",
           quantity: -qty,
           unit_cost: item.weighted_avg_cost || null,
           notes: `POS ${payMethod} sale [${SEED_TAG}]`,
