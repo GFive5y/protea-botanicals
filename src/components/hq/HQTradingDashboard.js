@@ -27,7 +27,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
@@ -1995,3 +1994,4 @@ function HistKPI({ label, value }) {
     </div>
   );
 }
+
