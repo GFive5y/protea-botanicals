@@ -26,10 +26,6 @@ const SEED_TAG = "demo_seed_v1";
 const DAYS = 90;
 const RESET = process.argv.includes("--reset");
 
-// ── Fixed demo customer UUIDs (generated once, stable across runs) ──────────
-const DEMO_CUSTOMERS = Array.from({ length: 8 }, () => crypto.randomUUID());
-const DEMO_NAMES = ["Thabo", "Lerato", "Sipho", "Naledi", "Kagiso", "Zanele", "Bongani", "Palesa"];
-
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function uuid() {
   return crypto.randomUUID();
@@ -140,17 +136,6 @@ async function resetSeedData() {
     }
   }
 
-  // user_profiles — delete only seeded demo users by their known UUIDs
-  {
-    const { error, count } = await supabase
-      .from("user_profiles")
-      .delete({ count: "exact" })
-      .eq("tenant_id", TENANT_ID)
-      .like("full_name", `%${SEED_TAG}%`);
-    if (error) console.error(`  WARN: user_profiles delete: ${error.message}`);
-    else console.log(`  Deleted ${count ?? "?"} rows from user_profiles`);
-  }
-
   console.log("  Reset complete.\n");
 }
 
@@ -186,23 +171,29 @@ async function main() {
   console.log(`    Dead:    ${deadItems.map((i) => i.name.slice(0, 30)).join(", ")}`);
   console.log(`    Regular: ${regularItems.length} items\n`);
 
-  // ── 2. Seed user_profiles FIRST (orders.user_id is NOT NULL) ───────────
-  const userProfileRows = DEMO_CUSTOMERS.map((id, i) => ({
-    id,
-    tenant_id: TENANT_ID,
-    full_name: `${DEMO_NAMES[i]} Demo [${SEED_TAG}]`,
-    loyalty_points: randomBetween(50, 500),
-    loyalty_tier: pick(["Bronze", "Silver", "Gold"]),
-  }));
+  // ── 2. Fetch real user IDs (user_profiles.id is FK to auth.users) ───────
+  const { data: realUsers } = await supabase
+    .from("user_profiles")
+    .select("id")
+    .eq("tenant_id", TENANT_ID)
+    .limit(10);
 
-  {
-    const { error } = await supabase.from("user_profiles").upsert(userProfileRows, { onConflict: "id" });
-    if (error) {
-      console.error("  ERROR: user_profiles upsert:", error.message);
-      process.exit(1);
-    }
-    console.log(`  Seeding user_profiles... done (${userProfileRows.length} rows)`);
+  // Fallback: use any user in the system
+  let userIds = (realUsers || []).map((u) => u.id);
+  if (userIds.length === 0) {
+    const { data: anyUsers } = await supabase
+      .from("user_profiles")
+      .select("id")
+      .limit(5);
+    userIds = (anyUsers || []).map((u) => u.id);
   }
+
+  if (userIds.length === 0) {
+    console.error("  No users found — cannot seed orders. Log into the app first to create a user profile.");
+    process.exit(1);
+  }
+
+  console.log(`  Using ${userIds.length} real user(s) for orders.user_id`);
 
   // ── Month multipliers for ~15% MoM growth ─────────────────────────────
   const currentMonth = monthIndex(0);
@@ -220,7 +211,7 @@ async function main() {
   const loyaltyTxns = [];
   const priceHistoryRows = [];
 
-  const totals = { user_profiles: userProfileRows.length };
+  const totals = {};
   let orderCustomerIdx = 0; // round-robin counter
 
   // ── Day-by-day generation ──────────────────────────────────────────────
@@ -273,7 +264,7 @@ async function main() {
       const orderTime = dayISO(d, hour, minute);
 
       // Round-robin assign demo customer (orders.user_id is NOT NULL)
-      const customerId = DEMO_CUSTOMERS[orderCustomerIdx % DEMO_CUSTOMERS.length];
+      const customerId = userIds[orderCustomerIdx % userIds.length];
       orderCustomerIdx++;
 
       let orderTotal = 0;
@@ -379,7 +370,6 @@ async function main() {
   }
 
   // ── Insert in FK order ─────────────────────────────────────────────────
-  // user_profiles already inserted above
   totals.pos_sessions = await insertBatch("pos_sessions", posSessions);
   totals.eod_cash_ups = await insertBatch("eod_cash_ups", eodCashUps);
   totals.stock_movements = await insertBatch("stock_movements", stockMovements);
