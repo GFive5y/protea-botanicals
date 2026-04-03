@@ -4175,18 +4175,20 @@ function DetailView({
     }
     dragCol.current = key;
     e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", key);
   };
   const handleDragOver = (e, key) => {
-    if (key === "_row" || key === "_actions" || !dragCol.current) return;
+    if (key === "_row" || key === "_actions") return;
     e.preventDefault();
     setDragOverKey(key);
   };
   const handleDrop = (e, targetKey) => {
     e.preventDefault();
     setDragOverKey(null);
+    const sourceKey = e.dataTransfer.getData("text/plain") || dragCol.current;
     if (
-      !dragCol.current ||
-      dragCol.current === targetKey ||
+      !sourceKey ||
+      sourceKey === targetKey ||
       targetKey === "_row" ||
       targetKey === "_actions"
     ) {
@@ -4195,11 +4197,11 @@ function DetailView({
     }
     setColOrder((prev) => {
       const next = [...prev];
-      const fromIdx = next.indexOf(dragCol.current);
+      const fromIdx = next.indexOf(sourceKey);
       const toIdx = next.indexOf(targetKey);
       if (fromIdx < 0 || toIdx < 0) return prev;
       next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, dragCol.current);
+      next.splice(toIdx, 0, sourceKey);
       try {
         localStorage.setItem("nuai_col_order", JSON.stringify(next));
       } catch {}
@@ -4270,6 +4272,8 @@ function DetailView({
       }}
     >
       <table
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); setDragOverKey(null); dragCol.current = null; }}
         style={{
           borderCollapse: "collapse",
           width: totalWidth,
