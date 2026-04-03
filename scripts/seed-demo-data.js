@@ -95,6 +95,32 @@ async function resetSeedData() {
   console.log("\n=== RESET MODE: Deleting previous seed data ===\n");
 
   // Delete in reverse FK order
+  // order_items — no tenant_id, delete by seeded order IDs
+  {
+    const { data: seedOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("tenant_id", TENANT_ID)
+      .like("notes", `%${SEED_TAG}%`);
+    const seedOrderIds = (seedOrders || []).map((o) => o.id);
+    if (seedOrderIds.length > 0) {
+      let deleted = 0;
+      const BATCH = 200;
+      for (let i = 0; i < seedOrderIds.length; i += BATCH) {
+        const chunk = seedOrderIds.slice(i, i + BATCH);
+        const { error, count } = await supabase
+          .from("order_items")
+          .delete({ count: "exact" })
+          .in("order_id", chunk);
+        if (error) console.error(`  WARN: order_items delete: ${error.message}`);
+        else deleted += count ?? 0;
+      }
+      console.log(`  Deleted ${deleted} rows from order_items`);
+    } else {
+      console.log(`  Deleted 0 rows from order_items (no seeded orders found)`);
+    }
+  }
+
   const taggedTables = [
     { table: "price_history", col: "source" },
     { table: "loyalty_transactions", col: "description" },
@@ -208,6 +234,7 @@ async function main() {
   const eodCashUps = [];
   const stockMovements = [];
   const orderRows = [];
+  const orderItemRows = [];
   const loyaltyTxns = [];
   const priceHistoryRows = [];
 
@@ -310,6 +337,22 @@ async function main() {
         updated_at: orderTime,
       });
 
+      // order_items: one row per unique item in this order
+      for (const item of uniqueItems) {
+        const qty = randomBetween(1, 3);
+        const unitPrice = item.sell_price || 100;
+        orderItemRows.push({
+          id: uuid(),
+          order_id: orderId,
+          product_name: item.name,
+          quantity: qty,
+          unit_price: round2(unitPrice),
+          line_total: round2(qty * unitPrice),
+          product_metadata: { item_id: item.id, category: item.category },
+          created_at: orderTime,
+        });
+      }
+
       if (payMethod === "cash") dayCashTotal += orderTotal;
       else dayCardTotal += orderTotal;
       dayOrderCount++;
@@ -377,6 +420,7 @@ async function main() {
   totals.eod_cash_ups = await insertBatch("eod_cash_ups", eodCashUps);
   totals.stock_movements = await insertBatch("stock_movements", stockMovements);
   totals.orders = await insertBatch("orders", orderRows);
+  totals.order_items = await insertBatch("order_items", orderItemRows);
 
   console.log("  Seeding daily_summaries... SKIP (table does not exist yet)");
 
