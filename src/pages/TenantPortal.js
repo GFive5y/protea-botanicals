@@ -40,6 +40,9 @@ import AdminCommsCenter from "../components/AdminCommsCenter";
 import POSScreen from "../components/hq/POSScreen";
 import ExpenseManager from "../components/hq/ExpenseManager";
 import SmartInventory from "../components/hq/SmartInventory";
+import HQTradingDashboard from "../components/hq/HQTradingDashboard";
+import EODCashUp from "../components/hq/EODCashUp";
+import HQBalanceSheet from "../components/hq/HQBalanceSheet";
 
 const T = {
   bg: "#FAFAF9",
@@ -100,6 +103,25 @@ const WATERFALL = [
         id: "documents",
         label: "Documents",
         desc: "Upload invoice → auto-process",
+      },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Daily Operations",
+    emoji: "📊",
+    color: "#1A3D2B",
+    roles: ["owner", "manager"],
+    tabs: [
+      {
+        id: "trading",
+        label: "Daily Trading",
+        desc: "Today's revenue · top sellers · 30-day chart",
+      },
+      {
+        id: "cashup",
+        label: "Cash-Up",
+        desc: "End of day · till reconciliation · variance",
       },
     ],
   },
@@ -194,6 +216,11 @@ const WATERFALL = [
         label: "Reorder",
         desc: "Stock alerts · procurement triggers",
       },
+      {
+        id: "balance-sheet",
+        label: "Balance Sheet",
+        desc: "Assets · liabilities · cash flow",
+      },
     ],
   },
   {
@@ -265,6 +292,24 @@ const CANNABIS_RETAIL_WATERFALL = [
         id: "documents",
         label: "Documents",
         desc: "Upload invoice → AI extracts costs",
+      },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Daily Operations",
+    emoji: "📊",
+    color: "#1A3D2B",
+    tabs: [
+      {
+        id: "trading",
+        label: "Daily Trading",
+        desc: "Today's revenue · top sellers · 30-day chart",
+      },
+      {
+        id: "cashup",
+        label: "Cash-Up",
+        desc: "End of day · till reconciliation · variance",
       },
     ],
   },
@@ -345,6 +390,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Reorder",
         desc: "Stock alerts · procurement triggers",
       },
+      {
+        id: "balance-sheet",
+        label: "Balance Sheet",
+        desc: "Assets · liabilities · cash flow",
+      },
     ],
   },
   {
@@ -376,6 +426,7 @@ const ROLE_SECTIONS = {
   owner: [
     "home",
     "procurement",
+    "operations",
     "production",
     "distribution",
     "sales",
@@ -385,6 +436,7 @@ const ROLE_SECTIONS = {
   manager: [
     "home",
     "procurement",
+    "operations",
     "production",
     "distribution",
     "sales",
@@ -471,6 +523,12 @@ function renderTab(tabId, tenantId, industryProfile) {
       return <AdminCustomerEngagement tenantId={tenantId} />;
     case "comms":
       return <AdminCommsCenter tenantId={tenantId} />;
+    case "trading":
+      return <HQTradingDashboard tenantId={tenantId} />;
+    case "cashup":
+      return <EODCashUp tenantId={tenantId} />;
+    case "balance-sheet":
+      return <HQBalanceSheet />;
     default:
       return (
         <div
