@@ -1174,7 +1174,7 @@ export default function HQPricing() {
                   }}
                 >
                   {channelMargins.length > 0 && (
-                    <ChartCard title="Avg Margin by Channel" height={220}>
+                    <ChartCard title="Avg Margin by Channel" subtitle="Gross margin % �� reference lines at 20% and 35%" accent="green" height={240}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={channelMargins}
@@ -1235,7 +1235,9 @@ export default function HQPricing() {
                           <Bar
                             dataKey="avg"
                             name="Avg Margin"
-                            isAnimationActive={false}
+                            isAnimationActive={true}
+                            animationDuration={600}
+                            animationEasing="ease-out"
                             maxBarSize={28}
                             radius={[0, 3, 3, 0]}
                           >
@@ -1258,7 +1260,7 @@ export default function HQPricing() {
                   )}
 
                   {scatterData.length > 1 && (
-                    <ChartCard title="Price vs Margin (all SKUs)" height={220}>
+                    <ChartCard title="Price vs Margin" subtitle="All SKUs · coloured by channel" accent="blue" height={240}>
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart
                           margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
