@@ -384,6 +384,24 @@ THEN respond with verified, accurate information
 
 ---
 
+## LL-200 — CANNABIS REFS BANNED ON PUBLIC/YOCO PAGES (RESTORED from LL-124)
+Zero cannabis references on any public-facing page or Yoco integration point.
+Visa/Mastercard network rules prohibit cannabis-related payment processing.
+Applies to: storefront, checkout, Yoco pages, email receipts, unauthenticated URLs.
+Banned words: cannabis, weed, ganja, bud, flower, THC, CBD, dagga, strain names,
+any category name implying cannabis. Use neutral language: "products", "items".
+Original text: LL-124 in LL-ARCHIVE_v1_0.md (lines 207-209).
+Restored: April 5, 2026.
+
+## LL-201 — YOCO SDK IS NATIVE MOBILE ONLY (RESTORED from LL-125)
+Yoco in-person payment SDK = Android and iOS native only. CANNOT run in React web.
+Web payment integration must use Yoco hosted payment portal redirect flow.
+Never import or bundle Yoco SDK into React/Next.js.
+Original text: LL-125 in LL-ARCHIVE_v1_0.md (lines 211-213).
+Restored: April 5, 2026.
+
+---
+
 *SESSION-CORE v2.11 · NuAi · April 4, 2026*
 *v2.11: LL-196 through LL-199*
 *  LL-196: WP-VISUAL typography banned patterns + required patterns*
