@@ -884,8 +884,9 @@ export default function HQPurchaseOrders({
               margin: 0,
               fontSize: 22,
               fontFamily: T.fontUi,
-              fontWeight: 300,
+              fontWeight: 600,
               color: T.ink900,
+              letterSpacing: "-0.01em",
             }}
           >
             Procurement
@@ -976,7 +977,7 @@ export default function HQPurchaseOrders({
                 style={{
                   fontFamily: T.fontData,
                   fontSize: 26,
-                  fontWeight: 400,
+                  fontWeight: 600,
                   color,
                   lineHeight: 1,
                 }}
@@ -1037,7 +1038,7 @@ export default function HQPurchaseOrders({
                 marginBottom: 20,
               }}
             >
-              <ChartCard title="PO Pipeline — Status Breakdown" height={220}>
+              <ChartCard title="PO Pipeline" subtitle="Purchase orders by current status" accent="blue" height={240}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={statusBarData}
@@ -1081,7 +1082,9 @@ export default function HQPurchaseOrders({
                     <Bar
                       dataKey="count"
                       name="POs"
-                      isAnimationActive={false}
+                      isAnimationActive={true}
+                      animationDuration={600}
+                      animationEasing="ease-out"
                       maxBarSize={36}
                       radius={[3, 3, 0, 0]}
                     >
@@ -1093,7 +1096,7 @@ export default function HQPurchaseOrders({
                 </ResponsiveContainer>
               </ChartCard>
 
-              <ChartCard title="Landed Cost by Supplier (ZAR)" height={220}>
+              <ChartCard title="Supplier Spend" subtitle="Landed cost by supplier · ZAR" accent="green" height={240}>
                 {spendData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1105,7 +1108,8 @@ export default function HQPurchaseOrders({
                         outerRadius={78}
                         dataKey="value"
                         paddingAngle={3}
-                        isAnimationActive={false}
+                        isAnimationActive={true}
+                        animationDuration={600}
                       >
                         {spendData.map((_, i) => (
                           <Cell
