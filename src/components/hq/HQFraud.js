@@ -375,7 +375,7 @@ function StatGrid({ stats }) {
             style={{
               fontFamily: T.font,
               fontSize: 22,
-              fontWeight: 400,
+              fontWeight: 600,
               color: s.color,
               lineHeight: 1,
               letterSpacing: "-0.02em",
@@ -2111,7 +2111,7 @@ export default function HQFraud() {
                         <div
                           style={{
                             fontSize: 24,
-                            fontWeight: 400,
+                            fontWeight: 600,
                             color: cfg.color,
                             fontFamily: T.font,
                             fontVariantNumeric: "tabular-nums",

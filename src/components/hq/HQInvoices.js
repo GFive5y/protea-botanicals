@@ -1122,7 +1122,7 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                   style={{
                     fontFamily: T.mono,
                     fontSize: 22,
-                    fontWeight: 400,
+                    fontWeight: 600,
                     color: m.color,
                     lineHeight: 1,
                   }}
