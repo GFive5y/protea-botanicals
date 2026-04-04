@@ -1186,6 +1186,249 @@ function EntriesDrawer({ timesheet, staffName, tenantId, onClose, onSaved }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TIMESHEET SETUP WIZARD
+// Shown when tenant has no timesheets yet.
+// Creates first timesheet and auto-opens the entries drawer.
+// ═══════════════════════════════════════════════════════════════════════════════
+function TimesheetSetupWizard({ staffList, tenantId, onCreated, onSkip }) {
+  const [staffId, setStaffId] = useState(staffList[0]?.id || "");
+  const [periodStart, setPeriodStart] = useState(getMonday());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const periodEnd = getSunday(periodStart);
+
+  async function handleCreate() {
+    if (!staffId || !periodStart) return;
+    setSaving(true);
+    setError(null);
+    try {
+      // Duplicate check
+      const { data: existing } = await supabase
+        .from("timesheets")
+        .select("id")
+        .eq("staff_profile_id", staffId)
+        .eq("period_start", periodStart)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (existing) {
+        setError("A timesheet for this staff member and week already exists.");
+        setSaving(false);
+        return;
+      }
+
+      const { data, error: err } = await supabase
+        .from("timesheets")
+        .insert({
+          tenant_id: tenantId,
+          staff_profile_id: staffId,
+          period_start: periodStart,
+          period_end: periodEnd,
+          status: "draft",
+        })
+        .select()
+        .single();
+
+      if (err) throw err;
+      onCreated(data); // parent opens EntriesDrawer immediately
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
+  }
+
+  const inp = {
+    padding: "10px 14px", border: `1px solid ${T.ink150}`, borderRadius: 8,
+    fontSize: 13, fontFamily: T.font, color: T.ink900, outline: "none",
+    width: "100%", boxSizing: "border-box", background: "#fff",
+  };
+  const lbl = {
+    display: "block", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+    textTransform: "uppercase", color: T.ink400, fontFamily: T.font, marginBottom: 6,
+  };
+
+  // No staff guard
+  if (staffList.length === 0) {
+    return (
+      <div style={{
+        background: "#fff", border: `1px solid ${T.ink150}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+      }}>
+        <div style={{ background: T.accent, padding: "28px 32px 24px", color: "#fff" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.7, marginBottom: 8 }}>
+            Timesheets · Getting started
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
+            Add staff before tracking hours
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
+            Timesheets are linked to staff profiles.
+            You need at least one active staff member before you can track hours.
+          </div>
+        </div>
+        <div style={{ padding: "28px 32px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+            {[
+              { num: "1", text: "Add staff profiles in the Staff tab" },
+              { num: "2", text: "Come back here to create timesheets" },
+              { num: "3", text: "Add daily clock-in / clock-out entries" },
+            ].map(({ num, text }) => (
+              <div key={num} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: T.ink150, color: T.ink500,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, fontWeight: 700, flexShrink: 0,
+                }}>
+                  {num}
+                </div>
+                <span style={{ fontSize: 12, color: T.ink500, fontFamily: T.font, lineHeight: 1.4 }}>
+                  {text}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            padding: "14px 18px", borderRadius: 8,
+            background: T.accentLit, border: `1px solid ${T.accentBd}`,
+            fontSize: 12, color: T.accent, fontFamily: T.font,
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <span style={{ fontSize: 18 }}>👉</span>
+            Go to the <strong>Staff tab</strong> in the navigation bar above to add your first team member.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      background: "#fff", border: `1px solid ${T.ink150}`,
+      borderRadius: 12, overflow: "hidden",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+    }}>
+      {/* Header */}
+      <div style={{ background: T.accent, padding: "28px 32px 24px", color: "#fff" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.7, marginBottom: 8 }}>
+          Timesheets Setup · Step 1 of 2
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
+          Create your first timesheet
+        </div>
+        <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
+          A timesheet covers one week (Monday to Sunday) for one staff member.
+          After creating it you'll add the daily clock-in and clock-out times.
+        </div>
+
+        {/* Step indicator */}
+        <div style={{ marginTop: 20, display: "flex", gap: 6, alignItems: "center" }}>
+          {["Create Timesheet", "Add Hours"].map((label, i) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: i === 0 ? "#fff" : "rgba(255,255,255,0.25)",
+                color: i === 0 ? T.accent : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, flexShrink: 0,
+              }}>
+                {i + 1}
+              </div>
+              <span style={{ fontSize: 11, fontWeight: i === 0 ? 700 : 400, opacity: i === 0 ? 1 : 0.6 }}>
+                {label}
+              </span>
+              {i < 1 && <div style={{ width: 24, height: 1, background: "rgba(255,255,255,0.3)" }} />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form body */}
+      <div style={{ padding: "28px 32px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
+          <div>
+            <label style={lbl}>Staff member *</label>
+            <select value={staffId} onChange={e => setStaffId(e.target.value)} style={inp}>
+              {staffList.map(st => (
+                <option key={st.id} value={st.id}>
+                  {st.preferred_name || st.full_name}
+                  {st.job_title ? ` — ${st.job_title}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Week starting (Monday) *</label>
+            <input
+              type="date"
+              value={periodStart}
+              onChange={e => setPeriodStart(e.target.value)}
+              style={inp}
+            />
+            {periodStart && (
+              <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font, marginTop: 5 }}>
+                Period: {fmtDate(periodStart)} — {fmtDate(periodEnd)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* What happens next */}
+        <div style={{
+          padding: "14px 18px", borderRadius: 8, marginBottom: 24,
+          background: T.accentLit, border: `1px solid ${T.accentBd}`,
+          fontSize: 12, color: T.accent, fontFamily: T.font, lineHeight: 1.6,
+        }}>
+          <strong>What happens next:</strong> After clicking Create, a daily entry
+          sheet opens immediately so you can log this week's hours straight away.
+          Each day shows clock-in, clock-out, break time, and hours calculated
+          automatically.
+        </div>
+
+        {error && (
+          <div style={{
+            padding: "10px 14px", borderRadius: 8, marginBottom: 16,
+            background: T.dangerBg, border: `1px solid ${T.dangerBd}`,
+            fontSize: 12, color: T.danger, fontFamily: T.font,
+          }}>
+            ⚠ {error}
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button
+            onClick={onSkip}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 12, color: T.ink400, fontFamily: T.font,
+              textDecoration: "underline",
+            }}
+          >
+            Skip — I'll do this later
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={saving || !staffId || !periodStart}
+            style={{
+              padding: "12px 28px", borderRadius: 8, border: "none",
+              background: staffId && periodStart ? T.accent : T.ink150,
+              color: "#fff", fontWeight: 700, fontSize: 13,
+              fontFamily: T.font,
+              cursor: staffId && periodStart ? "pointer" : "not-allowed",
+              opacity: saving ? 0.7 : 1, transition: "background 0.15s",
+            }}
+          >
+            {saving ? "Creating…" : "Create timesheet and add hours →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SUB-TAB: TIMESHEETS LIST
 // ═══════════════════════════════════════════════════════════════════════════════
 function TimesheetsList({ tenantId, staffList }) {
@@ -1623,29 +1866,19 @@ function TimesheetsList({ tenantId, staffList }) {
         </div>
       )}
 
-      {/* Table */}
+      {/* Table / Wizard */}
       {loading ? (
         <div style={s.emptyState}>Loading timesheets…</div>
       ) : timesheets.length === 0 ? (
-        <div style={s.emptyState}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>⏱</div>
-          <div
-            style={{
-              fontFamily: T.font,
-              fontSize: 15,
-              color: T.ink400,
-              marginBottom: 6,
-            }}
-          >
-            No timesheets yet
-          </div>
-          <div style={{ fontSize: 12, color: "#ccc", marginBottom: 20 }}>
-            Create a timesheet to start tracking hours for your team
-          </div>
-          <button style={s.btn(C.green)} onClick={() => setShowNew(true)}>
-            + Create First Timesheet
-          </button>
-        </div>
+        <TimesheetSetupWizard
+          staffList={staffList}
+          tenantId={tenantId}
+          onCreated={(newTs) => {
+            load();          // refresh list
+            setViewingEntries(newTs); // auto-open entries drawer (step 2)
+          }}
+          onSkip={() => setShowNew(true)} // fall back to existing modal
+        />
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={s.table}>
