@@ -2096,7 +2096,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                 marginBottom: 20,
               }}
             >
-              <ChartCard title="Points Issued vs Redeemed" height={200}>
+              <ChartCard title="Points Issued vs Redeemed" subtitle="All time vs last 30 days" accent="green" height={220}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={barData}
@@ -2113,12 +2113,12 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                         <stop
                           offset="5%"
                           stopColor={T.accentMid}
-                          stopOpacity={0.2}
+                          stopOpacity={0.42}
                         />
                         <stop
                           offset="95%"
                           stopColor={T.accentMid}
-                          stopOpacity={0}
+                          stopOpacity={0.02}
                         />
                       </linearGradient>
                       <linearGradient
@@ -2131,9 +2131,9 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                         <stop
                           offset="5%"
                           stopColor={T.info}
-                          stopOpacity={0.15}
+                          stopOpacity={0.35}
                         />
-                        <stop offset="95%" stopColor={T.info} stopOpacity={0} />
+                        <stop offset="95%" stopColor={T.info} stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid
@@ -2196,7 +2196,9 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                       strokeWidth={2}
                       fill="url(#loy-iss-grad)"
                       dot={{ r: 4, fill: T.accentMid }}
-                      isAnimationActive={false}
+                      isAnimationActive={true}
+                      animationDuration={700}
+                      animationEasing="ease-out"
                     />
                     <Area
                       type="monotone"
@@ -2211,7 +2213,7 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
-              <ChartCard title="Points Balance" height={200}>
+              <ChartCard title="Points Balance" subtitle="Redeemed vs outstanding" accent="purple" height={220}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -2222,7 +2224,8 @@ function TabEconomics({ draft, setDraft, liveStats }) {
                       outerRadius={76}
                       dataKey="value"
                       paddingAngle={4}
-                      isAnimationActive={false}
+                      isAnimationActive={true}
+                      animationDuration={600}
                     >
                       {donutData.map((_, i) => (
                         <Cell

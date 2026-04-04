@@ -1065,7 +1065,7 @@ function OverviewAnalytics({ data, industryProfile }) {
 
       {/* ── CHART #1: Revenue Trend — Line (via Area fill=none) ── */}
       {revTrendData.length >= 2 && (
-        <ChartCard title="Revenue Trend — Last 30 Days" height={220}>
+        <ChartCard title="Revenue Trend" subtitle="Daily orders · last 30 days" accent="green" height={240}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={revTrendData}
@@ -1073,8 +1073,8 @@ function OverviewAnalytics({ data, industryProfile }) {
             >
               <defs>
                 <linearGradient id="an-rev-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={T.accent} stopOpacity={0.12} />
-                  <stop offset="95%" stopColor={T.accent} stopOpacity={0} />
+                  <stop offset="5%" stopColor={T.accent} stopOpacity={0.42} />
+                  <stop offset="95%" stopColor={T.accent} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid
@@ -1117,7 +1117,9 @@ function OverviewAnalytics({ data, industryProfile }) {
                 strokeWidth={2}
                 fill="url(#an-rev-grad)"
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true}
+                animationDuration={800}
+                animationEasing="ease-out"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -1140,7 +1142,7 @@ function OverviewAnalytics({ data, industryProfile }) {
             .map(([date, count]) => ({ date, count }));
           if (trendData.length < 2) return null;
           return (
-            <ChartCard title="Scan Activity — Last 14 Days" height={200}>
+            <ChartCard title="Scan Activity" subtitle="QR scans · last 14 days" accent="teal" height={220}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={trendData}
@@ -1151,12 +1153,12 @@ function OverviewAnalytics({ data, industryProfile }) {
                       <stop
                         offset="5%"
                         stopColor={T.accentMid}
-                        stopOpacity={0.18}
+                        stopOpacity={0.4}
                       />
                       <stop
                         offset="95%"
                         stopColor={T.accentMid}
-                        stopOpacity={0}
+                        stopOpacity={0.02}
                       />
                     </linearGradient>
                   </defs>
@@ -1205,8 +1207,10 @@ function OverviewAnalytics({ data, industryProfile }) {
       {/* ── CHART #4: Grouped Bar — current vs prior 7d by QR type ── */}
       {groupedBarData.length > 0 && (
         <ChartCard
-          title="Scan Volume — Current vs Prior 7 Days by Type"
-          height={220}
+          title="Scan Volume — 7-Day Comparison"
+          subtitle="Current week vs prior week by type"
+          accent="blue"
+          height={240}
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -1275,7 +1279,7 @@ function OverviewAnalytics({ data, industryProfile }) {
 
       {/* ── CHART #6: Stacked Bar — scan outcomes by week ── */}
       {stackedBarData.length >= 2 && stackedOutcomes.length > 0 && (
-        <ChartCard title="Scan Outcomes by Week — Stacked" height={220}>
+        <ChartCard title="Weekly Scan Outcomes" subtitle="Stacked by outcome type" accent="purple" height={240}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={stackedBarData}
@@ -1354,7 +1358,7 @@ function OverviewAnalytics({ data, industryProfile }) {
           const COLOURS = [T.success, T.info, T.accentMid, "#92400E", T.ink400];
           if (pieData.length < 2) return <div />;
           return (
-            <ChartCard title="Inventory by Category" height={220}>
+            <ChartCard title="Inventory Mix" subtitle="SKU count by category" accent="amber" height={240}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -1365,7 +1369,8 @@ function OverviewAnalytics({ data, industryProfile }) {
                     outerRadius={82}
                     dataKey="value"
                     paddingAngle={3}
-                    isAnimationActive={false}
+                    isAnimationActive={true}
+                    animationDuration={600}
                   >
                     {pieData.map((_, i) => (
                       <Cell key={i} fill={COLOURS[i % COLOURS.length]} />
@@ -1411,7 +1416,7 @@ function OverviewAnalytics({ data, industryProfile }) {
           };
           if (barData.length === 0) return <div />;
           return (
-            <ChartCard title="Production Runs by Status" height={220}>
+            <ChartCard title="Production Status" subtitle="Runs by current status" accent="teal" height={240}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={barData}
@@ -2646,7 +2651,7 @@ function ScansAnalytics({ data, industryProfile }) {
         const trendData = Object.values(dayMap).slice(-20);
         if (trendData.length < 2) return null;
         return (
-          <ChartCard title="Scan Activity — Daily Trend" height={260}>
+          <ChartCard title="Scan Activity" subtitle="Daily scans + points overlay" accent="teal" height={280}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={trendData}
@@ -2657,12 +2662,12 @@ function ScansAnalytics({ data, industryProfile }) {
                     <stop
                       offset="5%"
                       stopColor={T.accentMid}
-                      stopOpacity={0.18}
+                      stopOpacity={0.4}
                     />
                     <stop
                       offset="95%"
                       stopColor={T.accentMid}
-                      stopOpacity={0}
+                      stopOpacity={0.02}
                     />
                   </linearGradient>
                 </defs>
@@ -2747,7 +2752,7 @@ function ScansAnalytics({ data, industryProfile }) {
           const barColors = [T.success, T.warning, T.ink400, T.danger];
           if (barData.length < 2) return null;
           return (
-            <ChartCard title="Scan Outcomes by QR Type" height={220}>
+            <ChartCard title="Outcomes by QR Type" subtitle="Stacked scan outcomes" accent="purple" height={240}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={barData}
@@ -3168,17 +3173,28 @@ function KPI({ label, value, semantic, sub }) {
     danger: T.danger,
     info: T.info,
   };
+  const semBorder = {
+    success: "#16A34A",
+    warning: "#D97706",
+    danger: "#DC2626",
+    info: "#2563EB",
+  };
   const color = semantic ? semC[semantic] : T.ink900;
+  const borderColor = semantic ? semBorder[semantic] : "transparent";
   return (
-    <div style={{ background: "#fff", padding: "16px 18px" }}>
+    <div style={{
+      background: "#fff",
+      padding: "16px 18px",
+      borderLeft: `3px solid ${borderColor}`,
+    }}>
       <div
         style={{
           fontSize: "10px",
           fontWeight: 700,
-          letterSpacing: "0.1em",
+          letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: T.ink400,
-          marginBottom: 6,
+          color: "#6B7280",
+          marginBottom: 8,
           fontFamily: T.fontUi,
         }}
       >
@@ -3187,11 +3203,12 @@ function KPI({ label, value, semantic, sub }) {
       <div
         style={{
           fontFamily: T.fontData,
-          fontSize: "24px",
-          fontWeight: 400,
+          fontSize: "22px",
+          fontWeight: 600,
           color,
           lineHeight: 1,
           letterSpacing: "-0.02em",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
@@ -3199,9 +3216,9 @@ function KPI({ label, value, semantic, sub }) {
       {sub && (
         <div
           style={{
-            color: T.ink500,
+            color: "#9CA3AF",
             fontSize: 10,
-            marginTop: 2,
+            marginTop: 3,
             fontFamily: T.fontUi,
           }}
         >
