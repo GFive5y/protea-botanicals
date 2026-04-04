@@ -10,8 +10,15 @@
 //   - No in-memory estimates — every line traces to a DB row
 
 import { useState, useEffect, useCallback } from "react";
+import {
+  PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, ComposedChart,
+  ReferenceLine,
+} from "recharts";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { ChartCard, ChartTooltip } from "../viz";
 
 // ── Design tokens (matches HQCogs/HQPricing) ──────────────────────────────────
 const T = {
@@ -787,6 +794,75 @@ export default function HQBalanceSheet() {
                 />
               </div>
 
+              {/* ── CHARTS: Asset Composition + Capital Structure ── */}
+              {totalAssets > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+
+                  {/* Asset Composition Donut */}
+                  <ChartCard title="Asset Composition" subtitle="Current vs fixed assets" accent="green" height={220}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "Inventory", value: Math.round(inventoryValue) },
+                            { name: "Receivables", value: Math.round(receivables) },
+                            { name: "Fixed Assets", value: Math.round(totalCapex) },
+                          ].filter(d => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={82}
+                          dataKey="value"
+                          paddingAngle={3}
+                          isAnimationActive={true}
+                          animationDuration={600}
+                        >
+                          {["#1A3D2B","#2563EB","#D97706"].map((c, i) => (
+                            <Cell key={i} fill={c} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<ChartTooltip formatter={(v) => `R${v.toLocaleString("en-ZA")}`} />} />
+                        <Legend
+                          iconSize={8}
+                          iconType="square"
+                          formatter={(v) => (
+                            <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>{v}</span>
+                          )}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                  {/* Capital Structure Bar */}
+                  <ChartCard title="Capital Structure" subtitle="Assets vs Liabilities vs Equity" accent="blue" height={220}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={[
+                          {
+                            name: "Balance",
+                            Assets: Math.round(totalAssets),
+                            Liabilities: Math.round(totalLiabilities),
+                            Equity: Math.round(netEquity > 0 ? netEquity : 0),
+                          }
+                        ]}
+                        margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                        barCategoryGap="40%"
+                      >
+                        <CartesianGrid horizontal vertical={false} stroke={T.ink150} strokeWidth={0.5} />
+                        <XAxis dataKey="name" tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} width={62} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
+                        <Tooltip content={<ChartTooltip formatter={(v) => `R${v.toLocaleString("en-ZA")}`} />} />
+                        <Legend iconSize={8} iconType="square" formatter={(v) => <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>{v}</span>} />
+                        <Bar dataKey="Assets" fill="#1A3D2B" radius={[4,4,0,0]} maxBarSize={48} isAnimationActive={true} animationDuration={700} />
+                        <Bar dataKey="Liabilities" fill="#DC2626" radius={[4,4,0,0]} maxBarSize={48} isAnimationActive={true} animationDuration={700} />
+                        <Bar dataKey="Equity" fill="#16A34A" radius={[4,4,0,0]} maxBarSize={48} isAnimationActive={true} animationDuration={700} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+
+                </div>
+              )}
+
               <div
                 style={{
                   display: "grid",
@@ -1098,6 +1174,43 @@ export default function HQBalanceSheet() {
                   color={T.info}
                 />
               </div>
+
+              {/* Cash Flow Waterfall */}
+              {cfData.cashFromCustomers > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <ChartCard title="Cash Flow Waterfall" subtitle="Operating inflows vs outflows vs investing" accent="teal" height={280}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={[
+                          { label: "Customer Cash", offset: 0, display: Math.round(cfData.cashFromCustomers), type: "positive" },
+                          { label: "Supplier Cost", offset: Math.round(cfData.cashFromCustomers - cfData.cashToSuppliers), display: Math.round(cfData.cashToSuppliers), type: "negative" },
+                          { label: "OpEx", offset: Math.round(cfData.cashFromCustomers - cfData.cashToSuppliers - cfData.opexPaid), display: Math.round(cfData.opexPaid), type: "negative" },
+                          { label: "Net Operating", offset: 0, display: Math.abs(Math.round(cfData.netOperating)), type: "total" },
+                          { label: "CapEx", offset: Math.max(0, Math.round(cfData.netOperating) - Math.round(cfData.capexPaid)), display: Math.round(cfData.capexPaid), type: "negative" },
+                          { label: "Net Cash", offset: 0, display: Math.abs(Math.round(cfData.netCash)), type: cfData.netCash >= 0 ? "positive" : "negative" },
+                        ]}
+                        margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                      >
+                        <CartesianGrid horizontal vertical={false} stroke={T.ink150} strokeWidth={0.5} />
+                        <XAxis dataKey="label" tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }} axisLine={false} tickLine={false} dy={6} />
+                        <YAxis tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }} axisLine={false} tickLine={false} width={62} tickFormatter={(v) => `R${(v/1000).toFixed(0)}k`} />
+                        <Tooltip content={<ChartTooltip formatter={(v, n) => n === "display" ? `R${v.toLocaleString("en-ZA")}` : null} labelFormatter={(l) => l} />} />
+                        <ReferenceLine y={0} stroke={T.ink150} strokeWidth={1} />
+                        <Bar dataKey="offset" stackId="cf" fill="transparent" isAnimationActive={false} />
+                        <Bar dataKey="display" stackId="cf" isAnimationActive={true} animationDuration={700} maxBarSize={56}
+                          shape={(props) => {
+                            const { x, y, width, height, index } = props;
+                            const types = ["positive","negative","negative","total","negative",cfData.netCash >= 0 ? "positive" : "negative"];
+                            const colors = { positive: "#16A34A", negative: "#DC2626", total: "#1A3D2B" };
+                            if (!height || height <= 0) return null;
+                            return <rect x={x} y={y} width={width} height={height} fill={colors[types[index]] || T.accentMid} rx={4} ry={4} />;
+                          }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                </div>
+              )}
 
               <div
                 style={{
