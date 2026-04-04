@@ -2840,8 +2840,10 @@ function OverviewPanel({
               }}
             >
               <ChartCard
-                title="Batch Yield History (last 10 runs)"
-                height={200}
+                title="Batch Yield History"
+                subtitle="Last 10 runs · dots turn amber below 95%"
+                accent="green"
+                height={220}
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -2896,13 +2898,15 @@ function OverviewPanel({
                           />
                         );
                       }}
-                      isAnimationActive={false}
+                      isAnimationActive={true}
+                      animationDuration={700}
+                      animationEasing="ease-out"
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </ChartCard>
 
-              <ChartCard title="Monthly Production Output" height={200}>
+              <ChartCard title="Monthly Output" subtitle="Units produced per month · current month highlighted" accent="teal" height={220}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={monthlyData}
@@ -2943,7 +2947,9 @@ function OverviewPanel({
                       dataKey="units"
                       name="Units"
                       fill={T.accentMid}
-                      isAnimationActive={false}
+                      isAnimationActive={true}
+                      animationDuration={600}
+                      animationEasing="ease-out"
                       maxBarSize={40}
                       radius={[3, 3, 0, 0]}
                     >

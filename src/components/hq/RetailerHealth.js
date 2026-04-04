@@ -114,17 +114,21 @@ function marginLabel(pct) {
 const sCard = {
   background: C.white,
   border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  borderRadius: "10px",
   padding: "20px",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)",
 };
 const sLabel = {
-  fontSize: "9px",
-  letterSpacing: "0.3em",
+  fontSize: "10px",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: "8px",
+  color: "#374151",
+  marginBottom: "12px",
   fontFamily: F.body,
   fontWeight: 700,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
 };
 
 function fmtDate(d) {
@@ -498,7 +502,8 @@ function RetailerCard({
       style={{
         ...sCard,
         borderTop: `3px solid ${tier.color}`,
-        transition: "box-shadow 0.2s",
+        borderRadius: 10,
+        transition: "box-shadow 0.2s ease",
         cursor: "pointer",
       }}
       onMouseEnter={(e) =>
@@ -647,7 +652,7 @@ function DetailModal({ tenant, scoreData, marginData, onClose }) {
       <div
         style={{
           background: C.white,
-          borderRadius: 2,
+          borderRadius: 12,
           padding: 32,
           maxWidth: 600,
           width: "90%",
@@ -1440,9 +1445,11 @@ export default function RetailerHealth() {
           <h2
             style={{
               fontFamily: F.heading,
-              fontSize: 24,
-              color: C.primaryDark,
+              fontSize: 22,
+              fontWeight: 600,
+              color: T.ink900,
               margin: 0,
+              letterSpacing: "-0.01em",
             }}
           >
             Retailer Health
