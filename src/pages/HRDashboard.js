@@ -36,6 +36,7 @@ import HRPerformance from "../components/hq/HRPerformance";
 import HRPayroll from "../components/hq/HRPayroll";
 import { ChartCard, ChartTooltip } from "../components/viz";
 import HRStockView from "../components/hq/HRStockView";
+import HRRoster from "../components/hq/HRRoster";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -92,6 +93,7 @@ const TABS = [
   { id: "payroll", label: "Payroll" },
   { id: "settings", label: "Settings" },
   { id: "stock", label: "Stock" },
+  { id: "roster", label: "Roster" },
 ];
 
 function TabBtn({ active, label, badge, onClick }) {
@@ -847,6 +849,7 @@ export default function HRDashboard() {
         {tab === "payroll" && <HRPayroll tenantId={tenantId} />}
         {tab === "settings" && <HRSettings tenantId={tenantId} />}
         {tab === "stock" && <HRStockView tenantId={tenantId} />}
+        {tab === "roster" && <HRRoster tenantId={tenantId} />}
       </div>
     </div>
   );

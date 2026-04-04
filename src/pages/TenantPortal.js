@@ -43,6 +43,7 @@ import SmartInventory from "../components/hq/SmartInventory";
 import HQTradingDashboard from "../components/hq/HQTradingDashboard";
 import EODCashUp from "../components/hq/EODCashUp";
 import HQBalanceSheet from "../components/hq/HQBalanceSheet";
+import HRRoster from "../components/hq/HRRoster";
 
 const T = {
   bg: "#FAFAF9",
@@ -122,6 +123,11 @@ const WATERFALL = [
         id: "cashup",
         label: "Cash-Up",
         desc: "End of day · till reconciliation · variance",
+      },
+      {
+        id: "roster",
+        label: "Team Roster",
+        desc: "Who's working this week · shift schedule",
       },
     ],
   },
@@ -310,6 +316,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         id: "cashup",
         label: "Cash-Up",
         desc: "End of day · till reconciliation · variance",
+      },
+      {
+        id: "roster",
+        label: "Team Roster",
+        desc: "Who's working this week · shift schedule",
       },
     ],
   },
@@ -535,6 +546,8 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange) {
       return <EODCashUp tenantId={tenantId} />;
     case "balance-sheet":
       return <HQBalanceSheet />;
+    case "roster":
+      return <HRRoster tenantId={tenantId} readOnly={false} />;
     default:
       return (
         <div
