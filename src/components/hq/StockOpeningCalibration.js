@@ -1,10 +1,11 @@
-// src/components/hq/StockOpeningCalibration.js v1.0
+// src/components/hq/StockOpeningCalibration.js v1.1
 // WP-STOCK-AVCO — Opening stock cost calibration
 // AI-assisted: ProteaAI reviews each item's suggested cost against SA market rates
 // Writes: UPDATE inventory_items SET weighted_avg_cost, cost_price
 // Does NOT create stock movements (this is a cost basis calibration, not a delivery)
 // LL-160: tenantId as PROP — never from useTenant() directly
 // LL-173: Component is new, no existing code modified
+// LL-120 FIX v1.1: runAIReview now routes through ai-copilot EF
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";
@@ -155,20 +156,33 @@ Rules:
 - adjusted_cost: your recommended cost (can equal suggested_cost if ok)
 - Keep notes concise — they appear in the UI as tooltips`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  // LL-120: NEVER call api.anthropic.com from React
+  // Always route through ai-copilot Edge Function
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+  const supabaseAnon = process.env.REACT_APP_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnon)
+    throw new Error("Supabase env vars not configured");
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/ai-copilot`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${supabaseAnon}`,
+    },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
       messages: [{ role: "user", content: prompt }],
+      userContext: { role: "hq" },
     }),
   });
 
+  if (!res.ok) throw new Error(`ai-copilot EF error: ${res.status}`);
+
   const data = await res.json();
-  const raw = data.content?.[0]?.text || "";
-  const clean = raw.replace(/```json|```/g, "").trim();
-  const parsed = JSON.parse(clean);
+  // ai-copilot EF returns data.reply (string), not data.content[0].text
+  const raw = (data.reply || "").replace(/```json|```/g, "").trim();
+  const a = raw.indexOf("{"), b = raw.lastIndexOf("}");
+  if (a === -1 || b === -1) throw new Error("No JSON in response");
+  const parsed = JSON.parse(raw.slice(a, b + 1));
   return parsed.reviews || [];
 }
 
