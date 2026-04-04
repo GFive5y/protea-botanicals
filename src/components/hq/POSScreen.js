@@ -93,6 +93,19 @@ export default function POSScreen({ tenantId }) {
   const [qtyInput, setQtyInput] = useState("1");
   const searchRef = useRef(null);
 
+  // ── Customer lookup ───────────────────────────────────────────────────────
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customer, setCustomer] = useState(null); // user_profiles row
+  const [customerSearching, setCustomerSearching] = useState(false);
+  const [customerNotFound, setCustomerNotFound] = useState(false);
+
+  // ── Cash tendered + change ────────────────────────────────────────────────
+  const [tendered, setTendered] = useState("");
+
+  // ── Session status (read-only — EODCashUp opens sessions) ────────────────
+  const [activeSession, setActiveSession] = useState(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   // ── Load products ────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -114,6 +127,24 @@ export default function POSScreen({ tenantId }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // ── Check for open pos_session today ─────────────────────────────────────
+  useEffect(() => {
+    if (!tenantId) return;
+    const checkSession = async () => {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("pos_sessions")
+        .select("id, opening_float, session_date")
+        .eq("tenant_id", tenantId)
+        .eq("session_date", todayStr)
+        .eq("status", "open")
+        .maybeSingle();
+      setActiveSession(data || null);
+      setSessionChecked(true);
+    };
+    checkSession();
+  }, [tenantId]);
 
   // ── Filter products ───────────────────────────────────────────────────────
   const filtered = products.filter((p) => {
@@ -175,6 +206,64 @@ export default function POSScreen({ tenantId }) {
     setCart([]);
     setPayMethod("cash");
     setError(null);
+    setTendered("");
+  }
+
+  // ── Customer lookup ───────────────────────────────────────────────────────
+  async function lookupCustomer() {
+    if (!customerPhone.trim()) return;
+    setCustomerSearching(true);
+    setCustomerNotFound(false);
+    setCustomer(null);
+    const phone = customerPhone.trim().replace(/\s+/g, "");
+    const { data } = await supabase
+      .from("user_profiles")
+      .select("id, full_name, phone, loyalty_points, loyalty_tier")
+      .eq("tenant_id", tenantId)
+      .ilike("phone", `%${phone}%`)
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      setCustomer(data);
+    } else {
+      setCustomerNotFound(true);
+    }
+    setCustomerSearching(false);
+  }
+
+  function clearCustomer() {
+    setCustomer(null);
+    setCustomerPhone("");
+    setCustomerNotFound(false);
+  }
+
+  // ── Points: 10pts per R1 spent — configurable from loyalty_config later ──
+  function calcPoints(total) {
+    return Math.floor(total * 10);
+  }
+
+  async function awardLoyaltyPoints(userId, orderRef, total) {
+    const pts = calcPoints(total);
+    if (pts <= 0) return 0;
+    try {
+      await supabase.from("loyalty_transactions").insert({
+        user_id: userId,
+        tenant_id: tenantId,
+        points: pts,
+        transaction_type: "earned",
+        reference: orderRef,
+        notes: `POS sale — ${payMethod}`,
+        created_at: new Date().toISOString(),
+      });
+      await supabase
+        .from("user_profiles")
+        .update({ loyalty_points: (customer.loyalty_points || 0) + pts })
+        .eq("id", userId);
+      return pts;
+    } catch (e) {
+      console.warn("[POS] loyalty award failed:", e.message);
+      return 0;
+    }
   }
 
   // ── Complete sale ─────────────────────────────────────────────────────────
@@ -192,7 +281,7 @@ export default function POSScreen({ tenantId }) {
       // 1 — INSERT order (status = 'paid' immediately for POS cash/card sales)
       const { error: orderErr } = await supabase.from("orders").insert({
         id: orderId,
-        user_id: null, // walk-in customer
+        user_id: customer?.id || null, // linked if found, null for walk-in
         tenant_id: tenantId, // LL-131, Rule 0F
         order_ref: orderRef,
         status: "paid",
@@ -249,7 +338,13 @@ export default function POSScreen({ tenantId }) {
           .eq("id", item.id);
       }
 
-      // 4 — Show receipt
+      // 4 — Award loyalty points if customer linked
+      let pointsEarned = 0;
+      if (customer?.id) {
+        pointsEarned = await awardLoyaltyPoints(customer.id, orderRef, cartTotal);
+      }
+
+      // 5 — Show receipt
       setReceipt({
         orderRef,
         total: cartTotal,
@@ -259,8 +354,17 @@ export default function POSScreen({ tenantId }) {
           qty,
           price: item.sell_price,
         })),
+        customer: customer
+          ? {
+              name: customer.full_name,
+              pointsEarned,
+              newBalance: (customer.loyalty_points || 0) + pointsEarned,
+              tier: customer.loyalty_tier,
+            }
+          : null,
       });
       clearCart();
+      clearCustomer();
       load(); // refresh stock levels
     } catch (err) {
       setError(err.message);
@@ -340,6 +444,20 @@ export default function POSScreen({ tenantId }) {
             <span style={{ fontWeight: 700, fontSize: 17, color: T.ink900 }}>
               POS Till
             </span>
+            {sessionChecked && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: 99,
+                  background: activeSession ? T.accentLit : T.amberLit,
+                  color: activeSession ? T.accentMid : T.amber,
+                }}
+              >
+                {activeSession ? "● Session open" : "⚠ No session"}
+              </span>
+            )}
             <span
               style={{
                 marginLeft: "auto",
@@ -530,6 +648,100 @@ export default function POSScreen({ tenantId }) {
           )}
         </div>
 
+        {/* Customer lookup */}
+        <div style={{ borderTop: `1px solid ${T.border}`, padding: "10px 14px" }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: T.ink400,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              marginBottom: 6,
+            }}
+          >
+            Customer (optional)
+          </div>
+          {customer ? (
+            <div
+              style={{
+                background: T.accentLit,
+                border: `1px solid ${T.accentMid}30`,
+                borderRadius: 8,
+                padding: "8px 10px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
+                  {customer.full_name || customer.phone}
+                </div>
+                <div style={{ fontSize: 11, color: T.accentMid }}>
+                  {customer.loyalty_tier || "Bronze"} · {customer.loyalty_points || 0} pts
+                  {cart.length > 0 && (
+                    <span style={{ color: T.accent, fontWeight: 700 }}>
+                      {" "}+{calcPoints(cartTotal)} this sale
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={clearCustomer}
+                style={{
+                  background: "none", border: "none",
+                  color: T.ink300, cursor: "pointer", fontSize: 14, padding: "0 2px",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && lookupCustomer()}
+                placeholder="Phone number…"
+                style={{
+                  flex: 1,
+                  padding: "7px 10px",
+                  border: `1px solid ${customerNotFound ? "#FCA5A5" : T.border}`,
+                  borderRadius: 7,
+                  fontSize: 13,
+                  fontFamily: T.font,
+                  color: T.ink900,
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={lookupCustomer}
+                disabled={customerSearching || !customerPhone.trim()}
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: 7,
+                  border: "none",
+                  background: T.accent,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: T.font,
+                  opacity: customerSearching ? 0.6 : 1,
+                }}
+              >
+                {customerSearching ? "…" : "Find"}
+              </button>
+            </div>
+          )}
+          {customerNotFound && (
+            <div style={{ fontSize: 11, color: T.amber, marginTop: 4 }}>
+              Not found — proceeding as walk-in
+            </div>
+          )}
+        </div>
+
         {/* Payment method selector */}
         <div
           style={{
@@ -609,6 +821,55 @@ export default function POSScreen({ tenantId }) {
               {zar(cartTotal)}
             </span>
           </div>
+
+          {/* Cash tendered + change */}
+          {payMethod === "cash" && cart.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: T.ink400, fontWeight: 600, whiteSpace: "nowrap" }}>
+                  Tendered R
+                </span>
+                <input
+                  type="number"
+                  min={cartTotal}
+                  step="10"
+                  value={tendered}
+                  onChange={(e) => setTendered(e.target.value)}
+                  placeholder={cartTotal.toFixed(2)}
+                  style={{
+                    flex: 1,
+                    padding: "6px 10px",
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 7,
+                    fontSize: 14,
+                    fontFamily: T.font,
+                    fontWeight: 700,
+                    color: T.ink900,
+                    outline: "none",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                />
+              </div>
+              {parseFloat(tendered) >= cartTotal && (
+                <div
+                  style={{
+                    background: "#F0FDF4",
+                    border: "1px solid #BBF7D0",
+                    borderRadius: 7,
+                    padding: "6px 12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>Change</span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: "#166534", letterSpacing: "-0.02em" }}>
+                    R{(parseFloat(tendered) - cartTotal).toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <div
@@ -938,6 +1199,34 @@ export default function POSScreen({ tenantId }) {
               </span>
             </div>
 
+            {/* Loyalty points earned */}
+            {receipt.customer?.pointsEarned > 0 && (
+              <div
+                style={{
+                  background: T.accentLit,
+                  border: `1px solid ${T.accentMid}30`,
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  marginBottom: 10,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.accent }}>
+                    🌿 {receipt.customer.name || "Customer"} earned points
+                  </div>
+                  <div style={{ fontSize: 11, color: T.accentMid, marginTop: 1 }}>
+                    New balance: {receipt.customer.newBalance} pts
+                  </div>
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: T.accent }}>
+                  +{receipt.customer.pointsEarned}
+                </div>
+              </div>
+            )}
+
             {/* Payment method pill */}
             <div style={{ textAlign: "right", marginBottom: 20 }}>
               <span
@@ -959,6 +1248,18 @@ export default function POSScreen({ tenantId }) {
               </span>
             </div>
 
+            {!receipt.customer && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.ink400,
+                  textAlign: "center",
+                  marginBottom: 10,
+                }}
+              >
+                Walk-in sale — no loyalty points awarded
+              </div>
+            )}
             <button
               onClick={() => setReceipt(null)}
               style={{
