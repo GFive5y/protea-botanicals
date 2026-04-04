@@ -249,10 +249,10 @@ async function main() {
     const wMult = weekend ? 1.4 : 1.0;
     const isToday = d === 0;
 
-    // Base transactions per day: 3-6, scaled; today = partial day (~40%)
+    // Base transactions per day: 3-6, scaled; today = forced 3-5 orders
     const baseTxns = randomBetween(3, 6);
     const fullCount = Math.max(1, Math.round(baseTxns * mMult * wMult));
-    const txnCount = isToday ? Math.max(1, Math.round(fullCount * 0.4)) : fullCount;
+    const txnCount = isToday ? randomBetween(3, 5) : fullCount;
 
     // ── pos_sessions ─────────────────────────────────────────────────
     const sessionId = uuid();
@@ -288,8 +288,10 @@ async function main() {
       const payMethod = Math.random() < 0.6 ? "cash" : "card";
       const orderId = uuid();
       const orderRef = `SEED-${date.replace(/-/g, "")}-${String(t + 1).padStart(3, "0")}`;
-      const maxHour = isToday ? Math.max(8, new Date().getHours()) : 17;
-      const hour = randomBetween(8, maxHour);
+      // Today: 08:00–12:00 SAST (06:00–10:00 UTC); other days: 08:00–17:00
+      const minHour = isToday ? 6 : 8;
+      const maxHour = isToday ? 10 : 17;
+      const hour = randomBetween(minHour, maxHour);
       const minute = randomBetween(0, 59);
       const orderTime = dayISO(d, hour, minute);
 
