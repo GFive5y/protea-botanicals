@@ -150,6 +150,22 @@ LL-182  category is enum — SQL needs ::inventory\_category cast
 LL-183  PowerShell has no \&\& — use separate lines or semicolons
 LL-126  Domain-to-tenant mapping required — tenants.domain column added ✅
 LL-131  Never hardcode tenant UUID anywhere in code
+
+TENANT-01  Every component in TenantPortal renderTab that accepts tenantId
+           as a prop MUST receive tenantId={tenantId} explicitly.
+           Never render tenant-scoped components without it.
+
+SESSION-01 Before ending any session that touches TenantPortal.js or
+           HRDashboard.js, click through EVERY nav tab in the tenant portal
+           and screenshot at least 3 tabs to catch silent failures.
+
+SESSION-02 When a visual session (WP-VISUAL) changes component files,
+           it is PROHIBITED to use "PATTERN A/B/C" bulk replacements
+           across files the session has not fully read. Read first, fix second.
+
+SESSION-03 Any component rendered without props that was previously rendered
+           with props = IMMEDIATE RED FLAG. Check the component signature
+           before committing.
 ```
 
 \---

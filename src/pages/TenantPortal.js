@@ -516,7 +516,7 @@ function renderTab(tabId, tenantId, industryProfile) {
     case "reorder":
       return <HQReorderScoring />;
     case "staff":
-      return <HRStaffDirectory />;
+      return <HRStaffDirectory tenantId={tenantId} />;
     case "qr-codes":
       return <AdminQRCodes tenantId={tenantId} />;
     case "customers":
