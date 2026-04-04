@@ -242,6 +242,7 @@ async function main() {
   let orderCustomerIdx = 0; // round-robin counter
 
   // ── Day-by-day generation ──────────────────────────────────────────────
+  let todayCount = 0;
   for (let d = DAYS - 1; d >= 0; d--) {
     const date = dayDate(d);
     const weekend = isWeekend(d);
@@ -288,12 +289,19 @@ async function main() {
       const payMethod = Math.random() < 0.6 ? "cash" : "card";
       const orderId = uuid();
       const orderRef = `SEED-${date.replace(/-/g, "")}-${String(t + 1).padStart(3, "0")}`;
-      // Today: 08:00–12:00 SAST (06:00–10:00 UTC); other days: 08:00–17:00
-      const minHour = isToday ? 6 : 8;
-      const maxHour = isToday ? 10 : 17;
-      const hour = randomBetween(minHour, maxHour);
-      const minute = randomBetween(0, 59);
-      const orderTime = dayISO(d, hour, minute);
+
+      let orderTime;
+      if (isToday) {
+        // Use actual current date to guarantee correct UTC date
+        const now = new Date();
+        const ts = new Date(now);
+        ts.setHours(9 + t, Math.floor(Math.random() * 59), 0, 0);
+        orderTime = ts.toISOString();
+      } else {
+        const hour = randomBetween(8, 17);
+        const minute = randomBetween(0, 59);
+        orderTime = dayISO(d, hour, minute);
+      }
 
       // Round-robin assign demo customer (orders.user_id is NOT NULL)
       const customerId = userIds[orderCustomerIdx % userIds.length];
@@ -397,7 +405,10 @@ async function main() {
       notes: `EOD auto [${SEED_TAG}]`,
     });
 
+    if (isToday) todayCount = dayOrderCount;
   }
+
+  console.log(`  Today's orders: ${todayCount} orders with date ${new Date().toISOString().split("T")[0]}`);
 
   // ── Price history — 3 price changes per hero over 90 days ─────────────
   for (const item of heroItems) {
