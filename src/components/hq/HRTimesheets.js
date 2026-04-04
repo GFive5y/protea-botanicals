@@ -1937,9 +1937,375 @@ function TimesheetSummary({ tenantId, staffList }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SUB-TAB: HOURS MONITOR
+// Scheduled (roster_assignments) vs Actual (timesheet_entries) per week
+// ═══════════════════════════════════════════════════════════════════════════════
+function HoursMonitor({ tenantId, staffList }) {
+  const [weekStart, setWeekStart] = useState(getMonday());
+  const [rows, setRows] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [rosterExists, setRosterExists] = useState(null);
+
+  const weekEnd = getSunday(weekStart);
+  const weekDates = weekDays(weekStart);
+
+  function fmtWeekLabel(monday) {
+    const end = getSunday(monday);
+    return `${fmtDate(monday)} – ${fmtDate(end)}`;
+  }
+  function prevWeek() {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() - 7);
+    setWeekStart(d.toISOString().slice(0, 10));
+  }
+  function nextWeek() {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + 7);
+    setWeekStart(d.toISOString().slice(0, 10));
+  }
+
+  const load = useCallback(async () => {
+    if (!tenantId || staffList.length === 0) return;
+    setLoading(true);
+
+    // 1. Roster week for this Monday
+    const { data: rosterWeek } = await supabase
+      .from("roster_weeks")
+      .select("id, status")
+      .eq("tenant_id", tenantId)
+      .eq("week_start", weekStart)
+      .maybeSingle();
+
+    setRosterExists(rosterWeek || null);
+
+    // 2. Roster assignments for this week
+    const { data: assignments } = rosterWeek
+      ? await supabase
+          .from("roster_assignments")
+          .select("staff_profile_id, work_date, shift_start, shift_end, break_minutes, is_off, shift_template_id, shift_templates(shift_start, shift_end, break_minutes)")
+          .eq("roster_week_id", rosterWeek.id)
+      : { data: [] };
+
+    // 3. Timesheet entries for all staff in this week
+    const staffIds = staffList.map(s => s.id);
+    const { data: entries } = await supabase
+      .from("timesheet_entries")
+      .select("staff_profile_id, work_date, hours_worked, late_flag, absent_flag, entry_type")
+      .eq("tenant_id", tenantId)
+      .in("staff_profile_id", staffIds)
+      .gte("work_date", weekStart)
+      .lte("work_date", weekEnd);
+
+    // 4. Public holidays this week
+    const { data: phData } = await supabase
+      .from("public_holidays")
+      .select("holiday_date, name")
+      .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      .eq("is_active", true)
+      .gte("holiday_date", weekStart)
+      .lte("holiday_date", weekEnd);
+
+    setHolidays(phData || []);
+    const holidayDates = new Set((phData || []).map(h => h.holiday_date));
+
+    // 5. Build per-staff rows
+    function calcAssignedHours(staffId) {
+      const staffAssignments = (assignments || []).filter(
+        a => a.staff_profile_id === staffId && !a.is_off
+      );
+      return staffAssignments.reduce((sum, a) => {
+        const start = a.shift_start || a.shift_templates?.shift_start;
+        const end   = a.shift_end   || a.shift_templates?.shift_end;
+        const brk   = a.break_minutes ?? a.shift_templates?.break_minutes ?? 30;
+        return sum + (parseFloat(calcHours(start, end, brk)) || 0);
+      }, 0);
+    }
+
+    const built = staffList.map(staff => {
+      const staffEntries = (entries || []).filter(e => e.staff_profile_id === staff.id);
+      const actualHours  = staffEntries.reduce((s, e) => s + parseFloat(e.hours_worked || 0), 0);
+      const scheduledHours = calcAssignedHours(staff.id);
+      const variance     = actualHours - scheduledHours;
+      const lateCount    = staffEntries.filter(e => e.late_flag).length;
+      const absentCount  = staffEntries.filter(e => e.absent_flag).length;
+      const phCount      = staffEntries.filter(e => holidayDates.has(e.work_date)).length;
+      const daysWorked   = staffEntries.filter(e => !e.absent_flag && parseFloat(e.hours_worked || 0) > 0).length;
+      const hasOT        = actualHours > 45;
+      return {
+        staff,
+        scheduledHours,
+        actualHours,
+        variance,
+        lateCount,
+        absentCount,
+        phCount,
+        daysWorked,
+        hasOT,
+        hasEntries: staffEntries.length > 0,
+        hasAssignments: scheduledHours > 0,
+      };
+    });
+
+    setRows(built);
+    setLoading(false);
+  }, [tenantId, staffList, weekStart, weekEnd]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Variance colour
+  function varColor(v, scheduled) {
+    if (scheduled === 0) return T.ink400;
+    const pct = scheduled > 0 ? (v / scheduled) * 100 : 0;
+    if (v > 0) return T.info;          // over scheduled — blue
+    if (pct >= -10) return T.success;  // within 10% short — green
+    if (pct >= -20) return T.warning;  // 10–20% short — amber
+    return T.danger;                   // >20% short — red
+  }
+
+  const totalScheduled = rows.reduce((s, r) => s + r.scheduledHours, 0);
+  const totalActual    = rows.reduce((s, r) => s + r.actualHours, 0);
+  const totalVariance  = totalActual - totalScheduled;
+  const hasAnyData     = rows.some(r => r.hasEntries || r.hasAssignments);
+
+  return (
+    <div>
+      {/* Week nav */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={prevWeek} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.ink150}`, background: "#fff", cursor: "pointer", fontSize: 15, color: T.ink400 }}>‹</button>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.ink900, fontFamily: T.font }}>
+              {fmtWeekLabel(weekStart)}
+            </div>
+            {rosterExists && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 10,
+                background: rosterExists.status === "published" ? T.accentLit
+                          : rosterExists.status === "locked" ? T.infoBg : T.ink075,
+                color: rosterExists.status === "published" ? T.accentMid
+                     : rosterExists.status === "locked" ? T.info : T.ink400,
+                fontFamily: T.font, textTransform: "uppercase", letterSpacing: "0.06em",
+              }}>
+                Roster: {rosterExists.status}
+              </span>
+            )}
+          </div>
+          <button onClick={nextWeek} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.ink150}`, background: "#fff", cursor: "pointer", fontSize: 15, color: T.ink400 }}>›</button>
+          <button onClick={() => setWeekStart(getMonday())} style={{
+            padding: "6px 12px", borderRadius: 6,
+            border: `1px solid ${T.accentBd}`, background: T.accentLit,
+            cursor: "pointer", fontSize: 11, fontWeight: 700, color: T.accent, fontFamily: T.font,
+          }}>This Week</button>
+        </div>
+        <button onClick={load} style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${T.ink150}`, background: "#fff", cursor: "pointer", fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Holiday banner */}
+      {holidays.length > 0 && (
+        <div style={{
+          padding: "8px 14px", borderRadius: 8, background: T.warningBg,
+          border: `1px solid ${T.warningBd}`, marginBottom: 16,
+          fontSize: 12, color: T.warning, fontFamily: T.font,
+        }}>
+          ★ Public holiday this week: {holidays.map(h => `${h.name} (${fmtDate(h.holiday_date)})`).join(" · ")}
+          {" "}— staff working these days earn 2× rate
+        </div>
+      )}
+
+      {loading ? (
+        <div style={s.emptyState}>Comparing hours…</div>
+      ) : staffList.length === 0 ? (
+        <div style={s.emptyState}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
+          <div style={{ fontFamily: T.font, fontSize: 14, color: T.ink400 }}>
+            No active staff profiles yet. Add staff in the Staff tab first.
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Summary KPI strip */}
+          {hasAnyData && (
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(4,1fr)",
+              gap: "1px", background: T.ink150, borderRadius: 8,
+              overflow: "hidden", border: `1px solid ${T.ink150}`,
+              boxShadow: T.shadow, marginBottom: 20,
+            }}>
+              {[
+                { label: "Scheduled", value: `${totalScheduled.toFixed(1)}h`, color: T.ink700 },
+                { label: "Actual", value: `${totalActual.toFixed(1)}h`, color: T.accentMid },
+                {
+                  label: "Variance",
+                  value: `${totalVariance >= 0 ? "+" : ""}${totalVariance.toFixed(1)}h`,
+                  color: totalVariance >= 0 ? T.info : Math.abs(totalVariance) < 5 ? T.success : T.danger,
+                },
+                {
+                  label: "Coverage",
+                  value: totalScheduled > 0 ? `${Math.round((totalActual / totalScheduled) * 100)}%` : "—",
+                  color: totalScheduled > 0 && totalActual / totalScheduled >= 0.9 ? T.success : T.warning,
+                },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: "#fff", padding: "14px 16px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, color, fontFamily: T.font, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Per-staff comparison table */}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ ...s.table, fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={s.th}>Staff</th>
+                  <th style={{ ...s.th, textAlign: "right" }}>Scheduled</th>
+                  <th style={{ ...s.th, textAlign: "right" }}>Actual</th>
+                  <th style={{ ...s.th, textAlign: "right" }}>Variance</th>
+                  <th style={{ ...s.th, textAlign: "center" }}>Days</th>
+                  <th style={{ ...s.th, textAlign: "center" }}>Late</th>
+                  <th style={{ ...s.th, textAlign: "center" }}>Absent</th>
+                  {holidays.length > 0 && <th style={{ ...s.th, textAlign: "center" }}>PH Days</th>}
+                  <th style={{ ...s.th, textAlign: "center" }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(row => {
+                  const vc = varColor(row.variance, row.scheduledHours);
+                  const noData = !row.hasEntries && !row.hasAssignments;
+                  return (
+                    <tr key={row.staff.id} style={{ background: noData ? T.ink050 : "#fff" }}>
+                      <td style={s.td}>
+                        <div style={{ fontWeight: 600, color: T.ink900, fontFamily: T.font }}>{row.staff.full_name || row.staff.preferred_name}</div>
+                        {row.staff.job_title && <div style={{ fontSize: 10, color: T.ink400 }}>{row.staff.job_title}</div>}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        {row.hasAssignments ? (
+                          <span style={{ fontWeight: 600, color: T.ink700 }}>{row.scheduledHours.toFixed(1)}h</span>
+                        ) : (
+                          <span style={{ color: T.ink300, fontSize: 11 }}>No roster</span>
+                        )}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        {row.hasEntries ? (
+                          <span style={{ fontWeight: 600, color: T.accentMid }}>{row.actualHours.toFixed(1)}h</span>
+                        ) : (
+                          <span style={{ color: T.ink300, fontSize: 11 }}>No entries</span>
+                        )}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        {(row.hasEntries || row.hasAssignments) && row.scheduledHours > 0 ? (
+                          <span style={{ fontWeight: 700, color: vc }}>
+                            {row.variance >= 0 ? "+" : ""}{row.variance.toFixed(1)}h
+                            {row.hasOT && <span style={{ fontSize: 10, marginLeft: 4, color: T.info }}>OT</span>}
+                          </span>
+                        ) : <span style={{ color: T.ink300 }}>—</span>}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: "center", color: T.ink700 }}>
+                        {row.daysWorked > 0 ? row.daysWorked : <span style={{ color: T.ink300 }}>—</span>}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: "center" }}>
+                        {row.lateCount > 0
+                          ? <span style={s.flagPill(true)}>{row.lateCount}</span>
+                          : <span style={{ color: T.ink300, fontSize: 11 }}>—</span>}
+                      </td>
+
+                      <td style={{ ...s.td, textAlign: "center" }}>
+                        {row.absentCount > 0
+                          ? <span style={s.flagPill(true)}>{row.absentCount}</span>
+                          : <span style={{ color: T.ink300, fontSize: 11 }}>—</span>}
+                      </td>
+
+                      {holidays.length > 0 && (
+                        <td style={{ ...s.td, textAlign: "center" }}>
+                          {row.phCount > 0
+                            ? <span style={{ fontSize: 11, fontWeight: 700, color: T.warning }}>★ {row.phCount}</span>
+                            : <span style={{ color: T.ink300, fontSize: 11 }}>—</span>}
+                        </td>
+                      )}
+
+                      <td style={{ ...s.td, textAlign: "center" }}>
+                        {noData ? (
+                          <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.font }}>No data</span>
+                        ) : !row.hasEntries ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.warning, fontFamily: T.font }}>Missing entries</span>
+                        ) : !row.hasAssignments ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.ink400, fontFamily: T.font }}>No roster</span>
+                        ) : row.hasOT ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.info, fontFamily: T.font }}>Overtime</span>
+                        ) : Math.abs(row.variance) <= 1 ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.success, fontFamily: T.font }}>✓ On track</span>
+                        ) : row.variance < -3 ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.danger, fontFamily: T.font }}>Short hours</span>
+                        ) : (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: T.warning, fontFamily: T.font }}>Slight short</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {hasAnyData && (
+                <tfoot>
+                  <tr style={{ background: T.accentLit, borderTop: `2px solid ${T.accentBd}` }}>
+                    <td style={{ ...s.td, fontWeight: 700, color: T.accent }}>TOTAL</td>
+                    <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.ink700, fontVariantNumeric: "tabular-nums" }}>{totalScheduled.toFixed(1)}h</td>
+                    <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.accentMid, fontVariantNumeric: "tabular-nums" }}>{totalActual.toFixed(1)}h</td>
+                    <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: varColor(totalVariance, totalScheduled), fontVariantNumeric: "tabular-nums" }}>
+                      {totalVariance >= 0 ? "+" : ""}{totalVariance.toFixed(1)}h
+                    </td>
+                    <td colSpan={holidays.length > 0 ? 5 : 4} />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+
+          {/* Empty state when no data for the week */}
+          {!hasAnyData && !loading && (
+            <div style={{ ...s.emptyState, marginTop: 20 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>📊</div>
+              <div style={{ fontFamily: T.font, fontSize: 14, fontWeight: 600, color: T.ink700, marginBottom: 8 }}>
+                No hours data for this week
+              </div>
+              <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font, maxWidth: 360, margin: "0 auto 20px" }}>
+                Build a roster in the Roster tab, then add timesheet entries in the Timesheets tab. Hours Monitor will compare them here.
+              </div>
+            </div>
+          )}
+
+          {/* Legend */}
+          <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 14 }}>
+            {[
+              { color: T.success, label: "On track (within 1h)" },
+              { color: T.warning, label: "Slight short (1–3h)" },
+              { color: T.danger,  label: "Short hours (>3h)" },
+              { color: T.info,    label: "Overtime (>45h/week)" },
+            ].map(({ color, label }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
+                <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-const SUB_TABS = ["Timesheets", "Summary"];
+const SUB_TABS = ["Timesheets", "Hours Monitor", "Summary"];
 
 export default function HRTimesheets({ tenantId }) {
   const [subTab, setSubTab] = useState("Timesheets");
@@ -1970,6 +2336,9 @@ export default function HRTimesheets({ tenantId }) {
       </div>
       {subTab === "Timesheets" && (
         <TimesheetsList tenantId={tenantId} staffList={staffList} />
+      )}
+      {subTab === "Hours Monitor" && (
+        <HoursMonitor tenantId={tenantId} staffList={staffList} />
       )}
       {subTab === "Summary" && (
         <TimesheetSummary tenantId={tenantId} staffList={staffList} />
