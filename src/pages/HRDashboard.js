@@ -358,24 +358,6 @@ function HROverview({ tenantId, onNavigate }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h2
-          style={{
-            fontFamily: T.font,
-            fontSize: 22,
-            fontWeight: 600,
-            color: T.ink900,
-            margin: "0 0 4px",
-            letterSpacing: "-0.01em",
-          }}
-        >
-          HR Command Centre
-        </h2>
-        <p style={{ margin: 0, fontSize: 13, color: T.ink400, fontFamily: T.font }}>
-          Staff · Leave · Timesheets · Contracts · Payroll
-        </p>
-      </div>
-
       <div
         style={{
           display: "grid",
