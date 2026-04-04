@@ -35,6 +35,38 @@ const TEMPLATE_COLORS = [
   "#991B1B","#5B21B6","#374151","#0369A1",
 ];
 
+// ── default templates (wizard seed data) ────────────────────────────────────
+const DEFAULT_TEMPLATES = [
+  {
+    key: "opening",
+    name: "Opening",
+    description: "Early shift — open the shop",
+    shift_start: "08:00", shift_end: "16:00", break_minutes: 30,
+    section: "General", color: "#1A3D2B",
+  },
+  {
+    key: "mid",
+    name: "Mid Shift",
+    description: "Core trading hours",
+    shift_start: "10:00", shift_end: "18:00", break_minutes: 30,
+    section: "General", color: "#2D6A4F",
+  },
+  {
+    key: "close",
+    name: "Closing",
+    description: "Afternoon through close",
+    shift_start: "12:00", shift_end: "20:00", break_minutes: 30,
+    section: "General", color: "#1E3A5F",
+  },
+  {
+    key: "fullday",
+    name: "Full Day",
+    description: "Open to close — long shift",
+    shift_start: "08:00", shift_end: "17:00", break_minutes: 60,
+    section: "General", color: "#374151",
+  },
+];
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 function zar(n) {
   return `R${(Number(n)||0).toFixed(2)}`;
@@ -423,7 +455,7 @@ function AssignDropdown({ templates, isWeekend, isHoliday, onSelect }) {
       onMouseEnter={e => { e.currentTarget.style.borderColor = T.accentMid; e.currentTarget.style.color = T.accentMid; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = T.ink150; e.currentTarget.style.color = T.ink300; }}
       >
-        {open ? "Close" : "+ Assign"}
+        {open ? "✕" : "+ Assign"}
       </button>
       {open && (
         <div style={{
@@ -465,6 +497,303 @@ function AssignDropdown({ templates, isWeekend, isHoliday, onSelect }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── ROSTER SETUP WIZARD ───────────────────────────────────────────────────────
+function RosterSetupWizard({ tenantId, onComplete }) {
+  const [selected, setSelected] = useState(
+    DEFAULT_TEMPLATES.reduce((acc, t) => ({ ...acc, [t.key]: true }), {})
+  );
+  const [edits, setEdits] = useState(
+    DEFAULT_TEMPLATES.reduce((acc, t) => ({
+      ...acc,
+      [t.key]: { shift_start: t.shift_start, shift_end: t.shift_end, break_minutes: t.break_minutes },
+    }), {})
+  );
+  const [saving, setSaving] = useState(false);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    name: "", shift_start: "09:00", shift_end: "17:00",
+    break_minutes: 30, section: "General", color: "#1A3D2B",
+  });
+
+  const toggleSelect = (key) => setSelected(p => ({ ...p, [key]: !p[key] }));
+  const setEdit = (key, field, val) =>
+    setEdits(p => ({ ...p, [key]: { ...p[key], [field]: val } }));
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
+  async function handleSave() {
+    setSaving(true);
+    const toInsert = DEFAULT_TEMPLATES
+      .filter(t => selected[t.key])
+      .map(t => ({
+        tenant_id: tenantId,
+        name: t.name,
+        description: t.description,
+        shift_start: edits[t.key].shift_start,
+        shift_end: edits[t.key].shift_end,
+        break_minutes: Number(edits[t.key].break_minutes) || 30,
+        section: t.section,
+        color: t.color,
+        is_active: true,
+      }));
+
+    if (showCustomForm && customForm.name.trim()) {
+      toInsert.push({
+        tenant_id: tenantId,
+        name: customForm.name.trim(),
+        description: null,
+        shift_start: customForm.shift_start,
+        shift_end: customForm.shift_end,
+        break_minutes: Number(customForm.break_minutes) || 30,
+        section: customForm.section,
+        color: customForm.color,
+        is_active: true,
+      });
+    }
+
+    if (toInsert.length > 0) {
+      await supabase.from("shift_templates").insert(toInsert);
+    }
+    setSaving(false);
+    onComplete();
+  }
+
+  const inp = {
+    padding: "5px 8px", border: `1px solid ${T.ink150}`, borderRadius: 6,
+    fontSize: 12, fontFamily: T.font, color: T.ink900, outline: "none",
+    background: "#fff", boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{
+      background: "#fff", border: `1px solid ${T.ink150}`,
+      borderRadius: 12, boxShadow: T.shadowMd,
+      fontFamily: T.font, overflow: "hidden",
+    }}>
+      {/* Header */}
+      <div style={{
+        background: T.accent, padding: "28px 32px 24px",
+        color: "#fff",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.7, marginBottom: 8 }}>
+          Roster Setup · Step 1 of 2
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
+          Set up your shift templates
+        </div>
+        <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
+          Templates are the building blocks of your roster — reusable shift patterns
+          you assign to staff each week. Select the ones that fit your shop and
+          adjust the times if needed.
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ marginTop: 20, display: "flex", gap: 6, alignItems: "center" }}>
+          {["Shift Templates", "Build Roster"].map((label, i) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: i === 0 ? "#fff" : "rgba(255,255,255,0.25)",
+                color: i === 0 ? T.accent : "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, flexShrink: 0,
+              }}>
+                {i + 1}
+              </div>
+              <span style={{
+                fontSize: 11, fontWeight: i === 0 ? 700 : 400,
+                opacity: i === 0 ? 1 : 0.6,
+              }}>
+                {label}
+              </span>
+              {i < 1 && <div style={{ width: 24, height: 1, background: "rgba(255,255,255,0.3)" }} />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Template cards */}
+      <div style={{ padding: "24px 32px" }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+          textTransform: "uppercase", color: T.ink400, marginBottom: 14,
+        }}>
+          Suggested shift patterns — click to select, edit times if needed
+        </div>
+
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+          gap: 12, marginBottom: 20,
+        }}>
+          {DEFAULT_TEMPLATES.map(t => {
+            const isOn = selected[t.key];
+            const hrs = calcHours(edits[t.key].shift_start, edits[t.key].shift_end, edits[t.key].break_minutes);
+            return (
+              <div
+                key={t.key}
+                onClick={() => toggleSelect(t.key)}
+                style={{
+                  border: `2px solid ${isOn ? t.color : T.ink150}`,
+                  borderRadius: 10, padding: "14px 16px",
+                  background: isOn ? t.color + "08" : T.ink050,
+                  cursor: "pointer", transition: "all 0.15s", position: "relative",
+                  boxShadow: isOn ? `0 0 0 3px ${t.color}22` : "none",
+                }}
+              >
+                {/* Checkmark */}
+                <div style={{
+                  position: "absolute", top: 10, right: 10,
+                  width: 20, height: 20, borderRadius: "50%",
+                  background: isOn ? t.color : T.ink150,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, color: "#fff", fontWeight: 700,
+                  transition: "all 0.15s",
+                }}>
+                  {isOn ? "✓" : ""}
+                </div>
+
+                <div style={{ fontWeight: 700, color: isOn ? t.color : T.ink500, fontSize: 13, marginBottom: 4 }}>
+                  {t.name}
+                </div>
+                <div style={{ fontSize: 11, color: T.ink400, marginBottom: 12 }}>
+                  {t.description}
+                </div>
+
+                {/* Inline time editors */}
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
+                >
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Start</div>
+                    <input type="time" value={edits[t.key].shift_start}
+                      onChange={e => setEdit(t.key, "shift_start", e.target.value)}
+                      style={{ ...inp, width: "100%" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>End</div>
+                    <input type="time" value={edits[t.key].shift_end}
+                      onChange={e => setEdit(t.key, "shift_end", e.target.value)}
+                      style={{ ...inp, width: "100%" }} />
+                  </div>
+                </div>
+
+                {hrs > 0 && (
+                  <div style={{
+                    marginTop: 8, fontSize: 10, color: isOn ? t.color : T.ink400, fontWeight: 600,
+                  }}>
+                    ⏱ {hrs.toFixed(1)}h net · {edits[t.key].break_minutes}min break
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Custom template add-on */}
+        {!showCustomForm ? (
+          <button
+            onClick={e => { e.stopPropagation(); setShowCustomForm(true); }}
+            style={{
+              padding: "8px 16px", borderRadius: 8, border: `1px dashed ${T.ink150}`,
+              background: "transparent", cursor: "pointer", fontSize: 12,
+              color: T.ink400, fontFamily: T.font, marginBottom: 24,
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >
+            + Add a custom shift
+          </button>
+        ) : (
+          <div style={{
+            border: `1px solid ${T.ink150}`, borderRadius: 10, padding: 16,
+            marginBottom: 24, background: T.ink050,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: T.ink700, marginBottom: 12 }}>
+              Custom shift
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Name</div>
+                <input value={customForm.name} onChange={e => setCustomForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="e.g. Weekend Morning" style={{ ...inp, width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Start</div>
+                <input type="time" value={customForm.shift_start} onChange={e => setCustomForm(p => ({ ...p, shift_start: e.target.value }))} style={{ ...inp, width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>End</div>
+                <input type="time" value={customForm.shift_end} onChange={e => setCustomForm(p => ({ ...p, shift_end: e.target.value }))} style={{ ...inp, width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Break (min)</div>
+                <input type="number" min="0" step="15" value={customForm.break_minutes} onChange={e => setCustomForm(p => ({ ...p, break_minutes: e.target.value }))} style={{ ...inp, width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: T.ink400, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Section</div>
+                <select value={customForm.section} onChange={e => setCustomForm(p => ({ ...p, section: e.target.value }))} style={{ ...inp, width: "100%" }}>
+                  {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                {TEMPLATE_COLORS.map(c => (
+                  <div key={c} onClick={() => setCustomForm(p => ({ ...p, color: c }))} style={{
+                    width: 20, height: 20, borderRadius: "50%", background: c,
+                    cursor: "pointer", boxSizing: "border-box",
+                    border: customForm.color === c ? `2.5px solid ${T.ink900}` : "2.5px solid transparent",
+                  }} />
+                ))}
+              </div>
+              <button onClick={() => setShowCustomForm(false)} style={{
+                marginLeft: "auto", padding: "4px 10px", borderRadius: 6,
+                border: `1px solid ${T.ink150}`, background: "transparent",
+                cursor: "pointer", fontSize: 11, color: T.ink400, fontFamily: T.font,
+              }}>Remove</button>
+            </div>
+          </div>
+        )}
+
+        {/* Action row */}
+        <div style={{
+          display: "flex", alignItems: "center",
+          justifyContent: "space-between", paddingTop: 16,
+          borderTop: `1px solid ${T.ink150}`,
+        }}>
+          <button
+            onClick={onComplete}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 12, color: T.ink400, fontFamily: T.font,
+              textDecoration: "underline",
+            }}
+          >
+            Skip — I'll set this up later
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || selectedCount === 0}
+            style={{
+              padding: "12px 28px", borderRadius: 8, border: "none",
+              background: selectedCount > 0 ? T.accent : T.ink150,
+              color: "#fff", fontWeight: 700, fontSize: 13,
+              fontFamily: T.font,
+              cursor: selectedCount > 0 ? "pointer" : "not-allowed",
+              opacity: saving ? 0.7 : 1,
+              transition: "background 0.15s",
+            }}
+          >
+            {saving
+              ? "Saving…"
+              : `Save ${selectedCount} template${selectedCount !== 1 ? "s" : ""} and continue →`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -772,6 +1101,35 @@ export default function HRRoster({ tenantId, readOnly = false }) {
             )}
           </div>
 
+          {/* ── SETUP WIZARD — shown until templates exist ── */}
+          {!readOnly && templates.length === 0 && (
+            <RosterSetupWizard
+              tenantId={tenantId}
+              onComplete={fetchBase}
+            />
+          )}
+
+          {/* ── NORMAL ROSTER UI — shown once templates exist ── */}
+          {(readOnly || templates.length > 0) && <>
+
+          {/* First-assign nudge — when templates exist but week is empty */}
+          {!readOnly && templates.length > 0 && assignments.length === 0 && selectedWeek && (
+            <div style={{
+              padding: "12px 16px", borderRadius: 8, marginBottom: 16,
+              background: T.accentLit, border: `1px solid ${T.accentBd}`,
+              display: "flex", alignItems: "center", gap: 12,
+              fontSize: 12, color: T.accent, fontFamily: T.font,
+            }}>
+              <span style={{ fontSize: 18 }}>💡</span>
+              <div>
+                <span style={{ fontWeight: 700 }}>Your shift templates are ready. </span>
+                Click <strong>+ Assign</strong> on any cell in the grid below to schedule
+                a shift for a staff member. Use <strong>⚡ Generate from schedules</strong> to
+                auto-fill from existing shift patterns.
+              </div>
+            </div>
+          )}
+
           {/* Holiday notice */}
           {holidays.length > 0 && (
             <div style={{
@@ -851,6 +1209,8 @@ export default function HRRoster({ tenantId, readOnly = false }) {
               </div>
             </div>
           )}
+
+          </> /* end normal roster UI wrapper */}
         </div>
       )}
 
