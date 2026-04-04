@@ -42,27 +42,31 @@ const PROVINCE_COLORS = {
 const card = (extra = {}) => ({
   background: T.surface,
   border: `1px solid ${T.border}`,
-  borderRadius: 2,
+  borderRadius: 10,
   padding: "20px 22px",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)",
   ...extra,
 });
 
 const label = (extra = {}) => ({
   fontFamily: T.font,
-  fontSize: 9,
-  letterSpacing: "0.3em",
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
-  color: T.muted,
+  color: "#374151",
   marginBottom: 6,
   ...extra,
 });
 
 const bigNum = (color = T.green, extra = {}) => ({
   fontFamily: T.serif,
-  fontSize: 36,
-  fontWeight: 300,
+  fontSize: 32,
+  fontWeight: 600,
   color,
   lineHeight: 1,
+  letterSpacing: "-0.02em",
+  fontVariantNumeric: "tabular-nums",
   ...extra,
 });
 
@@ -148,7 +152,7 @@ function BarChart({ data, total, colorFn }) {
                   fontFamily: T.font,
                   fontSize: 11,
                   color: T.muted,
-                  fontWeight: 300,
+                  fontWeight: 400,
                 }}
               >
                 {count} <span style={{ color: T.faint }}>·</span> {pct}%
@@ -575,10 +579,11 @@ export default function GeoAnalyticsDashboard() {
             <h2
               style={{
                 fontFamily: T.serif,
-                fontSize: 28,
-                fontWeight: 300,
+                fontSize: 22,
+                fontWeight: 600,
                 color: T.text,
                 marginBottom: 4,
+                letterSpacing: "-0.01em",
               }}
             >
               Geo & Analytics
@@ -677,10 +682,11 @@ export default function GeoAnalyticsDashboard() {
                   <p
                     style={{
                       fontFamily: T.serif,
-                      fontSize: 28,
-                      fontWeight: 300,
+                      fontSize: 24,
+                      fontWeight: 600,
                       color: T.green,
                       marginBottom: 6,
+                      letterSpacing: "-0.02em",
                     }}
                   >
                     {analytics?.topProvince || "—"}
