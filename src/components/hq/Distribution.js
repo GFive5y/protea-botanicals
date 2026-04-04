@@ -88,19 +88,20 @@ const C = {
 const F = { heading: T.font, body: T.font };
 
 const sLabel = {
-  fontSize: "9px",
-  letterSpacing: "0.3em",
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
-  color: C.accentGreen,
+  color: "#374151",
   marginBottom: "4px",
   fontFamily: F.body,
 };
 const sCard = {
   background: C.white,
   border: `1px solid ${C.border}`,
-  borderRadius: "2px",
+  borderRadius: 10,
   padding: "20px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)",
 };
 const sBtn = (variant = "primary") => ({
   padding: "8px 16px",
@@ -318,7 +319,7 @@ export default function Distribution() {
             style={{
               fontFamily: F.heading,
               fontSize: "22px",
-              fontWeight: 300,
+              fontWeight: 600,
               color: C.primaryDark,
               margin: 0,
             }}
@@ -344,7 +345,7 @@ export default function Distribution() {
           style={{
             color: C.muted,
             fontSize: "13px",
-            fontWeight: 300,
+            fontWeight: 400,
             margin: 0,
           }}
         >
@@ -2107,7 +2108,7 @@ function MiniStat({ label, value, color }) {
         style={{
           fontFamily: T.fontData,
           fontSize: "26px",
-          fontWeight: 400,
+          fontWeight: 600,
           color,
           lineHeight: 1,
           letterSpacing: "-0.02em",
