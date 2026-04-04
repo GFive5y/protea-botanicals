@@ -121,6 +121,7 @@ const EV = {
   hearing: { bg: T.dangerBg, border: T.dangerBd, text: T.danger },
   timesheet: { bg: T.infoBg, border: T.infoBd, text: T.info },
   shift: { bg: "#EDE9FE", border: "#A78BFA", text: "#5B21B6" },
+  diary: { bg: "#F0F9FF", border: "#BAE6FD", text: "#0369A1" },
 };
 
 const STATUS_COLOR = {
@@ -345,6 +346,7 @@ const LAYER_META = [
   { key: "hearing", label: "Hearings" },
   { key: "timesheet", label: "Timesheets" },
   { key: "shift", label: "Shifts" },
+  { key: "diary", label: "Notes" },
 ];
 
 function Legend({ layers, onToggle }) {
@@ -390,7 +392,7 @@ function Legend({ layers, onToggle }) {
 }
 
 // ─── MONTH VIEW ──────────────────────────────────────────────────────────────
-function MonthView({ year, month, events, layers, onEventClick }) {
+function MonthView({ year, month, events, layers, onEventClick, onDayClick }) {
   const firstDow = new Date(year, month, 1).getDay();
   const totalDays = daysInMonth(year, month);
   const todayStr = toDateStr(new Date());
@@ -462,6 +464,7 @@ function MonthView({ year, month, events, layers, onEventClick }) {
           return (
             <div
               key={i}
+              onClick={() => ds && onDayClick && onDayClick(ds)}
               style={{
                 minHeight: 90,
                 borderRadius: 4,
@@ -474,6 +477,7 @@ function MonthView({ year, month, events, layers, onEventClick }) {
                       : "#fff"
                   : T.ink050,
                 border: `1px solid ${isToday ? T.accentBd : T.ink150}`,
+                cursor: day ? "pointer" : "default",
               }}
             >
               {day && (
@@ -538,7 +542,7 @@ function MonthView({ year, month, events, layers, onEventClick }) {
 }
 
 // ─── WEEK VIEW ────────────────────────────────────────────────────────────────
-function WeekView({ weekStart, events, layers, onEventClick }) {
+function WeekView({ weekStart, events, layers, onEventClick, onDayClick }) {
   const todayStr = toDateStr(new Date());
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -571,6 +575,7 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
           return (
             <div
               key={i}
+              onClick={() => onDayClick && onDayClick(ds)}
               style={{
                 background: isToday
                   ? T.accentLit
@@ -581,6 +586,7 @@ function WeekView({ weekStart, events, layers, onEventClick }) {
                 borderRadius: 8,
                 padding: "10px 7px",
                 minHeight: 220,
+                cursor: "pointer",
               }}
             >
               <div style={{ textAlign: "center", marginBottom: 10 }}>
@@ -963,6 +969,316 @@ function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }
   );
 }
 
+// ─── DIARY CONFIG ────────────────────────────────────────────────────────────
+const DIARY_TYPES = [
+  { value: "note",         label: "Note",         emoji: "📝" },
+  { value: "meeting",      label: "Meeting",       emoji: "👥" },
+  { value: "reminder",     label: "Reminder",      emoji: "⏰" },
+  { value: "announcement", label: "Announcement",  emoji: "📢" },
+  { value: "task",         label: "Task",          emoji: "✅" },
+];
+const DIARY_COLORS = [
+  "#0369A1", "#166534", "#92400E", "#991B1B", "#5B21B6", "#374151",
+];
+
+// ─── DAY PANEL ────────────────────────────────────────────────────────────────
+function DayPanel({ date, events, onClose, tenantId, onSaved }) {
+  const [form, setForm] = useState({
+    title: "", body: "", entry_type: "note", color: "#0369A1",
+  });
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  if (!date) return null;
+
+  const dayEvs = events.filter((ev) => {
+    if (ev.date) return ev.date === date;
+    if (ev.startDate)
+      return date >= ev.startDate && date <= (ev.endDate || ev.startDate);
+    return false;
+  });
+  const diaryEvs = dayEvs.filter((e) => e.type === "diary");
+  const otherEvs  = dayEvs.filter((e) => e.type !== "diary");
+
+  const displayDate = new Date(date + "T00:00:00").toLocaleDateString("en-ZA", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
+  async function handleSave() {
+    if (!form.title.trim()) return;
+    setSaving(true);
+    try {
+      await supabase.from("hr_diary_entries").insert({
+        tenant_id: tenantId,
+        entry_date: date,
+        title: form.title.trim(),
+        body: form.body.trim() || null,
+        entry_type: form.entry_type,
+        color: form.color,
+      });
+      setForm({ title: "", body: "", entry_type: "note", color: "#0369A1" });
+      onSaved();
+    } catch (e) {
+      console.error("[DayPanel] save error:", e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    setDeleting(id);
+    try {
+      await supabase.from("hr_diary_entries").delete().eq("id", id);
+      onSaved();
+    } catch (e) {
+      console.error("[DayPanel] delete error:", e);
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, zIndex: 900,
+          background: "rgba(0,0,0,0.18)",
+        }}
+      />
+      {/* Slide-in panel */}
+      <div
+        style={{
+          position: "fixed", top: 0, right: 0, bottom: 0,
+          width: "min(380px, 90vw)",
+          background: "#fff",
+          borderLeft: `1px solid ${T.ink150}`,
+          boxShadow: "-4px 0 24px rgba(0,0,0,0.10)",
+          zIndex: 901,
+          display: "flex", flexDirection: "column",
+          fontFamily: T.font,
+          overflowY: "auto",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "18px 20px 14px",
+          borderBottom: `1px solid ${T.ink150}`,
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          flexShrink: 0,
+        }}>
+          <div>
+            <div style={{
+              fontSize: 10, fontWeight: 700, color: T.ink400,
+              textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3,
+              fontFamily: T.font,
+            }}>
+              Calendar
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.ink900, fontFamily: T.font }}>
+              {displayDate}
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontSize: 20, color: T.ink400, lineHeight: 1, padding: "2px 6px",
+          }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Other events (leave, holidays, hearings) */}
+          {otherEvs.length > 0 && (
+            <div>
+              <div style={{
+                fontSize: 10, fontWeight: 700, color: T.ink400,
+                textTransform: "uppercase", letterSpacing: "0.08em",
+                marginBottom: 8, fontFamily: T.font,
+              }}>
+                Events
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {otherEvs.map((ev, i) => {
+                  const c = EV[ev.type] || EV.leave;
+                  return (
+                    <div key={i} style={{
+                      padding: "8px 12px", borderRadius: 8,
+                      background: ev.leaveColor ? ev.leaveColor + "20" : c.bg,
+                      border: `1px solid ${ev.leaveColor ? ev.leaveColor + "55" : c.border}`,
+                      fontSize: 12, fontFamily: T.font,
+                      color: ev.leaveColor || c.text, fontWeight: 600,
+                    }}>
+                      {ev.title}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Existing diary entries */}
+          {diaryEvs.length > 0 && (
+            <div>
+              <div style={{
+                fontSize: 10, fontWeight: 700, color: T.ink400,
+                textTransform: "uppercase", letterSpacing: "0.08em",
+                marginBottom: 8, fontFamily: T.font,
+              }}>
+                Notes
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {diaryEvs.map((ev) => {
+                  const typeInfo = DIARY_TYPES.find((t) => t.value === ev.entryType) || DIARY_TYPES[0];
+                  return (
+                    <div key={ev.id} style={{
+                      padding: "10px 12px", borderRadius: 8,
+                      background: ev.color + "15",
+                      border: `1px solid ${ev.color}44`,
+                    }}>
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        marginBottom: ev.body ? 4 : 0,
+                      }}>
+                        <span style={{ fontSize: 13 }}>{typeInfo.emoji}</span>
+                        <span style={{
+                          fontSize: 12, fontWeight: 700, color: ev.color,
+                          fontFamily: T.font, flex: 1,
+                        }}>
+                          {ev.title}
+                        </span>
+                        <button
+                          onClick={() => handleDelete(ev.id)}
+                          disabled={deleting === ev.id}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            color: T.ink300, fontSize: 14, padding: "0 2px", lineHeight: 1,
+                          }}
+                        >
+                          {deleting === ev.id ? "…" : "✕"}
+                        </button>
+                      </div>
+                      {ev.body && (
+                        <div style={{
+                          fontSize: 12, color: T.ink500, fontFamily: T.font,
+                          lineHeight: 1.5, paddingLeft: 20,
+                        }}>
+                          {ev.body}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* No events empty state */}
+          {dayEvs.length === 0 && (
+            <div style={{
+              textAlign: "center", padding: "20px 0",
+              fontSize: 12, color: T.ink300, fontFamily: T.font,
+            }}>
+              No events on this day
+            </div>
+          )}
+
+          {/* Add note form */}
+          <div style={{ borderTop: `1px solid ${T.ink150}`, paddingTop: 16 }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, color: T.ink400,
+              textTransform: "uppercase", letterSpacing: "0.08em",
+              marginBottom: 12, fontFamily: T.font,
+            }}>
+              Add Note
+            </div>
+
+            {/* Entry type pills */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+              {DIARY_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setForm((p) => ({ ...p, entry_type: t.value }))}
+                  style={{
+                    padding: "4px 10px", borderRadius: 20, cursor: "pointer",
+                    fontSize: 11, fontFamily: T.font, fontWeight: 600,
+                    border: `1px solid ${form.entry_type === t.value ? form.color : T.ink150}`,
+                    background: form.entry_type === t.value ? form.color + "18" : "transparent",
+                    color: form.entry_type === t.value ? form.color : T.ink400,
+                    transition: "all 0.12s",
+                  }}
+                >
+                  {t.emoji} {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Colour swatches */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {DIARY_COLORS.map((c) => (
+                <div
+                  key={c}
+                  onClick={() => setForm((p) => ({ ...p, color: c }))}
+                  style={{
+                    width: 22, height: 22, borderRadius: "50%", background: c,
+                    cursor: "pointer", boxSizing: "border-box",
+                    border: form.color === c ? `2.5px solid ${T.ink900}` : "2.5px solid transparent",
+                    transition: "border 0.1s",
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Title */}
+            <input
+              value={form.title}
+              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSave()}
+              placeholder="Title (required)…"
+              style={{
+                width: "100%", padding: "8px 12px", marginBottom: 8,
+                border: `1px solid ${T.ink150}`, borderRadius: 8,
+                fontSize: 13, fontFamily: T.font, color: T.ink900,
+                outline: "none", boxSizing: "border-box",
+              }}
+            />
+
+            {/* Body */}
+            <textarea
+              value={form.body}
+              onChange={(e) => setForm((p) => ({ ...p, body: e.target.value }))}
+              placeholder="Details… (optional)"
+              rows={3}
+              style={{
+                width: "100%", padding: "8px 12px", marginBottom: 12,
+                border: `1px solid ${T.ink150}`, borderRadius: 8,
+                fontSize: 13, fontFamily: T.font, color: T.ink900,
+                outline: "none", resize: "vertical", boxSizing: "border-box",
+              }}
+            />
+
+            {/* Save */}
+            <button
+              onClick={handleSave}
+              disabled={saving || !form.title.trim()}
+              style={{
+                width: "100%", padding: "10px", borderRadius: 8, border: "none",
+                background: form.title.trim() ? form.color : T.ink150,
+                color: form.title.trim() ? "#fff" : T.ink400,
+                fontWeight: 700, fontSize: 13, fontFamily: T.font,
+                cursor: form.title.trim() ? "pointer" : "not-allowed",
+                opacity: saving ? 0.7 : 1, transition: "background 0.15s",
+              }}
+            >
+              {saving ? "Saving…" : "Save Note"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function HRCalendar({ tenantId }) {
   const today = new Date();
@@ -981,9 +1297,11 @@ export default function HRCalendar({ tenantId }) {
     hearing: true,
     timesheet: true,
     shift: true,
+    diary: true,
   });
 
   const toggleLayer = (key) => setLayers((p) => ({ ...p, [key]: !p[key] }));
+  const [dayPanel, setDayPanel] = useState(null); // "YYYY-MM-DD" or null
 
   const rangeStart = view === "year"
     ? `${year}-01-01`
@@ -1173,12 +1491,35 @@ export default function HRCalendar({ tenantId }) {
         }
       });
 
+      // 7. Diary entries (hr_diary_entries table)
+      const { data: diaryData } = await supabase
+        .from("hr_diary_entries")
+        .select("id, entry_date, title, body, entry_type, color")
+        .eq("tenant_id", tenantId)
+        .gte("entry_date", rangeStart)
+        .lte("entry_date", rangeEnd)
+        .order("entry_date");
+
+      const diaryEvents = (diaryData || []).map((d) => ({
+        id: d.id,
+        type: "diary",
+        title: d.title,
+        date: d.entry_date,
+        startDate: d.entry_date,
+        endDate: d.entry_date,
+        body: d.body,
+        entryType: d.entry_type,
+        color: d.color,
+        leaveColor: d.color, // reuses leaveColor so EventChip renders custom colour
+      }));
+
       setEvents([
         ...leaveEvents,
         ...holidayEvents,
         ...hearingEvents,
         ...timesheetEvents,
         ...shiftEvents,
+        ...diaryEvents,
       ]);
     } catch (err) {
       console.error("HRCalendar fetch error:", err);
@@ -1295,6 +1636,7 @@ export default function HRCalendar({ tenantId }) {
               { key: "holiday", label: "Holidays", color: T.warning },
               { key: "hearing", label: "Hearings", color: T.danger },
               { key: "shift", label: "Shifts", color: "#5B21B6" },
+              { key: "diary", label: "Notes", color: "#0369A1" },
             ].map(({ key, label, color }) => (
               <span
                 key={key}
@@ -1466,6 +1808,7 @@ export default function HRCalendar({ tenantId }) {
               events={events}
               layers={layers}
               onEventClick={setSelected}
+              onDayClick={setDayPanel}
             />
           )}
           {view === "week" && (
@@ -1474,6 +1817,7 @@ export default function HRCalendar({ tenantId }) {
               events={events}
               layers={layers}
               onEventClick={setSelected}
+              onDayClick={setDayPanel}
             />
           )}
           {view === "year" && (
@@ -1504,6 +1848,15 @@ export default function HRCalendar({ tenantId }) {
 
       {selected && (
         <DetailModal event={selected} onClose={() => setSelected(null)} />
+      )}
+      {dayPanel && (
+        <DayPanel
+          date={dayPanel}
+          events={events}
+          onClose={() => setDayPanel(null)}
+          tenantId={tenantId}
+          onSaved={fetchData}
+        />
       )}
     </div>
   );
