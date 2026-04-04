@@ -358,17 +358,23 @@ function HROverview({ tenantId, onNavigate }) {
 
   return (
     <div>
-      <h2
-        style={{
-          fontFamily: T.font,
-          fontSize: 18,
-          fontWeight: 600,
-          color: T.ink900,
-          marginBottom: 20,
-        }}
-      >
-        HR Command Centre
-      </h2>
+      <div style={{ marginBottom: 24 }}>
+        <h2
+          style={{
+            fontFamily: T.font,
+            fontSize: 22,
+            fontWeight: 600,
+            color: T.ink900,
+            margin: "0 0 4px",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          HR Command Centre
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: T.ink400, fontFamily: T.font }}>
+          Staff · Leave · Timesheets · Contracts · Payroll
+        </p>
+      </div>
 
       <div
         style={{
@@ -385,18 +391,19 @@ function HROverview({ tenantId, onNavigate }) {
             style={{
               background: C.white,
               border: "1px solid " + T.ink150,
-              borderRadius: 6,
-              padding: "16px 18px",
+              borderLeft: `4px solid ${tile.color === "#aaa" ? T.ink150 : tile.color}`,
+              borderRadius: 10,
+              padding: "18px 20px 16px",
               cursor: "pointer",
-              boxShadow: T.shadow,
-              transition: "box-shadow 0.15s",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+              transition: "box-shadow 0.18s ease, transform 0.12s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
               e.currentTarget.style.transform = "none";
             }}
           >
@@ -404,37 +411,39 @@ function HROverview({ tenantId, onNavigate }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 7,
+                justifyContent: "space-between",
                 marginBottom: 10,
               }}
             >
-              <span style={{ fontSize: 14 }}>{tile.icon}</span>
               <span
                 style={{
                   fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "0.15em",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: "#6B7280",
+                  fontFamily: T.font,
                 }}
               >
                 {tile.label}
               </span>
+              <span style={{ fontSize: 13 }}>{tile.icon}</span>
             </div>
             <div
               style={{
                 fontFamily: T.font,
                 fontSize: 28,
-                fontWeight: 400,
-                color: tile.color,
+                fontWeight: 600,
+                color: tile.color === "#aaa" ? T.ink400 : tile.color,
                 lineHeight: 1,
                 letterSpacing: "-0.02em",
                 fontVariantNumeric: "tabular-nums",
+                marginBottom: 4,
               }}
             >
               {tile.value}
             </div>
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: "#9CA3AF", fontFamily: T.font }}>
               {tile.sub}
             </div>
           </div>
@@ -450,7 +459,7 @@ function HROverview({ tenantId, onNavigate }) {
             marginBottom: 28,
           }}
         >
-          <ChartCard title="Leave Requests by Status" height={200}>
+          <ChartCard title="Leave Requests" subtitle="By approval status" accent="amber" height={220}>
             {leaveDonut.length === 0 ? (
               <div
                 style={{
@@ -477,7 +486,8 @@ function HROverview({ tenantId, onNavigate }) {
                     innerRadius={50}
                     outerRadius={75}
                     paddingAngle={3}
-                    isAnimationActive={false}
+                    isAnimationActive={true}
+                    animationDuration={600}
                   >
                     {leaveDonut.map((d, i) => (
                       <Cell key={i} fill={d.color} />
@@ -493,7 +503,7 @@ function HROverview({ tenantId, onNavigate }) {
             )}
           </ChartCard>
 
-          <ChartCard title="Timesheet Pipeline" height={200}>
+          <ChartCard title="Timesheet Pipeline" subtitle="Status flow · draft → paid" accent="blue" height={220}>
             {tsBar.length === 0 ? (
               <div
                 style={{
@@ -543,7 +553,9 @@ function HROverview({ tenantId, onNavigate }) {
                   <Bar
                     dataKey="count"
                     name="Timesheets"
-                    isAnimationActive={false}
+                    isAnimationActive={true}
+                    animationDuration={600}
+                    animationEasing="ease-out"
                     maxBarSize={36}
                     radius={[3, 3, 0, 0]}
                   >
@@ -556,7 +568,7 @@ function HROverview({ tenantId, onNavigate }) {
             )}
           </ChartCard>
 
-          <ChartCard title="Headcount by Department" height={200}>
+          <ChartCard title="Headcount by Department" subtitle="Active staff distribution" accent="green" height={220}>
             {deptBar.length === 0 ? (
               <div
                 style={{
@@ -658,15 +670,30 @@ function HROverview({ tenantId, onNavigate }) {
 
       <div
         style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.2em",
-          textTransform: "uppercase",
-          color: C.muted,
-          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
         }}
       >
-        Quick Actions
+        <span style={{
+          display: "inline-block",
+          width: 3,
+          height: 14,
+          borderRadius: 2,
+          background: T.accent,
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "#374151",
+          fontFamily: T.font,
+        }}>
+          Quick Actions
+        </span>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {[
