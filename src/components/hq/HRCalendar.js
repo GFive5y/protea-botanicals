@@ -862,6 +862,107 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
   );
 }
 
+// ─── YEAR VIEW ────────────────────────────────────────────────────────────────
+function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }) {
+  function countsForMonth(m) {
+    const pad = (n) => String(n).padStart(2, "0");
+    const monthStart = `${year}-${pad(m + 1)}-01`;
+    const monthEnd = `${year}-${pad(m + 1)}-${String(daysInMonth(year, m)).padStart(2, "0")}`;
+    const counts = { leave: 0, holiday: 0, hearing: 0, timesheet: 0, shift: 0 };
+    const seen = new Set();
+    events.forEach((ev) => {
+      if (!layers[ev.type]) return;
+      const start = ev.startDate || ev.date || "";
+      const end = ev.endDate || ev.date || "";
+      if (!start || start > monthEnd || end < monthStart) return;
+      const uid = ev.type === "shift"
+        ? ev.id.split("-")[0] + "-m" + m
+        : ev.id + "-m" + m;
+      if (seen.has(uid)) return;
+      seen.add(uid);
+      counts[ev.type]++;
+    });
+    return counts;
+  }
+
+  const isCurrentYear = year === todayYear;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, flex: 1 }}>
+      {MONTHS_FULL.map((monthName, m) => {
+        const counts = countsForMonth(m);
+        const isNow = isCurrentYear && m === todayMonth;
+        const hasEvents = Object.values(counts).some((v) => v > 0);
+        return (
+          <div
+            key={m}
+            onClick={() => onMonthSelect(m)}
+            style={{
+              border: `1.5px solid ${isNow ? T.accentBd : T.ink150}`,
+              borderRadius: 10,
+              padding: "14px 16px",
+              background: isNow ? T.accentLit : "#fff",
+              cursor: "pointer",
+              boxShadow: isNow ? `0 0 0 2px ${T.accentBd}` : T.shadow,
+              transition: "box-shadow 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = "0 2px 14px rgba(0,0,0,0.10)";
+              e.currentTarget.style.borderColor = T.accentMid;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = isNow ? `0 0 0 2px ${T.accentBd}` : T.shadow;
+              e.currentTarget.style.borderColor = isNow ? T.accentBd : T.ink150;
+            }}
+          >
+            <div style={{
+              fontSize: 13, fontWeight: 700, fontFamily: T.font,
+              color: isNow ? T.accent : T.ink700, marginBottom: 10,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              {monthName}
+              {isNow && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, color: T.accent,
+                  background: T.accentBd, padding: "1px 6px", borderRadius: 10,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>
+                  Now
+                </span>
+              )}
+            </div>
+            {!hasEvents ? (
+              <div style={{ fontSize: 11, fontFamily: T.font, color: T.ink300, fontStyle: "italic" }}>
+                No events
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {[
+                  { key: "holiday", label: "Holiday", c: EV.holiday },
+                  { key: "leave",   label: "Leave",   c: EV.leave   },
+                  { key: "hearing", label: "Hearing", c: EV.hearing  },
+                  { key: "shift",   label: "Shift",   c: EV.shift    },
+                ].filter(({ key }) => layers[key] && counts[key] > 0)
+                  .map(({ key, label, c }) => (
+                    <div key={key} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <div style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: c.text, flexShrink: 0,
+                      }} />
+                      <span style={{ fontSize: 11, fontFamily: T.font, color: T.ink500 }}>
+                        {counts[key]} {label}{counts[key] !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function HRCalendar({ tenantId }) {
   const today = new Date();
@@ -884,8 +985,12 @@ export default function HRCalendar({ tenantId }) {
 
   const toggleLayer = (key) => setLayers((p) => ({ ...p, [key]: !p[key] }));
 
-  const rangeStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-  const rangeEnd = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth(year, month)).padStart(2, "0")}`;
+  const rangeStart = view === "year"
+    ? `${year}-01-01`
+    : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const rangeEnd = view === "year"
+    ? `${year}-12-31`
+    : `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth(year, month)).padStart(2, "0")}`;
 
   const fetchData = useCallback(async () => {
     if (!tenantId) return;
@@ -937,7 +1042,7 @@ export default function HRCalendar({ tenantId }) {
       const { data: phData, error: phErr } = await supabase
         .from("public_holidays")
         .select("id, holiday_date, name, holiday_type")
-        .eq("tenant_id", tenantId)
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
         .eq("is_active", true)
         .gte("holiday_date", rangeStart)
         .lte("holiday_date", rangeEnd)
@@ -1112,6 +1217,9 @@ export default function HRCalendar({ tenantId }) {
   function nextWeek() {
     setWeekStart((d) => addDays(d, 7));
   }
+  function prevYear() { setYear((y) => y - 1); }
+  function nextYear() { setYear((y) => y + 1); }
+
   function goToday() {
     const t = new Date();
     setYear(t.getFullYear());
@@ -1209,7 +1317,7 @@ export default function HRCalendar({ tenantId }) {
             padding: 3,
           }}
         >
-          {["month", "week", "team"].map((v) => (
+          {["month", "week", "team", "year"].map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -1246,10 +1354,14 @@ export default function HRCalendar({ tenantId }) {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
-            onClick={view === "week" ? prevWeek : prevMonth}
+            onClick={
+              view === "week" ? prevWeek
+              : view === "year" ? prevYear
+              : prevMonth
+            }
             style={navBtnStyle}
           >
-            ‹
+            {view === "year" ? "‹‹" : "‹"}
           </button>
           <span
             style={{
@@ -1257,19 +1369,25 @@ export default function HRCalendar({ tenantId }) {
               fontSize: 15,
               fontWeight: 600,
               fontFamily: T.font,
-              minWidth: 210,
+              minWidth: view === "year" ? 80 : 210,
               textAlign: "center",
             }}
           >
             {view === "week"
               ? `${MONTHS_FULL[weekStart.getMonth()].slice(0, 3)} ${weekStart.getDate()} – ${MONTHS_FULL[addDays(weekStart, 6).getMonth()].slice(0, 3)} ${addDays(weekStart, 6).getDate()}, ${addDays(weekStart, 6).getFullYear()}`
-              : `${MONTHS_FULL[month]} ${year}`}
+              : view === "year"
+                ? `${year}`
+                : `${MONTHS_FULL[month]} ${year}`}
           </span>
           <button
-            onClick={view === "week" ? nextWeek : nextMonth}
+            onClick={
+              view === "week" ? nextWeek
+              : view === "year" ? nextYear
+              : nextMonth
+            }
             style={navBtnStyle}
           >
-            ›
+            {view === "year" ? "››" : "›"}
           </button>
           <button
             onClick={goToday}
@@ -1356,6 +1474,19 @@ export default function HRCalendar({ tenantId }) {
               events={events}
               layers={layers}
               onEventClick={setSelected}
+            />
+          )}
+          {view === "year" && (
+            <YearView
+              year={year}
+              events={events}
+              layers={layers}
+              todayYear={today.getFullYear()}
+              todayMonth={today.getMonth()}
+              onMonthSelect={(m) => {
+                setMonth(m);
+                setView("month");
+              }}
             />
           )}
           {view === "team" && (
