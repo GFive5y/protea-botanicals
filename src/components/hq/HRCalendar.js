@@ -868,37 +868,89 @@ function TeamView({ year, month, staff, events, layers, onEventClick }) {
   );
 }
 
-// ─── YEAR VIEW ────────────────────────────────────────────────────────────────
-function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }) {
-  function countsForMonth(m) {
-    const pad = (n) => String(n).padStart(2, "0");
-    const monthStart = `${year}-${pad(m + 1)}-01`;
-    const monthEnd = `${year}-${pad(m + 1)}-${String(daysInMonth(year, m)).padStart(2, "0")}`;
-    const counts = { leave: 0, holiday: 0, hearing: 0, timesheet: 0, shift: 0 };
-    const seen = new Set();
-    events.forEach((ev) => {
-      if (!layers[ev.type]) return;
-      const start = ev.startDate || ev.date || "";
-      const end = ev.endDate || ev.date || "";
-      if (!start || start > monthEnd || end < monthStart) return;
-      const uid = ev.type === "shift"
-        ? ev.id.split("-")[0] + "-m" + m
-        : ev.id + "-m" + m;
-      if (seen.has(uid)) return;
-      seen.add(uid);
-      counts[ev.type]++;
+// ─── MINI MONTH (used inside year view cards) ─────────────────────────────────
+function MiniMonth({ year, month, events, layers, todayStr }) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const firstDow = new Date(year, month, 1).getDay();
+  const totalDays = daysInMonth(year, month);
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(d);
+
+  function getDayEvents(day) {
+    if (!day) return [];
+    const ds = `${year}-${pad(month + 1)}-${pad(day)}`;
+    return events.filter((ev) => {
+      if (!layers[ev.type]) return false;
+      if (ev.date) return ev.date === ds;
+      if (ev.startDate)
+        return ds >= ev.startDate && ds <= (ev.endDate || ev.startDate);
+      return false;
     });
-    return counts;
   }
 
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 3 }}>
+        {["S","M","T","W","T","F","S"].map((d, i) => (
+          <div key={i} style={{
+            textAlign: "center", fontSize: 8, fontWeight: 700,
+            fontFamily: T.font,
+            color: i === 0 || i === 6 ? T.ink300 : T.ink400,
+          }}>{d}</div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", rowGap: 2 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} style={{ height: 18 }} />;
+          const ds = `${year}-${pad(month + 1)}-${pad(day)}`;
+          const isToday = ds === todayStr;
+          const dow = new Date(ds + "T00:00:00").getDay();
+          const isWeekend = dow === 0 || dow === 6;
+          const dayEvs = getDayEvents(day);
+          const isHoliday = dayEvs.some((e) => e.type === "holiday");
+          const eventTypes = [...new Set(dayEvs.map((e) => e.type))];
+          return (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{
+                fontSize: 9, fontFamily: T.font,
+                fontWeight: isToday ? 700 : 400,
+                width: 16, height: 16, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto", boxSizing: "border-box",
+                background: isToday ? T.accent : isHoliday ? T.warningBg : "transparent",
+                color: isToday ? "#fff" : isHoliday ? T.warning : isWeekend ? T.ink300 : T.ink500,
+                border: isHoliday && !isToday ? `1px solid ${T.warningBd}` : "none",
+              }}>
+                {day}
+              </div>
+              {eventTypes.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "center", gap: 1.5, marginTop: 1 }}>
+                  {eventTypes.slice(0, 3).map((type) => (
+                    <div key={type} style={{
+                      width: 3, height: 3, borderRadius: "50%",
+                      background: EV[type]?.text || T.ink400, flexShrink: 0,
+                    }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── YEAR VIEW ────────────────────────────────────────────────────────────────
+function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }) {
+  const todayStr = toDateStr(new Date());
   const isCurrentYear = year === todayYear;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, flex: 1 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, flex: 1 }}>
       {MONTHS_FULL.map((monthName, m) => {
-        const counts = countsForMonth(m);
         const isNow = isCurrentYear && m === todayMonth;
-        const hasEvents = Object.values(counts).some((v) => v > 0);
         return (
           <div
             key={m}
@@ -906,7 +958,7 @@ function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }
             style={{
               border: `1.5px solid ${isNow ? T.accentBd : T.ink150}`,
               borderRadius: 10,
-              padding: "14px 16px",
+              padding: "12px 14px 10px",
               background: isNow ? T.accentLit : "#fff",
               cursor: "pointer",
               boxShadow: isNow ? `0 0 0 2px ${T.accentBd}` : T.shadow,
@@ -922,46 +974,28 @@ function YearView({ year, events, layers, todayYear, todayMonth, onMonthSelect }
             }}
           >
             <div style={{
-              fontSize: 13, fontWeight: 700, fontFamily: T.font,
-              color: isNow ? T.accent : T.ink700, marginBottom: 10,
+              fontSize: 12, fontWeight: 700, fontFamily: T.font,
+              color: isNow ? T.accent : T.ink700, marginBottom: 8,
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>
               {monthName}
               {isNow && (
                 <span style={{
-                  fontSize: 9, fontWeight: 700, color: T.accent,
-                  background: T.accentBd, padding: "1px 6px", borderRadius: 10,
+                  fontSize: 8, fontWeight: 700, color: T.accent,
+                  background: T.accentBd, padding: "1px 5px", borderRadius: 8,
                   letterSpacing: "0.08em", textTransform: "uppercase",
                 }}>
                   Now
                 </span>
               )}
             </div>
-            {!hasEvents ? (
-              <div style={{ fontSize: 11, fontFamily: T.font, color: T.ink300, fontStyle: "italic" }}>
-                No events
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {[
-                  { key: "holiday", label: "Holiday", c: EV.holiday },
-                  { key: "leave",   label: "Leave",   c: EV.leave   },
-                  { key: "hearing", label: "Hearing", c: EV.hearing  },
-                  { key: "shift",   label: "Shift",   c: EV.shift    },
-                ].filter(({ key }) => layers[key] && counts[key] > 0)
-                  .map(({ key, label, c }) => (
-                    <div key={key} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <div style={{
-                        width: 8, height: 8, borderRadius: "50%",
-                        background: c.text, flexShrink: 0,
-                      }} />
-                      <span style={{ fontSize: 11, fontFamily: T.font, color: T.ink500 }}>
-                        {counts[key]} {label}{counts[key] !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            )}
+            <MiniMonth
+              year={year}
+              month={m}
+              events={events}
+              layers={layers}
+              todayStr={todayStr}
+            />
           </div>
         );
       })}
