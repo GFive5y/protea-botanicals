@@ -468,7 +468,7 @@ const PROFILE_BADGE = {
   operator: { label: "Operator", color: "#991B1B", bg: "#FEF2F2" },
 };
 
-function renderTab(tabId, tenantId, industryProfile) {
+function renderTab(tabId, tenantId, industryProfile, onTabChange) {
   switch (tabId) {
     case "overview":
       return <HQOverview />;
@@ -506,7 +506,13 @@ function renderTab(tabId, tenantId, industryProfile) {
     case "pos":
       return <POSScreen tenantId={tenantId} />;
     case "expenses":
-      return <ExpenseManager tenantId={tenantId} />;
+      return (
+        <ExpenseManager
+          tenantId={tenantId}
+          onClose={() => onTabChange("pl")}
+          onSaved={() => {}}
+        />
+      );
     case "pl":
       return <HQProfitLoss />;
     case "costing":
@@ -889,7 +895,7 @@ export default function TenantPortal() {
                     boxSizing: "border-box",
                   }}
                 >
-                  {renderTab(activeTab, tenantId, industryProfile)}
+                  {renderTab(activeTab, tenantId, industryProfile, setActiveTab)}
                 </div>
               </div>
             ) : (
@@ -903,7 +909,7 @@ export default function TenantPortal() {
                     boxSizing: "border-box",
                   }}
                 >
-                  {renderTab(activeTab, tenantId, industryProfile)}
+                  {renderTab(activeTab, tenantId, industryProfile, setActiveTab)}
                 </div>
               </div>
             )}
