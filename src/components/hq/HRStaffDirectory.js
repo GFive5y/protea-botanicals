@@ -294,6 +294,145 @@ const st = {
   },
 };
 
+// ─── STAFF SETUP WIZARD ──────────────────────────────────────────────────────
+function StaffSetupWizard({ onAddStaff }) {
+  const UNLOCKS = [
+    { icon: "⏱", label: "Timesheets" },
+    { icon: "📅", label: "Roster" },
+    { icon: "📋", label: "Contracts" },
+    { icon: "🗓", label: "Leave" },
+    { icon: "💰", label: "Payroll" },
+  ];
+
+  const NEEDS = [
+    { icon: "📄", label: "Full name",        note: "Required",               required: true  },
+    { icon: "💼", label: "Job title",         note: "Recommended",            required: false },
+    { icon: "🗓", label: "Start date",        note: "Recommended",            required: false },
+    { icon: "📋", label: "Employment type",   note: "Full / Part / Contractor", required: false },
+    { icon: "🪪", label: "ID number",         note: "For contracts",          required: false },
+    { icon: "📞", label: "Phone number",      note: "For contact",            required: false },
+    { icon: "🏦", label: "Bank details",      note: "For payroll",            required: false },
+    { icon: "💵", label: "Salary / rate",     note: "Via Contracts tab",      required: false },
+  ];
+
+  return (
+    <div style={{
+      background: "#fff", border: `1px solid ${T.ink150}`,
+      borderRadius: 12, overflow: "hidden",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+    }}>
+      {/* Dark green header */}
+      <div style={{ background: T.accent, padding: "32px 36px 28px" }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+          textTransform: "uppercase", color: T.accentBd, marginBottom: 10,
+        }}>
+          HR Setup · Getting Started
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 700, color: "#fff", marginBottom: 10, lineHeight: 1.2 }}>
+          Add your team members
+        </div>
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.82)", lineHeight: 1.6, maxWidth: 520 }}>
+          Staff profiles are the foundation of everything in the HR module.
+          Timesheets, roster, contracts, leave and payroll all connect to a staff profile.
+        </div>
+
+        {/* Unlocks pill row */}
+        <div style={{ display: "flex", gap: 8, marginTop: 22, flexWrap: "wrap" }}>
+          {UNLOCKS.map(({ icon, label }) => (
+            <div key={label} style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 20, padding: "5px 12px",
+              fontSize: 12, color: "#fff", fontFamily: T.font,
+            }}>
+              <span>{icon}</span> {label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "28px 36px 32px" }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+          textTransform: "uppercase", color: T.ink400, fontFamily: T.font,
+          marginBottom: 14,
+        }}>
+          What you'll need for each team member
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+          gap: 10, marginBottom: 28,
+        }}>
+          {NEEDS.map(({ icon, label, note, required }) => (
+            <div key={label} style={{
+              display: "flex", alignItems: "flex-start", gap: 10,
+              padding: "11px 14px", borderRadius: 8,
+              background: required ? T.accentLit : T.ink050,
+              border: `1px solid ${required ? T.accentBd : T.ink150}`,
+            }}>
+              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+              <div>
+                <div style={{
+                  fontSize: 12, fontWeight: 600, color: T.ink900,
+                  fontFamily: T.font, marginBottom: 2,
+                }}>
+                  {label}
+                  {required && (
+                    <span style={{
+                      marginLeft: 5, fontSize: 9, fontWeight: 700,
+                      color: T.accent, textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}>Required</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+                  {note}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tip strip */}
+        <div style={{
+          padding: "12px 16px", borderRadius: 8, marginBottom: 24,
+          background: T.accentLit, border: `1px solid ${T.accentBd}`,
+          fontSize: 12, color: T.accent, fontFamily: T.font, lineHeight: 1.6,
+          display: "flex", gap: 10, alignItems: "flex-start",
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
+          <div>
+            <strong>You only need a name to get started.</strong> You can add ID numbers,
+            bank details and salary information later. Fill in what you have now and
+            complete the rest as you go.
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+          <button
+            onClick={onAddStaff}
+            style={{
+              padding: "13px 32px", borderRadius: 8, border: "none",
+              background: T.accent, color: "#fff",
+              fontWeight: 700, fontSize: 14, fontFamily: T.font,
+              cursor: "pointer", letterSpacing: "0.01em",
+              boxShadow: "0 2px 8px rgba(26,61,43,0.25)",
+            }}
+          >
+            Add your first team member →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HRStaffDirectory({ tenantId, user }) {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -434,16 +573,7 @@ export default function HRStaffDirectory({ tenantId, user }) {
       {loading ? (
         <div style={st.loading}>Loading staff records…</div>
       ) : staff.length === 0 ? (
-        <div style={st.emptyState}>
-          <div style={st.emptyIcon}>👥</div>
-          <h3 style={st.emptyTitle}>No staff records yet</h3>
-          <p style={st.emptyText}>
-            Add your first team member to get started with HR management.
-          </p>
-          <button style={st.addBtn} onClick={openNew}>
-            + Add First Staff Member
-          </button>
-        </div>
+        <StaffSetupWizard onAddStaff={openNew} />
       ) : filtered.length === 0 ? (
         <div style={{ ...st.emptyState }}>
           <div style={st.emptyIcon}>🔍</div>
