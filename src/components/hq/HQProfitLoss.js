@@ -883,13 +883,14 @@ export default function HQProfitLoss() {
             <h2
               style={{
                 margin: 0,
-                ...T.type.pageTitle,
-                fontFamily: T.font.ui,
+                fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                fontSize: 22,
                 fontWeight: 600,
-                color: "#2d4a2d",
+                color: "#111827",
+                letterSpacing: "-0.01em",
               }}
             >
-              P&L Dashboard
+              Profit & Loss
             </h2>
             <InfoTooltip id="pl-title" />
           </div>
@@ -1082,7 +1083,7 @@ export default function HQProfitLoss() {
           {/* Waterfall Chart */}
           {websiteRevenue > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <ChartCard title="P&L Waterfall" height={280}>
+              <ChartCard title="P&L Waterfall" subtitle="Revenue → COGS → Gross → OpEx → Net" accent="green" height={300}>
                 <WaterfallChart
                   revenue={websiteRevenue}
                   totalCogs={totalCogs}
@@ -1512,7 +1513,7 @@ export default function HQProfitLoss() {
               {/* Margin Gauges */}
               {websiteRevenue > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <ChartCard title="Net Margin" height={200}>
+                  <ChartCard title="Margin Overview" subtitle="Gross & Net margin gauges" accent="amber" height={200}>
                     <div
                       style={{
                         display: "grid",
@@ -1552,7 +1553,7 @@ export default function HQProfitLoss() {
               {importCogsHardware + localCogsTotal + loyaltyCost + totalOpex >
                 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <ChartCard title="Cost Composition" height={220}>
+                  <ChartCard title="Cost Composition" subtitle="Where every rand goes" accent="purple" height={240}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -1577,7 +1578,8 @@ export default function HQProfitLoss() {
                           outerRadius={80}
                           dataKey="value"
                           paddingAngle={3}
-                          isAnimationActive={false}
+                          isAnimationActive={true}
+                          animationDuration={600}
                         >
                           {[CC.accentMid, CC.gold, CC.danger, "#52B788"].map(
                             (c, i) => (
@@ -1641,7 +1643,7 @@ export default function HQProfitLoss() {
                 if (trendData.length < 2) return null;
                 return (
                   <div style={{ marginBottom: 20 }}>
-                    <ChartCard title="Revenue vs COGS Trend" height={220}>
+                    <ChartCard title="Revenue vs COGS" subtitle="Daily trend · actual vs cost" accent="blue" height={240}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={trendData}
@@ -1658,12 +1660,12 @@ export default function HQProfitLoss() {
                               <stop
                                 offset="5%"
                                 stopColor={CC.accentMid}
-                                stopOpacity={0.15}
+                                stopOpacity={0.4}
                               />
                               <stop
                                 offset="95%"
                                 stopColor={CC.accentMid}
-                                stopOpacity={0}
+                                stopOpacity={0.02}
                               />
                             </linearGradient>
                             <linearGradient
@@ -1676,12 +1678,12 @@ export default function HQProfitLoss() {
                               <stop
                                 offset="5%"
                                 stopColor={CC.danger}
-                                stopOpacity={0.1}
+                                stopOpacity={0.3}
                               />
                               <stop
                                 offset="95%"
                                 stopColor={CC.danger}
-                                stopOpacity={0}
+                                stopOpacity={0.02}
                               />
                             </linearGradient>
                           </defs>
@@ -1732,7 +1734,9 @@ export default function HQProfitLoss() {
                             strokeWidth={2}
                             fill="url(#pl-rev-grad)"
                             dot={false}
-                            isAnimationActive={false}
+                            isAnimationActive={true}
+                            animationDuration={700}
+                            animationEasing="ease-out"
                           />
                           <Area
                             type="monotone"

@@ -2308,105 +2308,143 @@ function MetricTile({
   sparkData,
   delta,
 }) {
-  const s = semantic ? SEMANTIC[semantic] : null;
+  const SEMANTIC_STYLES = {
+    success: { border: "#16A34A", text: "#15803D", bg: "#F0FDF4", bd: "#BBF7D0" },
+    warning: { border: "#D97706", text: "#92400E", bg: "#FFFBEB", bd: "#FDE68A" },
+    danger:  { border: "#DC2626", text: "#991B1B", bg: "#FEF2F2", bd: "#FECACA" },
+    info:    { border: "#2563EB", text: "#1E3A5F", bg: "#EFF6FF", bd: "#BFDBFE" },
+  };
+  const s = semantic ? SEMANTIC_STYLES[semantic] : null;
   const clickable = !!onClick;
+  const [hovered, setHovered] = useState(false);
+
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        background: "white",
-        border: `1px solid #E2E2E2`,
-        borderRadius: 6,
-        padding: "18px 20px",
+        background: "#FFFFFF",
+        border: "1px solid #E5E7EB",
+        borderLeft: `4px solid ${s ? s.border : "#E5E7EB"}`,
+        borderRadius: 10,
+        padding: "18px 20px 16px",
         cursor: clickable ? "pointer" : "default",
-        transition: "box-shadow 0.15s",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-      }}
-      onMouseEnter={(e) => {
-        if (clickable)
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.07)";
+        boxShadow: hovered && clickable
+          ? "0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)"
+          : "0 1px 4px rgba(0,0,0,0.04)",
+        transition: "box-shadow 0.18s ease, transform 0.12s ease",
+        transform: hovered && clickable ? "translateY(-1px)" : "none",
+        position: "relative",
       }}
     >
+      {/* Label row */}
       <div
         style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: "#6B7280",
-          marginBottom: 10,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          marginBottom: 10,
         }}
       >
-        {label}
+        <span
+          style={{
+            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "#6B7280",
+          }}
+        >
+          {label}
+        </span>
         {clickable && hint && (
           <span
             style={{
               fontSize: 9,
-              color: "#999999",
-              fontWeight: 500,
-              textTransform: "none",
-              letterSpacing: 0,
+              color: "#9CA3AF",
+              fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
             }}
           >
-            {hint} ↗
+            {hint}
+            <span style={{ fontSize: 10 }}>↗</span>
           </span>
         )}
       </div>
+
+      {/* Value + sparkline row */}
       <div
         style={{
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
           gap: 8,
+          marginBottom: 4,
         }}
       >
-        <div style={{ ...T.kpi, fontSize: 28, color: s ? s.text : T.ink900 }}>
+        <div
+          style={{
+            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            fontSize: 28,
+            fontWeight: 600,
+            lineHeight: 1,
+            color: s ? s.text : "#111827",
+            letterSpacing: "-0.02em",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           {value}
         </div>
         {sparkData && sparkData.length > 1 && (
           <SparkLine
             data={sparkData}
             positive={delta === null || delta === undefined || delta >= 0}
-            width={60}
+            width={56}
             height={28}
           />
         )}
       </div>
+
+      {/* Delta badge */}
       {delta !== null && delta !== undefined && (
-        <div style={{ marginTop: 4 }}>
-          <DeltaBadge value={delta} />
+        <div style={{ marginBottom: 6 }}>
+          <DeltaBadge value={delta} size="sm" />
         </div>
       )}
+
+      {/* Sub-label */}
       {subLabel && (
         <div
           style={{
+            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
             fontSize: 10,
             color: "#9CA3AF",
-            marginTop: 3,
-            letterSpacing: "0.04em",
+            letterSpacing: "0.02em",
+            marginBottom: sub ? 6 : 0,
           }}
         >
           {subLabel}
         </div>
       )}
+
+      {/* Status badge */}
       {sub && (
         <div
           style={{
+            display: "inline-flex",
+            alignItems: "center",
             fontSize: 11,
-            color: s ? s.text : "#5A5A5A",
-            marginTop: 6,
+            fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
             fontWeight: s ? 600 : 400,
+            color: s ? s.text : "#6B7280",
             background: s ? s.bg : "transparent",
             border: s ? `1px solid ${s.bd}` : "none",
-            borderRadius: s ? 3 : 0,
-            padding: s ? "2px 6px" : 0,
-            display: "inline-block",
+            borderRadius: s ? 6 : 0,
+            padding: s ? "3px 8px" : 0,
           }}
         >
           {sub}
@@ -2457,7 +2495,7 @@ function btn(variant, size) {
 
 const tileGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-  gap: 12,
+  gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+  gap: 14,
   marginBottom: 28,
 };
