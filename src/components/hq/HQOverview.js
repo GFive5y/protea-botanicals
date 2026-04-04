@@ -981,6 +981,8 @@ export default function HQOverview({ onNavigate }) {
         <div style={{ marginBottom: 28 }}>
           <ChartCard
             title="Revenue — Last 30 Days"
+            subtitle="Daily orders · all channels"
+            accent="green"
             height={320}
             action={
               revDelta !== null ? (
@@ -995,8 +997,8 @@ export default function HQOverview({ onNavigate }) {
               >
                 <defs>
                   <linearGradient id="ov-rev-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={T.accent} stopOpacity={0.18} />
-                    <stop offset="95%" stopColor={T.accent} stopOpacity={0} />
+                    <stop offset="5%" stopColor={T.accent} stopOpacity={0.45} />
+                    <stop offset="95%" stopColor={T.accent} stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -1038,7 +1040,9 @@ export default function HQOverview({ onNavigate }) {
                   strokeWidth={2}
                   fill="url(#ov-rev-grad)"
                   dot={false}
-                  isAnimationActive={false}
+                  isAnimationActive={true}
+                  animationDuration={800}
+                  animationEasing="ease-out"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -1248,7 +1252,7 @@ export default function HQOverview({ onNavigate }) {
           {/* Category health mini-bars */}
           {Object.keys(cannabisStock.byCat).length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <ChartCard title="Stock by Category" height={180}>
+              <ChartCard title="Stock by Category" subtitle="In-stock ratio" accent="green" height={200}>
                 <div
                   style={{
                     padding: "8px 16px",
@@ -1334,7 +1338,7 @@ export default function HQOverview({ onNavigate }) {
       {/* ── CHART: Scan Activity — Area (secondary, below ops) ── */}
       {scanTrend.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <ChartCard title="Scan Activity — Last 30 Days" height={240}>
+          <ChartCard title="Scan Activity — Last 30 Days" subtitle="QR scans · 30 day window" accent="teal" height={240}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={scanTrend}
@@ -1345,12 +1349,12 @@ export default function HQOverview({ onNavigate }) {
                     <stop
                       offset="5%"
                       stopColor={T.accentMid}
-                      stopOpacity={0.18}
+                      stopOpacity={0.4}
                     />
                     <stop
                       offset="95%"
                       stopColor={T.accentMid}
-                      stopOpacity={0}
+                      stopOpacity={0.02}
                     />
                   </linearGradient>
                 </defs>
@@ -1471,7 +1475,7 @@ export default function HQOverview({ onNavigate }) {
             marginBottom: 28,
           }}
         >
-          <ChartCard title="Scan Distribution by Type" height={240}>
+          <ChartCard title="Scan Distribution" subtitle="By QR type" accent="blue" height={240}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1496,7 +1500,7 @@ export default function HQOverview({ onNavigate }) {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>
-          <ChartCard title="Scans by QR Type" height={240}>
+          <ChartCard title="Volume by Type" subtitle="Ranked" accent="purple" height={240}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={qrTypeDist}
@@ -1690,7 +1694,7 @@ export default function HQOverview({ onNavigate }) {
           {erpStats.avgMarginPct !== null &&
             erpStats.avgMarginPct !== undefined && (
               <div style={{ marginTop: 20, marginBottom: 28 }}>
-                <ChartCard title="Gross Margin — Retail Channel" height={220}>
+                <ChartCard title="Gross Margin" subtitle="Retail channel average" accent="amber" height={220}>
                   <MarginGauge
                     value={erpStats.avgMarginPct}
                     color={marginColour}
@@ -2170,7 +2174,30 @@ export default function HQOverview({ onNavigate }) {
 
 function SectionLabel({ label }) {
   return (
-    <div style={{ ...T.label, color: T.ink300, marginBottom: 12 }}>{label}</div>
+    <div
+      style={{
+        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "#374151",
+        marginBottom: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <span style={{
+        display: "inline-block",
+        width: 3,
+        height: 14,
+        borderRadius: 2,
+        background: "#1A3D2B",
+        flexShrink: 0,
+      }} />
+      {label}
+    </div>
   );
 }
 
@@ -2307,10 +2334,10 @@ function MetricTile({
         style={{
           fontSize: 10,
           fontWeight: 700,
-          letterSpacing: "0.1em",
+          letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "#999999",
-          marginBottom: 8,
+          color: "#6B7280",
+          marginBottom: 10,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -2359,11 +2386,10 @@ function MetricTile({
       {subLabel && (
         <div
           style={{
-            fontSize: 9,
-            color: "#999999",
-            marginTop: 2,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
+            fontSize: 10,
+            color: "#9CA3AF",
+            marginTop: 3,
+            letterSpacing: "0.04em",
           }}
         >
           {subLabel}

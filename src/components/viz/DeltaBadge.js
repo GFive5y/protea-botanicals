@@ -1,81 +1,62 @@
-// src/components/viz/DeltaBadge.js
-// WP-VISUAL-SYSTEM — Inline delta / % change badge
-// Props: value (number), suffix, decimals, forcePositive
-
-const T = {
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  ink500: "#5A5A5A",
-  ink075: "#F4F4F3",
-  ink150: "#E2E2E2",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-};
+// src/components/viz/DeltaBadge.js — v2.0
+// Enterprise delta indicator. Clear, bold, unambiguous.
 
 /**
- * DeltaBadge — ▲/▼ % change pill for KPI tiles
- * @param {number}  value        — the delta value (positive or negative)
- * @param {string}  suffix       — appended after number (default "%")
- * @param {number}  decimals     — decimal places (default 1)
- * @param {boolean} forcePositive — override colour — always green (e.g. cost reduction is good)
- * @param {boolean} forceNegative — override colour — always red
- * @param {boolean} neutral       — grey pill, no ▲/▼
+ * DeltaBadge v2.0
+ * @param {number}  value     — percentage change (positive = up, negative = down)
+ * @param {string}  suffix    — default "%"
+ * @param {number}  decimals  — decimal places (default 1)
+ * @param {boolean} inverse   — invert colour logic (for costs: up = bad)
+ * @param {string}  size      — "sm" | "md" | "lg" (default "md")
  */
 export default function DeltaBadge({
   value,
   suffix = "%",
   decimals = 1,
-  forcePositive = false,
-  forceNegative = false,
-  neutral = false,
-  style = {},
+  inverse = false,
+  size = "md",
 }) {
-  if (value === null || value === undefined) return null;
+  if (value === null || value === undefined || isNaN(value)) return null;
 
-  const num = parseFloat(value);
-  const isUp = num >= 0;
+  const isPositive = inverse ? value < 0 : value >= 0;
+  const isNeutral = Math.abs(value) < 0.05;
 
-  let color, bg, bd;
-  if (neutral) {
-    color = T.ink500;
-    bg = T.ink075;
-    bd = T.ink150;
-  } else if (forcePositive || (!forceNegative && isUp)) {
-    color = T.success;
-    bg = T.successBg;
-    bd = T.successBd;
-  } else {
-    color = T.danger;
-    bg = T.dangerBg;
-    bd = T.dangerBd;
-  }
+  const SIZES = {
+    sm: { fontSize: 10, padding: "2px 6px", iconSize: 8 },
+    md: { fontSize: 12, padding: "3px 8px", iconSize: 10 },
+    lg: { fontSize: 14, padding: "4px 10px", iconSize: 12 },
+  };
+  const s = SIZES[size] || SIZES.md;
 
-  const arrow = neutral ? "" : isUp ? "▲ " : "▼ ";
-  const display = `${arrow}${Math.abs(num).toFixed(decimals)}${suffix}`;
+  const COLORS = isNeutral
+    ? { text: "#6B7280", bg: "#F3F4F6", bd: "#E5E7EB" }
+    : isPositive
+    ? { text: "#15803D", bg: "#DCFCE7", bd: "#BBF7D0" }
+    : { text: "#DC2626", bg: "#FEE2E2", bd: "#FECACA" };
+
+  const arrow = isNeutral ? "→" : isPositive ? "↑" : "↓";
+  const display = `${Math.abs(value).toFixed(decimals)}${suffix}`;
 
   return (
     <span
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 2,
-        background: bg,
-        border: `1px solid ${bd}`,
-        color,
-        borderRadius: 3,
-        padding: "1px 7px",
-        fontSize: 11,
-        fontWeight: 600,
-        fontFamily: T.fontUi,
-        letterSpacing: "0.02em",
+        gap: 3,
+        padding: s.padding,
+        borderRadius: 6,
+        background: COLORS.bg,
+        border: `1px solid ${COLORS.bd}`,
+        color: COLORS.text,
+        fontSize: s.fontSize,
+        fontWeight: 700,
+        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
         fontVariantNumeric: "tabular-nums",
+        letterSpacing: "0.02em",
         whiteSpace: "nowrap",
-        ...style,
       }}
     >
+      <span style={{ fontSize: s.iconSize, lineHeight: 1 }}>{arrow}</span>
       {display}
     </span>
   );
