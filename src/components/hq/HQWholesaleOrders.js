@@ -411,7 +411,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               <div
                 style={{
                   fontSize: 28,
-                  fontWeight: 300,
+                  fontWeight: 600,
                   color: T.accent,
                   letterSpacing: "-0.02em",
                   marginBottom: 8,
@@ -421,19 +421,19 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               </div>
               <div style={{ fontSize: 13, color: T.ink500, lineHeight: 1.9 }}>
                 <div>
-                  <span style={{ color: T.ink300 }}>Invoice No: </span>
+                  <span style={{ color: "#6B7280" }}>Invoice No: </span>
                   <strong style={{ color: T.ink900 }}>{invNumber}</strong>
                 </div>
                 <div>
-                  <span style={{ color: T.ink300 }}>Order Ref: </span>
+                  <span style={{ color: "#6B7280" }}>Order Ref: </span>
                   <strong style={{ color: T.ink900 }}>{order.po_number}</strong>
                 </div>
                 <div>
-                  <span style={{ color: T.ink300 }}>Issue Date: </span>
+                  <span style={{ color: "#6B7280" }}>Issue Date: </span>
                   <strong style={{ color: T.ink900 }}>{issueDate}</strong>
                 </div>
                 <div>
-                  <span style={{ color: T.ink300 }}>Due Date: </span>
+                  <span style={{ color: "#6B7280" }}>Due Date: </span>
                   <strong style={{ color: "#92400E" }}>{dueDate}</strong>
                 </div>
               </div>
@@ -500,7 +500,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               style={{
                 background: T.ink075,
                 border: `1px solid ${T.ink150}`,
-                borderLeft: `4px solid ${T.ink300}`,
+                borderLeft: `4px solid #9CA3AF`,
                 borderRadius: 6,
                 padding: "18px 20px",
               }}
@@ -640,7 +640,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
                         <div
                           style={{
                             fontSize: 10,
-                            color: T.ink300,
+                            color: "#6B7280",
                             marginTop: 2,
                           }}
                         >
@@ -827,7 +827,7 @@ function InvoiceModal({ order, partner, lines, items, tenantName, onClose }) {
               paddingTop: 20,
               borderTop: `2px solid ${T.accentLit}`,
               fontSize: 11,
-              color: T.ink300,
+              color: "#6B7280",
               fontFamily: T.fontUi,
               lineHeight: 1.8,
             }}
@@ -1877,7 +1877,7 @@ export default function HQWholesaleOrders() {
               style={{
                 fontFamily: T.fontData,
                 fontSize: "20px",
-                fontWeight: 400,
+                fontWeight: 600,
                 color: s.color,
                 lineHeight: 1,
               }}

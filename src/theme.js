@@ -76,13 +76,13 @@ export const T = {
 
   // ── TYPE SCALE ────────────────────────────────────────────────────────────
   type: {
-    pageTitle: { fontSize: "22px", fontWeight: 300, letterSpacing: "-0.01em" },
-    sectionHead: { fontSize: "16px", fontWeight: 500 },
+    pageTitle: { fontSize: "22px", fontWeight: 600, letterSpacing: "-0.01em" },
+    sectionHead: { fontSize: "16px", fontWeight: 600 },
     cardTitle: { fontSize: "13px", fontWeight: 600 },
     label: {
-      fontSize: "10px",
+      fontSize: "11px",
       fontWeight: 700,
-      letterSpacing: "0.1em",
+      letterSpacing: "0.06em",
       textTransform: "uppercase",
     },
     body: { fontSize: "13px", fontWeight: 400, lineHeight: "1.6" },
@@ -173,7 +173,7 @@ export const sectionHeading = () => ({
 export const columnLabel = () => ({
   ...T.type.label,
   fontFamily: T.font.ui,
-  color: T.ink[500],
+  color: "#374151",
 });
 
 // Metric value (DM Mono, large)
@@ -307,12 +307,12 @@ export const subTab = (active = false) => ({
 
 // Table header cell
 export const tableHeader = () => ({
-  fontSize: "10px",
+  fontSize: "11px",
   fontWeight: 700,
-  letterSpacing: "0.1em",
+  letterSpacing: "0.06em",
   textTransform: "uppercase",
-  color: T.ink[400],
-  padding: "8px 12px",
+  color: "#374151",
+  padding: "9px 12px",
   textAlign: "left",
   borderBottom: `2px solid ${T.ink[150]}`,
   fontFamily: T.font.ui,
@@ -320,10 +320,10 @@ export const tableHeader = () => ({
 
 // Table data cell
 export const tableCell = () => ({
-  padding: "11px 12px",
+  padding: "12px 12px",
   borderBottom: `1px solid ${T.ink[75]}`,
-  color: T.ink[700],
-  fontSize: "12px",
+  color: "#2C2C2C",
+  fontSize: "13px",
   fontFamily: T.font.ui,
 });
 
