@@ -1276,99 +1276,40 @@ export default function HQOverview({ onNavigate }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3, minmax(0,1fr)) minmax(0,1.6fr)",
+              gridTemplateColumns: "minmax(0,1.5fr) minmax(0,1fr)",
               gap: 12,
               marginBottom: 28,
-              alignItems: "start",
+              alignItems: "stretch",
             }}
           >
-            {/* Stock Value */}
-            <MetricTile
-              label="Stock Value"
-              value={`R${Math.round(cannabisStock.stockValue).toLocaleString("en-ZA")}`}
-              subLabel="AVCO-weighted"
-              sub={`${cannabisStock.inStock} SKUs in stock`}
-              semantic="success"
-              onClick={() => nav("stock")}
-              hint="Stock"
-            />
-            {/* Margin Health */}
-            <MetricTile
-              label="Margin Health"
-              value={
-                cannabisStock.avgMargin != null
-                  ? `${cannabisStock.avgMargin.toFixed(1)}%`
-                  : "—"
-              }
-              subLabel="avg across priced items"
-              sub={`${cannabisStock.healthyCount} of ${cannabisStock.totalPriced} healthy (>40%)`}
-              semantic={
-                cannabisStock.avgMargin >= 50
-                  ? "success"
-                  : cannabisStock.avgMargin >= 35
-                    ? "warning"
-                    : "danger"
-              }
-              onClick={() => nav("pricing")}
-              hint="Pricing"
-            />
-            {/* Expiry Alert */}
-            <MetricTile
-              label="Expiry Status"
-              value={
-                cannabisStock.expired > 0
-                  ? cannabisStock.expired
-                  : cannabisStock.expiring7 > 0
-                    ? cannabisStock.expiring7
-                    : cannabisStock.expiring30 > 0
-                      ? cannabisStock.expiring30
-                      : "✓"
-              }
-              subLabel={
-                cannabisStock.expired > 0
-                  ? "items expired"
-                  : cannabisStock.expiring7 > 0
-                    ? "expiring this week"
-                    : cannabisStock.expiring30 > 0
-                      ? "expiring in 30 days"
-                      : "all clear"
-              }
-              sub={cannabisStock.expiryLabel}
-              semantic={cannabisStock.expiryAlert}
-              onClick={() => nav("stock")}
-              hint="Stock → Items"
-            />
+            {/* LEFT: Stock by Category — tall chart */}
             {Object.keys(cannabisStock.byCat).length > 0 && (
-              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={170}>
+              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={290}>
                 <div
                   style={{
                     padding: "8px 16px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 8,
+                    gap: 10,
                     height: "100%",
                     justifyContent: "center",
                   }}
                 >
                   {Object.entries(cannabisStock.byCat)
                     .sort((a, b) => b[1].count - a[1].count)
-                    .slice(0, 4)
+                    .slice(0, 6)
                     .map(([cat, data]) => {
                       const pct =
                         data.count > 0 ? (data.inStock / data.count) * 100 : 0;
                       return (
                         <div
                           key={cat}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
+                          style={{ display: "flex", alignItems: "center", gap: 10 }}
                         >
                           <div
                             style={{
-                              width: 80,
-                              fontSize: 10,
+                              width: 90,
+                              fontSize: 11,
                               color: T.ink500,
                               fontFamily: T.font,
                               textTransform: "capitalize",
@@ -1380,7 +1321,7 @@ export default function HQOverview({ onNavigate }) {
                           <div
                             style={{
                               flex: 1,
-                              height: 6,
+                              height: 7,
                               background: T.ink075,
                               borderRadius: 3,
                               overflow: "hidden",
@@ -1396,14 +1337,14 @@ export default function HQOverview({ onNavigate }) {
                                     : pct > 50
                                       ? "#D97706"
                                       : "#DC2626",
-                                borderRadius: 4,
+                                borderRadius: 3,
                                 transition: "width 0.5s",
                               }}
                             />
                           </div>
                           <div
                             style={{
-                              width: 50,
+                              width: 44,
                               fontSize: 10,
                               color: T.ink400,
                               fontFamily: T.fontData,
@@ -1418,6 +1359,64 @@ export default function HQOverview({ onNavigate }) {
                 </div>
               </ChartCard>
             )}
+            {/* RIGHT: 2 tiles top, 1 tile below */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <MetricTile
+                  label="Stock Value"
+                  value={`R${Math.round(cannabisStock.stockValue).toLocaleString("en-ZA")}`}
+                  subLabel="AVCO-weighted"
+                  sub={`${cannabisStock.inStock} SKUs in stock`}
+                  semantic="success"
+                  onClick={() => nav("stock")}
+                  hint="Stock"
+                />
+                <MetricTile
+                  label="Margin Health"
+                  value={
+                    cannabisStock.avgMargin != null
+                      ? `${cannabisStock.avgMargin.toFixed(1)}%`
+                      : "\u2014"
+                  }
+                  subLabel="avg across priced items"
+                  sub={`${cannabisStock.healthyCount} of ${cannabisStock.totalPriced} healthy (>40%)`}
+                  semantic={
+                    cannabisStock.avgMargin >= 50
+                      ? "success"
+                      : cannabisStock.avgMargin >= 35
+                        ? "warning"
+                        : "danger"
+                  }
+                  onClick={() => nav("pricing")}
+                  hint="Pricing"
+                />
+              </div>
+              <MetricTile
+                label="Expiry Status"
+                value={
+                  cannabisStock.expired > 0
+                    ? cannabisStock.expired
+                    : cannabisStock.expiring7 > 0
+                      ? cannabisStock.expiring7
+                      : cannabisStock.expiring30 > 0
+                        ? cannabisStock.expiring30
+                        : "\u2713"
+                }
+                subLabel={
+                  cannabisStock.expired > 0
+                    ? "items expired"
+                    : cannabisStock.expiring7 > 0
+                      ? "expiring this week"
+                      : cannabisStock.expiring30 > 0
+                        ? "expiring in 30 days"
+                        : "all clear"
+                }
+                sub={cannabisStock.expiryLabel}
+                semantic={cannabisStock.expiryAlert}
+                onClick={() => nav("stock")}
+                hint="Stock \u2192 Items"
+              />
+            </div>
           </div>
         </>
       )}
