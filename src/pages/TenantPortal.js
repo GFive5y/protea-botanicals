@@ -845,6 +845,7 @@ export default function TenantPortal() {
     [setSearchParams],
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   useEffect(() => {
     import("../services/supabaseClient").then(({ supabase }) => {
@@ -867,6 +868,13 @@ export default function TenantPortal() {
     const t = setTimeout(() => setSearchFilter(null), 800);
     return () => clearTimeout(t);
   }, [searchKey]);
+
+  // nuai:open-ai — AI pill in sidebar dispatches this event
+  useEffect(() => {
+    const handler = () => setAiOpen(true);
+    window.addEventListener("nuai:open-ai", handler);
+    return () => window.removeEventListener("nuai:open-ai", handler);
+  }, []);
   const handleTabSelect = useCallback(
     (tabId) => {
       setSearchParams({ tab: tabId }, { replace: true });
@@ -1472,7 +1480,15 @@ export default function TenantPortal() {
               </div>
             </div>
           )}
-          <ProteaAI />
+          <ProteaAI
+            isOpen={aiOpen}
+            onClose={() => setAiOpen(false)}
+            navExpanded={!sidebarCollapsed}
+            tenantId={tenantId}
+            role={userRole}
+            isHQ={false}
+            tenantName={tenantName}
+          />
         </div>
         <ToastContainer />
       </PlatformBarProvider>
