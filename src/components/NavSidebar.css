@@ -458,7 +458,7 @@
   left: var(--strip-w);
   width: 0;
   background: #ffffff;
-  border-right: 0.5px solid rgba(0, 0, 0, 0.1);
+  border-right: none;
   z-index: 28;
   overflow: hidden;
   transition:
@@ -473,6 +473,7 @@
 }
 .ai-pane.open {
   width: 320px;
+  border-right: 0.5px solid rgba(0, 0, 0, 0.1);
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.07);
 }
 
