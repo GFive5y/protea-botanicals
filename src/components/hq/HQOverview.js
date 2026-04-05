@@ -116,7 +116,19 @@ const T = {
   },
 };
 
-const DONUT_COLOURS = [T.accent, T.accentMid, "#52B788", T.accentBd, T.ink300];
+// ── Chart colour palette — Indigo Intelligence ──────────────────────────────
+const CHART = {
+  primary:    "#6366F1",
+  secondary:  "#F472B6",
+  tertiary:   "#06B6D4",
+  quaternary: "#A78BFA",
+  neutral:    "#94A3B8",
+  grid:       "#E2E8F0",
+  axis:       "#94A3B8",
+  cat: ["#6366F1","#F472B6","#06B6D4","#A78BFA","#94A3B8"],
+};
+
+const DONUT_COLOURS = CHART.cat;
 
 // ─── WorkflowGuide content ───────────────────────────────────────────────────
 const GUIDE_STEPS = [
@@ -997,19 +1009,19 @@ export default function HQOverview({ onNavigate }) {
               >
                 <defs>
                   <linearGradient id="ov-rev-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={T.accent} stopOpacity={0.45} />
-                    <stop offset="95%" stopColor={T.accent} stopOpacity={0.02} />
+                    <stop offset="5%" stopColor={CHART.primary} stopOpacity={0.09} />
+                    <stop offset="95%" stopColor={CHART.primary} stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   horizontal={true}
                   vertical={false}
-                  stroke={T.ink150}
+                  stroke={CHART.grid}
                   strokeWidth={0.5}
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   dy={6}
@@ -1017,7 +1029,7 @@ export default function HQOverview({ onNavigate }) {
                   maxRotation={0}
                 />
                 <YAxis
-                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   width={55}
@@ -1036,8 +1048,8 @@ export default function HQOverview({ onNavigate }) {
                   type="monotone"
                   dataKey="total"
                   name="Revenue"
-                  stroke={T.accent}
-                  strokeWidth={2}
+                  stroke={CHART.primary}
+                  strokeWidth={1.5}
                   fill="url(#ov-rev-grad)"
                   dot={false}
                   isAnimationActive={true}
@@ -1348,25 +1360,25 @@ export default function HQOverview({ onNavigate }) {
                   <linearGradient id="ov-scan-grad" x1="0" y1="0" x2="0" y2="1">
                     <stop
                       offset="5%"
-                      stopColor={T.accentMid}
-                      stopOpacity={0.4}
+                      stopColor={CHART.secondary}
+                      stopOpacity={0.09}
                     />
                     <stop
                       offset="95%"
-                      stopColor={T.accentMid}
-                      stopOpacity={0.02}
+                      stopColor={CHART.secondary}
+                      stopOpacity={0.01}
                     />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   horizontal={true}
                   vertical={false}
-                  stroke={T.ink150}
+                  stroke={CHART.grid}
                   strokeWidth={0.5}
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   dy={6}
@@ -1374,7 +1386,7 @@ export default function HQOverview({ onNavigate }) {
                   maxRotation={0}
                 />
                 <YAxis
-                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   width={28}
@@ -1387,8 +1399,8 @@ export default function HQOverview({ onNavigate }) {
                   type="monotone"
                   dataKey="count"
                   name="Scans"
-                  stroke={T.accentMid}
-                  strokeWidth={2}
+                  stroke={CHART.secondary}
+                  strokeWidth={1.5}
                   fill="url(#ov-scan-grad)"
                   dot={false}
                   isAnimationActive={false}
@@ -1510,12 +1522,12 @@ export default function HQOverview({ onNavigate }) {
                 <CartesianGrid
                   horizontal={false}
                   vertical={true}
-                  stroke={T.ink150}
+                  stroke={CHART.grid}
                   strokeWidth={0.5}
                 />
                 <XAxis
                   type="number"
-                  tick={{ fill: T.ink400, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   allowDecimals={false}
@@ -1523,7 +1535,7 @@ export default function HQOverview({ onNavigate }) {
                 <YAxis
                   type="category"
                   dataKey="name"
-                  tick={{ fill: T.ink500, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   width={76}
@@ -1534,7 +1546,7 @@ export default function HQOverview({ onNavigate }) {
                 <Bar
                   dataKey="value"
                   name="Scans"
-                  fill={T.accent}
+                  fill={CHART.primary}
                   radius={[0, 3, 3, 0]}
                   isAnimationActive={false}
                   maxBarSize={18}
