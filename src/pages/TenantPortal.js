@@ -129,11 +129,6 @@ const WATERFALL = [
         label: "Cash-Up",
         desc: "End of day · till reconciliation · variance",
       },
-      {
-        id: "roster",
-        label: "Team Roster",
-        desc: "Who's working this week · shift schedule",
-      },
     ],
   },
   {
@@ -327,11 +322,6 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Cash-Up",
         desc: "End of day · till reconciliation · variance",
       },
-      {
-        id: "roster",
-        label: "Team Roster",
-        desc: "Who's working this week · shift schedule",
-      },
     ],
   },
   {
@@ -462,6 +452,24 @@ const CANNABIS_RETAIL_WATERFALL = [
     ],
   },
 ];
+
+// Role-based section visibility for cannabis retail
+// staff     → till + customers only
+// management/hr → no financial intelligence
+// admin/owner   → everything
+const CANNABIS_ROLE_SECTIONS = {
+  staff:      ["home", "sales", "customers"],
+  hr:         ["home", "people"],
+  management: ["home", "inventory", "operations", "sales", "customers", "people"],
+  admin:      ["home", "inventory", "procurement", "operations", "sales", "customers", "intelligence", "people"],
+  retailer:   ["home", "sales", "customers"],
+  customer:   ["home"],
+};
+
+function getCannabisSections(waterfall, role) {
+  const allowed = CANNABIS_ROLE_SECTIONS[role] || CANNABIS_ROLE_SECTIONS["admin"];
+  return waterfall.filter(s => allowed.includes(s.id));
+}
 
 function getWaterfall(industryProfile) {
   if (
@@ -731,7 +739,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
 export default function TenantPortal() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { tenant, tenantId, industryProfile, isOperator } = useTenant();
+  const { tenant, tenantId, industryProfile, isOperator, role: userRole } = useTenant();
 
   const activeTab = searchParams.get("tab") || "overview";
   const setActiveTab = useCallback(
@@ -740,13 +748,13 @@ export default function TenantPortal() {
     },
     [setSearchParams],
   );
-  const role = "owner";
   const activeWaterfall = getWaterfall(industryProfile);
-  const visibleSectionIds = ROLE_SECTIONS[role] || ROLE_SECTIONS.owner;
   const visibleSections =
     activeWaterfall === CANNABIS_RETAIL_WATERFALL
-      ? activeWaterfall
-      : activeWaterfall.filter((s) => visibleSectionIds.includes(s.id));
+      ? getCannabisSections(activeWaterfall, userRole)
+      : activeWaterfall.filter((s) =>
+          (ROLE_SECTIONS[userRole] || ROLE_SECTIONS.owner).includes(s.id)
+        );
 
   const profileBadge =
     PROFILE_BADGE[industryProfile] || PROFILE_BADGE.general_retail;

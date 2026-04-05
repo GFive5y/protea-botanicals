@@ -38,6 +38,7 @@ export function TenantProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [tenantConfig, setTenantConfig] = useState({});
   const [isOperator, setIsOperator] = useState(false);
+  const [userRole, setUserRole] = useState("staff");
 
   // ★ v1.1: Track whether we've already loaded tenant data.
   // Prevents reloading on every SIGNED_IN event (Supabase fires this repeatedly).
@@ -75,6 +76,7 @@ export function TenantProvider({ children }) {
       const hasHQAccess = profile?.hq_access === true;
       setIsHQ(hasHQAccess);
       setIsOperator(profile?.is_operator === true);
+      setUserRole(profile?.role || "staff");
 
       // Load the user's tenant
       if (profile?.tenant_id) {
@@ -196,6 +198,7 @@ export function TenantProvider({ children }) {
     tenantConfig,
     industryProfile: tenant?.industry_profile || "cannabis_retail",
     isOperator,
+    role: userRole,
   };
 
   return (
