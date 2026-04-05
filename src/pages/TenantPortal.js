@@ -4,7 +4,7 @@
 //   2. Replace dead "+" AI pill with AIFixture + slimmer account strip
 //      AIFixture: proactive daily brief, cycling insights, NuAI typographic mark
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 import PlatformBar from "../components/PlatformBar";
@@ -49,6 +49,7 @@ import HRCalendar from "../components/hq/HRCalendar";
 import HRPayroll from "../components/hq/HRPayroll";
 import GlobalSearch from "../components/GlobalSearch";
 import AIFixture from "../components/AIFixture";
+import AccountBubble from "../components/AccountBubble";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
   User, Users, TrendingUp, Briefcase, Layers, Truck,
@@ -686,6 +687,9 @@ export default function TenantPortal() {
   );
   const [drawerOpen, setDrawerOpen]   = useState(false);
   const [aiOpen, setAiOpen]           = useState(false);
+  const [bubbleOpen, setBubbleOpen]   = useState(false);
+  const [acctRect, setAcctRect]       = useState(null);
+  const acctRef                       = useRef(null);
   const [currentUser, setCurrentUser] = useState(null);
   useEffect(() => {
     import("../services/supabaseClient").then(({ supabase }) => {
@@ -714,6 +718,19 @@ export default function TenantPortal() {
     window.addEventListener("nuai:open-ai", handler);
     return () => window.removeEventListener("nuai:open-ai", handler);
   }, []);
+
+  // Close account bubble on outside click
+  useEffect(() => {
+    if (!bubbleOpen) return;
+    const handler = (e) => {
+      if (acctRef.current && acctRef.current.contains(e.target)) return;
+      const bubble = document.getElementById("tp-acct-bubble");
+      if (bubble && bubble.contains(e.target)) return;
+      setBubbleOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [bubbleOpen]);
 
   const handleTabSelect = useCallback(
     (tabId) => {
@@ -838,21 +855,43 @@ export default function TenantPortal() {
             />
 
             {/* Account strip */}
-            <div style={{
-              padding: sidebarCollapsed ? "8px 0" : "8px 12px",
-              borderTop: `1px solid ${T.border}`,
-              display: "flex", alignItems: "center", gap: 8,
-              justifyContent: sidebarCollapsed ? "center" : "flex-start",
-              flexShrink: 0,
-            }}>
+            <div
+              ref={acctRef}
+              style={{
+                padding: sidebarCollapsed ? "8px 0" : "8px 12px",
+                borderTop: `1px solid ${T.border}`,
+                display: "flex", alignItems: "center", gap: 8,
+                justifyContent: sidebarCollapsed ? "center" : "flex-start",
+                flexShrink: 0,
+                position: "relative",
+              }}
+            >
+              {bubbleOpen && (
+                <AccountBubble
+                  tenantId={tenantId}
+                  tenantName={tenantName}
+                  industryProfile={industryProfile}
+                  role={userRole}
+                  currentUser={currentUser}
+                  collapsed={sidebarCollapsed}
+                  anchorRect={acctRect}
+                  onClose={() => setBubbleOpen(false)}
+                />
+              )}
               <button
                 title={currentUser?.email || "Account"}
+                onClick={() => {
+                  if (!bubbleOpen) setAcctRect(acctRef.current?.getBoundingClientRect() || null);
+                  setBubbleOpen(v => !v);
+                }}
                 style={{
                   width: 28, height: 28, borderRadius: "50%",
-                  background: T.accentMid, border: "none", cursor: "default",
+                  background: bubbleOpen ? T.accent : T.accentMid,
+                  border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0, color: "#fff", fontSize: 10, fontWeight: 700,
                   fontFamily: T.font, letterSpacing: "0.04em", textTransform: "uppercase",
+                  transition: "background 0.15s",
                 }}
               >
                 {currentUser?.email ? currentUser.email.slice(0, 2).toUpperCase() : "??"}
