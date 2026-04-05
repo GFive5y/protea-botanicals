@@ -1122,7 +1122,8 @@ export default function TenantPortal() {
                   justifyContent: "space-between",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {/* Mobile hamburger — unchanged */}
                   <button
                     className="portal-hamburger"
                     onClick={() => setDrawerOpen(true)}
@@ -1147,37 +1148,60 @@ export default function TenantPortal() {
                       <line x1="3" y1="18" x2="21" y2="18"/>
                     </svg>
                   </button>
-                  {activeSection && (
+
+                  {/* Home — always first, always navigates to overview */}
+                  <button
+                    onClick={() => setActiveTab("overview")}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      fontSize: 12,
+                      color: T.ink400,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      fontFamily: T.font,
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                      stroke={T.ink400} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    </svg>
+                    Home
+                  </button>
+
+                  {/* Section — only when NOT in the home section */}
+                  {activeSection && activeSection.id !== "home" && (
                     <>
-                      <span
+                      <span style={{ color: T.ink150, fontSize: 12 }}>›</span>
+                      <button
+                        onClick={() => setActiveTab(activeSection.tabs[0].id)}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 5,
                           fontSize: 12,
-                          color: T.ink300,
+                          color: T.ink400,
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          fontFamily: T.font,
                         }}
                       >
-                        {(() => {
-                          const BreadIcon = activeSection.icon;
-                          return BreadIcon ? (
-                            <BreadIcon size={12} strokeWidth={1.75} color={T.ink300} />
-                          ) : null;
-                        })()}
                         {activeSection.label}
-                      </span>
-                      <span style={{ color: T.ink150 }}>›</span>
+                      </button>
                     </>
                   )}
-                  <span
-                    style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}
-                  >
+
+                  {/* Current tab — bold, not clickable */}
+                  <span style={{ color: T.ink150, fontSize: 12 }}>›</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}>
                     {activeTabDef?.label || activeTab}
                   </span>
+
+                  {/* Desc — unchanged */}
                   {activeTabDef?.desc && (
-                    <span
-                      style={{ fontSize: 11, color: T.ink300, marginLeft: 4 }}
-                    >
+                    <span style={{ fontSize: 11, color: T.ink300, marginLeft: 2 }}>
                       · {activeTabDef.desc}
                     </span>
                   )}
