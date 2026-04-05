@@ -5,6 +5,29 @@
 
 ---
 
+## v190 — UX shell overhaul (search, sidebar, breadcrumb, taxonomy) · April 6, 2026
+HEAD: 5b2b04a
+WHAT CHANGED:
+  b88b0b5 — HR Session D Pay Calculator:
+    SA BCEA rules (regular/OT/Sunday/PH), summary cards + daily table + gross total
+  03d6b3a — Global command palette (WP-SEARCH v1.0):
+    GlobalSearch.js ~580 lines, 8 categories, role-based, Ctrl+K, 250ms debounce
+    Pre-filtered navigation: product→catalog, staff→staff, customer→customers
+  ae04b28 + f5da6b0 — Search trigger reposition:
+    Removed standalone bar, trigger now in breadcrumb right side
+    Wider pill (260px), clickable Esc button
+  27ee2c0 — Sidebar ✕ collapse + account/AI pills:
+    Removed edge strip, ✕ in header, + AI pill + user initials at bottom
+  156a7a0 — Breadcrumb Home link + clickable section:
+    Home › Section › Tab path, all navigable
+  45165fc — Taxonomy rename + section header click:
+    Sales & Customers→Sales, Customer 360→Profiles, Smart Catalog→Catalog,
+    Daily Operations→Operations. Section headers navigate to first tab.
+  81a25d7 + 5b2b04a — Phantom line fixes:
+    borderLeft transparent→none in expanded + collapsed modes
+
+---
+
 ## v189 — UX polish sprint (icons, mobile, collapsible sidebar) · April 5, 2026
 HEAD: dd25e4d
 
