@@ -751,6 +751,17 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
   );
 }
 
+const PORTAL_CSS = `
+  @media (max-width: 768px) {
+    .portal-sidebar { display: none !important; }
+    .portal-hamburger { display: flex !important; }
+  }
+  @media (min-width: 769px) {
+    .portal-hamburger { display: none !important; }
+    .portal-drawer { display: none !important; }
+  }
+`;
+
 export default function TenantPortal() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -760,6 +771,14 @@ export default function TenantPortal() {
   const setActiveTab = useCallback(
     (tabId) => {
       setSearchParams({ tab: tabId }, { replace: true });
+    },
+    [setSearchParams],
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const handleTabSelect = useCallback(
+    (tabId) => {
+      setSearchParams({ tab: tabId }, { replace: true });
+      setDrawerOpen(false);
     },
     [setSearchParams],
   );
@@ -785,6 +804,7 @@ export default function TenantPortal() {
   return (
     <DevErrorCapture>
       <PlatformBarProvider>
+        <style>{PORTAL_CSS}</style>
         <div
           style={{
             display: "flex",
@@ -792,10 +812,12 @@ export default function TenantPortal() {
             overflow: "hidden",
             fontFamily: T.font,
             background: T.bg,
+            position: "relative",
           }}
         >
-          {/* ── SIDEBAR — unchanged ───────────────────────────── */}
+          {/* ── SIDEBAR — desktop only (hidden on mobile via CSS) ── */}
           <div
+            className="portal-sidebar"
             style={{
               width: 220,
               minWidth: 220,
@@ -867,7 +889,7 @@ export default function TenantPortal() {
                   key={section.id}
                   section={section}
                   activeTab={activeTab}
-                  onSelect={setActiveTab}
+                  onSelect={handleTabSelect}
                   defaultOpen={i <= 1}
                 />
               ))}
@@ -912,6 +934,30 @@ export default function TenantPortal() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    className="portal-hamburger"
+                    onClick={() => setDrawerOpen(true)}
+                    style={{
+                      display: "none",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 34,
+                      height: 34,
+                      background: "transparent",
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      padding: 0,
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                      stroke={T.ink500} strokeWidth="2" strokeLinecap="round">
+                      <line x1="3" y1="6" x2="21" y2="6"/>
+                      <line x1="3" y1="12" x2="21" y2="12"/>
+                      <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                  </button>
                   {activeSection && (
                     <>
                       <span
@@ -1059,6 +1105,101 @@ export default function TenantPortal() {
             </div>
           </div>
 
+          {drawerOpen && (
+            <div
+              className="portal-drawer"
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 300,
+                display: "flex",
+              }}
+            >
+              <div
+                onClick={() => setDrawerOpen(false)}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.38)",
+                }}
+              />
+              <div
+                style={{
+                  position: "relative",
+                  width: 240,
+                  background: T.sidebar,
+                  borderRight: `1px solid ${T.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflowY: "auto",
+                  zIndex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "14px 16px 12px",
+                    borderBottom: `1px solid ${T.border}`,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 5 }}>
+                      {tenantName}
+                    </div>
+                    <div style={{
+                      display: "inline-block",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      background: profileBadge.bg,
+                      color: profileBadge.color,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                    }}>
+                      {profileBadge.label}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDrawerOpen(false)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: T.ink400,
+                      fontSize: 17,
+                      lineHeight: 1,
+                      padding: 4,
+                      marginTop: 2,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
+                  {visibleSections.map((section, i) => (
+                    <SidebarSection
+                      key={section.id}
+                      section={section}
+                      activeTab={activeTab}
+                      onSelect={handleTabSelect}
+                      defaultOpen={i <= 1}
+                    />
+                  ))}
+                </div>
+                <div style={{
+                  padding: "10px 16px 14px",
+                  borderTop: `1px solid ${T.border}`,
+                  fontSize: 10,
+                  color: T.ink300,
+                }}>
+                  {tenantId?.slice(0, 8)}…
+                </div>
+              </div>
+            </div>
+          )}
           <ProteaAI />
         </div>
         <ToastContainer />
