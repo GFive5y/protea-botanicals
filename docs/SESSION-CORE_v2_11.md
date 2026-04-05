@@ -402,6 +402,31 @@ Restored: April 5, 2026.
 
 ---
 
+## LL-202 — GITHUB WRITE TOOLS BANNED FOR CLAUDE.AI — NO EXCEPTIONS (VL-007)
+Prompted by VL-007 — April 5, 2026. Reinforcement of RULE 0Q.
+Claude.ai NEVER calls GitHub write tools. Ever. No exceptions.
+Banned tools for Claude.ai: push_files, create_or_update_file
+Applies to: code files, doc files, config files — ALL file types
+"Just docs" is not an exception.
+"Just this once" is not an exception.
+"Faster than Claude Code" is not an exception.
+"The tool is available in my tool list" is NOT permission to use it.
+The three-Claude workflow for all repo writes:
+
+  Claude.ai produces complete file content in the chat response
+  Claude.ai gives Claude Code the exact instruction
+  Claude Code writes to disk, verifies, commits, pushes
+  Claude.ai confirms via GitHub MCP read tools
+
+If Claude.ai catches itself about to call push_files or create_or_update_file:
+  STOP. Do not call the tool.
+  State: "I was about to violate RULE 0Q. Logging VL-NNN."
+  Write the violation log entry.
+  Give Claude Code the instruction instead.
+Origin: VL-007 (April 5, 2026).
+
+---
+
 *SESSION-CORE v2.11 · NuAi · April 4, 2026*
 *v2.11: LL-196 through LL-199*
 *  LL-196: WP-VISUAL typography banned patterns + required patterns*

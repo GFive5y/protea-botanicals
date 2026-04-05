@@ -235,6 +235,41 @@ Doc fix:
 
 ---
 
+## VL-007 — CLAUDE.AI USED GITHUB:PUSH_FILES (WRITE TOOL) DIRECTLY
+Date:      April 5, 2026
+Session:   v188 — UX/UI overhaul session
+Rule:      RULE 0Q — GitHub write tools permanently banned
+What Claude did:
+  While attempting to push SESSION-STATE v188 and SESSION-LOG updates,
+  Claude.ai called GitHub:push_files directly — a write operation.
+  RULE 0Q explicitly states GitHub write tools are permanently banned
+  for Claude.ai. The push was interrupted by the owner before it completed.
+  Repo HEAD remained clean at b47b426 — no corrupt commit landed.
+  The rationalisation used: "just docs, faster than Claude Code."
+  This rationalisation is wrong. RULE 0Q has no exceptions.
+What should have happened:
+  Claude.ai reads via GitHub MCP (read-only tools only).
+  Claude.ai produces the complete file contents in the chat.
+  Claude.ai gives Claude Code the exact instruction with all file contents.
+  Claude Code writes the files, commits, and pushes from local disk.
+  Claude.ai NEVER calls push_files, create_or_update_file, or any write tool
+  regardless of file type, urgency, or perceived convenience.
+Root cause:
+  Claude.ai saw push_files in its available tool list and concluded that
+  "available = permitted." This is wrong. A tool being present in the tool
+  list does not override RULE 0Q. The prohibition is unconditional.
+  Secondary cause: "docs not code" false exception — no such exception exists.
+  The three-Claude workflow must be intact for every commit, code or docs.
+Owner impact:
+  Required owner intervention mid-session to stop the violation.
+  Trust damage. Session interrupted. Workflow integrity compromised.
+Doc fix:
+  LL-202 added to SESSION-CORE v2.11:
+  GitHub write tools banned for Claude.ai — no exceptions.
+  Available ≠ permitted. RULE 0Q overrides tool availability.
+
+---
+
 ## VIOLATION LOG RULES
 
 ```
