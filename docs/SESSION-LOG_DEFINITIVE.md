@@ -5,6 +5,31 @@
 
 ---
 
+## v191 — ProteaAI wired + phantom line root cause + sidebar polish · April 6, 2026
+HEAD: eb7a83c
+
+WHAT CHANGED (post v190 docs at d4c55c7):
+  4604b7a — CSS hygiene: borderLeft → inset box-shadow on all buttons
+  2b1dac8 — CSS hygiene: translucent section header bg removed
+  37fca62 — PHANTOM LINE ROOT CAUSE FIXED:
+    Source: NavSidebar.css .ai-pane border-right:0.5px at width:0
+    position:fixed panel painted border at sidebar edge when closed
+    Fix: border-right:none closed, restored on .ai-pane.open
+    Lesson: DevTools Inspect FIRST. 7 attempts lost to wrong diagnosis.
+  9d172b3 — Section toggle restored + sidebar scroll fixed:
+    Toggle: onClick broken by 45165fc (always open) → restored
+    Scroll: height:100vh + explicit overflowX/Y when expanded
+  781f50e — Sidebar scrollbar hidden, appears 4px on hover
+  cf35d1a — ProteaAI wired to + pill:
+    aiOpen state + nuai:open-ai listener in TenantPortal
+    Props: isOpen, onClose, navExpanded, tenantId, role, isHQ=false
+  5c86d39 — ProteaAI position fixed:
+    left:52px (HQ) → left:56px/220px (TenantPortal collapsed/expanded)
+  eb7a83c — ProteaAI z-index fixed:
+    z-index:28 → z-index:200 when open (above PlatformBar icons)
+
+---
+
 ## v190 — UX shell overhaul (search, sidebar, breadcrumb, taxonomy) · April 6, 2026
 HEAD: 5b2b04a
 WHAT CHANGED:
