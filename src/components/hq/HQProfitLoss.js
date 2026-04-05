@@ -244,7 +244,7 @@ const FIN = {
   managed:    "#92400E",   // amber — loyalty, controllable costs
   grid:       "#E2E8F0",
   axis:       "#94A3B8",
-  costCat:    ["#334155","#64748B","#92400E","#6B7280"],
+  costCat:    ["#1E3A5F","#3B82F6","#B45309","#94A3B8"],
 };
 
 // ─── Waterfall helper ─────────────────────────────────────────────────────────
@@ -1627,7 +1627,7 @@ export default function HQProfitLoss() {
                 </div>
               )}
 
-              {/* Revenue vs COGS trend */}
+              {/* Gross Margin Trend */}
               {(() => {
                 const dayMap = {};
                 orders.forEach((o) => {
@@ -1635,68 +1635,36 @@ export default function HQProfitLoss() {
                     "en-ZA",
                     { month: "short", day: "numeric" },
                   );
-                  dayMap[day] = dayMap[day] || {
-                    date: day,
-                    revenue: 0,
-                    cogs: 0,
-                  };
+                  dayMap[day] = dayMap[day] || { date: day, revenue: 0, cogs: 0 };
                   dayMap[day].revenue += parseFloat(o.total) || 0;
-                  dayMap[day].cogs +=
-                    avgFullCogsPerUnit * (parseInt(o.items_count) || 1);
+                  dayMap[day].cogs += avgFullCogsPerUnit * (parseInt(o.items_count) || 1);
                 });
                 const trendData = Object.values(dayMap)
                   .slice(-20)
                   .map((d) => ({
-                    ...d,
-                    revenue: Math.round(d.revenue),
-                    cogs: Math.round(d.cogs),
-                    net: Math.round(d.revenue - d.cogs),
+                    date: d.date,
+                    marginPct: d.revenue > 0
+                      ? parseFloat(((d.revenue - d.cogs) / d.revenue * 100).toFixed(2))
+                      : 0,
                   }));
                 if (trendData.length < 2) return null;
+                const avgMargin = trendData.reduce((s, d) => s + d.marginPct, 0) / trendData.length;
                 return (
                   <div style={{ marginBottom: 20 }}>
-                    <ChartCard title="Revenue vs COGS" subtitle="Daily trend · actual vs cost" accent="blue" height={240}>
+                    <ChartCard
+                      title="Gross Margin Trend"
+                      subtitle="Daily gross margin % \u00b7 last 30 days"
+                      height={240}
+                    >
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={trendData}
                           margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
                         >
                           <defs>
-                            <linearGradient
-                              id="pl-rev-grad"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor={FIN.revenue}
-                                stopOpacity={0.09}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor={FIN.revenue}
-                                stopOpacity={0.01}
-                              />
-                            </linearGradient>
-                            <linearGradient
-                              id="pl-cogs-grad"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor={FIN.cost}
-                                stopOpacity={0.09}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor={FIN.cost}
-                                stopOpacity={0.01}
-                              />
+                            <linearGradient id="pl-margin-grad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={FIN.rate} stopOpacity={0.09} />
+                              <stop offset="95%" stopColor={FIN.rate} stopOpacity={0.01} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid
@@ -1707,11 +1675,7 @@ export default function HQProfitLoss() {
                           />
                           <XAxis
                             dataKey="date"
-                            tick={{
-                              fill: FIN.axis,
-                              fontSize: 10,
-                              fontFamily: CC.font,
-                            }}
+                            tick={{ fill: FIN.axis, fontSize: 10, fontFamily: CC.font }}
                             axisLine={false}
                             tickLine={false}
                             dy={6}
@@ -1719,56 +1683,45 @@ export default function HQProfitLoss() {
                             maxRotation={0}
                           />
                           <YAxis
-                            tick={{
-                              fill: FIN.axis,
-                              fontSize: 10,
-                              fontFamily: CC.font,
-                            }}
+                            tick={{ fill: FIN.axis, fontSize: 10, fontFamily: CC.font }}
                             axisLine={false}
                             tickLine={false}
-                            width={46}
-                            tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
+                            width={42}
+                            tickFormatter={(v) => `${v.toFixed(0)}%`}
+                            domain={['auto', 'auto']}
                           />
                           <Tooltip
                             content={
                               <ChartTooltip
-                                formatter={(v) =>
-                                  `R${v.toLocaleString("en-ZA")}`
-                                }
+                                formatter={(v) => `${parseFloat(v).toFixed(2)}%`}
                               />
                             }
                           />
+                          <ReferenceLine
+                            y={avgMargin}
+                            stroke={FIN.rate}
+                            strokeWidth={0.75}
+                            strokeDasharray="4 3"
+                            opacity={0.4}
+                            label={{
+                              value: `avg ${avgMargin.toFixed(1)}%`,
+                              position: "insideTopRight",
+                              fontSize: 9,
+                              fill: FIN.rate,
+                              opacity: 0.6,
+                            }}
+                          />
                           <Area
                             type="monotone"
-                            dataKey="revenue"
-                            name="Revenue"
-                            stroke={FIN.revenue}
+                            dataKey="marginPct"
+                            name="Gross margin"
+                            stroke={FIN.rate}
                             strokeWidth={1.5}
-                            fill="url(#pl-rev-grad)"
+                            fill="url(#pl-margin-grad)"
                             dot={false}
                             isAnimationActive={true}
                             animationDuration={700}
                             animationEasing="ease-out"
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="cogs"
-                            name="COGS"
-                            stroke={FIN.cost}
-                            strokeWidth={1.5}
-                            fill="url(#pl-cogs-grad)"
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="net"
-                            name="Net"
-                            stroke={FIN.rate}
-                            strokeWidth={1.5}
-                            dot={false}
-                            isAnimationActive={false}
-                            strokeDasharray="4 3"
                           />
                         </AreaChart>
                       </ResponsiveContainer>
