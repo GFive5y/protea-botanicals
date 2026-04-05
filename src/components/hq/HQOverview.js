@@ -1395,10 +1395,10 @@ export default function HQOverview({ onNavigate }) {
                                 height: "100%",
                                 background:
                                   pct === 100
-                                    ? T.accentMid
+                                    ? "#059669"
                                     : pct > 50
-                                      ? T.warning
-                                      : T.danger,
+                                      ? "#D97706"
+                                      : "#DC2626",
                                 borderRadius: 4,
                                 transition: "width 0.5s",
                               }}
@@ -2399,10 +2399,10 @@ function MetricTile({
   delta,
 }) {
   const SEMANTIC_STYLES = {
-    success: { border: "#16A34A", text: "#15803D", bg: "#F0FDF4", bd: "#BBF7D0" },
-    warning: { border: "#D97706", text: "#92400E", bg: "#FFFBEB", bd: "#FDE68A" },
-    danger:  { border: "#DC2626", text: "#991B1B", bg: "#FEF2F2", bd: "#FECACA" },
-    info:    { border: "#2563EB", text: "#1E3A5F", bg: "#EFF6FF", bd: "#BFDBFE" },
+    success: { border: "#059669", text: "#059669", bg: "rgba(5,150,105,0.07)",   bd: "rgba(5,150,105,0.2)"  },
+    warning: { border: "#D97706", text: "#D97706", bg: "rgba(215,119,6,0.07)",   bd: "rgba(215,119,6,0.2)"  },
+    danger:  { border: "#DC2626", text: "#DC2626", bg: "rgba(220,38,38,0.07)",   bd: "rgba(220,38,38,0.18)" },
+    info:    { border: "#2563EB", text: "#2563EB", bg: "rgba(37,99,235,0.07)",   bd: "rgba(37,99,235,0.18)" },
   };
   const s = semantic ? SEMANTIC_STYLES[semantic] : null;
   const clickable = !!onClick;

@@ -31,8 +31,8 @@ export default function DeltaBadge({
   const COLORS = isNeutral
     ? { text: "#6B7280", bg: "#F3F4F6", bd: "#E5E7EB" }
     : isPositive
-    ? { text: "#15803D", bg: "#DCFCE7", bd: "#BBF7D0" }
-    : { text: "#DC2626", bg: "#FEE2E2", bd: "#FECACA" };
+    ? { text: "#059669", bg: "rgba(5,150,105,0.08)", bd: "rgba(5,150,105,0.22)" }
+    : { text: "#DC2626", bg: "rgba(220,38,38,0.07)", bd: "rgba(220,38,38,0.2)" };
 
   const arrow = isNeutral ? "→" : isPositive ? "↑" : "↓";
   const display = `${Math.abs(value).toFixed(decimals)}${suffix}`;
