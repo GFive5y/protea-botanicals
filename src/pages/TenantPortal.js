@@ -6,7 +6,7 @@
 //      outer = full-width flex (scrollbar at screen edge / overflow:hidden for catalog)
 //      inner = maxWidth:1400 + margin:"0 auto" → aligns with FX bar on ANY screen width
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
 import PlatformBar from "../components/PlatformBar";
@@ -49,6 +49,7 @@ import HRTimesheets from "../components/hq/HRTimesheets";
 import HRContracts from "../components/hq/HRContracts";
 import HRCalendar from "../components/hq/HRCalendar";
 import HRPayroll from "../components/hq/HRPayroll";
+import GlobalSearch from "../components/GlobalSearch";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
   User, Users, TrendingUp, Briefcase, Layers, Truck,
@@ -531,7 +532,7 @@ const PROFILE_BADGE = {
   operator: { label: "Operator", color: "#991B1B", bg: "#FEF2F2" },
 };
 
-function renderTab(tabId, tenantId, industryProfile, onTabChange) {
+function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, searchFilter) {
   switch (tabId) {
     case "overview":
       return <HQOverview />;
@@ -551,9 +552,9 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange) {
     case "hq-production":
       return <HQProduction />;
     case "stock":
-      return <HQStock />;
+      return <HQStock key={searchKey} initialCategory={searchFilter?.category} initialSubcategory={searchFilter?.subcategory} />;
     case "catalog":
-      return <SmartInventory tenantId={tenantId} />;
+      return <SmartInventory key={searchKey} tenantId={tenantId} initialSearch={searchFilter?.q} initialCategory={searchFilter?.category} initialSubcategory={searchFilter?.subcategory} />;
     case "wholesale-orders":
       return <HQWholesaleOrders />;
     case "invoices":
@@ -585,11 +586,11 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange) {
     case "reorder":
       return <HQReorderScoring />;
     case "staff":
-      return <HRStaffDirectory tenantId={tenantId} />;
+      return <HRStaffDirectory key={searchKey} tenantId={tenantId} initialSearch={searchFilter?.q} />;
     case "qr-codes":
       return <AdminQRCodes tenantId={tenantId} />;
     case "customers":
-      return <AdminCustomerEngagement tenantId={tenantId} />;
+      return <AdminCustomerEngagement key={searchKey} tenantId={tenantId} initialSearch={searchFilter?.q} />;
     case "comms":
       return <AdminCommsCenter tenantId={tenantId} />;
     case "trading":
@@ -836,6 +837,21 @@ export default function TenantPortal() {
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchFilter, setSearchFilter] = useState(null);
+  const [searchKey, setSearchKey] = useState(0);
+  const handleNavigateWithFilter = useCallback((tabId, filter) => {
+    setSearchFilter(filter);
+    setSearchKey((k) => k + 1);
+    setSearchParams({ tab: tabId }, { replace: true });
+    setDrawerOpen(false);
+  }, [setSearchParams]);
+
+  // Clear searchFilter after destination mounts — prevents stale filter
+  // on subsequent same-tab navigation
+  useEffect(() => {
+    const t = setTimeout(() => setSearchFilter(null), 800);
+    return () => clearTimeout(t);
+  }, [searchKey]);
   const handleTabSelect = useCallback(
     (tabId) => {
       setSearchParams({ tab: tabId }, { replace: true });
@@ -1040,6 +1056,13 @@ export default function TenantPortal() {
               flexDirection: "column",
             }}
           >
+            {/* ── GLOBAL SEARCH ── above everything, always visible */}
+            <GlobalSearch
+              tenantId={tenantId}
+              role={userRole}
+              onNavigate={setActiveTab}
+              onNavigateWithFilter={handleNavigateWithFilter}
+            />
             {/* Breadcrumb — unchanged */}
             <div
               style={{
@@ -1165,7 +1188,7 @@ export default function TenantPortal() {
                     boxSizing: "border-box",
                   }}
                 >
-                  {renderTab(activeTab, tenantId, industryProfile, setActiveTab)}
+                  {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
                 </div>
               </div>
             ) : (
@@ -1179,7 +1202,7 @@ export default function TenantPortal() {
                     boxSizing: "border-box",
                   }}
                 >
-                  {renderTab(activeTab, tenantId, industryProfile, setActiveTab)}
+                  {renderTab(activeTab, tenantId, industryProfile, setActiveTab, searchKey, searchFilter)}
                 </div>
               </div>
             )}

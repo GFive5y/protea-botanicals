@@ -433,11 +433,11 @@ function StaffSetupWizard({ onAddStaff }) {
   );
 }
 
-export default function HRStaffDirectory({ tenantId, user }) {
+export default function HRStaffDirectory({ tenantId, user, initialSearch }) {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch || "");
   const [statusFilter, setStatusFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [editingStaff, setEditingStaff] = useState(null); // null = closed, {} = new, {id,..} = edit

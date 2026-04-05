@@ -371,6 +371,7 @@ const secHdr = (text) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminCustomerEngagement({
   tenantId: tenantIdProp,
+  initialSearch,
 } = {}) {
   const { tenantId: ctxTenantId } = useTenant();
   const tenantId = tenantIdProp || ctxTenantId;
@@ -381,7 +382,7 @@ export default function AdminCustomerEngagement({
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch || "");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [sortBy, setSortBy] = useState("engagement");

@@ -953,7 +953,7 @@ const EDIT_FIELDS = [
 // ─────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────
-export default function SmartInventory({ tenantId }) {
+export default function SmartInventory({ tenantId, initialSearch, initialCategory, initialSubcategory }) {
   const [items, setItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -962,10 +962,10 @@ export default function SmartInventory({ tenantId }) {
   const [viewMode, setViewMode] = useState(VIEW_DETAIL);
   const [pillExpanded, setPillExpanded] = useState(false);
   const [tileSize, setTileSize] = useState("M");
-  const [catFilter, setCatFilter] = useState("all");
+  const [catFilter, setCatFilter] = useState(initialCategory || "all");
   const [groupFilter, setGroupFilter] = useState(null);
-  const [subFilter, setSubFilter] = useState(null);
-  const [search, setSearch] = useState("");
+  const [subFilter, setSubFilter] = useState(initialSubcategory || null);
+  const [search, setSearch] = useState(initialSearch || "");
 
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
