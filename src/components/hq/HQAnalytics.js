@@ -2513,9 +2513,9 @@ function ScansAnalytics({ data, industryProfile }) {
   ).length;
   const ordersCount = orders.length;
   const funnelStages = [
-    { label: "Total Scans", count: scans.length, color: T.accent },
-    { label: "Points Awarded", count: pointsAwardedCount, color: T.accentMid },
-    { label: "Orders Placed", count: ordersCount, color: T.success },
+    { label: "Total Scans", count: scans.length, color: CHART.primary },
+    { label: "Points Awarded", count: pointsAwardedCount, color: CHART.quaternary },
+    { label: "Orders Placed", count: ordersCount, color: CHART.tertiary },
   ];
   const funnelMax = funnelStages[0].count || 1;
 

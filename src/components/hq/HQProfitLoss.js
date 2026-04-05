@@ -1593,7 +1593,7 @@ export default function HQProfitLoss() {
                           isAnimationActive={true}
                           animationDuration={600}
                         >
-                          {[CC.accentMid, CC.gold, CC.danger, "#52B788"].map(
+                          {CHART.cat.map(
                             (c, i) => (
                               <Cell key={i} fill={c} />
                             ),
