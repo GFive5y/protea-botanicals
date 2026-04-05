@@ -836,8 +836,13 @@ export default function TenantPortal() {
     [setSearchParams],
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  useEffect(() => {
+    import("../services/supabaseClient").then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data: { user } }) => setCurrentUser(user));
+    });
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [handleHover, setHandleHover] = useState(false);
   const [searchFilter, setSearchFilter] = useState(null);
   const [searchKey, setSearchKey] = useState(0);
   const handleNavigateWithFilter = useCallback((tabId, filter) => {
@@ -930,7 +935,8 @@ export default function TenantPortal() {
                   }}
                 />
               ) : (
-                <div style={{ width: "100%" }}>
+                <div style={{ width: "100%", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
                       fontSize: 13,
@@ -979,6 +985,24 @@ export default function TenantPortal() {
                       ← HQ Operator View
                     </button>
                   )}
+                  </div>
+                  <button
+                    onClick={() => setSidebarCollapsed(true)}
+                    title="Collapse sidebar"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: T.ink400,
+                      fontSize: 15,
+                      lineHeight: 1,
+                      padding: "2px 4px",
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
               )}
             </div>
@@ -995,52 +1019,73 @@ export default function TenantPortal() {
                 />
               ))}
             </div>
-            {!sidebarCollapsed && (
-              <div
-                style={{
-                  padding: "10px 16px 14px",
-                  borderTop: `1px solid ${T.border}`,
-                }}
-              >
-                <span style={{ fontSize: 10, color: T.ink300 }}>
-                  {tenantId?.slice(0, 8)}…
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* ── SIDEBAR COLLAPSE HANDLE ── full-height strip, arrow at breadcrumb row */}
-          <div
-            onClick={() => setSidebarCollapsed((v) => !v)}
-            onMouseEnter={() => setHandleHover(true)}
-            onMouseLeave={() => setHandleHover(false)}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            style={{
-              width: 14,
-              flexShrink: 0,
-              background: handleHover ? "#C8E6D4" : "#F0EFEC",
-              borderLeft: `1px solid ${handleHover ? T.accentMid : T.border}`,
-              borderRight: `1px solid ${handleHover ? T.accentMid : T.border}`,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "center",
-              paddingTop: 20,
-              transition: "background 0.15s, border-color 0.15s",
-              zIndex: 5,
-            }}
-          >
-            <span
+            {/* ── BOTTOM PILLS — account + AI ── */}
+            <div
               style={{
-                fontSize: 8,
-                color: handleHover ? T.accent : T.ink300,
-                lineHeight: 1,
-                userSelect: "none",
-                transition: "color 0.15s",
+                padding: sidebarCollapsed ? "12px 0" : "10px 12px",
+                borderTop: `1px solid ${T.border}`,
+                display: "flex",
+                flexDirection: sidebarCollapsed ? "column" : "row",
+                alignItems: "center",
+                gap: 8,
+                justifyContent: sidebarCollapsed ? "center" : "flex-start",
               }}
             >
-              {sidebarCollapsed ? "▶" : "◀"}
-            </span>
+              {/* AI pill */}
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("nuai:open-ai"))}
+                title="NuAi Assistant"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: T.accent,
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  color: "#fff",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  fontFamily: T.font,
+                }}
+              >
+                +
+              </button>
+              {/* Account pill */}
+              <button
+                title={currentUser?.email || "Account"}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: T.accentMid,
+                  border: "none",
+                  cursor: "default",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: T.font,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {currentUser?.email
+                  ? currentUser.email.slice(0, 2).toUpperCase()
+                  : "??"}
+              </button>
+              {!sidebarCollapsed && (
+                <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.font }}>
+                  {tenantId?.slice(0, 8)}…
+                </span>
+              )}
+            </div>
           </div>
 
           {/* ── MAIN CONTENT ──────────────────────────────────── */}
