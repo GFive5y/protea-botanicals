@@ -235,16 +235,16 @@ const CC = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-// ── Chart colour palette — Indigo Intelligence ──────────────────────────────
-const CHART = {
-  primary:    "#6366F1",
-  secondary:  "#F472B6",
-  tertiary:   "#06B6D4",
-  quaternary: "#A78BFA",
-  neutral:    "#94A3B8",
+// ── Premium Financial palette — semantic finance colors ──────────────────────
+const FIN = {
+  revenue:    "#059669",   // emerald — revenue, profit, positive
+  cost:       "#DC2626",   // crimson — costs, losses, COGS
+  rate:       "#2563EB",   // sapphire — margins, rates, net line
+  structural: "#64748B",   // slate — overhead, neutral categories
+  managed:    "#92400E",   // amber — loyalty, controllable costs
   grid:       "#E2E8F0",
   axis:       "#94A3B8",
-  cat: ["#6366F1","#F472B6","#06B6D4","#A78BFA","#94A3B8"],
+  costCat:    ["#334155","#64748B","#92400E","#6B7280"],
 };
 
 // ─── Waterfall helper ─────────────────────────────────────────────────────────
@@ -322,18 +322,18 @@ function WaterfallChart({
         <CartesianGrid
           horizontal={true}
           vertical={false}
-          stroke={CHART.grid}
+          stroke={FIN.grid}
           strokeWidth={0.5}
         />
         <XAxis
           dataKey="label"
-          tick={{ fill: CHART.axis, fontSize: 11, fontFamily: CC.font }}
+          tick={{ fill: FIN.axis, fontSize: 11, fontFamily: CC.font }}
           axisLine={false}
           tickLine={false}
           dy={6}
         />
         <YAxis
-          tick={{ fill: CHART.axis, fontSize: 11, fontFamily: CC.font }}
+          tick={{ fill: FIN.axis, fontSize: 11, fontFamily: CC.font }}
           axisLine={false}
           tickLine={false}
           width={62}
@@ -1593,7 +1593,7 @@ export default function HQProfitLoss() {
                           isAnimationActive={true}
                           animationDuration={600}
                         >
-                          {CHART.cat.map(
+                          {FIN.costCat.map(
                             (c, i) => (
                               <Cell key={i} fill={c} />
                             ),
@@ -1671,12 +1671,12 @@ export default function HQProfitLoss() {
                             >
                               <stop
                                 offset="5%"
-                                stopColor={CHART.primary}
+                                stopColor={FIN.revenue}
                                 stopOpacity={0.09}
                               />
                               <stop
                                 offset="95%"
-                                stopColor={CHART.primary}
+                                stopColor={FIN.revenue}
                                 stopOpacity={0.01}
                               />
                             </linearGradient>
@@ -1689,12 +1689,12 @@ export default function HQProfitLoss() {
                             >
                               <stop
                                 offset="5%"
-                                stopColor={CHART.secondary}
+                                stopColor={FIN.cost}
                                 stopOpacity={0.09}
                               />
                               <stop
                                 offset="95%"
-                                stopColor={CHART.secondary}
+                                stopColor={FIN.cost}
                                 stopOpacity={0.01}
                               />
                             </linearGradient>
@@ -1702,13 +1702,13 @@ export default function HQProfitLoss() {
                           <CartesianGrid
                             horizontal
                             vertical={false}
-                            stroke={CHART.grid}
+                            stroke={FIN.grid}
                             strokeWidth={0.5}
                           />
                           <XAxis
                             dataKey="date"
                             tick={{
-                              fill: CHART.axis,
+                              fill: FIN.axis,
                               fontSize: 10,
                               fontFamily: CC.font,
                             }}
@@ -1720,7 +1720,7 @@ export default function HQProfitLoss() {
                           />
                           <YAxis
                             tick={{
-                              fill: CHART.axis,
+                              fill: FIN.axis,
                               fontSize: 10,
                               fontFamily: CC.font,
                             }}
@@ -1742,7 +1742,7 @@ export default function HQProfitLoss() {
                             type="monotone"
                             dataKey="revenue"
                             name="Revenue"
-                            stroke={CHART.primary}
+                            stroke={FIN.revenue}
                             strokeWidth={1.5}
                             fill="url(#pl-rev-grad)"
                             dot={false}
@@ -1754,7 +1754,7 @@ export default function HQProfitLoss() {
                             type="monotone"
                             dataKey="cogs"
                             name="COGS"
-                            stroke={CHART.secondary}
+                            stroke={FIN.cost}
                             strokeWidth={1.5}
                             fill="url(#pl-cogs-grad)"
                             dot={false}
@@ -1764,7 +1764,7 @@ export default function HQProfitLoss() {
                             type="monotone"
                             dataKey="net"
                             name="Net"
-                            stroke={CHART.tertiary}
+                            stroke={FIN.rate}
                             strokeWidth={1.5}
                             dot={false}
                             isAnimationActive={false}
