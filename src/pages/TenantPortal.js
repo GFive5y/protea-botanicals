@@ -787,7 +787,27 @@ export default function TenantPortal() {
               minHeight: 52, transition: "padding 0.2s ease",
             }}>
               {sidebarCollapsed ? (
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.accentMid, flexShrink: 0 }} />
+                <button
+                  onClick={() => setSidebarCollapsed(false)}
+                  title="Open navigation"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 4,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                    <rect x="0" y="0"  width="16" height="1.5" rx="0.75" fill={T.accentMid} />
+                    <rect x="0" y="5"  width="16" height="1.5" rx="0.75" fill={T.accentMid} />
+                    <rect x="0" y="10" width="16" height="1.5" rx="0.75" fill={T.accentMid} />
+                  </svg>
+                </button>
               ) : (
                 <div style={{ width: "100%", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
