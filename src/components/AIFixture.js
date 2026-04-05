@@ -1,13 +1,13 @@
-// src/components/AIFixture.js — v1.0
+// src/components/AIFixture.js — v1.1
 // WP-AI-PRESENCE · NuAI · April 2026
 // The NuAI intelligence fixture. Replaces the "+" AI pill in TenantPortal sidebar.
 //
 // Behaviour:
 //   - 1 EF call per day per tenant (sessionStorage cache: nuai:brief:{id}:{YYYY-MM-DD})
 //   - Fetches OOS count + zero-price count from inventory_items for context
-//   - Cycles: "Ask anything..." → insight → "Ask anything..." → insight → ... → settles
-//   - Collapsed mode: shows "N·" mark in brand green
-//   - Expanded mode: shows "NuAI · [cycling text]"
+//   - Cycles: "Ask anything" → insight → "Ask anything" → insight → ... → settles
+//   - Collapsed mode: shows "AI" mark in brand green
+//   - Expanded mode: shows "NuAI · [cycling text with animated dots in placeholder state]"
 //   - Click anywhere → onOpen() → ProteaAI panel
 //   - Graceful fallback: if canUseAI=false or EF fails → static "Ask anything..."
 //
@@ -30,13 +30,21 @@ const T = {
   font:      "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
-const PLACEHOLDER = "Ask anything...";
+const PLACEHOLDER = "Ask anything";
 const FADE_MS     = 350;
 const INSIGHT_MS  = 6000;
 const GAP_MS      = 3500;
 
 const sleep    = ms => new Promise(r => setTimeout(r, ms));
 const todayKey = id => `nuai:brief:${id}:${new Date().toISOString().slice(0, 10)}`;
+
+// Inject animated-dot keyframe once at module load — no external CSS file needed
+if (typeof document !== "undefined" && !document.getElementById("nuai-dot-style")) {
+  const s = document.createElement("style");
+  s.id = "nuai-dot-style";
+  s.textContent = `@keyframes nuai-dot{0%,80%,100%{opacity:.2;transform:translateY(0)}40%{opacity:.8;transform:translateY(-2px)}}`;
+  document.head.appendChild(s);
+}
 
 export default function AIFixture({ tenantId, tenantName, role, collapsed, onOpen }) {
   const { canUseAI } = useTenantConfig();
@@ -193,14 +201,14 @@ Current data:
         }}
       >
         <span style={{
-          fontSize:       10,
-          fontWeight:     800,
-          letterSpacing:  "0.16em",
-          textTransform:  "uppercase",
-          color:          T.accent,
-          fontFamily:     T.font,
+          fontSize:      10,
+          fontWeight:    800,
+          letterSpacing: "0.16em",
+          textTransform: "uppercase",
+          color:         T.accent,
+          fontFamily:    T.font,
         }}>
-          N·
+          AI
         </span>
       </button>
     );
@@ -248,20 +256,45 @@ Current data:
         flexShrink: 0,
       }} />
 
-      {/* Cycling text */}
+      {/* Cycling text — placeholder shows animated dots, insights render static */}
       <span style={{
-        flex:           1,
-        fontSize:       12,
-        color:          isPlaceholder ? T.ink400 : T.ink700,
-        fontFamily:     T.font,
-        overflow:       "hidden",
-        textOverflow:   "ellipsis",
-        whiteSpace:     "nowrap",
-        opacity:        visible ? 1 : 0,
-        transition:     `opacity ${FADE_MS}ms ease`,
-        fontStyle:      "normal",
+        flex:        1,
+        fontSize:    12,
+        color:       isPlaceholder ? T.ink400 : T.ink700,
+        fontFamily:  T.font,
+        overflow:    "hidden",
+        whiteSpace:  "nowrap",
+        opacity:     visible ? 1 : 0,
+        transition:  `opacity ${FADE_MS}ms ease`,
+        display:     "flex",
+        alignItems:  "center",
       }}>
-        {text}
+        {isPlaceholder ? (
+          <>
+            <span style={{ fontFamily: T.font, fontSize: 12 }}>Ask anything</span>
+            {[0, 0.18, 0.36].map((delay, i) => (
+              <span
+                key={i}
+                style={{
+                  display:        "inline-block",
+                  fontSize:       12,
+                  color:          T.ink400,
+                  fontFamily:     T.font,
+                  animation:      `nuai-dot 1.4s ease-in-out ${delay}s infinite`,
+                  marginLeft:     "1px",
+                }}
+              >.</span>
+            ))}
+          </>
+        ) : (
+          <span style={{
+            overflow:     "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace:   "nowrap",
+          }}>
+            {text}
+          </span>
+        )}
       </span>
     </button>
   );
