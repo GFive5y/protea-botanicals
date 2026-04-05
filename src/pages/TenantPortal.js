@@ -775,12 +775,14 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                   display: "flex",
                   alignItems: "center",
                   width: "100%",
-                  padding: section.alwaysOpen ? "9px 16px" : "7px 16px 7px 36px",
+                  padding: section.alwaysOpen
+                    ? "9px 16px"
+                    : active
+                      ? "7px 16px 7px 33px"
+                      : "7px 16px 7px 36px",
                   background: active ? T.accentLit : "transparent",
                   border: "none",
-                  borderLeftStyle: "solid",
-                  borderLeftWidth: 3,
-                  borderLeftColor: active ? section.color : "transparent",
+                  borderLeft: active ? `3px solid ${section.color}` : "none",
                   cursor: "pointer",
                   fontFamily: T.font,
                   textAlign: "left",
