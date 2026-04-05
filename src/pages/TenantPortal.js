@@ -708,7 +708,14 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
     <div>
       {!section.alwaysOpen && (
         <button
-          onClick={() => { setOpen(true); onSelect(section.tabs[0].id); }}
+          onClick={() => {
+            if (!effectiveOpen) {
+              setOpen(true);
+              onSelect(section.tabs[0].id);
+            } else {
+              setOpen(false);
+            }
+          }}
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
           style={{
@@ -900,12 +907,13 @@ export default function TenantPortal() {
             style={{
               width: sidebarCollapsed ? 56 : 220,
               minWidth: sidebarCollapsed ? 56 : 220,
+              height: "100vh",
               background: T.sidebar,
               borderRight: `1px solid ${T.border}`,
               display: "flex",
               flexDirection: "column",
+              overflowX: sidebarCollapsed ? "visible" : "hidden",
               overflowY: sidebarCollapsed ? "visible" : "auto",
-              overflow: sidebarCollapsed ? "visible" : undefined,
               transition: "width 0.2s ease, min-width 0.2s ease",
             }}
           >
