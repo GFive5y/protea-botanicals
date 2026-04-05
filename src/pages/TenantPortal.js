@@ -1151,7 +1151,7 @@ export default function TenantPortal() {
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
-                    padding: "6px 14px",
+                    padding: "6px 20px",
                     background: "#FAFAF9",
                     border: `1px solid ${T.ink150}`,
                     borderRadius: 7,
@@ -1160,6 +1160,8 @@ export default function TenantPortal() {
                     flexShrink: 0,
                     whiteSpace: "nowrap",
                     lineHeight: 1,
+                    minWidth: 260,
+                    justifyContent: "space-between",
                   }}
                 >
                   <svg
@@ -1171,7 +1173,7 @@ export default function TenantPortal() {
                     <path d="m21 21-4.35-4.35" />
                   </svg>
                   <span style={{ fontSize: 12, color: T.ink400 }}>
-                    Search…
+                    Search products, staff, orders…
                   </span>
                   <span
                     style={{

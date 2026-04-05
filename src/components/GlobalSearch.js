@@ -349,13 +349,30 @@ export default function GlobalSearch({ tenantId, role, onNavigate, onNavigateWit
                   <X size={14} strokeWidth={2} />
                 </button>
               )}
-              <span style={{
-                fontSize: 10, fontWeight: 600, padding: "2px 6px",
-                background: T.ink075, border: `1px solid ${T.ink150}`,
-                borderRadius: 3, color: T.ink500, fontFamily: "monospace",
-              }}>
+              <button
+                onClick={() => {
+                  if (query) {
+                    setQuery("");
+                    setSelIdx(0);
+                    inputRef.current?.focus();
+                  } else {
+                    setOpen(false);
+                  }
+                }}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "2px 6px",
+                  background: T.ink075,
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 3,
+                  color: T.ink500,
+                  fontFamily: "monospace",
+                  cursor: "pointer",
+                }}
+              >
                 Esc
-              </span>
+              </button>
             </div>
 
             {/* Results area */}
