@@ -1276,11 +1276,13 @@ export default function HQOverview({ onNavigate }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
-              gap: 12,
+              gridTemplateColumns: "minmax(0,1fr) minmax(0,1.8fr)",
+              gap: 16,
               marginBottom: 28,
+              alignItems: "start",
             }}
           >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {/* Stock Value */}
             <MetricTile
               label="Stock Value"
@@ -1337,12 +1339,9 @@ export default function HQOverview({ onNavigate }) {
               onClick={() => nav("stock")}
               hint="Stock → Items"
             />
-          </div>
-
-          {/* Category health mini-bars */}
-          {Object.keys(cannabisStock.byCat).length > 0 && (
-            <div style={{ marginBottom: 28 }}>
-              <ChartCard title="Stock by Category" subtitle="In-stock ratio" accent="green" height={200}>
+            </div>
+            {Object.keys(cannabisStock.byCat).length > 0 && (
+              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={220}>
                 <div
                   style={{
                     padding: "8px 16px",
@@ -1420,8 +1419,8 @@ export default function HQOverview({ onNavigate }) {
                     })}
                 </div>
               </ChartCard>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
 
