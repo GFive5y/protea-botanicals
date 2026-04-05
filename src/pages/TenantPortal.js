@@ -241,6 +241,11 @@ const WATERFALL = [
         label: "Staff",
         desc: "Directory · profiles · timesheets",
       },
+      {
+        id: "hr-dashboard",
+        label: "HR Dashboard →",
+        desc: "Calendar · timesheets · leave · contracts · payroll",
+      },
     ],
   },
 ];
@@ -418,6 +423,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         id: "staff",
         label: "Staff",
         desc: "Directory · schedules · timesheets",
+      },
+      {
+        id: "hr-dashboard",
+        label: "HR Dashboard →",
+        desc: "Calendar · timesheets · leave · contracts · payroll",
       },
     ],
   },
@@ -690,6 +700,16 @@ export default function TenantPortal() {
     },
     [setSearchParams],
   );
+  const handleTabSelect = useCallback(
+    (tabId) => {
+      if (tabId === "hr-dashboard") {
+        navigate("/hr");
+        return;
+      }
+      setActiveTab(tabId);
+    },
+    [navigate, setActiveTab],
+  );
 
   const role = "owner";
   const activeWaterfall = getWaterfall(industryProfile);
@@ -795,7 +815,7 @@ export default function TenantPortal() {
                   key={section.id}
                   section={section}
                   activeTab={activeTab}
-                  onSelect={setActiveTab}
+                  onSelect={handleTabSelect}
                   defaultOpen={i <= 1}
                 />
               ))}
