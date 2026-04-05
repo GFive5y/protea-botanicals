@@ -771,7 +771,6 @@ export default function TenantPortal() {
               minWidth: sidebarCollapsed ? 56 : 220,
               height: "100vh",
               background: T.sidebar,
-              borderRight: `1px solid ${T.border}`,
               display: "flex", flexDirection: "column",
               overflowX: sidebarCollapsed ? "visible" : "hidden",
               overflowY: sidebarCollapsed ? "visible" : "auto",
@@ -781,7 +780,6 @@ export default function TenantPortal() {
             {/* Header */}
             <div style={{
               padding: sidebarCollapsed ? "14px 0" : "18px 16px 14px",
-              borderBottom: `1px solid ${T.border}`,
               display: "flex", alignItems: "center",
               justifyContent: sidebarCollapsed ? "center" : "flex-start",
               minHeight: 52, transition: "padding 0.2s ease",
