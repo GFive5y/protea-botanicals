@@ -717,9 +717,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
             alignItems: "center",
             gap: 8,
             padding: "9px 16px",
-            background: isActiveSection
-              ? `${section.color}12`
-              : hovering ? `${section.color}08` : "transparent",
+            background: hovering ? `${section.color}08` : "transparent",
             border: "none",
             cursor: "pointer",
             fontFamily: T.font,
