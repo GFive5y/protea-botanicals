@@ -107,16 +107,21 @@ export default function GlobalSearch({ tenantId, role, onNavigate, onNavigateWit
   const debounceRef = useRef(null);
   const allowedTypes = ROLE_TYPES[role] || ROLE_TYPES.staff;
 
-  // Ctrl+K / Cmd+K global shortcut
+  // Ctrl+K / Cmd+K + nuai:open-search from breadcrumb trigger
   useEffect(() => {
-    const handler = (e) => {
+    const keyHandler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setOpen((v) => !v);
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const openHandler = () => setOpen(true);
+    window.addEventListener("keydown", keyHandler);
+    window.addEventListener("nuai:open-search", openHandler);
+    return () => {
+      window.removeEventListener("keydown", keyHandler);
+      window.removeEventListener("nuai:open-search", openHandler);
+    };
   }, []);
 
   // Auto-focus + reset on open
@@ -290,40 +295,7 @@ export default function GlobalSearch({ tenantId, role, onNavigate, onNavigateWit
 
   return (
     <>
-      {/* ── TRIGGER BAR ── always visible above breadcrumb */}
-      <div
-        onClick={() => setOpen(true)}
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: "0 20px", height: 40,
-          background: "#fff", borderBottom: `1px solid ${T.border}`,
-          cursor: "text", flexShrink: 0,
-        }}
-      >
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          width: "100%", maxWidth: 520,
-          padding: "6px 14px",
-          background: T.ink050,
-          border: `1px solid ${T.ink150}`,
-          borderRadius: 8,
-        }}>
-          <Search size={13} color={T.ink300} strokeWidth={1.75} />
-          <span style={{ fontSize: 13, color: T.ink300, fontFamily: T.font, flex: 1, userSelect: "none" }}>
-            Search products, brands, staff, orders…
-          </span>
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 6px",
-            background: "#fff", border: `1px solid ${T.ink150}`,
-            borderRadius: 4, color: T.ink400, fontFamily: "monospace",
-            whiteSpace: "nowrap",
-          }}>
-            Ctrl+K
-          </span>
-        </div>
-      </div>
-
-      {/* ── OVERLAY MODAL ── */}
+      {/* ── OVERLAY MODAL ── trigger lives in TenantPortal breadcrumb */}
       {open && (
         <div
           style={{
