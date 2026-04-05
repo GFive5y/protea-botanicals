@@ -250,6 +250,7 @@ export default function HQOverview({ onNavigate }) {
   const [fxCountdown, setFxCountdown] = useState(60);
   const [scanDelta, setScanDelta] = useState(null); // % vs prior 7 days
   const [revDelta, setRevDelta] = useState(null); // % vs prior month
+  const [todaySummary, setTodaySummary] = useState(null);
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
 
@@ -643,6 +644,35 @@ export default function HQOverview({ onNavigate }) {
         }
       } catch (_) {}
 
+      // ── Today's snapshot (revenue + txns vs yesterday) ───────────────
+      try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const ydayStart = new Date(todayStart.getTime() - 86400000);
+        const [todayR, ydayR] = await Promise.all([
+          supabase.from("orders").select("total,items_count")
+            .gte("created_at", todayStart.toISOString())
+            .not("status", "in", '("cancelled","failed")'),
+          supabase.from("orders").select("total,items_count")
+            .gte("created_at", ydayStart.toISOString())
+            .lt("created_at", todayStart.toISOString())
+            .not("status", "in", '("cancelled","failed")')
+        ]);
+        const tRev   = (todayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
+        const tTxns  = (todayR.data||[]).length;
+        const tAvg   = tTxns > 0 ? tRev / tTxns : 0;
+        const yRev   = (ydayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
+        const yTxns  = (ydayR.data||[]).length;
+        setTodaySummary({
+          rev:      tRev,
+          txns:     tTxns,
+          avgBasket: tAvg,
+          ydayRev:  yRev,
+          revDelta:  yRev  > 0 ? ((tRev  - yRev)  / yRev  * 100) : null,
+          txnDelta:  yTxns > 0 ? ((tTxns - yTxns) / yTxns * 100) : null,
+        });
+      } catch(_) {}
+
       // ── Prior-period scan delta (this 7d vs prev 7d) ─────────────────
       try {
         const d7 = new Date();
@@ -988,6 +1018,54 @@ export default function HQOverview({ onNavigate }) {
         defaultOpen={false}
       />
 
+      {/* ── TODAY SNAPSHOT ── */}
+      <SectionLabel label="Today" />
+      <div style={{ ...tileGrid, marginBottom: 20 }}>
+        <MetricTile
+          label="Today's Sales"
+          value={todaySummary
+            ? `R${Math.round(todaySummary.rev).toLocaleString("en-ZA")}`
+            : "R0"}
+          subLabel={todaySummary?.ydayRev > 0
+            ? `R${Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} yesterday`
+            : "no sales yet today"}
+          sub={todaySummary?.revDelta != null
+            ? `${todaySummary.revDelta >= 0 ? "+" : ""}${todaySummary.revDelta.toFixed(1)}% vs yesterday`
+            : "\u2014"}
+          semantic={todaySummary?.revDelta != null
+            ? todaySummary.revDelta >= 0 ? "success" : "danger"
+            : null}
+          delta={todaySummary?.revDelta}
+          onClick={() => nav("trading")}
+          hint="Daily Trading"
+        />
+        <MetricTile
+          label="Transactions"
+          value={todaySummary ? todaySummary.txns : 0}
+          subLabel="orders today"
+          sub={todaySummary?.txnDelta != null
+            ? `${todaySummary.txnDelta >= 0 ? "+" : ""}${todaySummary.txnDelta.toFixed(1)}% vs yesterday`
+            : "no prior data"}
+          semantic={null}
+          delta={todaySummary?.txnDelta}
+          onClick={() => nav("trading")}
+          hint="Daily Trading"
+        />
+        <MetricTile
+          label="Avg Basket"
+          value={todaySummary && todaySummary.txns > 0
+            ? `R${Math.round(todaySummary.avgBasket).toLocaleString("en-ZA")}`
+            : "\u2014"}
+          subLabel="per transaction"
+          sub={todaySummary?.txns > 0
+            ? `${todaySummary.txns} transaction${todaySummary.txns !== 1 ? "s" : ""} today`
+            : "no transactions yet"}
+          semantic={null}
+          onClick={() => nav("trading")}
+          hint="Daily Trading"
+        />
+      </div>
+
       {/* ── REVENUE HERO — Area chart (orders.total last 30 days) ── */}
       {revenueTrend.length > 0 && (
         <div style={{ marginBottom: 28 }}>
@@ -1064,7 +1142,7 @@ export default function HQOverview({ onNavigate }) {
 
       {/* ── ROW 1: OPERATIONS HEALTH ── */}
       <SectionLabel
-        label={isCannabisRetail ? "Stock & Operations" : "Operations Health"}
+        label={isCannabisRetail ? "The Shelf" : "Operations Health"}
       />
       <div style={tileGrid}>
         {isCannabisRetail ? (
@@ -1194,7 +1272,7 @@ export default function HQOverview({ onNavigate }) {
       {/* ── CANNABIS ROW 1.5: STOCK INTELLIGENCE ─────────────────────────── */}
       {isCannabisRetail && cannabisStock && (
         <>
-          <SectionLabel label="Stock Intelligence" />
+          <SectionLabel label="Product Health" />
           <div
             style={{
               display: "grid",
@@ -1412,7 +1490,7 @@ export default function HQOverview({ onNavigate }) {
       )}
 
       {/* ── ROW 2: CUSTOMER INTELLIGENCE ── */}
-      <SectionLabel label="Customer Intelligence" />
+      <SectionLabel label="Members & Loyalty" />
       <div style={tileGrid}>
         <MetricTile
           label="QR Scans"
@@ -1590,7 +1668,7 @@ export default function HQOverview({ onNavigate }) {
       {/* ── ROW 4: IMPORT ERP ── */}
       {erpStats && (
         <>
-          <SectionLabel label="Import ERP" />
+          <SectionLabel label="Store Performance" />
           <div
             style={{
               display: "grid",
