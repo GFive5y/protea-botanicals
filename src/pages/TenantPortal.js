@@ -837,6 +837,7 @@ export default function TenantPortal() {
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [handleHover, setHandleHover] = useState(false);
   const [searchFilter, setSearchFilter] = useState(null);
   const [searchKey, setSearchKey] = useState(0);
   const handleNavigateWithFilter = useCallback((tabId, filter) => {
@@ -994,57 +995,55 @@ export default function TenantPortal() {
                 />
               ))}
             </div>
-            <div
-              style={{
-                padding: sidebarCollapsed ? "10px 0 14px" : "10px 16px 14px",
-                borderTop: `1px solid ${T.border}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: sidebarCollapsed ? "center" : "space-between",
-                gap: 8,
-              }}
-            >
-              {!sidebarCollapsed && (
+            {!sidebarCollapsed && (
+              <div
+                style={{
+                  padding: "10px 16px 14px",
+                  borderTop: `1px solid ${T.border}`,
+                }}
+              >
                 <span style={{ fontSize: 10, color: T.ink300 }}>
                   {tenantId?.slice(0, 8)}…
                 </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── SIDEBAR COLLAPSE HANDLE ── full-height edge strip */}
+          <div
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            onMouseEnter={() => setHandleHover(true)}
+            onMouseLeave={() => setHandleHover(false)}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            style={{
+              width: 8,
+              flexShrink: 0,
+              background: handleHover ? T.accentLit : "transparent",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "background 0.15s",
+              zIndex: 5,
+            }}
+          >
+            <svg
+              width="6"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={handleHover ? T.accent : "transparent"}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ transition: "stroke 0.15s", flexShrink: 0 }}
+            >
+              {sidebarCollapsed ? (
+                <polyline points="9 18 15 12 9 6" />
+              ) : (
+                <polyline points="15 18 9 12 15 6" />
               )}
-              <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                style={{
-                  background: "transparent",
-                  border: `1px solid ${T.ink150}`,
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  width: 22,
-                  height: 22,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: T.ink400,
-                  padding: 0,
-                  flexShrink: 0,
-                }}
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {sidebarCollapsed ? (
-                    <polyline points="9 18 15 12 9 6" />
-                  ) : (
-                    <polyline points="15 18 9 12 15 6" />
-                  )}
-                </svg>
-              </button>
-            </div>
+            </svg>
           </div>
 
           {/* ── MAIN CONTENT ──────────────────────────────────── */}
