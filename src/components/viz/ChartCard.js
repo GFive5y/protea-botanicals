@@ -20,17 +20,6 @@ const T = {
   shadowHover: "0 2px 8px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06)",
 };
 
-// Accent colours for top border variants
-const ACCENT_COLORS = {
-  green:   "#16A34A",
-  blue:    "#2563EB",
-  amber:   "#D97706",
-  red:     "#DC2626",
-  purple:  "#7C3AED",
-  teal:    "#0D9488",
-  default: "#1A3D2B",
-};
-
 /**
  * ChartCard v2.0 — enterprise chart container
  * @param {string}    title         — card heading
@@ -54,21 +43,18 @@ export default function ChartCard({
   action,
   badge,
   footer,
-  accent = "default",
+  accent,
   noPadding = false,
   style = {},
 }) {
-  const topColor = ACCENT_COLORS[accent] ?? ACCENT_COLORS.default;
-
   return (
     <div
       style={{
         background: "#FFFFFF",
-        border: `1px solid ${T.ink150}`,
-        borderRadius: 12,
+        border: `0.5px solid ${T.ink150}`,
+        borderRadius: 10,
         overflow: "hidden",
         boxShadow: T.shadow,
-        borderTop: `3px solid ${topColor}`,
         transition: "box-shadow 0.2s ease",
         ...style,
       }}
@@ -85,10 +71,8 @@ export default function ChartCard({
           display: "flex",
           alignItems: "flex-start",
           justifyContent: "space-between",
-          padding: "16px 20px 14px",
-          borderBottom: `1px solid ${T.ink150}`,
+          padding: "14px 20px 10px",
           gap: 12,
-          background: "#FAFAFA",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>

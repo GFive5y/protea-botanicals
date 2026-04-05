@@ -112,6 +112,18 @@ const C = {
 };
 const F = { heading: T.fontUi, body: T.fontUi };
 
+// ── Chart colour palette — Indigo Intelligence ──────────────────────────────
+const CHART = {
+  primary:    "#6366F1",
+  secondary:  "#F472B6",
+  tertiary:   "#06B6D4",
+  quaternary: "#A78BFA",
+  neutral:    "#94A3B8",
+  grid:       "#E2E8F0",
+  axis:       "#94A3B8",
+  cat: ["#6366F1","#F472B6","#06B6D4","#A78BFA","#94A3B8"],
+};
+
 const sCard = {
   background: "#fff",
   border: `1px solid ${T.ink150}`,
@@ -910,7 +922,7 @@ function OverviewAnalytics({ data, industryProfile }) {
   const stackedOutcomes = [
     ...new Set(scans.map((s) => s.scan_outcome || "unknown")),
   ].slice(0, 4);
-  const stackColours = [T.success, T.accentMid, T.warning, T.ink400];
+  const stackColours = CHART.cat;
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
@@ -1073,19 +1085,19 @@ function OverviewAnalytics({ data, industryProfile }) {
             >
               <defs>
                 <linearGradient id="an-rev-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={T.accent} stopOpacity={0.42} />
-                  <stop offset="95%" stopColor={T.accent} stopOpacity={0.02} />
+                  <stop offset="5%" stopColor={CHART.primary} stopOpacity={0.09} />
+                  <stop offset="95%" stopColor={CHART.primary} stopOpacity={0.01} />
                 </linearGradient>
               </defs>
               <CartesianGrid
                 horizontal
                 vertical={false}
-                stroke={T.ink150}
+                stroke={CHART.grid}
                 strokeWidth={0.5}
               />
               <XAxis
                 dataKey="date"
-                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                 axisLine={false}
                 tickLine={false}
                 dy={6}
@@ -1094,7 +1106,7 @@ function OverviewAnalytics({ data, industryProfile }) {
               />
               <YAxis
                 dataKey="revenue"
-                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                 axisLine={false}
                 tickLine={false}
                 width={52}
@@ -1113,8 +1125,8 @@ function OverviewAnalytics({ data, industryProfile }) {
                 type="monotone"
                 dataKey="revenue"
                 name="Revenue"
-                stroke={T.accent}
-                strokeWidth={2}
+                stroke={CHART.primary}
+                strokeWidth={1.5}
                 fill="url(#an-rev-grad)"
                 dot={false}
                 isAnimationActive={true}
@@ -1152,25 +1164,25 @@ function OverviewAnalytics({ data, industryProfile }) {
                     <linearGradient id="ov-an-grad" x1="0" y1="0" x2="0" y2="1">
                       <stop
                         offset="5%"
-                        stopColor={T.accentMid}
-                        stopOpacity={0.4}
+                        stopColor={CHART.secondary}
+                        stopOpacity={0.09}
                       />
                       <stop
                         offset="95%"
-                        stopColor={T.accentMid}
-                        stopOpacity={0.02}
+                        stopColor={CHART.secondary}
+                        stopOpacity={0.01}
                       />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
                     horizontal
                     vertical={false}
-                    stroke={T.ink150}
+                    stroke={CHART.grid}
                     strokeWidth={0.5}
                   />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={6}
@@ -1179,7 +1191,7 @@ function OverviewAnalytics({ data, industryProfile }) {
                   />
                   <YAxis
                     dataKey="count"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}
@@ -1192,8 +1204,8 @@ function OverviewAnalytics({ data, industryProfile }) {
                     type="monotone"
                     dataKey="count"
                     name="Scans"
-                    stroke={T.accentMid}
-                    strokeWidth={2}
+                    stroke={CHART.secondary}
+                    strokeWidth={1.5}
                     fill="url(#ov-an-grad)"
                     dot={false}
                     isAnimationActive={false}
@@ -1221,18 +1233,18 @@ function OverviewAnalytics({ data, industryProfile }) {
               <CartesianGrid
                 horizontal
                 vertical={false}
-                stroke={T.ink150}
+                stroke={CHART.grid}
                 strokeWidth={0.5}
               />
               <XAxis
                 dataKey="type"
-                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                 axisLine={false}
                 tickLine={false}
                 dy={6}
               />
               <YAxis
-                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                 axisLine={false}
                 tickLine={false}
                 width={24}
@@ -1259,7 +1271,7 @@ function OverviewAnalytics({ data, industryProfile }) {
               <Bar
                 dataKey="current"
                 name="Current 7d"
-                fill={T.accent}
+                fill={CHART.primary}
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
                 maxBarSize={24}
@@ -1267,7 +1279,7 @@ function OverviewAnalytics({ data, industryProfile }) {
               <Bar
                 dataKey="prior"
                 name="Prior 7d"
-                fill={T.accentBd}
+                fill={CHART.neutral}
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
                 maxBarSize={24}
@@ -1289,18 +1301,18 @@ function OverviewAnalytics({ data, industryProfile }) {
               <CartesianGrid
                 horizontal
                 vertical={false}
-                stroke={T.ink150}
+                stroke={CHART.grid}
                 strokeWidth={0.5}
               />
               <XAxis
                 dataKey="week"
-                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                 axisLine={false}
                 tickLine={false}
                 dy={6}
               />
               <YAxis
-                tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                 axisLine={false}
                 tickLine={false}
                 width={24}
@@ -1355,7 +1367,7 @@ function OverviewAnalytics({ data, industryProfile }) {
             name,
             value,
           }));
-          const COLOURS = [T.success, T.info, T.accentMid, "#92400E", T.ink400];
+          const COLOURS = CHART.cat;
           if (pieData.length < 2) return <div />;
           return (
             <ChartCard title="Inventory Mix" subtitle="SKU count by category" accent="amber" height={240}>
@@ -1425,18 +1437,18 @@ function OverviewAnalytics({ data, industryProfile }) {
                   <CartesianGrid
                     horizontal
                     vertical={false}
-                    stroke={T.ink150}
+                    stroke={CHART.grid}
                     strokeWidth={0.5}
                   />
                   <XAxis
                     dataKey="status"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={6}
                   />
                   <YAxis
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}
@@ -1753,18 +1765,18 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   <CartesianGrid
                     horizontal
                     vertical={false}
-                    stroke={T.ink150}
+                    stroke={CHART.grid}
                     strokeWidth={0.5}
                   />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={6}
                   />
                   <YAxis
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}
@@ -1784,7 +1796,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   <Bar
                     dataKey="value"
                     name="Items"
-                    fill={T.accent}
+                    fill={CHART.primary}
                     isAnimationActive={false}
                     maxBarSize={28}
                     radius={[3, 3, 0, 0]}
@@ -1792,7 +1804,7 @@ function SupplyChainAnalytics({ data, industryProfile }) {
                   <Bar
                     dataKey="cost"
                     name="Cost Value"
-                    fill={T.accentMid}
+                    fill={CHART.neutral}
                     isAnimationActive={false}
                     maxBarSize={28}
                     radius={[3, 3, 0, 0]}
@@ -2661,25 +2673,25 @@ function ScansAnalytics({ data, industryProfile }) {
                   <linearGradient id="an-scan-grad" x1="0" y1="0" x2="0" y2="1">
                     <stop
                       offset="5%"
-                      stopColor={T.accentMid}
-                      stopOpacity={0.4}
+                      stopColor={CHART.primary}
+                      stopOpacity={0.09}
                     />
                     <stop
                       offset="95%"
-                      stopColor={T.accentMid}
-                      stopOpacity={0.02}
+                      stopColor={CHART.primary}
+                      stopOpacity={0.01}
                     />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   horizontal
                   vertical={false}
-                  stroke={T.ink150}
+                  stroke={CHART.grid}
                   strokeWidth={0.5}
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   dy={6}
@@ -2688,7 +2700,7 @@ function ScansAnalytics({ data, industryProfile }) {
                 />
                 <YAxis
                   dataKey="scans"
-                  tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   width={24}
@@ -2707,8 +2719,8 @@ function ScansAnalytics({ data, industryProfile }) {
                   type="monotone"
                   dataKey="scans"
                   name="Scans"
-                  stroke={T.accentMid}
-                  strokeWidth={2}
+                  stroke={CHART.primary}
+                  strokeWidth={1.5}
                   fill="url(#an-scan-grad)"
                   dot={false}
                   isAnimationActive={false}
@@ -2717,7 +2729,7 @@ function ScansAnalytics({ data, industryProfile }) {
                   type="monotone"
                   dataKey="points"
                   name="Points"
-                  stroke={T.info}
+                  stroke={CHART.tertiary}
                   strokeWidth={1.5}
                   fill="none"
                   dot={false}
@@ -2749,7 +2761,7 @@ function ScansAnalytics({ data, industryProfile }) {
               type: type.replace(/_/g, " "),
               ...outcomes,
             }));
-          const barColors = [T.success, T.warning, T.ink400, T.danger];
+          const barColors = CHART.cat;
           if (barData.length < 2) return null;
           return (
             <ChartCard title="Outcomes by QR Type" subtitle="Stacked scan outcomes" accent="purple" height={240}>
@@ -2761,18 +2773,18 @@ function ScansAnalytics({ data, industryProfile }) {
                   <CartesianGrid
                     horizontal
                     vertical={false}
-                    stroke={T.ink150}
+                    stroke={CHART.grid}
                     strokeWidth={0.5}
                   />
                   <XAxis
                     dataKey="type"
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     dy={6}
                   />
                   <YAxis
-                    tick={{ fill: T.ink400, fontSize: 10, fontFamily: T.font }}
+                    tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                     axisLine={false}
                     tickLine={false}
                     width={24}

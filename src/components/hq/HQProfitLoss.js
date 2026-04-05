@@ -235,6 +235,18 @@ const CC = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
 };
 
+// ── Chart colour palette — Indigo Intelligence ──────────────────────────────
+const CHART = {
+  primary:    "#6366F1",
+  secondary:  "#F472B6",
+  tertiary:   "#06B6D4",
+  quaternary: "#A78BFA",
+  neutral:    "#94A3B8",
+  grid:       "#E2E8F0",
+  axis:       "#94A3B8",
+  cat: ["#6366F1","#F472B6","#06B6D4","#A78BFA","#94A3B8"],
+};
+
 // ─── Waterfall helper ─────────────────────────────────────────────────────────
 function wfCalc(steps) {
   let running = 0;
@@ -310,18 +322,18 @@ function WaterfallChart({
         <CartesianGrid
           horizontal={true}
           vertical={false}
-          stroke={CC.ink150}
+          stroke={CHART.grid}
           strokeWidth={0.5}
         />
         <XAxis
           dataKey="label"
-          tick={{ fill: CC.ink400, fontSize: 11, fontFamily: CC.font }}
+          tick={{ fill: CHART.axis, fontSize: 11, fontFamily: CC.font }}
           axisLine={false}
           tickLine={false}
           dy={6}
         />
         <YAxis
-          tick={{ fill: CC.ink400, fontSize: 11, fontFamily: CC.font }}
+          tick={{ fill: CHART.axis, fontSize: 11, fontFamily: CC.font }}
           axisLine={false}
           tickLine={false}
           width={62}
@@ -1659,13 +1671,13 @@ export default function HQProfitLoss() {
                             >
                               <stop
                                 offset="5%"
-                                stopColor={CC.accentMid}
-                                stopOpacity={0.4}
+                                stopColor={CHART.primary}
+                                stopOpacity={0.09}
                               />
                               <stop
                                 offset="95%"
-                                stopColor={CC.accentMid}
-                                stopOpacity={0.02}
+                                stopColor={CHART.primary}
+                                stopOpacity={0.01}
                               />
                             </linearGradient>
                             <linearGradient
@@ -1677,26 +1689,26 @@ export default function HQProfitLoss() {
                             >
                               <stop
                                 offset="5%"
-                                stopColor={CC.danger}
-                                stopOpacity={0.3}
+                                stopColor={CHART.secondary}
+                                stopOpacity={0.09}
                               />
                               <stop
                                 offset="95%"
-                                stopColor={CC.danger}
-                                stopOpacity={0.02}
+                                stopColor={CHART.secondary}
+                                stopOpacity={0.01}
                               />
                             </linearGradient>
                           </defs>
                           <CartesianGrid
                             horizontal
                             vertical={false}
-                            stroke={CC.ink150}
+                            stroke={CHART.grid}
                             strokeWidth={0.5}
                           />
                           <XAxis
                             dataKey="date"
                             tick={{
-                              fill: CC.ink400,
+                              fill: CHART.axis,
                               fontSize: 10,
                               fontFamily: CC.font,
                             }}
@@ -1708,7 +1720,7 @@ export default function HQProfitLoss() {
                           />
                           <YAxis
                             tick={{
-                              fill: CC.ink400,
+                              fill: CHART.axis,
                               fontSize: 10,
                               fontFamily: CC.font,
                             }}
@@ -1730,8 +1742,8 @@ export default function HQProfitLoss() {
                             type="monotone"
                             dataKey="revenue"
                             name="Revenue"
-                            stroke={CC.accentMid}
-                            strokeWidth={2}
+                            stroke={CHART.primary}
+                            strokeWidth={1.5}
                             fill="url(#pl-rev-grad)"
                             dot={false}
                             isAnimationActive={true}
@@ -1742,7 +1754,7 @@ export default function HQProfitLoss() {
                             type="monotone"
                             dataKey="cogs"
                             name="COGS"
-                            stroke={CC.danger}
+                            stroke={CHART.secondary}
                             strokeWidth={1.5}
                             fill="url(#pl-cogs-grad)"
                             dot={false}
@@ -1752,7 +1764,7 @@ export default function HQProfitLoss() {
                             type="monotone"
                             dataKey="net"
                             name="Net"
-                            stroke={CC.gold}
+                            stroke={CHART.tertiary}
                             strokeWidth={1.5}
                             dot={false}
                             isAnimationActive={false}
