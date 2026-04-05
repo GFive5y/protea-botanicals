@@ -639,38 +639,99 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange) {
   }
 }
 
-function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
+function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand }) {
   const isActiveSection = section.tabs.some((t) => t.id === activeTab);
-  const [open, setOpen] = useState(
-    defaultOpen || section.alwaysOpen || isActiveSection,
-  );
+  const [open, setOpen] = useState(defaultOpen || section.alwaysOpen || isActiveSection);
   const effectiveOpen = open || isActiveSection;
   const NavIcon = section.icon;
+  const [hovering, setHovering] = useState(false);
 
+  // ── COLLAPSED: icon-only strip with hover label ───────────────
+  if (collapsed) {
+    return (
+      <div style={{ padding: "1px 0", position: "relative" }}>
+        <button
+          onClick={onExpand}
+          onMouseEnter={() => setHovering(true)}
+          onMouseLeave={() => setHovering(false)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "11px 0",
+            background: isActiveSection ? `${section.color}14` : hovering ? `${section.color}09` : "transparent",
+            border: "none",
+            borderLeft: isActiveSection ? `3px solid ${section.color}` : "3px solid transparent",
+            cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+        >
+          {NavIcon && (
+            <NavIcon
+              size={18}
+              strokeWidth={hovering || isActiveSection ? 2.1 : 1.75}
+              color={isActiveSection ? section.color : hovering ? section.color : T.ink400}
+            />
+          )}
+        </button>
+        {hovering && (
+          <div
+            style={{
+              position: "absolute",
+              left: "calc(100% + 10px)",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "#1A3D2B",
+              color: "#fff",
+              padding: "5px 12px",
+              borderRadius: 5,
+              fontSize: 11,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              zIndex: 400,
+              pointerEvents: "none",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            {section.label}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── EXPANDED: full sidebar with hover effects ─────────────────
   return (
     <div>
       {!section.alwaysOpen && (
         <button
           onClick={() => setOpen((o) => !o)}
+          onMouseEnter={() => setHovering(true)}
+          onMouseLeave={() => setHovering(false)}
           style={{
             width: "100%",
             display: "flex",
             alignItems: "center",
             gap: 8,
             padding: "9px 16px",
-            background: isActiveSection ? `${section.color}12` : "transparent",
+            background: isActiveSection
+              ? `${section.color}12`
+              : hovering ? `${section.color}08` : "transparent",
             border: "none",
             cursor: "pointer",
             fontFamily: T.font,
             textAlign: "left",
             marginTop: 2,
+            transition: "background 0.15s",
           }}
         >
           {NavIcon && (
             <NavIcon
               size={14}
-              strokeWidth={1.75}
-              color={isActiveSection ? section.color : T.ink400}
+              strokeWidth={hovering || isActiveSection ? 2.1 : 1.75}
+              color={isActiveSection || hovering ? section.color : T.ink400}
               style={{ flexShrink: 0 }}
             />
           )}
@@ -681,7 +742,8 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: isActiveSection ? section.color : T.ink400,
+              color: isActiveSection || hovering ? section.color : T.ink400,
+              transition: "color 0.15s",
             }}
           >
             {section.label}
@@ -689,9 +751,9 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
           <span
             style={{
               fontSize: 8,
-              color: T.ink300,
+              color: hovering ? section.color : T.ink300,
               transform: effectiveOpen ? "rotate(90deg)" : "rotate(0deg)",
-              transition: "transform 0.2s",
+              transition: "transform 0.2s, color 0.15s",
               display: "inline-block",
             }}
           >
@@ -712,9 +774,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
                   display: "flex",
                   alignItems: "center",
                   width: "100%",
-                  padding: section.alwaysOpen
-                    ? "9px 16px"
-                    : "7px 16px 7px 36px",
+                  padding: section.alwaysOpen ? "9px 16px" : "7px 16px 7px 36px",
                   background: active ? T.accentLit : "transparent",
                   border: "none",
                   borderLeftStyle: "solid",
@@ -775,6 +835,7 @@ export default function TenantPortal() {
     [setSearchParams],
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const handleTabSelect = useCallback(
     (tabId) => {
       setSearchParams({ tab: tabId }, { replace: true });
@@ -819,68 +880,89 @@ export default function TenantPortal() {
           <div
             className="portal-sidebar"
             style={{
-              width: 220,
-              minWidth: 220,
+              width: sidebarCollapsed ? 56 : 220,
+              minWidth: sidebarCollapsed ? 56 : 220,
               background: T.sidebar,
               borderRight: `1px solid ${T.border}`,
               display: "flex",
               flexDirection: "column",
-              overflowY: "auto",
+              overflowY: sidebarCollapsed ? "visible" : "auto",
+              overflow: sidebarCollapsed ? "visible" : undefined,
+              transition: "width 0.2s ease, min-width 0.2s ease",
             }}
           >
             <div
               style={{
-                padding: "18px 16px 14px",
+                padding: sidebarCollapsed ? "14px 0" : "18px 16px 14px",
                 borderBottom: `1px solid ${T.border}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: sidebarCollapsed ? "center" : "flex-start",
+                minHeight: 52,
+                transition: "padding 0.2s ease",
               }}
             >
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: T.accent,
-                  marginBottom: 6,
-                  lineHeight: 1.3,
-                }}
-              >
-                {tenantName}
-              </div>
-              <div
-                style={{
-                  display: "inline-block",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: 20,
-                  background: profileBadge.bg,
-                  color: profileBadge.color,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                {profileBadge.label}
-              </div>
-              {isOperator && (
-                <button
-                  onClick={() => navigate("/hq")}
+              {sidebarCollapsed ? (
+                <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginTop: 10,
-                    fontSize: 11,
-                    color: T.ink400,
-                    background: "transparent",
-                    border: `1px solid ${T.ink150}`,
-                    borderRadius: 6,
-                    padding: "5px 10px",
-                    cursor: "pointer",
-                    fontFamily: T.font,
-                    width: "100%",
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: T.accentMid,
+                    flexShrink: 0,
                   }}
-                >
-                  ← HQ Operator View
-                </button>
+                />
+              ) : (
+                <div style={{ width: "100%" }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: T.accent,
+                      marginBottom: 6,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {tenantName}
+                  </div>
+                  <div
+                    style={{
+                      display: "inline-block",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      background: profileBadge.bg,
+                      color: profileBadge.color,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {profileBadge.label}
+                  </div>
+                  {isOperator && (
+                    <button
+                      onClick={() => navigate("/hq")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginTop: 10,
+                        fontSize: 11,
+                        color: T.ink400,
+                        background: "transparent",
+                        border: `1px solid ${T.ink150}`,
+                        borderRadius: 6,
+                        padding: "5px 10px",
+                        cursor: "pointer",
+                        fontFamily: T.font,
+                        width: "100%",
+                      }}
+                    >
+                      ← HQ Operator View
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
@@ -891,18 +973,61 @@ export default function TenantPortal() {
                   activeTab={activeTab}
                   onSelect={handleTabSelect}
                   defaultOpen={i <= 1}
+                  collapsed={sidebarCollapsed}
+                  onExpand={() => setSidebarCollapsed(false)}
                 />
               ))}
             </div>
             <div
               style={{
-                padding: "10px 16px 14px",
+                padding: sidebarCollapsed ? "10px 0 14px" : "10px 16px 14px",
                 borderTop: `1px solid ${T.border}`,
-                fontSize: 10,
-                color: T.ink300,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: sidebarCollapsed ? "center" : "space-between",
+                gap: 8,
               }}
             >
-              {tenantId?.slice(0, 8)}…
+              {!sidebarCollapsed && (
+                <span style={{ fontSize: 10, color: T.ink300 }}>
+                  {tenantId?.slice(0, 8)}…
+                </span>
+              )}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                style={{
+                  background: "transparent",
+                  border: `1px solid ${T.ink150}`,
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  width: 22,
+                  height: 22,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: T.ink400,
+                  padding: 0,
+                  flexShrink: 0,
+                }}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {sidebarCollapsed ? (
+                    <polyline points="9 18 15 12 9 6" />
+                  ) : (
+                    <polyline points="15 18 9 12 15 6" />
+                  )}
+                </svg>
+              </button>
             </div>
           </div>
 
