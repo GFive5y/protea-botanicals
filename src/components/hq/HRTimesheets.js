@@ -2536,9 +2536,310 @@ function HoursMonitor({ tenantId, staffList }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SUB-TAB: PAY CALCULATOR (Session D)
+// SA BCEA-compliant shift cost calculator
+// Reads: employment_contracts (hourly_rate_zar) + timesheet_entries + public_holidays
+// Rules: regular≤45h×1× | OT>45h×1.5× | Sunday×1.5× | PH×2×
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function PayCalculator({ tenantId, staffList }) {
+  const [staffId, setStaffId] = useState(staffList[0]?.id || "");
+  const [weekStart, setWeekStart] = useState(getMonday());
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const weekEnd = getSunday(weekStart);
+
+  async function calculate() {
+    if (!staffId || !weekStart) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      // 1. Active contract → rate
+      const { data: contract } = await supabase
+        .from("employment_contracts")
+        .select("hourly_rate_zar, contract_type")
+        .eq("staff_profile_id", staffId)
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!contract || !contract.hourly_rate_zar) {
+        setError("No active contract with an hourly rate found for this staff member. Create or edit a contract in the Contracts tab.");
+        setLoading(false);
+        return;
+      }
+      const rate = parseFloat(contract.hourly_rate_zar);
+
+      // 2. Timesheet entries for the week
+      const { data: entries } = await supabase
+        .from("timesheet_entries")
+        .select("work_date, hours_worked, entry_type, clock_in, clock_out")
+        .eq("staff_profile_id", staffId)
+        .eq("tenant_id", tenantId)
+        .gte("work_date", weekStart)
+        .lte("work_date", weekEnd)
+        .order("work_date");
+
+      // 3. Public holidays this week
+      const { data: holidays } = await supabase
+        .from("public_holidays")
+        .select("holiday_date, name")
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+        .eq("is_active", true)
+        .gte("holiday_date", weekStart)
+        .lte("holiday_date", weekEnd);
+
+      const phDates = new Set((holidays || []).map((h) => h.holiday_date));
+
+      // 4. Classify and cost each entry
+      let regularRaw = 0;
+      let sundayHours = 0;
+      let phHours = 0;
+      const entryDetails = (entries || []).map((entry) => {
+        const hours = parseFloat(entry.hours_worked || 0);
+        const dayOfWeek = new Date(entry.work_date + "T12:00:00").getDay();
+        const isSunday = dayOfWeek === 0;
+        const isPH = phDates.has(entry.work_date) || entry.entry_type === "public_holiday";
+
+        let category, multiplier;
+        if (isPH) {
+          category = "Public Holiday";
+          multiplier = 2.0;
+          phHours += hours;
+        } else if (isSunday) {
+          category = "Sunday";
+          multiplier = 1.5;
+          sundayHours += hours;
+        } else {
+          category = "Regular";
+          multiplier = 1.0;
+          regularRaw += hours;
+        }
+        return { date: entry.work_date, hours, category, multiplier, cost: hours * rate * multiplier };
+      });
+
+      // 5. Apply BCEA 45h weekly limit to regular hours
+      const BCEA_LIMIT = 45;
+      const regularHours = Math.min(regularRaw, BCEA_LIMIT);
+      const overtimeHours = Math.max(0, regularRaw - BCEA_LIMIT);
+
+      const regularCost = regularHours * rate;
+      const overtimeCost = overtimeHours * rate * 1.5;
+      const sundayCost = sundayHours * rate * 1.5;
+      const phCost = phHours * rate * 2.0;
+      const totalCost = regularCost + overtimeCost + sundayCost + phCost;
+      const totalHours = regularRaw + sundayHours + phHours;
+
+      const staffMember = staffList.find((s) => s.id === staffId);
+
+      setResult({
+        rate, contract,
+        entries: entries || [],
+        holidays: holidays || [],
+        entryDetails,
+        regularHours, overtimeHours, sundayHours, phHours,
+        totalHours, regularCost, overtimeCost, sundayCost, phCost, totalCost,
+        weekStart, weekEnd,
+        staffName: staffMember?.preferred_name || staffMember?.full_name || "Staff",
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (staffList.length === 0) {
+    return (
+      <div style={s.emptyState}>
+        No active staff. Add staff profiles in the Staff tab first.
+      </div>
+    );
+  }
+
+  const categoryColor = { Regular: T.accent, Sunday: T.warning, "Public Holiday": T.danger };
+
+  return (
+    <div>
+      {/* ── Controls ── */}
+      <div style={{ ...s.card, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 16, alignItems: "flex-end" }}>
+          <div>
+            <label style={s.label}>Staff Member</label>
+            <select style={{ ...s.select, width: "100%" }} value={staffId} onChange={(e) => { setStaffId(e.target.value); setResult(null); }}>
+              {staffList.map((st) => (
+                <option key={st.id} value={st.id}>{st.preferred_name || st.full_name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={s.label}>Week Starting (Monday)</label>
+            <input type="date" style={{ ...s.input, width: "100%" }} value={weekStart}
+              onChange={(e) => { setWeekStart(e.target.value); setResult(null); }} />
+            <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font, marginTop: 4 }}>
+              {fmtDate(weekStart)} — {fmtDate(weekEnd)}
+            </div>
+          </div>
+          <button
+            onClick={calculate}
+            disabled={loading || !staffId}
+            style={{ ...s.btn(T.accent), padding: "10px 24px", height: 42, alignSelf: "flex-start", marginTop: 20 }}
+          >
+            {loading ? "Calculating…" : "Calculate Pay →"}
+          </button>
+        </div>
+      </div>
+
+      {error && <div style={s.error}>⚠ {error}</div>}
+
+      {/* ── Results ── */}
+      {result && (
+        <div>
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+            <div>
+              <div style={{ ...s.sectionTitle, fontSize: 18, marginBottom: 4 }}>
+                {result.staffName} — {fmtDate(result.weekStart)} to {fmtDate(result.weekEnd)}
+              </div>
+              <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}>
+                R{result.rate.toFixed(2)}/hr · {result.contract.contract_type || "Contractor"} · BCEA compliant
+              </div>
+            </div>
+          </div>
+
+          {result.entries.length === 0 ? (
+            <div style={{ ...s.card, textAlign: "center", padding: "48px 24px", color: T.ink400 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>⏱</div>
+              <div style={{ fontFamily: T.font, fontSize: 14, fontWeight: 600, color: T.ink700, marginBottom: 6 }}>
+                No timesheet entries for this week
+              </div>
+              <div style={{ fontSize: 12, color: T.ink400, fontFamily: T.font }}>
+                Add clock-in / clock-out entries in the Timesheets tab, then come back to calculate pay.
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* PH banner */}
+              {result.holidays.length > 0 && (
+                <div style={{ padding: "8px 14px", borderRadius: 8, background: T.warningBg, border: `1px solid ${T.warningBd}`, marginBottom: 16, fontSize: 12, color: T.warning, fontFamily: T.font }}>
+                  ★ Public holiday this week: {result.holidays.map((h) => h.name).join(", ")} — 2× rate applied
+                </div>
+              )}
+
+              {/* Summary cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, marginBottom: 24 }}>
+                {[
+                  { label: "Regular Hours", hours: result.regularHours, cost: result.regularCost, mult: "1×", color: T.accent, show: result.regularHours > 0 },
+                  { label: "Overtime >45h", hours: result.overtimeHours, cost: result.overtimeCost, mult: "1.5×", color: T.info, show: result.overtimeHours > 0 },
+                  { label: "Sunday Work", hours: result.sundayHours, cost: result.sundayCost, mult: "1.5×", color: T.warning, show: result.sundayHours > 0 },
+                  { label: "Public Holiday", hours: result.phHours, cost: result.phCost, mult: "2×", color: T.danger, show: result.phHours > 0 },
+                ].filter((item) => item.show).map((item) => (
+                  <div key={item.label} style={{ background: "#fff", border: `1px solid ${T.ink150}`, borderTop: `3px solid ${item.color}`, borderRadius: 8, padding: "14px 16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.ink400, fontFamily: T.font }}>{item.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, background: `${item.color}18`, color: item.color, padding: "2px 6px", borderRadius: 4 }}>{item.mult} rate</span>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 600, color: item.color, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em", marginBottom: 4 }}>
+                      R{item.cost.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+                      {item.hours.toFixed(1)}h × R{result.rate.toFixed(2)}{item.mult !== "1×" ? ` × ${item.mult}` : ""}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Grand total card */}
+                <div style={{ background: T.accent, borderRadius: 8, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.65)", fontFamily: T.font, marginBottom: 8 }}>
+                    Total Gross Pay
+                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: "#fff", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em", marginBottom: 4 }}>
+                    R{result.totalCost.toFixed(2)}
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: T.font }}>
+                    {result.totalHours.toFixed(1)}h total · before deductions
+                  </div>
+                </div>
+              </div>
+
+              {/* Daily breakdown table */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink400, fontFamily: T.font, marginBottom: 10 }}>
+                  Daily breakdown
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ ...s.table, fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={s.th}>Date</th>
+                        <th style={s.th}>Day</th>
+                        <th style={{ ...s.th, textAlign: "right" }}>Hours</th>
+                        <th style={s.th}>Category</th>
+                        <th style={{ ...s.th, textAlign: "right" }}>Rate</th>
+                        <th style={{ ...s.th, textAlign: "right" }}>Multiplier</th>
+                        <th style={{ ...s.th, textAlign: "right" }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.entryDetails.map((entry, i) => {
+                        const col = categoryColor[entry.category] || T.ink500;
+                        const dayName = new Date(entry.date + "T12:00:00").toLocaleDateString("en-ZA", { weekday: "short" });
+                        return (
+                          <tr key={i}>
+                            <td style={{ ...s.td, fontSize: 11 }}>{fmtDate(entry.date)}</td>
+                            <td style={{ ...s.td, color: T.ink400, fontSize: 11 }}>{dayName}</td>
+                            <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: T.accent }}>{entry.hours.toFixed(1)}h</td>
+                            <td style={s.td}><span style={{ fontSize: 11, fontWeight: 700, color: col }}>{entry.category}</span></td>
+                            <td style={{ ...s.td, textAlign: "right", color: T.ink500, fontVariantNumeric: "tabular-nums" }}>R{result.rate.toFixed(2)}</td>
+                            <td style={{ ...s.td, textAlign: "right", fontWeight: entry.multiplier > 1 ? 700 : 400, color: entry.multiplier > 1 ? col : T.ink400 }}>{entry.multiplier}×</td>
+                            <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.ink900, fontVariantNumeric: "tabular-nums" }}>R{entry.cost.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                      {result.overtimeHours > 0 && (
+                        <tr style={{ background: T.infoBg }}>
+                          <td colSpan={2} style={{ ...s.td, fontSize: 11, color: T.info, fontWeight: 600, fontStyle: "italic" }}>+ Overtime premium (hours beyond 45h/wk)</td>
+                          <td style={{ ...s.td, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: T.info }}>{result.overtimeHours.toFixed(1)}h</td>
+                          <td style={s.td}><span style={{ fontSize: 11, fontWeight: 700, color: T.info }}>Overtime</span></td>
+                          <td style={{ ...s.td, textAlign: "right", color: T.info, fontVariantNumeric: "tabular-nums" }}>R{result.rate.toFixed(2)}</td>
+                          <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.info }}>+0.5×</td>
+                          <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.info, fontVariantNumeric: "tabular-nums" }}>R{result.overtimeCost.toFixed(2)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: T.accentLit, borderTop: `2px solid ${T.accentBd}` }}>
+                        <td colSpan={2} style={{ ...s.td, fontWeight: 700, color: T.accent, fontFamily: T.font }}>GROSS PAY</td>
+                        <td style={{ ...s.td, textAlign: "right", fontWeight: 700, color: T.accent, fontVariantNumeric: "tabular-nums" }}>{result.totalHours.toFixed(1)}h</td>
+                        <td colSpan={3} />
+                        <td style={{ ...s.td, textAlign: "right", fontWeight: 700, fontSize: 15, color: T.accent, fontVariantNumeric: "tabular-nums" }}>R{result.totalCost.toFixed(2)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* BCEA footnote */}
+              <div style={{ fontSize: 11, color: T.ink400, fontFamily: T.font, marginTop: 14, padding: "10px 14px", background: T.ink075, borderRadius: 6, lineHeight: 1.6 }}>
+                <strong>SA BCEA rules applied:</strong> Regular hours at 1× rate (up to 45h/week) ·
+                Overtime at 1.5× (hours beyond 45h) · Sunday work at 1.5× ·
+                Public holidays at 2×. Gross pay only — excludes UIF, PAYE tax, and deductions.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-const SUB_TABS = ["Timesheets", "Hours Monitor", "Summary"];
+const SUB_TABS = ["Timesheets", "Hours Monitor", "Pay Calculator", "Summary"];
 
 export default function HRTimesheets({ tenantId }) {
   const [subTab, setSubTab] = useState("Timesheets");
@@ -2572,6 +2873,9 @@ export default function HRTimesheets({ tenantId }) {
       )}
       {subTab === "Hours Monitor" && (
         <HoursMonitor tenantId={tenantId} staffList={staffList} />
+      )}
+      {subTab === "Pay Calculator" && (
+        <PayCalculator tenantId={tenantId} staffList={staffList} />
       )}
       {subTab === "Summary" && (
         <TimesheetSummary tenantId={tenantId} staffList={staffList} />
