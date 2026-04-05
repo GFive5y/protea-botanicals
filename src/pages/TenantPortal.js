@@ -830,6 +830,8 @@ const PORTAL_CSS = `
   .portal-sidebar:hover::-webkit-scrollbar { width: 4px; }
   .portal-sidebar:hover::-webkit-scrollbar-track { background: transparent; }
   .portal-sidebar:hover::-webkit-scrollbar-thumb { background: #E2E2E2; border-radius: 2px; }
+  .ai-pane { left: 56px !important; }
+  .ai-pane.nav-open { left: 220px !important; }
 `;
 
 export default function TenantPortal() {
