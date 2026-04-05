@@ -11,7 +11,6 @@ import PlatformBar from "../components/PlatformBar";
 import ProteaAI from "../components/ProteaAI";
 import DevErrorCapture from "../components/DevErrorCapture";
 import { PlatformBarProvider } from "../contexts/PlatformBarContext";
-import LiveFXBar from "../components/hq/LiveFXBar";
 import ToastContainer from "../components/ToastContainer";
 
 import HQOverview from "../components/hq/HQOverview";
@@ -987,9 +986,8 @@ export default function TenantPortal() {
               </div>
             </div>
 
-            {/* FX + Platform bar */}
+            {/* Platform bar */}
             <div style={{ ...INNER, overflow: "hidden", padding: "0 24px", flexShrink: 0 }}>
-              <LiveFXBar />
               <PlatformBar role="tenant" tenantId={tenantId} onNavigate={() => {}} />
             </div>
 
