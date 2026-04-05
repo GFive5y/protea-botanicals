@@ -1276,13 +1276,12 @@ export default function HQOverview({ onNavigate }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0,1fr) minmax(0,1.8fr)",
-              gap: 16,
+              gridTemplateColumns: "repeat(3, minmax(0,1fr)) minmax(0,1.6fr)",
+              gap: 12,
               marginBottom: 28,
               alignItems: "start",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {/* Stock Value */}
             <MetricTile
               label="Stock Value"
@@ -1339,9 +1338,8 @@ export default function HQOverview({ onNavigate }) {
               onClick={() => nav("stock")}
               hint="Stock → Items"
             />
-            </div>
             {Object.keys(cannabisStock.byCat).length > 0 && (
-              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={220}>
+              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={170}>
                 <div
                   style={{
                     padding: "8px 16px",
@@ -1354,7 +1352,7 @@ export default function HQOverview({ onNavigate }) {
                 >
                   {Object.entries(cannabisStock.byCat)
                     .sort((a, b) => b[1].count - a[1].count)
-                    .slice(0, 6)
+                    .slice(0, 4)
                     .map(([cat, data]) => {
                       const pct =
                         data.count > 0 ? (data.inStock / data.count) * 100 : 0;
@@ -1364,13 +1362,13 @@ export default function HQOverview({ onNavigate }) {
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 10,
+                            gap: 8,
                           }}
                         >
                           <div
                             style={{
-                              width: 100,
-                              fontSize: 11,
+                              width: 80,
+                              fontSize: 10,
                               color: T.ink500,
                               fontFamily: T.font,
                               textTransform: "capitalize",
@@ -1382,9 +1380,9 @@ export default function HQOverview({ onNavigate }) {
                           <div
                             style={{
                               flex: 1,
-                              height: 8,
+                              height: 6,
                               background: T.ink075,
-                              borderRadius: 4,
+                              borderRadius: 3,
                               overflow: "hidden",
                             }}
                           >
