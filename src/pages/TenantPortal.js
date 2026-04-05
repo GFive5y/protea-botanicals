@@ -49,6 +49,10 @@ import HRTimesheets from "../components/hq/HRTimesheets";
 import HRContracts from "../components/hq/HRContracts";
 import HRCalendar from "../components/hq/HRCalendar";
 import HRPayroll from "../components/hq/HRPayroll";
+import {
+  Home, Package, ShoppingCart, Activity, ShoppingBag,
+  User, Users, TrendingUp, Briefcase, Layers, Truck,
+} from "lucide-react";
 
 const T = {
   bg: "#FAFAF9",
@@ -76,7 +80,7 @@ const WATERFALL = [
   {
     id: "home",
     label: "Home",
-    emoji: "🏠",
+    icon: Home,
     color: "#1A3D2B",
     alwaysOpen: true,
     roles: ["owner", "manager", "staff", "production"],
@@ -91,7 +95,7 @@ const WATERFALL = [
   {
     id: "procurement",
     label: "Procurement",
-    emoji: "🛒",
+    icon: ShoppingCart,
     color: "#1E3A5F",
     roles: ["owner", "manager"],
     tabs: [
@@ -115,7 +119,7 @@ const WATERFALL = [
   {
     id: "operations",
     label: "Daily Operations",
-    emoji: "📊",
+    icon: Activity,
     color: "#1A3D2B",
     roles: ["owner", "manager"],
     tabs: [
@@ -134,7 +138,7 @@ const WATERFALL = [
   {
     id: "production",
     label: "Production",
-    emoji: "⚗️",
+    icon: Layers,
     color: "#5B21B6",
     roles: ["owner", "manager", "production"],
     tabs: [
@@ -154,7 +158,7 @@ const WATERFALL = [
   {
     id: "distribution",
     label: "Distribution",
-    emoji: "🚚",
+    icon: Truck,
     color: "#92400E",
     roles: ["owner", "manager"],
     tabs: [
@@ -183,7 +187,7 @@ const WATERFALL = [
   {
     id: "sales",
     label: "Sales",
-    emoji: "💻",
+    icon: ShoppingBag,
     color: "#065F46",
     roles: ["owner", "manager", "staff"],
     tabs: [
@@ -202,7 +206,7 @@ const WATERFALL = [
   {
     id: "intelligence",
     label: "Intelligence",
-    emoji: "📊",
+    icon: TrendingUp,
     color: "#991B1B",
     roles: ["owner"],
     tabs: [
@@ -232,7 +236,7 @@ const WATERFALL = [
   {
     id: "people",
     label: "People",
-    emoji: "👥",
+    icon: Briefcase,
     color: "#374151",
     roles: ["owner", "manager"],
     tabs: [
@@ -254,7 +258,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "home",
     label: "Home",
-    emoji: "🏠",
+    icon: Home,
     color: "#1A3D2B",
     alwaysOpen: true,
     tabs: [
@@ -268,7 +272,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "inventory",
     label: "Inventory",
-    emoji: "📦",
+    icon: Package,
     color: "#1A3D2B",
     tabs: [
       {
@@ -286,7 +290,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "procurement",
     label: "Ordering",
-    emoji: "🛒",
+    icon: ShoppingCart,
     color: "#1E3A5F",
     tabs: [
       {
@@ -309,7 +313,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "operations",
     label: "Daily Operations",
-    emoji: "📊",
+    icon: Activity,
     color: "#1A3D2B",
     tabs: [
       {
@@ -327,7 +331,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "sales",
     label: "Sales & Customers",
-    emoji: "💰",
+    icon: ShoppingBag,
     color: "#065F46",
     tabs: [
       {
@@ -355,7 +359,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "customers",
     label: "Customers",
-    emoji: "👤",
+    icon: User,
     color: "#1E3A5F",
     tabs: [
       {
@@ -378,7 +382,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "intelligence",
     label: "Reports",
-    emoji: "📈",
+    icon: TrendingUp,
     color: "#991B1B",
     tabs: [
       {
@@ -411,7 +415,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   {
     id: "people",
     label: "Team",
-    emoji: "👥",
+    icon: Briefcase,
     color: "#374151",
     tabs: [
       {
@@ -641,6 +645,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
     defaultOpen || section.alwaysOpen || isActiveSection,
   );
   const effectiveOpen = open || isActiveSection;
+  const NavIcon = section.icon;
 
   return (
     <div>
@@ -661,7 +666,14 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
             marginTop: 2,
           }}
         >
-          <span style={{ fontSize: 13 }}>{section.emoji}</span>
+          {NavIcon && (
+            <NavIcon
+              size={14}
+              strokeWidth={1.75}
+              color={isActiveSection ? section.color : T.ink400}
+              style={{ flexShrink: 0 }}
+            />
+          )}
           <span
             style={{
               flex: 1,
@@ -713,10 +725,13 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen }) {
                   textAlign: "left",
                 }}
               >
-                {section.alwaysOpen && (
-                  <span style={{ marginRight: 8, fontSize: 13 }}>
-                    {section.emoji}
-                  </span>
+                {section.alwaysOpen && NavIcon && (
+                  <NavIcon
+                    size={14}
+                    strokeWidth={1.75}
+                    color={active ? section.color : T.ink500}
+                    style={{ marginRight: 8, flexShrink: 0 }}
+                  />
                 )}
                 <span
                   style={{
@@ -899,8 +914,22 @@ export default function TenantPortal() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {activeSection && (
                     <>
-                      <span style={{ fontSize: 12, color: T.ink300 }}>
-                        {activeSection.emoji} {activeSection.label}
+                      <span
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontSize: 12,
+                          color: T.ink300,
+                        }}
+                      >
+                        {(() => {
+                          const BreadIcon = activeSection.icon;
+                          return BreadIcon ? (
+                            <BreadIcon size={12} strokeWidth={1.75} color={T.ink300} />
+                          ) : null;
+                        })()}
+                        {activeSection.label}
                       </span>
                       <span style={{ color: T.ink150 }}>›</span>
                     </>

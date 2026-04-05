@@ -37,6 +37,9 @@ import HRPayroll from "../components/hq/HRPayroll";
 import { ChartCard, ChartTooltip } from "../components/viz";
 import HRStockView from "../components/hq/HRStockView";
 import HRRoster from "../components/hq/HRRoster";
+import {
+  Users, Calendar, Clock, Lock, FileText, Bell, Settings,
+} from "lucide-react";
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -258,7 +261,7 @@ function HROverview({ tenantId, onNavigate }) {
 
   const tiles = [
     {
-      icon: "👥",
+      Icon: Users,
       label: "Active Staff",
       value: stats.activeStaff,
       sub: stats.totalStaff + " total",
@@ -266,7 +269,7 @@ function HROverview({ tenantId, onNavigate }) {
       tab: "staff",
     },
     {
-      icon: "🗓",
+      Icon: Calendar,
       label: "Leave Pending",
       value: stats.pendingLeave,
       sub: "awaiting approval",
@@ -274,7 +277,7 @@ function HROverview({ tenantId, onNavigate }) {
       tab: "leave",
     },
     {
-      icon: "⏱",
+      Icon: Clock,
       label: "Timesheets to Review",
       value: stats.pendingTimesheets,
       sub: "staff submitted",
@@ -282,7 +285,7 @@ function HROverview({ tenantId, onNavigate }) {
       tab: "timesheets",
     },
     {
-      icon: "✅",
+      Icon: Lock,
       label: "Timesheets to Lock",
       value: stats.adminApprovedTimesheets,
       sub: "admin approved → HR",
@@ -290,7 +293,7 @@ function HROverview({ tenantId, onNavigate }) {
       tab: "timesheets",
     },
     {
-      icon: "📋",
+      Icon: FileText,
       label: "Contracts Expiring",
       value: stats.expiringContracts,
       sub: "within 60 days",
@@ -298,7 +301,7 @@ function HROverview({ tenantId, onNavigate }) {
       tab: "contracts",
     },
     {
-      icon: "🔔",
+      Icon: Bell,
       label: "Probation Ending",
       value: stats.probationEnding,
       sub: "within 14 days",
@@ -411,7 +414,11 @@ function HROverview({ tenantId, onNavigate }) {
               >
                 {tile.label}
               </span>
-              <span style={{ fontSize: 13 }}>{tile.icon}</span>
+              <tile.Icon
+                size={15}
+                strokeWidth={1.75}
+                color={tile.color === "#aaa" ? T.ink300 : tile.color}
+              />
             </div>
             <div
               style={{
@@ -681,24 +688,12 @@ function HROverview({ tenantId, onNavigate }) {
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {[
-          {
-            label: "🗓 Review Leave",
-            tab: "leave",
-            highlight: stats.pendingLeave > 0,
-          },
-          {
-            label: "⏱ Lock Timesheets",
-            tab: "timesheets",
-            highlight: stats.adminApprovedTimesheets > 0,
-          },
-          {
-            label: "📋 Contracts",
-            tab: "contracts",
-            highlight: stats.expiringContracts > 0,
-          },
-          { label: "👥 Staff Directory", tab: "staff", highlight: false },
-          { label: "⚙ Settings", tab: "settings", highlight: false },
-        ].map(({ label, tab, highlight }) => (
+          { Icon: Calendar, label: "Review Leave",   tab: "leave",       highlight: stats.pendingLeave > 0 },
+          { Icon: Lock,     label: "Lock Timesheets", tab: "timesheets",  highlight: stats.adminApprovedTimesheets > 0 },
+          { Icon: FileText, label: "Contracts",       tab: "contracts",   highlight: stats.expiringContracts > 0 },
+          { Icon: Users,    label: "Staff Directory", tab: "staff",       highlight: false },
+          { Icon: Settings, label: "Settings",        tab: "settings",    highlight: false },
+        ].map(({ Icon: ActionIcon, label, tab, highlight }) => (
           <button
             key={tab}
             onClick={() => onNavigate(tab)}
@@ -714,8 +709,12 @@ function HROverview({ tenantId, onNavigate }) {
               color: "#fff",
               border: "none",
               borderRadius: "4px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
+            <ActionIcon size={11} strokeWidth={2} />
             {label}
           </button>
         ))}
