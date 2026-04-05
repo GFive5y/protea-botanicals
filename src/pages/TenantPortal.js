@@ -663,10 +663,9 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
             padding: "11px 0",
             background: isActiveSection ? `${section.color}14` : hovering ? `${section.color}09` : "transparent",
             border: "none",
-            borderLeft: isActiveSection ? `3px solid ${section.color}` : "none",
-            boxSizing: "border-box",
+            boxShadow: isActiveSection ? `inset 3px 0 0 ${section.color}` : "none",
             cursor: "pointer",
-            transition: "background 0.15s",
+            transition: "background 0.15s, box-shadow 0.15s",
           }}
         >
           {NavIcon && (
@@ -776,14 +775,10 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                   display: "flex",
                   alignItems: "center",
                   width: "100%",
-                  padding: section.alwaysOpen
-                    ? "9px 16px"
-                    : active
-                      ? "7px 16px 7px 33px"
-                      : "7px 16px 7px 36px",
+                  padding: section.alwaysOpen ? "9px 16px" : "7px 16px 7px 36px",
                   background: active ? T.accentLit : "transparent",
                   border: "none",
-                  borderLeft: active ? `3px solid ${section.color}` : "none",
+                  boxShadow: active ? `inset 3px 0 0 ${section.color}` : "none",
                   cursor: "pointer",
                   fontFamily: T.font,
                   textAlign: "left",
