@@ -119,7 +119,7 @@ const WATERFALL = [
   },
   {
     id: "operations",
-    label: "Daily Operations",
+    label: "Operations",
     icon: Activity,
     color: "#1A3D2B",
     roles: ["owner", "manager"],
@@ -283,8 +283,8 @@ const CANNABIS_RETAIL_WATERFALL = [
       },
       {
         id: "catalog",
-        label: "Smart Catalog",
-        desc: "Tile · list · detail view · cascading filters",
+        label: "Catalog",
+        desc: "Tile · list · detail · cascading filters",
       },
     ],
   },
@@ -313,7 +313,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
   {
     id: "operations",
-    label: "Daily Operations",
+    label: "Operations",
     icon: Activity,
     color: "#1A3D2B",
     tabs: [
@@ -331,7 +331,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
   {
     id: "sales",
-    label: "Sales & Customers",
+    label: "Sales",
     icon: ShoppingBag,
     color: "#065F46",
     tabs: [
@@ -365,8 +365,8 @@ const CANNABIS_RETAIL_WATERFALL = [
     tabs: [
       {
         id: "customers",
-        label: "Customer 360",
-        desc: "Profiles · loyalty · churn risk · engagement",
+        label: "Profiles",
+        desc: "Customer profiles · loyalty · churn risk · engagement",
       },
       {
         id: "qr-codes",
@@ -708,7 +708,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
     <div>
       {!section.alwaysOpen && (
         <button
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => { setOpen(true); onSelect(section.tabs[0].id); }}
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
           style={{
