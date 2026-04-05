@@ -2526,10 +2526,6 @@ function MetricTile({
             fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
             fontWeight: s ? 600 : 400,
             color: s ? s.text : "#6B7280",
-            background: s ? s.bg : "transparent",
-            border: s ? `1px solid ${s.bd}` : "none",
-            borderRadius: s ? 6 : 0,
-            padding: s ? "3px 8px" : 0,
           }}
         >
           {sub}
