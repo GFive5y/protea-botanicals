@@ -927,7 +927,7 @@ export default function TenantPortal() {
             />
 
             {/* Breadcrumb */}
-            <div style={{ background: "#fff", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+            <div style={{ background: "#fff", flexShrink: 0 }}>
               <div style={{ ...INNER, padding: "0 24px", height: 48, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <button
