@@ -5,6 +5,33 @@
 
 ---
 
+## v189 — UX polish sprint (icons, mobile, collapsible sidebar) · April 5, 2026
+HEAD: dd25e4d
+
+WHAT CHANGED:
+  8f85009 — Site-wide Lucide SVG icon upgrade:
+    TenantPortal.js: all WATERFALL emoji→Lucide refs, SidebarSection
+    renders NavIcon with active/inactive color, breadcrumb icon inline
+    HRDashboard.js: tiles (tile.Icon) + quick actions (Icon+label flex)
+    Rules locked: ICON-01–04 (nav=Lucide, onboarding=emoji, PlatformBar=LOCKED)
+  5de5116 — Mobile hamburger drawer (≤768px):
+    Sidebar hides, hamburger in header, overlay drawer, backdrop/✕/tab-select closes
+    PORTAL_CSS: @media query injection, desktop zero change
+  dd25e4d — Collapsible sidebar with smart hover (desktop only):
+    56px collapsed: icon-only, hover=label floats right + brand color + bolds
+    220px expanded: hover=section color shift on icon+label+chevron+bg tint
+    Toggle: chevron button in footer, 0.2s width transition
+    Header: collapses to brand-green dot
+    overflow:visible when collapsed (enables hover label overflow)
+
+ICON STANDARD ESTABLISHED:
+  Lucide SVG for all UI/navigation. Emoji only for onboarding wizards.
+  PlatformBar custom SVGs remain LOCKED — premium hand-crafted icons.
+
+DEFERRED: HQ sidebar emoji (focus = Medi Rec cannabis retail polish)
+
+---
+
 ## v188 — UX/UI overhaul + role-based nav · April 5, 2026
 HEAD: b47b426
 WHAT CHANGED:
