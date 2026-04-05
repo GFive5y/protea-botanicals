@@ -5,6 +5,24 @@
 
 ---
 
+## v192 — WP-AI-PRESENCE v1.0 · NuAI fixture · April 6, 2026
+HEAD: [this commit]
+
+NEW FILE: src/components/AIFixture.js v1.0
+  Proactive daily brief (1 EF call/day, sessionStorage cache)
+  Cycles: placeholder → insight[0] → placeholder → ... → settled
+  Collapsed: "N·" mark. Expanded: "NuAI · [cycling text]"
+  canUseAI gate — zero EF calls if AI disabled for tenant
+
+EDITED: src/pages/TenantPortal.js → v2.5
+  Import AIFixture added
+  Bottom pills replaced: AIFixture (full-width) + slim account strip
+  nuai:open-ai listener kept for backward compatibility
+
+NEW RULES: AF-01 through AF-04 (AIFixture architecture rules)
+
+---
+
 ## v191 — ProteaAI wired + phantom line root cause + sidebar polish · April 6, 2026
 HEAD: eb7a83c
 
