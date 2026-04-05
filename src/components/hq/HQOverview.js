@@ -23,6 +23,7 @@ import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
+import { PRODUCT_WORLDS, worldForItem } from "./ProductWorlds";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -839,13 +840,15 @@ export default function HQOverview({ onNavigate }) {
           ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 >= 40,
       );
 
-      // Category breakdown
+      // Category breakdown — grouped by Product World (not raw enum)
       const byCat = {};
       items.forEach((i) => {
-        const c = i.category || "other";
-        if (!byCat[c]) byCat[c] = { count: 0, inStock: 0 };
-        byCat[c].count++;
-        if ((i.quantity_on_hand || 0) > 0) byCat[c].inStock++;
+        const world = worldForItem(i);
+        if (!world || world.id === "all") return;
+        if (!byCat[world.id])
+          byCat[world.id] = { label: world.label, count: 0, inStock: 0 };
+        byCat[world.id].count++;
+        if ((i.quantity_on_hand || 0) > 0) byCat[world.id].inStock++;
       });
 
       setCannabisStock({
@@ -1284,39 +1287,40 @@ export default function HQOverview({ onNavigate }) {
           >
             {/* LEFT: Stock by Category — tall chart */}
             {Object.keys(cannabisStock.byCat).length > 0 && (
-              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={290}>
+              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={320}>
                 <div
                   style={{
-                    padding: "8px 16px",
+                    padding: "4px 16px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 10,
+                    gap: 0,
                     height: "100%",
-                    justifyContent: "center",
+                    justifyContent: "space-evenly",
                   }}
                 >
                   {Object.entries(cannabisStock.byCat)
                     .sort((a, b) => b[1].count - a[1].count)
-                    .slice(0, 6)
-                    .map(([cat, data]) => {
+                    .map(([worldId, data]) => {
                       const pct =
                         data.count > 0 ? (data.inStock / data.count) * 100 : 0;
                       return (
                         <div
-                          key={cat}
+                          key={worldId}
                           style={{ display: "flex", alignItems: "center", gap: 10 }}
                         >
                           <div
                             style={{
-                              width: 90,
+                              width: 96,
                               fontSize: 11,
                               color: T.ink500,
                               fontFamily: T.font,
-                              textTransform: "capitalize",
                               flexShrink: 0,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
                           >
-                            {cat}
+                            {data.label}
                           </div>
                           <div
                             style={{
