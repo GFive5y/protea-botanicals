@@ -858,10 +858,10 @@ export default function TenantPortal() {
             <div
               ref={acctRef}
               style={{
-                padding: sidebarCollapsed ? "8px 0" : "8px 12px",
+                padding: "8px 0",
                 borderTop: `1px solid ${T.border}`,
                 display: "flex", alignItems: "center", gap: 8,
-                justifyContent: sidebarCollapsed ? "center" : "flex-start",
+                justifyContent: "center",
                 flexShrink: 0,
                 position: "relative",
               }}
@@ -896,11 +896,6 @@ export default function TenantPortal() {
               >
                 {currentUser?.email ? currentUser.email.slice(0, 2).toUpperCase() : "??"}
               </button>
-              {!sidebarCollapsed && (
-                <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.font }}>
-                  {tenantId?.slice(0, 8)}{"\u2026"}
-                </span>
-              )}
             </div>
           </div>
 
