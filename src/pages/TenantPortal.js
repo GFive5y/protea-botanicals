@@ -44,6 +44,11 @@ import HQTradingDashboard from "../components/hq/HQTradingDashboard";
 import EODCashUp from "../components/hq/EODCashUp";
 import HQBalanceSheet from "../components/hq/HQBalanceSheet";
 import HRRoster from "../components/hq/HRRoster";
+import HRLeave from "../components/hq/HRLeave";
+import HRTimesheets from "../components/hq/HRTimesheets";
+import HRContracts from "../components/hq/HRContracts";
+import HRCalendar from "../components/hq/HRCalendar";
+import HRPayroll from "../components/hq/HRPayroll";
 
 const T = {
   bg: "#FAFAF9",
@@ -285,7 +290,7 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
   {
     id: "procurement",
-    label: "Procurement",
+    label: "Ordering",
     emoji: "🛒",
     color: "#1E3A5F",
     tabs: [
@@ -382,8 +387,8 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
   {
     id: "intelligence",
-    label: "Intelligence",
-    emoji: "📊",
+    label: "Reports",
+    emoji: "📈",
     color: "#991B1B",
     tabs: [
       {
@@ -415,19 +420,44 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
   {
     id: "people",
-    label: "People",
+    label: "Team",
     emoji: "👥",
     color: "#374151",
     tabs: [
       {
         id: "staff",
         label: "Staff",
-        desc: "Directory · schedules · timesheets",
+        desc: "Directory · profiles",
       },
       {
-        id: "hr-dashboard",
-        label: "HR Dashboard →",
-        desc: "Calendar · timesheets · leave · contracts · payroll",
+        id: "roster",
+        label: "Roster",
+        desc: "Who's working this week · shift schedule",
+      },
+      {
+        id: "timesheets",
+        label: "Timesheets",
+        desc: "Track hours · approve · lock",
+      },
+      {
+        id: "leave",
+        label: "Leave",
+        desc: "Leave requests · balances · approval",
+      },
+      {
+        id: "contracts",
+        label: "Contracts",
+        desc: "Employment contracts · probation",
+      },
+      {
+        id: "payroll",
+        label: "Payroll",
+        desc: "Pay runs · payslips",
+      },
+      {
+        id: "hr-calendar",
+        label: "Calendar",
+        desc: "HR calendar · public holidays · diary",
       },
     ],
   },
@@ -558,6 +588,16 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange) {
       return <HQBalanceSheet />;
     case "roster":
       return <HRRoster tenantId={tenantId} readOnly={false} />;
+    case "timesheets":
+      return <HRTimesheets tenantId={tenantId} />;
+    case "leave":
+      return <HRLeave tenantId={tenantId} />;
+    case "contracts":
+      return <HRContracts tenantId={tenantId} />;
+    case "payroll":
+      return <HRPayroll tenantId={tenantId} />;
+    case "hr-calendar":
+      return <HRCalendar tenantId={tenantId} />;
     default:
       return (
         <div
@@ -700,17 +740,6 @@ export default function TenantPortal() {
     },
     [setSearchParams],
   );
-  const handleTabSelect = useCallback(
-    (tabId) => {
-      if (tabId === "hr-dashboard") {
-        navigate("/hr");
-        return;
-      }
-      setActiveTab(tabId);
-    },
-    [navigate, setActiveTab],
-  );
-
   const role = "owner";
   const activeWaterfall = getWaterfall(industryProfile);
   const visibleSectionIds = ROLE_SECTIONS[role] || ROLE_SECTIONS.owner;
@@ -815,7 +844,7 @@ export default function TenantPortal() {
                   key={section.id}
                   section={section}
                   activeTab={activeTab}
-                  onSelect={handleTabSelect}
+                  onSelect={setActiveTab}
                   defaultOpen={i <= 1}
                 />
               ))}
