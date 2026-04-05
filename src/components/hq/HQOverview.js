@@ -2337,8 +2337,7 @@ function MetricTile({
       onMouseLeave={() => setHovered(false)}
       style={{
         background: "#FFFFFF",
-        border: "1px solid #E5E7EB",
-        borderLeft: `4px solid ${s ? s.border : "#E5E7EB"}`,
+        border: "0.5px solid #E5E7EB",
         borderRadius: 10,
         padding: "18px 20px 16px",
         cursor: clickable ? "pointer" : "default",
