@@ -733,14 +733,17 @@ export default function HQOverview({ onNavigate }) {
       try {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-        const ydayStart = new Date(todayStart.getTime() - 86400000);
+        const weekAgoStart = new Date(todayStart.getTime() - 7 * 86400000);
+        const weekAgoEnd   = new Date(weekAgoStart.getTime() + 86400000);
+        const DOW_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        const ydayLabel = `last ${DOW_SHORT[weekAgoStart.getDay()]}`;
         const [todayR, ydayR] = await Promise.all([
           supabase.from("orders").select("total,items_count")
             .gte("created_at", todayStart.toISOString())
             .not("status", "in", '("cancelled","failed")'),
           supabase.from("orders").select("total,items_count")
-            .gte("created_at", ydayStart.toISOString())
-            .lt("created_at", todayStart.toISOString())
+            .gte("created_at", weekAgoStart.toISOString())
+            .lt("created_at", weekAgoEnd.toISOString())
             .not("status", "in", '("cancelled","failed")')
         ]);
         const tRev   = (todayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
@@ -757,6 +760,7 @@ export default function HQOverview({ onNavigate }) {
           avgBasket: tAvg,
           avgItems: Math.round(tAvgItems * 10) / 10,
           ydayRev:  yRev,
+          ydayLabel,
           revDelta:  yRev  > 0 ? ((tRev  - yRev)  / yRev  * 100) : null,
           txnDelta:  yTxns > 0 ? ((tTxns - yTxns) / yTxns * 100) : null,
         });
@@ -1223,15 +1227,14 @@ export default function HQOverview({ onNavigate }) {
             ? `R${Math.round(todaySummary.rev).toLocaleString("en-ZA")}`
             : "R0"}
           subLabel={todaySummary?.ydayRev > 0
-            ? `R${Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} yesterday`
+            ? `R${Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} ${todaySummary.ydayLabel}`
             : "no sales yet today"}
           sub={todaySummary?.revDelta != null
-            ? `${todaySummary.revDelta >= 0 ? "+" : ""}${todaySummary.revDelta.toFixed(1)}% vs yesterday`
+            ? `${todaySummary.revDelta >= 0 ? "+" : ""}${todaySummary.revDelta.toFixed(1)}% vs ${todaySummary.ydayLabel}`
             : "\u2014"}
           semantic={todaySummary?.revDelta != null
             ? todaySummary.revDelta >= 0 ? "success" : "danger"
             : null}
-          delta={todaySummary?.revDelta}
           onClick={() => nav("trading")}
           hint="Daily Trading"
         />
