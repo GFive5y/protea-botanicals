@@ -1327,14 +1327,14 @@ export default function HQOverview({ onNavigate }) {
                         width: 28,
                         height: 28,
                         cursor: "pointer",
-                        fontSize: 16,
-                        color: "#6366F1",
-                        lineHeight: 1,
                         padding: 0,
+                        color: "#6366F1",
                       }}
                       title="Back to all categories"
                     >
-                      \u2190
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </button>
                   ) : null}
                   height={420}
