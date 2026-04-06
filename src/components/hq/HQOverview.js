@@ -1749,8 +1749,8 @@ export default function HQOverview({ onNavigate }) {
         <MetricTile
           label="QR Scans"
           value={stats.scans}
-          subLabel={`${stats.recentScanCount} last 7 days · ${stats.scanLast30} last 30 days`}
-          sub={null}
+          subLabel="total lifetime"
+          sub={`${stats.recentScanCount} last 7d · ${stats.scanLast30 ?? 0} last 30d`}
           semantic={stats.recentScanCount > 0 ? "success" : null}
           onClick={() => nav("analytics")}
           hint="Analytics"
@@ -1761,7 +1761,7 @@ export default function HQOverview({ onNavigate }) {
           label="Loyalty Points"
           value={stats.loyaltyPoints.toLocaleString()}
           subLabel={`${stats.users} registered members`}
-          sub={`${stats.pointsLast7.toLocaleString()} pts · 7d  ·  ${stats.pointsLast30.toLocaleString()} pts · 30d`}
+          sub={`${(stats.pointsLast7 ?? 0).toLocaleString()} pts last 7d · ${(stats.pointsLast30 ?? 0).toLocaleString()} pts last 30d`}
           semantic="info"
           onClick={() => nav("loyalty")}
           hint="Loyalty"
