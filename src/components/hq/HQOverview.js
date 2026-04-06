@@ -741,7 +741,7 @@ export default function HQOverview({ onNavigate }) {
         }
       } catch (_) {}
 
-      // ── Scan trend (sparkline) ───────────────────────────────────────
+      // ── Scan trend — all 30 days, zero-filled ───────────────────────
       try {
         const d30 = new Date();
         d30.setDate(d30.getDate() - 30);
@@ -759,9 +759,18 @@ export default function HQOverview({ onNavigate }) {
           });
           dayMap[day] = (dayMap[day] || 0) + 1;
         });
-        setScanTrend(
-          Object.entries(dayMap).map(([date, count]) => ({ date, count })),
-        );
+        // Generate all 30 days — zero for days with no scans
+        const fullTrend = [];
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(d30);
+          d.setDate(d30.getDate() + i);
+          const label = d.toLocaleDateString("en-ZA", {
+            month: "short",
+            day: "numeric",
+          });
+          fullTrend.push({ date: label, count: dayMap[label] || 0 });
+        }
+        setScanTrend(fullTrend);
         const wkMap = {};
         (trendRaw || []).forEach((s) => {
           const wk = Math.floor(
