@@ -1298,6 +1298,9 @@ export default function HQOverview({ onNavigate }) {
                   }}
                 >
                   {Object.entries(cannabisStock.byCat)
+                    .filter(([catKey]) =>
+                      !["raw_material", "finished_product"].includes(catKey)
+                    )
                     .sort((a, b) => b[1].count - a[1].count)
                     .map(([catKey, data]) => {
                       const pct =
