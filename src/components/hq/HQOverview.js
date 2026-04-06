@@ -1755,7 +1755,12 @@ export default function HQOverview({ onNavigate }) {
           label="QR Scans"
           value={stats.scans}
           subLabel="total lifetime"
-          sub={`${stats.recentScanCount} last 7d · ${stats.scanLast30 ?? 0} last 30d`}
+          sub={
+            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span>{stats.recentScanCount ?? 0} scans last 7 days</span>
+              <span>{stats.scanLast30 ?? 0} scans last 30 days</span>
+            </span>
+          }
           semantic={stats.recentScanCount > 0 ? "success" : null}
           onClick={() => nav("analytics")}
           hint="Analytics"
@@ -1766,7 +1771,12 @@ export default function HQOverview({ onNavigate }) {
           label="Loyalty Points"
           value={stats.loyaltyPoints.toLocaleString()}
           subLabel={`${stats.users} registered members`}
-          sub={`${(stats.pointsLast7 ?? 0).toLocaleString()} pts last 7d · ${(stats.pointsLast30 ?? 0).toLocaleString()} pts last 30d`}
+          sub={
+            <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span>{(stats.pointsLast7 ?? 0).toLocaleString()} pts last 7 days</span>
+              <span>{(stats.pointsLast30 ?? 0).toLocaleString()} pts last 30 days</span>
+            </span>
+          }
           semantic="info"
           onClick={() => nav("loyalty")}
           hint="Loyalty"
