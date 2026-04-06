@@ -27,8 +27,8 @@
 ## CRITICAL GAPS (priority order)
 
 1. **POS till locked (P5)** — No active session = zero sales possible
-2. **GeoAnalyticsDashboard NOT WIRED** — 38KB geographic analytics inaccessible
-3. **CannabisDetailView NOT WIRED** — 49KB product detail inaccessible
+2. ~~GeoAnalyticsDashboard NOT WIRED~~ — FIXED: wired as hq-tab geo-analytics (commit 39f475e)
+3. ~~CannabisDetailView NOT WIRED~~ — CORRECTED: wired in HQStock line 5051 (VL-009)
 4. **TenantSetupWizard NOT WIRED** — 52KB onboarding wizard with no entry point
 5. **invoices table EMPTY** — HQInvoices wired but nothing to show
 6. **orders.channel missing (P4)** — Cannot distinguish POS vs Online vs Wholesale
@@ -41,8 +41,8 @@
 
 ## UNDOCUMENTED GOLD
 
-1. GeoAnalyticsDashboard.js — 38KB geographic customer analytics
-2. CannabisDetailView.js — 49KB product detail with cannabinoid + terpene data
+1. ~~GeoAnalyticsDashboard.js~~ — FIXED: wired as hq-tab geo-analytics (commit 39f475e)
+2. ~~CannabisDetailView.js~~ — CORRECTED: wired in HQStock viewMode=detail (VL-009)
 3. TenantSetupWizard.js — 52KB self-service tenant onboarding
 4. HRStockView.js — 75KB read-only stock for HR users
 5. StockIntelPanel.js — 56KB per-item intelligence

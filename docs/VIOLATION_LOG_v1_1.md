@@ -294,10 +294,43 @@ Doc fix:
 
 ---
 
+## VL-009 — FEATURE-AUDIT LISTED CANNABISDETAILVIEW AS NOT WIRED
+
+```
+Date:      07 Apr 2026
+Session:   v197 audit session
+Rule:      RULE 0D (Disk is truth) · LL-075 · LL-200 (NEW)
+
+What Claude did:
+  FEATURE-AUDIT_v1_0.md listed CannabisDetailView.js as status 🔌 NOT WIRED,
+  stating "NOT IMPORTED IN ANY PAGE OR DASHBOARD." Claude checked page-level imports
+  (HQDashboard.js, TenantPortal.js, App.js) but did not grep for CannabisDetailView
+  across the full src/ tree. It IS wired inside HQStock.js at line 5051, rendering
+  when viewMode === "detail" in CannabisItemsView. Claude Code discovered this when
+  asked to wire it.
+
+What should have happened:
+  Before declaring any component NOT WIRED, run:
+  grep -rn "CannabisDetailView" src/
+  If found → wired. Record where. Do not mark NOT WIRED.
+
+Root cause:
+  Audit Layer 2 (nav wiring) only checked page-level imports. Sub-component imports
+  inside PROTECTED/large files were not verified. HQStock.js (208KB, PROTECTED) was
+  not read for its imports — only its tab map was inferred from SESSION-CORE.
+
+Doc fix:
+  LL-200 added: When auditing wiring, grep full src/ tree before declaring NOT WIRED.
+  FEATURE-AUDIT_v1_0.md CannabisDetailView status corrected to ⚡ WIRED-UNTESTED.
+```
+
+---
+
 *VIOLATION_LOG v1.1 · NuAi · April 7, 2026*
-*8 violations logged · VL-001/VL-002: code box discipline (April 3)*
+*9 violations logged · VL-001/VL-002: code box discipline (April 3)*
 *VL-003/VL-004: wrong build suggestions — already-built features presented as pending*
 *VL-005: asked owner to run PowerShell when GitHub MCP was available*
 *VL-006: REGISTRY_v3_2 corrupt — SC-01 listed as pending without disk verification*
 *VL-007: Claude.ai push_files attempt (April 5)*
 *VL-008: Claude.ai push_files attempt (April 7) — RULE 0Q + LL-202*
+*VL-009: FEATURE-AUDIT listed CannabisDetailView as NOT WIRED — was wired in HQStock (April 7)*
