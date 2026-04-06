@@ -1312,8 +1312,31 @@ export default function HQOverview({ onNavigate }) {
 
               return (
                 <ChartCard
-                  title={isdrilldown ? "Stock by Category" : "Stock by Category"}
-                  subtitle={isdrilldown ? "\u00a0" : "In-stock ratio"}
+                  title={isdrilldown ? "Stock by Sub Category" : "Stock by Category"}
+                  subtitle={isdrilldown ? "" : "In-stock ratio"}
+                  action={isdrilldown ? (
+                    <button
+                      onClick={() => setSelectedWorld(null)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "none",
+                        border: "0.5px solid #E2E8F0",
+                        borderRadius: 6,
+                        width: 28,
+                        height: 28,
+                        cursor: "pointer",
+                        fontSize: 16,
+                        color: "#6366F1",
+                        lineHeight: 1,
+                        padding: 0,
+                      }}
+                      title="Back to all categories"
+                    >
+                      \u2190
+                    </button>
+                  ) : null}
                   height={420}
                 >
                   <div
@@ -1326,43 +1349,6 @@ export default function HQOverview({ onNavigate }) {
                       justifyContent: "space-evenly",
                     }}
                   >
-                    {isdrilldown && (
-                      <div style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginBottom: 6,
-                        paddingBottom: 8,
-                        borderBottom: "0.5px solid #E2E8F0",
-                      }}>
-                        <button
-                          onClick={() => setSelectedWorld(null)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            background: "none",
-                            border: "0.5px solid #E2E8F0",
-                            borderRadius: 4,
-                            padding: "2px 8px",
-                            cursor: "pointer",
-                            fontSize: 10,
-                            color: "#6366F1",
-                            fontFamily: T.font,
-                            fontWeight: 500,
-                          }}
-                        >
-                          \u2190 Back
-                        </button>
-                        <span style={{ fontSize: 10, color: "#9CA3AF", fontFamily: T.font }}>
-                          Stock by Category
-                        </span>
-                        <span style={{ fontSize: 10, color: "#9CA3AF" }}>\u203A</span>
-                        <span style={{ fontSize: 10, color: "#374151", fontFamily: T.font, fontWeight: 600 }}>
-                          {activeWorld?.label || selectedWorld}
-                        </span>
-                      </div>
-                    )}
                     {rows.map(([rowKey, data]) => {
                       const pct = data.count > 0 ? (data.inStock / data.count) * 100 : 0;
                       const clickable = !isdrilldown;
