@@ -1799,71 +1799,77 @@ export default function HQOverview({ onNavigate }) {
             title="Scan Distribution"
             subtitle="By QR type"
             height={240}
-            footer={
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+          >
+            <div style={{ display: "flex", height: "100%", alignItems: "center" }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                gap: 10,
+                minWidth: 120,
+                paddingRight: 8,
+              }}>
                 {qrTypeDist.map((item, i) => (
-                  <span key={item.name} style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    fontSize: 10, color: "#6B7280",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  <div key={item.name} style={{
+                    display: "flex", alignItems: "center", gap: 7,
                   }}>
                     <span style={{
-                      display: "inline-block", width: 8, height: 8,
+                      display: "inline-block", width: 9, height: 9,
                       borderRadius: 2, flexShrink: 0,
                       background: CHART.cat[i % CHART.cat.length],
                     }}/>
-                    {item.name}
-                  </span>
+                    <span style={{
+                      fontSize: 11,
+                      color: "#374151",
+                      fontFamily: T.font,
+                      lineHeight: 1.3,
+                    }}>
+                      {item.name}
+                    </span>
+                    <span style={{
+                      marginLeft: "auto",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: "#111827",
+                      fontFamily: T.fontData,
+                      fontVariantNumeric: "tabular-nums",
+                    }}>
+                      {item.value}
+                    </span>
+                  </div>
                 ))}
               </div>
-            }
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={qrTypeDist}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={58}
-                  outerRadius={88}
-                  dataKey="value"
-                  nameKey="name"
-                  paddingAngle={3}
-                  isAnimationActive={false}
-                >
-                  {qrTypeDist.map((_, i) => (
-                    <Cell
-                      key={i}
-                      fill={DONUT_COLOURS[i % DONUT_COLOURS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
+              <div style={{ flex: 1, height: "100%" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={qrTypeDist}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={80}
+                      dataKey="value"
+                      nameKey="name"
+                      paddingAngle={3}
+                      isAnimationActive={false}
+                    >
+                      {qrTypeDist.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={CHART.cat[i % CHART.cat.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </ChartCard>
           <ChartCard
             title="Volume by Type"
             subtitle="Ranked"
             height={240}
-            footer={
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
-                {qrTypeDist.map((item, i) => (
-                  <span key={item.name} style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    fontSize: 10, color: "#6B7280",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-                  }}>
-                    <span style={{
-                      display: "inline-block", width: 8, height: 8,
-                      borderRadius: 2, flexShrink: 0,
-                      background: CHART.cat[i % CHART.cat.length],
-                    }}/>
-                    {item.name}
-                  </span>
-                ))}
-              </div>
-            }
           >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
