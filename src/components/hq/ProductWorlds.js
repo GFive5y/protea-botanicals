@@ -86,11 +86,13 @@ export const PRODUCT_WORLDS = [
       },
     ],
     subLabels: {
-      indica:     "Indica",
-      sativa:     "Sativa",
-      hybrid:     "Hybrid",
-      cbd_flower: "CBD Flower",
-      auto:       "Auto-Flowering",
+      indoor:      "Indoor",
+      outdoor:     "Outdoor",
+      greenhouse:  "Greenhouse",
+      hydroponic:  "Hydroponic",
+      organic:     "Organic",
+      living_soil: "Living Soil",
+      sun_grown:   "Sun-grown",
     },
   },
   {
