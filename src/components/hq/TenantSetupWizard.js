@@ -422,7 +422,7 @@ export default function TenantSetupWizard({ onClose, onSaved, showToast }) {
         .insert({
           name: identity.name.trim(),
           slug: identity.slug || slugify(identity.name),
-          type: "retail",
+          type: "shop",
           tier,
           is_active: true,
           industry_profile: industryProfile || "cannabis_retail",
