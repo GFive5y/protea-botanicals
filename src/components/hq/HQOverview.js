@@ -23,7 +23,7 @@ import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
-import { PRODUCT_WORLDS, worldForItem } from "./ProductWorlds";
+import { CATEGORY_LABELS } from "./ProductWorlds";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -840,15 +840,14 @@ export default function HQOverview({ onNavigate }) {
           ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 >= 40,
       );
 
-      // Category breakdown — grouped by Product World (not raw enum)
+      // Category breakdown — by DB enum, displayed with human labels
       const byCat = {};
       items.forEach((i) => {
-        const world = worldForItem(i);
-        if (!world || world.id === "all") return;
-        if (!byCat[world.id])
-          byCat[world.id] = { label: world.label, count: 0, inStock: 0 };
-        byCat[world.id].count++;
-        if ((i.quantity_on_hand || 0) > 0) byCat[world.id].inStock++;
+        const c = i.category || "other";
+        if (!byCat[c])
+          byCat[c] = { label: CATEGORY_LABELS[c] || c, count: 0, inStock: 0 };
+        byCat[c].count++;
+        if ((i.quantity_on_hand || 0) > 0) byCat[c].inStock++;
       });
 
       setCannabisStock({
@@ -1300,12 +1299,12 @@ export default function HQOverview({ onNavigate }) {
                 >
                   {Object.entries(cannabisStock.byCat)
                     .sort((a, b) => b[1].count - a[1].count)
-                    .map(([worldId, data]) => {
+                    .map(([catKey, data]) => {
                       const pct =
                         data.count > 0 ? (data.inStock / data.count) * 100 : 0;
                       return (
                         <div
-                          key={worldId}
+                          key={catKey}
                           style={{ display: "flex", alignItems: "center", gap: 10 }}
                         >
                           <div
