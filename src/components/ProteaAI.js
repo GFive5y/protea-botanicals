@@ -160,21 +160,90 @@ async function executeQuerySpec(spec) {
 
 // ── Codebase facts for dev mode ───────────────────────────────────────────────
 const CODEBASE_FACTS = `
-STACK: React 18 + Supabase JS v2 + React Router v6. Vercel deploy pending.
-REPO: github.com/GFive5y/protea-botanicals · branch: main
-HQ TENANT: 43b34c33-6864-4f02-98dd-df1d340475c3
-TEST SHOP: 4a6c7d5c-a66a-4a13-b39a-fe836104000c
-KEY RULES:
-LL-001: loyalty_config — no updated_at
-LL-002: batches — no created_at, ORDER BY production_date
-LL-041: PlatformBar.onNavigate = () => {} always
-LL-056: scan_logs — no tenant_id column
-LL-090: food_recipe_lines — never nested PostgREST select, always fetch separately
-LL-094: system_alerts — no updated_at
-EDGE FUNCTIONS: get-fx-rate · sign-qr (JWT verify disabled post-deploy) · process-document v1.9
-OPEN BUGS: BUG-043 — 23 inventory items inflated terpene counts
-BLOCKED: WP-FIN S1-S6 · Vercel deploy
-PATTERNS: local flat T tokens · tenant_id on every INSERT · useCallback for fetches · commit new files immediately (LL-033)
+NuAi ERP Platform — Cannabis Retail · Built: Jan–Apr 2026 · Live client: Medi Recreational (private beta)
+
+ARCHITECTURE
+- React SPA + Supabase (PostgreSQL + Edge Functions + RLS) + Vercel
+- 96 component files · 104 DB tables · 15 DB business-logic functions
+- 5 portals: HQ (operator) · TenantPortal (retailer) · HR · Staff · Admin
+- Three-Claude ecosystem: Claude.ai (strategy) · Claude Code (builds) · GitHub MCP (read-only)
+
+INVENTORY (232 items, 186 active, 14 product worlds)
+- HQStock (PROTECTED, 208KB) — 7 tabs: Overview/Items/Movements/Pricing/Receipts/POs/ShopManager
+- SmartInventory (175KB) — catalog view with tile/list/detail modes, SC-01 stats panel
+- CannabisDetailView — Excel-style sortable table with bulk actions
+- StockItemModal (LOCKED) — 14 product worlds with contextual fields
+- AVCO live costing · stock_movements: 1,206 rows · product_pricing: 36 rows
+- StockOpeningCalibration — AI calibration via ai-copilot Edge Function (LL-199 fixed)
+
+SALES & POS
+- POSScreen — full-screen budtender till (cash/card/Yoco). Requires active pos_session.
+- orders: 1,513 rows · order_items: 2,833 rows (enables per-SKU analytics)
+- EODCashUp — till reconciliation, variance GENERATED column, 90 cashups recorded
+- HQTradingDashboard — 30-day ComposedChart, SA public holidays annotated, history selector
+
+LOYALTY & CUSTOMERS
+- HQLoyalty (147KB) — points/tiers/campaigns/referrals/leaderboard, 263 transactions, 3,974 pts
+- QR-to-earn scan loop — 181 scans, 60 QR codes. get_monthly_leaderboard DB function.
+- HQFraud (92KB) — get_scan_velocity_flags, 62 system_alerts
+- AdminCustomerEngagement — 7 user profiles, churn risk, engagement
+- AdminCommsCenter — messaging, templates, support tickets
+- Public leaderboard at /leaderboard (no auth required)
+
+FINANCIAL
+- HQProfitLoss, HQBalanceSheet, HQCogs (144KB), HQPricing, ExpenseManager
+- FX-aware costing for imported goods · Live USD/ZAR via get-fx-rate EF v35 (fx_rates: 712 rows)
+- HQInvoices — AR/AP, aged debtors (invoices table currently empty — first invoice pending)
+- HQWholesaleOrders — B2B wholesale, 2 partners (wholesale_orders table currently empty)
+
+PROCUREMENT
+- HQPurchaseOrders (119KB) — full PO lifecycle, 6 POs, 27 line items
+- HQDocuments (102KB) — AI invoice ingestion → auto stock receive, 10 docs processed
+- HQSuppliers — 5 suppliers, 123 supplier products
+
+PRODUCTION (HQProduction 310KB — LARGEST FILE)
+- Batch creation, BOM, production runs (8 runs, 10 batches), yield tracking, COA
+- production_runs schema (LL-0J): id, tenant_id, batch_id, production_date, operator_id, batch_size_g, yield_g, yield_pct, status, qc_pass, notes
+
+FOOD & COMPLIANCE
+- HQFoodIngredients (158KB) — 121 ingredients, nutrient profiles, HACCP data
+- HQRecipeEngine — formulation, version control, cost per batch
+- HQHaccp — 3 control points seeded (Receiving/Storage/Dispensing Accuracy)
+- HQNutritionLabel — SA R146 compliant label generation
+- HQColdChain — temperature monitoring (tables empty — IoT setup pending)
+- HQRecall — batch-level recall traceability (recall_events table empty — no recalls yet)
+- HQFoodIntelligence — AI-powered food trend + formulation analysis
+
+HR SUITE (14 modules — wired in /hr and TenantPortal)
+- HRTimesheets (111KB) — draft→submitted→admin_approved→hr_locked→paid pipeline
+- HRLeave, HRContracts, HRRoster, HRCalendar (40 SA public holidays), HRPayroll
+- HRLoans (update_loan_balance DB function) · HRDisciplinary · HRPerformance · HRComms
+- HRStockView (75KB) — read-only inventory access for HR users
+- staff_profiles: 2 · timesheets: 1 · leave_requests: 1 · employment_contracts: 1
+
+INTELLIGENCE LAYER
+- HQAnalytics (105KB) — scan activity, cohort analysis, customer LTV
+- GeoAnalyticsDashboard (38KB) — geographic customer mapping [recently wired]
+- HQReorderScoring — velocity-weighted AI reorder, check_reorder DB function
+- RetailerHealth — dispensary performance, sell-through
+- Information Bubbles pattern: every KPI answers "what does this mean right now?"
+  Formula: Primary KPI + Comparative delta(s) + Operational callout
+  Gold standard: FX tile — R16.9776 + delta vs yesterday + delta vs 30 days
+
+SCHEMA FACTS (critical for correct queries)
+- inventory_items: NO notes column · category is enum (12 values) · loyalty_category separate
+- orders: field=total (NOT total_amount) · status: paid|pending|failed|cancelled|refunded
+- order_items: no inventory_item_id FK — via product_metadata jsonb · line_total GENERATED
+- eod_cash_ups: variance GENERATED · field=system_cash_total · UNIQUE(tenant_id, cashup_date)
+- pos_sessions: NO total_sales column · movement_type 'sale_pos' for POS
+- loyalty_transactions: column=transaction_type · use .ilike() not .eq()
+- daily_summaries: table does NOT exist
+
+LOCKED/PROTECTED FILES (never modify without explicit owner request)
+- StockItemModal.js · ProteaAI.js · PlatformBar.js · LiveFXBar.js · HQStock.js (protected)
+
+TENANT: Medi Recreational · b1bad266-ceb4-4558-bbc3-22cfeeeafe74 · cannabis_retail profile
+SUPABASE PROJECT: uvicrqapgzcdvozxrreo
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
