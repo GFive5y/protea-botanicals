@@ -1074,7 +1074,7 @@ export default function HQOverview({ onNavigate }) {
   const renderRevTick = ({ x, y, payload }) => {
     const entry = revenueTrend.find((e) => e.date === payload.value);
     const color =
-      entry?.dayType === "public_holiday" ? "#A78BFA"
+      entry?.dayType === "public_holiday" ? "#F472B6"
       : entry?.dayType === "weekend" ? "#818CF8"
       : "#94A3B8";
     const bold = entry?.dayType !== "weekday";
@@ -1184,8 +1184,8 @@ export default function HQOverview({ onNavigate }) {
             }}>
               {[
                 { color: "#6366F1", label: "Weekday" },
-                { color: "#818CF8", label: "Weekend" },
-                { color: "#A78BFA", label: "Public holiday" },
+                { color: "#C7D2FE", label: "Weekend" },
+                { color: "#F472B6", label: "Public holiday" },
               ].map(({ color, label }) => (
                 <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: color, flexShrink: 0 }}/>
@@ -1275,8 +1275,8 @@ export default function HQOverview({ onNavigate }) {
                     <Cell
                       key={`rev-cell-${idx}`}
                       fill={
-                        entry.dayType === "public_holiday" ? "#A78BFA"
-                        : entry.dayType === "weekend" ? "#818CF8"
+                        entry.dayType === "public_holiday" ? "#F472B6"
+                        : entry.dayType === "weekend" ? "#C7D2FE"
                         : "#6366F1"
                       }
                     />
