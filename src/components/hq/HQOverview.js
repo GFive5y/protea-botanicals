@@ -1312,19 +1312,8 @@ export default function HQOverview({ onNavigate }) {
 
               return (
                 <ChartCard
-                  title={isdrilldown ? activeWorld?.label || selectedWorld : "Stock by Category"}
-                  subtitle={
-                    isdrilldown
-                      ? (
-                        <span
-                          onClick={() => setSelectedWorld(null)}
-                          style={{ cursor: "pointer", color: "#6366F1", fontSize: 11, fontWeight: 500 }}
-                        >
-                          \u2190 All categories
-                        </span>
-                      )
-                      : "In-stock ratio"
-                  }
+                  title={isdrilldown ? "Stock by Category" : "Stock by Category"}
+                  subtitle={isdrilldown ? "\u00a0" : "In-stock ratio"}
                   height={420}
                 >
                   <div
@@ -1337,6 +1326,43 @@ export default function HQOverview({ onNavigate }) {
                       justifyContent: "space-evenly",
                     }}
                   >
+                    {isdrilldown && (
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginBottom: 6,
+                        paddingBottom: 8,
+                        borderBottom: "0.5px solid #E2E8F0",
+                      }}>
+                        <button
+                          onClick={() => setSelectedWorld(null)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            background: "none",
+                            border: "0.5px solid #E2E8F0",
+                            borderRadius: 4,
+                            padding: "2px 8px",
+                            cursor: "pointer",
+                            fontSize: 10,
+                            color: "#6366F1",
+                            fontFamily: T.font,
+                            fontWeight: 500,
+                          }}
+                        >
+                          \u2190 Back
+                        </button>
+                        <span style={{ fontSize: 10, color: "#9CA3AF", fontFamily: T.font }}>
+                          Stock by Category
+                        </span>
+                        <span style={{ fontSize: 10, color: "#9CA3AF" }}>\u203A</span>
+                        <span style={{ fontSize: 10, color: "#374151", fontFamily: T.font, fontWeight: 600 }}>
+                          {activeWorld?.label || selectedWorld}
+                        </span>
+                      </div>
+                    )}
                     {rows.map(([rowKey, data]) => {
                       const pct = data.count > 0 ? (data.inStock / data.count) * 100 : 0;
                       const clickable = !isdrilldown;
@@ -1355,13 +1381,22 @@ export default function HQOverview({ onNavigate }) {
                             transition: "background 0.12s",
                           }}
                           onMouseEnter={(e) => {
-                            if (clickable) e.currentTarget.style.background = "#F8FAFC";
+                            if (clickable) {
+                              e.currentTarget.style.background = "#F8FAFC";
+                              e.currentTarget.querySelector(".cat-label").style.color = "#6366F1";
+                              e.currentTarget.querySelector(".cat-label").style.fontWeight = "600";
+                            }
                           }}
                           onMouseLeave={(e) => {
-                            if (clickable) e.currentTarget.style.background = "transparent";
+                            if (clickable) {
+                              e.currentTarget.style.background = "transparent";
+                              e.currentTarget.querySelector(".cat-label").style.color = "";
+                              e.currentTarget.querySelector(".cat-label").style.fontWeight = "";
+                            }
                           }}
                         >
                           <div
+                            className="cat-label"
                             style={{
                               width: 100,
                               fontSize: 10,
@@ -1371,6 +1406,7 @@ export default function HQOverview({ onNavigate }) {
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
+                              transition: "color 0.12s, font-weight 0.12s",
                             }}
                           >
                             {data.label}
