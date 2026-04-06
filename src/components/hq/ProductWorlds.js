@@ -85,7 +85,13 @@ export const PRODUCT_WORLDS = [
         tagField: true,
       },
     ],
-    subLabels: {},
+    subLabels: {
+      indica:     "Indica",
+      sativa:     "Sativa",
+      hybrid:     "Hybrid",
+      cbd_flower: "CBD Flower",
+      auto:       "Auto-Flowering",
+    },
   },
   {
     id: "hash",
