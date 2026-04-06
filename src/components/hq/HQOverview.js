@@ -287,6 +287,7 @@ export default function HQOverview({ onNavigate }) {
   const [revDelta, setRevDelta] = useState(null); // % vs prior month
   const [selectedWorld, setSelectedWorld] = useState(null); // drill-down
   const [todaySummary, setTodaySummary] = useState(null);
+  const [todayPayments, setTodayPayments] = useState(null);
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
 
@@ -757,6 +758,25 @@ export default function HQOverview({ onNavigate }) {
         });
       } catch(_) {}
 
+      // ── Payment method breakdown (today) ─────────────────────────────
+      try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: pmRaw } = await supabase
+          .from("orders")
+          .select("payment_method,total")
+          .gte("created_at", todayStart.toISOString())
+          .not("status", "in", '("cancelled","failed")');
+        const pm = {};
+        (pmRaw || []).forEach((o) => {
+          const m = (o.payment_method || "other").toLowerCase();
+          if (!pm[m]) pm[m] = { txns: 0, revenue: 0 };
+          pm[m].txns++;
+          pm[m].revenue += parseFloat(o.total) || 0;
+        });
+        setTodayPayments(pm);
+      } catch (_) {}
+
       // ── Prior-period scan delta (this 7d vs prev 7d) ─────────────────
       try {
         const d7 = new Date();
@@ -1177,11 +1197,55 @@ export default function HQOverview({ onNavigate }) {
           label="Transactions"
           value={todaySummary ? todaySummary.txns : 0}
           subLabel="orders today"
-          sub={todaySummary?.txnDelta != null
-            ? `${todaySummary.txnDelta >= 0 ? "+" : ""}${todaySummary.txnDelta.toFixed(1)}% vs yesterday`
-            : "no prior data"}
-          semantic={null}
-          delta={todaySummary?.txnDelta}
+          sub={
+            todayPayments && Object.keys(todayPayments).length > 0 ? (
+              <span style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
+                <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { key: "cash",  label: "Cash",  color: "#059669" },
+                    { key: "card",  label: "Card",  color: "#2563EB" },
+                    { key: "yoco",  label: "Yoco",  color: "#6366F1" },
+                  ]
+                    .filter(m => todayPayments[m.key])
+                    .map(m => (
+                      <span key={m.key} style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 10,
+                        color: "#374151",
+                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                      }}>
+                        <span style={{
+                          display: "inline-block",
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          background: m.color,
+                          flexShrink: 0,
+                        }}/>
+                        <span style={{ fontWeight: 500, color: m.color }}>
+                          {todayPayments[m.key].txns}
+                        </span>
+                        <span style={{ color: "#9CA3AF" }}>{m.label}</span>
+                      </span>
+                    ))
+                  }
+                </span>
+                {todayPayments.cash && (
+                  <span style={{
+                    fontSize: 10,
+                    color: "#059669",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                    fontWeight: 500,
+                  }}>
+                    R{Math.round(todayPayments.cash.revenue).toLocaleString("en-ZA")} cash in till
+                  </span>
+                )}
+              </span>
+            ) : null
+          }
+          semantic={todaySummary?.txns > 0 ? "success" : null}
           onClick={() => nav("trading")}
           hint="Daily Trading"
         />
