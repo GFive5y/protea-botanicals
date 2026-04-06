@@ -14,6 +14,7 @@ import ShopManager from "../components/hq/ShopManager";
 import SupplyChain from "../components/hq/SupplyChain";
 import Distribution from "../components/hq/Distribution";
 import HQAnalytics from "../components/hq/HQAnalytics";
+import GeoAnalyticsDashboard from "../components/hq/GeoAnalyticsDashboard";
 import RetailerHealth from "../components/hq/RetailerHealth";
 import HQSuppliers from "../components/hq/HQSuppliers";
 import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
@@ -93,6 +94,7 @@ const TABS = [
   { id: "pl", label: "P&L", icon: "📉", ready: true },
   { id: "balance-sheet", label: "Balance Sheet", icon: "⚖️", ready: true },
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
+  { id: "geo-analytics", label: "Geo Analytics", icon: "🗺️", ready: true },
   { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
   { id: "reorder", label: "Reorder", icon: "🔔", ready: true },
   { id: "loyalty", label: "Loyalty", icon: "💎", ready: true },
@@ -251,6 +253,7 @@ export default function HQDashboard() {
           {activeTab === "distribution" && <Distribution />}
           {activeTab === "shops" && <ShopManager />}
           {activeTab === "analytics" && <HQAnalytics />}
+          {activeTab === "geo-analytics" && <GeoAnalyticsDashboard />}
           {activeTab === "retailer-health" && <RetailerHealth />}
           {activeTab === "suppliers" && <HQSuppliers />}
           {activeTab === "procurement" && <HQPurchaseOrders />}

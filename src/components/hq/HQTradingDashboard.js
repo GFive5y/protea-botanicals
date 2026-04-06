@@ -1700,7 +1700,7 @@ function ThirtyDayChart({ data }) {
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={entry.isToday ? T.accentMid : entry.revenue > 0 ? T.ink300 : T.ink150}
+                fill={entry.isToday ? "#6366F1" : entry.revenue > 0 ? "#C7D2FE" : T.ink150}
               />
             ))}
           </Bar>
