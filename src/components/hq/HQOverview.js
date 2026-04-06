@@ -1097,22 +1097,42 @@ export default function HQOverview({ onNavigate }) {
         <div style={{ marginBottom: 28 }}>
           <ChartCard
             title="Revenue \u2014 Last 30 Days"
-            subtitle="Daily bars \u00b7 last month dashed"
+            subtitle="Daily orders \u00b7 all channels"
             height={300}
             action={
               revDelta !== null ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#94A3B8" }}>
-                    <svg width="20" height="2" viewBox="0 0 20 2">
-                      <line x1="0" y1="1" x2="20" y2="1" stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="4 3"/>
-                    </svg>
-                    Last month
-                  </div>
-                  <DeltaBadge value={revDelta} suffix="%" decimals={1} />
-                </div>
+                <DeltaBadge value={revDelta} suffix="%" decimals={1} />
               ) : null
             }
           >
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              marginBottom: 8,
+              fontSize: 11,
+              color: "#6B7280",
+              fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+            }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{
+                  display: "inline-block",
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: "#6366F1",
+                  flexShrink: 0,
+                }}/>
+                This month
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <svg width="20" height="10" viewBox="0 0 20 10" style={{ flexShrink: 0 }}>
+                  <line x1="0" y1="5" x2="20" y2="5"
+                    stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="4 3"/>
+                </svg>
+                Last month
+              </span>
+            </div>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={revenueTrend}
