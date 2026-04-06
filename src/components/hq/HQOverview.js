@@ -1172,8 +1172,8 @@ export default function HQOverview({ onNavigate }) {
       {revenueTrend.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <ChartCard
-            title="Revenue \u2014 Last 30 Days"
-            subtitle="Daily orders \u00b7 all channels"
+            title="Revenue — Last 30 Days"
+            subtitle="Daily orders · all channels"
             height={330}
             action={
               revDelta !== null ? (
