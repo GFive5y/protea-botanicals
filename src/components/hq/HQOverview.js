@@ -281,6 +281,7 @@ export default function HQOverview({ onNavigate }) {
   const [fxUpdatedAt, setFxUpdatedAt] = useState(null);
   const [fxRefreshing, setFxRefreshing] = useState(false);
   const [fxCountdown, setFxCountdown] = useState(60);
+  const [fxYesterday, setFxYesterday] = useState(null);
   const [scanDelta, setScanDelta] = useState(null); // % vs prior 7 days
   const [revDelta, setRevDelta] = useState(null); // % vs prior month
   const [selectedWorld, setSelectedWorld] = useState(null); // drill-down
@@ -302,6 +303,20 @@ export default function HQOverview({ onNavigate }) {
           setErpStats((prev) =>
             prev ? { ...prev, fxRate: parseFloat(rate) } : prev,
           );
+          // Fetch yesterday's closing rate from Frankfurter
+          try {
+            const yd = new Date();
+            yd.setDate(yd.getDate() - 1);
+            const ydStr = yd.toISOString().split("T")[0];
+            const ydRes = await fetch(
+              `https://api.frankfurter.app/${ydStr}?from=USD&to=ZAR`
+            );
+            if (ydRes.ok) {
+              const ydJson = await ydRes.json();
+              const ydRate = ydJson?.rates?.ZAR;
+              if (ydRate) setFxYesterday(parseFloat(ydRate));
+            }
+          } catch (_) {}
           if (!silent) setFxRefreshing(false);
           return;
         }
@@ -2085,9 +2100,44 @@ export default function HQOverview({ onNavigate }) {
                     ? `R${erpStats.fxRate.toFixed(4)}`
                     : "—"}
               </div>
-              <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
-                {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
-              </div>
+              {(() => {
+                const currentRate = fxRate || erpStats?.fxRate;
+                if (fxYesterday && currentRate) {
+                  const delta = ((currentRate - fxYesterday) / fxYesterday) * 100;
+                  const isUp = delta > 0;
+                  const color = isUp ? "#DC2626" : "#059669";
+                  const arrow = isUp ? "\u2191" : "\u2193";
+                  return (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      marginTop: 6,
+                    }}>
+                      <span style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color,
+                        fontFamily: T.fontData,
+                        fontVariantNumeric: "tabular-nums",
+                      }}>
+                        {arrow} {Math.abs(delta).toFixed(2)}%
+                      </span>
+                      <span style={{ fontSize: 10, color: T.ink400 }}>
+                        vs yesterday
+                      </span>
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
+                    {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
+                  </div>
+                );
+              })()}
             </div>
           </div>
           {/* Gross margin radial gauge */}
