@@ -303,20 +303,7 @@ export default function HQOverview({ onNavigate }) {
           setErpStats((prev) =>
             prev ? { ...prev, fxRate: parseFloat(rate) } : prev,
           );
-          // Fetch yesterday's closing rate from Frankfurter
-          try {
-            const yd = new Date();
-            yd.setDate(yd.getDate() - 1);
-            const ydStr = yd.toISOString().split("T")[0];
-            const ydRes = await fetch(
-              `https://api.frankfurter.app/${ydStr}?from=USD&to=ZAR`
-            );
-            if (ydRes.ok) {
-              const ydJson = await ydRes.json();
-              const ydRate = ydJson?.rates?.ZAR;
-              if (ydRate) setFxYesterday(parseFloat(ydRate));
-            }
-          } catch (_) {}
+
           if (!silent) setFxRefreshing(false);
           return;
         }
@@ -353,6 +340,43 @@ export default function HQOverview({ onNavigate }) {
       clearInterval(fxCountRef.current);
     };
   }, [fetchFx]);
+
+  // ── Yesterday's closing USD/ZAR — Frankfurter v2 ──────────────────────────
+  useEffect(() => {
+    const fetchYesterday = async () => {
+      try {
+        // Go back 4 days to handle Easter long weekend + Good Friday
+        // Frankfurter returns the last available business day automatically
+        const yd = new Date();
+        yd.setDate(yd.getDate() - 1);
+        const ydStr = yd.toISOString().split("T")[0];
+        // Try v2 API first
+        const res = await fetch(
+          `https://api.frankfurter.dev/v2/rates?from=${ydStr}&to=${ydStr}&base=USD&quotes=ZAR`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const rate = json?.[0]?.rates?.ZAR ?? json?.rates?.ZAR;
+          if (rate) { setFxYesterday(parseFloat(rate)); return; }
+        }
+      } catch (_) {}
+      try {
+        // Fallback to legacy API
+        const yd = new Date();
+        yd.setDate(yd.getDate() - 1);
+        const ydStr = yd.toISOString().split("T")[0];
+        const res = await fetch(
+          `https://api.frankfurter.app/${ydStr}?from=USD&to=ZAR`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const rate = json?.rates?.ZAR;
+          if (rate) setFxYesterday(parseFloat(rate));
+        }
+      } catch (_) {}
+    };
+    fetchYesterday();
+  }, []);
 
   const fetchBirthdayStats = useCallback(async () => {
     try {
@@ -2100,44 +2124,28 @@ export default function HQOverview({ onNavigate }) {
                     ? `R${erpStats.fxRate.toFixed(4)}`
                     : "—"}
               </div>
-              {(() => {
-                const currentRate = fxRate || erpStats?.fxRate;
-                if (fxYesterday && currentRate) {
-                  const delta = ((currentRate - fxYesterday) / fxYesterday) * 100;
-                  const isUp = delta > 0;
-                  const color = isUp ? "#DC2626" : "#059669";
-                  const arrow = isUp ? "\u2191" : "\u2193";
-                  return (
-                    <div style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      marginTop: 6,
-                    }}>
-                      <span style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 3,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color,
-                        fontFamily: T.fontData,
-                        fontVariantNumeric: "tabular-nums",
-                      }}>
-                        {arrow} {Math.abs(delta).toFixed(2)}%
-                      </span>
-                      <span style={{ fontSize: 10, color: T.ink400 }}>
-                        vs yesterday
-                      </span>
-                    </div>
-                  );
-                }
+              {fxYesterday && (fxRate || erpStats?.fxRate) ? (() => {
+                const cur = fxRate || erpStats?.fxRate;
+                const delta = ((cur - fxYesterday) / fxYesterday) * 100;
+                const isUp = delta > 0;
                 return (
-                  <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
-                    {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600,
+                      color: isUp ? "#DC2626" : "#059669",
+                      fontFamily: T.fontData,
+                      fontVariantNumeric: "tabular-nums",
+                    }}>
+                      {isUp ? "\u2191" : "\u2193"} {Math.abs(delta).toFixed(2)}%
+                    </span>
+                    <span style={{ fontSize: 10, color: T.ink400 }}>vs yesterday</span>
                   </div>
                 );
-              })()}
+              })() : (
+                <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
+                  {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
+                </div>
+              )}
             </div>
           </div>
           {/* Gross margin radial gauge */}
