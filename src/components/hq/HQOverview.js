@@ -1261,23 +1261,21 @@ export default function HQOverview({ onNavigate }) {
           subLabel="orders today"
           sub={
             todayPayments && Object.keys(todayPayments).length > 0 ? (
-              <span style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 2 }}>
-                <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[
-                    { key: "cash",  label: "Cash",  color: "#059669" },
-                    { key: "card",  label: "Card",  color: "#2563EB" },
-                    { key: "yoco",  label: "Yoco",  color: "#6366F1" },
-                  ]
-                    .filter(m => todayPayments[m.key])
-                    .map(m => (
-                      <span key={m.key} style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: 10,
-                        color: "#374151",
-                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-                      }}>
+              <span style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 2 }}>
+                {[
+                  { key: "cash", label: "Cash", color: "#059669" },
+                  { key: "card", label: "Card", color: "#2563EB" },
+                  { key: "yoco", label: "Yoco", color: "#6366F1" },
+                ]
+                  .filter((m) => todayPayments[m.key])
+                  .map((m) => (
+                    <span key={m.key} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                         <span style={{
                           display: "inline-block",
                           width: 7,
@@ -1286,24 +1284,35 @@ export default function HQOverview({ onNavigate }) {
                           background: m.color,
                           flexShrink: 0,
                         }}/>
-                        <span style={{ fontWeight: 500, color: m.color }}>
-                          {todayPayments[m.key].txns}
+                        <span style={{
+                          fontSize: 10,
+                          color: "#6B7280",
+                          fontWeight: 500,
+                          fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        }}>
+                          {m.label}
                         </span>
-                        <span style={{ color: "#9CA3AF" }}>{m.label}</span>
                       </span>
-                    ))
-                  }
-                </span>
-                {todayPayments.cash && (
-                  <span style={{
-                    fontSize: 11,
-                    color: "#059669",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-                    fontWeight: 600,
-                  }}>
-                    R{Math.round(todayPayments.cash.revenue).toLocaleString("en-ZA")} cash in till
-                  </span>
-                )}
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: m.color,
+                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        fontVariantNumeric: "tabular-nums",
+                      }}>
+                        {todayPayments[m.key].txns}
+                      </span>
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: m.color,
+                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                        fontVariantNumeric: "tabular-nums",
+                      }}>
+                        R{Math.round(todayPayments[m.key].revenue).toLocaleString("en-ZA")}
+                      </span>
+                    </span>
+                  ))}
               </span>
             ) : null
           }
