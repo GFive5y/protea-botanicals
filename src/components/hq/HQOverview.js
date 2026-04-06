@@ -23,7 +23,7 @@ import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
-import { CATEGORY_LABELS } from "./ProductWorlds";
+import { worldForItem } from "./ProductWorlds";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -776,7 +776,7 @@ export default function HQOverview({ onNavigate }) {
         supabase
           .from("inventory_items")
           .select(
-            "id,category,quantity_on_hand,sell_price,weighted_avg_cost,reorder_level,expiry_date,is_active",
+            "id,category,subcategory,quantity_on_hand,sell_price,weighted_avg_cost,reorder_level,expiry_date,is_active",
           )
           .eq("tenant_id", tenantId)
           .eq("is_active", true),
@@ -840,14 +840,15 @@ export default function HQOverview({ onNavigate }) {
           ((i.sell_price - i.weighted_avg_cost) / i.sell_price) * 100 >= 40,
       );
 
-      // Category breakdown — by DB enum, displayed with human labels
+      // Category breakdown — 14 Product Worlds via subcategory-first matching
       const byCat = {};
       items.forEach((i) => {
-        const c = i.category || "other";
-        if (!byCat[c])
-          byCat[c] = { label: CATEGORY_LABELS[c] || c, count: 0, inStock: 0 };
-        byCat[c].count++;
-        if ((i.quantity_on_hand || 0) > 0) byCat[c].inStock++;
+        const world = worldForItem(i);
+        if (!world || world.id === "all") return;
+        if (!byCat[world.id])
+          byCat[world.id] = { label: world.label, count: 0, inStock: 0 };
+        byCat[world.id].count++;
+        if ((i.quantity_on_hand || 0) > 0) byCat[world.id].inStock++;
       });
 
       setCannabisStock({
@@ -1286,7 +1287,7 @@ export default function HQOverview({ onNavigate }) {
           >
             {/* LEFT: Stock by Category — tall chart */}
             {Object.keys(cannabisStock.byCat).length > 0 && (
-              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={320}>
+              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={420}>
                 <div
                   style={{
                     padding: "4px 16px",
@@ -1298,22 +1299,19 @@ export default function HQOverview({ onNavigate }) {
                   }}
                 >
                   {Object.entries(cannabisStock.byCat)
-                    .filter(([catKey]) =>
-                      !["raw_material", "finished_product"].includes(catKey)
-                    )
                     .sort((a, b) => b[1].count - a[1].count)
-                    .map(([catKey, data]) => {
+                    .map(([worldId, data]) => {
                       const pct =
                         data.count > 0 ? (data.inStock / data.count) * 100 : 0;
                       return (
                         <div
-                          key={catKey}
+                          key={worldId}
                           style={{ display: "flex", alignItems: "center", gap: 10 }}
                         >
                           <div
                             style={{
-                              width: 96,
-                              fontSize: 11,
+                              width: 100,
+                              fontSize: 10,
                               color: T.ink500,
                               fontFamily: T.font,
                               flexShrink: 0,
@@ -1355,6 +1353,7 @@ export default function HQOverview({ onNavigate }) {
                               color: T.ink400,
                               fontFamily: T.fontData,
                               textAlign: "right",
+                              flexShrink: 0,
                             }}
                           >
                             {data.inStock}/{data.count}
@@ -1366,7 +1365,7 @@ export default function HQOverview({ onNavigate }) {
               </ChartCard>
             )}
             {/* RIGHT: 2 tiles top, 1 tile below */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, justifyContent: "space-between", height: "100%" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <MetricTile
                   label="Stock Value"
