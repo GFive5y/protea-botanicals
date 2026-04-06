@@ -131,6 +131,36 @@ const CHART = {
   cat: ["#6366F1","#F472B6","#06B6D4","#A78BFA","#94A3B8"],
 };
 
+// ── SA Public Holidays 2025–2026 (ISO date → name) ───────────────────────────
+const SA_PUBLIC_HOLIDAYS = {
+  "2025-01-01": "New Year's Day",
+  "2025-03-21": "Human Rights Day",
+  "2025-04-18": "Good Friday",
+  "2025-04-21": "Family Day",
+  "2025-04-27": "Freedom Day",
+  "2025-04-28": "Freedom Day (observed)",
+  "2025-05-01": "Workers' Day",
+  "2025-06-16": "Youth Day",
+  "2025-08-09": "National Women's Day",
+  "2025-09-24": "Heritage Day",
+  "2025-12-16": "Day of Reconciliation",
+  "2025-12-25": "Christmas Day",
+  "2025-12-26": "Day of Goodwill",
+  "2026-01-01": "New Year's Day",
+  "2026-03-21": "Human Rights Day",
+  "2026-04-03": "Good Friday",
+  "2026-04-06": "Family Day",
+  "2026-04-27": "Freedom Day",
+  "2026-05-01": "Workers' Day",
+  "2026-06-16": "Youth Day",
+  "2026-08-09": "National Women's Day",
+  "2026-08-10": "National Women's Day (observed)",
+  "2026-09-24": "Heritage Day",
+  "2026-12-16": "Day of Reconciliation",
+  "2026-12-25": "Christmas Day",
+  "2026-12-26": "Day of Goodwill",
+};
+
 const DONUT_COLOURS = CHART.cat;
 
 // ─── WorkflowGuide content ───────────────────────────────────────────────────
@@ -627,15 +657,25 @@ export default function HQOverview({ onNavigate }) {
         const thisMap = bucketByDayIndex(thisRes.data || [], d30);
         const lastMap = bucketByDayIndex(lastRes.data || [], d60);
 
-        // Build merged array keyed by this-month date labels
+        // Build merged array — enriched with day type + public holiday
+        const DOW_ABBR = ["Su","Mo","Tu","We","Th","Fr","Sa"];
         const merged = [];
         for (let i = 0; i < 30; i++) {
           const d = new Date(d30); d.setDate(d30.getDate() + i);
-          const label = d.toLocaleDateString("en-ZA", { month: "short", day: "numeric" });
+          const iso = d.toISOString().split("T")[0];
+          const phName = SA_PUBLIC_HOLIDAYS[iso] || null;
+          const dow = d.getDay();
+          const isWeekend = dow === 0 || dow === 6;
+          const dayType = phName
+            ? "public_holiday"
+            : isWeekend ? "weekend" : "weekday";
           merged.push({
-            date: label,
+            date: `${DOW_ABBR[dow]} ${d.getDate()}`,
+            fullDate: d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" }),
             total: thisMap[i] || 0,
             lastMonth: lastMap[i] || null,
+            dayType,
+            phName,
           });
         }
         setRevenueTrend(merged);
@@ -1030,6 +1070,33 @@ export default function HQOverview({ onNavigate }) {
   const fraudTotal = (fraudStats?.flagged || 0) + (fraudStats?.suspended || 0);
   const lowFinishedCount = productionStats?.lowFinished?.length || 0;
 
+  // ── Custom x-axis tick: day abbr + day number, coloured by dayType ──────────
+  const renderRevTick = ({ x, y, payload }) => {
+    const entry = revenueTrend.find((e) => e.date === payload.value);
+    const color =
+      entry?.dayType === "public_holiday" ? "#A78BFA"
+      : entry?.dayType === "weekend" ? "#818CF8"
+      : "#94A3B8";
+    const bold = entry?.dayType !== "weekday";
+    const [abbr, num] = (payload.value || " ").split(" ");
+    return (
+      <g transform={`translate(${x},${y + 4})`}>
+        <text
+          textAnchor="middle"
+          fill={color}
+          fontSize={8}
+          fontWeight={bold ? 600 : 400}
+          y={0}
+        >
+          {abbr}
+        </text>
+        <text textAnchor="middle" fill={color} fontSize={8} y={11}>
+          {num}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <div style={{ fontFamily: T.fontUi }}>
       <WorkflowGuide
@@ -1098,7 +1165,7 @@ export default function HQOverview({ onNavigate }) {
           <ChartCard
             title="Revenue \u2014 Last 30 Days"
             subtitle="Daily orders \u00b7 all channels"
-            height={300}
+            height={330}
             action={
               revDelta !== null ? (
                 <DeltaBadge value={revDelta} suffix="%" decimals={1} />
@@ -1108,27 +1175,26 @@ export default function HQOverview({ onNavigate }) {
             <div style={{
               display: "flex",
               alignItems: "center",
-              gap: 16,
+              gap: 14,
               marginBottom: 8,
-              fontSize: 11,
+              fontSize: 10,
               color: "#6B7280",
               fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+              flexWrap: "wrap",
             }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{
-                  display: "inline-block",
-                  width: 10,
-                  height: 10,
-                  borderRadius: 2,
-                  background: "#6366F1",
-                  flexShrink: 0,
-                }}/>
-                This month
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <svg width="20" height="10" viewBox="0 0 20 10" style={{ flexShrink: 0 }}>
-                  <line x1="0" y1="5" x2="20" y2="5"
-                    stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="4 3"/>
+              {[
+                { color: "#6366F1", label: "Weekday" },
+                { color: "#818CF8", label: "Weekend" },
+                { color: "#A78BFA", label: "Public holiday" },
+              ].map(({ color, label }) => (
+                <span key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, background: color, flexShrink: 0 }}/>
+                  {label}
+                </span>
+              ))}
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <svg width="18" height="10" viewBox="0 0 18 10" style={{ flexShrink: 0 }}>
+                  <line x1="0" y1="5" x2="18" y2="5" stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="4 3"/>
                 </svg>
                 Last month
               </span>
@@ -1146,12 +1212,11 @@ export default function HQOverview({ onNavigate }) {
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
+                  tick={renderRevTick}
                   axisLine={false}
                   tickLine={false}
-                  dy={6}
-                  interval="preserveStartEnd"
-                  maxRotation={0}
+                  interval={0}
+                  height={30}
                 />
                 <YAxis
                   tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
@@ -1161,29 +1226,62 @@ export default function HQOverview({ onNavigate }) {
                   tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
-                  content={
-                    <ChartTooltip
-                      formatter={(v) =>
-                        v != null
-                          ? `R ${Number(v).toLocaleString("en-ZA", {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}`
-                          : "\u2014"
-                      }
-                    />
-                  }
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const entry = revenueTrend.find((e) => e.date === label);
+                    return (
+                      <div style={{
+                        background: "white",
+                        border: "0.5px solid #E2E8F0",
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                        fontFamily: T.font,
+                        fontSize: 12,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                        minWidth: 160,
+                      }}>
+                        <div style={{ fontWeight: 600, color: "#111827", marginBottom: 4 }}>
+                          {entry?.fullDate || label}
+                          {entry?.phName && (
+                            <span style={{ marginLeft: 6, fontSize: 10, color: "#A78BFA", fontWeight: 500 }}>
+                              {entry.phName}
+                            </span>
+                          )}
+                        </div>
+                        {payload.map((p) => (
+                          p.value != null && (
+                            <div key={p.name} style={{ display: "flex", justifyContent: "space-between", gap: 16, color: "#374151" }}>
+                              <span style={{ color: "#6B7280" }}>{p.name}</span>
+                              <span style={{ fontWeight: 500 }}>
+                                R {Number(p.value).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    );
+                  }}
                 />
                 <Bar
                   dataKey="total"
                   name="This month"
-                  fill={CHART.primary}
                   radius={[3, 3, 0, 0]}
                   maxBarSize={22}
                   isAnimationActive={true}
                   animationDuration={600}
                   animationEasing="ease-out"
-                />
+                >
+                  {revenueTrend.map((entry, idx) => (
+                    <Cell
+                      key={`rev-cell-${idx}`}
+                      fill={
+                        entry.dayType === "public_holiday" ? "#A78BFA"
+                        : entry.dayType === "weekend" ? "#818CF8"
+                        : "#6366F1"
+                      }
+                    />
+                  ))}
+                </Bar>
                 <Line
                   type="monotone"
                   dataKey="lastMonth"
