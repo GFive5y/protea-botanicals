@@ -1237,10 +1237,15 @@ export default function HQOverview({ onNavigate }) {
                   fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
                 }}>
                   {todaySummary.revDelta >= 0 ? "\u2191" : "\u2193"}
-                  {Math.abs(todaySummary.revDelta).toFixed(1)}%
+                  {Math.abs(todaySummary.revDelta).toFixed(1)}% vs {todaySummary.ydayLabel}
                 </span>
                 {todaySummary.ydayRev > 0 && (
-                  <span style={{ fontSize: 10, color: "#9CA3AF", fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif" }}>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: todaySummary.revDelta >= 0 ? "#059669" : "#DC2626",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
                     R{Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} {todaySummary.ydayLabel}
                   </span>
                 )}
