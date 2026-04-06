@@ -1795,7 +1795,29 @@ export default function HQOverview({ onNavigate }) {
             marginBottom: 28,
           }}
         >
-          <ChartCard title="Scan Distribution" subtitle="By QR type" accent="blue" height={240}>
+          <ChartCard
+            title="Scan Distribution"
+            subtitle="By QR type"
+            height={240}
+            footer={
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+                {qrTypeDist.map((item, i) => (
+                  <span key={item.name} style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    fontSize: 10, color: "#6B7280",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
+                    <span style={{
+                      display: "inline-block", width: 8, height: 8,
+                      borderRadius: 2, flexShrink: 0,
+                      background: CHART.cat[i % CHART.cat.length],
+                    }}/>
+                    {item.name}
+                  </span>
+                ))}
+              </div>
+            }
+          >
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1820,7 +1842,29 @@ export default function HQOverview({ onNavigate }) {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>
-          <ChartCard title="Volume by Type" subtitle="Ranked" accent="purple" height={240}>
+          <ChartCard
+            title="Volume by Type"
+            subtitle="Ranked"
+            height={240}
+            footer={
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+                {qrTypeDist.map((item, i) => (
+                  <span key={item.name} style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    fontSize: 10, color: "#6B7280",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
+                    <span style={{
+                      display: "inline-block", width: 8, height: 8,
+                      borderRadius: 2, flexShrink: 0,
+                      background: CHART.cat[i % CHART.cat.length],
+                    }}/>
+                    {item.name}
+                  </span>
+                ))}
+              </div>
+            }
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={qrTypeDist}
@@ -1854,11 +1898,17 @@ export default function HQOverview({ onNavigate }) {
                 <Bar
                   dataKey="value"
                   name="Scans"
-                  fill={CHART.primary}
                   radius={[0, 3, 3, 0]}
                   isAnimationActive={false}
                   maxBarSize={18}
-                />
+                >
+                  {qrTypeDist.map((_, i) => (
+                    <Cell
+                      key={`vol-cell-${i}`}
+                      fill={CHART.cat[i % CHART.cat.length]}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
