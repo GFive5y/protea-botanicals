@@ -296,6 +296,8 @@ export default function HQOverview({ onNavigate }) {
       if (res.ok) {
         const json = await res.json();
         const rate = json?.usd_zar || json?.rate || null;
+        const yesterday = json?.usd_zar_yesterday || null;
+        if (yesterday) setFxYesterday(parseFloat(yesterday));
         if (rate) {
           setFxRate(parseFloat(rate));
           setFxUpdatedAt(new Date());
@@ -341,42 +343,6 @@ export default function HQOverview({ onNavigate }) {
     };
   }, [fetchFx]);
 
-  // ── Yesterday's closing USD/ZAR — Frankfurter v2 ──────────────────────────
-  useEffect(() => {
-    const fetchYesterday = async () => {
-      try {
-        // Go back 4 days to handle Easter long weekend + Good Friday
-        // Frankfurter returns the last available business day automatically
-        const yd = new Date();
-        yd.setDate(yd.getDate() - 1);
-        const ydStr = yd.toISOString().split("T")[0];
-        // Try v2 API first
-        const res = await fetch(
-          `https://api.frankfurter.dev/v2/rates?from=${ydStr}&to=${ydStr}&base=USD&quotes=ZAR`
-        );
-        if (res.ok) {
-          const json = await res.json();
-          const rate = json?.[0]?.rates?.ZAR ?? json?.rates?.ZAR;
-          if (rate) { setFxYesterday(parseFloat(rate)); return; }
-        }
-      } catch (_) {}
-      try {
-        // Fallback to legacy API
-        const yd = new Date();
-        yd.setDate(yd.getDate() - 1);
-        const ydStr = yd.toISOString().split("T")[0];
-        const res = await fetch(
-          `https://api.frankfurter.app/${ydStr}?from=USD&to=ZAR`
-        );
-        if (res.ok) {
-          const json = await res.json();
-          const rate = json?.rates?.ZAR;
-          if (rate) setFxYesterday(parseFloat(rate));
-        }
-      } catch (_) {}
-    };
-    fetchYesterday();
-  }, []);
 
   const fetchBirthdayStats = useCallback(async () => {
     try {
@@ -2124,24 +2090,20 @@ export default function HQOverview({ onNavigate }) {
                     ? `R${erpStats.fxRate.toFixed(4)}`
                     : "—"}
               </div>
-              {fxYesterday && (fxRate || erpStats?.fxRate) ? (() => {
-                const cur = fxRate || erpStats?.fxRate;
-                const delta = ((cur - fxYesterday) / fxYesterday) * 100;
-                const isUp = delta > 0;
-                return (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600,
-                      color: isUp ? "#DC2626" : "#059669",
-                      fontFamily: T.fontData,
-                      fontVariantNumeric: "tabular-nums",
-                    }}>
-                      {isUp ? "\u2191" : "\u2193"} {Math.abs(delta).toFixed(2)}%
-                    </span>
-                    <span style={{ fontSize: 10, color: T.ink400 }}>vs yesterday</span>
-                  </div>
-                );
-              })() : (
+              {fxYesterday && (fxRate || erpStats?.fxRate) ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600,
+                    color: fxRate > fxYesterday ? "#DC2626" : "#059669",
+                    fontFamily: T.fontData,
+                    fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {fxRate > fxYesterday ? "\u2191" : "\u2193"}{" "}
+                    {Math.abs(((fxRate - fxYesterday) / fxYesterday) * 100).toFixed(2)}%
+                  </span>
+                  <span style={{ fontSize: 10, color: T.ink400 }}>vs yesterday</span>
+                </div>
+              ) : (
                 <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
                   {fxUpdatedAt ? `updated ${fmtAgo(fxUpdatedAt)}` : "live rate"}
                 </div>
