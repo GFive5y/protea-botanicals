@@ -989,6 +989,8 @@ export default function HQTenants() {
   const [expanded, setExpanded] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [toast, setToast] = useState(null);
+  const [simRunning, setSimRunning] = useState(false);
+  const [simWiping, setSimWiping] = useState(false);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -1168,6 +1170,87 @@ export default function HQTenants() {
           style={{ ...sBtn(), padding: "10px 20px" }}
         >
           + Add New Tenant
+        </button>
+      </div>
+
+      {/* ── Dev — Sales Simulator ── */}
+      <div style={{
+        ...sCard,
+        borderLeft: `3px solid ${T.info || "#2563EB"}`,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap",
+        padding: "12px 16px",
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: T.ink500, fontFamily: T.font }}>
+          Dev — Sales Simulator
+        </span>
+        <button
+          disabled={simRunning}
+          onClick={async () => {
+            setSimRunning(true);
+            try {
+              const { data, error: err } = await supabase.functions.invoke("sim-pos-sales", { body: { days: 30, orders_per_day: 15 } });
+              if (err) throw err;
+              showToast(`Sim 30d: ${data?.summary?.orders_created || "?"} orders, ${data?.summary?.total_revenue_simulated || "?"}`, "success");
+            } catch (e) { showToast("Sim failed: " + String(e), "error"); }
+            setSimRunning(false);
+          }}
+          style={{ ...sBtn(), fontSize: 10, padding: "6px 12px", opacity: simRunning ? 0.5 : 1 }}
+        >
+          {simRunning ? "Running…" : "▶ Run 30 Days"}
+        </button>
+        <button
+          disabled={simRunning}
+          onClick={async () => {
+            setSimRunning(true);
+            try {
+              const { data, error: err } = await supabase.functions.invoke("sim-pos-sales", { body: { days: 7, orders_per_day: 12 } });
+              if (err) throw err;
+              showToast(`Sim 7d: ${data?.summary?.orders_created || "?"} orders`, "success");
+            } catch (e) { showToast("Sim failed: " + String(e), "error"); }
+            setSimRunning(false);
+          }}
+          style={{ ...sBtn(), fontSize: 10, padding: "6px 12px", opacity: simRunning ? 0.5 : 1 }}
+        >
+          ▶ Run 7 Days
+        </button>
+        <button
+          disabled={simWiping}
+          onClick={async () => {
+            if (!window.confirm("Delete ALL sim data (sim_data_v1)? This cannot be undone.")) return;
+            setSimWiping(true);
+            try {
+              const tid = "b1bad266-ceb4-4558-bbc3-22cfeeeafe74";
+              const tag = "sim_data_v1";
+              await supabase.from("eod_cash_ups").delete().eq("notes", tag).eq("tenant_id", tid);
+              await supabase.from("pos_sessions").delete().eq("notes", tag).eq("tenant_id", tid);
+              await supabase.from("stock_movements").delete().eq("notes", tag).eq("tenant_id", tid);
+              // order_items cascade: get order ids first
+              const { data: simOrders } = await supabase.from("orders").select("id").eq("notes", tag).eq("tenant_id", tid);
+              if (simOrders?.length) {
+                const ids = simOrders.map(o => o.id);
+                for (let i = 0; i < ids.length; i += 100) {
+                  await supabase.from("order_items").delete().in("order_id", ids.slice(i, i + 100));
+                }
+              }
+              await supabase.from("orders").delete().eq("notes", tag).eq("tenant_id", tid);
+              showToast("Sim data wiped", "success");
+            } catch (e) { showToast("Wipe failed: " + String(e), "error"); }
+            setSimWiping(false);
+          }}
+          style={{
+            ...sBtn(),
+            fontSize: 10,
+            padding: "6px 12px",
+            background: T.dangerBg || "#FEF2F2",
+            color: T.danger || "#991B1B",
+            border: `1px solid ${T.dangerBd || "#FECACA"}`,
+            opacity: simWiping ? 0.5 : 1,
+          }}
+        >
+          {simWiping ? "Wiping…" : "🗑 Wipe Sim Data"}
         </button>
       </div>
 
