@@ -733,13 +733,19 @@ export default function HQOverview({ onNavigate }) {
       try {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
+        const ydayStart    = new Date(todayStart.getTime() - 86400000);
+        const ydayEnd      = todayStart;
         const weekAgoStart = new Date(todayStart.getTime() - 7 * 86400000);
         const weekAgoEnd   = new Date(weekAgoStart.getTime() + 86400000);
         const DOW_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-        const ydayLabel = `last ${DOW_SHORT[weekAgoStart.getDay()]}`;
-        const [todayR, ydayR] = await Promise.all([
+        const weekAgoLabel = `last ${DOW_SHORT[weekAgoStart.getDay()]}`;
+        const [todayR, ydayR, weekAgoR] = await Promise.all([
           supabase.from("orders").select("total,items_count")
             .gte("created_at", todayStart.toISOString())
+            .not("status", "in", '("cancelled","failed")'),
+          supabase.from("orders").select("total,items_count")
+            .gte("created_at", ydayStart.toISOString())
+            .lt("created_at", ydayEnd.toISOString())
             .not("status", "in", '("cancelled","failed")'),
           supabase.from("orders").select("total,items_count")
             .gte("created_at", weekAgoStart.toISOString())
@@ -752,17 +758,21 @@ export default function HQOverview({ onNavigate }) {
         const tAvgItems = tTxns > 0
           ? (todayR.data||[]).reduce((s,o)=>s+(parseInt(o.items_count)||0),0) / tTxns
           : 0;
-        const yRev   = (ydayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
-        const yTxns  = (ydayR.data||[]).length;
+        const yRev      = (ydayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
+        const yTxns     = (ydayR.data||[]).length;
+        const wkRev     = (weekAgoR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
+        const wkTxns    = (weekAgoR.data||[]).length;
         setTodaySummary({
-          rev:      tRev,
-          txns:     tTxns,
-          avgBasket: tAvg,
-          avgItems: Math.round(tAvgItems * 10) / 10,
-          ydayRev:  yRev,
-          ydayLabel,
-          revDelta:  yRev  > 0 ? ((tRev  - yRev)  / yRev  * 100) : null,
-          txnDelta:  yTxns > 0 ? ((tTxns - yTxns) / yTxns * 100) : null,
+          rev:          tRev,
+          txns:         tTxns,
+          avgBasket:    tAvg,
+          avgItems:     Math.round(tAvgItems * 10) / 10,
+          ydayRev:      yRev,
+          ydayDelta:    yRev  > 0 ? ((tRev - yRev)  / yRev  * 100) : null,
+          weekAgoRev:   wkRev,
+          weekAgoLabel,
+          weekAgoDelta: wkRev > 0 ? ((tRev - wkRev) / wkRev * 100) : null,
+          txnDelta:     yTxns > 0 ? ((tTxns - yTxns) / yTxns * 100) : null,
         });
       } catch(_) {}
 
@@ -1228,28 +1238,49 @@ export default function HQOverview({ onNavigate }) {
             : "R0"}
           subLabel="today's revenue"
           sub={
-            todaySummary?.revDelta != null ? (
-              <span style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
-                {todaySummary.ydayRev > 0 && (
+            <span style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
+              {todaySummary?.ydayDelta != null && (
+                <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   <span style={{
                     fontSize: 10,
                     color: "#9CA3AF",
                     fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
                   }}>
-                    R{Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} {todaySummary.ydayLabel}
+                    R{Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} yesterday
                   </span>
-                )}
-                <span style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: todaySummary.revDelta >= 0 ? "#059669" : "#DC2626",
-                  fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-                }}>
-                  {todaySummary.revDelta >= 0 ? "\u2191" : "\u2193"}
-                  {Math.abs(todaySummary.revDelta).toFixed(1)}% vs {todaySummary.ydayLabel}
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: todaySummary.ydayDelta >= 0 ? "#059669" : "#DC2626",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
+                    {todaySummary.ydayDelta >= 0 ? "\u2191" : "\u2193"}
+                    {Math.abs(todaySummary.ydayDelta).toFixed(1)}% vs yesterday
+                  </span>
                 </span>
-              </span>
-            ) : "\u2014"
+              )}
+              {todaySummary?.weekAgoDelta != null && (
+                <span style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
+                  <span style={{
+                    fontSize: 10,
+                    color: "#9CA3AF",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
+                    R{Math.round(todaySummary.weekAgoRev).toLocaleString("en-ZA")} {todaySummary.weekAgoLabel}
+                  </span>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: todaySummary.weekAgoDelta >= 0 ? "#059669" : "#DC2626",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
+                    {todaySummary.weekAgoDelta >= 0 ? "\u2191" : "\u2193"}
+                    {Math.abs(todaySummary.weekAgoDelta).toFixed(1)}% vs {todaySummary.weekAgoLabel}
+                  </span>
+                </span>
+              )}
+              {!todaySummary && "\u2014"}
+            </span>
           }
           semantic={null}
           onClick={() => nav("trading")}
