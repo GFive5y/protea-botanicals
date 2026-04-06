@@ -313,39 +313,116 @@ loyalty_config:   tenant_id, pts_per_r100_online, online_bonus_pct,
 
 ---
 
-## SECTION 10 — INTELLIGENCE PENDING (WP-INTELLIGENCE_v1_0.md)
+## SECTION 10 — INTELLIGENCE LAYER (BUILT + PENDING)
 
-The following features are planned and specced in WP-INTELLIGENCE_v1_0.md:
+### What the Intelligence Layer Does (Operational Value)
 
-**Phase 1 — Velocity Intelligence**
-- Days of stock per SKU (stock remaining / daily burn rate)
-- Velocity-based reorder alerts replacing static threshold
-- Revenue at risk: daily revenue × days out of stock
+The intelligence layer converts raw transaction data into operational decisions.
+Without it: the operator sees "R156,865 this month" and waits for month-end
+to understand performance. With it: every dashboard tile tells them what to
+do RIGHT NOW.
 
-**Phase 2 — True P&L**
-- Gross profit per sale from order_items × AVCO
-- P&L by category (revenue, COGS, gross profit, margin)
-- P&L screen rebuild with SKU-level drill-down
+**The core unlock (commit 4301631, Apr 7 2026):**
+Every POS sale now writes order_items with product_name, quantity, unit_price,
+line_total, and product_metadata (including weighted_avg_cost). This enables
+true retail P&L at SKU level — something no existing SA cannabis software does.
 
-**Phase 3 — Revenue Forecasting**
-- Category-level run rates alongside total
-- Week-over-week trend signals
-- Cash flow projection by payment method
+### ✅ BUILT — Intelligence Features Live
 
-**Phase 4 — Inventory Intelligence**
-- Dead stock panel (in stock + zero velocity 30+ days)
-- Optimal order quantity per SKU (velocity × lead time × safety factor)
-- Best seller crumb on Avg Basket tile (top SKU by units today)
+**Revenue MTD Run Rate (P3)**
+File: src/components/hq/HQOverview.js — Revenue MTD tile
+- Shows: margin % + R[X]/day run rate + projected month-end
+- Why it matters: replaces "how did we do?" with "are we on track?"
+- Example: R22k/day run rate → projected R672k month-end
+- Calculation: render-time only (MTD ÷ days elapsed × 30). No new query.
 
-**Phase 5 — Customer Intelligence (requires real multi-user orders)**
-- Purchase history per loyalty member
-- Category affinity per customer
-- RFM scoring (Recency / Frequency / Monetary)
-- Churn signals
+**Velocity-Based Reorder Alerts (P1-B)**
+File: src/components/hq/HQOverview.js — Reorder Alerts tile sub prop
+State: velocityAlerts[] computed in fetchCannabisData
+- Shows: top 2 critical SKUs with days of stock remaining + revenue at risk
+- Example: "Hybrid Flower 3.5g · 5d · R1,201/day"
+- Why it matters: static reorder_level says "6 items below threshold"
+  but velocity says "your top revenue SKU runs out tomorrow"
+- Query: order_items × inventory_items → daily_velocity → days_of_stock
+- Color: red ≤7 days · amber 8–13 days
+
+**orders.channel Column**
+Migration: Apr 7 2026
+Values: 'pos' | 'online' | 'wholesale'
+Enables: Transactions tile to split POS vs Online revenue (built, pending UI)
+
+**POS Data Simulator (sim-pos-sales)**
+Edge Function deployed Apr 7 2026
+- Generates realistic 60-day trading history for development/testing
+- Realistic patterns: time-of-day, day-of-week, payment splits, category weighting
+- Tags all records notes='sim_data_v1' — one SQL line to clean up
+- Does NOT deduct inventory — safe for development
+
+### ⏳ PENDING — Intelligence Features (WP-INTELLIGENCE_v1_0.md)
+
+**P4b — Online channel tagging (20 min)**
+Add channel: 'online' to payfast-checkout Edge Function orders INSERT.
+
+**Best Seller Crumb on Avg Basket tile (45 min)**
+Top SKU by units today from order_items → shown in Avg Basket tile sub prop.
+
+**Silent Fail UX — POS Toast on DB Errors (1 hour)**
+POSScreen.js: order_items and stock_movements errors are console.warn only.
+Should surface as toast to operator. Ref: LL-SUPABASE-SILENT-FAIL-01.
+
+**P2 — True P&L Rebuild (dedicated session)**
+HQProfitLoss.js: rebuild around order_items × weighted_avg_cost.
+Replaces revenue-only view with true gross profit by category and SKU.
+Proven query this session — category P&L, SKU profitability ranking.
+
+**Dead Stock Panel (2 hours)**
+Items with quantity_on_hand > 0 and zero velocity in last 45 days.
+Shows: name, units on hand, days since last sale, capital tied up.
+
+**P6 — HQTradingDashboard bar colour (15 min)**
+30-day revenue bar still on old green. Update to Indigo (#6366F1).
+
+Full 5-phase roadmap: docs/WP-INTELLIGENCE_v1_0.md
+
+### Intelligence Queries (Proven — Ready to Use)
+
+**Days of Stock per SKU:**
+```sql
+SELECT ii.name, ii.quantity_on_hand,
+  ROUND(SUM(oi.quantity)::numeric / 30, 2) as daily_velocity,
+  ROUND((ii.quantity_on_hand / (SUM(oi.quantity)::numeric / 30))::numeric, 0) as days_of_stock,
+  ROUND((SUM(oi.quantity)::numeric / 30 * ii.sell_price)::numeric, 0) as daily_revenue
+FROM inventory_items ii
+JOIN (
+  SELECT (oi.product_metadata->>'item_id')::uuid as item_id, SUM(oi.quantity) as quantity
+  FROM order_items oi JOIN orders o ON o.id = oi.order_id
+  WHERE o.tenant_id = '[tenant_id]' AND o.status = 'paid'
+    AND o.created_at >= NOW() - INTERVAL '30 days'
+  GROUP BY (oi.product_metadata->>'item_id')::uuid
+) s ON s.item_id = ii.id
+WHERE ii.tenant_id = '[tenant_id]' AND ii.is_active = true AND ii.quantity_on_hand > 0
+ORDER BY days_of_stock ASC NULLS LAST;
+```
+
+**True P&L by Category:**
+```sql
+SELECT (oi.product_metadata->>'category') as category,
+  ROUND(SUM(oi.line_total)::numeric, 0) as revenue,
+  ROUND(SUM(oi.quantity * COALESCE(ii.weighted_avg_cost, 0))::numeric, 0) as cogs,
+  ROUND((SUM(oi.line_total) - SUM(oi.quantity * COALESCE(ii.weighted_avg_cost, 0)))::numeric, 0) as gross_profit,
+  ROUND(((SUM(oi.line_total) - SUM(oi.quantity * COALESCE(ii.weighted_avg_cost,0)))
+    / NULLIF(SUM(oi.line_total),0) * 100)::numeric, 1) as margin_pct
+FROM order_items oi
+JOIN orders o ON o.id = oi.order_id
+LEFT JOIN inventory_items ii ON ii.id = (oi.product_metadata->>'item_id')::uuid
+WHERE o.tenant_id = '[tenant_id]' AND o.status = 'paid'
+GROUP BY (oi.product_metadata->>'category')
+ORDER BY gross_profit DESC;
+```
 
 ---
 
-## CRITICAL RULES FOR AI SESSIONS
+## SECTION 11 — CRITICAL RULES FOR AI SESSIONS
 
 1. NEVER edit without reading current file from disk first (LL-GH-MCP-01: SHA may be stale)
 2. NEVER use GitHub write tools from Claude.ai (RULE 0Q + LL-202)

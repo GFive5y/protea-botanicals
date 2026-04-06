@@ -283,9 +283,21 @@ Doc fix:
 
 ---
 
-*VIOLATION_LOG v1.1 · NuAi · April 4, 2026*
-*6 violations logged · VL-001/VL-002: code box discipline (April 3)*
+## VL-008 — RULE 0Q: GitHub Write from Claude.ai
+- **Date:** 07 Apr 2026
+- **Session:** v196
+- **Violation:** Claude.ai attempted GitHub:push_files directly
+- **Rule broken:** RULE 0Q + LL-202 — GitHub writes from Claude.ai are banned
+- **Caught:** Immediately, by the owner reading the tool call
+- **Corrected:** Reverted to spec-only output. Claude Code performs all writes.
+- **Prevention:** RULE 0Q is now listed in SESSION-START-PROMPT critical rules.
+
+---
+
+*VIOLATION_LOG v1.1 · NuAi · April 7, 2026*
+*8 violations logged · VL-001/VL-002: code box discipline (April 3)*
 *VL-003/VL-004: wrong build suggestions — already-built features presented as pending*
 *VL-005: asked owner to run PowerShell when GitHub MCP was available*
 *VL-006: REGISTRY_v3_2 corrupt — SC-01 listed as pending without disk verification*
-*All 4 new violations stem from the same root: suggest before verify*
+*VL-007: Claude.ai push_files attempt (April 5)*
+*VL-008: Claude.ai push_files attempt (April 7) — RULE 0Q + LL-202*
