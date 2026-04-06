@@ -1276,7 +1276,7 @@ export default function HQOverview({ onNavigate }) {
                 </span>
                 {todayPayments.cash && (
                   <span style={{
-                    fontSize: 10,
+                    fontSize: 11,
                     color: "#059669",
                     fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
                     fontWeight: 600,
@@ -1303,7 +1303,7 @@ export default function HQOverview({ onNavigate }) {
                 ? ((todaySummary.avgBasket - todaySummary.avg7d) / todaySummary.avg7d * 100)
                 : null;
               return (
-                <span style={{ display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center", marginTop: 2 }}>
                   {todaySummary.avgItems > 0 && (
                     <span style={{ color: "#6B7280", fontSize: 10 }}>
                       {todaySummary.avgItems.toFixed(1)} items avg
@@ -1321,7 +1321,7 @@ export default function HQOverview({ onNavigate }) {
                     <>
                       <span style={{ color: "#D1D5DB" }}>&middot;</span>
                       <span style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: 600,
                         color: vsSevenD >= 0 ? "#059669" : "#DC2626",
                         fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
@@ -1331,7 +1331,7 @@ export default function HQOverview({ onNavigate }) {
                       </span>
                     </>
                   )}
-                </span>
+                </div>
               );
             })() : "no transactions yet"
           }
