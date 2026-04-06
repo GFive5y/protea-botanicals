@@ -23,7 +23,7 @@ import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
-import { worldForItem } from "./ProductWorlds";
+import { PRODUCT_WORLDS, worldForItem } from "./ProductWorlds";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -251,6 +251,7 @@ export default function HQOverview({ onNavigate }) {
   const [fxCountdown, setFxCountdown] = useState(60);
   const [scanDelta, setScanDelta] = useState(null); // % vs prior 7 days
   const [revDelta, setRevDelta] = useState(null); // % vs prior month
+  const [selectedWorld, setSelectedWorld] = useState(null); // drill-down
   const [todaySummary, setTodaySummary] = useState(null);
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
@@ -842,13 +843,24 @@ export default function HQOverview({ onNavigate }) {
 
       // Category breakdown — 14 Product Worlds via subcategory-first matching
       const byCat = {};
+      const byWorldSub = {};
       items.forEach((i) => {
         const world = worldForItem(i);
         if (!world || world.id === "all") return;
+        // Overview counts
         if (!byCat[world.id])
           byCat[world.id] = { label: world.label, count: 0, inStock: 0 };
         byCat[world.id].count++;
         if ((i.quantity_on_hand || 0) > 0) byCat[world.id].inStock++;
+        // Subcategory drill-down counts
+        if (!byWorldSub[world.id]) byWorldSub[world.id] = {};
+        const subKey = i.subcategory || "__none__";
+        const subLabel = world.subLabels?.[subKey]
+          || (subKey === "__none__" ? world.label : subKey.replace(/_/g, " "));
+        if (!byWorldSub[world.id][subKey])
+          byWorldSub[world.id][subKey] = { label: subLabel, count: 0, inStock: 0 };
+        byWorldSub[world.id][subKey].count++;
+        if ((i.quantity_on_hand || 0) > 0) byWorldSub[world.id][subKey].inStock++;
       });
 
       setCannabisStock({
@@ -864,6 +876,7 @@ export default function HQOverview({ onNavigate }) {
         healthyCount: healthyItems.length,
         totalPriced: pricedItems.length,
         byCat,
+        byWorldSub,
         expiryAlert:
           expiredItems.length > 0
             ? "critical"
@@ -1285,28 +1298,68 @@ export default function HQOverview({ onNavigate }) {
               alignItems: "stretch",
             }}
           >
-            {/* LEFT: Stock by Category — tall chart */}
-            {Object.keys(cannabisStock.byCat).length > 0 && (
-              <ChartCard title="Stock by Category" subtitle="In-stock ratio" height={420}>
-                <div
-                  style={{
-                    padding: "4px 16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 0,
-                    height: "100%",
-                    justifyContent: "space-evenly",
-                  }}
-                >
-                  {Object.entries(cannabisStock.byCat)
+            {/* LEFT: Stock by Category — drill-down chart */}
+            {Object.keys(cannabisStock.byCat).length > 0 && (() => {
+              const isdrilldown = !!selectedWorld;
+              const activeWorld = selectedWorld
+                ? PRODUCT_WORLDS.find((w) => w.id === selectedWorld)
+                : null;
+              const rows = isdrilldown
+                ? Object.entries(cannabisStock.byWorldSub?.[selectedWorld] || {})
                     .sort((a, b) => b[1].count - a[1].count)
-                    .map(([worldId, data]) => {
-                      const pct =
-                        data.count > 0 ? (data.inStock / data.count) * 100 : 0;
+                : Object.entries(cannabisStock.byCat)
+                    .sort((a, b) => b[1].count - a[1].count);
+
+              return (
+                <ChartCard
+                  title={isdrilldown ? activeWorld?.label || selectedWorld : "Stock by Category"}
+                  subtitle={
+                    isdrilldown
+                      ? (
+                        <span
+                          onClick={() => setSelectedWorld(null)}
+                          style={{ cursor: "pointer", color: "#6366F1", fontSize: 11, fontWeight: 500 }}
+                        >
+                          \u2190 All categories
+                        </span>
+                      )
+                      : "In-stock ratio"
+                  }
+                  height={420}
+                >
+                  <div
+                    style={{
+                      padding: "4px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0,
+                      height: "100%",
+                      justifyContent: "space-evenly",
+                    }}
+                  >
+                    {rows.map(([rowKey, data]) => {
+                      const pct = data.count > 0 ? (data.inStock / data.count) * 100 : 0;
+                      const clickable = !isdrilldown;
                       return (
                         <div
-                          key={worldId}
-                          style={{ display: "flex", alignItems: "center", gap: 10 }}
+                          key={rowKey}
+                          onClick={clickable ? () => setSelectedWorld(rowKey) : undefined}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            cursor: clickable ? "pointer" : "default",
+                            borderRadius: 4,
+                            padding: "2px 4px",
+                            margin: "0 -4px",
+                            transition: "background 0.12s",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (clickable) e.currentTarget.style.background = "#F8FAFC";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (clickable) e.currentTarget.style.background = "transparent";
+                          }}
                         >
                           <div
                             style={{
@@ -1350,10 +1403,11 @@ export default function HQOverview({ onNavigate }) {
                             style={{
                               width: 44,
                               fontSize: 10,
-                              color: T.ink400,
+                              color: clickable ? "#6366F1" : T.ink400,
                               fontFamily: T.fontData,
                               textAlign: "right",
                               flexShrink: 0,
+                              fontWeight: clickable ? 500 : 400,
                             }}
                           >
                             {data.inStock}/{data.count}
@@ -1361,9 +1415,10 @@ export default function HQOverview({ onNavigate }) {
                         </div>
                       );
                     })}
-                </div>
-              </ChartCard>
-            )}
+                  </div>
+                </ChartCard>
+              );
+            })()}
             {/* RIGHT: 2 tiles top, 1 tile below */}
             <div style={{ display: "flex", flexDirection: "column", gap: 12, justifyContent: "space-between", height: "100%" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
