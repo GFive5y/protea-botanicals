@@ -1622,13 +1622,34 @@ export default function HQOverview({ onNavigate }) {
               : "—"
           }
           subLabel="this month"
-          sub={
-            isCannabisRetail && cannabisStock?.avgMargin != null
-              ? `${cannabisStock.avgMargin.toFixed(1)}% avg margin`
-              : erpStats?.avgMarginPct != null
-                ? `${erpStats.avgMarginPct.toFixed(1)}% avg margin`
-                : "margin loading…"
-          }
+          sub={(() => {
+            const margin = isCannabisRetail
+              ? cannabisStock?.avgMargin
+              : erpStats?.avgMarginPct;
+            const marginLine = margin != null
+              ? `${margin.toFixed(1)}% avg margin`
+              : "margin loading…";
+            if (!plStats?.revenueMTD) return marginLine;
+            const daysElapsed = new Date().getDate();
+            const runRate = plStats.revenueMTD / daysElapsed;
+            const projected = runRate * 30;
+            const fmt = (n) =>
+              n >= 1000000
+                ? `R${(n / 1000000).toFixed(1)}m`
+                : `R${Math.round(n / 1000)}k`;
+            return (
+              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <span>{marginLine}</span>
+                <span style={{
+                  fontSize: 10,
+                  color: "#6B7280",
+                  fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                }}>
+                  {fmt(runRate)}/day run rate · projected {fmt(projected)}
+                </span>
+              </span>
+            );
+          })()}
           semantic={
             (isCannabisRetail
               ? cannabisStock?.avgMargin
