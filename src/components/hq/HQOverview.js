@@ -1226,10 +1226,19 @@ export default function HQOverview({ onNavigate }) {
           value={todaySummary
             ? `R${Math.round(todaySummary.rev).toLocaleString("en-ZA")}`
             : "R0"}
-          subLabel={null}
+          subLabel="today's revenue"
           sub={
             todaySummary?.revDelta != null ? (
               <span style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
+                {todaySummary.ydayRev > 0 && (
+                  <span style={{
+                    fontSize: 10,
+                    color: "#9CA3AF",
+                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                  }}>
+                    R{Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} {todaySummary.ydayLabel}
+                  </span>
+                )}
                 <span style={{
                   fontSize: 11,
                   fontWeight: 600,
@@ -1239,16 +1248,6 @@ export default function HQOverview({ onNavigate }) {
                   {todaySummary.revDelta >= 0 ? "\u2191" : "\u2193"}
                   {Math.abs(todaySummary.revDelta).toFixed(1)}% vs {todaySummary.ydayLabel}
                 </span>
-                {todaySummary.ydayRev > 0 && (
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: todaySummary.revDelta >= 0 ? "#059669" : "#DC2626",
-                    fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-                  }}>
-                    R{Math.round(todaySummary.ydayRev).toLocaleString("en-ZA")} {todaySummary.ydayLabel}
-                  </span>
-                )}
               </span>
             ) : "\u2014"
           }
