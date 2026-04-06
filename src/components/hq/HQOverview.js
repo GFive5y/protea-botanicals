@@ -377,7 +377,10 @@ export default function HQOverview({ onNavigate }) {
         users = 0,
         totalPoints = 0,
         tenants = 0,
-        recentScanCount = 0;
+        recentScanCount = 0,
+        scanLast30 = 0,
+        pointsLast7 = 0,
+        pointsLast30 = 0;
       let scansData = [],
         lowStockData = [];
 
@@ -395,16 +398,25 @@ export default function HQOverview({ onNavigate }) {
         users = r.count || 0;
       } catch (_) {}
       try {
+        const now = new Date();
+        const d7pts = new Date(); d7pts.setDate(now.getDate() - 7);
+        const d30pts = new Date(); d30pts.setDate(now.getDate() - 30);
         const r = await supabase
           .from("loyalty_transactions")
-          .select("points")
+          .select("points,transaction_date")
           .in("transaction_type", [
             "EARNED",
             "earned",
             "EARNED_POINTS",
             "SCAN",
           ]);
-        totalPoints = (r.data || []).reduce((s, t) => s + (t.points || 0), 0);
+        (r.data || []).forEach((t) => {
+          const pts = t.points || 0;
+          totalPoints += pts;
+          const td = new Date(t.transaction_date);
+          if (td >= d30pts) pointsLast30 += pts;
+          if (td >= d7pts)  pointsLast7  += pts;
+        });
       } catch (_) {}
       try {
         const r = await supabase
@@ -429,13 +441,22 @@ export default function HQOverview({ onNavigate }) {
         scansData = r.data || [];
       } catch (_) {}
       try {
-        const d = new Date();
-        d.setDate(d.getDate() - 7);
+        const d7 = new Date();
+        d7.setDate(d7.getDate() - 7);
         const r = await supabase
           .from("scan_logs")
           .select("id", { count: "exact", head: true })
-          .gte("scanned_at", d.toISOString());
+          .gte("scanned_at", d7.toISOString());
         recentScanCount = r.count || 0;
+      } catch (_) {}
+      try {
+        const d30s = new Date();
+        d30s.setDate(d30s.getDate() - 30);
+        const r = await supabase
+          .from("scan_logs")
+          .select("id", { count: "exact", head: true })
+          .gte("scanned_at", d30s.toISOString());
+        scanLast30 = r.count || 0;
       } catch (_) {}
       try {
         const r = await supabase
@@ -482,6 +503,9 @@ export default function HQOverview({ onNavigate }) {
         loyaltyPoints: totalPoints,
         tenants,
         recentScanCount,
+        scanLast30,
+        pointsLast7,
+        pointsLast30,
         openTickets,
         unreadMsgs,
         unreadWholesale,
@@ -1725,9 +1749,9 @@ export default function HQOverview({ onNavigate }) {
         <MetricTile
           label="QR Scans"
           value={stats.scans}
-          subLabel="total lifetime"
-          sub={`${stats.recentScanCount} in last 7 days`}
-          semantic="success"
+          subLabel={`${stats.recentScanCount} last 7 days · ${stats.scanLast30} last 30 days`}
+          sub={null}
+          semantic={stats.recentScanCount > 0 ? "success" : null}
           onClick={() => nav("analytics")}
           hint="Analytics"
           sparkData={weeklySpark}
@@ -1736,8 +1760,8 @@ export default function HQOverview({ onNavigate }) {
         <MetricTile
           label="Loyalty Points"
           value={stats.loyaltyPoints.toLocaleString()}
-          subLabel="total issued"
-          sub={`${stats.users} registered members`}
+          subLabel={`${stats.users} registered members`}
+          sub={`${stats.pointsLast7.toLocaleString()} pts · 7d  ·  ${stats.pointsLast30.toLocaleString()} pts · 30d`}
           semantic="info"
           onClick={() => nav("loyalty")}
           hint="Loyalty"
