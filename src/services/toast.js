@@ -7,8 +7,14 @@
 //   toast.warning("Item deleted", { undo: () => restoreItem(), duration: 5000 });
 
 const _listeners = new Set();
+const _dedup = new Map();
+const _DEDUP_MS = 2500;
 
 function _emit(config) {
+  const _dedupKey = `${config.type}:${config.message}`;
+  const _last = _dedup.get(_dedupKey);
+  if (_last && Date.now() - _last < _DEDUP_MS) return;
+  _dedup.set(_dedupKey, Date.now());
   _listeners.forEach((fn) => fn(config));
 }
 

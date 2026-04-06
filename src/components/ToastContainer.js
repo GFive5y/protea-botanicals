@@ -63,8 +63,9 @@ function ToastItem({ t, onDismiss }) {
         fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
         position: "relative",
         overflow: "hidden",
-        animation:
-          "nuai-toast-in 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        animation: t.exiting
+          ? "nuai-toast-out 0.2s ease forwards"
+          : "nuai-toast-in 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
         pointerEvents: "all",
         cursor: "default",
       }}
@@ -173,14 +174,32 @@ export default function ToastContainer() {
 
   useEffect(() => {
     const unsub = toast.subscribe((t) => {
-      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      setToasts((prev) => [...prev, { ...t, id }]);
+      const newToast = { ...t, id: `toast-${Date.now()}-${Math.random().toString(36).slice(2)}` };
+      setToasts((prev) => {
+        const visible = prev.filter((x) => !x.exiting);
+        if (visible.length >= 2) {
+          const oldestId = visible[0].id;
+          setTimeout(() => {
+            setToasts((p) => p.filter((x) => x.id !== oldestId));
+          }, 200);
+          return [
+            ...prev.map((x) => (x.id === oldestId ? { ...x, exiting: true } : x)),
+            newToast,
+          ];
+        }
+        return [...prev, newToast];
+      });
     });
     return unsub;
   }, []);
 
   const dismiss = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, exiting: true } : t))
+    );
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 200);
   }, []);
 
   if (toasts.length === 0) return null;
@@ -191,6 +210,10 @@ export default function ToastContainer() {
         @keyframes nuai-toast-in {
           from { opacity: 0; transform: translateY(12px) scale(0.96); }
           to   { opacity: 1; transform: translateY(0)   scale(1);    }
+        }
+        @keyframes nuai-toast-out {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to   { opacity: 0; transform: translateY(12px) scale(0.95); }
         }
       `}</style>
       <div
