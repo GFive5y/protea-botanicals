@@ -282,6 +282,7 @@ export default function HQOverview({ onNavigate }) {
   const [fxRefreshing, setFxRefreshing] = useState(false);
   const [fxCountdown, setFxCountdown] = useState(60);
   const [fxYesterday, setFxYesterday] = useState(null);
+  const [fxRate30d, setFxRate30d] = useState(null);
   const [scanDelta, setScanDelta] = useState(null); // % vs prior 7 days
   const [revDelta, setRevDelta] = useState(null); // % vs prior month
   const [selectedWorld, setSelectedWorld] = useState(null); // drill-down
@@ -298,6 +299,8 @@ export default function HQOverview({ onNavigate }) {
         const rate = json?.usd_zar || json?.rate || null;
         const yesterday = json?.usd_zar_yesterday || null;
         if (yesterday) setFxYesterday(parseFloat(yesterday));
+        const rate30d = json?.usd_zar_30d || null;
+        if (rate30d) setFxRate30d(parseFloat(rate30d));
         if (rate) {
           setFxRate(parseFloat(rate));
           setFxUpdatedAt(new Date());
@@ -2101,17 +2104,33 @@ export default function HQOverview({ onNavigate }) {
                     : "—"}
               </div>
               {fxYesterday && (fxRate || erpStats?.fxRate) ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                  <span style={{
-                    fontSize: 11, fontWeight: 600,
-                    color: fxRate > fxYesterday ? "#DC2626" : "#059669",
-                    fontFamily: T.fontData,
-                    fontVariantNumeric: "tabular-nums",
-                  }}>
-                    {fxRate > fxYesterday ? "\u2191" : "\u2193"}{" "}
-                    {Math.abs(((fxRate - fxYesterday) / fxYesterday) * 100).toFixed(2)}%
-                  </span>
-                  <span style={{ fontSize: 10, color: T.ink400 }}>vs yesterday</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600,
+                      color: fxRate > fxYesterday ? "#DC2626" : "#059669",
+                      fontFamily: T.fontData,
+                      fontVariantNumeric: "tabular-nums",
+                    }}>
+                      {fxRate > fxYesterday ? "\u2191" : "\u2193"}{" "}
+                      {Math.abs(((fxRate - fxYesterday) / fxYesterday) * 100).toFixed(2)}%
+                    </span>
+                    <span style={{ fontSize: 10, color: T.ink400 }}>vs yesterday</span>
+                  </div>
+                  {fxRate30d && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600,
+                        color: fxRate > fxRate30d ? "#DC2626" : "#059669",
+                        fontFamily: T.fontData,
+                        fontVariantNumeric: "tabular-nums",
+                      }}>
+                        {fxRate > fxRate30d ? "\u2191" : "\u2193"}{" "}
+                        {Math.abs(((fxRate - fxRate30d) / fxRate30d) * 100).toFixed(2)}%
+                      </span>
+                      <span style={{ fontSize: 10, color: T.ink400 }}>vs 30 days</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ fontSize: 11, color: T.ink500, marginTop: 6 }}>
