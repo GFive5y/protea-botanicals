@@ -5,10 +5,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
+  ComposedChart,
   AreaChart,
   Area,
   BarChart,
   Bar,
+  Line,
   PieChart,
   Pie,
   Cell,
@@ -594,56 +596,64 @@ export default function HQOverview({ onNavigate }) {
         fxRate: currentFx,
       });
 
-      // ── Revenue trend (Area hero — orders.total by day) ──────────────
+      // ── Revenue trend: this 30d bars + prior 30d line ─────────────────
       try {
-        const d30r = new Date();
-        d30r.setDate(d30r.getDate() - 30);
-        const { data: revRaw } = await supabase
-          .from("orders")
-          .select("created_at,total")
-          .gte("created_at", d30r.toISOString())
-          .order("created_at", { ascending: true });
-        const revDayMap = {};
-        (revRaw || []).forEach((o) => {
-          const day = new Date(o.created_at).toLocaleDateString("en-ZA", {
-            month: "short",
-            day: "numeric",
-          });
-          revDayMap[day] = (revDayMap[day] || 0) + (parseFloat(o.total) || 0);
-        });
-        setRevenueTrend(
-          Object.entries(revDayMap).map(([date, total]) => ({ date, total })),
-        );
-        // Revenue delta: MTD vs same number of days last month
         const now = new Date();
+        const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+        const d60 = new Date(now); d60.setDate(d60.getDate() - 60);
+
+        const [thisRes, lastRes] = await Promise.all([
+          supabase.from("orders").select("created_at,total")
+            .gte("created_at", d30.toISOString())
+            .order("created_at", { ascending: true }),
+          supabase.from("orders").select("created_at,total")
+            .gte("created_at", d60.toISOString())
+            .lt("created_at", d30.toISOString())
+            .order("created_at", { ascending: true }),
+        ]);
+
+        // Build day-index maps (0 = oldest day in window)
+        const bucketByDayIndex = (rows, startDate) => {
+          const map = {};
+          (rows || []).forEach((o) => {
+            const diffMs = new Date(o.created_at) - startDate;
+            const idx = Math.floor(diffMs / 86400000);
+            if (idx >= 0 && idx < 31)
+              map[idx] = (map[idx] || 0) + (parseFloat(o.total) || 0);
+          });
+          return map;
+        };
+
+        const thisMap = bucketByDayIndex(thisRes.data || [], d30);
+        const lastMap = bucketByDayIndex(lastRes.data || [], d60);
+
+        // Build merged array keyed by this-month date labels
+        const merged = [];
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(d30); d.setDate(d30.getDate() + i);
+          const label = d.toLocaleDateString("en-ZA", { month: "short", day: "numeric" });
+          merged.push({
+            date: label,
+            total: thisMap[i] || 0,
+            lastMonth: lastMap[i] || null,
+          });
+        }
+        setRevenueTrend(merged);
+
+        // Delta: MTD vs same days last month
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastMonthStart = new Date(
-          now.getFullYear(),
-          now.getMonth() - 1,
-          1,
-        );
-        const lastMonthSameDay = new Date(
-          now.getFullYear(),
-          now.getMonth() - 1,
-          now.getDate(),
-        );
-        const { data: lastMonthRev } = await supabase
-          .from("orders")
-          .select("total")
-          .gte("created_at", lastMonthStart.toISOString())
-          .lte("created_at", lastMonthSameDay.toISOString());
-        const lastMonthTotal = (lastMonthRev || []).reduce(
-          (s, o) => s + (parseFloat(o.total) || 0),
-          0,
-        );
-        const thisMonthTotal = (revRaw || [])
+        const thisMTD = (thisRes.data || [])
           .filter((o) => new Date(o.created_at) >= monthStart)
           .reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
-        if (lastMonthTotal > 0) {
-          setRevDelta(
-            ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100,
-          );
-        }
+        const lastMTD = (lastRes.data || [])
+          .filter((o) => {
+            const d = new Date(o.created_at);
+            const lms = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const lme = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            return d >= lms && d <= lme;
+          })
+          .reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+        if (lastMTD > 0) setRevDelta(((thisMTD - lastMTD) / lastMTD) * 100);
       } catch (_) {}
 
       // ── Today's snapshot (revenue + txns vs yesterday) ───────────────
@@ -1082,31 +1092,32 @@ export default function HQOverview({ onNavigate }) {
         />
       </div>
 
-      {/* ── REVENUE HERO — Area chart (orders.total last 30 days) ── */}
+      {/* ── REVENUE — ComposedChart: bars + last month line ── */}
       {revenueTrend.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <ChartCard
-            title="Revenue — Last 30 Days"
-            subtitle="Daily orders · all channels"
-            accent="green"
-            height={320}
+            title="Revenue \u2014 Last 30 Days"
+            subtitle="Daily bars \u00b7 last month dashed"
+            height={300}
             action={
               revDelta !== null ? (
-                <DeltaBadge value={revDelta} suffix="%" decimals={1} />
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: "#94A3B8" }}>
+                    <svg width="20" height="2" viewBox="0 0 20 2">
+                      <line x1="0" y1="1" x2="20" y2="1" stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="4 3"/>
+                    </svg>
+                    Last month
+                  </div>
+                  <DeltaBadge value={revDelta} suffix="%" decimals={1} />
+                </div>
               ) : null
             }
           >
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
+              <ComposedChart
                 data={revenueTrend}
                 margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
               >
-                <defs>
-                  <linearGradient id="ov-rev-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART.primary} stopOpacity={0.09} />
-                    <stop offset="95%" stopColor={CHART.primary} stopOpacity={0.01} />
-                  </linearGradient>
-                </defs>
                 <CartesianGrid
                   horizontal={true}
                   vertical={false}
@@ -1115,7 +1126,7 @@ export default function HQOverview({ onNavigate }) {
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
                   dy={6}
@@ -1123,34 +1134,48 @@ export default function HQOverview({ onNavigate }) {
                   maxRotation={0}
                 />
                 <YAxis
-                  tick={{ fill: CHART.axis, fontSize: 11, fontFamily: T.font }}
+                  tick={{ fill: CHART.axis, fontSize: 10, fontFamily: T.font }}
                   axisLine={false}
                   tickLine={false}
-                  width={55}
+                  width={52}
                   tickFormatter={(v) => `R${(v / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
                   content={
                     <ChartTooltip
                       formatter={(v) =>
-                        `R ${Number(v).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        v != null
+                          ? `R ${Number(v).toLocaleString("en-ZA", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}`
+                          : "\u2014"
                       }
                     />
                   }
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="total"
-                  name="Revenue"
-                  stroke={CHART.primary}
-                  strokeWidth={1.5}
-                  fill="url(#ov-rev-grad)"
-                  dot={false}
+                  name="This month"
+                  fill={CHART.primary}
+                  radius={[3, 3, 0, 0]}
+                  maxBarSize={22}
                   isAnimationActive={true}
-                  animationDuration={800}
+                  animationDuration={600}
                   animationEasing="ease-out"
                 />
-              </AreaChart>
+                <Line
+                  type="monotone"
+                  dataKey="lastMonth"
+                  name="Last month"
+                  stroke={CHART.neutral}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  dot={false}
+                  connectNulls={true}
+                  isAnimationActive={false}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
         </div>
