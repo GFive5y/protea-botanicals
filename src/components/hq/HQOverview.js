@@ -1279,7 +1279,7 @@ export default function HQOverview({ onNavigate }) {
                     fontSize: 10,
                     color: "#059669",
                     fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
-                    fontWeight: 500,
+                    fontWeight: 600,
                   }}>
                     R{Math.round(todayPayments.cash.revenue).toLocaleString("en-ZA")} cash in till
                   </span>
@@ -1322,7 +1322,7 @@ export default function HQOverview({ onNavigate }) {
                       <span style={{ color: "#D1D5DB" }}>&middot;</span>
                       <span style={{
                         fontSize: 10,
-                        fontWeight: 500,
+                        fontWeight: 600,
                         color: vsSevenD >= 0 ? "#059669" : "#DC2626",
                         fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
                       }}>
