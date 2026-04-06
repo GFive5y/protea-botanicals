@@ -746,12 +746,16 @@ export default function HQOverview({ onNavigate }) {
         const tRev   = (todayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
         const tTxns  = (todayR.data||[]).length;
         const tAvg   = tTxns > 0 ? tRev / tTxns : 0;
+        const tAvgItems = tTxns > 0
+          ? (todayR.data||[]).reduce((s,o)=>s+(parseInt(o.items_count)||0),0) / tTxns
+          : 0;
         const yRev   = (ydayR.data||[]).reduce((s,o)=>s+(parseFloat(o.total)||0),0);
         const yTxns  = (ydayR.data||[]).length;
         setTodaySummary({
           rev:      tRev,
           txns:     tTxns,
           avgBasket: tAvg,
+          avgItems: Math.round(tAvgItems * 10) / 10,
           ydayRev:  yRev,
           revDelta:  yRev  > 0 ? ((tRev  - yRev)  / yRev  * 100) : null,
           txnDelta:  yTxns > 0 ? ((tTxns - yTxns) / yTxns * 100) : null,
@@ -775,6 +779,44 @@ export default function HQOverview({ onNavigate }) {
           pm[m].revenue += parseFloat(o.total) || 0;
         });
         setTodayPayments(pm);
+      } catch (_) {}
+
+      // ── Avg basket extras: 7d avg + best day of week (30d) ───────────
+      try {
+        const now30 = new Date();
+        const d30ago = new Date(now30); d30ago.setDate(d30ago.getDate() - 30);
+        const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+        const d7ago = new Date(todayMidnight); d7ago.setDate(d7ago.getDate() - 7);
+
+        const { data: last30 } = await supabase
+          .from("orders")
+          .select("created_at,total")
+          .gte("created_at", d30ago.toISOString())
+          .not("status", "in", '("cancelled","failed")');
+
+        // avg7d — last 7 full days, excluding today
+        const last7Orders = (last30 || []).filter(o => {
+          const t = new Date(o.created_at);
+          return t >= d7ago && t < todayMidnight;
+        });
+        const avg7d = last7Orders.length > 0
+          ? last7Orders.reduce((s,o) => s + (parseFloat(o.total)||0), 0) / last7Orders.length
+          : null;
+
+        // bestDow — highest avg basket day of week over 30 days
+        const DOW_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+        const dowMap = {};
+        (last30 || []).forEach(o => {
+          const dow = new Date(o.created_at).getDay();
+          if (!dowMap[dow]) dowMap[dow] = { total: 0, count: 0 };
+          dowMap[dow].total += parseFloat(o.total) || 0;
+          dowMap[dow].count++;
+        });
+        const bestDow = Object.entries(dowMap)
+          .map(([d, v]) => ({ label: DOW_LABELS[d], avg: v.total / v.count }))
+          .sort((a, b) => b.avg - a.avg)[0]?.label || null;
+
+        setTodaySummary(prev => prev ? { ...prev, avg7d, bestDow } : prev);
       } catch (_) {}
 
       // ── Prior-period scan delta (this 7d vs prev 7d) ─────────────────
@@ -1255,9 +1297,44 @@ export default function HQOverview({ onNavigate }) {
             ? `R${Math.round(todaySummary.avgBasket).toLocaleString("en-ZA")}`
             : "\u2014"}
           subLabel="per transaction"
-          sub={todaySummary?.txns > 0
-            ? `${todaySummary.txns} transaction${todaySummary.txns !== 1 ? "s" : ""} today`
-            : "no transactions yet"}
+          sub={
+            todaySummary?.txns > 0 ? (() => {
+              const vsSevenD = (todaySummary.avg7d || 0) > 0
+                ? ((todaySummary.avgBasket - todaySummary.avg7d) / todaySummary.avg7d * 100)
+                : null;
+              return (
+                <span style={{ display: "flex", flexWrap: "wrap", gap: "0 6px", alignItems: "center" }}>
+                  {todaySummary.avgItems > 0 && (
+                    <span style={{ color: "#6B7280", fontSize: 10 }}>
+                      {todaySummary.avgItems.toFixed(1)} items avg
+                    </span>
+                  )}
+                  {todaySummary.bestDow && (
+                    <>
+                      <span style={{ color: "#D1D5DB" }}>&middot;</span>
+                      <span style={{ color: "#6B7280", fontSize: 10 }}>
+                        best day: {todaySummary.bestDow}
+                      </span>
+                    </>
+                  )}
+                  {vsSevenD !== null && (
+                    <>
+                      <span style={{ color: "#D1D5DB" }}>&middot;</span>
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 500,
+                        color: vsSevenD >= 0 ? "#059669" : "#DC2626",
+                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                      }}>
+                        {vsSevenD >= 0 ? "\u2191" : "\u2193"}
+                        {Math.abs(vsSevenD).toFixed(0)}% vs 7d avg
+                      </span>
+                    </>
+                  )}
+                </span>
+              );
+            })() : "no transactions yet"
+          }
           semantic={null}
           onClick={() => nav("trading")}
           hint="Daily Trading"
