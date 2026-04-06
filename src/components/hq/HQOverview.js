@@ -288,6 +288,7 @@ export default function HQOverview({ onNavigate }) {
   const [selectedWorld, setSelectedWorld] = useState(null); // drill-down
   const [todaySummary, setTodaySummary] = useState(null);
   const [todayPayments, setTodayPayments] = useState(null);
+  const [velocityAlerts, setVelocityAlerts] = useState([]);
   const fxTimerRef = useRef(null);
   const fxCountRef = useRef(null);
 
@@ -1078,6 +1079,50 @@ export default function HQOverview({ onNavigate }) {
               : 1,
           )[0],
       });
+
+      // ── P1-B: Velocity-based reorder intelligence ─────────────────────
+      try {
+        const d30v = new Date();
+        d30v.setDate(d30v.getDate() - 30);
+        // Embed order_items in orders query — avoids large .in() URL limits
+        const { data: recentOrders } = await supabase
+          .from("orders")
+          .select("id, order_items(product_metadata, quantity)")
+          .eq("tenant_id", tenantId)
+          .gte("created_at", d30v.toISOString())
+          .not("status", "in", '("cancelled","failed")')
+          .limit(2000);
+
+        // Aggregate units sold per item_id over last 30 days
+        const velMap = {};
+        (recentOrders || []).forEach((o) => {
+          (o.order_items || []).forEach((oi) => {
+            const iid = oi.product_metadata?.item_id;
+            if (iid) velMap[iid] = (velMap[iid] || 0) + (oi.quantity || 0);
+          });
+        });
+
+        // Join against already-fetched items → compute days of stock
+        const alerts = items
+          .filter((i) => i.sell_price > 0 && (velMap[i.id] || 0) > 0)
+          .map((i) => {
+            const velocity = (velMap[i.id] || 0) / 30;
+            const daysLeft =
+              velocity > 0
+                ? Math.round((i.quantity_on_hand || 0) / velocity)
+                : null;
+            return {
+              name: i.name,
+              daysLeft,
+              dailyRevenue: Math.round(velocity * (i.sell_price || 0)),
+            };
+          })
+          .filter((a) => a.daysLeft !== null && a.daysLeft < 14)
+          .sort((a, b) => a.daysLeft - b.daysLeft)
+          .slice(0, 2);
+
+        setVelocityAlerts(alerts);
+      } catch (_) {}
     } catch (err) {
       console.error("[HQOverview] Cannabis fetch:", err);
     }
@@ -1672,13 +1717,41 @@ export default function HQOverview({ onNavigate }) {
               : (erpStats?.reorderCount ?? "—")
           }
           subLabel="below threshold"
-          sub={
-            (isCannabisRetail
+          sub={(() => {
+            const count = isCannabisRetail
               ? cannabisStock?.belowReorder
-              : erpStats?.reorderCount) > 0
-              ? "items need reorder"
-              : "all stocked"
-          }
+              : erpStats?.reorderCount;
+            if (!count || count <= 0) return "all stocked";
+            if (velocityAlerts.length > 0) {
+              return (
+                <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {velocityAlerts.map((a, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                        color: a.daysLeft <= 7 ? "#DC2626" : "#D97706",
+                        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+                      }}
+                    >
+                      {a.name.length > 20 ? a.name.slice(0, 20) + "…" : a.name}
+                      {" · "}
+                      <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                        {a.daysLeft}d
+                      </span>
+                      {" · "}
+                      <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                        R{a.dailyRevenue.toLocaleString("en-ZA")}/day
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              );
+            }
+            return "items need reorder";
+          })()}
           semantic={
             (isCannabisRetail
               ? cannabisStock?.belowReorder
