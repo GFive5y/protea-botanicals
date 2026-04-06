@@ -288,6 +288,7 @@ export default function POSScreen({ tenantId }) {
         total,
         currency: "ZAR",
         payment_method: payMethod,
+        channel: "pos",
         items_count: cart.length,
         notes: "POS sale",
         created_at: now,
@@ -322,7 +323,7 @@ export default function POSScreen({ tenantId }) {
       for (const { item, qty } of cart) {
         const newQty = Math.max(0, (item.quantity_on_hand || 0) - qty);
         // Stock movement (negative = outbound)
-        await supabase.from("stock_movements").insert({
+        const { error: movErr } = await supabase.from("stock_movements").insert({
           item_id: item.id,
           tenant_id: tenantId,
           movement_type: "sale_pos",
@@ -331,6 +332,7 @@ export default function POSScreen({ tenantId }) {
           notes: `POS ${payMethod} sale`,
           unit_cost: item.weighted_avg_cost || null,
         });
+        if (movErr) console.warn("[POS] stock_movement insert failed:", movErr.message);
         // Deduct stock
         await supabase
           .from("inventory_items")
