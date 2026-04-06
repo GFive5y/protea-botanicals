@@ -428,7 +428,7 @@ ORDER BY gross_profit DESC;
 2. NEVER use GitHub write tools from Claude.ai (RULE 0Q + LL-202)
 3. NEVER add tenant_id to scan_logs inserts (no column exists)
 4. NEVER upsert user_profiles — UPDATE only
-5. NEVER insert line_total in order_items — it is a stored column, insert it explicitly
+5. order_items.line_total is plain numeric — INSERT it explicitly (not generated)
 6. ALWAYS check Supabase insert {error} return — client does NOT throw on DB errors
 7. ALWAYS verify enum values before using in application code
 8. DISK IS TRUTH — verify schema from Supabase, not from docs

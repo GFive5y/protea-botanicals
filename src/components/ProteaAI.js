@@ -233,7 +233,7 @@ INTELLIGENCE LAYER
 SCHEMA FACTS (critical for correct queries)
 - inventory_items: NO notes column · category is enum (12 values) · loyalty_category separate
 - orders: field=total (NOT total_amount) · status: paid|pending|failed|cancelled|refunded
-- order_items: no inventory_item_id FK — via product_metadata jsonb · line_total GENERATED
+- order_items: no inventory_item_id FK — via product_metadata jsonb · line_total plain numeric (INSERT allowed)
 - eod_cash_ups: variance GENERATED · field=system_cash_total · UNIQUE(tenant_id, cashup_date)
 - pos_sessions: NO total_sales column · movement_type 'sale_pos' for POS
 - loyalty_transactions: column=transaction_type · use .ilike() not .eq()

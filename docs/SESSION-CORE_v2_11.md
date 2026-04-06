@@ -356,7 +356,8 @@ inventory_items:      no 'notes' column · category is enum (::inventory_categor
                       loyalty_category SEPARATE from category (LL-176)
 orders:               field = total (NOT total_amount) · status = pending/paid/failed/cancelled/refunded
 order_items:          NO inventory_item_id FK — via product_metadata jsonb
-                      line_total is GENERATED — NEVER INSERT
+                      line_total is plain numeric — INSERT allowed (verified 07 Apr 2026)
+                      (SESSION-CORE v2.11 was wrong — disk confirmed NOT GENERATED)
 loyalty_transactions: column = transaction_type (NOT type) — use .ilike() (LL-191)
 movement_type:        'sale_pos' for POS · 'sale_out' for wholesale/seed (LL-189)
 eod_cash_ups:         LIVE · UNIQUE(tenant_id, cashup_date) · variance GENERATED (LL-198)
