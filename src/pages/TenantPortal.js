@@ -41,6 +41,7 @@ import HQTradingDashboard from "../components/hq/HQTradingDashboard";
 import EODCashUp from "../components/hq/EODCashUp";
 import HQBalanceSheet from "../components/hq/HQBalanceSheet";
 import HQFixedAssets from "../components/hq/HQFixedAssets";
+import HQJournals from "../components/hq/HQJournals";
 import HQForecast from "../components/hq/HQForecast";
 import HRRoster from "../components/hq/HRRoster";
 import HRLeave from "../components/hq/HRLeave";
@@ -237,6 +238,11 @@ const WATERFALL = [
         id: "fixed-assets",
         label: "Fixed Assets",
         desc: "PPE register \u00b7 depreciation \u00b7 NBV",
+      },
+      {
+        id: "journals",
+        label: "Journals",
+        desc: "Accruals \u00b7 PAYE \u00b7 prepayments \u00b7 corrections",
       },
       {
         id: "forecast",
@@ -519,6 +525,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "cashup":         return <EODCashUp tenantId={tenantId} />;
     case "balance-sheet":  return <HQBalanceSheet />;
     case "fixed-assets":   return <HQFixedAssets />;
+    case "journals":       return <HQJournals />;
     case "forecast":       return <HQForecast />;
     case "roster":         return <HRRoster tenantId={tenantId} readOnly={false} />;
     case "timesheets":     return <HRTimesheets tenantId={tenantId} />;
