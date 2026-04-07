@@ -454,24 +454,26 @@ export default function HQBalanceSheet() {
       if (end) poQ = poQ.lte("received_date", end);
       const poRes = await poQ;
 
-      // OPEX paid
+      // OPEX paid — expense_date is DATE column, compare with YYYY-MM-DD only
+      const expStart = start ? start.slice(0, 10) : null;
+      const expEnd = end ? end.slice(0, 10) : null;
       let opexQ = supabase
         .from("expenses")
         .select("amount_zar, expense_date")
         .eq("tenant_id", tenantId)
         .eq("category", "opex");
-      if (start) opexQ = opexQ.gte("expense_date", start);
-      if (end) opexQ = opexQ.lte("expense_date", end);
+      if (expStart) opexQ = opexQ.gte("expense_date", expStart);
+      if (expEnd) opexQ = opexQ.lte("expense_date", expEnd);
       const opexRes = await opexQ;
 
-      // CAPEX paid
+      // CAPEX paid — same DATE fix
       let capexQ = supabase
         .from("expenses")
         .select("amount_zar, expense_date, description")
         .eq("tenant_id", tenantId)
         .eq("category", "capex");
-      if (start) capexQ = capexQ.gte("expense_date", start);
-      if (end) capexQ = capexQ.lte("expense_date", end);
+      if (expStart) capexQ = capexQ.gte("expense_date", expStart);
+      if (expEnd) capexQ = capexQ.lte("expense_date", expEnd);
       const capexRes = await capexQ;
 
       const cashFromCustomers = (ordersRes.data || []).reduce(
