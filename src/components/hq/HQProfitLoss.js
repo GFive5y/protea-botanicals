@@ -638,10 +638,8 @@ export default function HQProfitLoss() {
         .from("stock_movements")
         .select("item_id, quantity, unit_cost, movement_type, created_at")
         .eq("movement_type", "production_out"),
-      supabase
-        .from("stock_movements")
-        .select("item_id, quantity, created_at")
-        .eq("movement_type", "sale_out"),
+      // sale_out movements removed from P&L — not a revenue source (LL-203)
+      Promise.resolve({ data: [] }),
       supabase
         .from("inventory_items")
         .select("id, sell_price, name")
@@ -724,16 +722,9 @@ export default function HQProfitLoss() {
     0,
   );
 
-  // WP-FIN S4: wholesale revenue from sale_out movements × sell_price
-  const filteredWholesaleMovements = wholesaleMovements.filter((m) =>
-    periodFilter(m.created_at, period, customFrom, customTo),
-  );
-  const wholesaleRevenue = filteredWholesaleMovements.reduce((s, m) => {
-    const item = inventoryItems.find((i) => i.id === m.item_id);
-    const price = parseFloat(item?.sell_price || 0);
-    return s + Math.abs(parseFloat(m.quantity) || 0) * price;
-  }, 0);
-  const totalRevenue = websiteRevenue + wholesaleRevenue;
+  // Wholesale revenue: will come from wholesale_orders table when populated
+  // sale_out stock_movements are NOT revenue — removed (LL-203)
+  const totalRevenue = websiteRevenue;
 
   // WP-FIN S2: actual COGS from stock_movements production_out × AVCO
   const filteredProductionMovements = productionMovements.filter((m) =>
@@ -1124,7 +1115,7 @@ export default function HQProfitLoss() {
         <DataBadge
           label="Wholesale"
           ok={true}
-          count={filteredWholesaleMovements.length}
+          count={0}
         />
         <DataBadge label="Expenses" ok={true} count={expenses.length} />
         {hasDataErrors && (
@@ -1185,18 +1176,7 @@ export default function HQProfitLoss() {
                   indent={1}
                   highlight={websiteRevenue > 0 ? "green" : undefined}
                 />
-                <WRow
-                  label="Wholesale / store sales"
-                  sub={
-                    filteredWholesaleMovements.length > 0
-                      ? `${filteredWholesaleMovements.length} shipment movement${filteredWholesaleMovements.length !== 1 ? "s" : ""} · sale_out × sell price`
-                      : "No wholesale shipments this period"
-                  }
-                  value={wholesaleRevenue}
-                  indent={1}
-                  highlight={wholesaleRevenue > 0 ? "green" : undefined}
-                  dim={wholesaleRevenue === 0}
-                />
+                {/* Wholesale revenue: placeholder until wholesale_orders table is populated */}
                 <WRow
                   label="Total Revenue"
                   value={totalRevenue}
