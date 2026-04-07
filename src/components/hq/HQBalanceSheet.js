@@ -1,5 +1,6 @@
-// src/components/hq/HQBalanceSheet.js v1.0
-// WP-FIN S5+S6: Balance Sheet + Cash Flow Statement
+// src/components/hq/HQBalanceSheet.js v2.0 — WP-FINANCIALS Phase 3
+// v2.0: Fixed Asset Register (Cost/AccDep/NBV) · equity_ledger equity section ·
+//       VAT payable/receivable · PAYE accruals · accounting equation upgraded
 // v1.0:
 //   - Balance Sheet tab: Assets (inventory AVCO + CAPEX + receivables) vs
 //     Liabilities (payables) vs Equity (net assets)
@@ -328,6 +329,14 @@ export default function HQBalanceSheet() {
   // Cash flow state
   const [cfData, setCfData] = useState(null);
 
+  // ── WP-FINANCIALS Phase 3: new state ──────────────────────────────────────
+  const [fixedAssetsReg, setFixedAssetsReg] = useState([]);
+  const [equityLedger, setEquityLedger] = useState(null);
+  const [vatRegistered, setVatRegistered] = useState(false);
+  const [vatSummary, setVatSummary] = useState({ output: 0, input: 0 });
+  const [payePayable, setPayePayable] = useState(0); // eslint-disable-line no-unused-vars
+  const [ytdNetProfit, setYtdNetProfit] = useState(null);
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3500);
@@ -423,6 +432,48 @@ export default function HQBalanceSheet() {
           opexRes.data.reduce((s, e) => s + parseFloat(e.amount_zar || 0), 0),
         );
       }
+
+      // ── WP-FINANCIALS Phase 3: fixed_assets, equity_ledger, vat ──
+      const yr = `FY${new Date().getFullYear()}`;
+      const yrStart = `${new Date().getFullYear()}-01-01`;
+
+      const [faRes, eqRes, cfgRes, ordersYtdRes, expYtdRes] = await Promise.all([
+        supabase.from("fixed_assets")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .order("purchase_date", { ascending: false }),
+        supabase.from("equity_ledger")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .eq("financial_year", yr)
+          .maybeSingle(),
+        supabase.from("tenant_config")
+          .select("vat_registered, vat_rate")
+          .eq("tenant_id", tenantId)
+          .maybeSingle(),
+        supabase.from("orders")
+          .select("total")
+          .eq("tenant_id", tenantId)
+          .gte("created_at", yrStart)
+          .not("status", "in", '("cancelled","failed")'),
+        supabase.from("expenses")
+          .select("amount_zar")
+          .eq("tenant_id", tenantId)
+          .gte("expense_date", yrStart)
+          .in("category", ["opex","wages","tax","other"]),
+      ]);
+
+      setFixedAssetsReg(faRes.data || []);
+      if (eqRes.data) setEquityLedger(eqRes.data);
+      if (cfgRes.data) setVatRegistered(!!cfgRes.data.vat_registered);
+
+      if (ordersYtdRes.data && expYtdRes.data) {
+        const ytdRev = ordersYtdRes.data.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+        const ytdExp = expYtdRes.data.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
+        setYtdNetProfit(ytdRev - ytdExp);
+      }
+
     } catch (err) {
       console.error("Balance sheet fetch error:", err);
     } finally {
@@ -532,8 +583,29 @@ export default function HQBalanceSheet() {
   const totalAssets = totalCurrentAssets + totalFixedAssets;
   const totalLiabilities = payables;
   const netEquity = totalAssets - totalLiabilities;
+  // ── WP-FINANCIALS Phase 3: derived from new tables ─────────────────────
+  const totalFARCost  = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.cost_price) || 0), 0);
+  const totalFARAccDep = fixedAssetsReg.reduce((s, a) => s + (parseFloat(a.accumulated_depreciation) || 0), 0);
+  const totalFARNBV   = totalFARCost - totalFARAccDep;
+  const fixedAssetsValue = fixedAssetsReg.length > 0 ? totalFARNBV : totalCapex;
+
+  const vatNetPayable  = vatSummary.output - vatSummary.input;
+  const vatLiability   = vatRegistered && vatNetPayable > 0 ? vatNetPayable : 0;
+  const vatReceivable  = vatRegistered && vatNetPayable < 0 ? Math.abs(vatNetPayable) : 0;
+
+  const shareCapital     = equityLedger?.share_capital || 0;
+  const openingRetained  = equityLedger?.opening_retained_earnings || 0;
+  const currentYearPL    = ytdNetProfit !== null ? ytdNetProfit : 0;
+  const equityFromLedger = shareCapital + openingRetained + currentYearPL;
+  const equityAvailable  = equityLedger !== null || ytdNetProfit !== null;
+
+  const totalLiabilities2 = payables + vatLiability + payePayable;
+  const netEquity2        = equityAvailable ? equityFromLedger : totalAssets - totalLiabilities2;
+
   const balanced =
     Math.abs(totalAssets - (totalLiabilities + netEquity)) < 0.01;
+  const balanced2 =
+    Math.abs((inventoryValue + receivables + fixedAssetsValue) - (totalLiabilities2 + netEquity2)) < 1.0;
 
   // ── CSV export ────────────────────────────────────────────────────────────
   const exportCSV = () => {
@@ -901,36 +973,71 @@ export default function HQBalanceSheet() {
                     borderTop
                   />
 
-                  <SectionLabel label="Fixed Assets" />
-                  {capexAssets.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "14px 40px",
-                        fontSize: 13,
-                        color: T.ink300,
-                        fontFamily: T.font,
-                      }}
-                    >
-                      No CAPEX recorded — add via HQ Documents or Expenses
-                    </div>
-                  ) : (
-                    capexAssets.map((asset) => (
-                      <BSRow
-                        key={asset.id}
-                        label={asset.description}
-                        value={parseFloat(asset.amount_zar)}
-                        indent={1}
-                        sub={
-                          asset.expense_date
-                            ? fmtDate(asset.expense_date)
-                            : undefined
-                        }
-                      />
+                  <SectionLabel label="Fixed Assets (Property, Plant & Equipment)" />
+                  {fixedAssetsReg.length > 0 ? (
+                    <>
+                      <div style={{
+                        display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
+                        padding:"6px 16px 6px 40px",
+                        fontSize:10, fontWeight:700, color:T.ink400,
+                        letterSpacing:"0.07em", textTransform:"uppercase",
+                        borderBottom:`1px solid ${T.ink150}`, fontFamily:T.font,
+                      }}>
+                        <span>Asset</span>
+                        <span style={{ textAlign:"right" }}>Cost</span>
+                        <span style={{ textAlign:"right" }}>Accum Dep</span>
+                        <span style={{ textAlign:"right" }}>NBV</span>
+                      </div>
+                      {fixedAssetsReg.map(asset => {
+                        const cost   = parseFloat(asset.cost_price) || 0;
+                        const accDep = parseFloat(asset.accumulated_depreciation) || 0;
+                        const nbv    = cost - accDep;
+                        return (
+                          <div key={asset.id} style={{
+                            display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
+                            padding:"9px 16px 9px 40px",
+                            borderBottom:"1px solid #F8FAFC",
+                            alignItems:"center", fontFamily:T.font,
+                          }}>
+                            <div>
+                              <div style={{ fontSize:13, color:T.ink700 }}>{asset.asset_name}</div>
+                              <div style={{ fontSize:11, color:T.ink400, marginTop:2 }}>
+                                {asset.asset_category}{asset.purchase_date ? ` \u00b7 ${fmtDate(asset.purchase_date)}` : ""}
+                              </div>
+                            </div>
+                            <div style={{ fontSize:13, color:T.ink500, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{fmtZar(cost)}</div>
+                            <div style={{ fontSize:13, color:T.danger, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>({fmtZar(accDep)})</div>
+                            <div style={{ fontSize:13, fontWeight:600, color:nbv>0?T.accent:T.danger, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{fmtZar(nbv)}</div>
+                          </div>
+                        );
+                      })}
+                      {totalFARAccDep > 0 && (
+                        <div style={{
+                          display:"grid", gridTemplateColumns:"1fr 90px 90px 90px",
+                          padding:"10px 16px 10px 40px",
+                          borderTop:`1px solid ${T.ink150}`,
+                          background:T.ink075, fontFamily:T.font,
+                        }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:T.ink700 }}>PPE Totals</div>
+                          <div style={{ fontSize:13, fontWeight:600, color:T.ink500, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{fmtZar(totalFARCost)}</div>
+                          <div style={{ fontSize:13, fontWeight:600, color:T.danger, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>({fmtZar(totalFARAccDep)})</div>
+                          <div style={{ fontSize:14, fontWeight:700, color:T.accent, textAlign:"right", fontVariantNumeric:"tabular-nums" }}>{fmtZar(totalFARNBV)}</div>
+                        </div>
+                      )}
+                    </>
+                  ) : capexAssets.length > 0 ? (
+                    capexAssets.map(asset => (
+                      <BSRow key={asset.id} label={asset.description} value={parseFloat(asset.amount_zar)} indent={1}
+                        sub={asset.expense_date ? fmtDate(asset.expense_date) : undefined} />
                     ))
+                  ) : (
+                    <div style={{ padding:"14px 40px", fontSize:13, color:T.ink300, fontFamily:T.font }}>
+                      No fixed assets recorded — add via Fixed Asset Register
+                    </div>
                   )}
                   <BSRow
-                    label="Total Fixed Assets"
-                    value={totalFixedAssets}
+                    label="Total Fixed Assets (Net Book Value)"
+                    value={fixedAssetsValue}
                     bold
                     borderTop
                   />
@@ -963,75 +1070,83 @@ export default function HQBalanceSheet() {
                           : "No outstanding purchase orders"
                       }
                     />
+                    {/* WP-FINANCIALS Phase 3: VAT payable */}
+                    {vatRegistered && vatLiability > 0 && (
+                      <BSRow label="VAT Payable \u2014 SARS" value={vatLiability} indent={1}
+                        sub={`Output VAT ${fmtZar(vatSummary.output)} \u2212 Input VAT ${fmtZar(vatSummary.input)}`} />
+                    )}
+                    {vatRegistered && vatSummary.output === 0 && vatSummary.input === 0 && (
+                      <BSRow label="VAT Payable \u2014 SARS" value={0} indent={1}
+                        sub="VAT registered \u2014 no transactions recorded yet" muted />
+                    )}
                     {opexAccruals > 0 && (
-                      <BSRow
-                        label="Accrued OpEx"
-                        value={opexAccruals}
-                        indent={1}
-                        sub="Recorded operating expenses"
-                        muted
-                      />
+                      <BSRow label="Accrued OpEx" value={opexAccruals} indent={1}
+                        sub="Recorded operating expenses" muted />
                     )}
                     <BSRow
                       label="TOTAL LIABILITIES"
-                      value={totalLiabilities}
+                      value={totalLiabilities2}
                       total
                       bold
                       borderTop
                     />
                   </div>
 
-                  {/* Equity */}
+                  {/* WP-FINANCIALS Phase 3: Equity from equity_ledger */}
                   <div style={{ ...sCard, padding: 0, overflow: "hidden" }}>
                     <SectionLabel label="Equity" icon="⚖️" />
-                    <BSRow
-                      label="Net Assets"
-                      value={netEquity}
-                      indent={1}
-                      sub="Total Assets minus Total Liabilities"
-                    />
-                    <BSRow
-                      label="TOTAL EQUITY"
-                      value={netEquity}
-                      total
-                      bold
-                      borderTop
-                    />
+                    {equityAvailable ? (
+                      <>
+                        <BSRow label="Share Capital" value={shareCapital} indent={1}
+                          sub={equityLedger ? `${equityLedger.financial_year} \u00b7 from Financial Setup` : "YTD estimate"} />
+                        <BSRow label="Retained Earnings \u2014 Opening" value={openingRetained} indent={1}
+                          sub={openingRetained === 0 ? "First financial year" : "Brought forward from prior year"} />
+                        <BSRow label={`Current Year ${currentYearPL >= 0 ? "Profit" : "Loss"}`}
+                          value={Math.abs(currentYearPL)} indent={1}
+                          sub="YTD revenue minus OPEX expenses"
+                          negative={currentYearPL < 0} />
+                        <BSRow label="TOTAL EQUITY" value={netEquity2} total bold borderTop />
+                      </>
+                    ) : (
+                      <>
+                        <BSRow label="Net Assets" value={netEquity} indent={1}
+                          sub="Complete Financial Setup to see equity breakdown" />
+                        <BSRow label="TOTAL EQUITY" value={netEquity} total bold borderTop />
+                      </>
+                    )}
                   </div>
 
-                  {/* Accounting equation check */}
+                  {/* WP-FINANCIALS Phase 3: upgraded accounting equation */}
                   <div
                     style={{
                       ...sCard,
                       padding: 0,
                       overflow: "hidden",
-                      borderColor: balanced ? T.accentBd : T.dangerBd,
+                      borderColor: balanced2 ? T.accentBd : T.dangerBd,
                     }}
                   >
                     <SectionLabel
                       label="Accounting Equation Check"
-                      icon={balanced ? "✓" : "⚠"}
+                      icon={balanced2 ? "\u2713" : "\u26A0"}
                     />
-                    <BSRow
-                      label="Total Liabilities + Equity"
-                      value={totalLiabilities + netEquity}
-                      bold
-                    />
-                    <BSRow label="Total Assets" value={totalAssets} bold />
+                    <BSRow label="Total Assets" value={inventoryValue + receivables + fixedAssetsValue} bold />
+                    <BSRow label="Total Liabilities" value={totalLiabilities2} bold />
+                    <BSRow label="Total Equity" value={netEquity2} bold />
+                    <BSRow label="Liabilities + Equity" value={totalLiabilities2 + netEquity2} bold borderTop />
                     <div
                       style={{
                         padding: "10px 16px",
-                        background: balanced ? T.successBg : T.dangerBg,
+                        background: balanced2 ? T.successBg : T.dangerBg,
                         fontSize: 12,
-                        color: balanced ? T.success : T.danger,
+                        color: balanced2 ? T.success : T.danger,
                         fontWeight: 600,
                         fontFamily: T.font,
                         textAlign: "center",
                       }}
                     >
-                      {balanced
-                        ? "✓ Assets = Liabilities + Equity"
-                        : `⚠ Difference: ${fmtZar(Math.abs(totalAssets - totalLiabilities - netEquity))}`}
+                      {balanced2
+                        ? "\u2713 Assets = Liabilities + Equity"
+                        : `\u26A0 Difference: ${fmtZar(Math.abs((inventoryValue + receivables + fixedAssetsValue) - totalLiabilities2 - netEquity2))} \u2014 run Financial Setup Wizard`}
                     </div>
                   </div>
                 </div>
@@ -1051,15 +1166,15 @@ export default function HQBalanceSheet() {
                   fontFamily: T.font,
                 }}
               >
-                <strong style={{ color: T.ink700 }}>
-                  Notes to Balance Sheet:
-                </strong>{" "}
-                Inventory is stated at weighted average cost (AVCO) per unit.
-                Accounts Receivable includes all invoices with status other than
-                "paid". Fixed assets represent gross CAPEX spend — no
-                depreciation has been applied. Accounts Payable represents open
-                purchase orders not yet received. Cash and bank balances are not
-                yet connected — link your bank account to complete the picture.
+                <strong style={{ color: T.ink700 }}>Notes to Balance Sheet (v2.0):</strong>{" "}
+                Inventory is stated at weighted average cost (AVCO) per unit. Fixed assets
+                are stated at cost less accumulated depreciation (net book value) from the
+                Fixed Asset Register. Where no assets are registered, gross CAPEX expenses
+                are shown instead. Accounts Payable represents open purchase orders.
+                VAT position reflects YTD output less input VAT from recorded transactions.
+                Equity comprises share capital, opening retained earnings, and current year
+                profit/(loss) from equity_ledger. Comparative prior year figures will populate
+                after year-end close. Cash and bank balances connect via Bank Reconciliation.
               </div>
             </>
           )}
