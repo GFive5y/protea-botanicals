@@ -59,53 +59,69 @@ export default function HQYearEnd() {
     if (!tenantId) return;
     setLoading(true); setError(null);
     try {
-      // Get active financial year
-      const { data: fyData } = await supabase.from("financial_year").select("*").eq("tenant_id", tenantId).eq("is_active", true).single();
-      const fyId = fyData?.id;
-      setFyLabel(fyData?.year_label || "FY2024");
+      // Derive active FY from journal_entries (most recent financial_year label)
+      const { data: fyRows } = await supabase
+        .from("journal_entries")
+        .select("financial_year")
+        .eq("tenant_id", tenantId)
+        .not("financial_year", "is", null)
+        .order("financial_year", { ascending: false })
+        .limit(1);
+      const activeFY = fyRows?.[0]?.financial_year || `FY${new Date().getFullYear() - 1}`;
+      setFyLabel(activeFY);
 
-      // Summarise journal_lines for this FY
-      const { data: lines } = await supabase
-        .from("journal_lines")
-        .select("account_code, debit_amount, credit_amount, journal_entries!inner(tenant_id, financial_year_id, is_year_end_closing)")
-        .eq("journal_entries.tenant_id", tenantId)
-        .eq("journal_entries.financial_year_id", fyId)
-        .eq("journal_entries.is_year_end_closing", false);
+      // Get all non-closing journal entries for this FY
+      const { data: jeData } = await supabase
+        .from("journal_entries")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("financial_year", activeFY)
+        .eq("is_year_end_closing", false);
+      const jeIds = (jeData || []).map(j => j.id);
+      setJournals([{ count: jeIds.length }]);
 
-      // Get chart of accounts to classify
-      const { data: coa } = await supabase.from("chart_of_accounts").select("code, name, account_type").eq("tenant_id", tenantId);
+      // Get journal lines for those entries
+      let lines = [];
+      if (jeIds.length > 0) {
+        const { data: linesData } = await supabase
+          .from("journal_lines")
+          .select("account_code, debit_amount, credit_amount")
+          .in("journal_id", jeIds);
+        lines = linesData || [];
+      }
+
+      // Chart of accounts to classify
+      const { data: coa } = await supabase
+        .from("chart_of_accounts")
+        .select("code, name, account_type")
+        .eq("tenant_id", tenantId);
       const coaMap = {};
       (coa || []).forEach(a => { coaMap[a.code] = a; });
 
-      let revenue = 0, cogs = 0, opex = 0;
-      (lines || []).forEach(l => {
+      let revenue = 0, cogs = 0, opex = 0, capex = 0;
+      lines.forEach(l => {
         const acc = coaMap[l.account_code];
         if (!acc) return;
         const net = (parseFloat(l.credit_amount) || 0) - (parseFloat(l.debit_amount) || 0);
         if (acc.account_type === "revenue") revenue += net;
         else if (acc.account_type === "cogs") cogs -= net;
         else if (acc.account_type === "expense") {
-          if (acc.code?.startsWith("6")) opex -= net;
+          if (acc.code?.startsWith("6")) opex -= net; else capex -= net;
         }
       });
 
       const gross = revenue - cogs;
       const netProfit = gross - opex;
-      setPnl({ revenue, cogs, gross, opex, netProfit, fyId });
+      setPnl({ revenue, cogs, gross, opex, capex, netProfit });
 
-      // Check for journals count
-      const { count } = await supabase.from("journal_entries").select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId).eq("financial_year_id", fyId).eq("is_year_end_closing", false);
-      setJournals([{ count: count || 0 }]);
-
-      // Build closing journal preview lines
+      // Build closing journal preview
       const closingPreview = [];
       if (revenue > 0) closingPreview.push({ description: "Dr Revenue \u2192 Income Summary", debit: revenue, credit: 0, account: "Income Clearing" });
-      if (netProfit > 0) closingPreview.push({ description: "Dr Income Summary \u2192 Retained Earnings", debit: 0, credit: netProfit, account: "Retained Earnings" });
+      if (netProfit >= 0) closingPreview.push({ description: "Dr Income Summary \u2192 Retained Earnings", debit: 0, credit: netProfit, account: "Retained Earnings" });
       else closingPreview.push({ description: "Dr Accumulated Loss \u2192 Income Summary", debit: Math.abs(netProfit), credit: 0, account: "Accumulated Loss" });
       setClosingLines(closingPreview);
     } catch (e) {
-      setError(e.message);
+      setError(e.message || "Failed to load financials");
     } finally {
       setLoading(false);
     }
@@ -125,8 +141,8 @@ export default function HQYearEnd() {
       // 1. Post closing journal entry
       const { data: je, error: jeErr } = await supabase.from("journal_entries").insert({
         tenant_id: tenantId,
-        financial_year_id: pnl.fyId,
-        entry_date: new Date().toISOString().slice(0, 10),
+        financial_year: fyLabel,
+        journal_date: new Date().toISOString().slice(0, 10),
         description: `Year-end closing entry \u2014 ${fyLabel}`,
         is_year_end_closing: true,
         posted_by: userId,
@@ -134,7 +150,7 @@ export default function HQYearEnd() {
       }).select("id").single();
       if (jeErr) throw new Error(`Journal: ${jeErr.message}`);
 
-      // 2. Post closing journal lines (Dr Revenue, Cr Retained Earnings)
+      // 2. Post closing journal lines
       const jLines = [];
       if (pnl.revenue > 0) {
         jLines.push({ journal_id: je.id, account_code: "4000", description: "Close revenue to income summary", debit_amount: pnl.revenue, credit_amount: 0 });
@@ -144,9 +160,7 @@ export default function HQYearEnd() {
       } else {
         jLines.push({ journal_id: je.id, account_code: "3300", description: "Accumulated loss from operations", debit_amount: Math.abs(pnl.netProfit), credit_amount: 0 });
       }
-      if (jLines.length > 0) {
-        await supabase.from("journal_lines").insert(jLines);
-      }
+      if (jLines.length > 0) await supabase.from("journal_lines").insert(jLines);
 
       // 3. Archive the year
       const { data: archive, error: archErr } = await supabase.from("financial_year_archive").insert({
@@ -163,12 +177,17 @@ export default function HQYearEnd() {
       }).select().single();
       if (archErr) throw new Error(`Archive: ${archErr.message}`);
 
-      // 4. Lock the financial year
-      await supabase.from("financial_year").update({ is_active: false }).eq("id", pnl.fyId).eq("tenant_id", tenantId);
+      // 4. Lock journal entries for this FY
+      await supabase.from("journal_entries")
+        .update({ status: "locked" })
+        .eq("tenant_id", tenantId)
+        .eq("financial_year", fyLabel)
+        .eq("is_year_end_closing", false);
 
-      // 5. Mark equity_ledger year_closed
-      await supabase.from("equity_ledger").update({ year_closed: true, closed_at: new Date().toISOString() })
-        .eq("tenant_id", tenantId).eq("financial_year_id", pnl.fyId);
+      // 5. Mark equity_ledger year_closed (if financial_year column exists)
+      await supabase.from("equity_ledger")
+        .update({ year_closed: true, closed_at: new Date().toISOString() })
+        .eq("tenant_id", tenantId);
 
       setArchiveRow(archive);
       setStep(3);
