@@ -310,10 +310,33 @@ export default function HQSmartCapture() {
     finally{setPosting(false);}
   };
 
+  const handleReceiveStock=async()=>{
+    if(!captureQueueId){showToast("Capture not saved \u2014 try again.","error");return;}
+    setPosting(true);
+    try{
+      const userId=(await supabase.auth.getUser()).data.user?.id||null;
+      const{data:res,error:err}=await supabase.functions.invoke("receive-from-capture",{
+        body:{capture_queue_id:captureQueueId,approved_by:userId}
+      });
+      if(err||!res?.success)throw new Error(res?.error||err?.message||"Receipt failed");
+      setSuccessData({
+        vendor_name:capture?.vendor_name,amount_zar:capture?.amount_zar,
+        journal_entry_id:res.journal_entry_id,
+        items_received:res.items_received,items_skipped:res.items_skipped,
+        po_id:res.po_id,document_fingerprint:capture?.document_fingerprint,
+        is_stock_receipt:true,
+      });
+      setPhase("success");
+      showToast("Stock received and posted to books!");
+    }catch(err){showToast("Failed: "+err.message,"error");}
+    finally{setPosting(false);}
+  };
   const resetCapture=()=>{setCapture(null);setSuccessData(null);setPhase("idle");setProcessMsg("");setCaptureQueueId(null);};
   const updateCapture=(k,v)=>setCapture(p=>({...p,[k]:v}));
 
   const card={background:"#fff",borderRadius:12,boxShadow:D.shadow,overflow:"hidden",marginBottom:16};
+  const stockActions=(capture?.proposed_updates||[]).filter(u=>["receive_delivery_item","create_purchase_order"].includes(u.action));
+  const isStockCapture=["delivery_note","supplier_invoice"].includes(capture?.capture_type)&&stockActions.length>0;
 
   return (
     <div style={{fontFamily:D.font,color:D.ink700,maxWidth:720,margin:"0 auto"}}>
@@ -402,8 +425,39 @@ export default function HQSmartCapture() {
             ))}
           </div>}
 
+          {/* Stock to Receive panel — supplier_invoice / delivery_note */}
+          {isStockCapture&&<div style={{...card,padding:0,marginBottom:12}}>
+            <div style={{padding:"10px 16px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em"}}>
+              {"\uD83D\uDCE6"} Stock to Receive ({stockActions.reduce((n,u)=>{const items=(u.data?.items||[]);return n+(items.length||1);},0)} {stockActions.some(u=>u.action==="receive_delivery_item")?"line":"SKU"}{stockActions.reduce((n,u)=>(n+(u.data?.items||[]).length||1),0)!==1?"s":""})
+            </div>
+            {stockActions.map((u,i)=>{
+              const lines=u.action==="create_purchase_order"?(u.data?.items||[]):[u.data];
+              return lines.map((item,j)=>(
+                <div key={`${i}-${j}`} style={{display:"flex",justifyContent:"space-between",padding:"9px 16px",borderBottom:`1px solid ${D.ink150}`,fontSize:13,alignItems:"center"}}>
+                  <div>
+                    <div style={{fontWeight:600,color:D.ink700}}>{item?.description||item?.name||item?.item_name||"Item"}</div>
+                    <div style={{fontSize:11,color:D.ink500,marginTop:2}}>{item?.quantity||item?.quantity_received||"?"} {"\u00d7"} {item?.unit_cost_zar||item?.unit_cost||item?.unit_price?`R${parseFloat(item?.unit_cost_zar||item?.unit_cost||item?.unit_price||0).toFixed(2)}`:"\u2014"}</div>
+                  </div>
+                  <span style={{fontSize:10,padding:"2px 7px",borderRadius:4,background:item?.item_id||item?.matched_id?D.successBg:D.warningBg,color:item?.item_id||item?.matched_id?D.success:D.warning,fontWeight:700}}>{item?.item_id||item?.matched_id?"\u2713 Matched":"\u26A0 Unmatched"}</span>
+                </div>
+              ));
+            })}
+            {stockActions.some(u=>u.action==="create_purchase_order"&&(u.data?.items||[]).some(i=>!i.item_id&&!i.matched_id))&&(
+              <div style={{padding:"8px 16px",fontSize:11,color:D.warning,background:D.warningBg}}>
+                {"\u26A0"} Unmatched items will be skipped {"\u2014"} receive them manually via Stock {"\u2192"} Receive
+              </div>
+            )}
+          </div>}
           <div style={{display:"flex",gap:10,marginTop:16}}>
-            <button onClick={handleCreateExpense} disabled={posting||capture?.is_duplicate} style={{flex:1,padding:"12px 0",background:capture?.is_duplicate?"#9CA3AF":D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:700,cursor:(posting||capture?.is_duplicate)?"not-allowed":"pointer",opacity:posting?0.6:1}}>{capture?.is_duplicate?"\u26D4 Blocked \u2014 Duplicate":posting?"Posting\u2026":"\u2713 Approve & Post"}</button>
+            {isStockCapture?(
+              <button onClick={handleReceiveStock} disabled={posting||capture?.is_duplicate} style={{flex:1,padding:"12px 0",background:capture?.is_duplicate?"#9CA3AF":"#1E3A5F",color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:700,cursor:(posting||capture?.is_duplicate)?"not-allowed":"pointer",opacity:posting?0.6:1}}>
+                {capture?.is_duplicate?"\u26D4 Blocked \u2014 Duplicate":posting?"Receiving\u2026":"\uD83D\uDCE6 Receive Stock + Post to Books"}
+              </button>
+            ):(
+              <button onClick={handleCreateExpense} disabled={posting||capture?.is_duplicate} style={{flex:1,padding:"12px 0",background:capture?.is_duplicate?"#9CA3AF":D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:700,cursor:(posting||capture?.is_duplicate)?"not-allowed":"pointer",opacity:posting?0.6:1}}>
+                {capture?.is_duplicate?"\u26D4 Blocked \u2014 Duplicate":posting?"Posting\u2026":"\u2713 Approve & Post"}
+              </button>
+            )}
             <button onClick={resetCapture} style={{padding:"12px 20px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
           </div>
         </div>}
@@ -423,11 +477,23 @@ export default function HQSmartCapture() {
             </div>
             <div style={{background:D.ink075,borderRadius:8,padding:14,marginBottom:16}}>
               <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Records created</div>
-              {successData.expense_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Expense posted — <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.expense_id.slice(0,8)}…</span></div>}
-              {successData.journal_entry_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Journal balanced — <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.journal_entry_id.slice(0,8)}…</span></div>}
-              {successData.vat_transaction_id&&<div style={{fontSize:12,color:D.info,marginBottom:3}}>{"\u2713"} Input VAT — {successData.vat_period} · {fmtZar(successData.input_vat_amount)} claimable</div>}
-              {!successData.vat_transaction_id&&<div style={{fontSize:12,color:D.ink300}}>Input VAT: {successData.sars_compliant===false?"non-compliant document":"not applicable"}</div>}
-              {successData.document_fingerprint&&<div style={{fontSize:11,color:D.ink500,marginTop:6}}>{"📄"} Fingerprint: <span style={{fontFamily:"monospace"}}>{successData.document_fingerprint}</span></div>}
+              {successData.is_stock_receipt?(
+                <>
+                  <div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} {successData.items_received||0} item{(successData.items_received||0)!==1?"s":""} received into stock</div>
+                  {(successData.items_skipped||0)>0&&<div style={{fontSize:12,color:D.warning,marginBottom:3}}>{"\u26A0"} {successData.items_skipped} unmatched item{successData.items_skipped!==1?"s":""} skipped {"\u2014"} receive manually</div>}
+                  {successData.po_id&&<div style={{fontSize:12,color:D.info,marginBottom:3}}>{"\u2713"} Purchase order created {"\u2014"} <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.po_id.slice(0,8)}{"\u2026"}</span></div>}
+                  {successData.journal_entry_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Journal posted {"\u2014"} Dr Inventories / Cr Trade Payables</div>}
+                  {successData.document_fingerprint&&<div style={{fontSize:11,color:D.ink500,marginTop:6}}>{"\uD83D\uDCC4"} Fingerprint: <span style={{fontFamily:"monospace"}}>{successData.document_fingerprint}</span></div>}
+                </>
+              ):(
+                <>
+                  {successData.expense_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Expense posted {"\u2014"} <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.expense_id.slice(0,8)}{"\u2026"}</span></div>}
+                  {successData.journal_entry_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Journal balanced {"\u2014"} <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.journal_entry_id.slice(0,8)}{"\u2026"}</span></div>}
+                  {successData.vat_transaction_id&&<div style={{fontSize:12,color:D.info,marginBottom:3}}>{"\u2713"} Input VAT {"\u2014"} {successData.vat_period} {"\u00b7"} {fmtZar(successData.input_vat_amount)} claimable</div>}
+                  {!successData.vat_transaction_id&&<div style={{fontSize:12,color:D.ink300}}>Input VAT: {successData.sars_compliant===false?"non-compliant document":"not applicable"}</div>}
+                  {successData.document_fingerprint&&<div style={{fontSize:11,color:D.ink500,marginTop:6}}>{"\uD83D\uDCC4"} Fingerprint: <span style={{fontFamily:"monospace"}}>{successData.document_fingerprint}</span></div>}
+                </>
+              )}
             </div>
             <div style={{display:"flex",gap:10}}>
               <button onClick={resetCapture} style={{flex:1,padding:"11px 0",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDCF8"} Capture Another</button>
