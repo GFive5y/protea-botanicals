@@ -302,6 +302,7 @@ export default function HQSmartCapture() {
         sars_compliant:postRes.sars_compliant,input_vat_claimable:postRes.input_vat_claimable,
         input_vat_amount:postRes.input_vat_amount,
         vendor_name:capture?.vendor_name,amount_zar:capture?.amount_zar,
+        document_fingerprint:capture?.document_fingerprint||null,
       });
       setPhase("success");
       showToast("Posted to books!");
@@ -422,10 +423,11 @@ export default function HQSmartCapture() {
             </div>
             <div style={{background:D.ink075,borderRadius:8,padding:14,marginBottom:16}}>
               <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Records created</div>
-              {successData.expense_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Expense posted</div>}
-              {successData.journal_entry_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Journal entry (double-entry)</div>}
-              {successData.vat_transaction_id&&<div style={{fontSize:12,color:D.info,marginBottom:3}}>{"\u2713"} Input VAT \u2014 {successData.vat_period} \u00b7 {fmtZar(successData.input_vat_amount)}</div>}
+              {successData.expense_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Expense posted — <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.expense_id.slice(0,8)}…</span></div>}
+              {successData.journal_entry_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Journal balanced — <span style={{fontFamily:"monospace",fontSize:11,opacity:0.7}}>{successData.journal_entry_id.slice(0,8)}…</span></div>}
+              {successData.vat_transaction_id&&<div style={{fontSize:12,color:D.info,marginBottom:3}}>{"\u2713"} Input VAT — {successData.vat_period} · {fmtZar(successData.input_vat_amount)} claimable</div>}
               {!successData.vat_transaction_id&&<div style={{fontSize:12,color:D.ink300}}>Input VAT: {successData.sars_compliant===false?"non-compliant document":"not applicable"}</div>}
+              {successData.document_fingerprint&&<div style={{fontSize:11,color:D.ink500,marginTop:6}}>{"📄"} Fingerprint: <span style={{fontFamily:"monospace"}}>{successData.document_fingerprint}</span></div>}
             </div>
             <div style={{display:"flex",gap:10}}>
               <button onClick={resetCapture} style={{flex:1,padding:"11px 0",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDCF8"} Capture Another</button>
@@ -448,9 +450,13 @@ export default function HQSmartCapture() {
             <div key={h.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 20px",borderBottom:i<history.length-1?`1px solid ${D.ink150}`:"none",alignItems:"center"}}>
               <div>
                 <div style={{fontSize:13,fontWeight:600,color:D.ink700}}>{h.vendor_name||h.file_name||"Document"}</div>
-                <div style={{fontSize:11,color:D.ink500,marginTop:2}}>
-                  {fmtDate(h.captured_at||h.document_date)} \u00b7 {h.capture_type?.replace(/_/g," ")||"receipt"} \u00b7{" "}
-                  <span style={{fontWeight:700,color:["approved","auto_posted"].includes(h.status)?D.success:h.status==="rejected"?D.danger:D.warning}}>{h.status}</span>
+                <div style={{fontSize:11,color:D.ink500,marginTop:2,display:"flex",flexWrap:"wrap",gap:4,alignItems:"center"}}>
+                  <span>{fmtDate(h.captured_at||h.document_date)}</span>
+                  <span>{"\u00b7"} {h.capture_type?.replace(/_/g," ")||"receipt"}</span>
+                  <span style={{padding:"1px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:["approved","auto_posted"].includes(h.status)?D.successBg:h.status==="rejected"?D.dangerBg:D.warningBg,color:["approved","auto_posted"].includes(h.status)?D.success:h.status==="rejected"?D.danger:D.warning}}>{h.status}</span>
+                  {h.sars_compliant===true&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.successBg,color:D.success}}>SARS ✓</span>}
+                  {h.sars_compliant===false&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.warningBg,color:D.warning}}>Non-SARS</span>}
+                  {h.is_duplicate&&<span style={{padding:"1px 5px",borderRadius:4,fontSize:10,fontWeight:700,background:D.dangerBg,color:D.danger}}>{"\u26A0"} Duplicate</span>}
                 </div>
               </div>
               <div style={{textAlign:"right"}}>

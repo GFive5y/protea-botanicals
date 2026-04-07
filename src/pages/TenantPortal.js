@@ -47,6 +47,7 @@ import HQBankRecon from "../components/hq/HQBankRecon";
 import HQFinancialNotes from "../components/hq/HQFinancialNotes";
 import HQSmartCapture from "../components/hq/HQSmartCapture";
 import HQForecast from "../components/hq/HQForecast";
+import HQYearEnd from "../components/hq/HQYearEnd";
 import HRRoster from "../components/hq/HRRoster";
 import HRLeave from "../components/hq/HRLeave";
 import HRTimesheets from "../components/hq/HRTimesheets";
@@ -273,6 +274,11 @@ const WATERFALL = [
         label: "Forecast",
         desc: "30-day projection \u00b7 stock depletion \u00b7 cash flow",
       },
+      {
+        id: "year-end",
+        label: "Year-End Close",
+        desc: "Lock year \u00b7 post retained earnings \u00b7 archive period",
+      },
     ],
   },
   {
@@ -467,6 +473,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Forecast",
         desc: "30-day projection \u00b7 stock depletion \u00b7 cash flow",
       },
+      {
+        id: "year-end",
+        label: "Year-End Close",
+        desc: "Lock year \u00b7 post retained earnings \u00b7 archive period",
+      },
     ],
   },
   {
@@ -560,6 +571,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "bank-recon":     return <HQBankRecon />;
     case "fin-notes":      return <HQFinancialNotes />;
     case "forecast":       return <HQForecast />;
+    case "year-end":       return <HQYearEnd />;
     case "roster":         return <HRRoster tenantId={tenantId} readOnly={false} />;
     case "timesheets":     return <HRTimesheets tenantId={tenantId} />;
     case "leave":          return <HRLeave tenantId={tenantId} />;
