@@ -3943,27 +3943,6 @@ export default function HQLoyalty() {
   const [loadingAiLog, setLoadingAiLog] = useState(false);
   const [runningAi, setRunningAi] = useState(false);
 
-  const handleRunAiNow = useCallback(async () => {
-    if (!tenantId || runningAi) return;
-    setRunningAi(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("loyalty-ai", {
-        body: { tenant_id: tenantId }
-      });
-      if (error) throw error;
-      const r = data?.results?.[0] || {};
-      const churnMsg = r.churn ? `Churn: ${r.churn.scored||0} scored, ${r.churn.rescued||0} rescued` : "";
-      const bdayMsg = r.birthday ? `Birthdays: ${r.birthday.awarded||0}` : "";
-      const stockMsg = r.stock_boost ? `Stock boosts: ${r.stock_boost.suggestions||0}` : "";
-      showToast(`AI Engine ran \u2014 ${[churnMsg,bdayMsg,stockMsg].filter(Boolean).join(" \u00b7 ")}`);
-      await loadAiLog(tenantId);
-    } catch (err) {
-      showToast("AI run failed: " + err.message, "error");
-    } finally {
-      setRunningAi(false);
-    }
-  }, [tenantId, runningAi, showToast]); // eslint-disable-line
-
   // 10 tabs: Schema, Earning, Categories, Tiers, Economics, Referrals, QR Security, Simulator, AI Engine, Campaigns
   const SUB_TABS = [
     { label: "Schema", key: "schema" },
@@ -3985,6 +3964,27 @@ export default function HQLoyalty() {
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
   }, []);
+
+  const handleRunAiNow = useCallback(async () => {
+    if (!tenantId || runningAi) return;
+    setRunningAi(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("loyalty-ai", {
+        body: { tenant_id: tenantId }
+      });
+      if (error) throw error;
+      const r = data?.results?.[0] || {};
+      const churnMsg = r.churn ? `Churn: ${r.churn.scored||0} scored, ${r.churn.rescued||0} rescued` : "";
+      const bdayMsg = r.birthday ? `Birthdays: ${r.birthday.awarded||0}` : "";
+      const stockMsg = r.stock_boost ? `Stock boosts: ${r.stock_boost.suggestions||0}` : "";
+      showToast(`AI Engine ran \u2014 ${[churnMsg,bdayMsg,stockMsg].filter(Boolean).join(" \u00b7 ")}`);
+      await loadAiLog(tenantId);
+    } catch (err) {
+      showToast("AI run failed: " + err.message, "error");
+    } finally {
+      setRunningAi(false);
+    }
+  }, [tenantId, runningAi]); // showToast omitted — stable useCallback
 
   // ── loadAll: ALL queries tenant-scoped ─────────────────────────────────────
   async function loadAll(tid) {
