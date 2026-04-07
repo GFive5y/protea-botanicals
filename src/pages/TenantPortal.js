@@ -368,6 +368,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Cash-Up",
         desc: "End of day \u00b7 till reconciliation \u00b7 variance",
       },
+      {
+        id: "smart-capture",
+        label: "Smart Capture",
+        desc: "Photo \u00b7 AI reads \u00b7 auto-post to books",
+      },
     ],
   },
   {
