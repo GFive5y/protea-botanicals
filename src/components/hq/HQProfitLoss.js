@@ -34,6 +34,7 @@ import { usePageContext } from "../../hooks/usePageContext";
 import WorkflowGuide from "../WorkflowGuide";
 import InfoTooltip from "../InfoTooltip";
 import ExpenseManager from "./ExpenseManager";
+import HQFinancialSetup from "./HQFinancialSetup";
 import { T } from "../../theme";
 
 // ─── FX Hook ──────────────────────────────────────────────────────────────────
@@ -583,6 +584,7 @@ export default function HQProfitLoss() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
+  const [financialSetupComplete, setFinancialSetupComplete] = useState(null);
   const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
   const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
 
@@ -608,6 +610,16 @@ export default function HQProfitLoss() {
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses]);
+
+  // WP-FINANCIALS Phase 0: check if financial setup is complete
+  useEffect(() => {
+    if (!tenantId) return;
+    supabase.from("tenant_config")
+      .select("financial_setup_complete")
+      .eq("tenant_id", tenantId)
+      .maybeSingle()
+      .then(({ data }) => setFinancialSetupComplete(data?.financial_setup_complete ?? false));
+  }, [tenantId]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -919,6 +931,11 @@ export default function HQProfitLoss() {
     fontSize: 14,
     boxSizing: "border-box",
   };
+
+  // WP-FINANCIALS Phase 0: show setup wizard if not configured
+  if (financialSetupComplete === false) {
+    return <HQFinancialSetup onComplete={() => setFinancialSetupComplete(true)} />;
+  }
 
   return (
     <div style={{ fontFamily: T.font.ui, color: "#333" }}>
