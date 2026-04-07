@@ -160,91 +160,58 @@ async function executeQuerySpec(spec) {
 
 // ── Codebase facts for dev mode ───────────────────────────────────────────────
 const CODEBASE_FACTS = `
-NuAi ERP Platform — Cannabis Retail · Built: Jan–Apr 2026 · Live client: Medi Recreational (private beta)
-119 features · 7 portals · 130+ component files · 104 DB tables · 35 DB functions · 10 Edge Functions
+NuAi ERP Platform \u2014 Cannabis Retail \u00b7 Built: Jan\u2013Apr 2026 \u00b7 Live client: Medi Recreational (private beta)
+130+ features \u00b7 7 portals \u00b7 140+ component files \u00b7 112 DB tables \u00b7 35 DB functions \u00b7 10 Edge Functions
 
 ARCHITECTURE
 - React SPA + Supabase (PostgreSQL + Edge Functions + RLS) + Vercel
-- 7 portals: HQ (34 tabs) · TenantPortal · Admin (13 tabs) · Shop (4 tabs) · HR (14 tabs) · Staff · Wholesale
-- Consumer: /shop · /loyalty · /leaderboard · /scan · /terpenes · /molecules · /account
+- 7 portals: HQ (34 tabs) \u00b7 TenantPortal \u00b7 Admin (13 tabs) \u00b7 Shop (4 tabs) \u00b7 HR (14 tabs) \u00b7 Staff \u00b7 Wholesale
 
-INVENTORY (232 items, 186 active, 14 product worlds)
-- HQStock (PROTECTED, 208KB) — 7 tabs: Overview/Items/Movements/Pricing/Receipts/POs/ShopManager
-- SmartInventory (175KB) — catalog with tile/list/detail modes, SC-01 stats panel, bulk actions
-- CannabisDetailView — Excel-style sortable table (wired in HQStock line 5051, viewMode=detail)
-- StockItemModal (LOCKED) — 14 product worlds with contextual fields
-- StockControl (153KB) — admin portal, industry-profile-aware (hides cannabis for non-cannabis tenants)
-- AVCO live costing · stock_movements: 1,200+ rows · product_pricing: 36 rows
-- StockOpeningCalibration — AI calibration via ai-copilot Edge Function
+EDGE FUNCTIONS (10 active):
+ai-copilot v58 \u00b7 sim-pos-sales v4 (CORS fixed) \u00b7 create-admin-user v1
+payfast-checkout v44 \u00b7 payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34
+send-notification v37 \u00b7 get-fx-rate v35 \u00b7 process-document v49
 
-SALES & POS
-- POSScreen — full-screen budtender till (cash/card/Yoco). Requires active pos_session.
-- orders: 1,500+ rows · order_items: 2,800+ rows (AVCO stored in product_metadata per line item)
-- EODCashUp — till reconciliation, variance GENERATED column, 90+ cashups
-- HQTradingDashboard — 30-day chart (Indigo palette), SA public holidays, top sellers from order_items
-- sim-pos-sales v4 — generates orders + order_items + stock_movements + pos_sessions + eod_cash_ups
+FINANCIAL STATEMENTS MODULE (WP-FINANCIALS \u2014 COMPLETE Apr 2026):
+SETUP WIZARD: HQFinancialSetup.js \u2014 5 screens. Saves to tenant_config + equity_ledger + bank_accounts.
+IFRS INCOME STATEMENT: HQProfitLoss.js v4.0 \u2014 [Dashboard]/[IFRS] toggle. IFRSStatementView with letterhead, SUBCATEGORY_TO_ACCOUNT, depreciation, equity, StatusBadge. Print/PDF via exportFinancialStatements.js.
+BALANCE SHEET v2.0: HQBalanceSheet.js \u2014 FAR (Cost/AccDep/NBV), equity_ledger, VAT payable, upgraded equation.
+FIXED ASSETS: HQFixedAssets.js \u2014 Add/depreciate/dispose. Straight-line monthly. 3 demo assets (R66K cost).
+JOURNALS: HQJournals.js \u2014 Double-entry (Dr=Cr). 5 templates. Draft\u2192Posted locking. CoA datalist.
+VAT: HQVat.js \u2014 VAT201 (SARS fields 1/4/12/16/20). 6 bi-monthly periods. Filing tracker. CSV export.
+BANK RECON: HQBankRecon.js \u2014 CSV upload, SA bank auto-detect (FNB/ABSA/StdBank/Nedbank/Capitec). Match engine.
+NOTES: HQFinancialNotes.js \u2014 15 IFRS disclosure notes from live data. Collapsible sections.
 
-FINANCIAL — FULL SUITE LIVE
-- HQProfitLoss — transaction-level P&L using order_items × product_metadata AVCO (actual COGS)
-  Revenue: R477K/30d · COGS: R181K · Gross Profit: R297K · Blended margin: 62%
-  Margin by Product section: top 10 by GP or margin %. Best: Shatter 1g at 80.2%
-- HQBalanceSheet — assets (stock AVCO), liabilities, cash position, Cash Flow statement
-- HQForecast — 30-day projection, stock depletion per SKU, restock spend, cash flow projection
-- HQCogs (144KB) — per-SKU AVCO costing, recipe cost, FX impact, margin waterfall
-- HQPricing — channel pricing (POS/online/wholesale), 36 records
-- ExpenseManager — 44 expense rows, R87K in last 30 days (rent, wages, security, etc.)
-- Live USD/ZAR via get-fx-rate EF v35 (fx_rates: 716 rows)
-- COGS source: order_items product_metadata->weighted_avg_cost (NOT product_cogs — only 13 rows)
+NEW SCHEMA (8 tables):
+fixed_assets \u00b7 depreciation_entries \u00b7 chart_of_accounts (40 accounts) \u00b7 journal_entries \u00b7 journal_lines
+vat_transactions \u00b7 equity_ledger \u00b7 bank_accounts \u00b7 bank_statement_lines
+tenant_config: +16 cols (financial_year_end, vat_, auditor_, financial_setup_complete)
 
-LOYALTY & CUSTOMERS
-- HQLoyalty (147KB) — points/tiers/campaigns/referrals/leaderboard, 263 transactions, 3,974 pts
-- QR-to-earn scan loop — 181 scans, 60 QR codes. get_monthly_leaderboard DB function.
-- HQFraud (92KB) — scan velocity analysis, 62 system_alerts
-- AdminCustomerEngagement (113KB) — profiles, churn risk, engagement
-- AdminQRCodes (152KB) — complete batch management engine
-- 7 cannabinoid molecule visualizers + terpene education system (no SA competitor has this)
+MEDI REC DB STATE (Apr 2026):
+orders: 461 \u00b7 order_items: 1,094 \u00b7 expenses: 44 \u00b7 inventory: 232 \u00b7 eod_cash_ups: 90
+fixed_assets: 3 \u00b7 vat_transactions: 6 \u00b7 bank_statement_lines: 22 \u00b7 equity_ledger: 1 \u00b7 CoA: 40
 
-PROCUREMENT
-- HQPurchaseOrders (119KB) — full PO lifecycle, FX-aware, 6 POs, 27 line items
-- HQDocuments (102KB) — AI invoice ingestion → auto stock receive, 10 docs processed
-- HQSuppliers — 5 suppliers, 123 supplier products
+NAV TABS (Reports, cannabis waterfall):
+pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 fixed-assets \u00b7 journals \u00b7 vat \u00b7 bank-recon \u00b7 fin-notes \u00b7 forecast
 
-PRODUCTION & COMPLIANCE
-- HQProduction (310KB — LARGEST FILE) — batch/BOM/production runs/yield/QC/COA
-- HQFoodIngredients (158KB) — 121 ingredients, nutrient profiles, HACCP data
-- HQHaccp — 3 control points seeded · HQNutritionLabel — SA R146 compliant
-- HQColdChain · HQRecall · HQFoodIntelligence — all wired
+SCHEMA FACTS:
+- inventory_items: NO notes column \u00b7 category enum (12 values) \u00b7 loyalty_category separate
+- orders: field=total (NOT total_amount) \u00b7 channel: pos|online|wholesale
+- order_items: no inventory_item_id FK \u2014 via product_metadata jsonb \u00b7 line_total plain numeric (INSERT allowed)
+- eod_cash_ups: variance GENERATED \u00b7 field=system_cash_total \u00b7 UNIQUE(tenant_id, cashup_date)
+- pos_sessions: NO total_sales column \u00b7 movement_type 'sale_pos' for POS
+- tenants: type constraint 'hq'|'shop' only \u00b7 daily_summaries does NOT exist
+- expenses: expense_date is DATE \u2014 always compare with YYYY-MM-DD
 
-HR SUITE (14 modules)
-- HRTimesheets (111KB) — 5-stage pipeline: draft→submitted→admin_approved→hr_locked→paid
-- Full suite: Staff/Leave/Contracts/Roster/Calendar(40 holidays)/Payroll/Disciplinary/Comms/Loans/Performance
+KEY RULES:
+LL-056: scan_logs \u2014 no tenant_id column
+LL-090: food_recipe_lines \u2014 never nested PostgREST select
+LL-GH-MCP-01: GitHub MCP returns stale SHA \u2014 always grep before str_replace
+LL-202: GitHub write tools BANNED from Claude.ai
 
-INTELLIGENCE
-- HQAnalytics (105KB) · GeoAnalyticsDashboard · HQReorderScoring (velocity-weighted AI)
-- Information Bubbles: every KPI = Primary metric + delta(s) + operational callout
-- Velocity reorder: days of stock remaining + revenue at risk per SKU
-- Revenue MTD run rate: R/day × 30 projection in dashboard tile
-
-EDGE FUNCTIONS (10 active)
-ai-copilot v58 · payfast-checkout v44 · payfast-itn v39 · sign-qr v36 · verify-qr v34
-send-notification v37 · get-fx-rate v35 · process-document v49 · sim-pos-sales v4 · create-admin-user v1
-
-SCHEMA FACTS (critical for correct queries)
-- inventory_items: NO notes column · category is enum (12 values) · loyalty_category separate
-- orders: field=total (NOT total_amount) · channel: pos|online|wholesale · status: paid|pending|failed|cancelled|refunded
-- order_items: no inventory_item_id FK — via product_metadata jsonb · line_total plain numeric (INSERT allowed)
-  product_metadata stores: item_id, category, weighted_avg_cost (COGS source)
-- eod_cash_ups: variance GENERATED · field=system_cash_total · UNIQUE(tenant_id, cashup_date)
-- pos_sessions: NO total_sales column · movement_type 'sale_pos' for POS
-- loyalty_transactions: column=transaction_type · use .ilike() not .eq()
-- tenants: type constraint 'hq'|'shop' only · daily_summaries does NOT exist
-- expenses: expense_date is DATE (not timestamp) — always compare with YYYY-MM-DD
-
-LOCKED/PROTECTED FILES
-- StockItemModal.js · ProteaAI.js · PlatformBar.js · LiveFXBar.js · HQStock.js (protected)
-
-TENANT: Medi Recreational · b1bad266-ceb4-4558-bbc3-22cfeeeafe74 · cannabis_retail profile
-SUPABASE PROJECT: uvicrqapgzcdvozxrreo · 5 tenants registered
+LOCKED: StockItemModal.js \u00b7 ProteaAI.js \u00b7 PlatformBar.js \u00b7 LiveFXBar.js \u00b7 HQStock.js (protected)
+TENANT: Medi Recreational \u00b7 b1bad266-ceb4-4558-bbc3-22cfeeeafe74
+SUPABASE: uvicrqapgzcdvozxrreo \u00b7 5 tenants
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
