@@ -155,10 +155,15 @@ export default function HQSmartCapture() {
       if(upErr)throw new Error(`Storage: ${upErr.message}`);
       setProcessMsg("AI is reading your document\u2026");
       const base64=await fileToBase64(file);
-      const{data:fnData,error:fnErr}=await supabase.functions.invoke("process-document",{
-        body:{file_base64:base64,mime_type:file.type||"image/jpeg",file_url:path,file_name:file.name,file_size_kb:Math.round(file.size/1024),industry_profile:industryProfile||"cannabis_retail",tenant_id:tenantId,context:{}}
-      });
-      if(fnErr||!fnData?.success)throw new Error(fnData?.error||fnErr?.message||"AI extraction failed");
+      const invokeBody={file_base64:base64,mime_type:file.type||"image/jpeg",file_url:path,file_name:file.name,file_size_kb:Math.round(file.size/1024),industry_profile:industryProfile||"cannabis_retail",tenant_id:tenantId,context:{}};
+      let fnData=null,fnErr=null;
+      for(let attempt=0;attempt<2;attempt++){
+        const res=await supabase.functions.invoke("process-document",{body:invokeBody});
+        fnData=res.data;fnErr=res.error;
+        if(!fnErr&&fnData?.success)break;
+        if(attempt===0){setProcessMsg("Retrying AI extraction\u2026");await new Promise(r=>setTimeout(r,1500));}
+      }
+      if(fnErr||!fnData?.success)throw new Error(fnData?.error||fnErr?.message||"AI extraction failed \u2014 please try again");
       setProcessMsg("Done!");
       const ext2=fnData.extraction||{};
       setCapture({
