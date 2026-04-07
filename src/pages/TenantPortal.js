@@ -121,11 +121,6 @@ const WATERFALL = [
         label: "Documents",
         desc: "Upload invoice \u2192 auto-process",
       },
-      {
-        id: "smart-capture",
-        label: "Smart Capture",
-        desc: "Photograph receipts \u00b7 AI reads \u00b7 posts to books",
-      },
     ],
   },
   {
@@ -144,6 +139,11 @@ const WATERFALL = [
         id: "cashup",
         label: "Cash-Up",
         desc: "End of day \u00b7 till reconciliation \u00b7 variance",
+      },
+      {
+        id: "smart-capture",
+        label: "Smart Capture",
+        desc: "Photo \u00b7 AI reads \u00b7 auto-post to books",
       },
     ],
   },

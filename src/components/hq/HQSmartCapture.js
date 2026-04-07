@@ -187,6 +187,15 @@ export default function HQSmartCapture() {
         policy_flags:enriched.policy_flags||[],auto_posted:false,
       }).select("id").single();
       setCaptureQueueId(cqRow?.id||null);
+      // Merge policy results into capture state for render
+      setCapture(prev => ({
+        ...prev,
+        policy_flags: enriched.policy_flags || [],
+        requires_approval: enriched.requires_approval || false,
+        approval_reason: enriched.approval_reason || null,
+        suggested_category: enriched.suggested_category || prev?.suggested_category,
+        suggested_subcategory: enriched.suggested_subcategory || null,
+      }));
 
       setPhase("review");
     }catch(err){
@@ -280,6 +289,16 @@ export default function HQSmartCapture() {
 
         {phase==="review"&&capture&&<div>
           <SARSBadge sarsCompliant={capture.sars_compliant} vatNumber={capture.sars_vat_number} inputVatAmount={capture.input_vat_amount} flags={capture.sars_flags}/>
+          {/* Policy flags */}
+          {(capture.policy_flags||[]).map((flag,i)=>{
+            const cs={block:{bg:D.dangerBg,color:D.danger,icon:"\uD83D\uDEAB"},warning:{bg:D.warningBg,color:D.warning,icon:"\u26A0\uFE0F"},info:{bg:D.infoBg,color:D.info,icon:"\u2139\uFE0F"}};
+            const s=cs[flag.severity]||cs.info;
+            return <div key={i} style={{marginBottom:8,padding:"8px 12px",borderRadius:8,background:s.bg,border:`1px solid ${s.color}33`,display:"flex",gap:8,alignItems:"flex-start"}}>
+              <span>{s.icon}</span>
+              <div><div style={{fontSize:11,fontWeight:700,color:s.color}}>{flag.rule_name}</div><div style={{fontSize:11,color:s.color,opacity:0.9}}>{flag.message}</div></div>
+            </div>;
+          })}
+          {capture.requires_approval&&<div style={{padding:"10px 12px",background:D.warningBg,border:`1px solid ${D.warningBd}`,borderRadius:8,marginBottom:12,fontSize:12,color:D.warning}}><strong>Approval required:</strong> {capture.approval_reason}</div>}
           <div style={{...card,padding:20}}>
             <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Extracted Data</div>
             <EditableField label="Vendor" value={capture.vendor_name} onChange={v=>updateCapture("vendor_name",v)} placeholder="Vendor name"/>
