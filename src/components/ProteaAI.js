@@ -168,8 +168,9 @@ HQ TENANT: 43b34c33-6864-4f02-98dd-df1d340475c3
 EDGE FUNCTIONS (12 active):
 ai-copilot \u00b7 sim-pos-sales v4 \u00b7 create-admin-user \u00b7 payfast-checkout v44
 payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34 \u00b7 send-notification v37
-get-fx-rate v35 \u00b7 process-document v2.1 (WP-SMART-CAPTURE anti-fraud)
-auto-post-capture v1 (double-entry journal + VAT)
+get-fx-rate v35 \u00b7 process-document v2.1 (WP-SMART-CAPTURE anti-fraud + fingerprint)
+auto-post-capture v1 (expense + double-entry journal + VAT)
+receive-from-capture v1 (stock receipt \u00b7 AVCO recalc \u00b7 Dr 12000 Cr 20000)
 
 WP-FINANCIALS (COMPLETE):
 Setup Wizard \u00b7 IFRS Income Statement v4 \u00b7 Balance Sheet v2 \u00b7 Fixed Assets \u00b7 Journals \u00b7 VAT201 \u00b7 Bank Recon \u00b7 15 IFRS Notes \u00b7 PDF Export
@@ -192,6 +193,7 @@ Wired in CANNABIS_RETAIL_WATERFALL Reports section + generic WATERFALL Intellige
 NAV TABS (CANNABIS_RETAIL_WATERFALL):
 Operations: trading \u00b7 cashup \u00b7 smart-capture
 Reports: pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 costing \u00b7 forecast \u00b7 year-end
+Smart Capture: expense_receipt \u2192 auto-post-capture \u00b7 supplier_invoice/delivery_note \u2192 receive-from-capture
 
 KEY RULES:
 LL-056: scan_logs \u2014 no tenant_id column
