@@ -223,6 +223,7 @@ export default function HQSmartCapture() {
       try { enriched = await applyPolicyRules(tenantId, captureObj); }
       catch(policyErr) { console.warn("[SmartCapture] Policy rules failed (non-fatal):", policyErr?.message); }
 
+      console.log("[SmartCapture] Inserting capture_queue — fingerprint:", fnData?.document_fingerprint, "isDupe:", fnData?.is_duplicate);
       const { data:cqRow, error:cqErr } = await supabase.from("capture_queue").insert({
         tenant_id:           enriched.tenant_id,
         document_log_id:     enriched.document_log_id||null,
@@ -252,12 +253,12 @@ export default function HQSmartCapture() {
         approval_reason:     enriched.approval_reason||null,
         status:              "pending_review",
         auto_posted:         false,
-        document_fingerprint: capture?.document_fingerprint||null,
-        is_duplicate:        capture?.is_duplicate||false,
-        duplicate_of_id:     capture?.duplicate_of||null,
-        duplicate_confidence: capture?.duplicate_confidence||null,
-        duplicate_details:   capture?.duplicate_details||{},
-        unique_identifiers:  capture?.unique_identifiers||{},
+        document_fingerprint: fnData?.document_fingerprint||null,
+        is_duplicate:        fnData?.is_duplicate||false,
+        duplicate_of_id:     null,
+        duplicate_confidence: typeof fnData?.duplicate_confidence==="number"?fnData.duplicate_confidence:null,
+        duplicate_details:   fnData?.duplicate_details||{},
+        unique_identifiers:  fnData?.unique_identifiers||{},
       }).select("id").single();
 
       if (cqErr) {
