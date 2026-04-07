@@ -1,4 +1,5 @@
-// src/components/hq/HQProfitLoss.js v3.0 — WP-FIN S1: Expense Engine
+// src/components/hq/HQProfitLoss.js v4.0 — WP-FINANCIALS Phase 2: IFRS Statement View
+// v4.0: IFRS toggle · IFRSStatementView · depreciation line · equity ledger · status badge · COGS quality
 // v3.0: DB-backed OPEX from expenses table · CAPEX memo line · quarter + custom date range
 // v2.6 — WP-VIZ: wfCalc() helper + WaterfallChart (ComposedChart) above HTML detail
 // v2.5 — WP-THEME-2: Inter font + InfoTooltip + Toast
@@ -36,6 +37,271 @@ import InfoTooltip from "../InfoTooltip";
 import ExpenseManager from "./ExpenseManager";
 import HQFinancialSetup from "./HQFinancialSetup";
 import { T } from "../../theme";
+
+// ─── WP-FINANCIALS Phase 2: IFRS account mapping ─────────────────────────────
+const SUBCATEGORY_TO_ACCOUNT = {
+  "Rent & Premises":   { code: "60000", ifrsLabel: "Rent and occupancy costs" },
+  "Staff Wages":       { code: "60100", ifrsLabel: "Employee benefits expense" },
+  "Security":          { code: "60200", ifrsLabel: "Security services" },
+  "Utilities":         { code: "60300", ifrsLabel: "Utilities" },
+  "Insurance":         { code: "60400", ifrsLabel: "Insurance expense" },
+  "Marketing":         { code: "60500", ifrsLabel: "Marketing and advertising" },
+  "Packaging":         { code: "60600", ifrsLabel: "Packaging materials" },
+  "Banking & Fees":    { code: "60700", ifrsLabel: "Finance charges and bank fees" },
+  "Software":          { code: "60800", ifrsLabel: "Software and subscriptions" },
+  "Professional Fees": { code: "60900", ifrsLabel: "Professional fees" },
+  "Cleaning & Hygiene":{ code: "61000", ifrsLabel: "Cleaning and hygiene" },
+  "Equipment":         { code: "61900", ifrsLabel: "Other operating expenses" },
+};
+
+const STATUS_CONFIG = {
+  draft:    { label: "Draft", bg: "#FEF9C3", color: "#A16207", border: "#FDE047" },
+  reviewed: { label: "Reviewed", bg: "#DBEAFE", color: "#1D4ED8", border: "#93C5FD" },
+  signed:   { label: "Signed Off", bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+};
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+  return (
+    <span style={{
+      display:"inline-flex", alignItems:"center", gap:5,
+      padding:"3px 12px", borderRadius:20, fontSize:11, fontWeight:700,
+      background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}`,
+      letterSpacing:"0.05em", textTransform:"uppercase",
+    }}>
+      {status === "signed" ? "\u2713 " : status === "reviewed" ? "\u25CE " : "\u25CB "}
+      {cfg.label}
+    </span>
+  );
+}
+
+// ─── WP-FINANCIALS Phase 2: IFRS Statement View ───────────────────────────────
+function IFRSStatementView({
+  tenantName, financialYear, period,
+  totalRevenue, totalCogs, grossProfit, grossMarginPct,
+  depreciationTotal, expensesBySubcategory, loyaltyCost,
+  totalOpexIncLoyalty, netProfit, netMarginPct,
+  equityLedger, statementStatus,
+  fmtZar, fmt,
+}) {
+  const preparedDate = new Date().toLocaleDateString("en-ZA", {
+    day:"numeric", month:"long", year:"numeric",
+  });
+
+  const ifrsLines = [];
+  const mapped = new Map();
+  Object.entries(expensesBySubcategory).forEach(([sub, total]) => {
+    const acc = SUBCATEGORY_TO_ACCOUNT[sub];
+    const key = acc ? acc.code : "61900";
+    const label = acc ? acc.ifrsLabel : sub || "Other operating expenses";
+    if (mapped.has(key)) {
+      mapped.get(key).amount += total;
+    } else {
+      mapped.set(key, { code: key, label, amount: total });
+    }
+  });
+  Array.from(mapped.values())
+    .sort((a,b) => a.code.localeCompare(b.code))
+    .forEach(l => ifrsLines.push(l));
+
+  const totalOpex = ifrsLines.reduce((s,l)=>s+l.amount,0) + loyaltyCost + depreciationTotal;
+
+  const IS = {
+    page: {
+      background:"#fff", border:"1px solid #E2E8F0", borderRadius:12,
+      overflow:"hidden", fontFamily:"'Inter','Helvetica Neue',Arial,sans-serif",
+    },
+    letterhead: {
+      background:"linear-gradient(135deg,#1A3D2B 0%,#2D6A4F 100%)",
+      padding:"28px 40px 24px", color:"#fff",
+    },
+    statTitle: { fontSize:13,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",opacity:0.7,marginBottom:4 },
+    companyName: { fontSize:22,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 4px" },
+    statName: { fontSize:16,fontWeight:600,opacity:0.9 },
+    periodLine: { fontSize:12,opacity:0.65,marginTop:6 },
+    body: { padding:"0 40px 40px" },
+    tableHeader: {
+      display:"grid", gridTemplateColumns:"1fr 140px 140px",
+      padding:"10px 0", borderBottom:"2px solid #1A3D2B",
+      fontSize:11,fontWeight:700,color:"#374151",
+      letterSpacing:"0.07em",textTransform:"uppercase",marginTop:28,
+    },
+    sectionLabel: {
+      fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:"0.07em",
+      textTransform:"uppercase",padding:"18px 0 6px",
+    },
+    row: (bold, indent=0, shade=false) => ({
+      display:"grid", gridTemplateColumns:"1fr 140px 140px",
+      padding:`${bold?12:8}px 0 ${bold?12:8}px ${indent*20}px`,
+      borderBottom: bold ? "1px solid #E2E8F0" : "1px solid #F8FAFC",
+      background: shade ? "#F8FAFC" : "transparent",
+      alignItems:"center",
+    }),
+    lbl: (bold,dim) => ({
+      fontSize:bold?14:13, fontWeight:bold?700:400,
+      color:dim?"#9CA3AF":bold?"#111827":"#374151",
+    }),
+    amt: (bold,color) => ({
+      fontSize:bold?15:13, fontWeight:bold?700:500,
+      color:color||"#374151", textAlign:"right",
+      fontVariantNumeric:"tabular-nums",
+    }),
+    dash: { fontSize:13,color:"#D1D5DB",textAlign:"right" },
+    footnote: {
+      marginTop:32,paddingTop:16,borderTop:"1px solid #E2E8F0",
+      fontSize:11,color:"#9CA3AF",lineHeight:1.6,
+    },
+  };
+
+  return (
+    <div style={IS.page}>
+      <div style={IS.letterhead}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start" }}>
+          <div>
+            <div style={IS.statTitle}>Income Statement</div>
+            <div style={IS.companyName}>{tenantName || "Business Name"}</div>
+            <div style={IS.statName}>Statement of Comprehensive Income</div>
+            <div style={IS.periodLine}>
+              For the period ended {period} \u00b7 Prepared {preparedDate}
+            </div>
+          </div>
+          <div style={{ textAlign:"right" }}>
+            <StatusBadge status={statementStatus || "draft"} />
+            <div style={{ fontSize:11,opacity:0.6,marginTop:8 }}>IFRS for SMEs compliant</div>
+            <div style={{ fontSize:11,opacity:0.6,marginTop:2 }}>{financialYear}</div>
+          </div>
+        </div>
+      </div>
+      <div style={IS.body}>
+        <div style={IS.tableHeader}>
+          <span>Note</span>
+          <span style={{ textAlign:"right" }}>Current Period (ZAR)</span>
+          <span style={{ textAlign:"right" }}>Prior Period (ZAR)</span>
+        </div>
+
+        <div style={IS.sectionLabel}>Revenue</div>
+        <div style={IS.row(false,0)}>
+          <span style={IS.lbl(false)}>Revenue from contracts with customers</span>
+          <span style={IS.amt(false,"#059669")}>{fmtZar(totalRevenue)}</span>
+          <span style={IS.dash}>\u2014</span>
+        </div>
+        <div style={IS.row(true,0,true)}>
+          <span style={IS.lbl(true)}>Total Revenue</span>
+          <span style={IS.amt(true,"#059669")}>{fmtZar(totalRevenue)}</span>
+          <span style={IS.dash}>\u2014</span>
+        </div>
+
+        <div style={IS.sectionLabel}>Cost of Sales</div>
+        <div style={IS.row(false,1)}>
+          <span style={IS.lbl(false)}>Cost of inventories recognised as expense (actual)</span>
+          <span style={IS.amt(false,"#DC2626")}>({fmtZar(Math.abs(totalCogs))})</span>
+          <span style={IS.dash}>\u2014</span>
+        </div>
+        <div style={IS.row(true,0,true)}>
+          <span style={IS.lbl(true)}>Gross Profit</span>
+          <span style={IS.amt(true, grossProfit>=0?"#059669":"#DC2626")}>
+            {grossProfit < 0 ? `(${fmtZar(Math.abs(grossProfit))})` : fmtZar(grossProfit)}
+          </span>
+          <span style={IS.dash}>\u2014</span>
+        </div>
+        <div style={{ fontSize:11,color:"#6B7280",padding:"4px 0 8px",fontStyle:"italic" }}>
+          Gross margin: {fmt(grossMarginPct)}%
+        </div>
+
+        <div style={IS.sectionLabel}>Operating Expenses</div>
+        {ifrsLines.map(line => (
+          <div key={line.code} style={IS.row(false,1)}>
+            <span style={IS.lbl(false)}>
+              {line.label}
+              <span style={{ fontSize:10,color:"#9CA3AF",marginLeft:8 }}>{line.code}</span>
+            </span>
+            <span style={IS.amt(false,"#374151")}>({fmtZar(Math.abs(line.amount))})</span>
+            <span style={IS.dash}>\u2014</span>
+          </div>
+        ))}
+        {loyaltyCost > 0 && (
+          <div style={IS.row(false,1)}>
+            <span style={IS.lbl(false)}>
+              Marketing \u2014 loyalty programme cost
+              <span style={{ fontSize:10,color:"#9CA3AF",marginLeft:8 }}>60500</span>
+            </span>
+            <span style={IS.amt(false,"#374151")}>({fmtZar(Math.abs(loyaltyCost))})</span>
+            <span style={IS.dash}>\u2014</span>
+          </div>
+        )}
+        {depreciationTotal > 0 && (
+          <div style={IS.row(false,1)}>
+            <span style={IS.lbl(false)}>
+              Depreciation of property, plant and equipment
+              <span style={{ fontSize:10,color:"#9CA3AF",marginLeft:8 }}>61100</span>
+            </span>
+            <span style={IS.amt(false,"#374151")}>({fmtZar(Math.abs(depreciationTotal))})</span>
+            <span style={IS.dash}>\u2014</span>
+          </div>
+        )}
+        {depreciationTotal === 0 && (
+          <div style={{ fontSize:11,color:"#D1D5DB",padding:"6px 20px",fontStyle:"italic" }}>
+            Depreciation \u2014 no fixed assets registered yet
+          </div>
+        )}
+        <div style={IS.row(true,0,true)}>
+          <span style={IS.lbl(true)}>Total Operating Expenses</span>
+          <span style={IS.amt(true,"#DC2626")}>({fmtZar(Math.abs(totalOpex))})</span>
+          <span style={IS.dash}>\u2014</span>
+        </div>
+
+        <div style={{ ...IS.row(true,0), background:"#F0FDF4",borderTop:"2px solid #6EE7B7",borderBottom:"2px solid #6EE7B7" }}>
+          <span style={IS.lbl(true)}>
+            {netProfit >= 0 ? "Profit for the Period" : "Loss for the Period"}
+          </span>
+          <span style={IS.amt(true, netProfit>=0?"#059669":"#DC2626")}>
+            {netProfit < 0 ? `(${fmtZar(Math.abs(netProfit))})` : fmtZar(netProfit)}
+          </span>
+          <span style={IS.dash}>\u2014</span>
+        </div>
+        <div style={{ fontSize:11,color:"#6B7280",padding:"4px 0 16px",fontStyle:"italic" }}>
+          Net margin: {fmt(netMarginPct)}%
+        </div>
+
+        {equityLedger && (
+          <>
+            <div style={IS.sectionLabel}>Movement in Equity</div>
+            <div style={IS.row(false,0)}>
+              <span style={IS.lbl(false)}>Share capital</span>
+              <span style={IS.amt(false)}>{fmtZar(equityLedger.share_capital || 0)}</span>
+              <span style={IS.dash}>\u2014</span>
+            </div>
+            <div style={IS.row(false,0)}>
+              <span style={IS.lbl(false)}>Retained earnings \u2014 opening</span>
+              <span style={IS.amt(false)}>{fmtZar(equityLedger.opening_retained_earnings || 0)}</span>
+              <span style={IS.dash}>\u2014</span>
+            </div>
+            <div style={IS.row(false,0)}>
+              <span style={IS.lbl(false)}>Profit/(loss) for the period</span>
+              <span style={IS.amt(false,netProfit>=0?"#059669":"#DC2626")}>{fmtZar(netProfit)}</span>
+              <span style={IS.dash}>\u2014</span>
+            </div>
+            <div style={IS.row(true,0,true)}>
+              <span style={IS.lbl(true)}>Total Equity</span>
+              <span style={IS.amt(true)}>
+                {fmtZar((equityLedger.share_capital||0)+(equityLedger.opening_retained_earnings||0)+netProfit)}
+              </span>
+              <span style={IS.dash}>\u2014</span>
+            </div>
+          </>
+        )}
+
+        <div style={IS.footnote}>
+          <strong>Basis of preparation:</strong> These financial statements have been prepared in accordance with the International Financial Reporting Standard for Small and Medium-sized Entities (IFRS for SMEs). The functional and presentation currency is South African Rand (ZAR). Prepared on the historical cost basis.
+          <br /><br />
+          <strong>Note on comparative figures:</strong> No comparative period data is available. This will populate once the prior financial year has been closed.
+          <br /><br />
+          <em>System-generated from NuAi transaction data. Status: <strong>{(statementStatus || "draft").toUpperCase()}</strong>.</em>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── FX Hook ──────────────────────────────────────────────────────────────────
 function useFxRate() {
@@ -584,6 +850,11 @@ export default function HQProfitLoss() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
+  // ── WP-FINANCIALS Phase 2: IFRS view state ─────────────────────────────
+  const [ifrsView, setIfrsView] = useState(false);
+  const [depreciationEntries, setDepreciationEntries] = useState([]);
+  const [equityLedger, setEquityLedger] = useState(null);
+  const [statementStatus, setStatementStatus] = useState("draft");
   const [setupComplete, setSetupComplete] = useState(null);
   const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
   const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
@@ -610,6 +881,28 @@ export default function HQProfitLoss() {
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses]);
+
+  // ── WP-FINANCIALS Phase 2: fetch depreciation + equity ledger ──────────
+  useEffect(() => {
+    if (!tenantId) return;
+    const yr = `FY${new Date().getFullYear()}`;
+    Promise.all([
+      supabase.from("depreciation_entries")
+        .select("depreciation")
+        .eq("tenant_id", tenantId),
+      supabase.from("equity_ledger")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("financial_year", yr)
+        .maybeSingle(),
+    ]).then(([dep, eq]) => {
+      setDepreciationEntries(dep.data || []);
+      if (eq.data) {
+        setEquityLedger(eq.data);
+        setStatementStatus(eq.data.year_end_closed ? "signed" : "draft");
+      }
+    });
+  }, [tenantId]);
 
   // WP-FINANCIALS Phase 0 — setup gate
   useEffect(() => {
@@ -917,6 +1210,19 @@ export default function HQProfitLoss() {
     totalRevenue > 0 ? (scenarioGross / totalRevenue) * 100 : 0;
   const hasDataErrors = Object.keys(dataErrors).length > 0;
 
+  // ── WP-FINANCIALS Phase 2: IFRS computed values ─────────────────────────
+  const depreciationTotal = depreciationEntries.reduce(
+    (s, e) => s + (parseFloat(e.depreciation) || 0), 0
+  );
+  const expensesBySubcategory = expenses
+    .filter(e => ["opex","wages","tax","other"].includes(e.category))
+    .reduce((acc, e) => {
+      const key = e.subcategory || "Other";
+      acc[key] = (acc[key] || 0) + (parseFloat(e.amount_zar) || 0);
+      return acc;
+    }, {});
+  const periodLabel = PERIODS.find(p => p.id === period)?.label || period;
+
   const card = {
     background: "#fff",
     borderRadius: 12,
@@ -1052,6 +1358,29 @@ export default function HQProfitLoss() {
             </>
           )}
 
+          {/* WP-FINANCIALS Phase 2: IFRS view toggle */}
+          <div style={{
+            display:"flex", borderRadius:8, overflow:"hidden",
+            border:"1px solid #E2E8F0", flexShrink:0,
+          }}>
+            {[
+              { id:false, label:"\uD83D\uDCCA Dashboard" },
+              { id:true,  label:"\uD83D\uDCCB IFRS Statement" },
+            ].map(opt => (
+              <button key={String(opt.id)}
+                onClick={() => setIfrsView(opt.id)}
+                style={{
+                  padding:"7px 14px", border:"none", cursor:"pointer",
+                  fontFamily:"'Inter',sans-serif", fontSize:12, fontWeight:600,
+                  background: ifrsView===opt.id ? "#1A3D2B" : "#fff",
+                  color: ifrsView===opt.id ? "#fff" : "#6B7280",
+                  transition:"all 0.15s",
+                }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={fetchAll}
             disabled={loading}
@@ -1154,11 +1483,34 @@ export default function HQProfitLoss() {
         )}
       </div>
 
+      {/* WP-FINANCIALS Phase 2: IFRS Statement View */}
+      {ifrsView && !loading && (
+        <IFRSStatementView
+          tenantName={tenant?.name}
+          financialYear={`FY${new Date().getFullYear()}`}
+          period={periodLabel}
+          totalRevenue={totalRevenue}
+          totalCogs={totalCogs}
+          grossProfit={grossProfit}
+          grossMarginPct={grossMarginPct}
+          depreciationTotal={depreciationTotal}
+          expensesBySubcategory={expensesBySubcategory}
+          loyaltyCost={loyaltyCost}
+          totalOpexIncLoyalty={totalOpexIncLoyalty}
+          netProfit={netProfit}
+          netMarginPct={netMarginPct}
+          equityLedger={equityLedger}
+          statementStatus={statementStatus}
+          fmtZar={fmtZar}
+          fmt={fmt}
+        />
+      )}
+
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: "#999" }}>
           Loading P&L data…
         </div>
-      ) : (
+      ) : !ifrsView ? (
         <>
           {/* Waterfall Chart */}
           {websiteRevenue > 0 && (
@@ -2328,7 +2680,7 @@ export default function HQProfitLoss() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
 
       {/* WP-FIN S1: ExpenseManager modal */}
       {showExpMgr && (
