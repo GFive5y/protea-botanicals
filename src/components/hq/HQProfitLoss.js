@@ -579,7 +579,7 @@ export default function HQProfitLoss() {
   const [expenses, setExpenses] = useState([]);
   const [showExpMgr, setShowExpMgr] = useState(false);
   const [productionMovements, setProductionMovements] = useState([]);
-  const [wholesaleMovements, setWholesaleMovements] = useState([]);
+  // wholesaleMovements removed — sale_out is not a revenue source (LL-203)
   const [inventoryItems, setInventoryItems] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
@@ -658,7 +658,7 @@ export default function HQProfitLoss() {
     setLoyaltyTxns(r7.data || []);
     setLoyaltyConfig(r8.data || null);
     setProductionMovements(r9.data || []);
-    setWholesaleMovements(r10.data || []);
+    // setWholesaleMovements removed (LL-203)
     setInventoryItems(r11.data || []);
     setDataErrors(errors);
 
