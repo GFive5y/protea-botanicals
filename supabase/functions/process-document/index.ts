@@ -1,5 +1,6 @@
 // supabase/functions/process-document/index.ts
-// v2.0 — WP-SMART-CAPTURE: SARS compliance checker + capture type classifier
+// v2.1 — WP-SMART-CAPTURE: Anti-fraud unique identifier extraction + document fingerprinting
+// v2.0 — WP-SMART-CAPTURE: SARS tax invoice compliance check + capture type classifier
 // v1.9 — WP-FIN S3: Expense document detection + create_expense action
 //   classifyExpenseDocument() runs after Claude parse — detects CAPEX/OPEX invoices,
 //   service bills, payment confirmations for non-stock items. Adds create_expense
@@ -404,6 +405,61 @@ function classifyExpenseDocument(
       .filter(Boolean)
       .join(" | "),
   };
+}
+
+// ── WP-SMART-CAPTURE v2.1: Unique Identifier Extractor ───────────────────────
+function extractUniqueIdentifiers(extractedText: string, ext: Record<string,unknown>): Record<string,string|null> {
+  const ids: Record<string,string|null> = {};
+  const t = extractedText || "";
+  const utiM = t.match(/UTI\s*[:\-]?\s*([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{15,})/i);
+  if (utiM) ids.uti = utiM[1].toUpperCase();
+  const authM = t.match(/Auth(?:orization|orisation)?\s+Code\s*[:\-]?\s*([A-Z0-9]{6})/i) || t.match(/AuthCode\s*[:\-]?\s*([A-Z0-9]{6})/i);
+  if (authM) ids.auth_code = authM[1].toUpperCase();
+  const rcptM = t.match(/Receipt\s*(?:No\.?|Number|#)?\s*[:\-]?\s*(\d{4,12})/i);
+  if (rcptM) ids.receipt_number = rcptM[1];
+  const echoM = t.match(/ECHO\s*[:\-]?\s*([A-Z0-9]{6,12})/i);
+  if (echoM) ids.echo = echoM[1].toUpperCase();
+  const merchM = t.match(/Merch(?:ant)?\s+No\.?\s*[:\-]?\s*([0-9:]{6,20})/i);
+  if (merchM) ids.merchant_number = merchM[1];
+  const timeM = t.match(/\b(\d{2}:\d{2}(?::\d{2})?)\b/);
+  if (timeM) ids.transaction_time = timeM[1];
+  const panM = t.match(/PAN\s*[:\-]?\s*\d{6}[x*]{4,}\s*(\d{4})/i) || t.match(/\d{6}[xX*]{4,}(\d{4})/);
+  if (panM) ids.pan_last4 = panM[1];
+  const pumpM = t.match(/Pump\s*[:\-]?\s*(\d{1,2})/i);
+  if (pumpM) ids.pump_number = pumpM[1];
+  return ids;
+}
+
+function buildDocumentFingerprint(ext: Record<string,unknown>, ids: Record<string,string|null>, _captureType: string): string {
+  const vendor = String((ext.supplier as Record<string,unknown>)?.name||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,30);
+  const date = String((ext.reference as Record<string,unknown>)?.date||"unknown");
+  const amount = String(ext.total_amount||"0");
+  if (ids.uti) return `uti:${ids.uti}`;
+  if (ids.auth_code && date!=="unknown") return `auth:${ids.auth_code}:${date}`;
+  if (ids.echo && ids.merchant_number) return `echo:${ids.echo}:${ids.merchant_number}`;
+  if (ids.receipt_number && ids.merchant_number && date!=="unknown") return `rcpt:${ids.merchant_number}:${ids.receipt_number}:${date}`;
+  if (ids.receipt_number && date!=="unknown") return `rcpt:${ids.receipt_number}:${date}`;
+  if (vendor && date!=="unknown" && amount!=="0") return `composite:${vendor}:${date}:${amount}`;
+  return "";
+}
+
+async function checkDuplicateDocument(
+  db: ReturnType<typeof createClient>, tenantId: string|null, fingerprint: string, imageHash: string|null, currentDocId: string|null
+): Promise<{isDuplicate:boolean;duplicateOf:string|null;duplicateConfidence:number;duplicateDetails:Record<string,unknown>}> {
+  if (!tenantId || !fingerprint) return {isDuplicate:false,duplicateOf:null,duplicateConfidence:0,duplicateDetails:{}};
+  try {
+    const { data: fpMatch } = await db.from("document_log").select("id, uploaded_at, status, file_name, supplier_name")
+      .eq("tenant_id",tenantId).eq("document_fingerprint",fingerprint).neq("id",currentDocId||"").limit(1).maybeSingle();
+    if (fpMatch) {
+      const conf = fingerprint.startsWith("uti:")?1.0:fingerprint.startsWith("auth:")?0.99:fingerprint.startsWith("echo:")?0.97:fingerprint.startsWith("rcpt:")?0.95:0.85;
+      return {isDuplicate:true,duplicateOf:fpMatch.id,duplicateConfidence:conf,duplicateDetails:{
+        match_type:"fingerprint",fingerprint_type:fingerprint.split(":")[0],
+        matched_file:fpMatch.file_name,matched_supplier:fpMatch.supplier_name,matched_at:fpMatch.uploaded_at,
+        message:`Document fingerprint matches previous capture (${fingerprint.split(":")[0]} match)`,
+      }};
+    }
+  } catch(_) {}
+  return {isDuplicate:false,duplicateOf:null,duplicateConfidence:0,duplicateDetails:{}};
 }
 
 // ── WP-SMART-CAPTURE v2.0: SARS Tax Invoice Compliance Checker ───────────────
@@ -841,6 +897,22 @@ CRITICAL REMINDERS:
       capture_type:        captureType,
     };
 
+    // WP-SMART-CAPTURE v2.1: Anti-fraud fingerprinting
+    const rawText = [
+      (extraction.extraction_notes as string)||"",
+      ((extraction.line_items as Array<Record<string,unknown>>)||[]).map(l=>String(l.description||"")).join(" "),
+      (extraction.reference as Record<string,unknown>)?.number as string||"",
+    ].join(" ") + " " + file_name;
+    const uniqueIds = extractUniqueIdentifiers(rawText, extraction);
+    const fingerprint = buildDocumentFingerprint(extraction, uniqueIds, captureType);
+    const imageHashProxy = `${mime_type}:${file_size_kb}:${file_base64.slice(0,64)}`;
+    extraction = {
+      ...extraction,
+      unique_identifiers: uniqueIds,
+      document_fingerprint: fingerprint,
+      image_hash_proxy: imageHashProxy,
+    };
+
     const { data: logEntry, error: logErr } = await db
       .from("document_log")
       .insert({
@@ -870,6 +942,29 @@ CRITICAL REMINDERS:
     if (logErr)
       throw new Error(`Failed to log to document_log: ${logErr.message}`);
 
+    // WP-SMART-CAPTURE v2.1: Duplicate check + update document_log with fingerprint
+    const dupResult = await checkDuplicateDocument(db, tenant_id, fingerprint, imageHashProxy, logEntry.id);
+    await db.from("document_log").update({
+      document_fingerprint: fingerprint||null,
+      image_hash: imageHashProxy||null,
+      unique_identifiers: uniqueIds,
+      is_duplicate: dupResult.isDuplicate,
+      duplicate_of_id: dupResult.duplicateOf,
+    }).eq("id", logEntry.id);
+
+    if (dupResult.isDuplicate) {
+      if (!extraction.warnings) extraction.warnings = [];
+      (extraction.warnings as string[]).unshift(
+        `\uD83D\uDEA8 DUPLICATE: ${dupResult.duplicateDetails.message} \u2014 ` +
+        `confidence ${Math.round(dupResult.duplicateConfidence*100)}%. DO NOT POST.`
+      );
+      extraction.is_duplicate = true;
+      extraction.duplicate_of = dupResult.duplicateOf;
+      extraction.duplicate_confidence = dupResult.duplicateConfidence;
+      extraction.duplicate_details = dupResult.duplicateDetails;
+      extraction.confidence = Math.min(Number(extraction.confidence??1), 0.15);
+    }
+
     return new Response(
       JSON.stringify({
         success:             true,
@@ -881,6 +976,12 @@ CRITICAL REMINDERS:
         input_vat_amount:    sarsResult.input_vat_amount,
         sars_vat_number:     sarsResult.sars_vat_number,
         capture_type:        captureType,
+        unique_identifiers:  uniqueIds,
+        document_fingerprint: fingerprint,
+        is_duplicate:        dupResult.isDuplicate,
+        duplicate_of:        dupResult.duplicateOf,
+        duplicate_confidence: dupResult.duplicateConfidence,
+        duplicate_details:   dupResult.duplicateDetails,
       }),
       { headers: JSON_HEADERS },
     );

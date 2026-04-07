@@ -68,6 +68,25 @@ function EditableField({label,value,onChange,type="text",placeholder=""}) {
   );
 }
 
+function DuplicateBanner({duplicateDetails,confidence}) {
+  return (
+    <div style={{borderRadius:10,overflow:"hidden",marginBottom:16,border:"2px solid #DC2626",boxShadow:"0 4px 16px rgba(220,38,38,0.2)"}}>
+      <div style={{background:"#DC2626",padding:"12px 16px",display:"flex",gap:10,alignItems:"center"}}>
+        <span style={{fontSize:24}}>{"\uD83D\uDEA8"}</span>
+        <div>
+          <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>DUPLICATE DOCUMENT DETECTED</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.85)"}}>Confidence: {Math.round((confidence||0)*100)}% \u2014 {duplicateDetails?.fingerprint_type||duplicateDetails?.match_type||"unknown"} match</div>
+        </div>
+      </div>
+      <div style={{background:"#FEF2F2",padding:"12px 16px"}}>
+        <div style={{fontSize:13,color:"#DC2626",fontWeight:600,marginBottom:6}}>{duplicateDetails?.message}</div>
+        {duplicateDetails?.matched_at&&<div style={{fontSize:12,color:"#7F1D1D"}}>Original: {new Date(duplicateDetails.matched_at).toLocaleDateString("en-ZA",{day:"numeric",month:"long",year:"numeric"})}</div>}
+        <div style={{marginTop:10,padding:"8px 12px",background:"#FEE2E2",borderRadius:6,fontSize:12,color:"#7F1D1D"}}>{"\u26D4"} Posting will create duplicate records. Contact your accountant if this is a different transaction.</div>
+      </div>
+    </div>
+  );
+}
+
 // Policy engine — reads capture_rules, returns enriched capture
 async function applyPolicyRules(tid, cap) {
   try {
@@ -157,6 +176,12 @@ export default function HQSmartCapture() {
         line_items:(ext2.line_items||[]).slice(0,10),
         proposed_updates:ext2.proposed_updates||[],
         extraction:ext2,
+        is_duplicate:fnData.is_duplicate||false,
+        duplicate_of:fnData.duplicate_of||null,
+        duplicate_confidence:fnData.duplicate_confidence||0,
+        duplicate_details:fnData.duplicate_details||{},
+        document_fingerprint:fnData.document_fingerprint||null,
+        unique_identifiers:fnData.unique_identifiers||{},
       });
       // Guard: tenantId must exist
       if (!tenantId) {
@@ -222,6 +247,12 @@ export default function HQSmartCapture() {
         approval_reason:     enriched.approval_reason||null,
         status:              "pending_review",
         auto_posted:         false,
+        document_fingerprint: capture?.document_fingerprint||null,
+        is_duplicate:        capture?.is_duplicate||false,
+        duplicate_of_id:     capture?.duplicate_of||null,
+        duplicate_confidence: capture?.duplicate_confidence||null,
+        duplicate_details:   capture?.duplicate_details||{},
+        unique_identifiers:  capture?.unique_identifiers||{},
       }).select("id").single();
 
       if (cqErr) {
@@ -331,6 +362,8 @@ export default function HQSmartCapture() {
         </div>}
 
         {phase==="review"&&capture&&<div>
+          {/* Duplicate detection — highest priority */}
+          {capture.is_duplicate&&<DuplicateBanner duplicateDetails={capture.duplicate_details} confidence={capture.duplicate_confidence}/>}
           <SARSBadge sarsCompliant={capture.sars_compliant} vatNumber={capture.sars_vat_number} inputVatAmount={capture.input_vat_amount} flags={capture.sars_flags}/>
           {/* Policy flags */}
           {(capture.policy_flags||[]).map((flag,i)=>{
@@ -363,7 +396,7 @@ export default function HQSmartCapture() {
           </div>}
 
           <div style={{display:"flex",gap:10,marginTop:16}}>
-            <button onClick={handleCreateExpense} disabled={posting} style={{flex:1,padding:"12px 0",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:700,cursor:posting?"wait":"pointer",opacity:posting?0.6:1}}>{posting?"Posting\u2026":"\u2713 Create Expense"}</button>
+            <button onClick={handleCreateExpense} disabled={posting||capture?.is_duplicate} style={{flex:1,padding:"12px 0",background:capture?.is_duplicate?"#9CA3AF":D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:700,cursor:(posting||capture?.is_duplicate)?"not-allowed":"pointer",opacity:posting?0.6:1}}>{capture?.is_duplicate?"\u26D4 Blocked \u2014 Duplicate":posting?"Posting\u2026":"\u2713 Approve & Post"}</button>
             <button onClick={resetCapture} style={{padding:"12px 20px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
           </div>
         </div>}
