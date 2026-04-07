@@ -883,46 +883,27 @@ export default function ProteaAI({
         : sys;
 
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        const SUPA = process.env.REACT_APP_SUPABASE_URL;
+        const ANON = process.env.REACT_APP_SUPABASE_ANON_KEY;
+        const res = await fetch(`${SUPA}/functions/v1/ai-copilot`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ANON}`,
+          },
           body: JSON.stringify({
-            model,
-            max_tokens: model === MODELS.SONNET ? 1500 : 800,
-            system: fullSys,
             messages: histRef.current,
-            stream: true,
+            userContext: { role, isHQ },
+            systemOverride: fullSys,
           }),
         });
         if (!res.ok) {
           const e = await res.json().catch(() => ({}));
-          throw new Error(e.error?.message || `API ${res.status}`);
+          throw new Error(e.error || `API ${res.status}`);
         }
-
-        let full = "";
-        const reader = res.body.getReader(),
-          dec = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          for (const line of dec.decode(value).split("\n")) {
-            if (!line.startsWith("data: ")) continue;
-            const d = line.slice(6);
-            if (d === "[DONE]") continue;
-            try {
-              const p = JSON.parse(d);
-              const t = p.delta?.text || "";
-              if (t) {
-                full += t;
-                setMessages((p) =>
-                  p.map((m) =>
-                    m.id === aid ? { ...m, content: full, streaming: true } : m,
-                  ),
-                );
-              }
-            } catch {}
-          }
-        }
+        const efData = await res.json();
+        if (efData.error) throw new Error(efData.error);
+        const full = efData.reply || "";
         setMessages((p) =>
           p.map((m) =>
             m.id === aid ? { ...m, content: full, streaming: false } : m,
@@ -994,25 +975,30 @@ export default function ProteaAI({
       setQResults(null);
 
       try {
-        // Step 1: Ask Claude for query spec
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        // Step 1: Ask Claude for query spec via ai-copilot EF (LL-120)
+        const SUPA = process.env.REACT_APP_SUPABASE_URL;
+        const ANON = process.env.REACT_APP_SUPABASE_ANON_KEY;
+        const res = await fetch(`${SUPA}/functions/v1/ai-copilot`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ANON}`,
+          },
           body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 400,
             messages: [
               { role: "user", content: buildQueryPrompt(tenantId, question) },
             ],
+            userContext: { role },
+            systemOverride: "You are a Supabase query builder. Return ONLY valid JSON with no markdown, no explanation, no code blocks.",
           }),
         });
         if (!res.ok) {
           const e = await res.json().catch(() => ({}));
-          throw new Error(e.error?.message || `API ${res.status}`);
+          throw new Error(e.error || `API ${res.status}`);
         }
 
         const json = await res.json();
-        const raw = json.content?.find((b) => b.type === "text")?.text || "";
+        const raw = json.reply || "";
         // Strip any markdown fences if present
         const cleaned = raw.replace(/```json|```/g, "").trim();
         const spec = JSON.parse(cleaned);
