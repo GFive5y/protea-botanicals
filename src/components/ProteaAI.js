@@ -174,22 +174,31 @@ auto-post-capture v1 (double-entry journal + VAT)
 WP-FINANCIALS (COMPLETE):
 Setup Wizard \u00b7 IFRS Income Statement v4 \u00b7 Balance Sheet v2 \u00b7 Fixed Assets \u00b7 Journals \u00b7 VAT201 \u00b7 Bank Recon \u00b7 15 IFRS Notes \u00b7 PDF Export
 
-WP-SMART-CAPTURE (SESSION 1 COMPLETE):
+WP-SMART-CAPTURE (SESSION 2 COMPLETE \u2014 Apr 8 2026):
 Photo any document \u2192 AI reads \u2192 posts to books. One photo = expense + journal + VAT.
 process-document v2.1: SARS compliance + SA bank identifiers (UTI/TRN REF/Auth Code) + 6-level fingerprint + duplicate detection.
 auto-post-capture: atomic accounting (expense + double-entry journal + VAT). Balance check Dr=Cr.
 Anti-fraud: 3-layer duplicate detection. L1 image hash \u00b7 L2 6-level fingerprint (UTI 100% \u2192 composite 80%) \u00b7 L3 semantic similarity. DuplicateBanner blocks posting.
 10 capture rules: 4 auto-categorise + R1K threshold + entertainment approval + VAT flag + 3 anti-fraud.
+FIXED (Apr 8): capture_queue INSERT was failing because capture React state is null when insert runs (setCapture async). Fix: read anti-fraud fields from fnData (EF response local var) not state. PostgREST schema reload also applied (NOTIFY pgrst, 'reload schema') \u2014 anti-fraud columns were unknown to schema cache.
+SUCCESS SCREEN: now shows expense_id (truncated) + journal_entry_id + VAT period claimable + document fingerprint.
+HISTORY TAB: SARS/Non-SARS/Duplicate pill badges added. Reads from capture_queue (richer than document_log).
+
+WP-FINANCIALS PHASE 10 \u2014 YEAR-END CLOSE (Apr 8 2026):
+HQYearEnd.js: 4-screen wizard. Screen 1 live P&L summary. Screen 2 closing journal preview (Dr Revenue \u2192 Cr Retained Earnings). Screen 3 PIN confirm + post. Screen 4 archive report.
+DB: financial_year_archive table + journal_entries.is_year_end_closing + equity_ledger.year_closed/closed_at.
+Wired in CANNABIS_RETAIL_WATERFALL Reports section + generic WATERFALL Intelligence section. renderTab case "year-end".
 
 NAV TABS (CANNABIS_RETAIL_WATERFALL):
 Operations: trading \u00b7 cashup \u00b7 smart-capture
-Reports: pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 costing \u00b7 forecast \u00b7 fixed-assets \u00b7 journals \u00b7 vat \u00b7 bank-recon \u00b7 fin-notes
+Reports: pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 costing \u00b7 forecast \u00b7 year-end
 
 KEY RULES:
 LL-056: scan_logs \u2014 no tenant_id column
 LL-090: food_recipe_lines \u2014 never nested PostgREST select
 LL-202: GitHub write tools BANNED from Claude.ai
 capture_queue.is_duplicate blocks auto-post \u00b7 financial_setup_complete gates HQProfitLoss
+PostgREST schema reload required after adding columns via SQL (NOTIFY pgrst, 'reload schema').
 
 LOCKED: StockItemModal.js \u00b7 ProteaAI.js \u00b7 PlatformBar.js \u00b7 LiveFXBar.js \u00b7 HQStock.js (protected)
 TENANT: Medi Recreational \u00b7 b1bad266-ceb4-4558-bbc3-22cfeeeafe74
