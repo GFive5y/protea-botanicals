@@ -45,6 +45,7 @@ import HQJournals from "../components/hq/HQJournals";
 import HQVat from "../components/hq/HQVat";
 import HQBankRecon from "../components/hq/HQBankRecon";
 import HQFinancialNotes from "../components/hq/HQFinancialNotes";
+import HQSmartCapture from "../components/hq/HQSmartCapture";
 import HQForecast from "../components/hq/HQForecast";
 import HRRoster from "../components/hq/HRRoster";
 import HRLeave from "../components/hq/HRLeave";
@@ -119,6 +120,11 @@ const WATERFALL = [
         id: "documents",
         label: "Documents",
         desc: "Upload invoice \u2192 auto-process",
+      },
+      {
+        id: "smart-capture",
+        label: "Smart Capture",
+        desc: "Photograph receipts \u00b7 AI reads \u00b7 posts to books",
       },
     ],
   },
@@ -520,6 +526,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "procurement":    return <HQPurchaseOrders tenantId={tenantId} industryProfile={industryProfile} />;
     case "supply-chain":   return <SupplyChain />;
     case "documents":      return <HQDocuments />;
+    case "smart-capture":  return <HQSmartCapture />;
     case "hq-production":  return <HQProduction />;
     case "stock":          return <HQStock key={searchKey} initialCategory={searchFilter?.category} initialSubcategory={searchFilter?.subcategory} />;
     case "catalog":        return <SmartInventory key={searchKey} tenantId={tenantId} initialSearch={searchFilter?.q} initialCategory={searchFilter?.category} initialSubcategory={searchFilter?.subcategory} />;
