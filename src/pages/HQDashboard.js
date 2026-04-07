@@ -21,6 +21,7 @@ import HQPurchaseOrders from "../components/hq/HQPurchaseOrders";
 import HQCogs from "../components/hq/HQCogs";
 import HQPricing from "../components/hq/HQPricing";
 import HQProfitLoss from "../components/hq/HQProfitLoss";
+import HQForecast from "../components/hq/HQForecast";
 import HQReorderScoring from "../components/hq/HQReorderScoring";
 import HQDocuments from "../components/hq/HQDocuments";
 import HQMedical from "../components/hq/HQMedical";
@@ -93,6 +94,7 @@ const TABS = [
   { id: "costing", label: "Costing", icon: "🧮", ready: true },
   { id: "pl", label: "P&L", icon: "📉", ready: true },
   { id: "balance-sheet", label: "Balance Sheet", icon: "⚖️", ready: true },
+  { id: "forecast", label: "Forecast", icon: "🔮", ready: true },
   { id: "analytics", label: "Analytics", icon: "📈", ready: true },
   { id: "geo-analytics", label: "Geo Analytics", icon: "🗺️", ready: true },
   { id: "retailer-health", label: "Retailer Health", icon: "🏆", ready: true },
@@ -263,6 +265,7 @@ export default function HQDashboard() {
           {activeTab === "pricing" && <HQPricing />}
           {activeTab === "pl" && <HQProfitLoss />}
           {activeTab === "balance-sheet" && <HQBalanceSheet />}
+          {activeTab === "forecast" && <HQForecast />}
           {activeTab === "reorder" && <HQReorderScoring />}
           {activeTab === "documents" && <HQDocuments />}
           {activeTab === "medical" && <HQMedical />}
