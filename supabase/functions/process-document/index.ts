@@ -1,4 +1,5 @@
 // supabase/functions/process-document/index.ts
+// v2.0 — WP-SMART-CAPTURE: SARS compliance checker + capture type classifier
 // v1.9 — WP-FIN S3: Expense document detection + create_expense action
 //   classifyExpenseDocument() runs after Claude parse — detects CAPEX/OPEX invoices,
 //   service bills, payment confirmations for non-stock items. Adds create_expense
@@ -405,6 +406,50 @@ function classifyExpenseDocument(
   };
 }
 
+// ── WP-SMART-CAPTURE v2.0: SARS Tax Invoice Compliance Checker ───────────────
+function checkSarsCompliance(ext: Record<string, unknown>): {
+  sars_compliant: boolean; sars_flags: Array<{ code: string; message: string; severity: string }>;
+  input_vat_claimable: boolean; input_vat_amount: number; sars_vat_number: string | null;
+} {
+  const docType = String(ext.document_type || "").toLowerCase();
+  if (!["invoice","quote","proof_of_payment"].includes(docType))
+    return { sars_compliant: true, sars_flags: [], input_vat_claimable: false, input_vat_amount: 0, sars_vat_number: null };
+  const flags: Array<{ code: string; message: string; severity: string }> = [];
+  const sup = (ext.supplier as Record<string, unknown>) || {};
+  const raw = String((ext as Record<string,unknown>).vat_number||sup.vat_number||sup.vat_reg||"").replace(/\s/g,"").replace(/[^0-9]/g,"");
+  const vatOk = /^4\d{9}$/.test(raw);
+  const hasDate = !!(ext.reference as Record<string,unknown>)?.date;
+  const hasNum  = !!(ext.reference as Record<string,unknown>)?.number;
+  const hasDesc = ((ext.line_items as unknown[]) || []).length > 0;
+  const total   = Number(ext.total_amount ?? 0);
+  const vat     = Number((ext as Record<string,unknown>).vat_amount||(ext as Record<string,unknown>).tax_amount||0);
+  if (!vatOk)  flags.push({code:"NO_VAT_NUMBER",message:"No valid SARS VAT reg (10 digits starting with 4).",severity:"warning"});
+  if (!hasDate)flags.push({code:"NO_DATE",message:"No invoice date found.",severity:"warning"});
+  if (!hasNum) flags.push({code:"NO_INVOICE_NUMBER",message:"No invoice number.",severity:"info"});
+  if (!hasDesc)flags.push({code:"NO_DESCRIPTION",message:"No line items found.",severity:"warning"});
+  if (vat<=0&&total>0) flags.push({code:"NO_VAT_AMOUNT",message:"VAT not separately stated.",severity:"info"});
+  const ok = vatOk && hasDate && hasDesc;
+  const amt = ok ? (vat>0 ? vat : Math.round((total*15/115)*100)/100) : 0;
+  return { sars_compliant:ok, sars_flags:flags, input_vat_claimable:ok&&amt>0, input_vat_amount:amt, sars_vat_number:vatOk?raw:null };
+}
+
+// ── WP-SMART-CAPTURE v2.0: Capture type classifier ───────────────────────────
+function classifyCaptureType(ext: Record<string, unknown>): string {
+  const dt = String(ext.document_type||"unknown").toLowerCase();
+  const sn = String((ext.supplier as Record<string,unknown>)?.name||"").toLowerCase();
+  const ad = ((ext.line_items as Array<Record<string,unknown>>)||[]).map(l=>String(l.description||"").toLowerCase()).join(" ");
+  const ta = Number(ext.total_amount??0);
+  if (dt==="delivery_note") return "delivery_note";
+  if (dt==="coa") return "lab_report";
+  if (dt==="proof_of_payment") return "proof_of_payment";
+  if (["engen","shell","bp","total","astron","sasol","esso"].some(b=>sn.includes(b))||ad.includes("litres")||ad.includes("fuel")||ad.includes("petrol")) return "petrol_slip";
+  if (sn.includes("restaurant")||sn.includes("cafe")||ad.includes("meal")||ad.includes("lunch")||ad.includes("dinner")) return "entertainment";
+  if (sn.includes("city of")||sn.includes("municipality")||sn.includes("eskom")||ad.includes("electricity")||ad.includes("sanitation")) return "utility_bill";
+  const hasStock = ((ext.proposed_updates as unknown[])||[]).some((u:unknown)=>["create_purchase_order","receive_delivery_item"].includes(String((u as Record<string,unknown>).action||"")));
+  if (hasStock) return "supplier_invoice";
+  return ta>0&&ta<2000 ? "expense_receipt" : "supplier_invoice";
+}
+
 // ── System prompt ─────────────────────────────────────────────────────────────
 function buildSystemPrompt(
   existingSuppliers: unknown[],
@@ -782,6 +827,19 @@ CRITICAL REMINDERS:
       }
     }
 
+    // WP-SMART-CAPTURE v2.0: SARS compliance + capture type
+    const sarsResult  = checkSarsCompliance(extraction);
+    const captureType = classifyCaptureType(extraction);
+    extraction = {
+      ...extraction,
+      sars_compliant:      sarsResult.sars_compliant,
+      sars_flags:          sarsResult.sars_flags,
+      input_vat_claimable: sarsResult.input_vat_claimable,
+      input_vat_amount:    sarsResult.input_vat_amount,
+      sars_vat_number:     sarsResult.sars_vat_number,
+      capture_type:        captureType,
+    };
+
     const { data: logEntry, error: logErr } = await db
       .from("document_log")
       .insert({
@@ -812,9 +870,15 @@ CRITICAL REMINDERS:
 
     return new Response(
       JSON.stringify({
-        success: true,
-        document_log_id: logEntry.id,
+        success:             true,
+        document_log_id:     logEntry.id,
         extraction,
+        sars_compliant:      sarsResult.sars_compliant,
+        sars_flags:          sarsResult.sars_flags,
+        input_vat_claimable: sarsResult.input_vat_claimable,
+        input_vat_amount:    sarsResult.input_vat_amount,
+        sars_vat_number:     sarsResult.sars_vat_number,
+        capture_type:        captureType,
       }),
       { headers: JSON_HEADERS },
     );

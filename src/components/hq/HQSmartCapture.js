@@ -68,6 +68,33 @@ function EditableField({label,value,onChange,type="text",placeholder=""}) {
   );
 }
 
+// Policy engine — reads capture_rules, returns enriched capture
+async function applyPolicyRules(tid, cap) {
+  try {
+    const { data: rules } = await supabase.from("capture_rules").select("*").eq("tenant_id",tid).eq("is_active",true).order("priority");
+    let reqApproval=false, reason=null; const flags=[];
+    for (const r of rules||[]) {
+      const p=r.parameters||{};
+      if (r.rule_type==="amount_threshold"&&(cap.amount_zar||0)>(p.above||1000)) {
+        if(r.action==="require_approval"){reqApproval=true;reason=reason||r.message;}
+        flags.push({rule_id:r.id,rule_name:r.rule_name,severity:r.severity,message:r.message});
+      }
+      if (r.rule_type==="approval_required"&&(p.capture_types||[]).includes(cap.capture_type)) {
+        reqApproval=true;reason=reason||r.message;
+        flags.push({rule_id:r.id,rule_name:r.rule_name,severity:r.severity,message:r.message});
+      }
+      if (r.rule_type==="vat_required"&&(p.capture_types||[]).includes(cap.capture_type)&&!cap.sars_compliant)
+        flags.push({rule_id:r.id,rule_name:r.rule_name,severity:r.severity,message:r.message});
+      if (r.rule_type==="category_auto"&&!cap._catApplied) {
+        const v=(cap.vendor_name||"").toLowerCase();
+        const hit=p.vendor_contains?v.includes(p.vendor_contains.toLowerCase()):(p.vendor_contains_any||[]).some(k=>v.includes(k.toLowerCase()));
+        if(hit){cap.suggested_category=p.category;cap.suggested_subcategory=p.subcategory;cap._catApplied=true;}
+      }
+    }
+    return {...cap,policy_flags:flags,requires_approval:reqApproval,approval_reason:reason};
+  } catch{return cap;}
+}
+
 export default function HQSmartCapture() {
   const { tenant, tenantId, industryProfile } = useTenant(); // eslint-disable-line no-unused-vars
   const fileRef = useRef(null);
@@ -81,13 +108,15 @@ export default function HQSmartCapture() {
   const [history,setHistory]=useState([]);
   const [histLoading,setHistLoading]=useState(false);
   const [toast,setToast]=useState(null);
+  const [captureQueueId,setCaptureQueueId]=useState(null);
 
   const showToast=(msg,type="success")=>{setToast({msg,type});setTimeout(()=>setToast(null),4500);};
 
   const loadHistory=useCallback(async()=>{
     if(!tenantId)return; setHistLoading(true);
     try{
-      const { data }=await supabase.from("document_log").select("id,file_name,status,uploaded_at,extraction_summary").eq("tenant_id",tenantId).order("uploaded_at",{ascending:false}).limit(30);
+      const startOfMonth=new Date();startOfMonth.setDate(1);startOfMonth.setHours(0,0,0,0);
+      const { data }=await supabase.from("capture_queue").select("*").eq("tenant_id",tenantId).gte("captured_at",startOfMonth.toISOString()).order("captured_at",{ascending:false});
       setHistory(data||[]);
     }finally{setHistLoading(false);}
   },[tenantId]);
@@ -129,6 +158,36 @@ export default function HQSmartCapture() {
         proposed_updates:ext2.proposed_updates||[],
         extraction:ext2,
       });
+      // Write to capture_queue + run policy engine
+      let enriched = await applyPolicyRules(tenantId, {
+        tenant_id:tenantId, document_log_id:fnData.document_log_id,
+        file_name:file.name, image_storage_path:path,
+        capture_type:fnData.capture_type||"expense_receipt",
+        overall_confidence:ext2.confidence||null,
+        sars_compliant:fnData.sars_compliant??null,
+        sars_vat_number:fnData.sars_vat_number||null,
+        sars_flags:ext2.sars_flags||[],
+        input_vat_claimable:fnData.input_vat_claimable||false,
+        input_vat_amount:fnData.input_vat_amount||0,
+        vendor_name:ext2.supplier?.name||null,
+        vendor_matched_id:ext2.supplier?.matched_id||null,
+        document_date:ext2.reference?.date||null,
+        document_number:ext2.reference?.number||null,
+        amount_incl_vat:ext2.total_amount||0,
+        amount_excl_vat:(ext2.total_amount||0)-(fnData.input_vat_amount||0),
+        vat_amount:fnData.input_vat_amount||0,
+        amount_zar:ext2.total_amount||0,
+        currency:ext2.currency||"ZAR",
+        suggested_category:ext2.expense_category||"opex",
+        status:"pending_review",
+      });
+      const { data:cqRow } = await supabase.from("capture_queue").insert({
+        ...enriched,requires_approval:enriched.requires_approval||false,
+        approval_reason:enriched.approval_reason||null,
+        policy_flags:enriched.policy_flags||[],auto_posted:false,
+      }).select("id").single();
+      setCaptureQueueId(cqRow?.id||null);
+
       setPhase("review");
     }catch(err){
       console.error("[SmartCapture]",err.message);
@@ -140,28 +199,28 @@ export default function HQSmartCapture() {
   const handleDrop=(e)=>{e.preventDefault();setDragOver(false);const f=e.dataTransfer.files?.[0];if(f)processFile(f);};
 
   const handleCreateExpense=async()=>{
-    if(!capture)return; setPosting(true);
+    if(!captureQueueId){showToast("Capture not saved — try again.","error");return;}
+    setPosting(true);
     try{
-      const desc=capture.vendor_name?`${capture.vendor_name}${capture.document_number?" \u2014 "+capture.document_number:""}`:`Receipt \u2014 ${capture.document_date||"today"}`;
-      const{error}=await supabase.from("expenses").insert({
-        tenant_id:tenantId,
-        expense_date:capture.document_date||new Date().toISOString().split("T")[0],
-        category:"opex",
-        subcategory:null,
-        description:desc,
-        amount_zar:capture.amount_zar||0,
-        currency:capture.currency||"ZAR",
-        document_id:capture.document_log_id||null,
+      const userId=(await supabase.auth.getUser()).data.user?.id||null;
+      const{data:postRes,error:postErr}=await supabase.functions.invoke("auto-post-capture",{
+        body:{capture_queue_id:captureQueueId,approved_by:userId}
       });
-      if(error)throw error;
-      setSuccessData({amount:capture.amount_zar,vendor:capture.vendor_name,vat:capture.input_vat_amount});
+      if(postErr||!postRes?.success)throw new Error(postRes?.error||postErr?.message||"Post failed");
+      setSuccessData({
+        expense_id:postRes.expense_id,journal_entry_id:postRes.journal_entry_id,
+        vat_transaction_id:postRes.vat_transaction_id,vat_period:postRes.vat_period,
+        sars_compliant:postRes.sars_compliant,input_vat_claimable:postRes.input_vat_claimable,
+        input_vat_amount:postRes.input_vat_amount,
+        vendor_name:capture?.vendor_name,amount_zar:capture?.amount_zar,
+      });
       setPhase("success");
-      showToast("Expense created!");
+      showToast("Posted to books!");
     }catch(err){showToast("Failed: "+err.message,"error");}
     finally{setPosting(false);}
   };
 
-  const resetCapture=()=>{setCapture(null);setSuccessData(null);setPhase("idle");setProcessMsg("");};
+  const resetCapture=()=>{setCapture(null);setSuccessData(null);setPhase("idle");setProcessMsg("");setCaptureQueueId(null);};
   const updateCapture=(k,v)=>setCapture(p=>({...p,[k]:v}));
 
   const card={background:"#fff",borderRadius:12,boxShadow:D.shadow,overflow:"hidden",marginBottom:16};
@@ -254,12 +313,23 @@ export default function HQSmartCapture() {
             <div style={{fontSize:13,opacity:0.8}}>Expense created from captured document</div>
           </div>
           <div style={{padding:24}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-              {[["Amount",fmtZar(successData.amount),D.accent],["Vendor",successData.vendor||"\u2014",D.ink700],["Input VAT",successData.vat>0?fmtZar(successData.vat):"N/A",successData.vat>0?D.success:D.ink300]].map(([l,v,c])=>(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+              {[["Amount",fmtZar(successData.amount_zar),D.accent],["Vendor",successData.vendor_name||"\u2014",D.ink700],
+                ["Input VAT",successData.input_vat_claimable?fmtZar(successData.input_vat_amount):"N/A",successData.input_vat_claimable?D.success:D.ink300]].map(([l,v,c])=>(
                 <div key={l}><div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:3}}>{l}</div><div style={{fontSize:14,fontWeight:700,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</div></div>
               ))}
             </div>
-            <button onClick={resetCapture} style={{width:"100%",padding:"11px 0",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDCF8"} Capture Another</button>
+            <div style={{background:D.ink075,borderRadius:8,padding:14,marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Records created</div>
+              {successData.expense_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Expense posted</div>}
+              {successData.journal_entry_id&&<div style={{fontSize:12,color:D.success,marginBottom:3}}>{"\u2713"} Journal entry (double-entry)</div>}
+              {successData.vat_transaction_id&&<div style={{fontSize:12,color:D.info,marginBottom:3}}>{"\u2713"} Input VAT \u2014 {successData.vat_period} \u00b7 {fmtZar(successData.input_vat_amount)}</div>}
+              {!successData.vat_transaction_id&&<div style={{fontSize:12,color:D.ink300}}>Input VAT: {successData.sars_compliant===false?"non-compliant document":"not applicable"}</div>}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={resetCapture} style={{flex:1,padding:"11px 0",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDCF8"} Capture Another</button>
+              <button onClick={()=>setMode("history")} style={{flex:1,padding:"11px 0",background:"#fff",color:D.accentMid,border:`1.5px solid ${D.accentMid}`,borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDCCB"} This Month</button>
+            </div>
           </div>
         </div>}
       </>}
@@ -276,10 +346,16 @@ export default function HQSmartCapture() {
           {history.map((h,i)=>(
             <div key={h.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 20px",borderBottom:i<history.length-1?`1px solid ${D.ink150}`:"none",alignItems:"center"}}>
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:D.ink700}}>{h.file_name||"Document"}</div>
-                <div style={{fontSize:11,color:D.ink500,marginTop:2}}>{fmtDate(h.uploaded_at)} \u00b7 {h.status||"processed"}</div>
+                <div style={{fontSize:13,fontWeight:600,color:D.ink700}}>{h.vendor_name||h.file_name||"Document"}</div>
+                <div style={{fontSize:11,color:D.ink500,marginTop:2}}>
+                  {fmtDate(h.captured_at||h.document_date)} \u00b7 {h.capture_type?.replace(/_/g," ")||"receipt"} \u00b7{" "}
+                  <span style={{fontWeight:700,color:["approved","auto_posted"].includes(h.status)?D.success:h.status==="rejected"?D.danger:D.warning}}>{h.status}</span>
+                </div>
               </div>
-              <div style={{fontSize:12,fontWeight:700,color:D.accentMid,fontVariantNumeric:"tabular-nums"}}>{h.extraction_summary?.total_amount?fmtZar(h.extraction_summary.total_amount):"\u2014"}</div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13,fontWeight:700,color:D.accentMid,fontVariantNumeric:"tabular-nums"}}>{h.amount_zar?fmtZar(h.amount_zar):"\u2014"}</div>
+                {h.input_vat_claimable&&<div style={{fontSize:10,color:D.success}}>VAT: {fmtZar(h.input_vat_amount)}</div>}
+              </div>
             </div>
           ))}
         </div>}
