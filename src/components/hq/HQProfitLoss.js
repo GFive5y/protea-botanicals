@@ -1483,6 +1483,36 @@ export default function HQProfitLoss() {
         )}
       </div>
 
+      {/* WP-FINANCIALS Phase 9: Print/PDF export */}
+      {ifrsView && !loading && (
+        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
+          <button
+            onClick={() => {
+              import("../../utils/exportFinancialStatements").then(m => {
+                m.exportFinancialStatementsPDF({
+                  tenantName: tenant?.name,
+                  vatNumber: null,
+                  financialYear: `FY${new Date().getFullYear()}`,
+                  preparedDate: new Date().toLocaleDateString("en-ZA",{day:"numeric",month:"long",year:"numeric"}),
+                  totalRevenue, totalCogs, grossProfit, grossMarginPct,
+                  totalOpex: totalOpexIncLoyalty, depreciationTotal,
+                  netProfit, netMarginPct,
+                  expensesBySubcategory,
+                  equityLedger, shareCapital: equityLedger?.share_capital || 0,
+                  openingRetained: equityLedger?.opening_retained_earnings || 0,
+                  statementStatus,
+                });
+              });
+            }}
+            style={{
+              padding:"8px 18px", border:"1.5px solid #2D6A4F", borderRadius:8,
+              background:"#ECFDF5", color:"#1A3D2B", fontSize:13, fontWeight:700,
+              cursor:"pointer", fontFamily:"inherit",
+            }}
+          >{"\uD83D\uDDA8\uFE0F"} Print / Save PDF</button>
+        </div>
+      )}
+
       {/* WP-FINANCIALS Phase 2: IFRS Statement View */}
       {ifrsView && !loading && (
         <IFRSStatementView
