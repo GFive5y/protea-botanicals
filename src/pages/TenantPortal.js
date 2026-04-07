@@ -40,6 +40,7 @@ import SmartInventory from "../components/hq/SmartInventory";
 import HQTradingDashboard from "../components/hq/HQTradingDashboard";
 import EODCashUp from "../components/hq/EODCashUp";
 import HQBalanceSheet from "../components/hq/HQBalanceSheet";
+import HQForecast from "../components/hq/HQForecast";
 import HRRoster from "../components/hq/HRRoster";
 import HRLeave from "../components/hq/HRLeave";
 import HRTimesheets from "../components/hq/HRTimesheets";
@@ -210,7 +211,7 @@ const WATERFALL = [
     color: "#991B1B",
     roles: ["owner"],
     tabs: [
-      { id: "pl", label: "P&L", desc: "Live profit & loss \u00b7 actual COGS \u00b7 FX" },
+      { id: "pl", label: "P&L", desc: "Live revenue \u00b7 COGS \u00b7 net margin \u00b7 margin by product" },
       {
         id: "costing",
         label: "Costing",
@@ -230,6 +231,11 @@ const WATERFALL = [
         id: "balance-sheet",
         label: "Balance Sheet",
         desc: "Assets \u00b7 liabilities \u00b7 cash flow",
+      },
+      {
+        id: "forecast",
+        label: "Forecast",
+        desc: "30-day projection \u00b7 stock depletion \u00b7 cash flow",
       },
     ],
   },
@@ -388,7 +394,7 @@ const CANNABIS_RETAIL_WATERFALL = [
       {
         id: "pl",
         label: "Profit & Loss",
-        desc: "Live revenue \u00b7 COGS \u00b7 net margin",
+        desc: "Live revenue \u00b7 COGS \u00b7 net margin \u00b7 margin by product",
       },
       {
         id: "expenses",
@@ -409,6 +415,16 @@ const CANNABIS_RETAIL_WATERFALL = [
         id: "balance-sheet",
         label: "Balance Sheet",
         desc: "Assets \u00b7 liabilities \u00b7 cash flow",
+      },
+      {
+        id: "costing",
+        label: "Costing",
+        desc: "Per-SKU margin \u00b7 recipe COGS \u00b7 FX impact",
+      },
+      {
+        id: "forecast",
+        label: "Forecast",
+        desc: "30-day projection \u00b7 stock depletion \u00b7 cash flow",
       },
     ],
   },
@@ -496,6 +512,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "trading":        return <HQTradingDashboard tenantId={tenantId} />;
     case "cashup":         return <EODCashUp tenantId={tenantId} />;
     case "balance-sheet":  return <HQBalanceSheet />;
+    case "forecast":       return <HQForecast />;
     case "roster":         return <HRRoster tenantId={tenantId} readOnly={false} />;
     case "timesheets":     return <HRTimesheets tenantId={tenantId} />;
     case "leave":          return <HRLeave tenantId={tenantId} />;
