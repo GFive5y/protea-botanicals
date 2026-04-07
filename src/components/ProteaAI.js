@@ -171,6 +171,8 @@ payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34 \u00b7 send-notification
 get-fx-rate v35 \u00b7 process-document v2.1 (WP-SMART-CAPTURE anti-fraud + fingerprint)
 auto-post-capture v1 (expense + double-entry journal + VAT)
 receive-from-capture v1 (stock receipt \u00b7 AVCO recalc \u00b7 Dr 12000 Cr 20000)
+loyalty-ai v1 (churn scoring \u00b7 rescue \u00b7 birthday \u00b7 expiry \u00b7 stock-boost \u00b7 weekly brief)
+HQLoyalty Tab 8: Run Now button \u00b7 AI Actions Feed \u00b7 ACTIVE status badge
 
 WP-FINANCIALS (COMPLETE):
 Setup Wizard \u00b7 IFRS Income Statement v4 \u00b7 Balance Sheet v2 \u00b7 Fixed Assets \u00b7 Journals \u00b7 VAT201 \u00b7 Bank Recon \u00b7 15 IFRS Notes \u00b7 PDF Export
@@ -201,6 +203,7 @@ LL-090: food_recipe_lines \u2014 never nested PostgREST select
 LL-202: GitHub write tools BANNED from Claude.ai
 capture_queue.is_duplicate blocks auto-post \u00b7 financial_setup_complete gates HQProfitLoss
 PostgREST schema reload required after adding columns via SQL (NOTIFY pgrst, 'reload schema').
+R-TDZ-01: useCallback refs another useCallback \u2192 must be declared AFTER it (TDZ)
 
 LOCKED: StockItemModal.js \u00b7 ProteaAI.js \u00b7 PlatformBar.js \u00b7 LiveFXBar.js \u00b7 HQStock.js (protected)
 TENANT: Medi Recreational \u00b7 b1bad266-ceb4-4558-bbc3-22cfeeeafe74
