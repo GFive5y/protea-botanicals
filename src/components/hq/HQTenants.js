@@ -1190,11 +1190,18 @@ export default function HQTenants() {
           disabled={simRunning}
           onClick={async () => {
             setSimRunning(true);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 55000);
             try {
-              const { data, error: err } = await supabase.functions.invoke("sim-pos-sales", { body: { days: 30, orders_per_day: 15 } });
+              const { data, error: err } = await supabase.functions.invoke("sim-pos-sales", { body: { days: 30, orders_per_day: 15 }, signal: controller.signal });
+              clearTimeout(timeout);
               if (err) throw err;
               showToast(`Sim 30d: ${data?.summary?.orders_created || "?"} orders, ${data?.summary?.total_revenue_simulated || "?"}`, "success");
-            } catch (e) { showToast("Sim failed: " + String(e), "error"); }
+            } catch (e) {
+              clearTimeout(timeout);
+              const msg = e.name === "AbortError" ? "Sim timed out — check if data was written (Refresh page)" : `Sim failed: ${e.message || String(e)}`;
+              showToast(msg, "error");
+            }
             setSimRunning(false);
           }}
           style={{ ...sBtn(), fontSize: 10, padding: "6px 12px", opacity: simRunning ? 0.5 : 1 }}
@@ -1205,11 +1212,18 @@ export default function HQTenants() {
           disabled={simRunning}
           onClick={async () => {
             setSimRunning(true);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 55000);
             try {
-              const { data, error: err } = await supabase.functions.invoke("sim-pos-sales", { body: { days: 7, orders_per_day: 12 } });
+              const { data, error: err } = await supabase.functions.invoke("sim-pos-sales", { body: { days: 7, orders_per_day: 12 }, signal: controller.signal });
+              clearTimeout(timeout);
               if (err) throw err;
               showToast(`Sim 7d: ${data?.summary?.orders_created || "?"} orders`, "success");
-            } catch (e) { showToast("Sim failed: " + String(e), "error"); }
+            } catch (e) {
+              clearTimeout(timeout);
+              const msg = e.name === "AbortError" ? "Sim timed out — check if data was written (Refresh page)" : `Sim failed: ${e.message || String(e)}`;
+              showToast(msg, "error");
+            }
             setSimRunning(false);
           }}
           style={{ ...sBtn(), fontSize: 10, padding: "6px 12px", opacity: simRunning ? 0.5 : 1 }}
