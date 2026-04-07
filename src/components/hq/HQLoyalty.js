@@ -2968,7 +2968,7 @@ function TabSimulator({ draft }) {
 }
 
 // ─── Tab: AI Engine (NEW — WP-O v2.0) ────────────────────────────────────────
-function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName }) {
+function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName, onRunNow, runningAi }) {
   const cfg = draft;
   const setField = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -3042,6 +3042,25 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName }) {
         subtitle="All actions are logged to loyalty_ai_log — full audit trail"
         accent={T.accentMid}
       >
+        {/* Run Now button */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 16px",borderBottom:`1px solid ${T.ink150}`,marginBottom:16}}>
+          <div>
+            <div style={{fontFamily:T.fontUi,fontSize:13,fontWeight:600,color:T.ink900}}>loyalty-ai Edge Function</div>
+            <div style={{fontFamily:T.fontUi,fontSize:11,color:T.success,marginTop:2,display:"flex",alignItems:"center",gap:6}}>
+              <span style={{width:7,height:7,borderRadius:"50%",background:T.success,display:"inline-block"}}/>
+              ACTIVE {"\u2014"} deployed {"\u00b7"} runs nightly at 2am
+            </div>
+          </div>
+          <button
+            onClick={onRunNow}
+            disabled={runningAi}
+            style={{padding:"8px 18px",background:runningAi?"#9CA3AF":T.accentMid,color:"#fff",border:"none",borderRadius:6,fontFamily:T.fontUi,fontSize:12,fontWeight:700,cursor:runningAi?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6}}
+          >
+            {runningAi?(
+              <><span style={{width:12,height:12,border:"2px solid rgba(255,255,255,0.3)",borderTopColor:"#fff",borderRadius:"50%",display:"inline-block",animation:"spin 0.8s linear infinite"}}/>Running{"\u2026"}</>
+            ):"\u26A1 Run Now"}
+          </button>
+        </div>
         {AUTOMATIONS.map((auto) => (
           <div
             key={auto.key}
@@ -3386,10 +3405,10 @@ function TabAIEngine({ draft, setDraft, aiLog, loadingAiLog, tenantName }) {
             </div>
           </div>
         ))}
-        <InfoBox colour={T.warning} bgColour={T.warningBg}>
-          <strong>Edge function status:</strong> loyalty-ai/index.ts needs to be
-          deployed to Supabase Functions. This tab shows its output once
-          running. All automation toggles above control which jobs execute.
+        <InfoBox colour={T.success} bgColour={T.successBg}>
+          <strong>Edge function status:</strong> loyalty-ai v1 is ACTIVE on Supabase Functions.
+          Use "Run Now" to trigger manually, or it runs automatically at 2am nightly via pg_cron.
+          All automation toggles above control which jobs execute per run.
         </InfoBox>
       </SectionCard>
     </div>
@@ -3922,6 +3941,28 @@ export default function HQLoyalty() {
   const [atRiskCustomers, setAtRiskCustomers] = useState([]);
   const [aiLog, setAiLog] = useState([]);
   const [loadingAiLog, setLoadingAiLog] = useState(false);
+  const [runningAi, setRunningAi] = useState(false);
+
+  const handleRunAiNow = useCallback(async () => {
+    if (!tenantId || runningAi) return;
+    setRunningAi(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("loyalty-ai", {
+        body: { tenant_id: tenantId }
+      });
+      if (error) throw error;
+      const r = data?.results?.[0] || {};
+      const churnMsg = r.churn ? `Churn: ${r.churn.scored||0} scored, ${r.churn.rescued||0} rescued` : "";
+      const bdayMsg = r.birthday ? `Birthdays: ${r.birthday.awarded||0}` : "";
+      const stockMsg = r.stock_boost ? `Stock boosts: ${r.stock_boost.suggestions||0}` : "";
+      showToast(`AI Engine ran \u2014 ${[churnMsg,bdayMsg,stockMsg].filter(Boolean).join(" \u00b7 ")}`);
+      await loadAiLog(tenantId);
+    } catch (err) {
+      showToast("AI run failed: " + err.message, "error");
+    } finally {
+      setRunningAi(false);
+    }
+  }, [tenantId, runningAi, showToast]); // eslint-disable-line
 
   // 10 tabs: Schema, Earning, Categories, Tiers, Economics, Referrals, QR Security, Simulator, AI Engine, Campaigns
   const SUB_TABS = [
@@ -4410,6 +4451,8 @@ export default function HQLoyalty() {
             aiLog={aiLog}
             loadingAiLog={loadingAiLog}
             tenantName={tenantName}
+            onRunNow={handleRunAiNow}
+            runningAi={runningAi}
           />
         )}
         {activeTab === 9 && (
