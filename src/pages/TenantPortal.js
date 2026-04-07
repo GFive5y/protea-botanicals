@@ -44,6 +44,7 @@ import HQFixedAssets from "../components/hq/HQFixedAssets";
 import HQJournals from "../components/hq/HQJournals";
 import HQVat from "../components/hq/HQVat";
 import HQBankRecon from "../components/hq/HQBankRecon";
+import HQFinancialNotes from "../components/hq/HQFinancialNotes";
 import HQForecast from "../components/hq/HQForecast";
 import HRRoster from "../components/hq/HRRoster";
 import HRLeave from "../components/hq/HRLeave";
@@ -255,6 +256,11 @@ const WATERFALL = [
         id: "bank-recon",
         label: "Bank Recon",
         desc: "Statement import \u00b7 match transactions \u00b7 reconcile",
+      },
+      {
+        id: "fin-notes",
+        label: "Notes",
+        desc: "IFRS disclosure notes \u00b7 accounting policies \u00b7 15 notes",
       },
       {
         id: "forecast",
@@ -540,6 +546,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "journals":       return <HQJournals />;
     case "vat":            return <HQVat />;
     case "bank-recon":     return <HQBankRecon />;
+    case "fin-notes":      return <HQFinancialNotes />;
     case "forecast":       return <HQForecast />;
     case "roster":         return <HRRoster tenantId={tenantId} readOnly={false} />;
     case "timesheets":     return <HRTimesheets tenantId={tenantId} />;
