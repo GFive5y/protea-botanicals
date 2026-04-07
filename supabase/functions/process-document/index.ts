@@ -649,6 +649,7 @@ serve(async (req) => {
       file_size_kb = null,
       document_type_hint = null,
       context = {},
+      tenant_id = null,
     } = body;
 
     if (!file_base64 || !mime_type) {
@@ -843,6 +844,7 @@ CRITICAL REMINDERS:
     const { data: logEntry, error: logErr } = await db
       .from("document_log")
       .insert({
+        tenant_id: tenant_id,
         document_type: String(extraction.document_type || "unknown"),
         file_url: file_url,
         file_name: file_name,

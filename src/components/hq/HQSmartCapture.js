@@ -134,7 +134,7 @@ export default function HQSmartCapture() {
       setProcessMsg("AI is reading your document\u2026");
       const base64=await fileToBase64(file);
       const{data:fnData,error:fnErr}=await supabase.functions.invoke("process-document",{
-        body:{file_base64:base64,mime_type:file.type||"image/jpeg",file_url:path,file_name:file.name,file_size_kb:Math.round(file.size/1024),industry_profile:industryProfile||"cannabis_retail",context:{}}
+        body:{file_base64:base64,mime_type:file.type||"image/jpeg",file_url:path,file_name:file.name,file_size_kb:Math.round(file.size/1024),industry_profile:industryProfile||"cannabis_retail",tenant_id:tenantId,context:{}}
       });
       if(fnErr||!fnData?.success)throw new Error(fnData?.error||fnErr?.message||"AI extraction failed");
       setProcessMsg("Done!");
@@ -158,6 +158,11 @@ export default function HQSmartCapture() {
         proposed_updates:ext2.proposed_updates||[],
         extraction:ext2,
       });
+      // Guard: tenantId must exist
+      if (!tenantId) {
+        showToast("Session error \u2014 please refresh and try again.", "error");
+        setPhase("error"); return;
+      }
       // Write to capture_queue + run policy engine
       let enriched = await applyPolicyRules(tenantId, {
         tenant_id:tenantId, document_log_id:fnData.document_log_id,
