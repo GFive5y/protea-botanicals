@@ -164,33 +164,71 @@ export default function HQSmartCapture() {
         setPhase("error"); return;
       }
       // Write to capture_queue + run policy engine
-      let enriched = await applyPolicyRules(tenantId, {
-        tenant_id:tenantId, document_log_id:fnData.document_log_id,
-        file_name:file.name, image_storage_path:path,
-        capture_type:fnData.capture_type||"expense_receipt",
-        overall_confidence:ext2.confidence||null,
-        sars_compliant:fnData.sars_compliant??null,
-        sars_vat_number:fnData.sars_vat_number||null,
+      const captureObj = {
+        tenant_id:tenantId,
+        document_log_id:fnData?.document_log_id||null,
+        file_name:file?.name||null,
+        image_storage_path:path||null,
+        capture_type:fnData?.capture_type||"expense_receipt",
+        overall_confidence:typeof ext2.confidence==="number"?ext2.confidence:null,
+        sars_compliant:fnData?.sars_compliant??null,
+        sars_vat_number:fnData?.sars_vat_number||null,
         sars_flags:ext2.sars_flags||[],
-        input_vat_claimable:fnData.input_vat_claimable||false,
-        input_vat_amount:fnData.input_vat_amount||0,
+        input_vat_claimable:fnData?.input_vat_claimable||false,
+        input_vat_amount:fnData?.input_vat_amount||0,
         vendor_name:ext2.supplier?.name||null,
         vendor_matched_id:ext2.supplier?.matched_id||null,
         document_date:ext2.reference?.date||null,
         document_number:ext2.reference?.number||null,
         amount_incl_vat:ext2.total_amount||0,
-        amount_excl_vat:(ext2.total_amount||0)-(fnData.input_vat_amount||0),
-        vat_amount:fnData.input_vat_amount||0,
+        amount_excl_vat:(ext2.total_amount||0)-(fnData?.input_vat_amount||0),
+        vat_amount:fnData?.input_vat_amount||0,
         amount_zar:ext2.total_amount||0,
         currency:ext2.currency||"ZAR",
         suggested_category:ext2.expense_category||"opex",
+        suggested_subcategory:null,
         status:"pending_review",
-      });
-      const { data:cqRow } = await supabase.from("capture_queue").insert({
-        ...enriched,requires_approval:enriched.requires_approval||false,
-        approval_reason:enriched.approval_reason||null,
-        policy_flags:enriched.policy_flags||[],auto_posted:false,
+      };
+      let enriched = captureObj;
+      try { enriched = await applyPolicyRules(tenantId, captureObj); }
+      catch(policyErr) { console.warn("[SmartCapture] Policy rules failed (non-fatal):", policyErr?.message); }
+
+      const { data:cqRow, error:cqErr } = await supabase.from("capture_queue").insert({
+        tenant_id:           enriched.tenant_id,
+        document_log_id:     enriched.document_log_id||null,
+        file_name:           enriched.file_name||null,
+        image_storage_path:  enriched.image_storage_path||null,
+        capture_type:        enriched.capture_type||"expense_receipt",
+        extracted_data:      enriched.extracted_data||{},
+        overall_confidence:  enriched.overall_confidence||null,
+        sars_compliant:      enriched.sars_compliant??null,
+        sars_vat_number:     enriched.sars_vat_number||null,
+        sars_flags:          enriched.sars_flags||[],
+        input_vat_claimable: enriched.input_vat_claimable||false,
+        input_vat_amount:    enriched.input_vat_amount||0,
+        vendor_name:         enriched.vendor_name||null,
+        vendor_matched_id:   enriched.vendor_matched_id||null,
+        document_date:       enriched.document_date||null,
+        document_number:     enriched.document_number||null,
+        amount_incl_vat:     enriched.amount_incl_vat||0,
+        amount_excl_vat:     enriched.amount_excl_vat||0,
+        vat_amount:          enriched.vat_amount||0,
+        amount_zar:          enriched.amount_zar||0,
+        currency:            enriched.currency||"ZAR",
+        suggested_category:  enriched.suggested_category||"opex",
+        suggested_subcategory: enriched.suggested_subcategory||null,
+        policy_flags:        enriched.policy_flags||[],
+        requires_approval:   enriched.requires_approval||false,
+        approval_reason:     enriched.approval_reason||null,
+        status:              "pending_review",
+        auto_posted:         false,
       }).select("id").single();
+
+      if (cqErr) {
+        console.error("[SmartCapture] capture_queue insert failed:", cqErr.message, cqErr.code, cqErr.details);
+        showToast("Capture not saved \u2014 try again.", "error");
+        setPhase("error"); return;
+      }
       setCaptureQueueId(cqRow?.id||null);
       // Merge policy results into capture state for render
       setCapture(prev => ({
