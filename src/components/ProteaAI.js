@@ -160,54 +160,36 @@ async function executeQuerySpec(spec) {
 
 // ── Codebase facts for dev mode ───────────────────────────────────────────────
 const CODEBASE_FACTS = `
-NuAi ERP Platform \u2014 Cannabis Retail \u00b7 Built: Jan\u2013Apr 2026 \u00b7 Live client: Medi Recreational (private beta)
-130+ features \u00b7 7 portals \u00b7 140+ component files \u00b7 112 DB tables \u00b7 35 DB functions \u00b7 10 Edge Functions
+STACK: React 18 + Supabase JS v2 + React Router v6. Auto-deploys via Vercel on git push.
+REPO: github.com/GFive5y/protea-botanicals \u00b7 branch: main
+MEDI REC TENANT: b1bad266-ceb4-4558-bbc3-22cfeeeafe74
+HQ TENANT: 43b34c33-6864-4f02-98dd-df1d340475c3
 
-ARCHITECTURE
-- React SPA + Supabase (PostgreSQL + Edge Functions + RLS) + Vercel
-- 7 portals: HQ (34 tabs) \u00b7 TenantPortal \u00b7 Admin (13 tabs) \u00b7 Shop (4 tabs) \u00b7 HR (14 tabs) \u00b7 Staff \u00b7 Wholesale
+EDGE FUNCTIONS (12 active):
+ai-copilot \u00b7 sim-pos-sales v4 \u00b7 create-admin-user \u00b7 payfast-checkout v44
+payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34 \u00b7 send-notification v37
+get-fx-rate v35 \u00b7 process-document v2.1 (WP-SMART-CAPTURE anti-fraud)
+auto-post-capture v1 (double-entry journal + VAT)
 
-EDGE FUNCTIONS (10 active):
-ai-copilot v58 \u00b7 sim-pos-sales v4 (CORS fixed) \u00b7 create-admin-user v1
-payfast-checkout v44 \u00b7 payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34
-send-notification v37 \u00b7 get-fx-rate v35 \u00b7 process-document v49
+WP-FINANCIALS (COMPLETE):
+Setup Wizard \u00b7 IFRS Income Statement v4 \u00b7 Balance Sheet v2 \u00b7 Fixed Assets \u00b7 Journals \u00b7 VAT201 \u00b7 Bank Recon \u00b7 15 IFRS Notes \u00b7 PDF Export
 
-FINANCIAL STATEMENTS MODULE (WP-FINANCIALS \u2014 COMPLETE Apr 2026):
-SETUP WIZARD: HQFinancialSetup.js \u2014 5 screens. Saves to tenant_config + equity_ledger + bank_accounts.
-IFRS INCOME STATEMENT: HQProfitLoss.js v4.0 \u2014 [Dashboard]/[IFRS] toggle. IFRSStatementView with letterhead, SUBCATEGORY_TO_ACCOUNT, depreciation, equity, StatusBadge. Print/PDF via exportFinancialStatements.js.
-BALANCE SHEET v2.0: HQBalanceSheet.js \u2014 FAR (Cost/AccDep/NBV), equity_ledger, VAT payable, upgraded equation.
-FIXED ASSETS: HQFixedAssets.js \u2014 Add/depreciate/dispose. Straight-line monthly. 3 demo assets (R66K cost).
-JOURNALS: HQJournals.js \u2014 Double-entry (Dr=Cr). 5 templates. Draft\u2192Posted locking. CoA datalist.
-VAT: HQVat.js \u2014 VAT201 (SARS fields 1/4/12/16/20). 6 bi-monthly periods. Filing tracker. CSV export.
-BANK RECON: HQBankRecon.js \u2014 CSV upload, SA bank auto-detect (FNB/ABSA/StdBank/Nedbank/Capitec). Match engine.
-NOTES: HQFinancialNotes.js \u2014 15 IFRS disclosure notes from live data. Collapsible sections.
+WP-SMART-CAPTURE (SESSION 1 COMPLETE):
+Photo any document \u2192 AI reads \u2192 posts to books. One photo = expense + journal + VAT.
+process-document v2.1: SARS compliance + SA bank identifiers (UTI/TRN REF/Auth Code) + 6-level fingerprint + duplicate detection.
+auto-post-capture: atomic accounting (expense + double-entry journal + VAT). Balance check Dr=Cr.
+Anti-fraud: 3-layer duplicate detection. L1 image hash \u00b7 L2 6-level fingerprint (UTI 100% \u2192 composite 80%) \u00b7 L3 semantic similarity. DuplicateBanner blocks posting.
+10 capture rules: 4 auto-categorise + R1K threshold + entertainment approval + VAT flag + 3 anti-fraud.
 
-NEW SCHEMA (8 tables):
-fixed_assets \u00b7 depreciation_entries \u00b7 chart_of_accounts (40 accounts) \u00b7 journal_entries \u00b7 journal_lines
-vat_transactions \u00b7 equity_ledger \u00b7 bank_accounts \u00b7 bank_statement_lines
-tenant_config: +16 cols (financial_year_end, vat_, auditor_, financial_setup_complete)
-
-MEDI REC DB STATE (Apr 2026):
-orders: 461 \u00b7 order_items: 1,094 \u00b7 expenses: 44 \u00b7 inventory: 232 \u00b7 eod_cash_ups: 90
-fixed_assets: 3 \u00b7 vat_transactions: 6 \u00b7 bank_statement_lines: 22 \u00b7 equity_ledger: 1 \u00b7 CoA: 40
-
-NAV TABS (Reports, cannabis waterfall):
-pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 fixed-assets \u00b7 journals \u00b7 vat \u00b7 bank-recon \u00b7 fin-notes \u00b7 forecast
-
-SCHEMA FACTS:
-- inventory_items: NO notes column \u00b7 category enum (12 values) \u00b7 loyalty_category separate
-- orders: field=total (NOT total_amount) \u00b7 channel: pos|online|wholesale
-- order_items: no inventory_item_id FK \u2014 via product_metadata jsonb \u00b7 line_total plain numeric (INSERT allowed)
-- eod_cash_ups: variance GENERATED \u00b7 field=system_cash_total \u00b7 UNIQUE(tenant_id, cashup_date)
-- pos_sessions: NO total_sales column \u00b7 movement_type 'sale_pos' for POS
-- tenants: type constraint 'hq'|'shop' only \u00b7 daily_summaries does NOT exist
-- expenses: expense_date is DATE \u2014 always compare with YYYY-MM-DD
+NAV TABS (CANNABIS_RETAIL_WATERFALL):
+Operations: trading \u00b7 cashup \u00b7 smart-capture
+Reports: pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 costing \u00b7 forecast \u00b7 fixed-assets \u00b7 journals \u00b7 vat \u00b7 bank-recon \u00b7 fin-notes
 
 KEY RULES:
 LL-056: scan_logs \u2014 no tenant_id column
 LL-090: food_recipe_lines \u2014 never nested PostgREST select
-LL-GH-MCP-01: GitHub MCP returns stale SHA \u2014 always grep before str_replace
 LL-202: GitHub write tools BANNED from Claude.ai
+capture_queue.is_duplicate blocks auto-post \u00b7 financial_setup_complete gates HQProfitLoss
 
 LOCKED: StockItemModal.js \u00b7 ProteaAI.js \u00b7 PlatformBar.js \u00b7 LiveFXBar.js \u00b7 HQStock.js (protected)
 TENANT: Medi Recreational \u00b7 b1bad266-ceb4-4558-bbc3-22cfeeeafe74
