@@ -584,7 +584,7 @@ export default function HQProfitLoss() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
-  const [financialSetupComplete, setFinancialSetupComplete] = useState(null);
+  const [setupComplete, setSetupComplete] = useState(null);
   const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
   const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
 
@@ -611,14 +611,15 @@ export default function HQProfitLoss() {
     fetchExpenses();
   }, [fetchExpenses]);
 
-  // WP-FINANCIALS Phase 0: check if financial setup is complete
+  // WP-FINANCIALS Phase 0 — setup gate
   useEffect(() => {
     if (!tenantId) return;
-    supabase.from("tenant_config")
+    supabase
+      .from("tenant_config")
       .select("financial_setup_complete")
       .eq("tenant_id", tenantId)
-      .maybeSingle()
-      .then(({ data }) => setFinancialSetupComplete(data?.financial_setup_complete ?? false));
+      .single()
+      .then(({ data }) => setSetupComplete(data?.financial_setup_complete ?? false));
   }, [tenantId]);
 
   const fetchAll = useCallback(async () => {
@@ -933,8 +934,8 @@ export default function HQProfitLoss() {
   };
 
   // WP-FINANCIALS Phase 0: show setup wizard if not configured
-  if (financialSetupComplete === false) {
-    return <HQFinancialSetup onComplete={() => setFinancialSetupComplete(true)} />;
+  if (setupComplete === false) {
+    return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
   }
 
   return (
