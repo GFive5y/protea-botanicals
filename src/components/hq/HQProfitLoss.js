@@ -583,6 +583,8 @@ export default function HQProfitLoss() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [fxScenario, setFxScenario] = useState("");
   const [toast, setToast] = useState(null);
+  const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
+  const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
@@ -661,6 +663,25 @@ export default function HQProfitLoss() {
     setWholesaleMovements(r10.data || []);
     setInventoryItems(r11.data || []);
     setDataErrors(errors);
+
+    // WP-P&L-INTELLIGENCE: fetch order_items with AVCO for real COGS
+    try {
+      const paidOrderIds = (r1.data || []).filter(o => o.status === "paid").map(o => o.id);
+      const oiResults = [];
+      for (let i = 0; i < paidOrderIds.length; i += 50) {
+        const chunk = paidOrderIds.slice(i, i + 50);
+        const { data } = await supabase
+          .from("order_items")
+          .select("order_id, product_name, quantity, line_total, product_metadata, created_at")
+          .in("order_id", chunk);
+        if (data) oiResults.push(...data);
+      }
+      // Build per-product aggregation (filtered by period later in render)
+      setOrderItemsCogs({ items: oiResults, orderDates: Object.fromEntries((r1.data || []).map(o => [o.id, o.created_at])) });
+    } catch (_) {
+      setOrderItemsCogs(null);
+    }
+
     setLastUpdated(new Date());
     setLoading(false);
   }, []);
@@ -775,11 +796,49 @@ export default function HQProfitLoss() {
   const importCogsSold = avgImportCogsPerUnit * totalUnitsSold;
   const localCogsTotal = avgLocalCogsPerUnit * totalUnitsSold;
   const importCogsHardware = importCogsSold;
-  const totalCogs =
-    actualCogs !== null ? actualCogs : avgFullCogsPerUnit * totalUnitsSold;
+  // WP-P&L-INTELLIGENCE: order_items COGS (best source — transaction-level AVCO)
+  const filteredOI = orderItemsCogs?.items?.filter((oi) => {
+    const orderDate = orderItemsCogs.orderDates?.[oi.order_id];
+    return orderDate && periodFilter(orderDate, period, customFrom, customTo);
+  }) || [];
+  const oiCogsTotal = filteredOI.reduce((s, oi) => {
+    const avco = parseFloat(oi.product_metadata?.weighted_avg_cost || 0);
+    return s + (oi.quantity || 0) * avco;
+  }, 0);
+  const oiRevenueTotal = filteredOI.reduce((s, oi) => s + (parseFloat(oi.line_total) || 0), 0);
+  const hasOrderItemsCogs = filteredOI.length > 0 && oiCogsTotal > 0;
+
+  // Priority: order_items AVCO > production_out AVCO > recipe estimates
+  const totalCogs = hasOrderItemsCogs
+    ? oiCogsTotal
+    : actualCogs !== null ? actualCogs : avgFullCogsPerUnit * totalUnitsSold;
+  const cogsSource = hasOrderItemsCogs ? "actual" : actualCogs !== null ? "production" : "estimated";
   const grossProfit = totalRevenue - totalCogs;
   const grossMarginPct =
     totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+  // Per-product margin data for "Margin by Product" section
+  const productMargins = (() => {
+    const map = {};
+    filteredOI.forEach((oi) => {
+      const name = oi.product_name || "Unknown";
+      const avco = parseFloat(oi.product_metadata?.weighted_avg_cost || 0);
+      if (!map[name]) map[name] = { units: 0, revenue: 0, cogs: 0 };
+      map[name].units += oi.quantity || 0;
+      map[name].revenue += parseFloat(oi.line_total) || 0;
+      map[name].cogs += (oi.quantity || 0) * avco;
+    });
+    return Object.entries(map)
+      .map(([name, d]) => ({
+        name,
+        units: d.units,
+        revenue: d.revenue,
+        cogs: d.cogs,
+        gp: d.revenue - d.cogs,
+        margin: d.revenue > 0 ? ((d.revenue - d.cogs) / d.revenue) * 100 : 0,
+      }))
+      .filter((p) => p.revenue > 0 && p.cogs > 0);
+  })();
 
   const redemptionValue = loyaltyConfig?.redemption_value_zar ?? 0.1;
   const breakageRate = loyaltyConfig?.breakage_rate ?? 0.3;
@@ -1177,7 +1236,7 @@ export default function HQProfitLoss() {
                   dim={avgLocalCogsPerUnit === 0}
                 />
                 <WRow
-                  label="Total COGS"
+                  label={`Total COGS${cogsSource === "actual" ? " (actual)" : cogsSource === "production" ? " (production)" : " (estimated)"}`}
                   value={totalCogs}
                   bold
                   negative
@@ -1519,6 +1578,59 @@ export default function HQProfitLoss() {
                 </div>
               )}
             </div>
+
+            {/* WP-P&L-INTELLIGENCE: Margin by Product */}
+            {productMargins.length > 0 && (
+              <div style={{ ...card, marginTop: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px 8px", borderBottom: "1px solid #eee" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: T.color?.ink900 || "#111" }}>
+                    Gross Profit by Product
+                  </span>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[{ id: "gp", label: "By GP" }, { id: "margin", label: "By Margin %" }].map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => setMarginSortMode(m.id)}
+                        style={{
+                          fontSize: 10, fontWeight: 600, padding: "4px 10px", borderRadius: 3,
+                          border: "1px solid #ddd", cursor: "pointer",
+                          background: marginSortMode === m.id ? (T.color?.accent || "#1A3D2B") : "#fff",
+                          color: marginSortMode === m.id ? "#fff" : "#666",
+                        }}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ padding: "0 16px 12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 80px", gap: 4, padding: "8px 0 4px", fontSize: 10, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    <span>Product</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>Revenue</span><span style={{ textAlign: "right" }}>COGS</span><span style={{ textAlign: "right" }}>GP</span><span style={{ textAlign: "right" }}>Margin</span>
+                  </div>
+                  {[...productMargins]
+                    .sort((a, b) => marginSortMode === "gp" ? b.gp - a.gp : b.margin - a.margin)
+                    .slice(0, 10)
+                    .map((p, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 80px", gap: 4, padding: "6px 0", borderBottom: "1px solid #f5f5f5", fontSize: 12, alignItems: "center" }}>
+                        <span style={{ color: "#333", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                        <span style={{ textAlign: "right", color: "#666", fontVariantNumeric: "tabular-nums" }}>{p.units}</span>
+                        <span style={{ textAlign: "right", color: "#333", fontVariantNumeric: "tabular-nums" }}>{fmtZar(p.revenue)}</span>
+                        <span style={{ textAlign: "right", color: "#c62828", fontVariantNumeric: "tabular-nums" }}>−{fmtZar(p.cogs)}</span>
+                        <span style={{ textAlign: "right", color: "#2E7D32", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtZar(p.gp)}</span>
+                        <span style={{ textAlign: "right" }}>
+                          <span style={{
+                            display: "inline-block", padding: "2px 6px", borderRadius: 3, fontSize: 10, fontWeight: 600,
+                            background: p.margin >= 70 ? "#E8F5E9" : p.margin >= 50 ? "#FFF8E1" : "#FFEBEE",
+                            color: p.margin >= 70 ? "#2E7D32" : p.margin >= 50 ? "#F57F17" : "#c62828",
+                          }}>
+                            {p.margin.toFixed(1)}%
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* RIGHT: INTEL PANELS */}
             <div>
