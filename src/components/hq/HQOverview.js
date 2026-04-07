@@ -945,7 +945,7 @@ export default function HQOverview({ onNavigate }) {
         supabase
           .from("inventory_items")
           .select(
-            "id,category,subcategory,quantity_on_hand,sell_price,weighted_avg_cost,reorder_level,expiry_date,is_active",
+            "id,name,category,subcategory,quantity_on_hand,sell_price,weighted_avg_cost,reorder_level,expiry_date,is_active",
           )
           .eq("tenant_id", tenantId)
           .eq("is_active", true),
@@ -1736,7 +1736,7 @@ export default function HQOverview({ onNavigate }) {
                         fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
                       }}
                     >
-                      {a.name.length > 20 ? a.name.slice(0, 20) + "…" : a.name}
+                      {(a.name || "").length > 20 ? a.name.slice(0, 20) + "…" : (a.name || "—")}
                       {" · "}
                       <span style={{ fontVariantNumeric: "tabular-nums" }}>
                         {a.daysLeft}d
