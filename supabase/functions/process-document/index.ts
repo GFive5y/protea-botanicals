@@ -1,5 +1,8 @@
 // supabase/functions/process-document/index.ts
-// v2.1 — WP-SMART-CAPTURE: Anti-fraud unique identifier extraction + document fingerprinting
+// v2.1 — WP-SMART-CAPTURE: Anti-fraud — SA bank identifier extraction + 6-level document fingerprinting
+//   extractUniqueIdentifiers(): UTI/TRN REF/TXN ID (all SA banks), Auth Code, Receipt No, ECHO, Merchant
+//   buildDocumentFingerprint(): 6-level: UTI → Auth+Date → ECHO+Merchant → Receipt+Merchant+Date → Receipt+Date → Composite
+//   checkDuplicateDocument(): image hash + fingerprint match against document_log
 // v2.0 — WP-SMART-CAPTURE: SARS tax invoice compliance check + capture type classifier
 // v1.9 — WP-FIN S3: Expense document detection + create_expense action
 //   classifyExpenseDocument() runs after Claude parse — detects CAPEX/OPEX invoices,
@@ -407,59 +410,78 @@ function classifyExpenseDocument(
   };
 }
 
-// ── WP-SMART-CAPTURE v2.1: Unique Identifier Extractor ───────────────────────
-function extractUniqueIdentifiers(extractedText: string, ext: Record<string,unknown>): Record<string,string|null> {
+// ── WP-SMART-CAPTURE v2.1: SA Bank Identifier Extractor ──────────────────────
+function extractUniqueIdentifiers(rawText: string, _ext: Record<string,unknown>): Record<string,string|null> {
   const ids: Record<string,string|null> = {};
-  const t = extractedText || "";
-  const utiM = t.match(/UTI\s*[:\-]?\s*([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{15,})/i);
-  if (utiM) ids.uti = utiM[1].toUpperCase();
-  const authM = t.match(/Auth(?:orization|orisation)?\s+Code\s*[:\-]?\s*([A-Z0-9]{6})/i) || t.match(/AuthCode\s*[:\-]?\s*([A-Z0-9]{6})/i);
-  if (authM) ids.auth_code = authM[1].toUpperCase();
-  const rcptM = t.match(/Receipt\s*(?:No\.?|Number|#)?\s*[:\-]?\s*(\d{4,12})/i);
+  const t = (rawText||"").replace(/\r?\n/g," ");
+  // UTI — standard hyphenated + FNB TRN REF + StdBank TXN ID
+  const utiStd = t.match(/\bUTI\s*[:\-]?\s*([A-Z0-9]{8}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{12,20})\b/i);
+  const utiFNB = t.match(/\bTRN\s+REF\s*[:\-]?\s*([A-Z0-9]{12,40})\b/i)||t.match(/\bTRANSACTION\s+REF(?:ERENCE)?\s*[:\-]?\s*([A-Z0-9]{12,40})\b/i);
+  const utiStdB = t.match(/\bTXN\s+(?:ID|REF)\s*[:\-]?\s*([A-Z0-9]{12,40})\b/i);
+  const utiRaw = utiStd?.[1]||utiFNB?.[1]||utiStdB?.[1]||null;
+  if (utiRaw) ids.uti = utiRaw.toUpperCase().trim();
+  // Auth Code — all SA banks
+  for (const p of [/\bAuth(?:or(?:is|iz)ation)?\s+Code\s*[:\-]?\s*([A-Z0-9]{6})\b/i,/\bAUTH\s*[:\-]?\s*([A-Z0-9]{6})\b/i,/\bApproval\s+Code\s*[:\-]?\s*([A-Z0-9]{6})\b/i]) {
+    const m = t.match(p); if (m) { ids.auth_code = m[1].toUpperCase(); break; }
+  }
+  const rcptM = t.match(/\bReceipt\s*(?:No\.?|#|Number)?\s*[:\-]\s*(\d{4,12})\b/i);
   if (rcptM) ids.receipt_number = rcptM[1];
-  const echoM = t.match(/ECHO\s*[:\-]?\s*([A-Z0-9]{6,12})/i);
+  const echoM = t.match(/\bECHO\s*[:\-]?\s*([A-Z0-9]{4,15})\b/i);
   if (echoM) ids.echo = echoM[1].toUpperCase();
-  const merchM = t.match(/Merch(?:ant)?\s+No\.?\s*[:\-]?\s*([0-9:]{6,20})/i);
-  if (merchM) ids.merchant_number = merchM[1];
+  const merchM = t.match(/\bMerch(?:ant)?\s+No\.?\s*[:\-]?\s*([0-9:\/]{6,25})\b/i);
+  if (merchM) ids.merchant_number = merchM[1].replace(/\s/g,"");
+  const spohM = t.match(/\bSPOH\s*[:\-]?\s*([A-Z0-9]{4,15})\b/i);
+  if (spohM) ids.spoh = spohM[1];
   const timeM = t.match(/\b(\d{2}:\d{2}(?::\d{2})?)\b/);
   if (timeM) ids.transaction_time = timeM[1];
-  const panM = t.match(/PAN\s*[:\-]?\s*\d{6}[x*]{4,}\s*(\d{4})/i) || t.match(/\d{6}[xX*]{4,}(\d{4})/);
+  const panM = t.match(/\bPAN\s*[:\-]?\s*\d{6}[xX*]{4,}\s*(\d{4})\b/i)||t.match(/\b\d{6}[xX*]{4,}(\d{4})\b/);
   if (panM) ids.pan_last4 = panM[1];
-  const pumpM = t.match(/Pump\s*[:\-]?\s*(\d{1,2})/i);
+  const pumpM = t.match(/\bP\s+(\d{1,2})\s+\d+[\.,]\d+\b/)||t.match(/\bPump\s*[:\-]?\s*(\d{1,2})\b/i);
   if (pumpM) ids.pump_number = pumpM[1];
+  const batchM = t.match(/\bBatch[-\s]Rec\s*[:\-]?\s*([A-Z0-9-]{4,15})\b/i);
+  if (batchM) ids.batch_rec = batchM[1];
+  const isFleet = /\bfleet\b|\bwex\b|\bpetrocheck\b/i.test(t);
+  ids.payment_type = isFleet?"fleet_card":ids.auth_code?"card":"cash";
   return ids;
 }
 
-function buildDocumentFingerprint(ext: Record<string,unknown>, ids: Record<string,string|null>, _captureType: string): string {
+// ── WP-SMART-CAPTURE v2.1: 6-Level Document Fingerprint ──────────────────────
+function buildDocumentFingerprint(ext: Record<string,unknown>, ids: Record<string,string|null>, _ct: string): {fingerprint:string;confidence:number;level:number} {
   const vendor = String((ext.supplier as Record<string,unknown>)?.name||"").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,30);
-  const date = String((ext.reference as Record<string,unknown>)?.date||"unknown");
-  const amount = String(ext.total_amount||"0");
-  if (ids.uti) return `uti:${ids.uti}`;
-  if (ids.auth_code && date!=="unknown") return `auth:${ids.auth_code}:${date}`;
-  if (ids.echo && ids.merchant_number) return `echo:${ids.echo}:${ids.merchant_number}`;
-  if (ids.receipt_number && ids.merchant_number && date!=="unknown") return `rcpt:${ids.merchant_number}:${ids.receipt_number}:${date}`;
-  if (ids.receipt_number && date!=="unknown") return `rcpt:${ids.receipt_number}:${date}`;
-  if (vendor && date!=="unknown" && amount!=="0") return `composite:${vendor}:${date}:${amount}`;
-  return "";
+  const date = String((ext.reference as Record<string,unknown>)?.date||"").trim();
+  const amount = String(Math.round(Number(ext.total_amount??0))).trim();
+  const time = (ids.transaction_time||"").replace(":","");
+  if (ids.uti && ids.uti.length>8) return {fingerprint:`uti:${ids.uti}`,confidence:1.0,level:1};
+  if (ids.auth_code && date) return {fingerprint:`auth:${ids.auth_code}:${date}`,confidence:0.999,level:2};
+  if (ids.echo && ids.merchant_number) return {fingerprint:`echo:${ids.echo}:${ids.merchant_number}`,confidence:0.97,level:3};
+  if (ids.receipt_number && ids.merchant_number && date) return {fingerprint:`rcpt:${ids.merchant_number}:${ids.receipt_number}:${date}`,confidence:0.95,level:4};
+  if (ids.receipt_number && date) return {fingerprint:`rcpt:${ids.receipt_number}:${date}`,confidence:0.90,level:5};
+  if (vendor && date && amount!=="0") return {fingerprint:`composite:${vendor}:${date}${time?`:${time}`:""}:${amount}`,confidence:0.80,level:6};
+  return {fingerprint:"",confidence:0,level:0};
 }
 
+// ── WP-SMART-CAPTURE v2.1: Duplicate Document Checker ────────────────────────
 async function checkDuplicateDocument(
-  db: ReturnType<typeof createClient>, tenantId: string|null, fingerprint: string, imageHash: string|null, currentDocId: string|null
-): Promise<{isDuplicate:boolean;duplicateOf:string|null;duplicateConfidence:number;duplicateDetails:Record<string,unknown>}> {
-  if (!tenantId || !fingerprint) return {isDuplicate:false,duplicateOf:null,duplicateConfidence:0,duplicateDetails:{}};
+  db: ReturnType<typeof createClient>, tenantId: string|null, fingerprint: string, fpLevel: number, imageHash: string, currentDocId: string
+): Promise<{isDuplicate:boolean;duplicateOf:string|null;duplicateConfidence:number;matchType:string;duplicateDetails:Record<string,unknown>}> {
+  const empty = {isDuplicate:false,duplicateOf:null,duplicateConfidence:0,matchType:"",duplicateDetails:{}};
+  if (!tenantId) return empty;
   try {
-    const { data: fpMatch } = await db.from("document_log").select("id, uploaded_at, status, file_name, supplier_name")
-      .eq("tenant_id",tenantId).eq("document_fingerprint",fingerprint).neq("id",currentDocId||"").limit(1).maybeSingle();
-    if (fpMatch) {
-      const conf = fingerprint.startsWith("uti:")?1.0:fingerprint.startsWith("auth:")?0.99:fingerprint.startsWith("echo:")?0.97:fingerprint.startsWith("rcpt:")?0.95:0.85;
-      return {isDuplicate:true,duplicateOf:fpMatch.id,duplicateConfidence:conf,duplicateDetails:{
-        match_type:"fingerprint",fingerprint_type:fingerprint.split(":")[0],
-        matched_file:fpMatch.file_name,matched_supplier:fpMatch.supplier_name,matched_at:fpMatch.uploaded_at,
-        message:`Document fingerprint matches previous capture (${fingerprint.split(":")[0]} match)`,
-      }};
+    if (imageHash) {
+      const { data } = await db.from("document_log").select("id, uploaded_at, file_name, supplier_name").eq("tenant_id",tenantId).eq("image_hash",imageHash).neq("id",currentDocId).limit(1);
+      if (data?.length) return {isDuplicate:true,duplicateOf:data[0].id,duplicateConfidence:1.0,matchType:"exact_image",duplicateDetails:{match_type:"exact_image",fingerprint_type:"image_hash",matched_file:data[0].file_name,matched_supplier:data[0].supplier_name,matched_at:data[0].uploaded_at,message:"Identical image uploaded before"}};
+    }
+    if (fingerprint) {
+      const { data } = await db.from("document_log").select("id, uploaded_at, file_name, supplier_name").eq("tenant_id",tenantId).eq("document_fingerprint",fingerprint).neq("id",currentDocId).limit(1);
+      if (data?.length) {
+        const conf = fpLevel===1?1.0:fpLevel===2?0.999:fpLevel===3?0.97:fpLevel===4?0.95:fpLevel===5?0.90:0.80;
+        const fpType = fingerprint.split(":")[0];
+        const labels: Record<string,string> = {uti:"UTI match (100%)",auth:"Auth code + date",echo:"ECHO + merchant",rcpt:"Receipt + date",composite:"Vendor + date + amount"};
+        return {isDuplicate:true,duplicateOf:data[0].id,duplicateConfidence:conf,matchType:`fingerprint_${fpType}`,duplicateDetails:{match_type:`fingerprint_${fpType}`,fingerprint_type:fpType,fingerprint_level:fpLevel,fingerprint_label:labels[fpType]||fpType,matched_file:data[0].file_name,matched_supplier:data[0].supplier_name,matched_at:data[0].uploaded_at,message:`Duplicate via ${labels[fpType]||fpType}`}};
+      }
     }
   } catch(_) {}
-  return {isDuplicate:false,duplicateOf:null,duplicateConfidence:0,duplicateDetails:{}};
+  return empty;
 }
 
 // ── WP-SMART-CAPTURE v2.0: SARS Tax Invoice Compliance Checker ───────────────
@@ -498,7 +520,7 @@ function classifyCaptureType(ext: Record<string, unknown>): string {
   if (dt==="delivery_note") return "delivery_note";
   if (dt==="coa") return "lab_report";
   if (dt==="proof_of_payment") return "proof_of_payment";
-  if (["engen","shell","bp","total","astron","sasol","esso"].some(b=>sn.includes(b))||ad.includes("litres")||ad.includes("fuel")||ad.includes("petrol")) return "petrol_slip";
+  if (["engen","shell","bp","total","astron","sasol","esso","caltex","puma"].some(b=>sn.includes(b))||ad.includes("litres")||ad.includes("fuel")||ad.includes("petrol")||ad.includes("unleaded")||ad.includes("diesel")||ad.includes("lpg")) return "petrol_slip";
   if (sn.includes("restaurant")||sn.includes("cafe")||ad.includes("meal")||ad.includes("lunch")||ad.includes("dinner")) return "entertainment";
   if (sn.includes("city of")||sn.includes("municipality")||sn.includes("eskom")||ad.includes("electricity")||ad.includes("sanitation")) return "utility_bill";
   const hasStock = ((ext.proposed_updates as unknown[])||[]).some((u:unknown)=>["create_purchase_order","receive_delivery_item"].includes(String((u as Record<string,unknown>).action||"")));
@@ -897,20 +919,19 @@ CRITICAL REMINDERS:
       capture_type:        captureType,
     };
 
-    // WP-SMART-CAPTURE v2.1: Anti-fraud fingerprinting
-    const rawText = [
-      (extraction.extraction_notes as string)||"",
-      ((extraction.line_items as Array<Record<string,unknown>>)||[]).map(l=>String(l.description||"")).join(" "),
-      (extraction.reference as Record<string,unknown>)?.number as string||"",
-    ].join(" ") + " " + file_name;
-    const uniqueIds = extractUniqueIdentifiers(rawText, extraction);
-    const fingerprint = buildDocumentFingerprint(extraction, uniqueIds, captureType);
-    const imageHashProxy = `${mime_type}:${file_size_kb}:${file_base64.slice(0,64)}`;
+    // WP-SMART-CAPTURE v2.1: Anti-fraud — identifier extraction + fingerprinting
+    const searchText = [rawText, file_name, (extraction.extraction_notes as string)||""].join(" ");
+    const uniqueIds = extractUniqueIdentifiers(searchText, extraction);
+    const fpResult = buildDocumentFingerprint(extraction, uniqueIds, captureType);
+    const fingerprint = fpResult.fingerprint;
+    const imageHashProxy = file_size_kb ? `${mime_type}:${file_size_kb}:${file_base64.slice(0,80)}` : null;
     extraction = {
       ...extraction,
       unique_identifiers: uniqueIds,
-      document_fingerprint: fingerprint,
+      document_fingerprint: fingerprint||null,
       image_hash_proxy: imageHashProxy,
+      fingerprint_level: fpResult.level,
+      fingerprint_confidence: fpResult.confidence,
     };
 
     const { data: logEntry, error: logErr } = await db
@@ -935,6 +956,9 @@ CRITICAL REMINDERS:
             ? extraction.confidence
             : null,
         status: "pending_review",
+        document_fingerprint: fingerprint||null,
+        image_hash: imageHashProxy||null,
+        unique_identifiers: uniqueIds,
       })
       .select()
       .single();
@@ -943,7 +967,7 @@ CRITICAL REMINDERS:
       throw new Error(`Failed to log to document_log: ${logErr.message}`);
 
     // WP-SMART-CAPTURE v2.1: Duplicate check + update document_log with fingerprint
-    const dupResult = await checkDuplicateDocument(db, tenant_id, fingerprint, imageHashProxy, logEntry.id);
+    const dupResult = await checkDuplicateDocument(db, tenant_id, fingerprint, fpResult.level, imageHashProxy||"", logEntry.id);
     await db.from("document_log").update({
       document_fingerprint: fingerprint||null,
       image_hash: imageHashProxy||null,
@@ -975,13 +999,16 @@ CRITICAL REMINDERS:
         input_vat_claimable: sarsResult.input_vat_claimable,
         input_vat_amount:    sarsResult.input_vat_amount,
         sars_vat_number:     sarsResult.sars_vat_number,
-        capture_type:        captureType,
-        unique_identifiers:  uniqueIds,
-        document_fingerprint: fingerprint,
-        is_duplicate:        dupResult.isDuplicate,
-        duplicate_of:        dupResult.duplicateOf,
-        duplicate_confidence: dupResult.duplicateConfidence,
-        duplicate_details:   dupResult.duplicateDetails,
+        capture_type:          captureType,
+        unique_identifiers:    uniqueIds,
+        document_fingerprint:  fingerprint||null,
+        fingerprint_level:     fpResult.level,
+        fingerprint_confidence: fpResult.confidence,
+        is_duplicate:          dupResult.isDuplicate,
+        duplicate_of:          dupResult.duplicateOf,
+        duplicate_confidence:  dupResult.duplicateConfidence,
+        duplicate_match_type:  dupResult.matchType,
+        duplicate_details:     dupResult.duplicateDetails,
       }),
       { headers: JSON_HEADERS },
     );
