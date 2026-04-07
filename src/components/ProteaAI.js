@@ -161,89 +161,90 @@ async function executeQuerySpec(spec) {
 // ── Codebase facts for dev mode ───────────────────────────────────────────────
 const CODEBASE_FACTS = `
 NuAi ERP Platform — Cannabis Retail · Built: Jan–Apr 2026 · Live client: Medi Recreational (private beta)
+119 features · 7 portals · 130+ component files · 104 DB tables · 35 DB functions · 10 Edge Functions
 
 ARCHITECTURE
 - React SPA + Supabase (PostgreSQL + Edge Functions + RLS) + Vercel
-- 96 component files · 104 DB tables · 15 DB business-logic functions
-- 5 portals: HQ (operator) · TenantPortal (retailer) · HR · Staff · Admin
-- Three-Claude ecosystem: Claude.ai (strategy) · Claude Code (builds) · GitHub MCP (read-only)
+- 7 portals: HQ (34 tabs) · TenantPortal · Admin (13 tabs) · Shop (4 tabs) · HR (14 tabs) · Staff · Wholesale
+- Consumer: /shop · /loyalty · /leaderboard · /scan · /terpenes · /molecules · /account
 
 INVENTORY (232 items, 186 active, 14 product worlds)
 - HQStock (PROTECTED, 208KB) — 7 tabs: Overview/Items/Movements/Pricing/Receipts/POs/ShopManager
-- SmartInventory (175KB) — catalog view with tile/list/detail modes, SC-01 stats panel
-- CannabisDetailView — Excel-style sortable table with bulk actions
+- SmartInventory (175KB) — catalog with tile/list/detail modes, SC-01 stats panel, bulk actions
+- CannabisDetailView — Excel-style sortable table (wired in HQStock line 5051, viewMode=detail)
 - StockItemModal (LOCKED) — 14 product worlds with contextual fields
-- AVCO live costing · stock_movements: 1,206 rows · product_pricing: 36 rows
-- StockOpeningCalibration — AI calibration via ai-copilot Edge Function (LL-199 fixed)
+- StockControl (153KB) — admin portal, industry-profile-aware (hides cannabis for non-cannabis tenants)
+- AVCO live costing · stock_movements: 1,200+ rows · product_pricing: 36 rows
+- StockOpeningCalibration — AI calibration via ai-copilot Edge Function
 
 SALES & POS
 - POSScreen — full-screen budtender till (cash/card/Yoco). Requires active pos_session.
-- orders: 1,513 rows · order_items: 2,833 rows (enables per-SKU analytics)
-- EODCashUp — till reconciliation, variance GENERATED column, 90 cashups recorded
-- HQTradingDashboard — 30-day ComposedChart, SA public holidays annotated, history selector
+- orders: 1,500+ rows · order_items: 2,800+ rows (AVCO stored in product_metadata per line item)
+- EODCashUp — till reconciliation, variance GENERATED column, 90+ cashups
+- HQTradingDashboard — 30-day chart (Indigo palette), SA public holidays, top sellers from order_items
+- sim-pos-sales v4 — generates orders + order_items + stock_movements + pos_sessions + eod_cash_ups
+
+FINANCIAL — FULL SUITE LIVE
+- HQProfitLoss — transaction-level P&L using order_items × product_metadata AVCO (actual COGS)
+  Revenue: R477K/30d · COGS: R181K · Gross Profit: R297K · Blended margin: 62%
+  Margin by Product section: top 10 by GP or margin %. Best: Shatter 1g at 80.2%
+- HQBalanceSheet — assets (stock AVCO), liabilities, cash position, Cash Flow statement
+- HQForecast — 30-day projection, stock depletion per SKU, restock spend, cash flow projection
+- HQCogs (144KB) — per-SKU AVCO costing, recipe cost, FX impact, margin waterfall
+- HQPricing — channel pricing (POS/online/wholesale), 36 records
+- ExpenseManager — 44 expense rows, R87K in last 30 days (rent, wages, security, etc.)
+- Live USD/ZAR via get-fx-rate EF v35 (fx_rates: 716 rows)
+- COGS source: order_items product_metadata->weighted_avg_cost (NOT product_cogs — only 13 rows)
 
 LOYALTY & CUSTOMERS
 - HQLoyalty (147KB) — points/tiers/campaigns/referrals/leaderboard, 263 transactions, 3,974 pts
 - QR-to-earn scan loop — 181 scans, 60 QR codes. get_monthly_leaderboard DB function.
-- HQFraud (92KB) — get_scan_velocity_flags, 62 system_alerts
-- AdminCustomerEngagement — 7 user profiles, churn risk, engagement
-- AdminCommsCenter — messaging, templates, support tickets
-- Public leaderboard at /leaderboard (no auth required)
-
-FINANCIAL
-- HQProfitLoss, HQBalanceSheet, HQCogs (144KB), HQPricing, ExpenseManager
-- FX-aware costing for imported goods · Live USD/ZAR via get-fx-rate EF v35 (fx_rates: 712 rows)
-- HQInvoices — AR/AP, aged debtors (invoices table currently empty — first invoice pending)
-- HQWholesaleOrders — B2B wholesale, 2 partners (wholesale_orders table currently empty)
+- HQFraud (92KB) — scan velocity analysis, 62 system_alerts
+- AdminCustomerEngagement (113KB) — profiles, churn risk, engagement
+- AdminQRCodes (152KB) — complete batch management engine
+- 7 cannabinoid molecule visualizers + terpene education system (no SA competitor has this)
 
 PROCUREMENT
-- HQPurchaseOrders (119KB) — full PO lifecycle, 6 POs, 27 line items
+- HQPurchaseOrders (119KB) — full PO lifecycle, FX-aware, 6 POs, 27 line items
 - HQDocuments (102KB) — AI invoice ingestion → auto stock receive, 10 docs processed
 - HQSuppliers — 5 suppliers, 123 supplier products
 
-PRODUCTION (HQProduction 310KB — LARGEST FILE)
-- Batch creation, BOM, production runs (8 runs, 10 batches), yield tracking, COA
-- production_runs schema (LL-0J): id, tenant_id, batch_id, production_date, operator_id, batch_size_g, yield_g, yield_pct, status, qc_pass, notes
-
-FOOD & COMPLIANCE
+PRODUCTION & COMPLIANCE
+- HQProduction (310KB — LARGEST FILE) — batch/BOM/production runs/yield/QC/COA
 - HQFoodIngredients (158KB) — 121 ingredients, nutrient profiles, HACCP data
-- HQRecipeEngine — formulation, version control, cost per batch
-- HQHaccp — 3 control points seeded (Receiving/Storage/Dispensing Accuracy)
-- HQNutritionLabel — SA R146 compliant label generation
-- HQColdChain — temperature monitoring (tables empty — IoT setup pending)
-- HQRecall — batch-level recall traceability (recall_events table empty — no recalls yet)
-- HQFoodIntelligence — AI-powered food trend + formulation analysis
+- HQHaccp — 3 control points seeded · HQNutritionLabel — SA R146 compliant
+- HQColdChain · HQRecall · HQFoodIntelligence — all wired
 
-HR SUITE (14 modules — wired in /hr and TenantPortal)
-- HRTimesheets (111KB) — draft→submitted→admin_approved→hr_locked→paid pipeline
-- HRLeave, HRContracts, HRRoster, HRCalendar (40 SA public holidays), HRPayroll
-- HRLoans (update_loan_balance DB function) · HRDisciplinary · HRPerformance · HRComms
-- HRStockView (75KB) — read-only inventory access for HR users
-- staff_profiles: 2 · timesheets: 1 · leave_requests: 1 · employment_contracts: 1
+HR SUITE (14 modules)
+- HRTimesheets (111KB) — 5-stage pipeline: draft→submitted→admin_approved→hr_locked→paid
+- Full suite: Staff/Leave/Contracts/Roster/Calendar(40 holidays)/Payroll/Disciplinary/Comms/Loans/Performance
 
-INTELLIGENCE LAYER
-- HQAnalytics (105KB) — scan activity, cohort analysis, customer LTV
-- GeoAnalyticsDashboard (38KB) — geographic customer mapping [recently wired]
-- HQReorderScoring — velocity-weighted AI reorder, check_reorder DB function
-- RetailerHealth — dispensary performance, sell-through
-- Information Bubbles pattern: every KPI answers "what does this mean right now?"
-  Formula: Primary KPI + Comparative delta(s) + Operational callout
-  Gold standard: FX tile — R16.9776 + delta vs yesterday + delta vs 30 days
+INTELLIGENCE
+- HQAnalytics (105KB) · GeoAnalyticsDashboard · HQReorderScoring (velocity-weighted AI)
+- Information Bubbles: every KPI = Primary metric + delta(s) + operational callout
+- Velocity reorder: days of stock remaining + revenue at risk per SKU
+- Revenue MTD run rate: R/day × 30 projection in dashboard tile
+
+EDGE FUNCTIONS (10 active)
+ai-copilot v58 · payfast-checkout v44 · payfast-itn v39 · sign-qr v36 · verify-qr v34
+send-notification v37 · get-fx-rate v35 · process-document v49 · sim-pos-sales v4 · create-admin-user v1
 
 SCHEMA FACTS (critical for correct queries)
 - inventory_items: NO notes column · category is enum (12 values) · loyalty_category separate
-- orders: field=total (NOT total_amount) · status: paid|pending|failed|cancelled|refunded
+- orders: field=total (NOT total_amount) · channel: pos|online|wholesale · status: paid|pending|failed|cancelled|refunded
 - order_items: no inventory_item_id FK — via product_metadata jsonb · line_total plain numeric (INSERT allowed)
+  product_metadata stores: item_id, category, weighted_avg_cost (COGS source)
 - eod_cash_ups: variance GENERATED · field=system_cash_total · UNIQUE(tenant_id, cashup_date)
 - pos_sessions: NO total_sales column · movement_type 'sale_pos' for POS
 - loyalty_transactions: column=transaction_type · use .ilike() not .eq()
-- daily_summaries: table does NOT exist
+- tenants: type constraint 'hq'|'shop' only · daily_summaries does NOT exist
+- expenses: expense_date is DATE (not timestamp) — always compare with YYYY-MM-DD
 
-LOCKED/PROTECTED FILES (never modify without explicit owner request)
+LOCKED/PROTECTED FILES
 - StockItemModal.js · ProteaAI.js · PlatformBar.js · LiveFXBar.js · HQStock.js (protected)
 
 TENANT: Medi Recreational · b1bad266-ceb4-4558-bbc3-22cfeeeafe74 · cannabis_retail profile
-SUPABASE PROJECT: uvicrqapgzcdvozxrreo
+SUPABASE PROJECT: uvicrqapgzcdvozxrreo · 5 tenants registered
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
