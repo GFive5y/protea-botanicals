@@ -48,6 +48,7 @@ import HQFinancialNotes from "../components/hq/HQFinancialNotes";
 import HQSmartCapture from "../components/hq/HQSmartCapture";
 import HQForecast from "../components/hq/HQForecast";
 import HQYearEnd from "../components/hq/HQYearEnd";
+import HQFinancialStatements from "../components/hq/HQFinancialStatements";
 import HRRoster from "../components/hq/HRRoster";
 import HRLeave from "../components/hq/HRLeave";
 import HRTimesheets from "../components/hq/HRTimesheets";
@@ -248,6 +249,11 @@ const WATERFALL = [
         id: "fixed-assets",
         label: "Fixed Assets",
         desc: "PPE register \u00b7 depreciation \u00b7 NBV",
+      },
+      {
+        id: "fin-statements",
+        label: "IFRS Statements",
+        desc: "4 IFRS statements \u00b7 auditor sign-off \u00b7 status workflow",
       },
       {
         id: "journals",
@@ -498,6 +504,11 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Fixed Assets",
         desc: "PPE register \u00b7 depreciation \u00b7 NBV",
       },
+      {
+        id: "fin-statements",
+        label: "IFRS Statements",
+        desc: "Income Statement \u00b7 Balance Sheet \u00b7 Cash Flow \u00b7 Changes in Equity",
+      },
     ],
   },
   {
@@ -592,6 +603,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
     case "fin-notes":      return <HQFinancialNotes />;
     case "forecast":       return <HQForecast />;
     case "year-end":       return <HQYearEnd />;
+    case "fin-statements": return <HQFinancialStatements />;
     case "roster":         return <HRRoster tenantId={tenantId} readOnly={false} />;
     case "timesheets":     return <HRTimesheets tenantId={tenantId} />;
     case "leave":          return <HRLeave tenantId={tenantId} />;
