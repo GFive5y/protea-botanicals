@@ -1,3 +1,18 @@
+## ⚠️ READ THIS FIRST — BEFORE ANY RULE
+
+This platform has 224,293 lines of production code across 190 files.
+It is a complete multi-tenant SaaS ERP. It is NOT a dev project building features.
+Before you form any opinion about a task, read docs/PLATFORM-OVERVIEW_v1_0.md.
+
+Key numbers every agent must carry:
+- 6 portals · 41 HQ tabs · 109 tables · 10 EFs · 17 stock components
+- AVCO on every movement · VAT 3-point automated · IFRS statements live
+- 4 industry profiles from one codebase · Multi-tenant RLS on all 109 tables
+
+The LIVE-AUDIT is in docs/LIVE-AUDIT_v1_0_part1/2/3.md — authoritative source.
+
+---
+
 # NUAI AGENT BIBLE v1.0 — 08 Apr 2026
 ## The single authoritative document for every Claude session.
 ## Read this FIRST. Read this COMPLETELY. Then act.
