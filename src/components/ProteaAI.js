@@ -971,10 +971,13 @@ export default function ProteaAI({
                     ),
                   );
                 });
-                // Yield to browser between tokens — forces a repaint of each
-                // word before the next is processed. Without this, all flushSync
-                // calls in one reader.read() chunk paint in a single browser frame.
-                await new Promise((resolve) => requestAnimationFrame(resolve));
+                // 80ms pacing between tokens — consistent smooth word-by-word.
+                // requestAnimationFrame fires at irregular browser frame intervals
+                // (16-33ms depending on load) causing visible jitter between words.
+                // setTimeout(80) gives a fixed 80ms gap between each word render
+                // = ~12 words/second, consistent regardless of when words arrive.
+                // flushSync already committed the state — this just controls pace.
+                await new Promise((resolve) => setTimeout(resolve, 80));
               }
             } catch { /* skip malformed SSE line */ }
           }
