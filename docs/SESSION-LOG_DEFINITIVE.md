@@ -5,42 +5,44 @@
 
 ---
 
-## v208 — Project Bible + Process Reform · 08 Apr 2026
+## v208 — Project Bible + Full Doc Audit + Process Reform · 08 Apr 2026
 HEAD: [this commit]
 
-PROBLEM SOLVED:
-  Two recurring process failures addressed with structural fixes:
-  1. RULE 0Q violations (4 confirmed: VL-007/008/010/011)
-     → NUAI-AGENT-BIBLE.md leads with RULE 0Q as first content
-     → LL-203 defines single-box Claude Code instruction format
-  2. Fragmented Claude Code instructions
-     → LL-203: one box, all files, all commands, self-contained
+PROBLEMS SOLVED THIS SESSION:
+  1. RULE 0Q violated 2 more times (VL-010/011) → Bible leads with RULE 0Q
+  2. Fragmented Claude Code instructions → LL-203: one box only
+  3. Stale project knowledge → Bible + updated docs + new SESSION-START-PROMPT
+  4. Incomplete audit (previous attempt) → Full read of every doc in docs/
 
-NEW FILE:
-  docs/NUAI-AGENT-BIBLE.md v1.0
-    - Complete system description for cold AI sessions
-    - All features, all DB schemas, all rules consolidated
-    - Section 0: RULE 0Q front and center
-    - Read order: Bible → SESSION-STATE → VIOLATION_LOG → source file
+NEW FILE CREATED:
+  docs/NUAI-AGENT-BIBLE.md v1.0 — complete system bible for cold AI sessions
+    - RULE 0Q as first content (zero text before it)
+    - Claude Code instruction format (LL-203)
+    - Full platform description (all 7 portals, all features)
+    - Complete DB schema with exact column names
+    - All 10 edge functions with versions
+    - Current state (08 Apr 2026)
+    - All critical rules consolidated
+    - Process flows (Smart Capture, QR scan, checkout, wholesale)
+    - Document map for navigation
 
 UPDATED FILES:
-  docs/SESSION-CORE_v2_11.md: LL-203 + LL-204 added
-  docs/VIOLATION_LOG_v1_1.md: VL-010 + VL-011 added
-  docs/SESSION-LOG_DEFINITIVE.md: this entry
+  docs/SESSION-START-PROMPT.md — was referencing SESSION-STATE_v196 (12 versions stale)
+  docs/NEXT-SESSION-PROMPT_v201.md → replaced as v208 (DB snapshot was wrong)
+  docs/MANIFEST_v3_0.md — Edge Functions table updated (ai-copilot v59, +5 new EFs)
+  docs/REGISTRY_v3_2.md — Section 3 stale entries removed (loyalty-ai, CODEBASE_FACTS)
+  docs/SESSION-CORE_v2_11.md — LL-203, LL-204, R-TDZ-01, R-PGRST-01, facts added
+  docs/VIOLATION_LOG_v1_1.md — VL-010 + VL-011 logged
+  docs/SESSION-LOG_DEFINITIVE.md — this entry + v207 entry
 
-FULL SESSION WORK (v207 built on v206):
-  02bdc33 — HQOverview crash fix
+FULL SESSION WORK (captured in SESSION-STATE_v207):
+  02bdc33 — HQOverview crash (name missing from cannabis SELECT)
   266261e — Smart Capture auto-retry on 500
   3e6aa5a — ProteaAI LL-120 fix (handleSend + handleQuery via EF)
-  39a29e2 — CODEBASE_FACTS updated
+  39a29e2 — CODEBASE_FACTS (loyalty-ai v2, 50 customers, AI Actions Feed)
   944416c — SESSION-STATE v207
-  loyalty-ai v2 deployed (RPC fix p_user_id/p_points)
-  ai-copilot v59 deployed (systemOverride param)
-  50 mock customers seeded (a0000001 pattern)
-  ~250 loyalty_transactions seeded
-  Churn rescue: 3 fired. Birthday bonuses: 5 fired. Dedup confirmed working.
-  RLS on 12 finance tables — Supabase security alert cleared
-  Pure PTV industry_profile: food_beverage → cannabis_retail (fixed)
+  + Supabase only: RLS 12 tables, ai-copilot v59, loyalty-ai v2, 50 customers,
+    250 loyalty_transactions, churn rescue x3, birthday bonus x5, Pure PTV fix
 
 ---
 

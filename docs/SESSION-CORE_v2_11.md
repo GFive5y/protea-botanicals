@@ -449,6 +449,38 @@ Rules:
 Scope changes only on explicit owner instruction.
 Origin: 08 Apr 2026 session — established as permanent mode for development phase.
 
+## R-TDZ-01 — USECALLBACK TDZ ORDER (08 Apr 2026)
+useCallback that references another useCallback must be declared AFTER it.
+const has a Temporal Dead Zone — declaration order in component body = execution order.
+NEVER place a callback that calls showToast before showToast's useCallback declaration.
+Origin: HQLoyalty.js Tab 8 crash fixed this session.
+
+## R-PGRST-01 — SCHEMA RELOAD AFTER RAW SQL (08 Apr 2026)
+After adding columns via raw SQL (not dashboard migration):
+ALWAYS run: NOTIFY pgrst, 'reload schema';
+BEFORE testing INSERTs against new columns.
+Failure: 400 error "column does not exist" even though SQL succeeded.
+Origin: loyalty AI columns session this session.
+
+## loyalty_dedup_guard — TRIGGER NAME FACT (08 Apr 2026)
+The dedup trigger on loyalty_transactions is named: loyalty_dedup_guard
+To bulk seed loyalty_transactions safely:
+  ALTER TABLE loyalty_transactions DISABLE TRIGGER loyalty_dedup_guard;
+  -- insert rows --
+  ALTER TABLE loyalty_transactions ENABLE TRIGGER loyalty_dedup_guard;
+Never bulk seed without disabling this trigger first.
+
+## increment_loyalty_points — RPC PARAM NAMES (08 Apr 2026)
+Function signature: increment_loyalty_points(p_user_id uuid, p_points integer)
+CORRECT call: client.rpc('increment_loyalty_points', { p_user_id: userId, p_points: points })
+WRONG (was in loyalty-ai v1): { user_id: userId, delta: points }
+Wrong param names = silent fail — RPC returns 400, no error thrown by .catch() if not checked.
+This bug caused loyalty-ai churn rescue to never fire in v1.
+
+## mock_customer_uuid_pattern — DATA IDENTIFICATION (08 Apr 2026)
+All 50 mock customers use UUID pattern: a0000001-0000-0000-0000-00000000000X
+where X = 01 through 50. This identifies them as mock data for safe cleanup.
+
 ---
 
 *SESSION-CORE v2.11 · NuAi · April 4, 2026*

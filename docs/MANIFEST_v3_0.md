@@ -74,7 +74,8 @@
 | HQDocuments.js | Document vault — AI extraction, review screen. WP-FIN S0: dedup gate (LL-084), unit_cost_zar on confirm. WP-FIN S3: create_expense handler + amber badge. | v2.4 | ✅ WP-FIN S0+S3 (3d2c262) |
 | HQFraud.js | HQ fraud — cross-tenant anomaly, POPIA tracking | v2.0 | ✅ |
 | HQInvoices.js | Invoice list, aged debtors panel (0/30/60/90+ day buckets per dispensary), status pipeline, payment recording. LL-116: supplier_id for all partners, invoice_number not reference. | v2.0 | ✅ WP-FIN S4 |
-| HQLoyalty.js | 7-tab loyalty engine config — earning rates, tiers, redemption, referral | — | ⚠️ COMPLEX. READ BEFORE TOUCHING |
+| HQJournals.js | Journal entry module — list, expand lines, filter by status/type, new journal form, post, reverse, delete draft | v1.0 | ✅ BUILT WP-FINANCIALS Ph5 |
+| HQLoyalty.js | 10-tab AI loyalty engine. 8 product categories. Harvest Club. Programme Health Score. Tab 8 = AI Engine (Run Now button, churn/birthday/boost/promo toggles, AI Actions Feed). | v4.0 | ⚠️ COMPLEX. READ BEFORE TOUCHING |
 | HQMedical.js | Medical dispensary — patients, prescriptions, SAHPRA reports. Gated. | v1.0 | ✅ GATED |
 | HQOverview.js | HQ overview dashboard — live tiles, realtime subs | v2.0 | ✅ |
 | HQPricing.js | Pricing and margin — profile-adaptive since S13. | v4.1+S13 | ✅ WP-BIB S13 (40468c8) |
@@ -88,7 +89,7 @@
 | HQTenants.js | Tenant management — TenantSetupWizard wired. industry_profile saves correctly (BUG-042 resolved). Profile save still needs Ctrl+Shift+R. | v1.1+BUG-042 | ✅ BUG-042 RESOLVED (264a5cb) |
 | HQTransfer.js | HQ→Shop transfer orders. draft→in_transit→received lifecycle. Ship deducts HQ stock + transfer_out movement. Receive adds shop stock + transfer_in movement. Auto-creates shop item if not found (sell_price=0, LL-024). Cancel in_transit reverses HQ deduction. 4 sub-tabs: Overview / New Transfer / Active / History. Reference: TRF-YYYYMMDD-XXXX (UNIQUE). | v1.0 | ✅ WP-STOCK-PRO S5 (c617f55) |
 | HQTradingDashboard.js | Daily trading intelligence — v3.0. KPI strip (5 cards incl. projected revenue), 30-day revenue bar chart (day-of-week labels, today green), SAST-correct hourly chart, top sellers, payment split, category breakdown, loyalty strip, EODStatusWidget, 5-min auto-refresh. History panel: 4 presets + By Month mode (Jan 2025 → present). SAST helpers: dayStartSAST/dayEndSAST/todayStrSAST/sastHour. resolveCategories() fixes product_metadata?.category from inventory_items. ALL queries status='paid'. loyalty_transactions uses transaction_type (LL-191). | v3.0 | ✅ WP-DAILY-OPS Sessions B+C+D (a5340f8 via PR #1) |
-| POSScreen.js | POS till — product grid with category filter + search, qty modal with stock guard, cart with stepper, Cash/Card/Online payment, Complete Sale → receipt modal. Writes: orders (status='paid') + order_items + stock_movements (movement_type='sale_pos'). | v1.0 | ✅ WP-POS (aa51b74) |
+| POSScreen.js | POS till — product grid, customer lookup, loyalty (10pts/R1), cash change, session badge, qty modal with stock guard, cart with stepper, Cash/Card/Online payment, Complete Sale → receipt modal. Writes: orders (status='paid') + order_items + stock_movements (movement_type='sale_pos'). | v1.0 | ✅ WP-POS (aa51b74) |
 | EODCashUp.js | End-of-day cash reconciliation — 3 steps: set float, count cash (SA denominations or lump sum), reconcile. All thresholds from tenant_config.settings (never hardcoded). Status: balanced/flagged/escalated. Reason required if flagged. History panel 30 days. DB: pos_sessions + eod_cash_ups. | v1.0 | ✅ WP-EOD (5249529) |
 | HQWholesaleOrders.js | B2B wholesale orders — Draft/Confirm/Ship/Cancel reservation flow. v2.0: SAGE-style invoice modal (dark green toolbar, Print/Save PDF/Email), auto-generates invoice on ship. LL-115: stock_reservations uses inventory_item_id, quantity_reserved. LL-116: invoices uses supplier_id, invoice_number. | v2.0 | ✅ WP-FIN S4 |
 | TenantSetupWizard.js | 5-step Business in a Box onboarding — Identity / Industry / Tier+Flags / Catalogue / Admin user | v1.0 | ✅ WP-BIB S7 (2d01a40) |
@@ -260,11 +261,19 @@
 
 | Function | What It Does | Version | State |
 |---|---|---|---|
-| ai-copilot | Powers ProteaAI.js. Claude Sonnet. | v3.0 | ✅ LIVE |
-| get-fx-rate | USD/ZAR live FX, 60s cache. Fallback R18.50. | — | ✅ LIVE |
-| sign-qr | HMAC-signs QR codes. ⚠️ JWT verify MUST be disabled after every redeploy. | — | ✅ LIVE — CRITICAL RULE |
-| process-document | AI document ingestion — lump-sum cost allocation (WP-FIN S0), CAPEX/OPEX classification (WP-FIN S3), duplicate invoice detection. v1.9. All helpers at module level (LL-085). | v1.9 | ✅ LIVE (--no-verify-jwt) |
-| create-admin-user | Creates Supabase Auth user + user_profiles row | — | ⚠️ STATUS UNKNOWN — TenantSetupWizard Step 5 needs it |
+| ai-copilot | All Claude API calls. systemOverride param (v59). Tab-aware context. | v59 | ✅ LIVE |
+| loyalty-ai | Nightly AI engine — 5 jobs: churn scoring, churn rescue, birthday bonuses, point expiry, stock-boost suggestions. Weekly brief Mondays. RPC bug fixed in v2. | v2 | ✅ LIVE (verify_jwt=false) |
+| process-document | AI doc ingestion — SARS compliance, fingerprint dedup, anti-fraud 6-level fingerprint, auto-categorise. | v52 | ✅ LIVE (verify_jwt=false) |
+| auto-post-capture | Atomically posts expense + journal_entries + journal_lines + vat_transactions on capture approval. | v1 | ✅ LIVE (verify_jwt=false) |
+| receive-from-capture | Handles stock receipt from delivery notes — stock_movements + AVCO + Dr 12000 Cr 20000 journal. | v1 | ✅ LIVE (verify_jwt=false) |
+| sim-pos-sales | POS sales simulator — 55% cash / 30% card / 15% Yoco split, AVCO in product_metadata. | v4 | ✅ LIVE |
+| get-fx-rate | USD/ZAR live FX, 60s cache. Fallback R18.50. | v35 | ✅ LIVE |
+| sign-qr | HMAC-signs QR codes. ⚠️ JWT verify MUST be disabled after every redeploy. | v36 | ✅ LIVE — CRITICAL RULE |
+| verify-qr | QR validation and fraud check. | v34 | ✅ LIVE |
+| send-notification | WhatsApp via Twilio — tier upgrades, alerts. | v37 | ✅ LIVE |
+| payfast-checkout | PayFast payment initiation. | v44 | ✅ LIVE |
+| payfast-itn | PayFast payment confirmation webhook. | v39 | ✅ LIVE |
+| create-admin-user | Creates Supabase Auth user + user_profiles row. | v1 | ⚠️ STATUS UNKNOWN — TenantSetupWizard Step 5 needs it |
 
 ---
 

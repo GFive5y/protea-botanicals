@@ -80,6 +80,10 @@
 | Show shipment tracking | ✅ BUILT | `AdminShipments.js` |
 | Show HR panel (admin / team-scoped view) | ✅ BUILT | `AdminHRPanel.js` |
 | Show loyalty programme configuration | ✅ BUILT | `HQLoyalty.js v4.0` |
+| Show AI-powered document capture with anti-fraud fingerprint + auto-post accounting | ✅ BUILT WP-SMART-CAPTURE | `HQDocuments.js v2.4 + process-document v52 + auto-post-capture v1 + receive-from-capture v1` |
+| Receive stock from AI-extracted delivery note (AVCO + Dr 12000 Cr 20000 journal) | ✅ BUILT WP-SMART-CAPTURE | `receive-from-capture EF v1` |
+| Show journal entry module (list, expand lines, post, reverse, COA picker) | ✅ BUILT WP-FINANCIALS Ph5 | `HQJournals.js v1.0` |
+| Nightly AI loyalty automation (churn rescue, birthday, expiry, stock boost) | ✅ BUILT WP-O v2.0 | `loyalty-ai EF v2 (deployed 08 Apr 2026)` |
 | Show live P&L with actual COGS + DB-backed OPEX | ✅ BUILT WP-FIN S1+S2 | `HQProfitLoss.js v3.2` |
 | Show expense manager (CRUD + bulk import + CSV export) | ✅ BUILT WP-FIN S1 | `ExpenseManager.js v1.0` |
 | Add CAPEX/OPEX expense from document ingestion | ✅ BUILT WP-FIN S3 | `HQDocuments.js v2.4 + process-document v1.9` |
@@ -594,6 +598,10 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 # SECTION 3 — SAFE TO BUILD
 ## Verified absent from disk — not yet implemented
 
+⚠️  STALE ENTRIES REMOVED 08 Apr 2026:
+loyalty-ai EF → NOW DEPLOYED as v2 (see Section 1)
+ProteaAI CODEBASE_FACTS → UPDATED in commit 39a29e2
+
 | Feature | WP Ref | What It Is |
 |---|---|---|
 | BUG-044: HQCogs shipping live FX | — | Verify shipping_alloc_usd column. If missing: ALTER TABLE product_cogs ADD COLUMN shipping_alloc_usd NUMERIC, shipping_units INT. Then ~6 find/replace ops in HQCogs.js only. |
@@ -605,7 +613,6 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 | SaaS Revenue dashboard | — | Platform MRR tile |
 | ProteaAI Phase C | WP-AI-UNIFIED | Proactive PlatformBar triggers |
 | AdminQRCodes.js inventory_item_id link UI | — | Currently SQL-only |
-| loyalty-ai Edge Function | WP-O v2.0 | Nightly cron: 7 jobs (churn rescue, birthday, expiry, streak, stock-boost, tier upgrade, weekly brief). Tables ready. Not yet deployed. |
 | create-admin-user Edge Function | — | STATUS UNKNOWN — TenantSetupWizard Step 5 needs it. Verify before building. |
 | Batch ID stamping on movements | — | stock_movements.batch_id exists, never populated by any UI path |
 | SimplePay API integration | WP-HR-11 ext. | Direct push from HRPayroll.js — decision pending |
@@ -619,7 +626,6 @@ create_expense (WP-FIN S3 — links document_log.expense_id ← expense.id)
 | WP-STOCK-RECEIVE-S3 | WP-STOCK-RECEIVE-S3 | Product World Item Picker for receive delivery modal. ProductWorlds.js as single source of truth. |
 | WP-STOCK-MERGE | WP-STOCK-MERGE | Merge Smart Catalog into HQStock nav as a tab. AFTER SC-01–SC-10 complete. |
 | CLAUDE.md in repo root | — | Claude Code reads this before every task — add critical SESSION-CORE rules here |
-| ProteaAI CODEBASE_FACTS update | — | String is stale (says "Vercel deploy pending"). Owner must update. Search: const CODEBASE_FACTS |
 | Medi Rec sell prices | — | 182 SKUs at R0. Gates shop, P&L, loyalty. Owner must set via HQPricing. |
 | Supabase backups | — | Enable via Settings → Add-ons. URGENT — no backups currently running. |
 

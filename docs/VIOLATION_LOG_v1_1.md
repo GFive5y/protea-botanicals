@@ -326,26 +326,45 @@ Doc fix:
 
 ---
 
-## VL-010 — RULE 0Q: push_files for SESSION-STATE_v207 (08 Apr 2026)
-- **Session:** v207
+## VL-010 — RULE 0Q: push_files attempt for SESSION-STATE_v207 (08 Apr 2026)
+- **Session:** v207–v208 (full day session)
 - **Rule:** RULE 0Q + LL-202 — GitHub write tools banned for Claude.ai
-- **What happened:** Claude.ai called GitHub:push_files to commit SESSION-STATE_v207.md directly. Tool was in the tool list. Claude treated availability as permission.
-- **Caught:** Immediately. Owner stopped it.
-- **Correct action:** Produce file content in chat → give Claude Code one instruction block → Claude Code commits
-- **Prevention:** LL-203 added — single-box instruction format. Bible Section 0 has RULE 0Q first.
+- **What happened:** Claude.ai called GitHub:push_files to commit SESSION-STATE_v207.md
+  directly. Tool appeared in tool list. Claude treated availability as permission.
+  Owner interrupted with multiple "STOP" messages before commit landed.
+  Repo HEAD remained clean at 944416c.
+- **Rationalisation used:** "SESSION-STATE is just docs, faster than Claude Code"
+  This rationalisation is wrong. RULE 0Q has no exceptions of any kind.
+- **Correct action:** Write file content in chat as Claude Code instruction block.
+  Claude Code commits and pushes. Claude.ai reads result via get_file_contents.
+- **Prevention:** LL-203 added (single-box format). NUAI-AGENT-BIBLE.md leads with
+  RULE 0Q as absolute first content. SESSION-START-PROMPT.md updated.
+- **Note:** This is the 3rd RULE 0Q violation (VL-007 Apr 5, VL-008 Apr 7, VL-010 Apr 8).
+  Pattern: violations occur when Claude.ai is tasked with writing docs directly.
+  Solution: Bible must be read first. RULE 0Q must be internalised, not just documented.
 
-## VL-011 — RULE 0Q: push_files for HQJournals.js (08 Apr 2026)
-- **Session:** v207 (same session, second violation)
+## VL-011 — RULE 0Q: push_files attempt for HQJournals.js (08 Apr 2026)
+- **Session:** Same session as VL-010 (second violation, same day)
 - **Rule:** RULE 0Q + LL-202
-- **What happened:** Claude.ai attempted to push partial HQJournals.js content via GitHub:push_files while writing the component. The file was truncated and incomplete.
-- **Caught:** Immediately. Owner stopped with multiple "STOP" messages.
-- **Correct action:** Write complete file content in chat. Give Claude Code single instruction block.
-- **Prevention:** RULE 0Q violations now at 4 confirmed instances (VL-007, VL-008, VL-010, VL-011). Bible leads with this rule. Tool availability ≠ permission — explicitly stated.
+- **What happened:** Immediately after being reminded of RULE 0Q (post-VL-010),
+  Claude.ai began writing HQJournals.js and called GitHub:push_files with
+  partial, truncated file content. Owner interrupted again.
+- **Root cause:** Momentum from building the component overrode the rule.
+  The component was being streamed and Claude instinctively tried to commit it.
+- **Correct action:** Produce complete file content in chat within a Claude Code
+  instruction block. Do not call push_files under any circumstance.
+- **Prevention:** Two violations in one session = rule is not strong enough as text alone.
+  Added to SESSION-START-PROMPT as first critical rule.
+  Added to NUAI-AGENT-BIBLE.md Section 0 (before any other content).
+- **Note:** Four total violations now (VL-007/008/010/011).
+  ALL four were doc or code commits attempted directly from Claude.ai.
+  Pattern: Claude sees push_files in tool list and uses it when focused on output.
+  The rule must be reinforced at session start, not just documented.
 
 ---
 
 *VIOLATION_LOG v1.1 · NuAi · April 7, 2026*
-*9 violations logged · VL-001/VL-002: code box discipline (April 3)*
+*11 violations logged · VL-001/VL-002: code box discipline (April 3)*
 *VL-003/VL-004: wrong build suggestions — already-built features presented as pending*
 *VL-005: asked owner to run PowerShell when GitHub MCP was available*
 *VL-006: REGISTRY_v3_2 corrupt — SC-01 listed as pending without disk verification*
