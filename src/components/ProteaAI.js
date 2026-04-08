@@ -930,50 +930,26 @@ export default function ProteaAI({
           const e = await res.json().catch(() => ({}));
           throw new Error(e.error || `API ${res.status}`);
         }
-        // SSE streaming — token queue + requestAnimationFrame drain.
+        // SSE streaming — flushSync per individual token.
         //
-        // Root cause of paragraph jumps: the EF's TransformStream batches
-        // multiple Claude tokens into one network chunk. flushSync per chunk
-        // still renders 10-20 tokens at once = paragraph-level jump.
+        // All previous approaches (dual-loop, RAF drain, flushSync per chunk)
+        // failed because the EF TransformStream delivers multiple tokens per
+        // network chunk. Rendering once per chunk = line-by-line jumps.
         //
-        // Fix: decouple rendering from network delivery entirely.
-        // Reader fills tokenQueue at whatever speed the network delivers.
-        // RAF loop drains 2 tokens per frame at ~60fps = smooth typewriter.
-        // flushSync inside RAF forces each frame to actually paint.
+        // The only correct fix: parse every token individually inside the
+        // reader loop and call flushSync for each one immediately.
+        // Each flushSync forces a synchronous DOM paint before the next token.
+        // The user sees every character appear as it is processed, regardless
+        // of how many tokens arrived in the same network chunk.
         //
-        // Result: rendering rate is constant 60fps regardless of network bursts.
+        // Performance: each flushSync on a small chat bubble is <1ms.
+        // A 20-token chunk = ~20 synchronous renders = ~5ms total. Fine.
 
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = "";
         let full = "";
-        const tokenQueue = [];
-        let streamDone = false;
-        let rafId = null;
 
-        // RAF drain — runs at 60fps, renders 2 tokens per frame
-        const renderFrame = () => {
-          if (tokenQueue.length > 0) {
-            const batch = tokenQueue.splice(0, 2).join("");
-            full += batch;
-            flushSync(() => {
-              setMessages((p) =>
-                p.map((m) =>
-                  m.id === aid ? { ...m, content: full } : m,
-                ),
-              );
-            });
-          }
-          if (!streamDone || tokenQueue.length > 0) {
-            rafId = requestAnimationFrame(renderFrame);
-          } else {
-            rafId = null;
-          }
-        };
-
-        rafId = requestAnimationFrame(renderFrame);
-
-        // Network reader — fills tokenQueue at SSE delivery speed
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -986,29 +962,18 @@ export default function ProteaAI({
             if (raw === "[DONE]") continue;
             try {
               const { token } = JSON.parse(raw);
-              if (token) tokenQueue.push(token);
+              if (token) {
+                full += token;
+                flushSync(() => {
+                  setMessages((p) =>
+                    p.map((m) =>
+                      m.id === aid ? { ...m, content: full } : m,
+                    ),
+                  );
+                });
+              }
             } catch { /* skip malformed SSE line */ }
           }
-        }
-
-        // Stream finished — wait for RAF to drain remaining tokens
-        streamDone = true;
-        await new Promise((resolve) => {
-          const wait = () => {
-            if (tokenQueue.length === 0 && rafId === null) { resolve(undefined); }
-            else { setTimeout(wait, 16); }
-          };
-          wait();
-        });
-
-        // Guarantee final full content is committed
-        if (tokenQueue.length > 0) {
-          full += tokenQueue.join("");
-          setMessages((p) =>
-            p.map((m) =>
-              m.id === aid ? { ...m, content: full } : m,
-            ),
-          );
         }
 
         // Mark streaming complete
