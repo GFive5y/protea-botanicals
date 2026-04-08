@@ -1,272 +1,418 @@
-// src/components/hq/HQBankRecon.js — WP-FINANCIALS Phase 7
-// Bank Reconciliation: CSV import, SA bank auto-detection, match/unmatch, recon summary
-// Tables: bank_accounts, bank_statement_lines
+// src/components/hq/HQBankRecon.js
+// WP-FINANCIALS Phase 7 — Bank Reconciliation
+// v1.0 · 08 Apr 2026
+// Schema verified · LL-205 applied · LL-206 pattern · additive only
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase } from "../../services/supabaseClient";
-import { useTenant } from "../../services/tenantService";
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../../services/supabaseClient';
+import { useTenant } from '../../services/tenantService';
 
-const D = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900: "#0D0D0D", ink700: "#1F2937", ink500: "#6B7280",
-  ink300: "#D1D5DB", ink150: "#E5E7EB", ink075: "#F9FAFB",
-  accent: "#1A3D2B", accentMid: "#2D6A4F", accentLit: "#ECFDF5",
-  success: "#059669", successBg: "#ECFDF5", successBd: "#6EE7B7",
-  danger: "#DC2626", dangerBg: "#FEF2F2",
-  warning: "#D97706", warningBg: "#FFFBEB",
-  info: "#2563EB", infoBg: "#EFF6FF", infoBd: "#BFDBFE",
-  shadow: "0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+
+const MATCH_CFG = {
+  order:          { label: 'POS / ORDER',    bg: '#dcfce7', color: '#15803d' },
+  expense:        { label: 'EXPENSE',         bg: '#fef3c7', color: '#b45309' },
+  purchase_order: { label: 'PURCHASE ORDER',  bg: '#dbeafe', color: '#1d4ed8' },
+  journal:        { label: 'JOURNAL',         bg: '#f3e8ff', color: '#7c3aed' },
+  unmatched:      { label: 'UNMATCHED',       bg: '#fee2e2', color: '#b91c1c' },
+  other:          { label: 'OTHER',           bg: '#f3f4f6', color: '#6b7280' },
+  opening:        { label: 'OPENING BAL',     bg: '#f0f9ff', color: '#0369a1' },
 };
 
-const fmtZar = (n) => `R\u202F${(Math.abs(parseFloat(n)||0)).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"}) : "\u2014";
+const MATCH_OPTIONS = [
+  { value: 'order',          label: 'POS / Order settlement' },
+  { value: 'expense',        label: 'Expense payment' },
+  { value: 'purchase_order', label: 'Supplier / PO payment' },
+  { value: 'journal',        label: 'Journal entry' },
+  { value: 'other',          label: 'Other / Non-recurring' },
+];
 
-function detectBank(headerLine) {
-  const l = headerLine.toLowerCase();
-  if (l.includes("fnb")||l.includes("first national")) return "FNB";
-  if (l.includes("absa")||l.includes("transaction date")&&l.includes("debit amount")) return "ABSA";
-  if (l.includes("standard bank")||l.includes("std bank")) return "Standard Bank";
-  if (l.includes("nedbank")||l.includes("ned bank")) return "Nedbank";
-  if (l.includes("capitec")||l.includes("client ref")) return "Capitec";
-  return "Unknown";
-}
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-function parseCSVLine(line) {
-  const r=[]; let c="",q=false;
-  for (let i=0;i<line.length;i++) { const ch=line[i]; if(ch==='"'){q=!q;continue;} if(ch===","&&!q){r.push(c.trim());c="";continue;} c+=ch; }
-  r.push(c.trim()); return r;
-}
+const fmt = (n) =>
+  `R${Number(n || 0).toLocaleString('en-ZA', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })}`;
 
-function parseAmount(s) { if(!s)return 0; return parseFloat(s.replace(/[R\s,]/g,"").replace("(","-").replace(")",""))||0; }
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-ZA', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  }) : '\u2014';
 
-function parseDate(s) {
-  if(!s)return null; s=s.trim().replace(/['"]/g,"");
-  let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
-  const mos={jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
-  m=s.match(/^(\d{1,2})\s([A-Za-z]{3})\s(\d{4})$/i);
-  if(m) return `${m[3]}-${mos[m[2].toLowerCase()]||"01"}-${m[1].padStart(2,"0")}`;
-  return null;
-}
+const matchCfg = (type, ref) => {
+  if (!type && ref === 'OB-MAR') return MATCH_CFG.opening;
+  return MATCH_CFG[type] || MATCH_CFG.other;
+};
 
-function parseCSV(content) {
-  const ls=content.split(/\r?\n/).filter(l=>l.trim());
-  if(ls.length<2)return{bank:"Unknown",parsed:[]};
-  const bank=detectBank(ls[0]);
-  const rows=ls.map(parseCSVLine);
-  const parsed=rows.slice(1).map(row=>{
-    const [d,desc,...rest]=row;
-    const amt=rest.length>=3?null:parseAmount(rest[0]);
-    return {
-      statement_date:parseDate(d),
-      description:(desc||"").trim(),
-      reference:null,
-      debit_amount:amt!==null?(amt<0?Math.abs(amt):0):(parseAmount(rest[0])),
-      credit_amount:amt!==null?(amt>0?amt:0):(parseAmount(rest[1])),
-      balance:parseAmount(rest[rest.length-1]),
-    };
-  }).filter(r=>r.statement_date);
-  return {bank,parsed};
-}
-
-function KPICard({label,value,sub,color,icon}) {
-  return <div style={{background:"#fff",borderRadius:12,padding:"18px 20px",boxShadow:D.shadow,flex:1,minWidth:150}}>
-    <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:D.font,marginBottom:8,display:"flex",gap:5}}>{icon&&<span>{icon}</span>}{label}</div>
-    <div style={{fontSize:22,fontWeight:700,color:color||D.accent,fontVariantNumeric:"tabular-nums",fontFamily:D.font,lineHeight:1}}>{value}</div>
-    {sub&&<div style={{fontSize:11,color:D.ink500,marginTop:5,fontFamily:D.font}}>{sub}</div>}
-  </div>;
-}
+// ─── COMPONENT ───────────────────────────────────────────────────────────────
 
 export default function HQBankRecon() {
   const { tenant } = useTenant();
   const tenantId = tenant?.id;
-  const fileRef = useRef(null);
-  const [accounts, setAccounts] = useState([]);
-  const [selectedAccount, setSelectedAccount] = useState(null);
-  const [lines, setLines] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [filterMatch, setFilterMatch] = useState("all");
-  const [csvPreview, setCsvPreview] = useState(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const showToast = (msg,type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),4500); };
+
+  const [account,  setAccount]  = useState(null);
+  const [lines,    setLines]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+
+  // Filters
+  const [fMatch, setFMatch]   = useState('all');
+  const [fType,  setFType]    = useState('all');
+  const [fBatch, setFBatch]   = useState('all');
+
+  // Inline match edit
+  const [editingId,  setEditingId]  = useState(null);
+  const [editType,   setEditType]   = useState('');
+  const [saving,     setSaving]     = useState(false);
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async () => {
-    if(!tenantId)return; setLoading(true);
+    if (!tenantId) return;
+    setLoading(true);
+    setError(null);
     try {
-      const {data:accs}=await supabase.from("bank_accounts").select("*").eq("tenant_id",tenantId).order("is_primary",{ascending:false});
-      setAccounts(accs||[]);
-      const primary=accs?.find(a=>a.is_primary)||accs?.[0];
-      if(primary){setSelectedAccount(primary);
-        const{data}=await supabase.from("bank_statement_lines").select("*").eq("bank_account_id",primary.id).order("statement_date",{ascending:false});
-        setLines(data||[]);
-      }
-    } catch(e){showToast("Load failed: "+e.message,"error");} finally{setLoading(false);}
-  },[tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(()=>{fetchAll();},[fetchAll]);
+      const [accRes, linesRes] = await Promise.all([
+        supabase
+          .from('bank_accounts')
+          .select('id, bank_name, account_name, account_number, account_type, currency, opening_balance, is_primary')
+          .eq('tenant_id', tenantId)
+          .eq('is_primary', true)
+          .single(),
+        supabase
+          .from('bank_statement_lines')
+          .select('id, bank_account_id, statement_date, description, reference, debit_amount, credit_amount, balance, matched_type, matched_id, matched_at, import_batch')
+          .eq('tenant_id', tenantId)
+          .order('statement_date', { ascending: true })
+          .order('created_at', { ascending: true }),
+      ]);
 
-  const switchAccount = async(acc) => {
-    setSelectedAccount(acc); setLoading(true);
-    try{const{data}=await supabase.from("bank_statement_lines").select("*").eq("bank_account_id",acc.id).order("statement_date",{ascending:false});setLines(data||[]);}finally{setLoading(false);}
-  };
+      if (accRes.error && accRes.error.code !== 'PGRST116') throw accRes.error;
+      if (linesRes.error) throw linesRes.error;
 
-  const handleFileSelect = (e) => {
-    const file=e.target.files?.[0]; if(!file)return;
-    const reader=new FileReader();
-    reader.onload=(ev)=>{const result=parseCSV(ev.target.result);if(result.parsed.length===0){showToast("No valid rows.","error");return;}setCsvPreview(result);setShowPreview(true);};
-    reader.readAsText(file); e.target.value="";
-  };
+      setAccount(accRes.data || null);
+      setLines(linesRes.data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load bank data');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
 
-  const importCSV = async() => {
-    if(!csvPreview||!selectedAccount)return; setImporting(true);
-    try{
-      const batch=`IMPORT-${Date.now()}`;
-      const rows=csvPreview.parsed.map(r=>({bank_account_id:selectedAccount.id,tenant_id:tenantId,statement_date:r.statement_date,description:r.description,reference:r.reference,debit_amount:r.debit_amount,credit_amount:r.credit_amount,balance:r.balance||null,matched_type:null,import_batch:batch}));
-      const{error}=await supabase.from("bank_statement_lines").insert(rows);
-      if(error)throw error;
-      showToast(`${rows.length} lines imported from ${csvPreview.bank}.`);
-      setShowPreview(false);setCsvPreview(null);fetchAll();
-    }catch(e){showToast("Import failed: "+e.message,"error");}finally{setImporting(false);}
-  };
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const updateMatch = async(lineId,type) => {
-    const{error}=await supabase.from("bank_statement_lines").update({matched_type:type,matched_at:type?new Date().toISOString():null}).eq("id",lineId);
-    if(error){showToast("Failed.","error");return;}
-    setLines(ls=>ls.map(l=>l.id===lineId?{...l,matched_type:type,matched_at:type?new Date().toISOString():null}:l));
-  };
+  // ── Derived ────────────────────────────────────────────────────────────────
 
-  const filteredLines=lines.filter(l=>{
-    if(filterMatch==="unmatched"&&l.matched_type&&l.matched_type!=="unmatched")return false;
-    if(filterMatch!=="all"&&filterMatch!=="unmatched"&&l.matched_type!==filterMatch)return false;
+  const openingBalance = account?.opening_balance ? Number(account.opening_balance) : 0;
+
+  const txLines = lines.filter(l => !(Number(l.debit_amount) === 0 && Number(l.credit_amount) === 0));
+
+  const totalCredits = txLines.reduce((s, l) => s + Number(l.credit_amount || 0), 0);
+  const totalDebits  = txLines.reduce((s, l) => s + Number(l.debit_amount  || 0), 0);
+  const calcClosing  = openingBalance + totalCredits - totalDebits;
+
+  const sortedByDate = [...lines].sort((a, b) => new Date(a.statement_date) - new Date(b.statement_date));
+  const lastLine     = sortedByDate[sortedByDate.length - 1];
+  const stmtClosing  = lastLine?.balance ? Number(lastLine.balance) : null;
+  const reconciled   = stmtClosing !== null && Math.abs(calcClosing - stmtClosing) < 0.05;
+
+  const unmatchedLines = lines.filter(l => l.matched_type === 'unmatched');
+  const unmatchedValue = unmatchedLines.reduce(
+    (s, l) => s + Number(l.debit_amount || 0) + Number(l.credit_amount || 0), 0
+  );
+
+  const matchedCount   = lines.filter(l => l.matched_type && l.matched_type !== 'unmatched').length;
+  const unmatchedCount = unmatchedLines.length;
+
+  const batches = [...new Set(lines.map(l => l.import_batch).filter(Boolean))].sort();
+
+  const filtered = lines.filter(l => {
+    if (fMatch === 'matched'   && (l.matched_type === 'unmatched' || !l.matched_type)) return false;
+    if (fMatch === 'unmatched' && l.matched_type !== 'unmatched') return false;
+    if (fType  !== 'all'       && l.matched_type !== fType) return false;
+    if (fBatch !== 'all'       && l.import_batch !== fBatch) return false;
     return true;
   });
 
-  const totalCredits=lines.reduce((s,l)=>s+(parseFloat(l.credit_amount)||0),0);
-  const totalDebits=lines.reduce((s,l)=>s+(parseFloat(l.debit_amount)||0),0);
-  const netMovement=totalCredits-totalDebits;
-  const closingBalance=(parseFloat(selectedAccount?.opening_balance)||0)+netMovement;
-  const matchedCount=lines.filter(l=>l.matched_type&&l.matched_type!=="unmatched").length;
-  const unmatchedLines=lines.filter(l=>!l.matched_type||l.matched_type==="unmatched");
-  const reconPct=lines.length>0?Math.round((matchedCount/lines.length)*100):0;
+  // ── Save match type ────────────────────────────────────────────────────────
 
-  const card={background:"#fff",borderRadius:12,boxShadow:D.shadow,overflow:"hidden",marginBottom:20};
+  async function saveMatch(lineId) {
+    if (!editType) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('bank_statement_lines')
+        .update({
+          matched_type: editType,
+          matched_at:   new Date().toISOString(),
+        })
+        .eq('id', lineId);
+      if (error) throw error;
+      setEditingId(null);
+      setEditType('');
+      await fetchAll();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  if(showPreview&&csvPreview) return (
-    <div style={{fontFamily:D.font,color:D.ink700}}>
-      {toast&&<div style={{position:"fixed",top:24,right:24,zIndex:9999,background:toast.type==="error"?D.danger:D.accent,color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600}}>{toast.msg}</div>}
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-        <button onClick={()=>{setShowPreview(false);setCsvPreview(null);}} style={{padding:"7px 14px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:D.font}}>{"\u2190"} Cancel</button>
-        <h2 style={{margin:0,fontSize:20,fontWeight:700,color:D.ink900}}>Import \u2014 {csvPreview.bank}</h2>
-        <span style={{padding:"3px 12px",borderRadius:12,fontSize:11,fontWeight:700,background:D.infoBg,color:D.info,border:`1px solid ${D.infoBd}`}}>{csvPreview.parsed.length} rows</span>
-      </div>
-      <div style={card}>
-        <div style={{display:"grid",gridTemplateColumns:"100px 1fr 110px 110px 110px",padding:"8px 20px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em"}}>
-          <span>Date</span><span>Description</span><span style={{textAlign:"right"}}>Debit</span><span style={{textAlign:"right"}}>Credit</span><span style={{textAlign:"right"}}>Balance</span>
-        </div>
-        {csvPreview.parsed.slice(0,10).map((r,i)=>(
-          <div key={i} style={{display:"grid",gridTemplateColumns:"100px 1fr 110px 110px 110px",padding:"10px 20px",borderBottom:`1px solid ${D.ink150}`,alignItems:"center"}}>
-            <span style={{fontSize:12,color:D.ink500}}>{fmtDate(r.statement_date)}</span>
-            <span style={{fontSize:13,color:D.ink700}}>{r.description}</span>
-            <span style={{fontSize:13,color:r.debit_amount>0?D.danger:D.ink300,textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:r.debit_amount>0?600:400}}>{r.debit_amount>0?fmtZar(r.debit_amount):"\u2014"}</span>
-            <span style={{fontSize:13,color:r.credit_amount>0?D.success:D.ink300,textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:r.credit_amount>0?600:400}}>{r.credit_amount>0?fmtZar(r.credit_amount):"\u2014"}</span>
-            <span style={{fontSize:12,color:D.ink500,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{r.balance?fmtZar(r.balance):"\u2014"}</span>
-          </div>
-        ))}
-        {csvPreview.parsed.length>10&&<div style={{padding:"10px 20px",fontSize:12,color:D.ink500,fontStyle:"italic"}}>+ {csvPreview.parsed.length-10} more\u2026</div>}
-      </div>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={importCSV} disabled={importing} style={{padding:"10px 24px",border:"none",borderRadius:8,background:D.accent,color:"#fff",fontSize:13,fontWeight:700,cursor:importing?"wait":"pointer",fontFamily:D.font,opacity:importing?0.7:1}}>{importing?"Importing\u2026":`Import ${csvPreview.parsed.length} Rows`}</button>
-        <button onClick={()=>{setShowPreview(false);setCsvPreview(null);}} style={{padding:"10px 16px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:D.font}}>Cancel</button>
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (loading) return (
+    <div style={S.center}>
+      <div style={S.spinner} />
+      <span style={{ fontSize: 14, color: '#6b7280' }}>Loading bank reconciliation{"\u2026"}</span>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ padding: 32, color: '#b91c1c', fontSize: 14 }}>{"\u26A0\uFE0F"} {error}</div>
+  );
+
+  if (!account) return (
+    <div style={S.center}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>{"\uD83C\uDFE6"}</div>
+        <div style={{ fontWeight: 700, fontSize: 16, color: '#374151', marginBottom: 8 }}>No bank account configured</div>
+        <div style={{ fontSize: 13, color: '#6b7280' }}>Add a primary bank account in the Financial Setup Wizard.</div>
       </div>
     </div>
   );
 
   return (
-    <div style={{fontFamily:D.font,color:D.ink700}}>
-      {toast&&<div style={{position:"fixed",top:24,right:24,zIndex:9999,background:toast.type==="error"?D.danger:D.accent,color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600,boxShadow:"0 4px 20px rgba(0,0,0,0.18)"}}>{toast.msg}</div>}
+    <div style={S.root}>
 
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24}}>
-        <div><h2 style={{margin:0,fontSize:22,fontWeight:700,color:D.ink900,letterSpacing:"-0.02em"}}>Bank Reconciliation</h2><p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>Upload CSV \u00b7 match transactions \u00b7 reconcile balance</p></div>
-        <div><input ref={fileRef} type="file" accept=".csv,.txt" style={{display:"none"}} onChange={handleFileSelect}/><button onClick={()=>fileRef.current?.click()} style={{padding:"9px 20px",border:`1.5px solid ${D.accentMid}`,borderRadius:8,background:D.accentLit,color:D.accentMid,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:D.font}}>{"\u2191"} Upload CSV</button></div>
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <div style={S.header}>
+        <div>
+          <h2 style={S.title}>Bank Reconciliation</h2>
+          <p style={S.subtitle}>WP-FINANCIALS Phase 7 {"\u00b7"} Cash at Bank verified for Balance Sheet {"\u00b7"} Schema verified 08 Apr 2026</p>
+        </div>
+        <button style={S.btnRefresh} onClick={fetchAll}>{"\u21BA"} Refresh</button>
       </div>
 
-      {accounts.length>1&&<div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>{accounts.map(acc=><button key={acc.id} onClick={()=>switchAccount(acc)} style={{padding:"9px 16px",borderRadius:8,cursor:"pointer",fontFamily:D.font,border:`2px solid ${selectedAccount?.id===acc.id?D.accent:D.ink150}`,background:selectedAccount?.id===acc.id?D.accentLit:"#fff",color:selectedAccount?.id===acc.id?D.accent:D.ink700,fontSize:13,fontWeight:700}}>{acc.bank_name} \u00b7\u00b7\u00b7{acc.account_number?.slice(-4)}{acc.is_primary&&<span style={{fontSize:10,marginLeft:6,color:D.accentMid}}>PRIMARY</span>}</button>)}</div>}
-
-      {loading?<div style={{textAlign:"center",padding:60,color:D.ink500}}>Loading\u2026</div>
-      :accounts.length===0?<div style={{...card,padding:"48px 32px",textAlign:"center"}}><div style={{fontSize:40,marginBottom:12}}>{"\uD83C\uDFE6"}</div><div style={{fontSize:16,fontWeight:700,color:D.ink700,marginBottom:6}}>No bank accounts</div><div style={{fontSize:13,color:D.ink500}}>Complete Financial Setup to add your bank account.</div></div>
-      :<>
-        {selectedAccount&&<div style={{...card,padding:20,marginBottom:20}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div><div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:3}}>Account</div><div style={{fontSize:16,fontWeight:700,color:D.ink900}}>{selectedAccount.bank_name} \u2014 {selectedAccount.account_name}</div><div style={{fontSize:12,color:D.ink500}}>{selectedAccount.account_number} \u00b7 Branch {selectedAccount.branch_code}</div></div>
-          <div style={{textAlign:"right"}}><div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:3}}>Balance</div><div style={{fontSize:24,fontWeight:700,color:closingBalance>=0?D.success:D.danger,fontVariantNumeric:"tabular-nums"}}>{fmtZar(closingBalance)}</div><div style={{fontSize:11,color:D.ink500}}>Opening {fmtZar(selectedAccount.opening_balance)} + movements</div></div>
-        </div></div>}
-
-        <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
-          <KPICard label="Credits" value={fmtZar(totalCredits)} sub="Money in" color={D.success} icon={"\u2193"}/>
-          <KPICard label="Debits" value={fmtZar(totalDebits)} sub="Money out" color={D.danger} icon={"\u2191"}/>
-          <KPICard label="Reconciled" value={`${reconPct}%`} sub={`${matchedCount}/${lines.length} matched`} color={reconPct===100?D.success:reconPct>70?D.warning:D.danger} icon={"\u2713"}/>
-          <KPICard label="Unmatched" value={String(unmatchedLines.length)} sub="Need review" color={unmatchedLines.length===0?D.success:D.danger} icon={"\u26A0"}/>
+      {/* ── ACCOUNT CARD ───────────────────────────────────────────────── */}
+      <div style={S.accountCard}>
+        <div style={S.accountLeft}>
+          <div style={S.bankBadge}>{account.bank_name}</div>
+          <div style={S.accountName}>{account.account_name}</div>
+          <div style={S.accountMeta}>{account.account_number} {"\u00b7"} {account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)} {"\u00b7"} {account.currency}</div>
         </div>
-
-        <div style={{marginBottom:24}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:D.ink500,marginBottom:6}}>
-          <span>Reconciliation Progress</span><span style={{fontWeight:700,color:reconPct===100?D.success:D.ink700}}>{reconPct}%</span></div>
-          <div style={{height:8,borderRadius:4,background:D.ink150,overflow:"hidden"}}><div style={{height:"100%",borderRadius:4,transition:"width 0.5s",width:`${reconPct}%`,background:reconPct===100?D.success:reconPct>70?D.warning:D.danger}}/></div>
+        <div style={S.accountRight}>
+          <div style={S.balanceLabel}>VERIFIED CLOSING BALANCE</div>
+          <div style={S.balanceValue}>{fmt(stmtClosing ?? calcClosing)}</div>
+          <div style={{ ...S.reconBadge, background: reconciled ? '#dcfce7' : '#fef9c3', color: reconciled ? '#15803d' : '#b45309' }}>
+            {reconciled
+              ? '\u2713 Reconciled \u2014 Cash at Bank confirmed for Balance Sheet'
+              : `\u26A0 Difference of ${fmt(Math.abs(calcClosing - (stmtClosing ?? 0)))} \u2014 review unmatched items`}
+          </div>
         </div>
+      </div>
 
-        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
-          <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em"}}>Filter:</div>
-          {[["all","All"],["order","Sales"],["expense","Expenses"],["purchase_order","POs"],["unmatched","Unmatched"]].map(([id,label])=>(
-            <button key={id} onClick={()=>setFilterMatch(id)} style={{padding:"5px 12px",borderRadius:16,cursor:"pointer",fontFamily:D.font,border:`1.5px solid ${filterMatch===id?D.accentMid:D.ink150}`,background:filterMatch===id?D.accentLit:"#fff",color:filterMatch===id?D.accentMid:D.ink500,fontSize:12,fontWeight:700}}>{label}</button>
+      {/* ── STATS STRIP ────────────────────────────────────────────────── */}
+      <div style={S.statsRow}>
+        {[
+          { label: 'OPENING BALANCE',  val: fmt(openingBalance),  color: '#374151' },
+          { label: 'TOTAL IN (CREDITS)', val: fmt(totalCredits), color: '#15803d' },
+          { label: 'TOTAL OUT (DEBITS)', val: fmt(totalDebits),  color: '#b91c1c' },
+          { label: 'CLOSING BALANCE',  val: fmt(calcClosing),    color: '#1d4ed8' },
+          { label: 'UNMATCHED',        val: `${unmatchedCount} items \u00b7 ${fmt(unmatchedValue)}`, color: '#b91c1c', wide: true },
+        ].map(s => (
+          <div key={s.label} style={{ ...S.statCard, flex: s.wide ? 1.8 : 1 }}>
+            <div style={S.statLabel}>{s.label}</div>
+            <div style={{ ...S.statVal, color: s.color, fontSize: s.wide ? 14 : 20 }}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── FILTERS ────────────────────────────────────────────────────── */}
+      <div style={S.filterBar}>
+        <div style={S.filterGroup}>
+          <span style={S.filterLabel}>SHOW</span>
+          {[
+            { v: 'all',        l: `All (${lines.length})` },
+            { v: 'matched',    l: `Matched (${matchedCount})` },
+            { v: 'unmatched',  l: `Unmatched (${unmatchedCount})` },
+          ].map(o => (
+            <button key={o.v} style={{ ...S.chip, ...(fMatch === o.v ? S.chipActive : {}) }} onClick={() => setFMatch(o.v)}>{o.l}</button>
           ))}
         </div>
-
-        {filteredLines.length===0?<div style={{...card,padding:"36px 24px",textAlign:"center"}}><div style={{fontSize:36,marginBottom:10}}>{"\uD83D\uDCC4"}</div><div style={{fontSize:15,fontWeight:700,color:D.ink700,marginBottom:6}}>{lines.length===0?"No statement lines":"No lines match filter"}</div>{lines.length===0&&<button onClick={()=>fileRef.current?.click()} style={{padding:"9px 20px",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:D.font}}>{"\u2191"} Upload CSV</button>}</div>
-        :<div style={card}>
-          <div style={{display:"grid",gridTemplateColumns:"90px 1fr 100px 100px 110px 160px 36px",padding:"10px 20px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.07em"}}>
-            <span>Date</span><span>Description</span><span>Ref</span><span style={{textAlign:"right"}}>Debit</span><span style={{textAlign:"right"}}>Credit</span><span style={{textAlign:"center"}}>Match</span><span/>
+        <div style={S.filterGroup}>
+          <span style={S.filterLabel}>TYPE</span>
+          {['all', 'order', 'expense', 'purchase_order', 'unmatched'].map(v => (
+            <button key={v} style={{ ...S.chip, ...(fType === v ? S.chipActive : {}) }} onClick={() => setFType(v)}>
+              {v === 'all' ? 'All' : MATCH_CFG[v]?.label || v}
+            </button>
+          ))}
+        </div>
+        {batches.length > 1 && (
+          <div style={S.filterGroup}>
+            <span style={S.filterLabel}>BATCH</span>
+            {['all', ...batches].map(v => (
+              <button key={v} style={{ ...S.chip, ...(fBatch === v ? S.chipActive : {}) }} onClick={() => setFBatch(v)}>
+                {v === 'all' ? 'All Batches' : v}
+              </button>
+            ))}
           </div>
-          {filteredLines.map((line,idx)=>{
-            const unm=!line.matched_type||line.matched_type==="unmatched";
-            return <div key={line.id||idx} style={{display:"grid",gridTemplateColumns:"90px 1fr 100px 100px 110px 160px 36px",padding:"12px 20px",borderBottom:idx<filteredLines.length-1?`1px solid ${D.ink150}`:"none",alignItems:"center",background:unm?"#FFFDF5":"transparent"}}>
-              <span style={{fontSize:12,color:D.ink500}}>{fmtDate(line.statement_date)}</span>
-              <div><div style={{fontSize:13,fontWeight:500,color:D.ink700}}>{line.description}</div>{line.matched_at&&<div style={{fontSize:10,color:D.success,marginTop:1}}>Matched {fmtDate(line.matched_at)}</div>}</div>
-              <span style={{fontSize:11,color:D.ink500}}>{line.reference||"\u2014"}</span>
-              <span style={{fontSize:13,fontWeight:600,color:parseFloat(line.debit_amount)>0?D.danger:D.ink300,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{parseFloat(line.debit_amount)>0?fmtZar(line.debit_amount):"\u2014"}</span>
-              <span style={{fontSize:13,fontWeight:600,color:parseFloat(line.credit_amount)>0?D.success:D.ink300,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{parseFloat(line.credit_amount)>0?fmtZar(line.credit_amount):"\u2014"}</span>
-              <div style={{display:"flex",justifyContent:"center"}}><select value={line.matched_type||""} onChange={e=>updateMatch(line.id,e.target.value||null)} style={{padding:"3px 6px",border:`1px solid ${D.ink150}`,borderRadius:6,fontSize:11,fontWeight:600,fontFamily:D.font,background:unm?D.warningBg:D.successBg,color:unm?D.warning:D.success,cursor:"pointer",maxWidth:140}}>
-                <option value="">Unmatched</option><option value="order">Sale</option><option value="expense">Expense</option><option value="purchase_order">PO</option><option value="journal">Journal</option>
-              </select></div>
-              <div style={{textAlign:"center"}}>{unm?<span style={{fontSize:14,color:D.warning}}>{"\u26A0"}</span>:<span style={{fontSize:14,color:D.success}}>{"\u2713"}</span>}</div>
-            </div>;
-          })}
-          <div style={{display:"grid",gridTemplateColumns:"90px 1fr 100px 100px 110px 160px 36px",padding:"13px 20px",background:D.ink075,borderTop:`2px solid ${D.ink150}`}}>
-            <span/><span style={{fontSize:12,fontWeight:700,color:D.ink700}}>{filteredLines.length} lines</span><span/>
-            <span style={{fontSize:14,fontWeight:700,color:D.danger,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(filteredLines.reduce((s,l)=>s+(parseFloat(l.debit_amount)||0),0))}</span>
-            <span style={{fontSize:14,fontWeight:700,color:D.success,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(filteredLines.reduce((s,l)=>s+(parseFloat(l.credit_amount)||0),0))}</span>
-            <span/><span/>
-          </div>
-        </div>}
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#9ca3af', alignSelf: 'center' }}>{filtered.length} of {lines.length} lines</span>
+      </div>
 
-        <div style={{...card,padding:20}}>
-          <div style={{fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:14}}>Supported Banks</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
-            {[{b:"FNB",c:"Date, Desc, Amount, Balance"},{b:"ABSA",c:"Date, Desc, Debit, Credit, Balance"},{b:"Standard Bank",c:"Date, Desc, Amount, Balance"},{b:"Nedbank",c:"Date, Desc, Debit, Credit, Balance"},{b:"Capitec",c:"Date, Ref, Desc, Debit, Credit, Balance"}].map(x=>
-              <div key={x.b} style={{padding:"12px 14px",background:D.ink075,borderRadius:8,border:`1px solid ${D.ink150}`}}>
-                <div style={{fontSize:13,fontWeight:700,color:D.ink700,marginBottom:4}}>{x.b}</div>
-                <div style={{fontSize:11,color:D.ink500}}>{x.c}</div>
+      {/* ── STATEMENT TABLE ────────────────────────────────────────────── */}
+      <div style={S.tableWrap}>
+        <div style={S.thead}>
+          <span style={{ ...S.th, flex: 1.2 }}>DATE</span>
+          <span style={{ ...S.th, flex: 1.5 }}>REFERENCE</span>
+          <span style={{ ...S.th, flex: 3.5 }}>DESCRIPTION</span>
+          <span style={{ ...S.th, flex: 1.2 }}>TYPE</span>
+          <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>DEBIT (OUT)</span>
+          <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>CREDIT (IN)</span>
+          <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>BALANCE</span>
+          <span style={{ ...S.th, flex: 1.2, textAlign: 'center' }}>MATCH</span>
+        </div>
+
+        {filtered.map(line => {
+          const isEditing   = editingId === line.id;
+          const cfg         = matchCfg(line.matched_type, line.reference);
+          const isUnmatched = line.matched_type === 'unmatched';
+
+          return (
+            <div key={line.id} style={{ ...S.lineRow, background: isUnmatched ? '#fffbeb' : '#fff', borderLeft: isUnmatched ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              <span style={{ ...S.td, flex: 1.2, color: '#374151', fontWeight: 500 }}>{fmtDate(line.statement_date)}</span>
+              <span style={{ ...S.td, flex: 1.5, fontFamily: 'monospace', fontSize: 11, color: '#6b7280' }}>{line.reference || '\u2014'}</span>
+              <span style={{ ...S.td, flex: 3.5, color: '#111827', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {line.description}
+                {line.import_batch && <span style={S.batchPill}>{line.import_batch}</span>}
+              </span>
+              <span style={{ ...S.td, flex: 1.2 }}><span style={{ ...S.badge, background: cfg.bg, color: cfg.color }}>{cfg.label}</span></span>
+              <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: Number(line.debit_amount) > 0 ? '#b91c1c' : '#d1d5db' }}>
+                {Number(line.debit_amount) > 0 ? fmt(line.debit_amount) : '\u2014'}
+              </span>
+              <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: Number(line.credit_amount) > 0 ? '#15803d' : '#d1d5db' }}>
+                {Number(line.credit_amount) > 0 ? fmt(line.credit_amount) : '\u2014'}
+              </span>
+              <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#374151' }}>
+                {line.balance ? fmt(line.balance) : '\u2014'}
+              </span>
+              <span style={{ ...S.td, flex: 1.2, justifyContent: 'center' }} onClick={e => e.stopPropagation()}>
+                {isEditing ? (
+                  <div style={S.matchEdit}>
+                    <select style={S.matchSelect} value={editType} onChange={e => setEditType(e.target.value)} autoFocus>
+                      <option value="">Select{"\u2026"}</option>
+                      {MATCH_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    <button style={S.btnSave} onClick={() => saveMatch(line.id)} disabled={!editType || saving}>{saving ? '\u2026' : '\u2713'}</button>
+                    <button style={S.btnCancel} onClick={() => { setEditingId(null); setEditType(''); }}>{"\u2715"}</button>
+                  </div>
+                ) : isUnmatched ? (
+                  <button style={S.btnMatch} onClick={() => { setEditingId(line.id); setEditType(''); }}>Categorise</button>
+                ) : (
+                  <button style={S.btnReCat} onClick={() => { setEditingId(line.id); setEditType(line.matched_type || ''); }}>Edit</button>
+                )}
+              </span>
+            </div>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <div style={S.empty}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>{"\uD83C\uDFE6"}</div>
+            <div style={{ fontWeight: 600, color: '#374151' }}>No lines match the current filter</div>
+          </div>
+        )}
+      </div>
+
+      {/* ── UNMATCHED SUMMARY ──────────────────────────────────────────── */}
+      {unmatchedCount > 0 && (
+        <div style={S.unmatchedSummary}>
+          <div style={S.unmatchedTitle}>{"\u26A0\uFE0F"} {unmatchedCount} Unmatched Item{unmatchedCount > 1 ? 's' : ''} Require Attention</div>
+          <div style={S.unmatchedList}>
+            {unmatchedLines.map(l => (
+              <div key={l.id} style={S.unmatchedItem}>
+                <span style={{ color: '#374151', fontWeight: 500 }}>{fmtDate(l.statement_date)}</span>
+                <span style={{ color: '#6b7280' }}>{l.description}</span>
+                <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: Number(l.debit_amount) > 0 ? '#b91c1c' : '#15803d' }}>
+                  {Number(l.debit_amount) > 0 ? `\u2212${fmt(l.debit_amount)}` : `+${fmt(l.credit_amount)}`}
+                </span>
+                <button style={S.btnMatchSm} onClick={() => { setEditingId(l.id); setEditType(''); setFMatch('all'); }}>Categorise {"\u2192"}</button>
               </div>
-            )}
+            ))}
           </div>
-          <div style={{marginTop:12,fontSize:12,color:D.ink500}}>Export CSV from online banking. Auto-detected from headers.</div>
+          <div style={S.unmatchedNote}>Once all items are categorised, the Balance Sheet Cash figure is fully verified.</div>
         </div>
+      )}
 
-        <div style={{background:D.ink075,borderRadius:8,padding:"14px 18px",fontSize:12,color:D.ink500,border:`1px solid ${D.ink150}`,lineHeight:1.7,fontFamily:D.font}}>
-          <strong style={{color:D.ink700}}>Reconciliation note:</strong>{" "}
-          Every bank transaction should match an accounting record. Unmatched items need investigation \u2014 timing differences, bank charges, or errors. 100% = your NuAi cash matches your bank.
-        </div>
-      </>}
+      {/* ── BALANCE SHEET NOTE ─────────────────────────────────────────── */}
+      <div style={S.bsNote}>
+        <span style={{ fontWeight: 700, color: '#1d4ed8' }}>{"\uD83D\uDCCA"} Balance Sheet {"\u2014"} Cash at Bank</span>
+        <span style={{ color: '#374151' }}>
+          This reconciled closing balance of <strong>{fmt(stmtClosing ?? calcClosing)}</strong> is the verified Cash at Bank figure for the Statement of Financial Position.
+          {!reconciled && ' \u26A0 Complete all matches above to fully verify.'}
+        </span>
+      </div>
+
     </div>
   );
 }
+
+// ─── STYLES ──────────────────────────────────────────────────────────────────
+
+const TK = {
+  ink900: '#111827', ink700: '#374151', ink500: '#6b7280',
+  ink300: '#d1d5db', ink200: '#e5e7eb', ink100: '#f3f4f6',
+  green:  '#15803d', greenLt: '#dcfce7',
+  red:    '#b91c1c', redLt:   '#fee2e2',
+  blue:   '#1d4ed8', blueLt:  '#dbeafe',
+  amber:  '#b45309', amberLt: '#fef3c7',
+};
+
+const S = {
+  root: { padding: '24px 28px', maxWidth: 1440, margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: TK.ink900 },
+  center: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 80, color: TK.ink500 },
+  spinner: { width: 20, height: 20, border: `2px solid ${TK.ink300}`, borderTopColor: TK.blue, borderRadius: '50%', animation: 'spin 0.75s linear infinite' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  title: { margin: 0, fontSize: 22, fontWeight: 700, color: TK.ink900 },
+  subtitle: { margin: '4px 0 0', fontSize: 12, color: TK.ink500 },
+  btnRefresh: { background: '#fff', color: TK.ink700, border: `1px solid ${TK.ink300}`, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  accountCard: { background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 14, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
+  accountLeft: { display: 'flex', flexDirection: 'column', gap: 6 },
+  bankBadge: { display: 'inline-block', background: TK.blueLt, color: TK.blue, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', padding: '3px 10px', borderRadius: 20 },
+  accountName: { fontSize: 18, fontWeight: 700, color: TK.ink900 },
+  accountMeta: { fontSize: 13, color: TK.ink500, fontFamily: 'monospace' },
+  accountRight: { textAlign: 'right' },
+  balanceLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginBottom: 6 },
+  balanceValue: { fontSize: 32, fontWeight: 800, color: TK.blue, fontVariantNumeric: 'tabular-nums', marginBottom: 8 },
+  reconBadge: { fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, display: 'inline-block' },
+  statsRow: { display: 'flex', gap: 12, marginBottom: 20 },
+  statCard: { background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' },
+  statLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginBottom: 6 },
+  statVal: { fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
+  filterBar: { display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' },
+  filterGroup: { display: 'flex', alignItems: 'center', gap: 6 },
+  filterLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginRight: 2 },
+  chip: { padding: '5px 13px', borderRadius: 20, border: `1px solid ${TK.ink300}`, background: '#fff', fontSize: 11, fontWeight: 600, color: TK.ink700, cursor: 'pointer' },
+  chipActive: { background: TK.ink900, color: '#fff', borderColor: TK.ink900 },
+  tableWrap: { background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 12, overflow: 'hidden', marginBottom: 16 },
+  thead: { display: 'flex', gap: 8, padding: '10px 16px', background: TK.ink100, borderBottom: `1px solid ${TK.ink200}` },
+  th: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em' },
+  lineRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${TK.ink100}`, transition: 'background 0.1s' },
+  td: { fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' },
+  badge: { fontSize: 9, fontWeight: 800, letterSpacing: '0.05em', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' },
+  batchPill: { fontSize: 9, fontWeight: 700, background: TK.ink100, color: TK.ink500, padding: '1px 6px', borderRadius: 10, marginLeft: 8, whiteSpace: 'nowrap', flexShrink: 0 },
+  matchEdit: { display: 'flex', gap: 4, alignItems: 'center' },
+  matchSelect: { fontSize: 11, padding: '3px 6px', borderRadius: 6, border: `1px solid ${TK.ink300}`, background: '#fff', maxWidth: 120 },
+  btnSave: { background: TK.greenLt, color: TK.green, border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  btnCancel: { background: TK.ink100, color: TK.ink500, border: 'none', borderRadius: 5, padding: '3px 8px', fontSize: 12, cursor: 'pointer' },
+  btnMatch: { background: TK.amberLt, color: TK.amber, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  btnReCat: { background: TK.ink100, color: TK.ink700, border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
+  unmatchedSummary: { background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 12, padding: '16px 20px', marginBottom: 16 },
+  unmatchedTitle: { fontWeight: 700, fontSize: 14, color: TK.amber, marginBottom: 12 },
+  unmatchedList: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 },
+  unmatchedItem: { display: 'flex', gap: 16, alignItems: 'center', fontSize: 13, background: '#fff', padding: '8px 12px', borderRadius: 8, border: '1px solid #fde68a' },
+  unmatchedNote: { fontSize: 12, color: TK.amber },
+  btnMatchSm: { marginLeft: 'auto', background: TK.amber, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  bsNote: { background: TK.blueLt, border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 },
+  empty: { textAlign: 'center', padding: '40px 20px', color: TK.ink500 },
+};
