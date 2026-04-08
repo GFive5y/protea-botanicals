@@ -171,7 +171,10 @@ payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34 \u00b7 send-notification
 get-fx-rate v35 \u00b7 process-document v2.1 (WP-SMART-CAPTURE anti-fraud + fingerprint)
 auto-post-capture v1 (expense + double-entry journal + VAT)
 receive-from-capture v1 (stock receipt \u00b7 AVCO recalc \u00b7 Dr 12000 Cr 20000)
-loyalty-ai v1 (churn scoring \u00b7 rescue \u00b7 birthday \u00b7 expiry \u00b7 stock-boost \u00b7 weekly brief)
+loyalty-ai v2 (churn scoring \u00b7 rescue \u00b7 birthday \u00b7 expiry \u00b7 stock-boost \u00b7 weekly brief)
+FIXED v2: RPC param names corrected (p_user_id, p_points) \u00b7 try/catch per user \u00b7 dedup working
+50 mock customers seeded (Bronze\u00d720 \u00b7 Silver\u00d715 \u00b7 Gold\u00d710 \u00b7 Platinum\u00d74 \u00b7 Harvest\u00d71)
+AI Actions Feed: churn rescues + birthday bonuses live in loyalty_ai_log
 HQLoyalty Tab 8: Run Now button \u00b7 AI Actions Feed \u00b7 ACTIVE status badge
 
 WP-FINANCIALS (COMPLETE):
