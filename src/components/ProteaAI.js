@@ -9,6 +9,7 @@
 // v1.0: Core chat, role-aware context, streaming, suggested questions
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { useTenantConfig } from "../hooks/useTenantConfig";
@@ -929,59 +930,46 @@ export default function ProteaAI({
           const e = await res.json().catch(() => ({}));
           throw new Error(e.error || `API ${res.status}`);
         }
-        // SSE streaming reader — dual-loop for smooth word-by-word rendering.
-        // React 18 automatic batching groups all setMessages calls in a tight
-        // synchronous loop into one render, causing text to jump in blocks.
-        // Fix: reader fills tokenBuf at network speed; renderer drains at ~30fps
-        // so each render call is isolated by the setTimeout, breaking the batch.
+        // SSE streaming reader — flushSync breaks React 18 automatic batching.
+        // React 18 batches ALL state updates (including setTimeout/promises).
+        // setTimeout(33ms) does NOT break this — tested and confirmed jumpy.
+        // flushSync forces a synchronous DOM flush after each network chunk,
+        // guaranteeing one React render per chunk regardless of batching rules.
+        // One network chunk typically = 1-5 tokens → smooth word-by-word render.
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = "";
         let full = "";
-        const tokenBuf = [];
-        let readComplete = false;
 
-        // Reader loop — fills tokenBuf as fast as SSE delivers
-        const readerLoop = (async () => {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buf += dec.decode(value, { stream: true });
-              const lines = buf.split("\n");
-              buf = lines.pop() ?? "";
-              for (const line of lines) {
-                if (!line.startsWith("data: ")) continue;
-                const raw = line.slice(6).trim();
-                if (raw === "[DONE]") continue;
-                try {
-                  const parsed = JSON.parse(raw);
-                  if (parsed.token) tokenBuf.push(parsed.token);
-                } catch { /* skip malformed SSE line */ }
-              }
-            }
-          } finally {
-            readComplete = true;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+
+          let chunkHasContent = false;
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") continue;
+            try {
+              const { token } = JSON.parse(raw);
+              if (token) { full += token; chunkHasContent = true; }
+            } catch { /* skip malformed SSE line */ }
           }
-        })();
 
-        // Render loop — drains tokenBuf at ~30fps (33ms intervals)
-        // Renders up to 3 tokens per frame: smooth at any Claude generation speed
-        const renderLoop = (async () => {
-          while (!readComplete || tokenBuf.length > 0) {
-            if (tokenBuf.length > 0) {
-              full += tokenBuf.splice(0, 3).join("");
+          // One forced synchronous render per network chunk — breaks React 18 batching
+          if (chunkHasContent) {
+            flushSync(() => {
               setMessages((p) =>
                 p.map((m) =>
                   m.id === aid ? { ...m, content: full } : m,
                 ),
               );
-            }
-            await new Promise((r) => setTimeout(r, 33));
+            });
           }
-        })();
-
-        await Promise.all([readerLoop, renderLoop]);
+        }
 
         // Mark streaming complete
         setMessages((p) =>
