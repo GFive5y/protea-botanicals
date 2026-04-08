@@ -1,5 +1,7 @@
-// src/components/ProteaAI.js — v1.3
+// src/components/ProteaAI.js — v1.4
 // WP-AI-UNIFIED: Chat · Live Query
+// v1.4: Real SSE streaming — tokens arrive word by word. systemOverride now reaches EF.
+//        tenantId sent in userContext for tool-use tenant isolation.
 // v1.3: Dev tab removed — Claude Code has full repo access. Two-tab UI (Chat + Query).
 // v1.2: Query tab — plain English → Claude returns Supabase spec → live results table
 // v1.0: Core chat, role-aware context, streaming, suggested questions
@@ -908,20 +910,51 @@ export default function ProteaAI({
           },
           body: JSON.stringify({
             messages: histRef.current,
-            userContext: { role, isHQ },
+            userContext: { role, isHQ, tenantId },
             systemOverride: fullSys,
+            stream: true,
           }),
         });
         if (!res.ok) {
           const e = await res.json().catch(() => ({}));
           throw new Error(e.error || `API ${res.status}`);
         }
-        const efData = await res.json();
-        if (efData.error) throw new Error(efData.error);
-        const full = efData.reply || "";
+        // SSE streaming reader — tokens arrive word by word
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        let full = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") continue;
+            try {
+              const { token } = JSON.parse(raw);
+              if (token) {
+                full += token;
+                setMessages((p) =>
+                  p.map((m) =>
+                    m.id === aid ? { ...m, content: full } : m,
+                  ),
+                );
+              }
+            } catch { /* malformed SSE line — skip */ }
+          }
+        }
+
+        // Mark streaming complete
         setMessages((p) =>
           p.map((m) =>
-            m.id === aid ? { ...m, content: full, streaming: false } : m,
+            m.id === aid
+              ? { ...m, content: full || "Sorry, I didn't get a response. Try again.", streaming: false }
+              : m,
           ),
         );
         histRef.current = [
