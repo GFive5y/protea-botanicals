@@ -105,6 +105,7 @@ export default function HQVat() {
   const [orderStats,    setOrderStats]    = useState({});
   const [expenseStats,  setExpenseStats]  = useState({});
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [expensesInputVat, setExpensesInputVat] = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState(currentPeriodId());
   const [view,          setView]          = useState("dashboard");
@@ -132,6 +133,7 @@ export default function HQVat() {
       setVatTxns(txnRes.data || []);
       setFilings(filingsRes.data || []);
       setTotalExpenses((expensesRes.data || []).length);
+      setExpensesInputVat((expensesRes.data || []).reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0));
 
       const oStats = {};
       (ordersRes.data || []).forEach(o => {
@@ -436,9 +438,19 @@ export default function HQVat() {
             </div>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ width: 68, fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.06em", paddingTop: 2, flexShrink: 0 }}>Input</div>
-              <div style={{ fontSize: 12, color: D.warning, lineHeight: 1.7 }}>
-                <strong>{"\u26A0"} expenses.input_vat_amount = R0</strong> across all {totalExpenses} expense rows. Smart Capture must populate this field before live input calculation is possible. Current figure ({fmtZar(current.inputVat)}) is {current.hasCalculated ? "from a calculated period close" : "manually seeded"}.
-              </div>
+              {expensesInputVat !== null && expensesInputVat > 0 ? (
+                <div style={{ fontSize: 12, color: "#166534", lineHeight: 1.7 }}>
+                  <span style={{ fontWeight: 700 }}>{"\u2713"} Input VAT captured from expenses:</span>{" "}
+                  <strong>{fmtZar(expensesInputVat)}</strong>
+                  {" \u00b7 "}
+                  <span style={{ color: D.ink500 }}>sourced from expense records via tax invoices</span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: D.warning, lineHeight: 1.7 }}>
+                  <strong>{"\u26A0"} No input VAT captured on expenses yet.</strong>{" "}
+                  <span style={{ color: D.ink500 }}>Add VAT amounts in Expenses Manager, or use Smart Capture to read them from supplier invoices automatically.</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -105,6 +105,7 @@ const EMPTY_FORM = {
   subcategory: "",
   description: "",
   amount_zar: "",
+  input_vat_amount: "",
   currency: "ZAR",
   amount_foreign: "",
   fx_rate: "",
@@ -129,7 +130,7 @@ function parseBulkCSV(text) {
       );
       return;
     }
-    const [date, category, description, amount, subcategory] = parts;
+    const [date, category, description, amount, subcategory, vat_amount] = parts;
     if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) {
       errors.push(`Row ${idx + 1}: date must be YYYY-MM-DD, got "${date}"`);
       return;
@@ -153,6 +154,7 @@ function parseBulkCSV(text) {
       description: description || "Imported expense",
       amount_zar: parseFloat(amount),
       subcategory: subcategory || "",
+      input_vat_amount: vat_amount ? parseFloat(vat_amount) : 0,
       currency: "ZAR",
     });
   });
@@ -180,6 +182,7 @@ export default function ExpenseManager({
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  const [vatRegistered, setVatRegistered] = useState(false);
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
@@ -211,6 +214,16 @@ export default function ExpenseManager({
     fetchExpenses();
   }, [fetchExpenses]);
 
+  useEffect(() => {
+    if (!tenantId) return;
+    supabase
+      .from("tenant_config")
+      .select("vat_registered")
+      .eq("tenant_id", tenantId)
+      .maybeSingle()
+      .then(({ data }) => setVatRegistered(!!data?.vat_registered));
+  }, [tenantId]);
+
   const handleFormChange = (field, value) => {
     setForm((p) => ({ ...p, [field]: value }));
     // Auto-populate subcategory options when category changes
@@ -233,6 +246,9 @@ export default function ExpenseManager({
         subcategory: form.subcategory || null,
         description: form.description.trim(),
         amount_zar: parseFloat(form.amount_zar),
+        input_vat_amount: form.input_vat_amount
+          ? parseFloat(form.input_vat_amount)
+          : 0,
         currency: form.currency || "ZAR",
         amount_foreign: form.amount_foreign
           ? parseFloat(form.amount_foreign)
@@ -272,6 +288,9 @@ export default function ExpenseManager({
       subcategory: expense.subcategory || "",
       description: expense.description || "",
       amount_zar: String(expense.amount_zar || ""),
+      input_vat_amount: expense.input_vat_amount
+        ? String(expense.input_vat_amount)
+        : "",
       currency: expense.currency || "ZAR",
       amount_foreign: expense.amount_foreign
         ? String(expense.amount_foreign)
@@ -335,10 +354,10 @@ export default function ExpenseManager({
         ? expenses
         : expenses.filter((e) => e.category === filterCat);
     const header =
-      "Date,Category,Subcategory,Description,Amount ZAR,Currency,Notes";
+      "Date,Category,Subcategory,Description,Amount ZAR,Input VAT,Currency,Notes";
     const rows = filtered.map(
       (e) =>
-        `${e.expense_date},${e.category},${e.subcategory || ""},${JSON.stringify(e.description)},${e.amount_zar},${e.currency || "ZAR"},${JSON.stringify(e.notes || "")}`,
+        `${e.expense_date},${e.category},${e.subcategory || ""},${JSON.stringify(e.description)},${e.amount_zar},${e.input_vat_amount || 0},${e.currency || "ZAR"},${JSON.stringify(e.notes || "")}`,
     );
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -650,7 +669,7 @@ export default function ExpenseManager({
                   >
                     <thead>
                       <tr style={{ background: T.accent }}>
-                        {["Date", "Category", "Description", "Amount", ""].map(
+                        {["Date", "Category", "Description", "Amount", vatRegistered ? "VAT" : null, ""].filter(Boolean).map(
                           (h) => (
                             <th
                               key={h}
@@ -737,6 +756,22 @@ export default function ExpenseManager({
                           >
                             {fmtZar(e.amount_zar)}
                           </td>
+                          {vatRegistered && (
+                            <td
+                              style={{
+                                padding: "10px 12px",
+                                fontSize: 12,
+                                color: parseFloat(e.input_vat_amount) > 0
+                                  ? T.accentMid : T.ink300,
+                                fontVariantNumeric: "tabular-nums",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {parseFloat(e.input_vat_amount) > 0
+                                ? fmtZar(e.input_vat_amount)
+                                : "\u2014"}
+                            </td>
+                          )}
                           <td
                             style={{
                               padding: "10px 12px",
@@ -952,6 +987,55 @@ export default function ExpenseManager({
                     style={inp}
                   />
                 </div>
+                {vatRegistered && (
+                  <div>
+                    <label style={lbl}>Input VAT (R)</label>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.input_vat_amount}
+                        onChange={(e) =>
+                          handleFormChange("input_vat_amount", e.target.value)
+                        }
+                        placeholder="0.00"
+                        style={{ ...inp, flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const amt = parseFloat(form.amount_zar);
+                          if (amt > 0) {
+                            handleFormChange(
+                              "input_vat_amount",
+                              ((amt * 15) / 115).toFixed(2)
+                            );
+                          }
+                        }}
+                        title="Calculate 15% VAT from inclusive amount"
+                        style={{
+                          padding: "8px 10px",
+                          background: T.accentLit,
+                          border: `1px solid ${T.accentBd}`,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontFamily: T.font,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: T.accent,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Calc 15%
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: T.ink400, marginTop: 3, fontFamily: T.font }}>
+                      From supplier tax invoice. Auto-filled by Smart Capture.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: 16 }}>
@@ -1113,7 +1197,7 @@ export default function ExpenseManager({
                   }}
                 >
                   date (YYYY-MM-DD), category, description, amount_zar,
-                  subcategory (optional)
+                  subcategory (optional), vat_amount (optional)
                   <br />
                   <strong>Categories:</strong> opex · wages · capex · tax ·
                   other
