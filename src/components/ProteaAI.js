@@ -622,7 +622,7 @@ async function buildContext(tenantId, role, tab, isHQ) {
       const [sRes, aRes] = await Promise.all([
         supabase
           .from("inventory_items")
-          .select("id,name,on_hand_qty,reorder_level,is_active")
+          .select("id,name,quantity_on_hand,reorder_level,is_active")
           .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .limit(200),
@@ -638,7 +638,7 @@ async function buildContext(tenantId, role, tab, isHQ) {
       ctx.stock = {
         active_items: s.length,
         low_stock_items: s
-          .filter((i) => i.reorder_level && i.on_hand_qty <= i.reorder_level)
+          .filter((i) => i.reorder_level && (i.quantity_on_hand || 0) <= i.reorder_level)
           .map((i) => i.name)
           .slice(0, 6),
         critical_alerts: a.filter((x) => x.severity === "critical").length,
@@ -646,7 +646,7 @@ async function buildContext(tenantId, role, tab, isHQ) {
         alert_types: [...new Set(a.map((x) => x.alert_type))],
       };
     }
-    if (isHQ) {
+    if (isHQ || role === "admin") {
       const [rRes, hRes, tRes, rcRes] = await Promise.all([
         supabase
           .from("food_recipes")
