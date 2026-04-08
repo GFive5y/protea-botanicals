@@ -9,7 +9,7 @@
 // Prior period shown as "No data for prior period" (future-proof)
 // Status workflow: any authenticated user with access can advance (tenant self-managed)
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import HQFinancialSetup from "./HQFinancialSetup";
@@ -230,7 +230,10 @@ export default function HQFinancialStatements() {
   const [equityData, setEquityData] = useState(null);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
-  const bounds = selectedFY === "custom" ? customBounds(customFrom, customTo) : fyBounds(selectedFY);
+  const bounds = useMemo(
+    () => selectedFY === "custom" ? customBounds(customFrom, customTo) : fyBounds(selectedFY),
+    [selectedFY, customFrom, customTo]
+  );
 
   useEffect(() => {
     if (!tenantId) return;
@@ -259,9 +262,9 @@ export default function HQFinancialStatements() {
         supabase.from("inventory_items").select("quantity_on_hand,weighted_avg_cost,is_active").eq("tenant_id", tenantId).eq("is_active", true),
         supabase.from("fixed_assets").select("purchase_cost,accumulated_depreciation,is_active").eq("tenant_id", tenantId).eq("is_active", true),
         supabase.from("invoices").select("total_amount,status,invoice_type").eq("tenant_id", tenantId).not("status", "eq", "paid"),
-        supabase.from("purchase_orders").select("landed_cost_zar,status").eq("tenant_id", tenantId).in("status", ["pending", "confirmed", "in_transit", "ordered"]),
+        supabase.from("purchase_orders").select("landed_cost_zar,po_status").eq("tenant_id", tenantId).in("po_status", ["pending", "confirmed", "ordered"]),
         supabase.from("orders").select("total").eq("tenant_id", tenantId).not("status", "in", '("cancelled","failed")').gte("created_at", start).lte("created_at", end),
-        supabase.from("purchase_orders").select("landed_cost_zar").eq("tenant_id", tenantId).in("status", ["received", "complete"]),
+        supabase.from("purchase_orders").select("landed_cost_zar").eq("tenant_id", tenantId).in("po_status", ["received", "complete"]),
       ]);
 
       // Income Statement
