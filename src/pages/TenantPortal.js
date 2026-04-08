@@ -478,6 +478,26 @@ const CANNABIS_RETAIL_WATERFALL = [
         label: "Year-End Close",
         desc: "Lock year \u00b7 post retained earnings \u00b7 archive period",
       },
+      {
+        id: "journals",
+        label: "Journals",
+        desc: "Accruals \u00b7 PAYE \u00b7 prepayments \u00b7 corrections",
+      },
+      {
+        id: "vat",
+        label: "VAT",
+        desc: "VAT201 returns \u00b7 output \u00b7 input \u00b7 SARS filing",
+      },
+      {
+        id: "bank-recon",
+        label: "Bank Recon",
+        desc: "Statement import \u00b7 match transactions \u00b7 reconcile",
+      },
+      {
+        id: "fixed-assets",
+        label: "Fixed Assets",
+        desc: "PPE register \u00b7 depreciation \u00b7 NBV",
+      },
     ],
   },
   {
