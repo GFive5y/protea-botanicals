@@ -79,6 +79,12 @@ Repo:       github.com/GFive5y/protea-botanicals · branch: main
 Fonts:      Inter for ALL HQ/admin. Cormorant Garamond + Jost for customer pages only.
 OPERATING MODE: BETA DEV MODE (locked until owner changes scope)
 
+Key file paths (confirmed from disk):
+useNavConfig.js: src/hooks/useNavConfig.js  (NOT src/navigation/ — that path does not exist)
+HQ Finance nav group in useNavConfig: HQ_PAGES array, group: "Finance"
+HQ Finance nav items (12): Pricing/Costing/P&L/Balance Sheet/Invoices/Journals/
+  Bank Recon/Fixed Assets/Expenses/Forecast/VAT/Year-End Close
+
 Stock data = test only. AVCO = test values.
 Physical contact points (Yoco, real deliveries) = skip.
 Data is Claude's responsibility — keep it coherent.
@@ -417,6 +423,14 @@ bank_accounts · bank_statement_lines · capture_queue · capture_rules · chart
   Confirmed on: HQBalanceSheet.js · HQProfitLoss.js · HQJournals.js · all HQ components.
   Adjust relative path for component depth (../../ for hq/ components).
 
+- **LL-208 — ALWAYS PATCH ALL FINANCE TABLES IN ONE MIGRATION**:
+  depreciation_entries was missed from the LL-205 migration and had to be patched mid-session.
+  Before any LL-205 migration, enumerate ALL tables HQ operators will query.
+  Standard finance table checklist:
+  journal_entries · journal_lines · vat_transactions · fixed_assets · depreciation_entries
+  bank_accounts · bank_statement_lines · expenses
+  Any new table → add hq_all_ policy in the SAME migration. Never ship a new table without it.
+
 - **LL-207 — switchTenant() ARCHITECTURE — NO PROPS NEEDED ON HQ CHILDREN**:
   HQDashboard calls switchTenant(selected) when operator changes the VIEWING dropdown.
   This updates the global useTenant() context for ALL child components simultaneously.
@@ -465,11 +479,18 @@ Missing any one = silent failure (BUG-006 pattern)
 | a42d13d | HQJournals.js v1.0 — WP-FINANCIALS Phase 5 · 660 lines |
 | [db]    | Supabase migration: hq_operator_access_finance_tables (7 tables, no code commit) |
 | [docs]  | SESSION-STATE v209 + NUAI-AGENT-BIBLE LL-205/206/207 (this commit) |
+| 228170e | HQBankRecon.js v1.0 — WP-FINANCIALS Phase 7 · 384 lines |
+| 013eba8 | HQFixedAssets.js v1.0 — WP-FINANCIALS Phase 4 · 433 lines |
+| aa755a9 | HQ Finance nav wiring fix — Expenses + VAT + YearEnd + Forecast |
+| [docs]  | SESSION-STATE v210 + NUAI-AGENT-BIBLE full session patches |
 
 ## Verified Working (screenshots confirmed 08 Apr 2026)
 P&L (R477,880 revenue · 62.13% gross margin · R296,606 net profit) · Balance Sheet · Cash Flow · Year-End Close · Smart Capture (95% confidence, auto-retry) · ProteaAI (EF-routed) · Loyalty AI Engine Tab 8 (Run Now, dedup confirmed) · Customer Profiles (50 customers) · RLS (12 finance tables)
 HQJournals.js v1.0 (WP-FINANCIALS Phase 5): journal list · expand-to-lines · type/status/FY filters · COA picker grouped by account type · post · reverse · delete draft · stats strip · audit trail
-RLS HQ bypass (LL-205): 7 tables patched — HQ operator can now read all finance tables cross-tenant
+HQBankRecon.js v1.0 (WP-FINANCIALS Phase 7): FNB account · R180,733.69 closing balance reconciled · 22 lines · inline categorise · Balance Sheet Cash link
+HQFixedAssets.js v1.0 (WP-FINANCIALS Phase 4): 3 assets · R59,774.44 NBV · Run Depreciation modal · depreciation history · PP&E Balance Sheet note
+HQ Finance nav complete: 12 items — Pricing/Costing/P&L/Balance Sheet/Invoices/Journals/Bank Recon/Fixed Assets/Expenses/Forecast/VAT/Year-End Close
+RLS HQ bypass (LL-205): 8 tables patched (7 main + depreciation_entries mid-session)
 
 ## Outstanding Owner Actions
 - **pg_cron**: Supabase Dashboard → Database → Extensions → enable pg_cron, then:
@@ -482,10 +503,20 @@ RLS HQ bypass (LL-205): 7 tables patched — HQ operator can now read all financ
 - **Yoco keys**: After CIPRO → portal.yoco.com
 
 ## Next Dev Priorities
-1. HQVat.js — WP-FINANCIALS Phase 6 (DB ready: vat_transactions 6 rows · LL-205 already applied)
-2. HQBankRecon.js — WP-FINANCIALS Phase 7 (DB ready: bank_accounts 1 row · bank_statement_lines 22 rows · LL-205 applied)
-3. HQFixedAssets.js — WP-FINANCIALS Phase 4 (DB ready: fixed_assets 3 rows · LL-205 applied)
-4. monthly_visit_count + monthly_spend_zar checkout wiring (low priority — beta dev)
+1. HQVat.js — Assessment before build (component exists on disk — 19KB · wired at /hq?tab=vat)
+   CRITICAL: Read existing component first. Data model issues documented in SESSION-STATE v210.
+   tenant_config.vat_registered = null — configure first. Source data gaps exist.
+   Do NOT rebuild without reading the existing file and understanding current state.
+
+2. HQFinancialStatements.js — Unified shell (Option A: build after all pieces verified)
+   Absorbs: Journals · BankRecon · FixedAssets · VAT · FinancialNotes · FinancialSetup
+
+3. VAT Auto-Population Pipeline — Backlog
+   Edge Function/SQL: orders + expenses → vat_transactions (proper per-transaction rows)
+   Blocked on: tenant VAT configuration + owner decision on data model
+
+4. Depreciation catch-up — Owner action (not dev)
+   Run HQFixedAssets → Run Depreciation for each missing month (15-23 months per asset)
 
 ---
 
