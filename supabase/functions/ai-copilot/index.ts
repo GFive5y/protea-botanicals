@@ -1,22 +1,27 @@
 // supabase/functions/ai-copilot/index.ts
-// v60 (patch) — Phase 1: Real SSE streaming + systemOverride fix + NuAi table allowlist
+// v62 ��� Phase 2: Tool Use (Agentic DB queries)
 //
-// PATCH vs initial v60:
-//   streaming path now sends NO tools to Claude.
-//   When tools are passed in a streaming call, Claude emits tool_use events
-//   (input_json_delta), not text_delta. Our SSE reader only captures text_delta,
-//   so tool calls silently swallow the response — AI says "I'll check" then stops.
-//   Fix: streaming path = text-only from context. Tool use = non-streaming (Phase 2).
+// Architecture:
+//   stream:true  + HQ/admin + non-trivial msg:
+//     → runToolLoop (non-streamed, Claude decides which tools to call)
+//     → streamFinalResponse (stream the synthesis with full tool context)
+//   stream:true  + non-HQ OR trivial msg:
+//     → streamResponse (direct SSE, no tool overhead — Phase 1 path)
+//   stream:false (Query tab + legacy):
+//     → runToolLoop (non-streamed) → JSON response
 //
-// CRITICAL FIXES vs v59:
-//   1. systemOverride now ACTUALLY USED — was silently ignored in v59
-//   2. Real SSE streaming — when stream:true in body, final synthesis streams token by token
-//   3. NuAi table allowlist — query_database covers all 49 NuAi tables
-//   4. tenantId enforcement — query_database always filters by tenant_id
+// Phase 1 (v61) changes preserved:
+//   - systemOverride actually used
+//   - SSE streaming
+//   - 49-table NuAi allowlist
+//   - tenantId enforcement
+//   - Cannabis retail catalog removed
 //
-// Streaming architecture (Phase 1):
-//   stream:true  → Claude called WITHOUT tools → pure text stream → SSE tokens to client
-//   stream:false → Claude called WITH tools, full tool loop → JSON response (Query tab)
+// Phase 2 (v62) new:
+//   - Tool loop runs BEFORE streaming for HQ/admin
+//   - streamFinalResponse: runs tool context through Claude one more time as stream
+//   - pipeSSE: shared SSE piping utility
+//   - runToolLoop returns { messages, finalText } so context is available for re-stream
 //
 // Deploy: npx supabase functions deploy ai-copilot --no-verify-jwt
 
@@ -62,19 +67,19 @@ const NUAI_ALLOWED_TABLES = new Set([
 // Tables with no tenant_id column
 const NO_TENANT_ID = new Set(["scan_logs", "scans"]);
 
-// ── Tool definitions (used by non-streaming / Query tab path only) ────────────
+// ── Tool definitions ─────────────────────────────────────────────────────────
 const TOOLS = [
   {
     name: "query_database",
-    description: "Run a read-only query on any NuAi database table. Always filters by tenant_id. Returns up to 100 rows.",
+    description: "Run a read-only query on any NuAi database table. Always filters by tenant_id. Use this to get specific data: inventory levels, orders, expenses, VAT, journals, customers, staff, loyalty, etc. Returns up to 100 rows.",
     input_schema: {
       type: "object" as const,
       properties: {
         table: { type: "string" as const, description: "Table name to query" },
-        columns: { type: "string" as const, description: "Columns to select, comma-separated or * (keep under 10)" },
+        columns: { type: "string" as const, description: "Columns to select, comma-separated or * for all (keep under 10 columns for readability)" },
         filters: {
           type: "array" as const,
-          description: "Filter conditions (tenant_id added automatically)",
+          description: "Additional filter conditions (tenant_id is added automatically)",
           items: {
             type: "object" as const,
             properties: {
@@ -92,25 +97,25 @@ const TOOLS = [
             ascending: { type: "boolean" as const },
           },
         },
-        limit: { type: "number" as const, description: "Max rows (default 20, max 100)" },
+        limit: { type: "number" as const, description: "Max rows to return (default 20, max 100)" },
       },
       required: ["table"],
     },
   },
   {
     name: "get_financial_summary",
-    description: "Get real-time financial summary: MTD revenue (ex-VAT), expenses, orders count, VAT position.",
+    description: "Get a real-time financial summary for a time period: revenue ex-VAT (÷1.15), expenses, gross profit estimate, orders count, VAT position. Use for financial questions.",
     input_schema: {
       type: "object" as const,
       properties: {
-        period: { type: "string" as const, enum: ["mtd","ytd"] },
+        period: { type: "string" as const, enum: ["mtd","ytd"], description: "mtd = month to date, ytd = year to date" },
       },
       required: ["period"],
     },
   },
   {
     name: "get_alerts",
-    description: "Get current unacknowledged system alerts and low stock items.",
+    description: "Get current unacknowledged system alerts and low-stock items needing attention.",
     input_schema: { type: "object" as const, properties: {} },
   },
 ];
@@ -132,14 +137,16 @@ async function executeTool(
       const limit = Math.min((input.limit as number) || 20, 100);
 
       if (!NUAI_ALLOWED_TABLES.has(table)) {
-        return JSON.stringify({ error: `Table "${table}" not in allowlist.` });
+        return JSON.stringify({ error: `Table "${table}" not in allowlist. Use one of the 49 NuAi tables.` });
       }
 
       let q = supabase.from(table).select(columns).limit(limit);
+
+      // Enforce tenant isolation
       if (tenantId && !NO_TENANT_ID.has(table)) q = q.eq("tenant_id", tenantId);
 
       for (const f of filters) {
-        if (f.column === "tenant_id") continue;
+        if (f.column === "tenant_id") continue; // already applied
         if (f.op === "eq") q = q.eq(f.column, f.value);
         else if (f.op === "neq") q = q.neq(f.column, f.value);
         else if (f.op === "gt") q = q.gt(f.column, f.value);
@@ -150,15 +157,16 @@ async function executeTool(
         else if (f.op === "ilike") q = q.ilike(f.column, f.value as string);
         else if (f.op === "in") q = q.in(f.column, Array.isArray(f.value) ? f.value : [f.value]);
       }
+
       if (order) q = q.order(order.column, { ascending: order.ascending ?? false });
 
       const { data, error } = await q;
       if (error) return JSON.stringify({ error: error.message });
-      return JSON.stringify({ table, row_count: data?.length ?? 0, data });
+      return JSON.stringify({ table, row_count: data?.length ?? 0, rows: data });
     }
 
     case "get_financial_summary": {
-      if (!tenantId) return JSON.stringify({ error: "No tenant context" });
+      if (!tenantId) return JSON.stringify({ error: "No tenant context for financial summary." });
       const period = (input.period as string) || "mtd";
       const now = new Date();
       const startDate = period === "mtd"
@@ -167,7 +175,7 @@ async function executeTool(
       const periodId = `${now.getFullYear()}-P${Math.ceil((now.getMonth()+1)/2)}`;
 
       const [ordersRes, expRes, vatRes] = await Promise.all([
-        supabase.from("orders").select("total,status")
+        supabase.from("orders").select("total")
           .eq("tenant_id", tenantId).eq("status","paid")
           .gte("created_at", startDate+"T00:00:00"),
         supabase.from("expenses").select("amount_zar,category")
@@ -183,37 +191,40 @@ async function executeTool(
       const inputVat = (vatRes.data||[]).reduce((s:number,t:Record<string,unknown>)=>s+(parseFloat(t.input_vat as string)||0),0);
 
       return JSON.stringify({
-        period, period_start: startDate,
+        period, start: startDate,
         orders_count: (ordersRes.data||[]).length,
-        revenue_incl_vat: Math.round(revIncl*100)/100,
         revenue_excl_vat: revExcl,
+        revenue_incl_vat: Math.round(revIncl*100)/100,
         total_expenses: Math.round(expenses*100)/100,
         gross_profit_estimate: Math.round((revExcl-expenses)*100)/100,
         vat_output: Math.round(outputVat*100)/100,
         vat_input: Math.round(inputVat*100)/100,
         vat_net_payable: Math.round((outputVat-inputVat)*100)/100,
-        note: "Revenue ex-VAT (÷1.15). GAP-01: source data includes VAT.",
+        note: "Revenue shown ex-VAT (total÷1.15). Known: P&L source data includes VAT — see GAP-01.",
       });
     }
 
     case "get_alerts": {
-      if (!tenantId) return JSON.stringify({ error: "No tenant context" });
+      if (!tenantId) return JSON.stringify({ error: "No tenant context for alerts." });
       const [alertsRes, stockRes] = await Promise.all([
-        supabase.from("system_alerts").select("severity,alert_type,message")
-          .eq("tenant_id",tenantId).is("acknowledged_at",null).limit(20),
-        supabase.from("inventory_items").select("name,quantity_on_hand,reorder_level")
+        supabase.from("system_alerts").select("severity,alert_type,message,created_at")
+          .eq("tenant_id",tenantId).is("acknowledged_at",null)
+          .order("created_at",{ascending:false}).limit(20),
+        supabase.from("inventory_items")
+          .select("name,quantity_on_hand,reorder_level,category")
           .eq("tenant_id",tenantId).eq("is_active",true)
           .not("reorder_level","is",null).limit(200),
       ]);
       const alerts = alertsRes.data||[];
       const low = (stockRes.data||[]).filter((i:Record<string,unknown>)=>
         (i.reorder_level as number)>0 && (i.quantity_on_hand as number)<=(i.reorder_level as number)
-      ).map((i:Record<string,unknown>)=>({name:i.name,on_hand:i.quantity_on_hand,reorder_level:i.reorder_level}));
+      ).map((i:Record<string,unknown>)=>({ name:i.name, on_hand:i.quantity_on_hand, reorder_level:i.reorder_level, category:i.category }));
+
       return JSON.stringify({
         unacknowledged_alerts: alerts.length,
         critical: alerts.filter((a:Record<string,unknown>)=>a.severity==="critical").length,
         warning: alerts.filter((a:Record<string,unknown>)=>a.severity==="warning").length,
-        alert_types:[...new Set(alerts.map((a:Record<string,unknown>)=>a.alert_type))],
+        recent_alerts: alerts.slice(0,5).map((a:Record<string,unknown>)=>({ severity:a.severity, type:a.alert_type, message:a.message })),
         low_stock_count: low.length,
         low_stock_items: low.slice(0,8),
       });
@@ -228,16 +239,16 @@ async function executeTool(
 function buildFallbackSystemPrompt(userContext: Record<string,unknown>|null): string {
   const role = (userContext?.role as string)||"guest";
   return `You are ProteaAI, the AI assistant for a South African specialty retail ERP platform.
-Role: ${role}. Be helpful, concise. Use ZAR. Under 200 words unless detail requested.`;
+Role: ${role}. Be helpful and concise. Use ZAR. Under 200 words unless more detail is requested.`;
 }
 
-// ── Non-streaming tool loop (Query tab + legacy) ──────────────────────────────
+// ── Tool loop (non-streamed) — used by both stream and non-stream paths ───────
 async function runToolLoop(
   initialMessages: Array<Record<string,unknown>>,
   system: string,
   apiKey: string,
   tenantId: string|null,
-): Promise<string> {
+): Promise<{ messages: Array<Record<string,unknown>>; finalText: string }> {
   let currentMessages = [...initialMessages];
   let finalText = "";
 
@@ -266,20 +277,22 @@ async function runToolLoop(
     const data = await response.json();
 
     if (data.stop_reason !== "tool_use") {
+      // Claude finished — extract text and add to messages
       finalText = (data.content||[])
         .filter((b:Record<string,unknown>)=>b.type==="text")
         .map((b:Record<string,unknown>)=>b.text as string)
         .join("\n");
+      currentMessages = [...currentMessages, { role: "assistant", content: data.content }];
       break;
     }
 
-    // Execute tool calls
+    // Claude called tools — execute and continue
     const toolUseBlocks = (data.content||[]).filter((b:Record<string,unknown>)=>b.type==="tool_use");
-    currentMessages.push({ role: "assistant", content: data.content });
+    currentMessages = [...currentMessages, { role: "assistant", content: data.content }];
 
     const toolResults = await Promise.all(
       toolUseBlocks.map(async (tu:Record<string,unknown>) => {
-        console.log(`[ai-copilot] Tool: ${tu.name}`);
+        console.log(`[ai-copilot v62] Tool: ${tu.name}`, JSON.stringify(tu.input));
         const result = await executeTool(
           tu.name as string,
           (tu.input as Record<string,unknown>)||{},
@@ -288,51 +301,19 @@ async function runToolLoop(
         return { type: "tool_result", tool_use_id: tu.id, content: result };
       }),
     );
-    currentMessages.push({ role: "user", content: toolResults } as any);
 
-    if (round === MAX_TOOL_ROUNDS-1) {
-      finalText = "I hit a processing limit. Please try a more specific question.";
+    currentMessages = [...currentMessages, { role: "user", content: toolResults } as any];
+
+    if (round === MAX_TOOL_ROUNDS - 1) {
+      finalText = "I reached a processing limit. Please try a more specific question.";
     }
   }
 
-  return finalText;
+  return { messages: currentMessages, finalText };
 }
 
-// ── SSE streaming (Chat tab) — NO tools, answers from system prompt context ───
-// IMPORTANT: Tools are intentionally omitted from this call.
-// When tools are passed in a streaming call, Claude emits tool_use content blocks
-// (input_json_delta events). Our SSE reader only captures text_delta events.
-// Tool calls in streaming silently consume the response with no visible output.
-// Phase 1 = stream from rich context. Phase 2 = agentic tool loop (non-streaming).
-async function streamResponse(
-  messages: Array<Record<string,unknown>>,
-  system: string,
-  apiKey: string,
-): Promise<Response> {
-  const claudeRes = await fetch(ANTHROPIC_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      system,
-      messages,
-      // NO tools here — see comment above
-      max_tokens: 1024,
-      temperature: 0.4,
-      stream: true,
-    }),
-  });
-
-  if (!claudeRes.ok) {
-    const err = await claudeRes.text();
-    throw new Error(`Anthropic streaming error ${claudeRes.status}: ${err}`);
-  }
-
-  // Pipe Anthropic SSE → NuAi SSE (text_delta tokens only)
+// ── SSE pipe — shared utility ─────────────────────────────────────────────────
+function pipeSSE(claudeRes: Response): Response {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const enc = new TextEncoder();
@@ -354,20 +335,14 @@ async function streamResponse(
           if (raw === "[DONE]") continue;
           try {
             const evt = JSON.parse(raw);
-            if (
-              evt.type === "content_block_delta" &&
-              evt.delta?.type === "text_delta" &&
-              evt.delta?.text
-            ) {
-              await writer.write(
-                enc.encode(`data: ${JSON.stringify({ token: evt.delta.text })}\n\n`),
-              );
+            if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta" && evt.delta?.text) {
+              await writer.write(enc.encode(`data: ${JSON.stringify({ token: evt.delta.text })}\n\n`));
             }
           } catch { /* malformed SSE line — skip */ }
         }
       }
     } catch (e) {
-      console.error("[ai-copilot] Stream pipe error:", e);
+      console.error("[ai-copilot v62] SSE pipe error:", e);
     } finally {
       try {
         await writer.write(enc.encode("data: [DONE]\n\n"));
@@ -386,6 +361,77 @@ async function streamResponse(
   });
 }
 
+// ── Stream direct — no tools, for non-HQ or trivial messages ─────────────────
+async function streamDirect(
+  messages: Array<Record<string,unknown>>,
+  system: string,
+  apiKey: string,
+): Promise<Response> {
+  const claudeRes = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      system,
+      messages,
+      // No tools — prevents tool_use events swallowing text_delta tokens
+      max_tokens: 1024,
+      temperature: 0.4,
+      stream: true,
+    }),
+  });
+
+  if (!claudeRes.ok) {
+    throw new Error(`Anthropic streaming error ${claudeRes.status}: ${await claudeRes.text()}`);
+  }
+
+  return pipeSSE(claudeRes);
+}
+
+// ── Stream synthesis — after tool loop, re-stream the final answer ────────────
+// Takes the messages array INCLUDING the last assistant turn from tool loop.
+// Drops it and re-calls Claude with stream:true so the answer streams.
+// No tools in synthesis call — prevents recursive tool loops.
+async function streamSynthesis(
+  messagesWithTools: Array<Record<string,unknown>>,
+  system: string,
+  apiKey: string,
+): Promise<Response> {
+  // Drop last assistant turn to re-generate as a stream
+  const last = messagesWithTools[messagesWithTools.length - 1] as Record<string,unknown>;
+  const msgs = last?.role === "assistant"
+    ? messagesWithTools.slice(0, -1)
+    : messagesWithTools;
+
+  const claudeRes = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      system,
+      messages: msgs,
+      // No tools in synthesis — Claude has all the data from tool results in context
+      max_tokens: 1024,
+      temperature: 0.4,
+      stream: true,
+    }),
+  });
+
+  if (!claudeRes.ok) {
+    throw new Error(`Anthropic synthesis streaming error ${claudeRes.status}: ${await claudeRes.text()}`);
+  }
+
+  return pipeSSE(claudeRes);
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -401,12 +447,11 @@ serve(async (req: Request) => {
   try {
     const body = await req.json();
 
-    // v60 CRITICAL FIX: extract systemOverride and stream from body
     const {
       messages,
       userContext = null,
-      systemOverride = null,   // ProteaAI.js sends this — NOW ACTUALLY USED
-      stream = false,          // Chat tab: true  |  Query tab: false
+      systemOverride = null,  // ProteaAI.js always provides this — v60+ critical fix
+      stream = false,         // Chat tab: true  |  Query tab: false
     } = body;
 
     // Health check
@@ -426,22 +471,23 @@ serve(async (req: Request) => {
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
-      const noKeyMsg = "AI assistant not configured. Set ANTHROPIC_API_KEY in Supabase secrets.";
+      const msg = "AI assistant not configured. Set ANTHROPIC_API_KEY in Supabase secrets.";
       if (stream) {
-        // Return error as SSE so client SSE reader doesn't hang
-        const body = `data: ${JSON.stringify({ token: noKeyMsg })}\n\ndata: [DONE]\n\n`;
-        return new Response(body, {
-          headers: { ...CORS_HEADERS, "Content-Type": "text/event-stream" },
-        });
+        const body = `data: ${JSON.stringify({ token: msg })}\n\ndata: [DONE]\n\n`;
+        return new Response(body, { headers: { ...CORS_HEADERS, "Content-Type": "text/event-stream" } });
       }
       return new Response(
-        JSON.stringify({ reply: noKeyMsg, model: null, usage: null, error: "ANTHROPIC_API_KEY not set" }),
+        JSON.stringify({ reply: msg, model: null, usage: null, error: "ANTHROPIC_API_KEY not set" }),
         { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
       );
     }
 
-    // Use systemOverride when provided (ProteaAI.js always provides it)
+    // Extract context — ProteaAI.js sends { role, isHQ, tenantId }
     const tenantId = (userContext?.tenantId as string) || null;
+    const role = (userContext?.role as string) || null;
+    const isHQ = !!(userContext?.isHQ);
+
+    // Use systemOverride when provided (ProteaAI.js always provides it)
     const system: string = systemOverride || buildFallbackSystemPrompt(userContext);
 
     const anthropicMessages = messages.map((m: Record<string,unknown>) => ({
@@ -450,15 +496,38 @@ serve(async (req: Request) => {
     }));
 
     // ── Stream path (Chat tab) ────────────────────────────────────────────────
-    // No tools — AI answers from rich system prompt context (financial MTD,
-    // stock levels, alerts, tab-specific data loaded by buildContext in ProteaAI.js)
     if (stream) {
-      return await streamResponse(anthropicMessages, system, apiKey);
+      // Phase 2: HQ and admin users get tool-aware streaming
+      const userHasTools = isHQ || role === "admin";
+
+      if (!userHasTools) {
+        // Non-HQ: stream directly — no tool overhead
+        return await streamDirect(anthropicMessages, system, apiKey);
+      }
+
+      // Skip tool loop for trivial/greeting messages (saves 1 API call)
+      const lastContent = String(messages[messages.length-1]?.content || "").trim();
+      const trivialMsg = lastContent.length < 15 ||
+        /^(hi|hello|thanks|ok|sure|great|yes|no|good|cool|nice|got it)\b/i.test(lastContent);
+
+      if (trivialMsg) {
+        return await streamDirect(anthropicMessages, system, apiKey);
+      }
+
+      // Tool-aware streaming:
+      // 1. Run tool loop non-streamed (Claude decides which tools to call)
+      // 2. Stream the final synthesis with full tool context
+      console.log(`[ai-copilot v62] Tool-aware stream for role:${role} isHQ:${isHQ}`);
+      const { messages: withTools } = await runToolLoop(
+        anthropicMessages, system, apiKey, tenantId,
+      );
+      return await streamSynthesis(withTools, system, apiKey);
     }
 
     // ── Non-stream path (Query tab + legacy callers) ──────────────────────────
-    // Full tool loop — AI can query database, get financial summary, get alerts
-    const finalText = await runToolLoop(anthropicMessages, system, apiKey, tenantId);
+    const { finalText } = await runToolLoop(
+      anthropicMessages, system, apiKey, tenantId,
+    );
 
     return new Response(
       JSON.stringify({
@@ -471,12 +540,9 @@ serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error("[ai-copilot] Error:", error);
+    console.error("[ai-copilot v62] Error:", error);
     return new Response(
-      JSON.stringify({
-        reply: null, model: null, usage: null,
-        error: (error as Error).message || "Internal server error",
-      }),
+      JSON.stringify({ reply: null, model: null, usage: null, error: (error as Error).message || "Internal server error" }),
       { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
     );
   }
