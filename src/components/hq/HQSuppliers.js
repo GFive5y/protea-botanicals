@@ -509,6 +509,8 @@ function AddSupplierPanel({ onClose, onSaved }) {
     contact_phone: "",
     website: "",
     notes: "",
+    vat_registered: false,
+    vat_number: "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -526,6 +528,8 @@ function AddSupplierPanel({ onClose, onSaved }) {
         country: form.country.trim() || "Unknown",
         currency: form.currency,
         contact_name: form.contact_name.trim() || null,
+        vat_registered: form.currency === "ZAR" ? form.vat_registered : false,
+        vat_number: form.vat_number.trim() || null,
       },
     ]);
     setSaving(false);
@@ -635,6 +639,25 @@ function AddSupplierPanel({ onClose, onSaved }) {
           </Select>
         </div>
       </div>
+      {form.currency === "ZAR" && (
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: 16, marginBottom: 16 }}>
+          <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
+            VAT Registration
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: C.text }}>
+              <input type="checkbox" checked={form.vat_registered} onChange={(e) => set("vat_registered", e.target.checked)} style={{ width: 16, height: 16, cursor: "pointer", accentColor: C.accent }} />
+              Supplier is VAT-registered with SARS
+            </label>
+          </div>
+          {form.vat_registered && (
+            <Input label="VAT Number" value={form.vat_number} onChange={(e) => set("vat_number", e.target.value)} placeholder="e.g. 4123456789" />
+          )}
+          <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
+            VAT-registered suppliers generate claimable input VAT on deliveries. Import suppliers (USD/EUR) are not subject to SA VAT.
+          </div>
+        </div>
+      )}
       <div
         style={{
           background: C.bg,
@@ -1260,7 +1283,7 @@ export default function HQSuppliers() {
       await Promise.all([
         supabase
           .from("suppliers")
-          .select("id, name, country, currency, contact_name")
+          .select("id, name, country, currency, contact_name, vat_registered, vat_number")
           .order("name"),
         supabase
           .from("supplier_products")
@@ -2349,6 +2372,33 @@ export default function HQSuppliers() {
                       No products catalogued yet.
                     </div>
                   )}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: 11, color: C.muted }}>VAT:</span>
+                    {s.vat_registered === true ? (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: T.success, background: T.successBg, padding: "2px 8px", borderRadius: 4 }}>
+                        {"\u2713"} Registered{s.vat_number ? ` \u00b7 ${s.vat_number}` : ""}
+                      </span>
+                    ) : s.vat_registered === false ? (
+                      <span style={{ fontSize: 11, color: C.muted, background: C.bg, padding: "2px 8px", borderRadius: 4 }}>
+                        Not registered
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: T.warning, background: T.warningBg, padding: "2px 8px", borderRadius: 4 }}>
+                        Unknown
+                      </span>
+                    )}
+                    {s.currency === "ZAR" && (
+                      <button onClick={async () => { const newVal = s.vat_registered !== true; await supabase.from("suppliers").update({ vat_registered: newVal }).eq("id", s.id); load(); }}
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: `1px solid ${C.border}`, background: "none", cursor: "pointer", color: C.muted }}>
+                        {s.vat_registered === true ? "Mark not registered" : "Mark registered"}
+                      </button>
+                    )}
+                    {s.currency !== "ZAR" && (
+                      <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>
+                        Import supplier — SA VAT not applicable
+                      </span>
+                    )}
+                  </div>
                 </Card>
               );
             })

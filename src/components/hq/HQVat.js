@@ -114,6 +114,8 @@ export default function HQVat() {
   const [submissionRef, setSubmissionRef] = useState("");
   const [closeModal,    setCloseModal]    = useState(null);
   const [closing,       setClosing]       = useState(false);
+  const [receiptsInputVat, setReceiptsInputVat] = useState(null);
+  const [receiptStats,     setReceiptStats]     = useState({});
 
   const periods = getBiMonthlyPeriods();
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
@@ -122,12 +124,14 @@ export default function HQVat() {
     if (!tenantId) return;
     setLoading(true);
     try {
-      const [cfgRes, txnRes, filingsRes, ordersRes, expensesRes] = await Promise.all([
+      const [cfgRes, txnRes, filingsRes, ordersRes, expensesRes, receiptsRes] = await Promise.all([
         supabase.from("tenant_config").select("vat_registered,vat_number,vat_period,vat_rate,trading_name,company_reg_number,registered_address").eq("tenant_id", tenantId).maybeSingle(),
         supabase.from("vat_transactions").select("*").eq("tenant_id", tenantId).order("transaction_date", { ascending: false }),
         supabase.from("vat_period_filings").select("*").eq("tenant_id", tenantId),
         supabase.from("orders").select("total,created_at").eq("tenant_id", tenantId).eq("status", "paid"),
         supabase.from("expenses").select("expense_date,input_vat_amount,amount_zar").eq("tenant_id", tenantId),
+        supabase.from("stock_receipts").select("received_at,input_vat_amount")
+          .eq("tenant_id", tenantId).gt("input_vat_amount", 0),
       ]);
       setVatConfig(cfgRes.data);
       setVatTxns(txnRes.data || []);
@@ -162,6 +166,20 @@ export default function HQVat() {
         eStats[pid].totalInputVat += parseFloat(e.input_vat_amount) || 0;
       });
       setExpenseStats(eStats);
+
+      // Stock receipts input VAT — per period + YTD total
+      const rStats = {};
+      (receiptsRes.data || []).forEach(r => {
+        const pid = getPeriodIdFromDate(r.received_at);
+        if (!pid) return;
+        if (!rStats[pid]) rStats[pid] = { count: 0, totalInputVat: 0 };
+        rStats[pid].count++;
+        rStats[pid].totalInputVat += parseFloat(r.input_vat_amount) || 0;
+      });
+      setReceiptStats(rStats);
+      setReceiptsInputVat(
+        (receiptsRes.data || []).reduce((s, r) => s + (parseFloat(r.input_vat_amount) || 0), 0)
+      );
     } catch (e) { showToast("Load failed: " + e.message, "error"); }
     finally { setLoading(false); }
   }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -207,19 +225,29 @@ export default function HQVat() {
   const openCloseModal = (pid) => {
     const stored    = periodData(pid);
     const oS        = orderStats[pid]   || { count: 0, totalIncl: 0, totalExcl: 0, outputVat: 0 };
-    const eS        = expenseStats[pid] || { count: 0, totalInputVat: 0 };
+    const eS        = expenseStats[pid]  || { count: 0, totalInputVat: 0 };
+    const rS        = receiptStats[pid]  || { count: 0, totalInputVat: 0 };
     const seededRows = vatTxns.filter(t => t.vat_period === pid && t.source === "seeded");
     setCloseModal({
-      periodId: pid, calcOutputVat: oS.outputVat, calcInputVat: eS.totalInputVat,
-      calcOrderCount: oS.count, calcExpenseCount: eS.count, totalIncl: oS.totalIncl,
-      storedOutputVat: stored.outputVat, storedInputVat: stored.inputVat, seededRowCount: seededRows.length,
+      periodId: pid,
+      calcOutputVat:        oS.outputVat,
+      calcInputVat:         eS.totalInputVat + rS.totalInputVat,
+      calcExpenseInputVat:  eS.totalInputVat,
+      calcReceiptInputVat:  rS.totalInputVat,
+      calcOrderCount:       oS.count,
+      calcExpenseCount:     eS.count,
+      calcReceiptCount:     rS.count,
+      totalIncl:            oS.totalIncl,
+      storedOutputVat:      stored.outputVat,
+      storedInputVat:       stored.inputVat,
+      seededRowCount:       seededRows.length,
     });
   };
 
   const confirmClose = async () => {
     if (!closeModal) return;
     setClosing(true);
-    const { periodId, calcOutputVat, calcInputVat, calcOrderCount, calcExpenseCount, totalIncl } = closeModal;
+    const { periodId, calcOutputVat, calcInputVat, calcExpenseInputVat, calcReceiptInputVat, calcOrderCount, calcExpenseCount, calcReceiptCount, totalIncl } = closeModal;
     const pDef = periods.find(p => p.id === periodId);
     try {
       const { error: delErr } = await supabase.from("vat_transactions")
@@ -239,7 +267,7 @@ export default function HQVat() {
           tenant_id: tenantId, transaction_type: "input", vat_period: periodId, source: "calculated",
           output_vat: 0, input_vat: Math.round(calcInputVat * 100) / 100,
           exclusive_amount: 0, inclusive_amount: 0,
-          description: `Period close: ${calcExpenseCount} expenses \u2014 input_vat_amount from expenses table${calcInputVat === 0 ? " (R0 \u2014 populate via Smart Capture)" : ""}`,
+          description: `Period close: expenses R${(calcExpenseInputVat||0).toFixed(2)} + receipts R${(calcReceiptInputVat||0).toFixed(2)}${calcInputVat === 0 ? " (R0 \u2014 add VAT via Expenses or Stock Receive)" : ""}`,
           vat_rate: 0.15, transaction_date: pDef?.end, source_table: "expenses",
         },
       ];
@@ -438,19 +466,28 @@ export default function HQVat() {
             </div>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ width: 68, fontSize: 11, fontWeight: 700, color: D.ink500, textTransform: "uppercase", letterSpacing: "0.06em", paddingTop: 2, flexShrink: 0 }}>Input</div>
-              {expensesInputVat !== null && expensesInputVat > 0 ? (
-                <div style={{ fontSize: 12, color: "#166534", lineHeight: 1.7 }}>
-                  <span style={{ fontWeight: 700 }}>{"\u2713"} Input VAT captured from expenses:</span>{" "}
-                  <strong>{fmtZar(expensesInputVat)}</strong>
-                  {" \u00b7 "}
-                  <span style={{ color: D.ink500 }}>sourced from expense records via tax invoices</span>
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, color: D.warning, lineHeight: 1.7 }}>
-                  <strong>{"\u26A0"} No input VAT captured on expenses yet.</strong>{" "}
-                  <span style={{ color: D.ink500 }}>Add VAT amounts in Expenses Manager, or use Smart Capture to read them from supplier invoices automatically.</span>
-                </div>
-              )}
+              {(() => {
+                const totalIn = (expensesInputVat || 0) + (receiptsInputVat || 0);
+                if (totalIn > 0) {
+                  return (
+                    <div style={{ fontSize: 12, color: "#166534", lineHeight: 1.8 }}>
+                      <span style={{ fontWeight: 700 }}>{"\u2713"} Total input VAT captured: {fmtZar(totalIn)}</span>
+                      {(expensesInputVat || 0) > 0 && (
+                        <div style={{ color: D.ink500 }}>{"\u00b7"} Expenses: <strong>{fmtZar(expensesInputVat)}</strong></div>
+                      )}
+                      {(receiptsInputVat || 0) > 0 && (
+                        <div style={{ color: D.ink500 }}>{"\u00b7"} Stock receipts: <strong>{fmtZar(receiptsInputVat)}</strong></div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ fontSize: 12, color: D.warning, lineHeight: 1.7 }}>
+                    <strong>{"\u26A0"} No input VAT captured yet.</strong>{" "}
+                    <span style={{ color: D.ink500 }}>Add VAT amounts in Expenses Manager or on stock deliveries, or use Smart Capture to read them from supplier invoices automatically.</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
