@@ -10,6 +10,7 @@
 // Status workflow: any authenticated user with access can advance (tenant self-managed)
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import HQFinancialSetup from "./HQFinancialSetup";
@@ -228,6 +229,7 @@ export default function HQFinancialStatements() {
   const [bsData, setBsData] = useState(null);
   const [cfData, setCfData] = useState(null);
   const [equityData, setEquityData] = useState(null);
+  const [printing, setPrinting] = useState(false);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
   const bounds = useMemo(
@@ -253,7 +255,7 @@ export default function HQFinancialStatements() {
     setLoading(true);
     try {
       const { start, end, startDate, endDate } = bounds;
-      const [ordersRes, orderItemsRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, cfOrdersRes, cfPoRes] = await Promise.all([
+      const [ordersRes, orderItemsRes, expensesRes, depRes, equityRes, inventoryRes, faRes, invoicesRes, payablesRes, cfOrdersRes, cfPoRes, vatTxnRes] = await Promise.all([
         supabase.from("orders").select("id,total,created_at,status").eq("tenant_id", tenantId).not("status", "in", '("cancelled","failed")').gte("created_at", start).lte("created_at", end),
         supabase.from("order_items").select("order_id,quantity,line_total,product_name,product_metadata"),
         supabase.from("expenses").select("*").eq("tenant_id", tenantId).gte("expense_date", startDate).lte("expense_date", endDate),
@@ -265,6 +267,7 @@ export default function HQFinancialStatements() {
         supabase.from("purchase_orders").select("landed_cost_zar,po_status").eq("tenant_id", tenantId).in("po_status", ["pending", "confirmed", "ordered"]),
         supabase.from("orders").select("total").eq("tenant_id", tenantId).not("status", "in", '("cancelled","failed")').gte("created_at", start).lte("created_at", end),
         supabase.from("purchase_orders").select("landed_cost_zar").eq("tenant_id", tenantId).in("po_status", ["received", "complete"]),
+        supabase.from("vat_transactions").select("output_vat,input_vat").eq("tenant_id", tenantId),
       ]);
 
       // Income Statement
@@ -294,7 +297,9 @@ export default function HQFinancialStatements() {
       const fixedAssetsCost = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.purchase_cost || 0)), 0);
       const fixedAssetsAD = (faRes.data || []).reduce((s, a) => s + (parseFloat(a.accumulated_depreciation || 0)), 0);
       const fixedAssetsNBV = fixedAssetsCost > 0 ? fixedAssetsCost - fixedAssetsAD : capexPaid;
-      const vatLiability = 0;
+      const vatOutput = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
+      const vatInput  = (vatTxnRes.data || []).reduce((s, t) => s + (parseFloat(t.input_vat)  || 0), 0);
+      const vatLiability = Math.max(0, Math.round((vatOutput - vatInput) * 100) / 100);
       const eqData = equityRes.data;
       const shareCapital = eqData?.share_capital || 0;
       const openingRE = eqData?.opening_retained_earnings || 0;
@@ -336,6 +341,20 @@ export default function HQFinancialStatements() {
   const handleSignOff = () => { if (!auditorName.trim()) { showToast("Enter auditor name", "error"); return; } advanceStatus("signed", { signed_at: new Date().toISOString(), signed_by: auditorName.trim() }); setShowSignModal(false); setAuditorName(""); };
   const handleLock = () => { if (window.confirm(`Lock ${fy} financial statements? This cannot be undone.`)) advanceStatus("locked", { locked_at: new Date().toISOString() }); };
 
+  const handlePrint = useCallback(() => {
+    if (loading || !incomeData || !bsData || !cfData || !equityData) {
+      showToast("Statements still loading \u2014 wait a moment", "error");
+      return;
+    }
+    setPrinting(true);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => setPrinting(false), 400);
+      }, 150);
+    });
+  }, [loading, incomeData, bsData, cfData, equityData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (setupComplete === false) return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
   if (setupComplete === null) return <div style={{ padding: 60, textAlign: "center", color: C.ink400, fontFamily: C.font }}>Loading{"\u2026"}</div>;
 
@@ -348,6 +367,17 @@ export default function HQFinancialStatements() {
 
   return (
     <div style={{ fontFamily: C.font, color: C.ink700 }}>
+      {/* Print CSS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          #root { display: none !important; }
+          .nuai-print-portal { display: block !important; position: static !important; overflow: visible !important; }
+          .nuai-print-page-break { page-break-after: always; break-after: page; }
+          @page { size: A4 portrait; margin: 1.5cm; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+      `}} />
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: C.ink900, letterSpacing: "-0.01em", fontFamily: C.font }}>IFRS Financial Statements</h2>
@@ -357,6 +387,11 @@ export default function HQFinancialStatements() {
           {FY_OPTIONS.map(opt => (
             <button key={opt.id} onClick={() => setSelectedFY(opt.id)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid", borderColor: selectedFY === opt.id ? C.accent : C.ink150, background: selectedFY === opt.id ? C.accentLit : "#fff", color: selectedFY === opt.id ? C.accent : C.ink500, fontWeight: selectedFY === opt.id ? 700 : 400, cursor: "pointer", fontSize: 12, fontFamily: C.font }}>{opt.label}</button>
           ))}
+          {!loading && incomeData && (
+            <button onClick={handlePrint} disabled={printing} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: printing ? C.ink075 : C.accentLit, color: printing ? C.ink400 : C.accent, cursor: printing ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
+              {printing ? "Preparing\u2026" : "\uD83D\uDDA8\uFE0F Print / Save PDF"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -413,6 +448,29 @@ export default function HQFinancialStatements() {
       )}
 
       {toast && <div style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, background: toast.type === "error" ? "#991B1B" : C.accent, color: "#fff", padding: "12px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: C.font, boxShadow: "0 4px 20px rgba(0,0,0,0.18)" }}>{toast.msg}</div>}
+
+      {/* Print portal — renders all 4 statements outside #root for clean printing */}
+      {printing && createPortal(
+        <div className="nuai-print-portal" style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 99999, overflowY: "auto", padding: "24px", fontFamily: C.font }}>
+          <div style={{ textAlign: "center", marginBottom: 32, paddingBottom: 24, borderBottom: `2px solid ${C.ink150}` }}>
+            <div style={{ fontSize: 11, color: C.ink400, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>NuAi Financial Reporting</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: C.ink900 }}>{tenantName}</div>
+            <div style={{ fontSize: 14, color: C.ink500, marginTop: 4 }}>IFRS Financial Statements {"\u00b7"} {financialYear}</div>
+            <div style={{ fontSize: 12, color: C.ink400, marginTop: 4 }}>{periodLabel}</div>
+            <div style={{ marginTop: 12 }}><StatusBadge status={currentStatus} /></div>
+            {statusRow?.signed_by && <div style={{ fontSize: 12, color: C.ink500, marginTop: 8 }}>Signed by: <strong>{statusRow.signed_by}</strong>{statusRow.signed_at ? ` on ${new Date(statusRow.signed_at).toLocaleDateString("en-ZA")}` : ""}</div>}
+            <div style={{ fontSize: 11, color: C.ink300, marginTop: 6 }}>Prepared {fmtDate(new Date())} {"\u00b7"} IFRS for SMEs compliant {"\u00b7"} Functional currency: ZAR</div>
+          </div>
+          <div className="nuai-print-page-break">{incomeData && <IncomeStatement data={incomeData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}</div>
+          <div className="nuai-print-page-break">{bsData && <BalanceSheetStatement data={bsData} tenantName={tenantName} asAtLabel={asAtLabel} financialYear={financialYear} status={currentStatus} />}</div>
+          <div className="nuai-print-page-break">{cfData && <CashFlowStatement data={cfData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}</div>
+          <div>{equityData && <ChangesInEquityStatement data={equityData} tenantName={tenantName} periodLabel={periodLabel} financialYear={financialYear} status={currentStatus} />}</div>
+          <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.ink150}`, fontSize: 11, color: C.ink300, textAlign: "center", lineHeight: 1.7 }}>
+            Generated by NuAi {"\u00b7"} {new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })} {"\u00b7"} These statements have been prepared in accordance with IFRS for SMEs. {"\u00b7"} Prepared on the historical cost basis. Functional currency: South African Rand (ZAR).
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
