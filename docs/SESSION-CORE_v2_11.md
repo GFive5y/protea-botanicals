@@ -428,6 +428,29 @@ Origin: VL-007 (April 5, 2026).
 
 ---
 
+## LL-203 — CLAUDE CODE INSTRUCTIONS: ONE BOX ONLY (08 Apr 2026)
+Claude.ai instructions to Claude Code MUST be a single complete block.
+Requirements:
+  - All file contents included in full — no placeholders
+  - All modifications to existing files included with exact str_replace blocks
+  - Exact git add / git commit / git push commands at the bottom
+  - Self-contained: paste once, run start to finish
+NEVER produce multiple boxes, never split across messages, never omit git commands.
+If Claude.ai finds itself writing a second box: merge into the first.
+Origin: Owner feedback 08 Apr 2026 — fragmented instructions waste tokens and time.
+
+## LL-204 — BETA DEV MODE (LOCKED OPERATING MODE — 08 Apr 2026)
+BETA DEV MODE is the current operating mode. Locked until owner explicitly changes scope.
+Rules:
+  - Stock data = test data only. Do not correct AVCO values for demo accuracy.
+  - Physical contact points (Yoco, real deliveries, real invoices) = skip.
+  - Data coherence is Claude's responsibility. Keep mock data realistic.
+  - Goal: every system talking correctly with realistic mock data.
+Scope changes only on explicit owner instruction.
+Origin: 08 Apr 2026 session — established as permanent mode for development phase.
+
+---
+
 *SESSION-CORE v2.11 · NuAi · April 4, 2026*
 *v2.11: LL-196 through LL-199*
 *  LL-196: WP-VISUAL typography banned patterns + required patterns*

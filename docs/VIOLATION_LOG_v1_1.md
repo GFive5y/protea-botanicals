@@ -326,6 +326,24 @@ Doc fix:
 
 ---
 
+## VL-010 — RULE 0Q: push_files for SESSION-STATE_v207 (08 Apr 2026)
+- **Session:** v207
+- **Rule:** RULE 0Q + LL-202 — GitHub write tools banned for Claude.ai
+- **What happened:** Claude.ai called GitHub:push_files to commit SESSION-STATE_v207.md directly. Tool was in the tool list. Claude treated availability as permission.
+- **Caught:** Immediately. Owner stopped it.
+- **Correct action:** Produce file content in chat → give Claude Code one instruction block → Claude Code commits
+- **Prevention:** LL-203 added — single-box instruction format. Bible Section 0 has RULE 0Q first.
+
+## VL-011 — RULE 0Q: push_files for HQJournals.js (08 Apr 2026)
+- **Session:** v207 (same session, second violation)
+- **Rule:** RULE 0Q + LL-202
+- **What happened:** Claude.ai attempted to push partial HQJournals.js content via GitHub:push_files while writing the component. The file was truncated and incomplete.
+- **Caught:** Immediately. Owner stopped with multiple "STOP" messages.
+- **Correct action:** Write complete file content in chat. Give Claude Code single instruction block.
+- **Prevention:** RULE 0Q violations now at 4 confirmed instances (VL-007, VL-008, VL-010, VL-011). Bible leads with this rule. Tool availability ≠ permission — explicitly stated.
+
+---
+
 *VIOLATION_LOG v1.1 · NuAi · April 7, 2026*
 *9 violations logged · VL-001/VL-002: code box discipline (April 3)*
 *VL-003/VL-004: wrong build suggestions — already-built features presented as pending*

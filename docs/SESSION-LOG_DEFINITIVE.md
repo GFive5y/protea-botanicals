@@ -5,6 +5,51 @@
 
 ---
 
+## v208 — Project Bible + Process Reform · 08 Apr 2026
+HEAD: [this commit]
+
+PROBLEM SOLVED:
+  Two recurring process failures addressed with structural fixes:
+  1. RULE 0Q violations (4 confirmed: VL-007/008/010/011)
+     → NUAI-AGENT-BIBLE.md leads with RULE 0Q as first content
+     → LL-203 defines single-box Claude Code instruction format
+  2. Fragmented Claude Code instructions
+     → LL-203: one box, all files, all commands, self-contained
+
+NEW FILE:
+  docs/NUAI-AGENT-BIBLE.md v1.0
+    - Complete system description for cold AI sessions
+    - All features, all DB schemas, all rules consolidated
+    - Section 0: RULE 0Q front and center
+    - Read order: Bible → SESSION-STATE → VIOLATION_LOG → source file
+
+UPDATED FILES:
+  docs/SESSION-CORE_v2_11.md: LL-203 + LL-204 added
+  docs/VIOLATION_LOG_v1_1.md: VL-010 + VL-011 added
+  docs/SESSION-LOG_DEFINITIVE.md: this entry
+
+FULL SESSION WORK (v207 built on v206):
+  02bdc33 — HQOverview crash fix
+  266261e — Smart Capture auto-retry on 500
+  3e6aa5a — ProteaAI LL-120 fix (handleSend + handleQuery via EF)
+  39a29e2 — CODEBASE_FACTS updated
+  944416c — SESSION-STATE v207
+  loyalty-ai v2 deployed (RPC fix p_user_id/p_points)
+  ai-copilot v59 deployed (systemOverride param)
+  50 mock customers seeded (a0000001 pattern)
+  ~250 loyalty_transactions seeded
+  Churn rescue: 3 fired. Birthday bonuses: 5 fired. Dedup confirmed working.
+  RLS on 12 finance tables — Supabase security alert cleared
+  Pure PTV industry_profile: food_beverage → cannabis_retail (fixed)
+
+---
+
+## v207 — Full Day Session · 08 Apr 2026
+HEAD: 944416c
+See docs/SESSION-STATE_v207.md for full detail.
+
+---
+
 ## v192 — WP-AI-PRESENCE v1.0 · NuAI fixture · April 6, 2026
 HEAD: [this commit]
 

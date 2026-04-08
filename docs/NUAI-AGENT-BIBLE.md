@@ -1,0 +1,513 @@
+# NUAI AGENT BIBLE v1.0 — 08 Apr 2026
+## The single authoritative document for every Claude session.
+## Read this FIRST. Read this COMPLETELY. Then act.
+## All other docs are supplementary. This is the source of truth.
+
+---
+
+# ██████████████████████████████████████████████████████
+# RULE 0Q — READ THIS BEFORE ANYTHING ELSE
+# ██████████████████████████████████████████████████████
+
+## Claude.ai CANNOT PUSH TO GITHUB. EVER. NO EXCEPTIONS.
+
+**Banned tools for Claude.ai:** `push_files` · `create_or_update_file`
+These tools may appear in the Claude.ai tool list. Their presence is NOT permission.
+
+**Why this rule exists:**
+- VL-007 (05 Apr), VL-008 (07 Apr), VL-010, VL-011 (08 Apr) — four violations
+- Every violation wastes tokens, requires owner intervention, breaks trust
+- The tool being listed does not mean Claude.ai is permitted to use it
+
+**The correct three-role workflow:**
+Claude.ai  → reads GitHub (get_file_contents only) · plans · produces content
+→ writes ONE complete Claude Code instruction block in chat
+Claude Code → writes files to disk · verifies compile · commits · pushes
+Claude.ai  → confirms via get_file_contents (READ ONLY)
+
+**If Claude.ai finds itself about to call push_files or create_or_update_file:**
+1. STOP immediately
+2. Log the violation: "I was about to violate RULE 0Q. Logging VL-NNN."
+3. Write the content in the chat as a Claude Code instruction block instead
+
+## CLAUDE CODE INSTRUCTION FORMAT — MANDATORY
+
+Every instruction from Claude.ai to Claude Code must be:
+- **ONE single code block** — no exceptions
+- **Complete** — all file contents, all modifications, exact git commands
+- **Self-contained** — can be pasted once and run start to finish
+- **No fragmentation** — never split across multiple messages or boxes
+
+If Claude.ai produces multiple boxes, the instruction is WRONG. Start over.
+
+---
+
+# SECTION 1 — SYSTEM IDENTITY
+
+**NuAi** — South Africa's first AI-native multi-tenant ERP for specialty retail.
+Built on a real cannabis retail business. Ready to sell as SaaS.
+
+**One sentence:** NuAi turns every stock movement, customer scan, purchase, and staff action
+into live intelligence — replacing R1.4M of bespoke software at R3,500–R12,000/month.
+
+**Brand rules:**
+- Product name: NuAi (Nu + AI — capital A and I)
+- NEVER mention Claude or Anthropic — say "enterprise-grade AI stack"
+- NEVER say "cannabis" on public-facing pages, Yoco pages, or receipts (LL-200)
+- Yoco SDK = Android/iOS native only — not React web (LL-201)
+
+**Entities:**
+| Entity | ID | Role |
+|---|---|---|
+| Protea Botanicals HQ | 43b34c33-6864-4f02-98dd-df1d340475c3 | Internal operator, never public |
+| Medi Recreational | b1bad266-ceb4-4558-bbc3-22cfeeeafe74 | Client 2, cannabis_retail |
+| Pure Premium THC Vapes | f8ff8d07-7688-44a7-8714-5941ab4ceaa5 | Client 1, cannabis_retail |
+| Test Dispensary CT | 064adbdc-faaf-4949-9c4b-b5a927b7f2d1 | cannabis_retail |
+| TEST SHOP | 4a6c7d5c-a66a-4a13-b39a-fe836104000c | cannabis_retail |
+
+---
+
+# SECTION 2 — STACK & INFRA
+Frontend:   React 18 · Supabase JS client · Inline styles only (no Tailwind/CSS modules)
+Backend:    Supabase (Postgres + RLS + Auth + Edge Functions + Storage)
+Project: uvicrqapgzcdvozxrreo
+AI:         Anthropic Claude via ai-copilot Edge Function ONLY
+NEVER call api.anthropic.com from React (LL-120, VL-009)
+Payments:   PayFast (sandbox) · Yoco (awaiting keys — after CIPRO)
+Hosting:    Vercel · ERP: protea-botanicals.vercel.app
+Repo:       github.com/GFive5y/protea-botanicals · branch: main
+Fonts:      Inter for ALL HQ/admin. Cormorant Garamond + Jost for customer pages only.
+OPERATING MODE: BETA DEV MODE (locked until owner changes scope)
+
+Stock data = test only. AVCO = test values.
+Physical contact points (Yoco, real deliveries) = skip.
+Data is Claude's responsibility — keep it coherent.
+
+
+**Edge Functions — all active as of 08 Apr 2026:**
+| EF | Version | Purpose |
+|---|---|---|
+| ai-copilot | v59 | All Claude API calls. systemOverride param added. |
+| loyalty-ai | v2 | Nightly AI engine. RPC bug fixed. try/catch per user. |
+| process-document | v52 | Smart Capture AI extraction. SARS compliance + fingerprint. |
+| auto-post-capture | v1 | Atomic accounting on Smart Capture approve. |
+| receive-from-capture | v1 | Stock receipt + AVCO on delivery note capture. |
+| sim-pos-sales | v4 | POS sales simulator. |
+| sign-qr | v36 | QR HMAC signing. |
+| verify-qr | v34 | QR validation. |
+| send-notification | v37 | WhatsApp via Twilio. |
+| get-fx-rate | v35 | Live FX rates. 60s cache. R18.50 fallback. |
+
+---
+
+# SECTION 3 — SESSION START SEQUENCE (MANDATORY EVERY SESSION)
+
+1. List `docs/` directory → identify highest SESSION-STATE version number
+2. Read that SESSION-STATE file via `GitHub:get_file_contents`
+3. For each build target mentioned: read the actual source file from GitHub — NEVER trust docs alone
+4. Read VIOLATION_LOG — know what rules have been broken and why
+5. THEN respond with verified, accurate plan
+
+**Never suggest a feature as "pending build" without first reading the source file.**
+**Never ask the owner to run PowerShell/bash commands Claude can run via GitHub MCP.**
+
+---
+
+# SECTION 4 — FOUR USER TIERS
+TIER 1: OPERATOR (Gerhardt / NuAi team)
+Route: /hq → HQDashboard.js v4.3 (30+ active tabs)
+Sees: ALL tenants · ALL financial detail · ALL production
+Controls: procurement, pricing, fraud, tenants, F&B, HR, loyalty AI
+TIER 2: SHOP OWNER / MANAGER
+Route: /tenant-portal → TenantPortal.js v3.0
+Sees: Their tenant's data only (RLS enforced)
+Controls: stock, customers, orders, staff, pricing, Smart Capture
+TIER 3: SHOP CLERK / CASHIER
+Route: /admin → AdminDashboard.js
+Sees: Operational data only
+Controls: POS, stock adjustments, customer comms, QR codes
+TIER 4: CUSTOMER (end consumer)
+Route: /shop, /scan, /loyalty, /account
+Actions: browse, buy, scan QR, earn points, redeem, refer friends
+
+---
+
+# SECTION 5 — COMPLETE FEATURE MAP
+
+## 5.1 HQ COMMAND CENTRE (HQDashboard.js v4.3) — 30+ tabs
+
+### OPERATIONS
+| Tab ID | Component | What it does | Client benefit |
+|---|---|---|---|
+| overview | HQOverview.js | KPIs, live alerts, realtime subscriptions, 6 charts | Single screen for day's health |
+| supply-chain | SupplyChain.js | Supplier + raw material visibility across all tenants | Know what's flowing in |
+| suppliers | HQSuppliers.js | Supplier CRUD, contact management, reliability scoring | Vendor intelligence |
+| procurement | HQPurchaseOrders.js v2.1 | FX-aware POs, landed cost calculator (DDP), receive→inventory | Accurate cost from first order |
+| hq-production | HQProduction.js v3.5 | BOM, QC gate, allergen tracking, AVCO write-back — 5 industry profiles | End-to-end production control |
+| hq-stock | HQStock.js v3.1 | 7-tab stock intelligence: Overview/Items/Movements/Pricing/Receipts/POs/Shop | Real-time inventory truth |
+| hq-transfers | HQTransfer.js v1.0 | HQ→Shop stock transfers, TRF-YYYYMMDD ref, auto-receive | Zero stock discrepancies |
+| distribution | Distribution.js | Wholesale shipment tracking | B2B delivery visibility |
+| hq-trading | HQTradingDashboard.js v3.0 | Daily sales intelligence, 30-day chart, EOD history, month/year selector | Daily business pulse |
+| hq-pos | POSScreen.js v2.0 | In-store POS: customer lookup, loyalty (10pts/R1), cash change, session badge | Till operations |
+| hq-eod | EODCashUp.js v1.0 | End-of-day reconciliation. Thresholds from tenant_config.settings JSONB | Cash variance alert |
+
+### SMART CAPTURE (Documents tab — HQDocuments.js v2.4 + 3 EFs)
+Smart Capture is the AI document ingestion system. It handles:
+- **Expense invoices**: Upload → process-document EF (v52) extracts supplier, amounts, classifies CAPEX/OPEX → auto-post-capture EF posts Dr Expense/Cr Bank journal + creates expense row
+- **Delivery notes/supplier invoices**: Detected by document type → receive-from-capture EF creates stock movements + AVCO recalculation + Dr 12000 Inventories/Cr 20000 Trade Payables journal
+- **Fingerprint dedup**: process-document generates a fingerprint hash — same document blocked from double-posting
+- **Auto-retry**: 1 retry after 1.5s on 500 errors
+- **Confidence display**: Shows extraction confidence %. Below 70% = manual review flag.
+- **Stock receipt panel**: isStockCapture flag triggers "Stock to Receive" UI with matched/unmatched item badges
+- Client benefit: Upload a photo of an invoice → stock updated + accounts posted in under 10 seconds
+
+### FINANCE
+| Tab ID | Component | What it does |
+|---|---|---|
+| pricing | HQPricing.js v4.2 | Per-SKU prices × 3 channels (wholesale/retail/website) + NET AFTER LOYALTY column + FX sensitivity |
+| costing | HQCogs.js v4.2 | COGS builder: hardware (FX-live), terpene, distillate, lab, transport, packaging + loyalty cost line |
+| pl | HQProfitLoss.js v3.2 | Actual P&L: movements-based COGS (AVCO), DB-backed OPEX from expenses table, revenue from orders |
+| balance-sheet | HQBalanceSheet.js v1.0 | Assets / Liabilities / Equity. Accounting equation badge. |
+| invoices | HQInvoices.js v2.0 | Invoice list + aged debtors (0/30/60/90+ day buckets) + grand total outstanding |
+| wholesale-orders | HQWholesaleOrders.js v2.0 | B2B orders → reserve stock → SAGE-style invoice on ship |
+| documents | HQDocuments.js v2.4 | Smart Capture AI extraction (see above) |
+| journals | HQJournals.js v1.0 | **BEING BUILT NOW** — journal entries, post, reverse, COA picker |
+
+### INTELLIGENCE
+| Tab ID | Component | What it does |
+|---|---|---|
+| analytics | HQAnalytics.js v4.3 | 6 sub-tabs, profile-adaptive, cross-tenant comparisons |
+| geo-analytics | GeoAnalyticsDashboard.js | Province/city heatmaps, churn geography, demand gaps |
+| retailer-health | RetailerHealth.js | Per-tenant health scoring |
+| reorder | HQReorderScoring.js | Automated reorder triggers, draft PO creation |
+
+### PLATFORM (LOYALTY — most complex module)
+**HQLoyalty.js v4.0 — 10 tabs:**
+1. **Programme** — earn rates, tier thresholds, all config
+2. **Tiers** — Bronze/Silver/Gold/Platinum/Harvest Club breakdown
+3. **Customers** — all loyalty members, tier distribution
+4. **Transactions** — full points ledger
+5. **QR Security** — QR code management
+6. **Simulator** — POS sales simulator with loyalty preview
+7. **AI Engine (Tab 8)** — loyalty-ai EF control: Run Now button, 4 automation toggles, AI Actions Feed
+8. **Campaigns** — double-points events
+9. **Referrals** — referral code management
+10. **Programme Health** — health score (1-10), CLV projection, CPA comparison
+
+**loyalty-ai EF v2 — 5 nightly jobs:**
+1. Churn Scoring: recalculates churn_risk_score (0-1) for all customers
+2. Churn Rescue: 25pts BONUS to Gold+ customers silent ≥21 days (60-day dedup)
+3. Birthday Bonuses: pts_birthday_bonus in birth month (annual dedup per calendar year)
+4. Point Expiry: marks is_expired=true, deducts from loyalty_points balance
+5. Stock-Boost Suggestions: flags items with >90 days stock on hand for points multiplier suggestion (14-day dedup)
+Bonus: Weekly Brief on Mondays — health score + programme stats
+
+**RPC fix in v2:** `increment_loyalty_points(p_user_id uuid, p_points integer)` — was called with wrong param names in v1
+
+| Tab ID | Component | What it does |
+|---|---|---|
+| fraud | HQFraud.js v2.0 | Cross-tenant anomaly scoring, POPIA deletion tracking, audit log |
+| medical | HQMedical.js v1.0 | GATED: prescription patients, SAHPRA reports, dispensing log |
+| tenants | HQTenants.js v1.1 | Tenant management + TenantSetupWizard |
+
+### FOOD & BEVERAGE (food_beverage industry profile only)
+| Tab ID | Component | Lines | SA Compliance |
+|---|---|---|---|
+| hq-ingredients | HQFoodIngredients.js | 5082 | 121 SA ingredients, DAFF nutrition data |
+| hq-recipes | HQRecipeEngine.js | 1075 | BOM, allergen propagation, "▶ Start Batch" |
+| hq-haccp | HQHaccp.js | 1031 | CCP log, NCR auto-raise — SA R638 |
+| hq-food-safety | HQFoodSafety.js | 632 | Certificate vault, expiry alerts |
+| hq-nutrition | HQNutritionLabel.js | 590 | SA R638 nutritional label generator |
+| hq-cold-chain | HQColdChain.js | 798 | Temperature monitoring, breach detection |
+| hq-recall | HQRecall.js | 791 | Product recall, lot traceability, FSCA letter |
+| hq-food-intelligence | HQFoodIntelligence.js | — | AI-powered weekly F&B brief |
+
+### HR SUITE (HRDashboard.js — 13 modules)
+| Component | What it does |
+|---|---|
+| HRStaffDirectory.js | Staff list, search, CSV export, setup wizard |
+| HRStaffProfile.js | Single employee deep-view |
+| HRLeave.js | Leave requests, approval, conflict detection |
+| HRTimesheets.js | Batch approve, QR clock-in, hours monitor, setup wizard |
+| HRContracts.js | HTML→PDF contracts, template library |
+| HRDisciplinary.js | Warnings, hearings, appeals |
+| HRComms.js | Inbox, broadcasts, acknowledgements |
+| HRCalendar.js | 13 event layers, SA public holidays, MiniMonth, diary |
+| HRLoans.js | Loans, stipends, repayment tracking |
+| HRPayroll.js | SimplePay-compatible CSV export |
+| HRPerformance.js | KPI forms, PIP tracker, goals |
+| HRSettings.js | Leave types, work hours, warning templates |
+| HRStockView.js | Stock takes — blind/guided, schedule, approve |
+
+## 5.2 TENANT PORTAL (TenantPortal.js v3.0)
+The client's own portal. URL: /tenant-portal. Role-based nav.
+Key sections: Dashboard · Inventory (Stock, Catalog) · Ordering · Operations (Daily Trading, Cash-Up, Smart Capture) · Sales (POS Till, Pricing, Loyalty, Invoices) · Customers (Profiles, QR Codes, Messaging) · Reports · Team (Staff, Roster, Timesheets, Leave, Contracts, Payroll, Calendar)
+
+**Customer Profiles tab:**
+50 mock customers seeded for Medi Rec (PwC-style test dataset):
+- UUID pattern: a0000001-0000-0000-0000-00000000000X
+- Tiers: Bronze×20, Silver×15, Gold×10, Platinum×4, Harvest Club×1, Suspended×1
+- ~250 loyalty transactions across 90 days
+
+## 5.3 CUSTOMER-FACING PAGES
+| Route | Component | What it does |
+|---|---|---|
+| /shop | Shop.js | Profile-adaptive product listing (VapeCard/FoodShopCard/GeneralShopCard) |
+| /scan/:code | ScanResult.js v4.9 | QR scan: auth + points + fraud check + velocity detection |
+| /checkout | CheckoutPage.js v2.4 | PayFast + 8-category loyalty stack + redemption + referral |
+| /loyalty | Loyalty.js v5.7 | Points balance, tier progress, Harvest Club, referral code |
+| /account | Account.js v6.4 | Profile, loyalty history, settings |
+
+## 5.4 AI SYSTEM (ProteaAI — unified, NEVER rebuild or duplicate)
+**ProteaAI.js — LOCKED. str_replace CODEBASE_FACTS string only.**
+3 tabs: Chat (tab-aware streaming) / Query (plain English → live SQL) / Dev (error capture)
+Route: ALL Claude calls → ai-copilot EF v59 (never direct Anthropic API from React — LL-120)
+ai-copilot v59 contract: POST `{ messages, userContext, systemOverride }` → `{ reply, model, usage, error }`
+When systemOverride provided: tools skipped, caller's system prompt used.
+
+## 5.5 PLATFORM INTELLIGENCE BAR (PlatformBar.js — LOCKED)
+40px sticky bar. Icons: Alerts 🔔 · Comms 💬 · Fraud 🛡 · Actions ⚡
+Never modify. Premium hand-crafted SVG icons.
+
+## 5.6 AVCO COST ENGINE
+Every stock movement → stock_movement_stamp trigger → calculate_avco(item_id)
+→ inventory_items.weighted_avg_cost updated
+Pattern always: weighted_avg_cost ?? cost_price ?? 0
+NEVER use cost_price alone for P&L calculations.
+HQCogs.js uses SEPARATE cost engine (product_cogs recipes) — never mix.
+
+## 5.7 THREE-STATE STOCK RESERVATION
+quantity_on_hand  = physical (changes on physical movement only)
+reserved_qty      = soft hold for B2B orders (never physical)
+available_qty     = on_hand - reserved_qty (COMPUTED — NEVER stored)
+DB functions: get_available_qty() · reserve_stock() · release_reservation()
+reserve_stock() on ORDER CONFIRMATION only — never on draft
+
+## 5.8 FEATURE FLAGS (tenant_config)
+feature_hq · feature_ai_basic · feature_ai_full · feature_medical
+feature_white_label · feature_wholesale · feature_hr
+Gate: tenantConfig?.feature_X !== false
+(absence = enabled — backwards compatible)
+tenant_config.settings (JSONB): EOD thresholds — ALWAYS read from here, never hardcode
+
+---
+
+# SECTION 6 — DATABASE SCHEMA (CONFIRMED COLUMN NAMES)
+
+**Critical: never guess column names. These have caused silent failures.**
+
+### Key Tables — Exact Columns
+
+**journal_entries:** id, tenant_id, journal_date (DATE), reference, description, journal_type, status (draft/posted/reversed), created_by (UUID), posted_by (UUID), posted_at (TIMESTAMPTZ), financial_year (TEXT e.g.'FY2026'), created_at, is_year_end_closing (BOOLEAN)
+
+**journal_lines:** id, journal_id, tenant_id, account_code, account_name, debit_amount (NUMERIC), credit_amount (NUMERIC), description, line_order (INTEGER)
+
+**chart_of_accounts:** account_code, account_name, account_type (40 rows, cannabis retail template, codes 10000-69999)
+
+**loyalty_config:** pts_qr_scan, pts_per_r100_online, online_bonus_pct, mult_bronze/silver/gold/platinum, threshold_silver/gold/platinum, pts_referral_referrer, pts_referral_referee, redemption_value_zar, min_pts_to_redeem, max_redeem_pct_per_order, pts_expiry_months, pts_birthday_bonus, birthday_bonus_active, ai_churn_rescue_enabled, ai_churn_rescue_threshold_days (21), ai_stock_boost_enabled, ai_stock_boost_days_on_hand (90), ai_crosssell_nudge_enabled, ai_margin_guard_pct, ai_promo_suggestions_enabled, threshold_harvest_club, mult_tier_harvest_club, mult_cat_cannabis_flower/vape/edible/seeds_clones/grow_supplies/accessories/health_wellness/lifestyle_merch, streak_visits_threshold (3), streak_visits_bonus_pts (50), streak_spend_threshold_zar (1000), streak_spend_bonus_pts (100)
+
+**user_profiles:** id (FK to auth.users), tenant_id, full_name, email, phone, role, loyalty_points (NUMERIC), loyalty_tier (TEXT), churn_risk_score (NUMERIC 0-1), last_purchase_at (TIMESTAMPTZ), monthly_visit_count (INT), monthly_spend_zar (NUMERIC), category_flags (JSONB), date_of_birth (DATE), is_suspended (BOOLEAN), anomaly_score (INT)
+
+**loyalty_transactions:** id, tenant_id, user_id, points (NUMERIC), transaction_type (TEXT — use ILIKE not =), description (TEXT), transaction_date (TIMESTAMPTZ), channel (TEXT), ai_triggered (BOOLEAN), expires_at (TIMESTAMPTZ), is_expired (BOOLEAN)
+
+**loyalty_ai_log:** id, tenant_id, action_type (TEXT: churn_rescue/birthday_bonus/stock_boost_suggestion/point_expiry/weekly_brief), target_user_id (UUID nullable), target_item_id (UUID nullable), payload (JSONB), outcome (TEXT), created_at (TIMESTAMPTZ)
+
+**orders:** id, tenant_id, user_id, total (NUMERIC — NOT total_amount), status (pending/paid/failed/cancelled/refunded)
+
+**order_items:** id, order_id, product_name (TEXT — no inventory_item_id FK), line_total (GENERATED — NEVER INSERT)
+
+**inventory_items:** id, tenant_id, name, category (ENUM::inventory_category), loyalty_category (SEPARATE — TEXT), quantity_on_hand (NUMERIC), reserved_qty (NUMERIC), weighted_avg_cost (NUMERIC), sell_price (NUMERIC), is_active (BOOLEAN)
+NOTE: NO 'notes' column on inventory_items (LL-181)
+
+**scan_logs:** NO tenant_id column — NEVER filter by it (LL-056)
+
+**expenses:** id, tenant_id, category (opex/capex), subcategory (TEXT), description, amount_zar (NUMERIC), expense_date (DATE)
+
+**bank_accounts:** id, tenant_id, bank_name, account_name, account_number, branch_code, account_type, currency, opening_balance, is_active, is_primary
+
+**bank_statement_lines:** id, bank_account_id, tenant_id, statement_date, description, reference, debit_amount, credit_amount, balance, matched_type, matched_id, matched_at, import_batch
+
+**fixed_assets:** id, tenant_id, asset_name, asset_code, category, purchase_date, cost, residual_value, useful_life_months, depreciation_method, accumulated_depreciation, is_active
+
+**vat_transactions:** id, tenant_id, transaction_date, vat_period (TEXT 'YYYY-MM'), source_type, source_id, source_ref, vat_type (output/input), vat_code, exclusive_amount, vat_amount, inclusive_amount, vat_rate (NUMERIC 0.15), is_claimed
+
+**equity_ledger:** id, tenant_id, financial_year (TEXT), opening_retained_earnings, share_capital, net_profit_for_year, dividends_declared, owner_drawings, closing_retained_earnings, year_end_closed (BOOLEAN), year_end_date
+
+**eod_cash_ups:** UNIQUE(tenant_id, cashup_date) · variance is GENERATED (never insert) · field = system_cash_total (NOT expected_cash)
+
+### DB State — Medi Rec (verified 08 Apr 2026)
+user_profiles (customers): 50 rows
+loyalty_transactions:       ~250 rows across 90 days
+loyalty_ai_log:             181 stock_boost + 3 churn_rescue + 5 birthday_bonus
+auth.users (mock):          50 rows (a0000001-0000-0000-0000-00000000000X)
+journal_entries:            5 rows | journal_lines: 10 rows
+vat_transactions:           6 rows | bank_accounts: 1 | bank_statement_lines: 22
+fixed_assets:               3 rows | chart_of_accounts: 40 rows | equity_ledger: 1
+
+### RLS — Tables With Enabled Policies (April 8, 2026)
+Standard tenant isolation on all 50+ tables.
+Finance tables with service INSERT policies (for EF writes):
+bank_accounts · bank_statement_lines · capture_queue · capture_rules · chart_of_accounts · depreciation_entries · equity_ledger · financial_year_archive · fixed_assets · journal_entries · journal_lines · vat_transactions
+
+---
+
+# SECTION 7 — CRITICAL RULES (CONSOLIDATED)
+
+## Architecture Rules
+- **LL-120**: React NEVER calls api.anthropic.com. ALL Claude calls via ai-copilot EF.
+- **RULE 0F**: Every INSERT to tenant-scoped table MUST include tenant_id.
+- **RULE 0G**: useTenant() called INSIDE the component — never assume parent scope.
+- **RULE 0H**: Fix code bugs in CODE, not data. Only exception: corrupt legacy data.
+- **RULE 0L**: Read HQStock.js before ANY inventory-related build.
+- **RULE 0K**: Never replace a renderTab() case without explicitly listing what becomes unreachable.
+
+## Building Rules
+- **LL-195**: Read source file from GitHub FIRST. Determine state. THEN suggest.
+- **LL-193**: SESSION-STATE docs lag behind code. Always verify from disk.
+- **LL-192**: When GitHub MCP is available, file inspection is Claude's job. Never ask owner to run PowerShell.
+- **LL-178/LL-179**: New features = new nav entries + new cases. NEVER hijack existing cases.
+- **RULE 0P**: Three questions before every build: WHO / WHAT / DOES IT EXIST?
+
+## Schema Rules
+- **LL-181**: inventory_items has NO 'notes' column.
+- **LL-182**: inventory_items.category is an ENUM — SQL needs ::inventory_category cast.
+- **LL-191**: loyalty_transactions.transaction_type — use ILIKE, never =.
+- **LL-189**: movement_type: 'sale_pos' for POS, 'sale_out' for wholesale only.
+- **LL-190**: EOD thresholds ALWAYS from tenant_config.settings JSONB — never hardcode.
+- **LL-056**: scan_logs has NO tenant_id — NEVER filter by it.
+- **LL-198**: eod_cash_ups.variance is GENERATED — never insert. Field = system_cash_total.
+- **R-FY-01**: journal_entries.financial_year is TEXT ('FY2026') — no financial_year_id FK.
+
+## Code Style Rules
+- **LL-196**: fontWeight minimum 400 body, 600 values. fontSize minimum 11px. borderRadius 10+ on cards.
+- **LL-197**: Always use ChartCard/ChartTooltip/DeltaBadge from src/components/viz/.
+- **LL-184**: Code boxes contain executable content ONLY. No labels immediately above fences.
+- **LL-183**: Git in PowerShell — separate lines only. No && operator.
+
+## New Rules (08 Apr 2026)
+- **LL-203**: Claude Code instructions are ONE complete block. No fragmentation. No multiple boxes. All file contents + all modifications + exact git commands in one paste.
+- **LL-204**: BETA DEV MODE is locked. Stock = test data. Physical contact points = skip. Data coherence is Claude's responsibility.
+- **R-TDZ-01**: useCallback referencing another useCallback must be declared AFTER it. TDZ applies.
+- **R-PGRST-01**: After adding columns via raw SQL, always NOTIFY pgrst, 'reload schema'.
+- **loyalty_dedup_guard**: This is the trigger name on loyalty_transactions. Disable before bulk seeding, re-enable after.
+- **ai-copilot v59**: increment_loyalty_points RPC signature is (p_user_id uuid, p_points integer).
+
+## Locked / Protected Files
+LOCKED (never modify):
+src/components/StockItemModal.js    — 14 product worlds
+src/components/ProteaAI.js          — str_replace CODEBASE_FACTS only
+src/components/PlatformBar.js
+src/services/supabaseClient.js
+PROTECTED (read full file before any change):
+src/components/hq/LiveFXBar.js
+src/components/hq/HQStock.js        — 7 tabs, 14 worlds (RULE 0L)
+src/pages/ScanResult.js             — 1700+ lines, complex
+src/components/hq/HQCogs.js         — 3000+ lines, separate cost engine
+
+## Adding a New HQDashboard Tab — ALL FOUR REQUIRED
+
+Import:   import NewComp from '../components/hq/NewComp';
+TABS[]:   { id: 'new-tab', label: 'Name', icon: '🔧', ready: true }
+Render:   {activeTab === 'new-tab' && <NewComp />}
+Nav:      useNavConfig.js HQ_PAGES array — { group: 'Finance', label: 'Name', path: '/hq?tab=new-tab' }
+Missing any one = silent failure (BUG-006 pattern)
+
+
+---
+
+# SECTION 8 — CURRENT STATE (08 Apr 2026)
+
+## HEAD: 944416c · Repo: github.com/GFive5y/protea-botanicals
+
+## Commits This Session (on top of v206)
+| SHA | What |
+|---|---|
+| 02bdc33 | HQOverview crash — name missing from cannabis inventory SELECT |
+| 266261e | Smart Capture auto-retry on 500 |
+| 3e6aa5a | ProteaAI LL-120 fix — both handleSend + handleQuery via EF |
+| 39a29e2 | CODEBASE_FACTS — loyalty-ai v2, 50 mock customers, AI Actions Feed |
+| 944416c | SESSION-STATE v207 |
+
+## Verified Working (screenshots confirmed 08 Apr 2026)
+P&L (R477,880 revenue · 62.13% gross margin · R296,606 net profit) · Balance Sheet · Cash Flow · Year-End Close · Smart Capture (95% confidence, auto-retry) · ProteaAI (EF-routed) · Loyalty AI Engine Tab 8 (Run Now, dedup confirmed) · Customer Profiles (50 customers) · RLS (12 finance tables)
+
+## Outstanding Owner Actions
+- **pg_cron**: Supabase Dashboard → Database → Extensions → enable pg_cron, then:
+```sql
+  SELECT cron.schedule('loyalty-ai-nightly', '0 2 * * *',
+    $$SELECT net.http_post(url:='https://uvicrqapgzcdvozxrreo.supabase.co/functions/v1/loyalty-ai',
+    headers:='{"Content-Type":"application/json"}'::jsonb,
+    body:='{"scheduled":true,"tenant_id":"b1bad266-ceb4-4558-bbc3-22cfeeeafe74"}'::jsonb);$$);
+```
+- **Yoco keys**: After CIPRO → portal.yoco.com
+
+## Next Dev Priorities
+1. HQJournals.js — WP-FINANCIALS Phase 5 (spec given, Claude Code to build)
+2. HQVat.js — WP-FINANCIALS Phase 6
+3. HQBankRecon.js — WP-FINANCIALS Phase 7
+4. monthly_visit_count + monthly_spend_zar checkout wiring (low priority — beta dev)
+
+---
+
+# SECTION 9 — DOCUMENT MAP
+
+All docs live in `docs/` in the repo. Read via GitHub:get_file_contents.
+
+| Document | Purpose | Freshness |
+|---|---|---|
+| NUAI-AGENT-BIBLE.md | **This file** — single source of truth | 08 Apr 2026 |
+| SESSION-STATE_vNNN.md | Latest session state — find highest N | Always latest |
+| SESSION-CORE_v2_11.md | All LL rules + schema facts + RULE 0Q | 08 Apr 2026 |
+| VIOLATION_LOG_v1_1.md | All rule violations — read to understand failure patterns | 08 Apr 2026 |
+| CAPABILITIES_v2_0.md | Feature map (older — Bible supersedes for current state) | 04 Apr 2026 |
+| ONBOARDING_v2_0.md | Architecture + process flows | 30 Mar 2026 |
+| STRATEGY_v2_0.md | Business strategy, pricing, competitive position | 30 Mar 2026 |
+| SESSION-LOG_DEFINITIVE.md | Commit history v180 onwards | 06 Apr 2026 |
+| WP-FINANCIALS-v1_1.md | Financial suite spec (Phases 0-10) | 07 Apr 2026 |
+| WP-O_v2_0_Loyalty_Engine_Spec.md | Loyalty engine spec | — |
+| REGISTRY_v3_2.md | Component registry + feature index | 04 Apr 2026 |
+| LL-ARCHIVE_v1_0.md | LL-001 through LL-173 (historical reference) | — |
+
+**READ ORDER FOR FRESH SESSION:**
+1. NUAI-AGENT-BIBLE.md (this file)
+2. SESSION-STATE_vNNN (latest — for current priorities)
+3. VIOLATION_LOG (to know what rules are being broken)
+4. Source file for build target (verify state from disk before planning)
+
+---
+
+# SECTION 10 — PROCESS FLOWS
+
+## Smart Capture Flow
+Owner photographs supplier invoice
+→ Upload to HQDocuments.js
+→ process-document EF v52 (AI extraction, SARS compliance, fingerprint dedup)
+→ If isStockCapture (delivery note): receive-from-capture EF
+→ stock_movements (purchase_in) → AVCO recalculation
+→ journal_entries: Dr 12000 Inventories / Cr 20000 Trade Payables
+→ If expense invoice: auto-post-capture EF
+→ expenses row → journal_entries: Dr expense / Cr 10100 Bank
+→ UI shows confidence %, matched items, success badge
+
+## Customer Scan Flow
+Customer scans product QR → /scan/:code
+→ ScanResult.js v4.9: HMAC validate (sign-qr EF) → velocity check → loyalty_category
+→ pts = qr_scan_pts × category_mult × tier_mult × campaign_mult
+→ loyalty_transactions INSERT + user_profiles.loyalty_points UPDATE
+→ If tier upgrade → send-notification EF (WhatsApp)
+→ If anomaly_score > 85 → PlatformBar 🛡 icon pulses
+
+## Online Purchase Flow
+Cart → /checkout → CheckoutPage.js v2.4
+→ pts = (total/100) × pts_per_r100_online × online_bonus × category_mult × tier_mult
+  + first_purchase_bonus + crosssell_bonus + referral_bonus
+→ Redemption: effectiveTotal = total - (pts × 0.10) if toggled
+→ PayFast EF → redirect to PayFast → ITN confirms → OrderSuccess
+→ loyalty_transactions + user_profiles.loyalty_points update
+
+---
+
+*NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
+*Maintained by: Claude Code after each major session*
+*Owner reviews: after each WP completion*
+*Replace this file: never — append and version it*
