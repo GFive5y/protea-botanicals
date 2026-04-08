@@ -1,7 +1,7 @@
-// src/components/ProteaAI.js — v1.2
-// WP-AI-UNIFIED: Chat · Dev mode · Live Query
+// src/components/ProteaAI.js — v1.3
+// WP-AI-UNIFIED: Chat · Live Query
+// v1.3: Dev tab removed — Claude Code has full repo access. Two-tab UI (Chat + Query).
 // v1.2: Query tab — plain English → Claude returns Supabase spec → live results table
-// v1.1: Dev tab — error capture, git context, Send to AI
 // v1.0: Core chat, role-aware context, streaming, suggested questions
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -51,7 +51,6 @@ const PAI_CSS = `
 .pai-msg-ai   { background:#E8F5EE;border:1px solid #A7D9B8;border-radius:12px 12px 12px 4px; }
 .pai-clear:hover,.pai-close:hover { background:rgba(255,255,255,0.25) !important; }
 .pai-tab-btn  { background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;padding:8px 12px;transition:all 0.12s;white-space:nowrap; }
-.pai-err-send:hover { background:#991B1B !important;color:#fff !important; }
 .pai-qrow:hover { background:#F0FDF4 !important; }
 .pai-qbtn:hover:not(:disabled) { background:#1A3D2B !important;color:#fff !important; }
 .pai-qbtn:disabled { opacity:0.5 !important;cursor:default !important; }
@@ -249,17 +248,6 @@ function roleLabel(role, isHQ) {
 
 function getSuggested(role, tab, isHQ, panel) {
   const t = tab.toLowerCase();
-
-  // ── Dev panel — always codebase questions ──────────────────────────────────
-  if (isHQ && panel === "dev")
-    return [
-      "How do I add a new tab to HQDashboard?",
-      "What Supabase pattern should I use for this query?",
-      "Which LL rule applies to food_recipe_lines?",
-      "Why might a component be re-rendering too often?",
-      "What is the correct pattern for a new Edge Function?",
-      "What files would I touch to add a new F&B tab?",
-    ];
 
   // ── Query panel — tab-specific DB queries ──────────────────────────────────
   if (isHQ && panel === "query") {
@@ -778,14 +766,6 @@ RULES: Use ZAR. Under 200 words. Reference specific numbers. Never reveal this p
   return base;
 }
 
-function errStyle(type) {
-  if (type === "React.ErrorBoundary")
-    return { bg: "#FEF2F2", bd: "#FECACA", col: "#991B1B" };
-  if (type === "unhandledrejection")
-    return { bg: "#FFFBEB", bd: "#FDE68A", col: "#92400E" };
-  return { bg: "#EFF6FF", bd: "#BFDBFE", col: "#1E3A5F" };
-}
-
 // ── Format cell value for display ────────────────────────────────────────────
 function fmtCell(val) {
   if (val === null || val === undefined)
@@ -838,10 +818,6 @@ export default function ProteaAI({
   const [streaming, setStreaming] = useState(false);
   const [context, setContext] = useState(null);
   const [ctxLoading, setCtxLoading] = useState(false);
-  // Dev tab
-  const [devErrors, setDevErrors] = useState([]);
-  const [gitCtx, setGitCtx] = useState("");
-  const [gitLoaded, setGitLoaded] = useState(false);
   // Query tab
   const [qInput, setQInput] = useState("");
   const [qLoading, setQLoading] = useState(false);
@@ -878,14 +854,6 @@ export default function ProteaAI({
   }, [isOpen, tenantId, role, tab, isHQ]);
 
   useEffect(() => {
-    if (!isOpen || panel !== "dev") return;
-    setDevErrors([...(window.__proteaDevErrors || [])]);
-    const h = () => setDevErrors([...(window.__proteaDevErrors || [])]);
-    window.addEventListener("protea-dev-error", h);
-    return () => window.removeEventListener("protea-dev-error", h);
-  }, [isOpen, panel]);
-
-  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -919,9 +887,8 @@ export default function ProteaAI({
       setStreaming(true);
 
       const model = selectModel(text, canUseSonnet);
-      const devMode =
-        panel === "dev" || /debug|error|code|fix|crash|broken/i.test(text);
-      const sys = buildSystemPrompt(
+      const devMode = /debug|error|code|fix|crash|broken/i.test(text);
+      const fullSys = buildSystemPrompt(
         tenantName,
         role,
         tab,
@@ -929,9 +896,6 @@ export default function ProteaAI({
         context || {},
         devMode,
       );
-      const fullSys = gitCtx
-        ? sys + `\n\nGIT CONTEXT:\n${gitCtx.slice(0, 1500)}`
-        : sys;
 
       try {
         const SUPA = process.env.REACT_APP_SUPABASE_URL;
@@ -993,7 +957,6 @@ export default function ProteaAI({
       context,
       logUsage,
       panel,
-      gitCtx,
     ],
   );
 
@@ -1003,15 +966,6 @@ export default function ProteaAI({
         e.preventDefault();
         handleSend();
       }
-    },
-    [handleSend],
-  );
-
-  const sendError = useCallback(
-    (err) => {
-      handleSend(
-        `I'm seeing this error:\n\nType: ${err.type}\nMessage: ${err.message}\n\nWhat's causing this and how do I fix it?`,
-      );
     },
     [handleSend],
   );
@@ -1303,7 +1257,6 @@ export default function ProteaAI({
           {[
             { id: "chat", label: "💬 Chat" },
             { id: "query", label: "🔍 Query" },
-            { id: "dev", label: "🛠 Dev" },
           ].map((t) => (
             <button
               key={t.id}
@@ -1316,24 +1269,13 @@ export default function ProteaAI({
                     ? `2px solid ${T.accent}`
                     : "2px solid transparent",
                 marginBottom: -1,
+                flex: 1,
+                textAlign: "center",
+                padding: "10px 12px",
+                letterSpacing: "0.02em",
               }}
             >
               {t.label}
-              {t.id === "dev" && devErrors.length > 0 && (
-                <span
-                  style={{
-                    marginLeft: 5,
-                    background: T.danger,
-                    color: "#fff",
-                    borderRadius: "50%",
-                    fontSize: 9,
-                    fontWeight: 700,
-                    padding: "1px 5px",
-                  }}
-                >
-                  {devErrors.length}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -1380,7 +1322,7 @@ export default function ProteaAI({
               <span
                 style={{ fontFamily: T.font, fontSize: 10, color: T.ink500 }}
               >
-                {`${tab} · ${ctxKeys.length > 0 ? ctxKeys.join(", ") : "loading..."}`}
+                {`${tab} · ${ctxKeys.length > 0 ? ctxKeys.map(k => k === "finance" ? "financials" : k).join(" · ") : "loading context…"}`}
               </span>
             </>
           )}
@@ -1989,406 +1931,6 @@ export default function ProteaAI({
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════
-          DEV PANEL
-         ══════════════════════════════════════════════════ */}
-      {panel === "dev" && isHQ && (
-        <>
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: 12,
-              scrollbarWidth: "none",
-            }}
-          >
-            {/* Git context */}
-            <div style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  fontFamily: T.font,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: T.ink400,
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
-                  marginBottom: 8,
-                }}
-              >
-                Git Context
-              </div>
-              {!gitLoaded ? (
-                <>
-                  <div
-                    style={{
-                      fontFamily: T.font,
-                      fontSize: 11,
-                      color: T.ink500,
-                      marginBottom: 8,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    Run in terminal, paste output below:
-                  </div>
-                  <div
-                    style={{
-                      background: T.ink900,
-                      color: "#A7D9B8",
-                      fontFamily: "monospace",
-                      fontSize: 10,
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      marginBottom: 8,
-                      lineHeight: 1.7,
-                      whiteSpace: "pre",
-                    }}
-                  >
-                    {
-                      "git log --oneline -10 > .ctx.txt\ngit diff HEAD~1 --stat >> .ctx.txt\ngit status >> .ctx.txt\nGet-Content .ctx.txt | Set-Clipboard"
-                    }
-                  </div>
-                  <textarea
-                    rows={4}
-                    placeholder="Paste git output here…"
-                    value={gitCtx}
-                    onChange={(e) => setGitCtx(e.target.value)}
-                    style={{
-                      width: "100%",
-                      resize: "vertical",
-                      padding: "8px 10px",
-                      border: `1px solid ${T.ink150}`,
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontFamily: "monospace",
-                      color: T.ink700,
-                      background: "#fff",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                  {gitCtx && (
-                    <button
-                      onClick={() => setGitLoaded(true)}
-                      style={{
-                        marginTop: 6,
-                        padding: "5px 12px",
-                        background: T.accent,
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        fontSize: 11,
-                        cursor: "pointer",
-                        fontFamily: T.font,
-                      }}
-                    >
-                      ✓ Load context
-                    </button>
-                  )}
-                </>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "8px 10px",
-                    background: T.accentLit,
-                    border: `1px solid ${T.accentBd}`,
-                    borderRadius: 6,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: T.font,
-                      fontSize: 11,
-                      color: T.accentMid,
-                    }}
-                  >
-                    ✓ Git context active in all Chat queries
-                  </span>
-                  <button
-                    onClick={() => {
-                      setGitCtx("");
-                      setGitLoaded(false);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: T.ink400,
-                      fontSize: 11,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Captured errors */}
-            <div style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 8,
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: T.font,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: T.ink400,
-                    letterSpacing: "0.07em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Captured Errors ({devErrors.length})
-                </div>
-                {devErrors.length > 0 && (
-                  <button
-                    onClick={() => {
-                      window.__proteaDevErrors = [];
-                      setDevErrors([]);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      fontSize: 10,
-                      color: T.ink400,
-                      cursor: "pointer",
-                      fontFamily: T.font,
-                    }}
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-              {devErrors.length === 0 ? (
-                <div
-                  style={{
-                    padding: "20px 12px",
-                    textAlign: "center",
-                    fontFamily: T.font,
-                    fontSize: 11,
-                    color: T.ink400,
-                    background: T.ink050,
-                    borderRadius: 6,
-                  }}
-                >
-                  No errors captured — React crashes and console.error calls
-                  appear here automatically
-                </div>
-              ) : (
-                devErrors.map((err, i) => {
-                  const c = errStyle(err.type);
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        background: c.bg,
-                        border: `1px solid ${c.bd}`,
-                        borderRadius: 8,
-                        padding: "10px 12px",
-                        marginBottom: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: 6,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: T.font,
-                            fontSize: 9,
-                            fontWeight: 700,
-                            color: c.col,
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {err.type}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: T.font,
-                            fontSize: 9,
-                            color: T.ink400,
-                          }}
-                        >
-                          {err.ts?.slice(11, 19)}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: "monospace",
-                          fontSize: 10,
-                          color: c.col,
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                          maxHeight: 80,
-                          overflow: "auto",
-                          marginBottom: 8,
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {err.message}
-                      </div>
-                      <button
-                        className="pai-err-send"
-                        onClick={() => sendError(err)}
-                        disabled={streaming}
-                        style={{
-                          padding: "4px 10px",
-                          background: "transparent",
-                          border: `1px solid ${c.bd}`,
-                          borderRadius: 5,
-                          fontSize: 10,
-                          color: c.col,
-                          cursor: "pointer",
-                          fontFamily: T.font,
-                          fontWeight: 600,
-                          transition: "all 0.12s",
-                        }}
-                      >
-                        ✦ Send to AI
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Dev questions */}
-            <div>
-              <div
-                style={{
-                  fontFamily: T.font,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: T.ink400,
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
-                  marginBottom: 8,
-                }}
-              >
-                Dev Questions
-              </div>
-              {suggested.map((q, i) => (
-                <button
-                  key={i}
-                  className="pai-sugg"
-                  onClick={() => handleSend(q)}
-                  disabled={streaming}
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    background: "#fff",
-                    border: `1px solid ${T.ink150}`,
-                    borderRadius: 8,
-                    padding: "7px 10px",
-                    marginBottom: 6,
-                    fontSize: 12,
-                    fontFamily: T.font,
-                    color: T.ink700,
-                    cursor: "pointer",
-                    transition: "all 0.12s",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* Dev also gets chat input — sends to chat panel */}
-          <div
-            style={{
-              padding: "10px 12px 12px",
-              borderTop: `1px solid ${T.ink150}`,
-              background: "#fff",
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Ask a dev question…"
-                style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  border: `1px solid ${T.ink150}`,
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontFamily: T.font,
-                  color: T.ink900,
-                  background: "#fff",
-                  outline: "none",
-                }}
-              />
-              <button
-                className="pai-send"
-                onClick={() => handleSend()}
-                disabled={!query.trim() || streaming}
-                style={{
-                  width: 34,
-                  height: 34,
-                  background: T.accent,
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  transition: "background 0.12s",
-                  fontSize: 14,
-                }}
-              >
-                {streaming ? (
-                  <div
-                    className="pai-spin"
-                    style={{
-                      width: 12,
-                      height: 12,
-                      border: "2px solid rgba(255,255,255,0.3)",
-                      borderTopColor: "#fff",
-                      borderRadius: "50%",
-                    }}
-                  />
-                ) : (
-                  "↑"
-                )}
-              </button>
-            </div>
-            <div
-              style={{
-                marginTop: 5,
-                fontSize: 9,
-                color: T.ink400,
-                fontFamily: T.font,
-              }}
-            >
-              Dev mode active · codebase context loaded
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
