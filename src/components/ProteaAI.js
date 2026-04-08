@@ -971,6 +971,10 @@ export default function ProteaAI({
                     ),
                   );
                 });
+                // Yield to browser between tokens — forces a repaint of each
+                // word before the next is processed. Without this, all flushSync
+                // calls in one reader.read() chunk paint in a single browser frame.
+                await new Promise((resolve) => requestAnimationFrame(resolve));
               }
             } catch { /* skip malformed SSE line */ }
           }
