@@ -930,37 +930,32 @@ export default function ProteaAI({
           const e = await res.json().catch(() => ({}));
           throw new Error(e.error || `API ${res.status}`);
         }
-        // SSE streaming reader — flushSync breaks React 18 automatic batching.
-        // React 18 batches ALL state updates (including setTimeout/promises).
-        // setTimeout(33ms) does NOT break this — tested and confirmed jumpy.
-        // flushSync forces a synchronous DOM flush after each network chunk,
-        // guaranteeing one React render per chunk regardless of batching rules.
-        // One network chunk typically = 1-5 tokens → smooth word-by-word render.
+        // SSE streaming — token queue + requestAnimationFrame drain.
+        //
+        // Root cause of paragraph jumps: the EF's TransformStream batches
+        // multiple Claude tokens into one network chunk. flushSync per chunk
+        // still renders 10-20 tokens at once = paragraph-level jump.
+        //
+        // Fix: decouple rendering from network delivery entirely.
+        // Reader fills tokenQueue at whatever speed the network delivers.
+        // RAF loop drains 2 tokens per frame at ~60fps = smooth typewriter.
+        // flushSync inside RAF forces each frame to actually paint.
+        //
+        // Result: rendering rate is constant 60fps regardless of network bursts.
+
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = "";
         let full = "";
+        const tokenQueue = [];
+        let streamDone = false;
+        let rafId = null;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          const lines = buf.split("\n");
-          buf = lines.pop() ?? "";
-
-          let chunkHasContent = false;
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6).trim();
-            if (raw === "[DONE]") continue;
-            try {
-              const { token } = JSON.parse(raw);
-              if (token) { full += token; chunkHasContent = true; }
-            } catch { /* skip malformed SSE line */ }
-          }
-
-          // One forced synchronous render per network chunk — breaks React 18 batching
-          if (chunkHasContent) {
+        // RAF drain — runs at 60fps, renders 2 tokens per frame
+        const renderFrame = () => {
+          if (tokenQueue.length > 0) {
+            const batch = tokenQueue.splice(0, 2).join("");
+            full += batch;
             flushSync(() => {
               setMessages((p) =>
                 p.map((m) =>
@@ -969,6 +964,51 @@ export default function ProteaAI({
               );
             });
           }
+          if (!streamDone || tokenQueue.length > 0) {
+            rafId = requestAnimationFrame(renderFrame);
+          } else {
+            rafId = null;
+          }
+        };
+
+        rafId = requestAnimationFrame(renderFrame);
+
+        // Network reader — fills tokenQueue at SSE delivery speed
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") continue;
+            try {
+              const { token } = JSON.parse(raw);
+              if (token) tokenQueue.push(token);
+            } catch { /* skip malformed SSE line */ }
+          }
+        }
+
+        // Stream finished — wait for RAF to drain remaining tokens
+        streamDone = true;
+        await new Promise((resolve) => {
+          const wait = () => {
+            if (tokenQueue.length === 0 && rafId === null) { resolve(undefined); }
+            else { setTimeout(wait, 16); }
+          };
+          wait();
+        });
+
+        // Guarantee final full content is committed
+        if (tokenQueue.length > 0) {
+          full += tokenQueue.join("");
+          setMessages((p) =>
+            p.map((m) =>
+              m.id === aid ? { ...m, content: full } : m,
+            ),
+          );
         }
 
         // Mark streaming complete
