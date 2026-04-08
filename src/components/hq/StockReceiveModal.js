@@ -148,12 +148,12 @@ function StepDots({ step }) {
 }
 
 // ─── Step 1 — Delivery Info ───────────────────────────────────────────────────
-function Step1({ data, onChange, onNext }) {
+function Step1({ data, onChange, onNext, vatRegistered, supplierVatRegistered, onSupplierVatChange }) {
   const [suppliers, setSuppliers] = useState([]);
   useEffect(() => {
     supabase
       .from("suppliers")
-      .select("id,name")
+      .select("id,name,currency,vat_registered")
       .order("name")
       .then(({ data: rows }) => setSuppliers(rows || []));
   }, []);
@@ -177,7 +177,16 @@ function Step1({ data, onChange, onNext }) {
       <label style={labelStyle}>Supplier</label>
       <select
         value={data.supplier_id}
-        onChange={(e) => onChange("supplier_id", e.target.value)}
+        onChange={(e) => {
+          onChange("supplier_id", e.target.value);
+          const selected = suppliers.find((s) => s.id === e.target.value);
+          if (selected) {
+            onSupplierVatChange(selected.vat_registered ?? null);
+            onChange("input_vat_amount", "");
+          } else {
+            onSupplierVatChange(null);
+          }
+        }}
         style={inputStyle}
       >
         <option value="">— Select supplier —</option>
@@ -207,6 +216,42 @@ function Step1({ data, onChange, onNext }) {
         onChange={(e) => onChange("invoice_number", e.target.value)}
         style={inputStyle}
       />
+
+      {/* VAT input section — only for VAT-registered tenants */}
+      {vatRegistered && (() => {
+        const selectedSupplier = suppliers.find((s) => s.id === data.supplier_id);
+        const isImport = selectedSupplier?.currency && selectedSupplier.currency !== "ZAR";
+        const supplierNotVat = supplierVatRegistered === false;
+
+        if (isImport) {
+          return (
+            <div style={{ padding: "10px 12px", background: T.warningBg, border: `1px solid ${T.warning}40`, borderRadius: 4, marginBottom: 14, fontSize: 11, color: T.warning, fontFamily: T.font, lineHeight: 1.5 }}>
+              <strong>Import delivery</strong> — supplier VAT does not apply. Record customs clearance VAT (import VAT paid to SARS) via <strong>Expenses Manager</strong> using category <em>Tax</em>.
+            </div>
+          );
+        }
+
+        if (supplierNotVat) {
+          return (
+            <div style={{ padding: "10px 12px", background: T.ink075, border: `1px solid ${T.ink150}`, borderRadius: 4, marginBottom: 14, fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+              Supplier is not VAT-registered — no input VAT applicable.
+            </div>
+          );
+        }
+
+        return (
+          <div>
+            <label style={labelStyle}>Input VAT (R)</label>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 14 }}>
+              <input type="number" min="0" step="0.01" placeholder="0.00" value={data.input_vat_amount} onChange={(e) => onChange("input_vat_amount", e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 1 }} />
+              <button type="button" title="Enter VAT amount from supplier invoice" style={{ padding: "8px 10px", background: T.accentBg, border: `1px solid ${T.accentLight}40`, borderRadius: 4, cursor: "pointer", fontFamily: T.font, fontSize: 11, fontWeight: 600, color: T.accentDark, whiteSpace: "nowrap", flexShrink: 0 }} onClick={() => {}}>Enter from invoice</button>
+            </div>
+            <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font, marginTop: -10, marginBottom: 14 }}>
+              VAT amount from supplier's tax invoice. Leave 0 if not applicable. Auto-filled by Smart Capture when processing invoices.
+            </div>
+          </div>
+        );
+      })()}
 
       <label style={labelStyle}>Reference</label>
       <input
@@ -1253,6 +1298,15 @@ function Step3({ deliveryInfo, lines, onConfirm, onBack, saving }) {
             <strong>Notes:</strong> {deliveryInfo.notes}
           </span>
         )}
+        {parseFloat(deliveryInfo.input_vat_amount) > 0 && (
+          <span>
+            <strong>Input VAT:</strong>{" "}
+            R{parseFloat(deliveryInfo.input_vat_amount).toFixed(2)}
+            <span style={{ fontSize: 10, color: T.ink400, marginLeft: 4 }}>
+              (claimed — trigger auto-writes to VAT ledger)
+            </span>
+          </span>
+        )}
       </div>
 
       {/* Lines table */}
@@ -1867,11 +1921,24 @@ export default function StockReceiveModal({
     invoice_number: "",
     reference: "",
     notes: "",
+    input_vat_amount: "",
   });
 
   const [lines, setLines] = useState([]);
   const [receiptRef, setReceiptRef] = useState("");
   const [totalValue, setTotalValue] = useState(0);
+  const [vatRegistered, setVatRegistered] = useState(false);
+  const [supplierVatRegistered, setSupplierVatRegistered] = useState(null);
+
+  useEffect(() => {
+    if (!tenantIdProp) return;
+    supabase
+      .from("tenant_config")
+      .select("vat_registered")
+      .eq("tenant_id", tenantIdProp)
+      .maybeSingle()
+      .then(({ data }) => setVatRegistered(!!data?.vat_registered));
+  }, [tenantIdProp]);
 
   function updateDelivery(field, value) {
     setDeliveryInfo((prev) => ({ ...prev, [field]: value }));
@@ -1920,6 +1987,9 @@ export default function StockReceiveModal({
           received_by: user.id,
           notes: deliveryInfo.notes || null,
           total_value_zar: tv,
+          input_vat_amount: deliveryInfo.input_vat_amount
+            ? parseFloat(deliveryInfo.input_vat_amount)
+            : 0,
           status: "confirmed",
         })
         .select("id")
@@ -2101,6 +2171,9 @@ export default function StockReceiveModal({
             data={deliveryInfo}
             onChange={updateDelivery}
             onNext={() => setStep(2)}
+            vatRegistered={vatRegistered}
+            supplierVatRegistered={supplierVatRegistered}
+            onSupplierVatChange={setSupplierVatRegistered}
           />
         )}
         {step === 2 && (
