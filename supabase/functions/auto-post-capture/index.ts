@@ -1,6 +1,7 @@
 // supabase/functions/auto-post-capture/index.ts
-// WP-SMART-CAPTURE: Atomic accounting engine v1.0
-// Creates expense + double-entry journal + VAT transaction from capture_queue entry
+// WP-SMART-CAPTURE: Atomic accounting engine v1.1
+// Creates expense + double-entry journal from capture_queue entry
+// VAT: writes input_vat_amount to expense → expense_vat_sync trigger creates vat_transaction
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -51,6 +52,7 @@ Deno.serve(async (req) => {
 
     const tid = cap.tenant_id, date = cap.document_date || new Date().toISOString().split("T")[0];
     const fy = `FY${new Date().getFullYear()}`, ctype = cap.capture_type || "expense_receipt";
+    const inputVatAmt = cap.input_vat_claimable ? (cap.input_vat_amount || 0) : 0;
     const res: Record<string, string|null> = { expense_id: null, journal_entry_id: null, vat_transaction_id: null };
 
     // 1. Expense
@@ -58,7 +60,8 @@ Deno.serve(async (req) => {
     const { data: exp, error: expErr } = await db.from("expenses").insert({
       tenant_id: tid, expense_date: date, category: cap.suggested_category||"opex",
       subcategory: cap.suggested_subcategory||null, description: desc,
-      amount_zar: cap.amount_zar||cap.amount_incl_vat||0, currency: cap.currency||"ZAR",
+      amount_zar: cap.amount_zar||cap.amount_incl_vat||0, input_vat_amount: inputVatAmt,
+      currency: cap.currency||"ZAR",
       supplier_id: cap.vendor_matched_id||null, document_id: cap.document_log_id||null,
     }).select("id").single();
     if (expErr) throw new Error(`Expense: ${expErr.message}`);
@@ -91,18 +94,18 @@ Deno.serve(async (req) => {
     res.journal_entry_id = je.id;
     await db.from("expenses").update({ journal_entry_id: je.id }).eq("id", res.expense_id);
 
-    // 3. VAT
-    if (cap.input_vat_claimable && (cap.input_vat_amount||0) > 0) {
-      const { data: vt, error: vtErr } = await db.from("vat_transactions").insert({
-        tenant_id: tid, transaction_date: date, transaction_type: "input",
-        source_table: "capture_queue", source_id: capture_queue_id,
-        vat_period: vatPeriod(date), output_vat: 0, input_vat: cap.input_vat_amount,
-        exclusive_amount: cap.amount_excl_vat||0, inclusive_amount: cap.amount_incl_vat||cap.amount_zar||0,
-        vat_rate: 0.15, description: `Input VAT — ${vendor} — ${ref} — VAT No: ${cap.sars_vat_number||"n/a"}`,
-      }).select("id").single();
-      if (vtErr) throw new Error(`VAT: ${vtErr.message}`);
-      res.vat_transaction_id = vt.id;
-      await db.from("expenses").update({ vat_transaction_id: vt.id }).eq("id", res.expense_id);
+    // 3. VAT — trigger-based: expense_vat_sync fires on expenses INSERT with input_vat_amount > 0
+    // Query the trigger-created vat_transaction row and link it back to the expense
+    if (inputVatAmt > 0 && res.expense_id) {
+      const { data: vtRow } = await db.from("vat_transactions")
+        .select("id")
+        .eq("source_table", "expenses")
+        .eq("source_id", res.expense_id)
+        .maybeSingle();
+      if (vtRow) {
+        res.vat_transaction_id = vtRow.id;
+        await db.from("expenses").update({ vat_transaction_id: vtRow.id }).eq("id", res.expense_id);
+      }
     }
 
     // 4. Update capture_queue
@@ -123,7 +126,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true, capture_queue_id, status: "approved", ...res,
       sars_compliant: cap.sars_compliant, input_vat_claimable: cap.input_vat_claimable,
-      input_vat_amount: cap.input_vat_amount, vat_period: res.vat_transaction_id ? vatPeriod(date) : null,
+      input_vat_amount: inputVatAmt, vat_period: res.vat_transaction_id ? vatPeriod(date) : null,
+      vat_source: inputVatAmt > 0 ? "expense_trigger" : null,
     }), { headers: JSON_H });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

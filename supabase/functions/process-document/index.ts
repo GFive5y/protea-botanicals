@@ -1,4 +1,5 @@
 // supabase/functions/process-document/index.ts
+// v2.2 — P3-C: VAT auto-fill — vat_amount/amount_excl_vat extraction + supplier VAT override
 // v2.1 — WP-SMART-CAPTURE: Anti-fraud — SA bank identifier extraction + 6-level document fingerprinting
 //   extractUniqueIdentifiers(): UTI/TRN REF/TXN ID (all SA banks), Auth Code, Receipt No, ECHO, Merchant
 //   buildDocumentFingerprint(): 6-level: UTI → Auth+Date → ECHO+Merchant → Receipt+Merchant+Date → Receipt+Date → Composite
@@ -507,7 +508,9 @@ function checkSarsCompliance(ext: Record<string, unknown>): {
   if (!hasDesc)flags.push({code:"NO_DESCRIPTION",message:"No line items found.",severity:"warning"});
   if (vat<=0&&total>0) flags.push({code:"NO_VAT_AMOUNT",message:"VAT not separately stated.",severity:"info"});
   const ok = vatOk && hasDate && hasDesc;
-  const amt = ok ? (vat>0 ? vat : Math.round((total*15/115)*100)/100) : 0;
+  // Prefer explicit vat_amount from extraction; only fallback to 15/115 if none provided
+  const explicitVat = Number((ext as Record<string,unknown>).vat_amount || 0);
+  const amt = ok ? (explicitVat > 0 ? explicitVat : (vat > 0 ? vat : Math.round((total*15/115)*100)/100)) : 0;
   return { sars_compliant:ok, sars_flags:flags, input_vat_claimable:ok&&amt>0, input_vat_amount:amt, sars_vat_number:vatOk?raw:null };
 }
 
@@ -570,12 +573,26 @@ RESPOND EXACTLY in this JSON structure:
   "reference": { "number": "INV-001", "date": "2026-03-01", "due_date": null, "confidence": 0.99 },
   "currency": "ZAR",
   "total_amount": 1750.00,
+  "vat_amount": 228.26,
+  "amount_excl_vat": 1521.74,
   "line_items": [],
   "proposed_updates": [],
   "unknown_items": [],
   "warnings": [],
   "extraction_notes": "brief note"
 }
+
+=======================================================
+VAT EXTRACTION RULES
+=======================================================
+If the document explicitly states a VAT amount (e.g. "VAT: R228.26"):
+  → set "vat_amount" to that exact figure
+  → set "amount_excl_vat" to total_amount minus vat_amount
+If VAT is NOT explicitly stated on the document:
+  → set "vat_amount" to 0
+  → set "amount_excl_vat" to 0
+Do NOT calculate VAT yourself — only extract what the document shows.
+The backend will apply the 15/115 formula when needed.
 
 =======================================================
 MANDATORY RULE - proposed_updates MUST NEVER BE EMPTY
@@ -751,6 +768,8 @@ serve(async (req) => {
         name: s.name,
         country: s.country,
         currency: s.currency,
+        vat_registered: s.vat_registered ?? null,
+        vat_number: s.vat_number ?? null,
       }),
     );
     const existingProducts = (context.existing_products || []).map(
@@ -821,7 +840,8 @@ CRITICAL REMINDERS:
 7. For COA/lab reports: use update_batch_coa.
 8. For general retail invoices (no PO): use create_inventory_item + create_stock_movement pairs.
 9. Detect currency correctly: R/ZAR=ZAR, $=USD, ¥=CNY, €=EUR.
-10. Non-English documents (Chinese, etc.): translate extracted data to English.`,
+10. Non-English documents (Chinese, etc.): translate extracted data to English.
+11. Extract vat_amount and amount_excl_vat ONLY if explicitly stated on the document. If not shown, set both to 0.`,
       },
     ];
 
@@ -919,6 +939,17 @@ CRITICAL REMINDERS:
       capture_type:        captureType,
     };
 
+    // P3-C: Supplier VAT override — if matched supplier is explicitly not VAT-registered, block input VAT
+    const matchedSupplierId = (extraction.supplier as Record<string,unknown>)?.matched_id;
+    if (matchedSupplierId) {
+      const matchedSupplier = existingSuppliers.find((s: Record<string,unknown>) => s.id === matchedSupplierId);
+      if (matchedSupplier && (matchedSupplier as Record<string,unknown>).vat_registered === false) {
+        extraction = { ...extraction, input_vat_claimable: false, input_vat_amount: 0 };
+        sarsResult.input_vat_claimable = false;
+        sarsResult.input_vat_amount = 0;
+      }
+    }
+
     // WP-SMART-CAPTURE v2.1: Anti-fraud — identifier extraction + fingerprinting
     const searchText = [rawText, file_name, (extraction.extraction_notes as string)||""].join(" ");
     const uniqueIds = extractUniqueIdentifiers(searchText, extraction);
@@ -996,8 +1027,8 @@ CRITICAL REMINDERS:
         extraction,
         sars_compliant:      sarsResult.sars_compliant,
         sars_flags:          sarsResult.sars_flags,
-        input_vat_claimable: sarsResult.input_vat_claimable,
-        input_vat_amount:    sarsResult.input_vat_amount,
+        input_vat_claimable: (extraction as Record<string,unknown>).input_vat_claimable ?? sarsResult.input_vat_claimable,
+        input_vat_amount:    (extraction as Record<string,unknown>).input_vat_amount ?? sarsResult.input_vat_amount,
         sars_vat_number:     sarsResult.sars_vat_number,
         capture_type:          captureType,
         unique_identifiers:    uniqueIds,
