@@ -437,7 +437,7 @@ export default function HQBalanceSheet() {
       const yr = `FY${new Date().getFullYear()}`;
       const yrStart = `${new Date().getFullYear()}-01-01`;
 
-      const [faRes, eqRes, cfgRes, ordersYtdRes, expYtdRes] = await Promise.all([
+      const [faRes, eqRes, cfgRes, ordersYtdRes, expYtdRes, vatTxnRes] = await Promise.all([
         supabase.from("fixed_assets")
           .select("*")
           .eq("tenant_id", tenantId)
@@ -462,11 +462,21 @@ export default function HQBalanceSheet() {
           .eq("tenant_id", tenantId)
           .gte("expense_date", yrStart)
           .in("category", ["opex","wages","tax","other"]),
+        supabase.from("vat_transactions")
+          .select("output_vat,input_vat")
+          .eq("tenant_id", tenantId),
       ]);
 
       setFixedAssetsReg(faRes.data || []);
       if (eqRes.data) setEquityLedger(eqRes.data);
       if (cfgRes.data) setVatRegistered(!!cfgRes.data.vat_registered);
+
+      // Real VAT position from vat_transactions
+      const vatOutput = (vatTxnRes.data || [])
+        .reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
+      const vatInput = (vatTxnRes.data || [])
+        .reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+      setVatSummary({ output: vatOutput, input: vatInput });
 
       if (ordersYtdRes.data && expYtdRes.data) {
         const ytdRev = ordersYtdRes.data.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
