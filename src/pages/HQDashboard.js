@@ -44,6 +44,7 @@ import HQLoyalty from "../components/hq/HQLoyalty";
 import HQBalanceSheet from "../components/hq/HQBalanceSheet";
 import HQFraud from "../components/hq/HQFraud";
 import HQInvoices from "../components/hq/HQInvoices";
+import HQJournals from "../components/hq/HQJournals";
 import HQTenants from "../components/hq/HQTenants";
 import LiveFXBar from "../components/hq/LiveFXBar";
 import PlatformBar from "../components/PlatformBar";
@@ -69,6 +70,7 @@ const TABS = [
   { id: "suppliers", label: "Suppliers", icon: "🌍", ready: true },
   { id: "procurement", label: "Procurement", icon: "🛒", ready: true },
   { id: "invoices", label: "Invoices", icon: "🧾", ready: true },
+  { id: "journals", label: "Journals", icon: "📒", ready: true },
   { id: "tenants", label: "Tenants", icon: "🏢", ready: true },
   { id: "hq-production", label: "Production", icon: "⚗️", ready: true },
   { id: "hq-stock", label: "HQ Stock", icon: "=", ready: true },
@@ -260,6 +262,7 @@ export default function HQDashboard() {
           {activeTab === "suppliers" && <HQSuppliers />}
           {activeTab === "procurement" && <HQPurchaseOrders />}
           {activeTab === "invoices" && <HQInvoices />}
+          {activeTab === "journals" && <HQJournals />}
           {activeTab === "tenants" && <HQTenants />}
           {activeTab === "costing" && <HQCogs />}
           {activeTab === "pricing" && <HQPricing />}

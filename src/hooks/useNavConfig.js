@@ -122,6 +122,7 @@ const HQ_PAGES = [
     path: "/hq?tab=balance-sheet",
   },
   { group: "Finance", icon: "🧾", label: "Invoices", path: "/hq?tab=invoices" },
+  { group: "Finance", icon: "📒", label: "Journals", path: "/hq?tab=journals" },
   // ── Intelligence ─────────────────────────────────────────────────────────────
   {
     group: "Intelligence",

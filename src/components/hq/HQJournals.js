@@ -33,7 +33,7 @@ const JOURNAL_TEMPLATES = [
     lines:[{account_code:"",account_name:"",debit:true,placeholder:"Debit"},{account_code:"",account_name:"",credit:true,placeholder:"Credit"}]},
 ];
 
-const STATUS_STYLES = { draft:{bg:"#FEF9C3",color:"#A16207",label:"Draft"}, posted:{bg:D.successBg,color:D.success,label:"Posted"} };
+const STATUS_STYLES = { draft:{bg:"#FEF9C3",color:"#A16207",label:"Draft"}, posted:{bg:D.successBg,color:D.success,label:"Posted"}, reversed:{bg:"#F3F4F6",color:"#6B7280",label:"Reversed"} };
 const inputSx = {width:"100%",padding:"8px 10px",border:`1.5px solid ${D.ink150}`,borderRadius:6,fontSize:13,color:D.ink700,outline:"none",boxSizing:"border-box",fontFamily:D.font,background:"#fff"};
 
 function StatusPill({status}) { const s=STATUS_STYLES[status]||STATUS_STYLES.draft; return <span style={{padding:"2px 10px",borderRadius:12,fontSize:11,fontWeight:700,background:s.bg,color:s.color,textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.label}</span>; }
@@ -50,6 +50,7 @@ export default function HQJournals() {
   const [posting, setPosting] = useState(false);
   const [toast, setToast] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterType, setFilterType] = useState("all");
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   const today = new Date().toISOString().split("T")[0];
@@ -69,7 +70,7 @@ export default function HQJournals() {
     try {
       const [jRes,coaRes] = await Promise.all([
         supabase.from("journal_entries").select("*, journal_lines(*)").eq("tenant_id",tenantId).order("journal_date",{ascending:false}),
-        supabase.from("chart_of_accounts").select("account_code, account_name, account_type").eq("tenant_id",tenantId).eq("is_active",true).order("account_code"),
+        supabase.from("chart_of_accounts").select("account_code, account_name, account_type").eq("tenant_id",tenantId).order("account_code"),
       ]);
       setJournals(jRes.data||[]);
       setCoa(coaRes.data||[]);
@@ -147,15 +148,47 @@ export default function HQJournals() {
     if (selectedJournal?.id===id) { setSelectedJournal(null); setView("list"); }
   };
 
+  const reverseJournal = async (j) => {
+    if (!window.confirm(`Reverse journal ${j.reference||j.id.slice(0,8)}? This creates a new reversal entry.`)) return;
+    try {
+      const { data:{session} } = await supabase.auth.getSession();
+      const userId = session?.user?.id || null;
+      const now = new Date().toISOString();
+      const { data:newJe, error:jeErr } = await supabase.from("journal_entries").insert({
+        tenant_id:tenantId, journal_date:now.slice(0,10),
+        reference:"REV-"+(j.reference||""), description:`Reversal of ${j.reference||""}: ${j.description||""}`,
+        journal_type:j.journal_type||"manual", status:"posted",
+        posted_at:now, posted_by:userId, created_by:userId,
+        financial_year:"FY"+new Date().getFullYear(), is_year_end_closing:false,
+      }).select("id").single();
+      if (jeErr) throw jeErr;
+      const revLines = (j.journal_lines||[]).map((l,i)=>({
+        journal_id:newJe.id, tenant_id:tenantId, account_code:l.account_code,
+        account_name:l.account_name, debit_amount:parseFloat(l.credit_amount)||0,
+        credit_amount:parseFloat(l.debit_amount)||0, description:l.description||"", line_order:i+1,
+      }));
+      if (revLines.length>0) await supabase.from("journal_lines").insert(revLines);
+      await supabase.from("journal_entries").update({status:"reversed"}).eq("id",j.id).eq("tenant_id",tenantId);
+      showToast("Reversal journal created \u2713");
+      fetchAll();
+      if (selectedJournal?.id===j.id) { setSelectedJournal(null); setView("list"); }
+    } catch(e) { showToast("Reverse failed: "+e.message,"error"); }
+  };
+
   const resetForm = () => {
     setJForm({journal_date:today,reference:"",description:"",journal_type:"manual"});
     setLines([{account_code:"",account_name:"",debit_amount:"",credit_amount:"",description:""},{account_code:"",account_name:"",debit_amount:"",credit_amount:"",description:""}]);
     setSelectedTemplate(null);
   };
 
-  const filteredJournals = filterStatus==="all"?journals:journals.filter(j=>j.status===filterStatus);
+  const filteredJournals = journals.filter(j=>{
+    if(filterStatus!=="all"&&j.status!==filterStatus)return false;
+    if(filterType!=="all"&&j.journal_type!==filterType)return false;
+    return true;
+  });
   const draftCount = journals.filter(j=>j.status==="draft").length;
   const postedCount = journals.filter(j=>j.status==="posted").length;
+  const reversedCount = journals.filter(j=>j.status==="reversed").length;
   const totalPosted = journals.filter(j=>j.status==="posted").reduce((s,j)=>s+(j.journal_lines||[]).reduce((ls,l)=>ls+(parseFloat(l.debit_amount)||0),0),0);
 
   const card = {background:"#fff",borderRadius:12,boxShadow:D.shadow,overflow:"hidden",marginBottom:16};
@@ -209,7 +242,13 @@ export default function HQJournals() {
             <button onClick={()=>deleteDraft(selectedJournal.id)} style={{padding:"10px 18px",border:`1px solid ${D.dangerBd}`,borderRadius:8,background:D.dangerBg,color:D.danger,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:D.font}}>Delete Draft</button>
           </div>
         )}
-        {selectedJournal.status==="posted"&&<div style={{padding:"10px 16px",background:D.successBg,border:`1px solid ${D.successBd}`,borderRadius:8,fontSize:13,color:D.success,fontWeight:600}}>{"\u2713"} Posted {selectedJournal.posted_at?fmtDate(selectedJournal.posted_at):""} \u00b7 Locked.</div>}
+        {selectedJournal.status==="posted"&&(
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <div style={{padding:"10px 16px",background:D.successBg,border:`1px solid ${D.successBd}`,borderRadius:8,fontSize:13,color:D.success,fontWeight:600,flex:1}}>{"\u2713"} Posted {selectedJournal.posted_at?fmtDate(selectedJournal.posted_at):""} {"\u00b7"} Locked.</div>
+            <button onClick={()=>reverseJournal(selectedJournal)} style={{padding:"10px 18px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:D.font}}>Reverse Journal</button>
+          </div>
+        )}
+        {selectedJournal.status==="reversed"&&<div style={{padding:"10px 16px",background:"#F3F4F6",border:"1px solid #D1D5DB",borderRadius:8,fontSize:13,color:D.ink500,fontWeight:600}}>{"\u21A9"} Reversed {"\u00b7"} A reversal entry has been posted.</div>}
       </div>
     );
   }
@@ -277,7 +316,7 @@ export default function HQJournals() {
       </div>
 
       <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
-        {[["Total",String(journals.length),D.accent,"\uD83D\uDCD2"],["Drafts",String(draftCount),draftCount>0?D.warning:D.ink500,"\u270F\uFE0F"],["Posted",String(postedCount),D.success,"\u2713"],["Posted Value",fmtZar(totalPosted),D.info,"R"]].map(([label,value,color,icon])=>(
+        {[["Total",String(journals.length),D.accent,"\uD83D\uDCD2"],["Drafts",String(draftCount),draftCount>0?D.warning:D.ink500,"\u270F\uFE0F"],["Posted",String(postedCount),D.success,"\u2713"],["Reversed",String(reversedCount),D.ink500,"\u21A9"]].map(([label,value,color,icon])=>(
           <div key={label} style={{background:"#fff",borderRadius:12,padding:"18px 20px",boxShadow:D.shadow,flex:1,minWidth:140}}>
             <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8,display:"flex",gap:6,alignItems:"center"}}><span>{icon}</span>{label}</div>
             <div style={{fontSize:24,fontWeight:700,color,fontVariantNumeric:"tabular-nums"}}>{value}</div>
@@ -299,10 +338,14 @@ export default function HQJournals() {
         </div>
       </div>
 
-      <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[["all","All"],["draft","Drafts"],["posted","Posted"]].map(([id,label])=>(
+      <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
+        {[["all","All"],["draft","Drafts"],["posted","Posted"],["reversed","Reversed"]].map(([id,label])=>(
           <button key={id} onClick={()=>setFilterStatus(id)} style={{padding:"6px 14px",border:`1.5px solid ${filterStatus===id?D.accentMid:D.ink150}`,borderRadius:20,background:filterStatus===id?D.accentLit:"#fff",color:filterStatus===id?D.accentMid:D.ink500,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:D.font}}>{label}{id==="draft"&&draftCount>0?` (${draftCount})`:""}</button>
         ))}
+        <select value={filterType} onChange={e=>setFilterType(e.target.value)} style={{padding:"6px 12px",borderRadius:20,fontSize:12,border:`1.5px solid ${D.ink150}`,background:"#fff",color:D.ink500,fontFamily:D.font,cursor:"pointer",marginLeft:4}}>
+          <option value="all">All types</option>
+          {["manual","accrual","prepayment","depreciation","provision","correction","vat_adjustment","year_end"].map(t=><option key={t} value={t}>{t.replace(/_/g," ")}</option>)}
+        </select>
       </div>
 
       {loading?(
