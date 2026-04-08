@@ -47,6 +47,9 @@ import HQInvoices from "../components/hq/HQInvoices";
 import HQJournals from "../components/hq/HQJournals";
 import HQBankRecon from "../components/hq/HQBankRecon";
 import HQFixedAssets from "../components/hq/HQFixedAssets";
+import ExpenseManager from "../components/hq/ExpenseManager";
+import HQYearEnd from "../components/hq/HQYearEnd";
+import HQVat from "../components/hq/HQVat";
 import HQTenants from "../components/hq/HQTenants";
 import LiveFXBar from "../components/hq/LiveFXBar";
 import PlatformBar from "../components/PlatformBar";
@@ -75,6 +78,9 @@ const TABS = [
   { id: "journals", label: "Journals", icon: "📒", ready: true },
   { id: "bank-recon", label: "Bank Recon", icon: "🏦", ready: true },
   { id: "fixed-assets", label: "Fixed Assets", icon: "🏗️", ready: true },
+  { id: "expenses", label: "Expenses", icon: "💸", ready: true },
+  { id: "vat", label: "VAT", icon: "🏛️", ready: true },
+  { id: "year-end-close", label: "Year-End Close", icon: "📅", ready: true },
   { id: "tenants", label: "Tenants", icon: "🏢", ready: true },
   { id: "hq-production", label: "Production", icon: "⚗️", ready: true },
   { id: "hq-stock", label: "HQ Stock", icon: "=", ready: true },
@@ -297,6 +303,9 @@ export default function HQDashboard() {
           )}
           {activeTab === "loyalty" && <HQLoyalty />}
           {activeTab === "fraud" && <HQFraud />}
+          {activeTab === "expenses" && <ExpenseManager />}
+          {activeTab === "vat" && <HQVat />}
+          {activeTab === "year-end-close" && <HQYearEnd />}
         </div>
       </div>
     </PlatformBarProvider>

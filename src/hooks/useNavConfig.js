@@ -125,6 +125,10 @@ const HQ_PAGES = [
   { group: "Finance", icon: "📒", label: "Journals", path: "/hq?tab=journals" },
   { group: "Finance", icon: "🏦", label: "Bank Recon", path: "/hq?tab=bank-recon" },
   { group: "Finance", icon: "🏗️", label: "Fixed Assets", path: "/hq?tab=fixed-assets" },
+  { group: "Finance", icon: "💸", label: "Expenses", path: "/hq?tab=expenses" },
+  { group: "Finance", icon: "🔮", label: "Forecast", path: "/hq?tab=forecast" },
+  { group: "Finance", icon: "🏛️", label: "VAT", path: "/hq?tab=vat" },
+  { group: "Finance", icon: "📅", label: "Year-End Close", path: "/hq?tab=year-end-close" },
   // ── Intelligence ─────────────────────────────────────────────────────────────
   {
     group: "Intelligence",
