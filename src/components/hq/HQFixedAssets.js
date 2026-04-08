@@ -1,335 +1,479 @@
-// src/components/hq/HQFixedAssets.js — WP-FINANCIALS Phase 4
-// Fixed Asset Register — manages fixed_assets + depreciation_entries tables
-// Straight-line depreciation · monthly run · Cost/AccDep/NBV per asset
+// src/components/hq/HQFixedAssets.js
+// WP-FINANCIALS Phase 4 — Fixed Asset Register & Depreciation
+// v1.0 · 08 Apr 2026
+// Schema verified · LL-205 applied · LL-206 pattern · additive only
 
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "../../services/supabaseClient";
-import { useTenant } from "../../services/tenantService";
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../../services/supabaseClient';
+import { useTenant } from '../../services/tenantService';
 
-const D = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900: "#0D0D0D", ink700: "#1F2937", ink500: "#6B7280",
-  ink300: "#D1D5DB", ink150: "#E5E7EB", ink075: "#F9FAFB",
-  accent: "#1A3D2B", accentMid: "#2D6A4F", accentLit: "#ECFDF5",
-  success: "#059669", danger: "#DC2626", dangerBg: "#FEF2F2", dangerBd: "#FECACA",
-  warning: "#D97706", info: "#2563EB",
-  shadow: "0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const CATEGORY_CFG = {
+  'Equipment':            { icon: '\u2699\uFE0F', color: '#1d4ed8', bg: '#dbeafe' },
+  'Furniture & Fittings': { icon: '\uD83E\uDE91', color: '#7c3aed', bg: '#ede9fe' },
+  'Motor Vehicles':       { icon: '\uD83D\uDE97', color: '#059669', bg: '#dcfce7' },
+  'Computer Equipment':   { icon: '\uD83D\uDCBB', color: '#0369a1', bg: '#e0f2fe' },
+  'Leasehold Improvements': { icon: '\uD83C\uDFD7\uFE0F', color: '#b45309', bg: '#fef3c7' },
+  'Buildings':            { icon: '\uD83C\uDFE2', color: '#374151', bg: '#f3f4f6' },
 };
 
-const ASSET_CATEGORIES = ["Equipment","Furniture & Fittings","Computer & IT","Vehicles","Leasehold Improvements","Machinery","Other"];
-const DEP_METHODS = [{value:"straight_line",label:"Straight-Line"},{value:"reducing_balance",label:"Reducing Balance"}];
+const catCfg = (cat) => CATEGORY_CFG[cat] || { icon: '\uD83D\uDCE6', color: '#6b7280', bg: '#f3f4f6' };
 
-const fmtZar = (n) => `R\u202F${(parseFloat(n)||0).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-ZA",{day:"numeric",month:"short",year:"numeric"}) : "\u2014";
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-function calcMonthlyDep(cost, residual, lifeYrs) {
-  return Math.max(0, cost - residual) / Math.max(1, lifeYrs * 12);
-}
-function calcNBV(a) {
-  const cost = parseFloat(a.purchase_cost)||0;
-  const accDep = parseFloat(a.accumulated_depreciation)||0;
-  return Math.max(parseFloat(a.residual_value)||0, cost - accDep);
-}
+const fmt = (n) =>
+  `R${Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const inputSx = {
-  width:"100%",padding:"9px 12px",border:`1.5px solid ${D.ink150}`,
-  borderRadius:8,fontSize:14,color:D.ink700,outline:"none",
-  boxSizing:"border-box",fontFamily:D.font,background:"#fff",
+const fmtDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '\u2014';
+
+const monthlyDep = (asset) => {
+  const depBase = Number(asset.purchase_cost) - Number(asset.residual_value);
+  const lifeMonths = Number(asset.useful_life_years) * 12;
+  return lifeMonths > 0 ? depBase / lifeMonths : 0;
 };
 
-function StatCard({label,value,sub,color,icon}) {
-  return (
-    <div style={{background:"#fff",borderRadius:12,padding:"20px 22px",boxShadow:D.shadow,flex:1,minWidth:160}}>
-      <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:D.font,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-        {icon&&<span>{icon}</span>}{label}
-      </div>
-      <div style={{fontSize:26,fontWeight:600,color:color||D.accent,fontFamily:D.font,lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{value}</div>
-      {sub&&<div style={{fontSize:12,color:D.ink500,marginTop:6,fontFamily:D.font}}>{sub}</div>}
-    </div>
-  );
-}
+const monthsElapsed = (purchaseDateStr) => {
+  const purchase = new Date(purchaseDateStr);
+  const now = new Date();
+  return (now.getFullYear() - purchase.getFullYear()) * 12 + (now.getMonth() - purchase.getMonth());
+};
 
-function InputField({label,required,children}) {
-  return (
-    <div>
-      <label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:6,fontFamily:D.font}}>
-        {label}{required&&<span style={{color:D.danger,marginLeft:2}}>*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
+const expectedAccumDep = (asset) => {
+  const monthly = monthlyDep(asset);
+  const elapsed = monthsElapsed(asset.purchase_date);
+  const maxDep = Number(asset.purchase_cost) - Number(asset.residual_value);
+  return Math.min(monthly * elapsed, maxDep);
+};
+
+const monthsBehind = (asset) => {
+  const monthly = monthlyDep(asset);
+  if (monthly === 0) return 0;
+  const accumulated = Number(asset.accumulated_depreciation);
+  const expected = expectedAccumDep(asset);
+  return Math.max(0, Math.round((expected - accumulated) / monthly));
+};
+
+const remainingMonths = (asset) => {
+  const maxDep = Number(asset.purchase_cost) - Number(asset.residual_value);
+  const remaining = maxDep - Number(asset.accumulated_depreciation);
+  const monthly = monthlyDep(asset);
+  return monthly > 0 ? Math.max(0, Math.ceil(remaining / monthly)) : 0;
+};
+
+const remainingYears = (asset) => (remainingMonths(asset) / 12).toFixed(1);
+
+// ─── COMPONENT ───────────────────────────────────────────────────────────────
 
 export default function HQFixedAssets() {
   const { tenant } = useTenant();
   const tenantId = tenant?.id;
 
   const [assets, setAssets] = useState([]);
-  const [depEntries, setDepEntries] = useState([]);
+  const [depHistory, setDepHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [runningDep, setRunningDep] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [error, setError] = useState(null);
 
-  const currentMonth = new Date().toLocaleString("default",{month:"long"});
-  const currentYear = new Date().getFullYear();
-  const periodMonth = String(new Date().getMonth()+1).padStart(2,"0");
+  const [showRunDep, setShowRunDep] = useState(false);
+  const [runMonth, setRunMonth] = useState(MONTHS_SHORT[new Date().getMonth()]);
+  const [runYear, setRunYear] = useState(new Date().getFullYear());
+  const [runLoading, setRunLoading] = useState(false);
+  const [runResult, setRunResult] = useState(null);
+  const [runError, setRunError] = useState(null);
 
-  const [form, setForm] = useState({
-    asset_name:"",asset_category:"Equipment",asset_code:"",
-    purchase_date:new Date().toISOString().split("T")[0],
-    purchase_cost:"",residual_value:"0",
-    useful_life_years:"5",depreciation_method:"straight_line",notes:"",
-  });
-  const setF = (k,v) => setForm(f=>({...f,[k]:v}));
+  const [expandedId, setExpandedId] = useState(null);
 
-  const showToast = (msg,type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),4000); };
+  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
+    setError(null);
     try {
-      const [aRes,dRes] = await Promise.all([
-        supabase.from("fixed_assets").select("*").eq("tenant_id",tenantId).order("purchase_date",{ascending:false}),
-        supabase.from("depreciation_entries").select("*").eq("tenant_id",tenantId).order("period_year",{ascending:false}).order("period_month",{ascending:false}),
+      const [assetsRes, histRes] = await Promise.all([
+        supabase.from('fixed_assets')
+          .select('id, asset_name, asset_category, asset_code, purchase_date, purchase_cost, residual_value, useful_life_years, depreciation_method, accumulated_depreciation, net_book_value, is_active, notes')
+          .eq('tenant_id', tenantId).eq('is_active', true).order('purchase_date'),
+        supabase.from('depreciation_entries')
+          .select('id, asset_id, period_month, period_year, depreciation, accum_dep_after, nbv_after, posted_at')
+          .eq('tenant_id', tenantId).order('period_year', { ascending: false }).order('period_month', { ascending: false }),
       ]);
-      setAssets(aRes.data||[]);
-      setDepEntries(dRes.data||[]);
-    } catch(e) { showToast("Failed to load: "+e.message,"error"); }
-    finally { setLoading(false); }
-  },[tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+      if (assetsRes.error) throw assetsRes.error;
+      if (histRes.error) throw histRes.error;
+      setAssets(assetsRes.data || []);
+      setDepHistory(histRes.data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load fixed assets');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
 
-  useEffect(()=>{ fetchAll(); },[fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const handleAddAsset = async () => {
-    if (!form.asset_name.trim()) { showToast("Asset name required.","error"); return; }
-    if (!form.purchase_cost||parseFloat(form.purchase_cost)<=0) { showToast("Cost must be > 0.","error"); return; }
-    setSaving(true);
+  // ── Derived ────────────────────────────────────────────────────────────────
+
+  const totalCost = assets.reduce((s, a) => s + Number(a.purchase_cost), 0);
+  const totalAccumDep = assets.reduce((s, a) => s + Number(a.accumulated_depreciation), 0);
+  const totalNBV = assets.reduce((s, a) => s + Number(a.net_book_value), 0);
+  const totalMonthly = assets.reduce((s, a) => s + monthlyDep(a), 0);
+  const anyBehind = assets.some(a => monthsBehind(a) > 0);
+  const yearOptions = [new Date().getFullYear() - 1, new Date().getFullYear()];
+
+  // ── Run Depreciation ───────────────────────────────────────────────────────
+
+  async function runDepreciation() {
+    if (!runMonth || !runYear) return;
+    setRunLoading(true);
+    setRunError(null);
+    setRunResult(null);
+
+    let posted = 0, skipped = 0, totalPosted = 0;
+
     try {
-      const cost=parseFloat(form.purchase_cost); const residual=parseFloat(form.residual_value)||0;
-      const { error } = await supabase.from("fixed_assets").insert({
-        tenant_id:tenantId, asset_name:form.asset_name.trim(), asset_category:form.asset_category,
-        asset_code:form.asset_code.trim()||null, purchase_date:form.purchase_date,
-        purchase_cost:cost, residual_value:residual,
-        useful_life_years:parseFloat(form.useful_life_years)||5,
-        depreciation_method:form.depreciation_method,
-        accumulated_depreciation:0, net_book_value:cost-residual, is_active:true,
-        notes:form.notes.trim()||null,
-      });
-      if (error) throw error;
-      showToast(`${form.asset_name} added.`);
-      setShowAddForm(false);
-      setForm({asset_name:"",asset_category:"Equipment",asset_code:"",purchase_date:new Date().toISOString().split("T")[0],purchase_cost:"",residual_value:"0",useful_life_years:"5",depreciation_method:"straight_line",notes:""});
-      fetchAll();
-    } catch(e) { showToast("Failed: "+e.message,"error"); }
-    finally { setSaving(false); }
-  };
-
-  const runDepreciation = async () => {
-    if (assets.length===0) { showToast("No assets.","error"); return; }
-    setRunningDep(true);
-    try {
-      let posted=0, skipped=0;
       for (const asset of assets) {
-        if (!asset.is_active) { skipped++; continue; }
-        const cost=parseFloat(asset.purchase_cost)||0;
-        const residual=parseFloat(asset.residual_value)||0;
-        const accDep=parseFloat(asset.accumulated_depreciation)||0;
-        const lifeYrs=parseFloat(asset.useful_life_years)||5;
-        const monthlyDep=calcMonthlyDep(cost,residual,lifeYrs);
-        if (accDep>=(cost-residual)||monthlyDep<=0) { skipped++; continue; }
-        const { data:existing } = await supabase.from("depreciation_entries").select("id").eq("asset_id",asset.id).eq("period_month",periodMonth).eq("period_year",currentYear).maybeSingle();
-        if (existing) { skipped++; continue; }
-        const dep=Math.min(monthlyDep, cost-residual-accDep);
-        const newAcc=accDep+dep;
-        const { error:depErr } = await supabase.from("depreciation_entries").insert({
-          tenant_id:tenantId, asset_id:asset.id, period_month:periodMonth, period_year:currentYear,
-          depreciation:dep, accum_dep_after:newAcc, nbv_after:cost-newAcc,
+        const { data: existing } = await supabase.from('depreciation_entries')
+          .select('id').eq('tenant_id', tenantId).eq('asset_id', asset.id)
+          .eq('period_month', runMonth).eq('period_year', runYear);
+
+        if (existing && existing.length > 0) { skipped++; continue; }
+
+        const monthly = monthlyDep(asset);
+        const maxDep = Number(asset.purchase_cost) - Number(asset.residual_value);
+        const currentAccum = Number(asset.accumulated_depreciation);
+
+        if (currentAccum >= maxDep) { skipped++; continue; }
+
+        const charge = Math.min(monthly, maxDep - currentAccum);
+        const newAccumDep = currentAccum + charge;
+        const newNBV = Number(asset.purchase_cost) - newAccumDep;
+
+        const { error: insertErr } = await supabase.from('depreciation_entries').insert({
+          tenant_id: tenantId, asset_id: asset.id, period_month: runMonth,
+          period_year: runYear, depreciation: charge, accum_dep_after: newAccumDep, nbv_after: newNBV,
         });
-        if (depErr) { skipped++; continue; }
-        await supabase.from("fixed_assets").update({accumulated_depreciation:newAcc,net_book_value:cost-newAcc}).eq("id",asset.id);
+        if (insertErr) throw insertErr;
+
+        const { error: updateErr } = await supabase.from('fixed_assets').update({
+          accumulated_depreciation: newAccumDep, net_book_value: newNBV,
+          updated_at: new Date().toISOString(),
+        }).eq('id', asset.id);
+        if (updateErr) throw updateErr;
+
         posted++;
+        totalPosted += charge;
       }
-      showToast(posted>0?`Posted: ${posted} asset${posted!==1?"s":""}. ${skipped>0?skipped+" skipped.":""}`:`No new entries \u2014 ${skipped} skipped.`,posted>0?"success":"error");
-      fetchAll();
-    } catch(e) { showToast("Failed: "+e.message,"error"); }
-    finally { setRunningDep(false); }
-  };
 
-  const disposeAsset = async (id,name) => {
-    if (!window.confirm(`Dispose "${name}"?`)) return;
-    const { error } = await supabase.from("fixed_assets").update({is_active:false,disposal_date:new Date().toISOString().split("T")[0]}).eq("id",id);
-    if (error) { showToast("Failed.","error"); return; }
-    showToast(`${name} disposed.`); fetchAll();
-  };
+      setRunResult({ posted, skipped, total: totalPosted });
+      await fetchAll();
+    } catch (err) {
+      setRunError(err.message);
+    } finally {
+      setRunLoading(false);
+    }
+  }
 
-  const activeAssets=assets.filter(a=>a.is_active);
-  const disposedAssets=assets.filter(a=>!a.is_active);
-  const totalCost=activeAssets.reduce((s,a)=>s+(parseFloat(a.purchase_cost)||0),0);
-  const totalAccDep=activeAssets.reduce((s,a)=>s+(parseFloat(a.accumulated_depreciation)||0),0);
-  const totalNBV=activeAssets.reduce((s,a)=>s+calcNBV(a),0);
-  const monthlyDepTotal=activeAssets.reduce((s,a)=>{
-    const c=parseFloat(a.purchase_cost)||0,r=parseFloat(a.residual_value)||0,l=parseFloat(a.useful_life_years)||5,ad=parseFloat(a.accumulated_depreciation)||0;
-    return s+(ad>=(c-r)?0:calcMonthlyDep(c,r,l));
-  },0);
-  const depRunThisMonth=depEntries.some(d=>d.period_month===periodMonth&&d.period_year===currentYear);
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-  const card={background:"#fff",borderRadius:12,boxShadow:D.shadow,overflow:"hidden",marginBottom:20};
+  if (loading) return (
+    <div style={S.center}>
+      <div style={S.spinner} />
+      <span style={{ fontSize: 14, color: '#6b7280' }}>Loading asset register{"\u2026"}</span>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ padding: 32, color: '#b91c1c', fontSize: 14 }}>{"\u26A0\uFE0F"} {error}</div>
+  );
 
   return (
-    <div style={{fontFamily:D.font,color:D.ink700}}>
-      {toast&&<div style={{position:"fixed",top:24,right:24,zIndex:9999,background:toast.type==="error"?D.danger:D.accent,color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600,boxShadow:"0 4px 20px rgba(0,0,0,0.18)",fontFamily:D.font}}>{toast.msg}</div>}
+    <div style={S.root}>
 
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24}}>
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <div style={S.header}>
         <div>
-          <h2 style={{margin:0,fontSize:22,fontWeight:600,color:D.ink900,letterSpacing:"-0.02em"}}>Fixed Asset Register</h2>
-          <p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>Property, Plant & Equipment \u00b7 Cost / Accumulated Depreciation / Net Book Value</p>
+          <h2 style={S.title}>Fixed Asset Register</h2>
+          <p style={S.subtitle}>PP&E {"\u00b7"} IAS 16 {"\u00b7"} Straight-line depreciation {"\u00b7"} WP-FINANCIALS Phase 4</p>
         </div>
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={runDepreciation} disabled={runningDep||activeAssets.length===0} style={{
-            padding:"9px 18px",borderRadius:8,border:`1.5px solid ${depRunThisMonth?D.ink150:D.accentMid}`,
-            background:depRunThisMonth?D.ink075:D.accentLit,color:depRunThisMonth?D.ink500:D.accentMid,
-            fontSize:13,fontWeight:700,cursor:runningDep?"wait":"pointer",fontFamily:D.font,opacity:activeAssets.length===0?0.4:1,
-          }}>{runningDep?"Running\u2026":depRunThisMonth?`\u2713 ${currentMonth} ${currentYear} posted`:`\u25B6 Run ${currentMonth} ${currentYear} Depreciation`}</button>
-          <button onClick={()=>setShowAddForm(v=>!v)} style={{
-            padding:"9px 20px",borderRadius:8,border:"none",background:D.accent,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:D.font,
-          }}>{showAddForm?"\u2715 Cancel":"+ Add Asset"}</button>
-        </div>
+        <button style={S.btnPrimary} onClick={() => { setShowRunDep(true); setRunResult(null); setRunError(null); }}>{"\u25B6"} Run Depreciation</button>
       </div>
 
-      {showAddForm&&(
-        <div style={{...card,padding:28,marginBottom:24,borderLeft:`4px solid ${D.accent}`}}>
-          <h3 style={{margin:"0 0 20px",fontSize:15,fontWeight:700,color:D.ink900}}>New Fixed Asset</h3>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
-            <InputField label="Asset Name" required><input style={inputSx} placeholder="e.g. Display Refrigerator" value={form.asset_name} onChange={e=>setF("asset_name",e.target.value)}/></InputField>
-            <InputField label="Category" required><select style={inputSx} value={form.asset_category} onChange={e=>setF("asset_category",e.target.value)}>{ASSET_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></InputField>
-            <InputField label="Asset Code"><input style={inputSx} placeholder="FA-001" value={form.asset_code} onChange={e=>setF("asset_code",e.target.value)}/></InputField>
-            <InputField label="Purchase Date" required><input style={inputSx} type="date" value={form.purchase_date} onChange={e=>setF("purchase_date",e.target.value)}/></InputField>
-            <InputField label="Cost (ZAR)" required><input style={inputSx} type="number" min="0" step="0.01" value={form.purchase_cost} onChange={e=>setF("purchase_cost",e.target.value)}/></InputField>
-            <InputField label="Residual Value"><input style={inputSx} type="number" min="0" step="0.01" value={form.residual_value} onChange={e=>setF("residual_value",e.target.value)}/></InputField>
-            <InputField label="Useful Life (Years)" required><input style={inputSx} type="number" min="1" max="50" step="0.5" value={form.useful_life_years} onChange={e=>setF("useful_life_years",e.target.value)}/></InputField>
-            <InputField label="Method"><select style={inputSx} value={form.depreciation_method} onChange={e=>setF("depreciation_method",e.target.value)}>{DEP_METHODS.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}</select></InputField>
-            <InputField label="Notes"><input style={inputSx} placeholder="Optional" value={form.notes} onChange={e=>setF("notes",e.target.value)}/></InputField>
+      {/* ── BEHIND ALERT ───────────────────────────────────────────────── */}
+      {anyBehind && (
+        <div style={S.alertBehind}>
+          <span style={{ fontWeight: 700 }}>{"\u26A0\uFE0F"} Depreciation is behind on one or more assets.</span>
+          <span style={{ fontSize: 13 }}>The P&L depreciation charge and Balance Sheet NBV are understated. Use <strong>Run Depreciation</strong> to post charges month by month.</span>
+        </div>
+      )}
+
+      {/* ── STATS ──────────────────────────────────────────────────────── */}
+      <div style={S.statsRow}>
+        {[
+          { label: 'ASSETS ON REGISTER', val: assets.length, color: '#374151' },
+          { label: 'TOTAL COST (PP&E)', val: fmt(totalCost), color: '#1d4ed8' },
+          { label: 'ACCUM DEPRECIATION', val: fmt(totalAccumDep), color: '#b91c1c' },
+          { label: 'NET BOOK VALUE', val: fmt(totalNBV), color: '#15803d' },
+          { label: 'MONTHLY DEP CHARGE', val: fmt(totalMonthly), color: '#7c3aed' },
+        ].map(s => (
+          <div key={s.label} style={S.statCard}>
+            <div style={S.statLabel}>{s.label}</div>
+            <div style={{ ...S.statVal, color: s.color }}>{s.val}</div>
           </div>
-          {form.purchase_cost&&parseFloat(form.purchase_cost)>0&&(
-            <div style={{marginTop:16,padding:"12px 16px",background:D.accentLit,borderRadius:8,display:"flex",gap:24,flexWrap:"wrap"}}>
-              {[["Monthly",fmtZar(calcMonthlyDep(parseFloat(form.purchase_cost)||0,parseFloat(form.residual_value)||0,parseFloat(form.useful_life_years)||5))],
-                ["Annual",fmtZar(calcMonthlyDep(parseFloat(form.purchase_cost)||0,parseFloat(form.residual_value)||0,parseFloat(form.useful_life_years)||5)*12)],
-                ["Depreciable",fmtZar(Math.max(0,(parseFloat(form.purchase_cost)||0)-(parseFloat(form.residual_value)||0)))],
-              ].map(([l,v])=>(
-                <div key={l}><div style={{fontSize:10,fontWeight:700,color:D.accentMid,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{l}</div><div style={{fontSize:15,fontWeight:700,color:D.accent,fontVariantNumeric:"tabular-nums"}}>{v}</div></div>
-              ))}
+        ))}
+      </div>
+
+      {/* ── ASSET TABLE ────────────────────────────────────────────────── */}
+      <div style={S.section}>
+        <div style={S.sectionTitle}>Asset Register</div>
+        <div style={S.thead}>
+          <span style={{ ...S.th, flex: 0.7 }}>CODE</span>
+          <span style={{ ...S.th, flex: 2.5 }}>ASSET</span>
+          <span style={{ ...S.th, flex: 1.2 }}>PURCHASED</span>
+          <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>COST</span>
+          <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>ACCUM DEP</span>
+          <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>NBV</span>
+          <span style={{ ...S.th, flex: 1 }}>DEP %</span>
+          <span style={{ ...S.th, flex: 1.2, textAlign: 'right' }}>MONTHLY</span>
+          <span style={{ ...S.th, flex: 1 }}>LIFE LEFT</span>
+          <span style={{ ...S.th, flex: 1 }}>STATUS</span>
+        </div>
+
+        {assets.map(asset => {
+          const isOpen = expandedId === asset.id;
+          const cfg = catCfg(asset.asset_category);
+          const behind = monthsBehind(asset);
+          const monthly = monthlyDep(asset);
+          const depPct = Number(asset.purchase_cost) > 0
+            ? (Number(asset.accumulated_depreciation) / (Number(asset.purchase_cost) - Number(asset.residual_value))) * 100 : 0;
+          const lifeMos = remainingMonths(asset);
+          const fullyDep = lifeMos === 0;
+
+          return (
+            <div key={asset.id} style={{ ...S.assetCard, ...(isOpen ? { borderColor: '#c4b5fd', boxShadow: '0 4px 16px rgba(124,58,237,0.1)' } : {}) }}>
+              <div style={S.assetRow} onClick={() => setExpandedId(isOpen ? null : asset.id)}>
+                <span style={{ ...S.td, flex: 0.7, fontFamily: 'monospace', fontSize: 11, color: '#6b7280' }}>{asset.asset_code}</span>
+                <span style={{ ...S.td, flex: 2.5, gap: 8 }}>
+                  <span style={{ ...S.catBadge, background: cfg.bg, color: cfg.color }}>{cfg.icon} {asset.asset_category}</span>
+                  <span style={{ fontWeight: 600, color: '#111827' }}>{asset.asset_name}</span>
+                </span>
+                <span style={{ ...S.td, flex: 1.2, color: '#6b7280', fontSize: 12 }}>{fmtDate(asset.purchase_date)}</span>
+                <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: '#1d4ed8' }}>{fmt(asset.purchase_cost)}</span>
+                <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: '#b91c1c' }}>({fmt(asset.accumulated_depreciation)})</span>
+                <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#15803d' }}>{fmt(asset.net_book_value)}</span>
+                <span style={{ ...S.td, flex: 1 }}>
+                  <div style={S.depBar}><div style={{ ...S.depBarFill, width: `${Math.min(depPct, 100)}%` }} /><span style={S.depBarLabel}>{depPct.toFixed(0)}%</span></div>
+                </span>
+                <span style={{ ...S.td, flex: 1.2, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', color: '#7c3aed', fontWeight: 600 }}>{fmt(monthly)}/mo</span>
+                <span style={{ ...S.td, flex: 1, fontSize: 12, color: fullyDep ? '#b91c1c' : '#374151' }}>{fullyDep ? 'Fully dep.' : `${remainingYears(asset)} yrs`}</span>
+                <span style={{ ...S.td, flex: 1 }}>
+                  {behind > 0
+                    ? <span style={{ ...S.badge, background: '#fef3c7', color: '#b45309' }}>{behind}mo behind</span>
+                    : <span style={{ ...S.badge, background: '#dcfce7', color: '#15803d' }}>Current</span>}
+                </span>
+              </div>
+
+              {isOpen && (
+                <div style={S.expandBox}>
+                  <div style={S.expandGrid}>
+                    {[
+                      ['DEPRECIATION METHOD', asset.depreciation_method === 'straight_line' ? 'Straight-Line (SL)' : asset.depreciation_method],
+                      ['USEFUL LIFE', `${asset.useful_life_years} years`],
+                      ['RESIDUAL VALUE', fmt(asset.residual_value)],
+                      ['DEPRECIABLE AMOUNT', fmt(Number(asset.purchase_cost) - Number(asset.residual_value))],
+                      ['ANNUAL DEP CHARGE', `${fmt(monthly * 12)}/yr`],
+                      ['REMAINING LIFE', `${remainingMonths(asset)} months (${remainingYears(asset)} yrs)`],
+                      ['EXPECTED ACCUM DEP TODAY', `${fmt(expectedAccumDep(asset))}${behind > 0 ? ` (${behind} months unposted)` : ''}`],
+                      ['NOTES', asset.notes || '\u2014'],
+                    ].map(([label, val]) => (
+                      <div key={label} style={S.expandItem}>
+                        <div style={S.expandLabel}>{label}</div>
+                        <div style={S.expandVal}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-          <div style={{marginTop:20,display:"flex",justifyContent:"flex-end",gap:10}}>
-            <button onClick={()=>setShowAddForm(false)} style={{padding:"9px 18px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"transparent",color:D.ink500,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:D.font}}>Cancel</button>
-            <button onClick={handleAddAsset} disabled={saving} style={{padding:"9px 22px",border:"none",borderRadius:8,background:D.accent,color:"#fff",fontSize:13,fontWeight:700,cursor:saving?"wait":"pointer",fontFamily:D.font,opacity:saving?0.6:1}}>{saving?"Saving\u2026":"Add to Register"}</button>
+          );
+        })}
+      </div>
+
+      {/* ── DEPRECIATION HISTORY ───────────────────────────────────────── */}
+      <div style={S.section}>
+        <div style={S.sectionTitle}>Depreciation History <span style={S.sectionCount}>{depHistory.length} {depHistory.length === 1 ? 'entry' : 'entries'}</span></div>
+        {depHistory.length === 0 ? (
+          <div style={S.emptyHistory}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>{"\uD83D\uDCC5"}</div>
+            <div style={{ fontWeight: 600, color: '#374151', marginBottom: 4 }}>No depreciation entries posted yet</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Current accumulated depreciation was seeded directly. Use <strong>Run Depreciation</strong> to begin posting monthly entries.</div>
+          </div>
+        ) : (
+          <>
+            <div style={{ ...S.thead, marginTop: 8 }}>
+              <span style={{ ...S.th, flex: 1.2 }}>PERIOD</span>
+              <span style={{ ...S.th, flex: 2.5 }}>ASSET</span>
+              <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>CHARGE</span>
+              <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>ACCUM DEP AFTER</span>
+              <span style={{ ...S.th, flex: 1.3, textAlign: 'right' }}>NBV AFTER</span>
+              <span style={{ ...S.th, flex: 1.5 }}>POSTED</span>
+            </div>
+            {depHistory.map(entry => {
+              const asset = assets.find(a => a.id === entry.asset_id);
+              return (
+                <div key={entry.id} style={S.histRow}>
+                  <span style={{ ...S.td, flex: 1.2, fontWeight: 600, color: '#374151' }}>{entry.period_month} {entry.period_year}</span>
+                  <span style={{ ...S.td, flex: 2.5, color: '#374151' }}>{asset?.asset_name || entry.asset_id.slice(0, 8)}</span>
+                  <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: '#b91c1c' }}>({fmt(entry.depreciation)})</span>
+                  <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', color: '#374151' }}>{fmt(entry.accum_dep_after)}</span>
+                  <span style={{ ...S.td, flex: 1.3, justifyContent: 'flex-end', fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: '#15803d' }}>{fmt(entry.nbv_after)}</span>
+                  <span style={{ ...S.td, flex: 1.5, fontSize: 11, color: '#9ca3af' }}>{entry.posted_at ? new Date(entry.posted_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '\u2014'}</span>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {/* ── BS NOTE ────────────────────────────────────────────────────── */}
+      <div style={S.bsNote}>
+        <div style={{ fontWeight: 700, color: '#1d4ed8', marginBottom: 8 }}>{"\uD83D\uDCCA"} Balance Sheet {"\u2014"} Property, Plant & Equipment (IAS 16)</div>
+        <div style={S.bsGrid}>
+          <div><span style={S.bsLabel}>PP&E at Cost</span><span style={{ ...S.bsVal, color: '#1d4ed8' }}>{fmt(totalCost)}</span></div>
+          <div><span style={S.bsLabel}>Less: Accumulated Depreciation</span><span style={{ ...S.bsVal, color: '#b91c1c' }}>({fmt(totalAccumDep)})</span></div>
+          <div style={{ borderTop: '2px solid #93c5fd', paddingTop: 8 }}>
+            <span style={{ ...S.bsLabel, fontWeight: 700 }}>Net Book Value</span>
+            <span style={{ ...S.bsVal, color: '#15803d', fontSize: 20, fontWeight: 800 }}>{fmt(totalNBV)}</span>
+          </div>
+        </div>
+        {anyBehind && <div style={{ fontSize: 12, color: '#b45309', marginTop: 10 }}>{"\u26A0"} NBV is overstated {"\u2014"} unposted depreciation not yet reflected. Run depreciation to correct.</div>}
+      </div>
+
+      {/* ── RUN DEP MODAL ──────────────────────────────────────────────── */}
+      {showRunDep && (
+        <div style={S.overlay}>
+          <div style={S.modal}>
+            <div style={S.modalHead}>
+              <div>
+                <div style={S.modalTitle}>{"\u25B6"} Run Depreciation</div>
+                <div style={S.modalSub}>Posts monthly depreciation charge for all active assets {"\u00b7"} Updates accumulated_depreciation + net_book_value</div>
+              </div>
+              <button style={S.btnX} onClick={() => setShowRunDep(false)}>{"\u2715"}</button>
+            </div>
+            <div style={{ padding: '20px 24px' }}>
+              <div style={S.periodRow}>
+                <div style={S.field}>
+                  <label style={S.fieldLbl}>MONTH</label>
+                  <select style={S.select} value={runMonth} onChange={e => setRunMonth(e.target.value)}>
+                    {MONTHS_SHORT.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div style={S.field}>
+                  <label style={S.fieldLbl}>YEAR</label>
+                  <select style={S.select} value={runYear} onChange={e => setRunYear(Number(e.target.value))}>
+                    {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={S.previewBox}>
+                <div style={S.previewTitle}>Preview {"\u2014"} {runMonth} {runYear}</div>
+                {assets.map(asset => {
+                  const charge = monthlyDep(asset);
+                  const maxDep = Number(asset.purchase_cost) - Number(asset.residual_value);
+                  const already = Number(asset.accumulated_depreciation) >= maxDep;
+                  return (
+                    <div key={asset.id} style={S.previewRow}>
+                      <span style={{ flex: 1, color: already ? '#9ca3af' : '#374151', fontSize: 13 }}>{asset.asset_code} {"\u00b7"} {asset.asset_name}</span>
+                      <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13, color: already ? '#9ca3af' : '#b91c1c', fontWeight: 600 }}>
+                        {already ? 'Fully depreciated \u2014 skip' : `(${fmt(charge)})`}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div style={S.previewTotal}>
+                  <span style={{ fontWeight: 700 }}>Total charge</span>
+                  <span style={{ fontWeight: 800, color: '#b91c1c', fontVariantNumeric: 'tabular-nums' }}>({fmt(totalMonthly)})</span>
+                </div>
+              </div>
+              {runError && <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{"\u26A0\uFE0F"} {runError}</div>}
+              {runResult && <div style={{ background: '#dcfce7', color: '#15803d', padding: '12px 16px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{"\u2713"} Done {"\u2014"} {runResult.posted} entries posted ({fmt(runResult.total)} total){runResult.skipped > 0 && ` \u00b7 ${runResult.skipped} skipped (already posted or fully depreciated)`}</div>}
+              <div style={S.modalFooter}>
+                <button style={S.btnOutline} onClick={() => setShowRunDep(false)}>{runResult ? 'Close' : 'Cancel'}</button>
+                {!runResult && (
+                  <button style={{ ...S.btnPrimary, opacity: runLoading ? 0.7 : 1 }} disabled={runLoading} onClick={runDepreciation}>
+                    {runLoading ? 'Running\u2026' : `\u25B6 Post ${runMonth} ${runYear} Depreciation`}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {loading?(
-        <div style={{textAlign:"center",padding:60,color:D.ink500}}>Loading register\u2026</div>
-      ):(
-        <>
-          <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
-            <StatCard label="Total Cost" value={fmtZar(totalCost)} sub={`${activeAssets.length} active`} color={D.accent} icon="\uD83C\uDFD7\uFE0F"/>
-            <StatCard label="Accum Depreciation" value={fmtZar(totalAccDep)} sub={totalCost>0?`${((totalAccDep/totalCost)*100).toFixed(1)}% of cost`:"\u2014"} color={D.warning} icon="\uD83D\uDCC9"/>
-            <StatCard label="Net Book Value" value={fmtZar(totalNBV)} sub="Carrying amount" color={D.info} icon="\u2696\uFE0F"/>
-            <StatCard label="Monthly Dep" value={fmtZar(monthlyDepTotal)} sub={`${fmtZar(monthlyDepTotal*12)} / year`} color={D.accentMid} icon="\uD83D\uDCC5"/>
-          </div>
-
-          {activeAssets.length===0?(
-            <div style={{...card,padding:"48px 32px",textAlign:"center"}}>
-              <div style={{fontSize:40,marginBottom:12}}>{"\uD83C\uDFD7\uFE0F"}</div>
-              <div style={{fontSize:16,fontWeight:700,color:D.ink700,marginBottom:6}}>No assets in the register</div>
-              <div style={{fontSize:13,color:D.ink500,marginBottom:20}}>Add your first fixed asset to begin tracking depreciation.</div>
-              <button onClick={()=>setShowAddForm(true)} style={{padding:"10px 24px",background:D.accent,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:D.font}}>+ Add First Asset</button>
-            </div>
-          ):(
-            <div style={card}>
-              <div style={{display:"grid",gridTemplateColumns:"2fr 120px 110px 110px 110px 110px 80px 40px",padding:"12px 20px",background:D.ink075,borderBottom:`1px solid ${D.ink150}`,fontSize:10,fontWeight:700,color:D.ink500,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:D.font}}>
-                <span>Asset</span><span>Date</span><span style={{textAlign:"right"}}>Cost</span><span style={{textAlign:"right"}}>Accum Dep</span><span style={{textAlign:"right"}}>NBV</span><span style={{textAlign:"right"}}>Monthly</span><span style={{textAlign:"center"}}>Life</span><span/>
-              </div>
-              {activeAssets.map((asset,idx)=>{
-                const cost=parseFloat(asset.purchase_cost)||0,residual=parseFloat(asset.residual_value)||0,accDep=parseFloat(asset.accumulated_depreciation)||0,life=parseFloat(asset.useful_life_years)||5;
-                const nbv=calcNBV(asset),md=calcMonthlyDep(cost,residual,life),pct=cost>0?(accDep/(cost-residual||1))*100:0,fullyDep=accDep>=(cost-residual)-0.01;
-                const isExp=selectedAsset===asset.id;
-                return (
-                  <div key={asset.id}>
-                    <div onClick={()=>setSelectedAsset(isExp?null:asset.id)} style={{display:"grid",gridTemplateColumns:"2fr 120px 110px 110px 110px 110px 80px 40px",padding:"14px 20px",borderBottom:`1px solid ${idx<activeAssets.length-1?D.ink150:"transparent"}`,alignItems:"center",cursor:"pointer",background:isExp?"#F0FDF4":"transparent",transition:"background 0.15s"}}>
-                      <div>
-                        <div style={{fontSize:14,fontWeight:600,color:D.ink900}}>{asset.asset_name}{asset.asset_code&&<span style={{fontSize:10,color:D.ink500,marginLeft:8,padding:"2px 6px",background:D.ink075,borderRadius:4}}>{asset.asset_code}</span>}</div>
-                        <div style={{fontSize:11,color:D.ink500,marginTop:2}}>{asset.asset_category}</div>
-                        <div style={{marginTop:5,height:3,borderRadius:2,background:D.ink150,overflow:"hidden",width:120}}><div style={{height:"100%",width:`${Math.min(100,pct)}%`,background:fullyDep?D.danger:pct>80?D.warning:D.success,transition:"width 0.4s"}}/></div>
-                      </div>
-                      <div style={{fontSize:13,color:D.ink500}}>{fmtDate(asset.purchase_date)}</div>
-                      <div style={{fontSize:13,fontWeight:600,color:D.ink700,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(cost)}</div>
-                      <div style={{fontSize:13,color:D.warning,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{accDep>0?`(${fmtZar(accDep)})`:"\u2014"}</div>
-                      <div style={{fontSize:14,fontWeight:700,color:fullyDep?D.danger:nbv>cost*0.5?D.success:D.warning,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(nbv)}</div>
-                      <div style={{fontSize:13,color:D.info,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fullyDep?<span style={{color:D.danger,fontSize:11,fontWeight:700}}>FULLY DEP</span>:fmtZar(md)}</div>
-                      <div style={{fontSize:12,color:D.ink500,textAlign:"center"}}>{life}y</div>
-                      <div style={{textAlign:"center"}}><span style={{fontSize:14,color:D.ink300}}>{isExp?"\u25B2":"\u25BC"}</span></div>
-                    </div>
-                    {isExp&&(
-                      <div style={{padding:"16px 24px 20px",background:"#F0FDF4",borderBottom:`1px solid ${D.ink150}`}}>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:16,marginBottom:16}}>
-                          {[["Residual",fmtZar(residual)],["Depreciable",fmtZar(cost-residual)],["Annual Dep",fmtZar(md*12)],["% Depreciated",fullyDep?"100%":`${Math.min(100,pct).toFixed(1)}%`]].map(([l,v])=>(
-                            <div key={l}><div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{l}</div><div style={{fontSize:14,fontWeight:700,color:D.accent,fontVariantNumeric:"tabular-nums"}}>{v}</div></div>
-                          ))}
-                        </div>
-                        {depEntries.filter(d=>d.asset_id===asset.id).slice(0,3).length>0&&(
-                          <div>
-                            <div style={{fontSize:10,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}}>Recent Entries</div>
-                            {depEntries.filter(d=>d.asset_id===asset.id).slice(0,3).map(e=>(
-                              <div key={e.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${D.ink150}`,fontSize:12}}>
-                                <span style={{color:D.ink500}}>{new Date(e.period_year,parseInt(e.period_month)-1).toLocaleString("default",{month:"long"})} {e.period_year}</span>
-                                <span style={{fontWeight:600,color:D.warning,fontVariantNumeric:"tabular-nums"}}>({fmtZar(e.depreciation)})</span>
-                                <span style={{color:D.ink500,fontVariantNumeric:"tabular-nums"}}>NBV: {fmtZar(e.nbv_after)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {asset.notes&&<div style={{marginTop:12,fontSize:12,color:D.ink500,fontStyle:"italic"}}>Notes: {asset.notes}</div>}
-                        <div style={{marginTop:14}}>
-                          <button onClick={()=>disposeAsset(asset.id,asset.asset_name)} style={{padding:"7px 14px",border:`1px solid ${D.dangerBd}`,borderRadius:6,background:D.dangerBg,color:D.danger,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:D.font}}>Dispose Asset</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <div style={{display:"grid",gridTemplateColumns:"2fr 120px 110px 110px 110px 110px 80px 40px",padding:"14px 20px",background:D.ink075,borderTop:`2px solid ${D.ink150}`,fontFamily:D.font}}>
-                <div style={{fontSize:13,fontWeight:700,color:D.ink700}}>Totals \u2014 {activeAssets.length} active</div><div/>
-                <div style={{fontSize:14,fontWeight:700,color:D.ink700,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(totalCost)}</div>
-                <div style={{fontSize:14,fontWeight:700,color:D.warning,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>({fmtZar(totalAccDep)})</div>
-                <div style={{fontSize:15,fontWeight:700,color:D.accent,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(totalNBV)}</div>
-                <div style={{fontSize:14,fontWeight:700,color:D.info,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmtZar(monthlyDepTotal)}</div>
-                <div/><div/>
-              </div>
-            </div>
-          )}
-
-          {disposedAssets.length>0&&(
-            <div style={{...card,opacity:0.75}}>
-              <div style={{padding:"12px 20px",background:D.ink075,fontSize:11,fontWeight:700,color:D.ink500,textTransform:"uppercase",letterSpacing:"0.08em",borderBottom:`1px solid ${D.ink150}`}}>Disposed ({disposedAssets.length})</div>
-              {disposedAssets.map(a=>(
-                <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"12px 20px",borderBottom:`1px solid ${D.ink150}`,alignItems:"center"}}>
-                  <div><div style={{fontSize:13,fontWeight:600,color:D.ink500}}>{a.asset_name}</div><div style={{fontSize:11,color:D.ink300}}>{a.asset_category} \u00b7 Disposed {fmtDate(a.disposal_date)}</div></div>
-                  <div style={{fontSize:13,color:D.ink500,fontVariantNumeric:"tabular-nums"}}>Cost {fmtZar(a.purchase_cost)}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{background:D.ink075,borderRadius:8,padding:"14px 18px",fontSize:12,color:D.ink500,border:`1px solid ${D.ink150}`,lineHeight:1.7,fontFamily:D.font}}>
-            <strong style={{color:D.ink700}}>Accounting policy \u2014 PPE:</strong>{" "}
-            Assets recognised at cost less accumulated depreciation. Straight-line basis over useful life. Residual values reviewed at each reporting date. Depreciation charged to Income Statement (account 61100).
-          </div>
-        </>
-      )}
     </div>
   );
 }
+
+// ─── STYLES ──────────────────────────────────────────────────────────────────
+
+const TK = {
+  ink900: '#111827', ink700: '#374151', ink500: '#6b7280',
+  ink300: '#d1d5db', ink200: '#e5e7eb', ink100: '#f3f4f6',
+};
+
+const S = {
+  root: { padding: '24px 28px', maxWidth: 1440, margin: '0 auto', fontFamily: 'Inter, -apple-system, sans-serif', color: TK.ink900 },
+  center: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 80 },
+  spinner: { width: 20, height: 20, border: `2px solid ${TK.ink300}`, borderTopColor: '#7c3aed', borderRadius: '50%', animation: 'spin 0.75s linear infinite' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  title: { margin: 0, fontSize: 22, fontWeight: 700, color: TK.ink900 },
+  subtitle: { margin: '4px 0 0', fontSize: 12, color: TK.ink500 },
+  alertBehind: { background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: '#b45309' },
+  statsRow: { display: 'flex', gap: 12, marginBottom: 24 },
+  statCard: { flex: 1, background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' },
+  statLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em', marginBottom: 6 },
+  statVal: { fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums' },
+  section: { marginBottom: 24 },
+  sectionTitle: { fontSize: 14, fontWeight: 700, color: TK.ink700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 },
+  sectionCount: { fontSize: 12, fontWeight: 400, color: TK.ink500, background: TK.ink100, padding: '2px 10px', borderRadius: 20 },
+  thead: { display: 'flex', gap: 8, padding: '8px 16px', background: TK.ink100, borderRadius: '10px 10px 0 0', border: `1px solid ${TK.ink200}`, borderBottom: 'none' },
+  th: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em' },
+  assetCard: { background: '#fff', border: `1px solid ${TK.ink200}`, borderTop: 'none', overflow: 'hidden', transition: 'border-color 0.15s, box-shadow 0.15s' },
+  assetRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '13px 16px', cursor: 'pointer' },
+  td: { fontSize: 13, display: 'flex', alignItems: 'center', overflow: 'hidden' },
+  catBadge: { fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0 },
+  badge: { fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' },
+  depBar: { width: '100%', height: 8, background: TK.ink200, borderRadius: 4, position: 'relative', overflow: 'hidden' },
+  depBarFill: { height: '100%', background: '#b91c1c', borderRadius: 4, transition: 'width 0.3s' },
+  depBarLabel: { position: 'absolute', right: 0, top: -1, fontSize: 9, color: TK.ink500, fontWeight: 600 },
+  expandBox: { padding: '14px 16px 16px', background: '#fafafa', borderTop: `1px solid ${TK.ink100}` },
+  expandGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 },
+  expandItem: { display: 'flex', flexDirection: 'column', gap: 4 },
+  expandLabel: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em' },
+  expandVal: { fontSize: 13, fontWeight: 600, color: TK.ink700 },
+  histRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: `1px solid ${TK.ink100}`, background: '#fff' },
+  emptyHistory: { textAlign: 'center', padding: '32px 20px', background: '#fff', border: `1px solid ${TK.ink200}`, borderRadius: '0 0 10px 10px' },
+  bsNote: { background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 12, padding: '18px 20px', marginBottom: 16 },
+  bsGrid: { display: 'flex', flexDirection: 'column', gap: 10 },
+  bsLabel: { fontSize: 13, color: TK.ink700, display: 'block', marginBottom: 2 },
+  bsVal: { fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums', display: 'block' },
+  btnPrimary: { background: TK.ink900, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnOutline: { background: '#fff', color: TK.ink700, border: `1px solid ${TK.ink300}`, borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnX: { background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: TK.ink500, padding: 4, lineHeight: 1 },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000, padding: 20 },
+  modal: { background: '#fff', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' },
+  modalHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 24px 16px', borderBottom: `1px solid ${TK.ink200}` },
+  modalTitle: { fontSize: 18, fontWeight: 700, color: TK.ink900, marginBottom: 3 },
+  modalSub: { fontSize: 12, color: TK.ink500 },
+  modalFooter: { display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 16, borderTop: `1px solid ${TK.ink200}`, marginTop: 4 },
+  periodRow: { display: 'flex', gap: 16, marginBottom: 20 },
+  field: { display: 'flex', flexDirection: 'column', gap: 6 },
+  fieldLbl: { fontSize: 10, fontWeight: 700, color: TK.ink500, letterSpacing: '0.07em' },
+  select: { padding: '8px 12px', borderRadius: 8, border: `1px solid ${TK.ink300}`, fontSize: 13, color: TK.ink900, background: '#fff', minWidth: 120 },
+  previewBox: { background: TK.ink100, borderRadius: 10, padding: '14px 16px', marginBottom: 20 },
+  previewTitle: { fontSize: 12, fontWeight: 700, color: TK.ink500, marginBottom: 10, letterSpacing: '0.05em' },
+  previewRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${TK.ink200}` },
+  previewTotal: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 4, borderTop: `2px solid ${TK.ink300}` },
+};

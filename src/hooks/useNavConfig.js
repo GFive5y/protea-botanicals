@@ -124,6 +124,7 @@ const HQ_PAGES = [
   { group: "Finance", icon: "🧾", label: "Invoices", path: "/hq?tab=invoices" },
   { group: "Finance", icon: "📒", label: "Journals", path: "/hq?tab=journals" },
   { group: "Finance", icon: "🏦", label: "Bank Recon", path: "/hq?tab=bank-recon" },
+  { group: "Finance", icon: "🏗️", label: "Fixed Assets", path: "/hq?tab=fixed-assets" },
   // ── Intelligence ─────────────────────────────────────────────────────────────
   {
     group: "Intelligence",
