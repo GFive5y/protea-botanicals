@@ -1,278 +1,286 @@
 # CLAUDE.md — NuAi Platform Context
+# Read this before writing any code. Updated: 09 Apr 2026.
 
-## Read this file at the start of every session before writing any code.
+---
 
-\---
+## WHAT THIS SYSTEM ACTUALLY IS
 
-## PLATFORM IDENTITY
+NuAi is NOT a cannabis retail website. It is a production multi-tenant SaaS ERP.
 
-```
-Product:    NuAi — multi-tenant SaaS ERP for SA cannabis retail
-Stack:      React (CRA) + Supabase + Vercel
-Repo:       github.com/GFive5y/protea-botanicals
+224,293 lines of code · 190 files · 109 database tables (all RLS-secured)
+6 distinct user portals · 10 cloud edge functions · 4 industry profiles
+41 HQ tabs · 17 stock components · 13 HR modules · 10 major systems all live
+
+Every task is a small increment on a large, complete system.
+Read docs/PLATFORM-OVERVIEW_v1_0.md for the full picture before any task.
+
+---
+
+## STACK & REPO
+
+Product:    NuAi — multi-tenant SaaS ERP (cannabis, food/bev, general retail, medical)
+Stack:      React (CRA) + Supabase (PostgreSQL) + Vercel
+Repo:       github.com/GFive5y/protea-botanicals · branch: main
 Dev:        localhost:3000
 Prod:       protea-botanicals.vercel.app
-Supabase:   uvicrqapgzcdvozxrreo.supabase.co
-Tenant:     Medi Recreational · b1bad266-ceb4-4558-bbc3-22cfeeeafe74
-            183 SKUs · R110,324 AVCO · 54 sold out · 1 no price
-```
+Supabase:   uvicrqapgzcdvozxrreo
+Medi Rec:   b1bad266-ceb4-4558-bbc3-22cfeeeafe74 (ON HOLD)
+HQ tenant:  43b34c33-6864-4f02-98dd-df1d340475c3
+HEAD:       9939421 (verify with: git log --oneline -1)
 
-\---
+---
 
 ## OWNER PROFILE
 
-```
-Non-technical. Uses Claude.ai chat interface only.
-Terminal: PowerShell — NEVER use \&\& (use separate lines or semicolons)
-Workflow: Claude produces diffs/files → owner applies via Ctrl+H or patch scripts
-Git: owner runs git commands manually in VS Code terminal
-```
+Non-technical. Uses Claude.ai chat interface for strategy and architecture.
+Claude Code (this context) handles all file edits, commits, and pushes.
+Terminal: PowerShell — NEVER use && (use separate lines or semicolons).
+Build: CI=false npm run build (Vercel env var set).
 
-\---
+---
 
-## CURRENT HEAD
+## THE SIX PORTALS
 
-```
-Commit:  d83a329 (verify with git log --oneline -1)
-Branch:  main
-Build:   CI=false npm run build (Vercel env var set)
-```
+/hq           — HQ Command Centre: 41 tabs, cross-tenant operator view
+/tenant-portal — Business owner: ~35 tabs, industry-adaptive waterfall nav
+/admin         — Store manager: 13 tabs
+/hr            — HR Suite: 13 modules
+/shop          — Consumer storefront: e-commerce + loyalty + PayFast
+/staff         — Staff self-service: 4 tabs
 
-\---
+---
 
-## SMARTINVENTORY.JS — v1.1 FEATURE SET
+## MAJOR SYSTEMS — ALL LIVE
 
-```
-File: src/components/hq/SmartInventory.js (\~1,650 lines)
-Status: Active WP — Smart Catalog
+### 1. Financial Suite (WP-FINANCIALS — ALL 10 PHASES COMPLETE ✅)
+Live figures: R477,880 revenue · 62.13% gross margin · R296,606 net profit
 
-VIEWS:
-  Tile view    — S/M/L density toggle, hover ··· menu, smart tags, SC-05 ✅
-  List view    — compact rows, click to open panel
-  Detail view  — Excel-style, default view
+HQProfitLoss.js v4     — IFRS Income Statement, AVCO COGS from order_items
+HQBalanceSheet.js v2   — Assets = Liabilities + Equity, VAT payable live
+HQFixedAssets.js       — IAS 16, straight-line depreciation, R59,774 NBV
+HQJournals.js          — Double-entry, COA picker, post/reverse/delete
+HQVat.js v2            — VAT201, 3-point automated pipeline, period close
+HQBankRecon.js         — R180,733.69 FNB reconciled, 22 lines
+HQFinancialStatements.js — 4 IFRS statements, print/PDF
+HQFinancialNotes.js    — 15 IFRS disclosure notes from live data
+HQYearEnd.js           — 4-step close wizard, closing journal, lock/archive
+HQFinancialSetup.js    — 5-screen wizard, gates all statements
 
-DETAIL VIEW FEATURES:
-  \_row column        — row numbers (#), system col, always visible, excluded from CSV/picker ✅
-  SKU column         — after Name, hidden by default ✅
-  Drag-to-reorder    — HTML5 drag on column headers, persists to localStorage ✅
-  Drag-to-resize     — resize handle between columns, persists to localStorage ✅
-  Column picker      — show/hide columns, excludes system cols (\_row) ✅
-  Column filters     — filter row per column when Filters open ✅
-  Sort               — click header to sort asc/desc ✅
+### 2. VAT Pipeline — ALL 3 POINTS COMPLETE ✅
+P3-A: expenses.input_vat_amount → expense_vat_sync trigger → vat_transactions
+P3-B: stock_receipts.input_vat_amount → receipt_vat_sync trigger → vat_transactions
+P3-C: Smart Capture → auto-post-capture writes input_vat_amount → trigger fires
 
-TOOLBAR:
-  Search             — above KPI cards, always visible ✅
-  View toggle        — Tile / List / Detail ✅
-  S/M/L toggle       — tile density (tile view only) ✅
-  Filters button     — issues-first sort toggle ✅
-  CSV export         — visible columns + current filter, excludes \_row ✅ (SC-09)
-  Columns picker     — detail view only ✅
-  Refresh + Add Item ✅
+### 3. Smart Capture
+HQDocuments.js / HQSmartCapture.js + process-document EF (v53) + auto-post-capture EF (v2)
+AI reads invoice → 6-level HMAC anti-fraud fingerprint → atomic expense + journal + VAT
 
-KPI CARDS (SC-01 ✅):
-  Total · Stock Value · Active · Sold Out · Below Reorder · No Price
-  Each with global + filtered counts
-  Sold Out, Below Reorder, No Price → action panels (slide-in 420px)
+### 4. QR Authentication
+AdminQRCodes.js (4,750 lines) + sign-qr EF (v36) + verify-qr EF (v34)
+HMAC-SHA256 signing · GPS + device capture on scan · velocity fraud detection
+Loyalty points on scan · 181 scans · 60 active codes
 
-PILL NAVIGATION — 3-level nesting doll (UX-02 ✅):
-  Level 0: \[● All (183)]  \[Categories ▼]
-  Level 1: \[● All]  \[‹ Back]  \[14 world pills]  \[×]
-  Level 2: \[● All]  \[‹ Back]  \[Active world]  \[×]  + all sub-groups flat below
-  Sub-pills: per group row, clickable, toggle-deselect, active filter chip
+### 5. Inventory (17 components, 33,000+ lines)
+AVCO recalculated by DB trigger on every stock movement
+14 Product Worlds · Smart Catalog (SmartInventory.js 5,343 lines)
+Smart search syntax: price>500, qty:0, brand:RAW
+AI reorder scoring · 3-step receiving · inter-store transfers · COGS builder
 
-PANELS (SC-02 ✅):
-  StockItemPanel — single click tile/list/detail row → 460px slide-in (4 tabs)
-  StockItemModal — world-specific add/edit, opens above panel (z:1200)
+### 6. Loyalty + AI Engine
+HQLoyalty.js (4,537 lines) · loyalty-ai EF (v2)
+Nightly AI: churn rescue, birthday, stock boost · 401 transactions
+WhatsApp notifications via Twilio (send-notification EF v37)
 
-OTHER FEATURES:
-  Toast system (SC-04 ✅) — bottom-centre, progress bar, Undo
-  Sold-out visual weight (SC-03 ✅) — red/amber chips + left border
-  Smart tags (SC-05 ✅) — variant\_value + brand parsed per world
-  Shimmer skeleton (SC-07 ✅) — matches column widths
-  Loading/Error/Empty states ✅
+### 7. ProteaAI (LOCKED — 2,346 lines)
+3 tabs: Chat · natural language DB Query · Dev error monitor
+ai-copilot EF v59. ALL AI calls go through this EF only. Never direct from React.
 
-&#x20; Bulk select (SC-08 ✅) — toolbar toggle, checkboxes all 3 views, floating action bar
+### 8. HR Suite (13 modules, 21,583 lines)
+Timesheets · Leave (BCEA) · Roster · Performance · Loans · Disciplinary
+Contracts · Payroll (SimplePay CSV) · Calendar (SA public holidays)
 
-&#x20; Smart search (SC-10 ✅) — price>500, qty:0, brand:RAW, margin>50, cost<100, supplier:X
+### 9. Industry Profiles (4 profiles, 26 files with branching)
+cannabis_retail · cannabis_dispensary · food_beverage · general_retail
+food_beverage exclusive: 16,085 lines (HACCP, SA R638, cold chain, recall, DAFF ingredients)
 
-&#x20; "X of Y" count — shows filtered count next to search when any filter active
+### 10. Consumer Shop
+Age gate · PayFast · Loyalty redemption · 7 cannabinoid molecule visualisers
 
-&#x20; "✕ Clear" button — clears ALL filters (pills, search, column filters, issues sort)
+---
 
-&#x20; Auto-hide empty columns — on first load with no saved preference
+## EDGE FUNCTIONS — CURRENT VERSIONS
 
+process-document    v53  — AI Smart Capture (Anthropic claude-sonnet-4-20250514)
+auto-post-capture   v2   — Atomic expense + journal (VAT via trigger, not direct insert)
+ai-copilot          v59  — All ProteaAI queries
+loyalty-ai          v2   — Nightly AI loyalty engine
+sim-pos-sales       v4   — POS sales simulator
+sign-qr             v36  — HMAC-SHA256 QR signing
+verify-qr           v34  — QR verification + scan logging
+get-fx-rate         v35  — Live USD/ZAR, 60s cache, R18.50 fallback
+send-notification   v37  — WhatsApp via Twilio (7 business triggers)
+receive-from-capture v1  — Stock receive from Smart Capture
 
-```
+---
 
-\---
+## LOCKED & PROTECTED FILES
 
-## SC STATUS — WP-SMART-CATALOG
+LOCKED (never modify — Claude.ai str_replace only for specific fields):
+  src/components/StockItemModal.js    — 14 product worlds, custom fields per world
+  src/components/ProteaAI.js          — CODEBASE_FACTS str_replace only
+  src/components/PlatformBar.js       — cross-portal intelligence bar
+  src/services/supabaseClient.js      — Supabase client init
 
-```
-SC-01 ✅  KPI cards + action panels (Sold Out / Reorder / No Price)
-SC-02 ✅  StockItemPanel single-click slide-in (4 tabs)
-SC-03 ✅  Sold-out visual weight (red/amber chips, issues-first sort)
-SC-04 ✅  Platform-wide toast system with Undo
-SC-05 ✅  Tile hover menu + S/M/L density toggle + smart tags
-SC-06 ✅  Pill row fade-edge scroll
-SC-07 ✅  Loading skeleton (shimmer rows matching column widths)
-SC-08 ✅  Bulk actions — select mode, bulk hide/show/delete/set price/flag reorder
+PROTECTED (read the full file before any change):
+  src/components/hq/HQStock.js        — 5,890 lines, 7 tabs, 11 sub-components
+  src/components/hq/LiveFXBar.js      — 2,078 lines, always-on FX ticker
 
-SC-09 ✅  CSV export — visible columns, current filter, excludes \_row
+---
 
-SC-10 ✅  Smart search parser (price>500, qty:0, brand:RAW, margin>50, cost<100)```
+## CRITICAL RULES (LL LIST — cumulative)
 
-\---
+### RULE 0Q — ABSOLUTE (4 violations already: VL-007/008/010/011)
+NEVER write files to GitHub from Claude.ai using push_files or create_or_update_file.
+All code changes go via Claude Code (this context) only.
 
-## LOCKED COMPONENTS — DO NOT MODIFY
-
-```
-StockItemModal.js   — 14 product worlds with custom fields per world. LOCKED.
-ProteaAI.js         — AI assistant sidebar. LOCKED.
-PlatformBar.js      — Top status bar. LOCKED.
-HQStock.js          — PROTECTED. Read LL-178/179/180 before any change.
-```
-
-\---
-
-## CRITICAL RULES (LL LIST)
-
-```
-LL-131  Never hardcode tenant UUID — always use tenantId prop/hook
-LL-172  Never remove code for linter — use eslint-disable comment
-LL-173  Always show diff + plain English before touching files
-LL-174  CATEGORY\_LABELS/ICONS from ProductWorlds.js — never define locally
-LL-178  Never replace renderTab case without listing everything lost + owner confirm
-LL-179  New screens = new nav entries only — never replace existing cases
-LL-180  Read existing component before building parallel
-LL-181  inventory\_items has NO notes column — never include in INSERT/UPDATE
-LL-182  category is enum — SQL needs ::inventory\_category cast
-LL-183  PowerShell has no \&\& — use separate lines or semicolons
-LL-126  Domain-to-tenant mapping required — tenants.domain column added ✅
-LL-131  Never hardcode tenant UUID anywhere in code
-
-TENANT-01  Every component in TenantPortal renderTab that accepts tenantId
-           as a prop MUST receive tenantId={tenantId} explicitly.
-           Never render tenant-scoped components without it.
-
-SESSION-01 Before ending any session that touches TenantPortal.js or
-           HRDashboard.js, click through EVERY nav tab in the tenant portal
-           and screenshot at least 3 tabs to catch silent failures.
-
-SESSION-02 When a visual session (WP-VISUAL) changes component files,
-           it is PROHIBITED to use "PATTERN A/B/C" bulk replacements
-           across files the session has not fully read. Read first, fix second.
-
-SESSION-03 Any component rendered without props that was previously rendered
-           with props = IMMEDIATE RED FLAG. Check the component signature
-           before committing.
-```
-
-\---
-
-## DB SCHEMA — KEY COLUMNS
-
-```
-inventory\_items:
-  id, tenant\_id, name, category (enum: inventory\_category), sell\_price,
-  weighted\_avg\_cost, quantity\_on\_hand, image\_url, is\_active, is\_featured,
-  display\_order, loyalty\_category, supplier\_id, expiry\_date,
-  reorder\_level, max\_stock\_level, needs\_reorder (bool), on\_order (bool),
-  sku, brand, variant\_value, subcategory, variant\_type, tags,
-  created\_at, updated\_at
-  ❌ NO notes column (LL-181)
-  ❌ category is enum — SQL needs ::inventory\_category cast (LL-182)
-
-tenants:
-  id, name, industry\_profile, domain (TEXT UNIQUE — added WP-MULTISITE S1 ✅)
-
-DB functions: reserve\_stock(), AVCO engine
-RLS: enabled on all tables. tenant\_id on every INSERT (Rule 0F).
-```
-
-\---
-
-## ARCHITECTURE RULES
-
-```
-Rule 0F:  Every INSERT to tenant-scoped table MUST include tenant\_id
-Rule 0G:  useTenant() must be called INSIDE the component that uses it
+### Database
+Rule 0F:  Every INSERT to tenant-scoped table MUST include tenant_id
 Rule 0H:  Fix the CODE not the data (except corrupt legacy + root fix)
-Rule 0K:  Before touching any renderTab case — list all features it serves, get explicit owner confirm
+LL-131:   Never hardcode tenant UUID — always use tenantId prop/hook
+LL-181:   inventory_items has NO notes column — never include in INSERT/UPDATE
+LL-182:   category is enum — SQL needs ::inventory_category cast
+
+### LL-205 — HQ OPERATOR RLS BYPASS (mandatory for all new tables)
+Every new DB table needs:
+  CREATE POLICY "hq_all_[table]" ON [table] FOR ALL TO public USING (is_hq_user());
+Tables already patched (12 — do NOT re-patch):
+  journal_entries · journal_lines · vat_transactions · fixed_assets ·
+  bank_accounts · bank_statement_lines · expenses · depreciation_entries ·
+  chart_of_accounts · equity_ledger · vat_period_filings · financial_statement_status
+Symptom when missing: HQ tab shows 0 data despite confirmed rows in DB.
+
+### LL-206 — useTenant CORRECT PATTERN
+  const { tenant } = useTenant(); const tenantId = tenant?.id;
+  NEVER: const { tenantId } = useTenant();
+
+### LL-207 — No tenantId props on HQ child components
+HQ child components call useTenant() directly. Never pass tenantId as a prop.
+
+### LL-208 — Enumerate ALL tables before any migration
+Before any new migration: list every table the feature will query.
+
+### Navigation
+LL-178:   Never replace renderTab case without listing everything lost + owner confirm
+LL-179:   New screens = new nav entries only — never replace existing cases
+WATERFALL: CANNABIS_RETAIL_WATERFALL and WATERFALL are separate configs in TenantPortal.js.
+           Patch both when adding a new tab.
+
+### React
+LL-172:   Never remove code for linter — use eslint-disable comment
+LL-174:   CATEGORY_LABELS/ICONS from ProductWorlds.js — never define locally
+useMemo:  Any derived object used as useCallback/useEffect dependency MUST be
+          wrapped in useMemo. Inline = new reference every render = infinite loop.
+
+### JSX
+JSX UNICODE: \u2014 and \u00b7 do NOT render in JSX text nodes.
+             Use literal characters: — and · directly.
+
+### Purchase Orders
+purchase_orders has TWO status columns:
+  po_status: lifecycle (pending/confirmed/ordered/received/complete) — ALWAYS use this
+  status: general enum — NEVER use for procurement filtering
+
+### PowerShell
+LL-183:   Never use && in PowerShell — use separate lines or semicolons
+
+### Session Protocol
+LL-173:   Always show diff + plain English before touching any file
+Rule 0K:  Before touching any renderTab case — list all features, get owner confirm
 Rule 0L:  Before building any inventory component — read HQStock.js first
-AI calls: ALL Claude API calls go through ai-copilot Edge Function only. NEVER direct from React.
-```
 
-\---
+---
 
-## OPEN BUGS (check SESSION-BUGS for details)
+## DB SCHEMA — KEY FACTS
 
-```
-BUG-044  HQCogs live FX shipping — 15 min fix, low priority
-BUG-043  (check SESSION-BUGS file)
-BUG-042  (check SESSION-BUGS file)
-BUG-041  (check SESSION-BUGS file)
-```
+inventory_items columns:
+  id, tenant_id, name, category (enum::inventory_category), sell_price,
+  weighted_avg_cost, quantity_on_hand, image_url, is_active, is_featured,
+  display_order, loyalty_category, supplier_id, expiry_date,
+  reorder_level, max_stock_level, needs_reorder (bool), on_order (bool),
+  sku, brand, variant_value, subcategory, variant_type, tags,
+  created_at, updated_at
+  ❌ NO notes column (LL-181)
+  ❌ category is enum — always cast with ::inventory_category (LL-182)
 
-\---
+expenses columns (key additions):
+  input_vat_amount NUMERIC — triggers expense_vat_sync → vat_transactions
+  vat_transaction_id — linked after trigger fires
 
-## NEXT PRIORITIES (in order)
+stock_receipts:
+  input_vat_amount NUMERIC DEFAULT 0 — triggers receipt_vat_sync
 
-```
-P1  WP-REORDER — Smart procurement engine (full scoping session needed)
+suppliers:
+  vat_registered BOOLEAN DEFAULT NULL
+  vat_number TEXT
 
-P2  BUG-044 — HQCogs live FX shipping (15 min)
+RLS: enabled on ALL 109 tables. tenant_id on every INSERT (Rule 0F).
+DB functions: calculate_avco · increment_loyalty_points · check_reorder ·
+              reserve_stock · release_reservation · is_hq_user · get_vat_period
+DB triggers: expense_vat_sync · receipt_vat_sync · stock_movement_stamp ·
+             reorder_check · loyalty_dedup_guard · trg_loyalty_tier
 
-P3  WP-STOCK-MERGE — merge Smart Catalog into Stock tab (major)
+---
 
-P4  First real sale — POS → cash sale → unlocks intelligence panels```
+## CURRENT PRIORITIES
 
-\---
+P1 — WP-REORDER Phase 1
+     Spec: docs/WP-REORDER_v1_0.md — read before starting
+     Velocity-based reorder engine, stock alerts, procurement nudges
+     Thinking session before any build
+
+P2 — WP-DASHBOARD-IB
+     Spec: docs/WP-DASHBOARD-IB_v1_0.md
+     Inbox-style dashboard for branch/store managers
+
+P3 — ProteaAI CODEBASE_FACTS update
+     str_replace only — ProteaAI.js is LOCKED
+     Update EF versions + platform scale numbers
+
+Medi Rec — ON HOLD until further notice
+
+---
+
+## OWNER ACTIONS (URGENT — still pending)
+- Supabase backups: Settings → Add-ons → Enable (NO BACKUPS RUNNING)
+- pg_cron loyalty-ai nightly: see docs/NUAI-AGENT-BIBLE.md Section 8
+- Run Depreciation: HQFixedAssets → catch up 15-23 months per asset
+- Yoco live keys: portal.yoco.com (after CIPRO registration)
+
+---
 
 ## SESSION PROTOCOL
 
-```
-1. Read this file first
-2. Read SESSION-STATE.md from project knowledge
-3. Read SESSION-CORE.md for full LL list
-4. Do NOT build anything without owner "build it" confirmation
-5. Do NOT modify LOCKED components
+1. Read this file (done)
+2. Read docs/PLATFORM-OVERVIEW_v1_0.md — full system picture
+3. Read docs/SESSION-STATE_v216.md — current state and HEAD
+4. Read docs/VIOLATION_LOG_v1_1.md — what went wrong before
+5. Verify HEAD: git log --oneline -1
 6. Show diff + plain English before any file change
-7. Every code change: npm run build must pass before commit
-8. PowerShell: never use \&\& — use separate lines
-9. Commit immediately after every working change — never batch large commits
-10. After session: update SESSION-STATE.md with new HEAD and completed work
-```
+7. Build must pass: CI=false npm run build
+8. PowerShell: never use && — use separate lines
+9. Commit after every working change — never batch large commits
 
-\---
+---
 
 ## VERCEL + DEPLOYMENT
 
-```
-Build command: CI=false npm run build  (set as Vercel env var)
-Env vars required: REACT\_APP\_SUPABASE\_URL, REACT\_APP\_SUPABASE\_ANON\_KEY, CI=false
-Edge Functions: ai-copilot, process-document, get-fx-rate, sign-qr, payfast-checkout/itn
-```
+Build:     CI=false npm run build
+Env vars:  REACT_APP_SUPABASE_URL · REACT_APP_SUPABASE_ANON_KEY · CI=false
+Deploy:    git push to main → Vercel auto-deploys
 
-\---
+---
 
-## WP STATUS — FULL PLATFORM
-
-```
-WP-POS v1.0                COMPLETE ✅
-WP-SMARTSTOCK-UI Phase 1   COMPLETE ✅
-WP-SMARTSTOCK-UI Phase 2   COMPLETE ✅
-WP-SMART-CATALOG SC-01–10  COMPLETE ✅
-
-WP-REORDER                 SCOPED (spec in WP-REORDER\_v1\_0.md)
-WP-STOCK-MERGE             PLACEHOLDER (post SC-01–10)
-WP-MULTISITE S1            COMPLETE ✅ (tenants.domain column added)
-WP-PAY S1 (Yoco)           BLOCKED — needs sk\_test\_ keys
-BUG-044 HQCogs FX          OPEN — 15 min fix
-```
-
-\---
-
-*CLAUDE.md · NuAi · April 2, 2026
-Update HEAD and SC status at the end of each session.*
-
+*CLAUDE.md · NuAi · 09 Apr 2026*
+*HEAD: 9939421*
+*WP-FINANCIALS: COMPLETE. VAT pipeline: COMPLETE. Medi Rec: ON HOLD.*
+*Next: WP-REORDER Phase 1 — read spec first.*
