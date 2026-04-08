@@ -134,7 +134,7 @@ export default function HQVat() {
         {toast&&<div style={{position:"fixed",top:24,right:24,zIndex:9999,background:toast.type==="error"?D.danger:D.accent,color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600}}>{toast.msg}</div>}
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
           <button onClick={()=>setView("dashboard")} style={{padding:"7px 14px",border:`1px solid ${D.ink150}`,borderRadius:8,background:"#fff",color:D.ink500,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:D.font}}>{"\u2190"} Dashboard</button>
-          <h2 style={{margin:0,fontSize:20,fontWeight:700,color:D.ink900}}>VAT201 \u2014 {p?.label}</h2>
+          <h2 style={{margin:0,fontSize:20,fontWeight:700,color:D.ink900}}>VAT201 — {p?.label}</h2>
           {isFiled&&<span style={{padding:"3px 12px",borderRadius:12,fontSize:11,fontWeight:700,background:D.successBg,color:D.success,border:`1px solid ${D.successBd}`}}>{"\u2713"} Filed</span>}
           {overdue&&<span style={{padding:"3px 12px",borderRadius:12,fontSize:11,fontWeight:700,background:D.dangerBg,color:D.danger,border:`1px solid ${D.dangerBd}`}}>{"\u26A0"} Overdue</span>}
         </div>
@@ -182,8 +182,8 @@ export default function HQVat() {
     <div style={{fontFamily:D.font,color:D.ink700}}>
       {toast&&<div style={{position:"fixed",top:24,right:24,zIndex:9999,background:toast.type==="error"?D.danger:D.accent,color:"#fff",padding:"12px 20px",borderRadius:10,fontSize:13,fontWeight:600}}>{toast.msg}</div>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24}}>
-        <div><h2 style={{margin:0,fontSize:22,fontWeight:700,color:D.ink900,letterSpacing:"-0.02em"}}>VAT</h2><p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>VAT201 returns \u00b7 output & input tax \u00b7 SARS filing</p></div>
-        <div style={{padding:"7px 14px",background:D.accentLit,border:`1px solid ${D.accentMid}`,borderRadius:8,fontSize:12,fontWeight:700,color:D.accentMid,fontFamily:D.font}}>VAT No: {vatConfig?.vat_number} \u00b7 Bi-Monthly \u00b7 15%</div>
+        <div><h2 style={{margin:0,fontSize:22,fontWeight:700,color:D.ink900,letterSpacing:"-0.02em"}}>VAT</h2><p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>VAT201 returns · output & input tax · SARS filing</p></div>
+        <div style={{padding:"7px 14px",background:D.accentLit,border:`1px solid ${D.accentMid}`,borderRadius:8,fontSize:12,fontWeight:700,color:D.accentMid,fontFamily:D.font}}>VAT No: {vatConfig?.vat_number} · Bi-Monthly · 15%</div>
       </div>
 
       <div style={{display:"flex",gap:14,marginBottom:24,flexWrap:"wrap"}}>
