@@ -92,6 +92,22 @@ const KNOWN_TABLES = [
   "orders",
   "order_items",
   "customers",
+  "journal_entries",
+  "journal_lines",
+  "vat_transactions",
+  "depreciation_entries",
+  "bank_statement_lines",
+  "fixed_assets",
+  "chart_of_accounts",
+  "equity_ledger",
+  "capture_queue",
+  "loyalty_ai_log",
+  "financial_statement_status",
+  "vat_period_filings",
+  "notification_log",
+  "stock_receipts",
+  "stock_receipt_lines",
+  "financial_year_archive",
 ].join(", ");
 
 // ── Query system prompt ───────────────────────────────────────────────────────
@@ -165,52 +181,44 @@ REPO: github.com/GFive5y/protea-botanicals \u00b7 branch: main
 MEDI REC TENANT: b1bad266-ceb4-4558-bbc3-22cfeeeafe74
 HQ TENANT: 43b34c33-6864-4f02-98dd-df1d340475c3
 
-EDGE FUNCTIONS (12 active):
-ai-copilot \u00b7 sim-pos-sales v4 \u00b7 create-admin-user \u00b7 payfast-checkout v44
-payfast-itn v39 \u00b7 sign-qr v36 \u00b7 verify-qr v34 \u00b7 send-notification v37
-get-fx-rate v35 \u00b7 process-document v2.1 (WP-SMART-CAPTURE anti-fraud + fingerprint)
-auto-post-capture v1 (expense + double-entry journal + VAT)
-receive-from-capture v1 (stock receipt \u00b7 AVCO recalc \u00b7 Dr 12000 Cr 20000)
-loyalty-ai v2 (churn scoring \u00b7 rescue \u00b7 birthday \u00b7 expiry \u00b7 stock-boost \u00b7 weekly brief)
-FIXED v2: RPC param names corrected (p_user_id, p_points) \u00b7 try/catch per user \u00b7 dedup working
-50 mock customers seeded (Bronze\u00d720 \u00b7 Silver\u00d715 \u00b7 Gold\u00d710 \u00b7 Platinum\u00d74 \u00b7 Harvest\u00d71)
-AI Actions Feed: churn rescues + birthday bonuses live in loyalty_ai_log
-HQLoyalty Tab 8: Run Now button \u00b7 AI Actions Feed \u00b7 ACTIVE status badge
+EDGE FUNCTIONS (10 active):
+ai-copilot v59 · auto-post-capture v2 (P3-C: writes expenses.input_vat_amount)
+process-document v53 (v2.2: vat_amount extraction, supplier VAT override)
+sim-pos-sales v4 · sign-qr v36 · verify-qr v34 · send-notification v37
+get-fx-rate v35 · payfast-checkout v44 · payfast-itn v39
+receive-from-capture v1
 
-WP-FINANCIALS (COMPLETE):
-Setup Wizard \u00b7 IFRS Income Statement v4 \u00b7 Balance Sheet v2 \u00b7 Fixed Assets \u00b7 Journals \u00b7 VAT201 \u00b7 Bank Recon \u00b7 15 IFRS Notes \u00b7 PDF Export
+WP-FINANCIALS (ALL 10 PHASES COMPLETE — 09 Apr 2026):
+IFRS Income Statement · Balance Sheet · Fixed Assets (IAS 16) · Journals (double-entry)
+VAT201 Module · Bank Recon · Financial Notes (15 IFRS) · PDF Export · Year-End Close
+Financial Setup Wizard · R477,880 revenue · 62.13% GM · R296,606 net profit
 
-WP-SMART-CAPTURE (SESSION 2 COMPLETE \u2014 Apr 8 2026):
-Photo any document \u2192 AI reads \u2192 posts to books. One photo = expense + journal + VAT.
-process-document v2.1: SARS compliance + SA bank identifiers (UTI/TRN REF/Auth Code) + 6-level fingerprint + duplicate detection.
-auto-post-capture: atomic accounting (expense + double-entry journal + VAT). Balance check Dr=Cr.
-Anti-fraud: 3-layer duplicate detection. L1 image hash \u00b7 L2 6-level fingerprint (UTI 100% \u2192 composite 80%) \u00b7 L3 semantic similarity. DuplicateBanner blocks posting.
-10 capture rules: 4 auto-categorise + R1K threshold + entertainment approval + VAT flag + 3 anti-fraud.
-FIXED (Apr 8): capture_queue INSERT was failing because capture React state is null when insert runs (setCapture async). Fix: read anti-fraud fields from fnData (EF response local var) not state. PostgREST schema reload also applied (NOTIFY pgrst, 'reload schema') \u2014 anti-fraud columns were unknown to schema cache.
-SUCCESS SCREEN: now shows expense_id (truncated) + journal_entry_id + VAT period claimable + document fingerprint.
-HISTORY TAB: SARS/Non-SARS/Duplicate pill badges added. Reads from capture_queue (richer than document_log).
+VAT PIPELINE (3-POINT, ALL LIVE):
+P3-A: expenses.input_vat_amount → expense_vat_sync → vat_transactions
+P3-B: stock_receipts.input_vat_amount → receipt_vat_sync → vat_transactions
+P3-C: Smart Capture → auto-post-capture → expenses.input_vat_amount → trigger
 
-WP-FINANCIALS PHASE 10 \u2014 YEAR-END CLOSE (Apr 8 2026):
-HQYearEnd.js: 4-screen wizard. Screen 1 live P&L summary. Screen 2 closing journal preview (Dr Revenue \u2192 Cr Retained Earnings). Screen 3 PIN confirm + post. Screen 4 archive report.
-DB: financial_year_archive table + journal_entries.is_year_end_closing + equity_ledger.year_closed/closed_at.
-Wired in CANNABIS_RETAIL_WATERFALL Reports section + generic WATERFALL Intelligence section. renderTab case "year-end".
+PLATFORM SCALE (from LIVE-AUDIT v1.0 — 09 Apr 2026):
+224,293 lines · 180 JS files · 10 TS Edge Functions · 109 DB tables (all RLS)
+6 user portals · 41 HQ tabs · 17 stock components · 13 HR modules
+4 industry profiles · 5 active tenants
 
-NAV TABS (CANNABIS_RETAIL_WATERFALL):
-Operations: trading \u00b7 cashup \u00b7 smart-capture
-Reports: pl \u00b7 expenses \u00b7 analytics \u00b7 reorder \u00b7 balance-sheet \u00b7 costing \u00b7 forecast \u00b7 year-end
-Smart Capture: expense_receipt \u2192 auto-post-capture \u00b7 supplier_invoice/delivery_note \u2192 receive-from-capture
+FINANCIAL AUDIT FINDINGS (FIN-AUDIT v1.0 — 09 Apr 2026):
+GAP-01: Revenue is VAT-inclusive — overstated ~15% (R61,758). Fix pending.
+GAP-02: Journal entries not flowing to P&L/BS. Fix pending.
+GAP-03: 47 expenses have input_vat_amount = 0. Owner action needed.
+GAP-04: Depreciation never run — 0 entries, 3 assets. Owner action needed.
 
-KEY RULES:
-LL-056: scan_logs \u2014 no tenant_id column
-LL-090: food_recipe_lines \u2014 never nested PostgREST select
-LL-202: GitHub write tools BANNED from Claude.ai
-capture_queue.is_duplicate blocks auto-post \u00b7 financial_setup_complete gates HQProfitLoss
-PostgREST schema reload required after adding columns via SQL (NOTIFY pgrst, 'reload schema').
-R-TDZ-01: useCallback refs another useCallback \u2192 must be declared AFTER it (TDZ)
+KEY RULES (additions):
+LL-205: Every new DB table needs hq_all_ RLS bypass policy (is_hq_user())
+LL-206: const { tenant } = useTenant(); const tenantId = tenant?.id;
+LL-207: No tenantId props on HQ child components
+LL-208: Enumerate ALL tables before any migration
+RULE 0Q: NEVER push_files or create_or_update_file from Claude.ai
 
-LOCKED: StockItemModal.js \u00b7 ProteaAI.js \u00b7 PlatformBar.js \u00b7 LiveFXBar.js \u00b7 HQStock.js (protected)
-TENANT: Medi Recreational \u00b7 b1bad266-ceb4-4558-bbc3-22cfeeeafe74
-SUPABASE: uvicrqapgzcdvozxrreo \u00b7 5 tenants
+LOCKED: StockItemModal.js · ProteaAI.js · PlatformBar.js · LiveFXBar.js · HQStock.js (protected)
+TENANT: Medi Recreational · b1bad266-ceb4-4558-bbc3-22cfeeeafe74
+SUPABASE: uvicrqapgzcdvozxrreo · 5 tenants
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -686,6 +694,46 @@ async function buildContext(tenantId, role, tab, isHQ) {
         open_recalls: rc.filter(
           (x) => !x.is_drill && (x.status === "open" || x.status === "active"),
         ).length,
+      };
+
+      // ── Financial context (MTD) ──────────────────────────────────
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString().split("T")[0];
+      const currentPeriodId = `${now.getFullYear()}-P${Math.ceil((now.getMonth() + 1) / 2)}`;
+
+      const [finOrdersRes, finExpRes, finVatRes] = await Promise.all([
+        supabase.from("orders").select("total,status")
+          .eq("tenant_id", tenantId).eq("status", "paid")
+          .gte("created_at", startOfMonth + "T00:00:00"),
+        supabase.from("expenses").select("amount_zar,category,input_vat_amount")
+          .eq("tenant_id", tenantId).gte("expense_date", startOfMonth),
+        supabase.from("vat_transactions").select("output_vat,input_vat")
+          .eq("tenant_id", tenantId).eq("vat_period", currentPeriodId),
+      ]);
+
+      const revInclMtd = (finOrdersRes.data || [])
+        .reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+      const revExclMtd = Math.round((revInclMtd / 1.15) * 100) / 100;
+      const expMtd = (finExpRes.data || [])
+        .reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
+      const inputVatMtd = (finExpRes.data || [])
+        .reduce((s, e) => s + (parseFloat(e.input_vat_amount) || 0), 0);
+      const outputVat = (finVatRes.data || [])
+        .reduce((s, t) => s + (parseFloat(t.output_vat) || 0), 0);
+      const inputVat = (finVatRes.data || [])
+        .reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
+
+      ctx.finance = {
+        revenue_mtd_excl_vat: revExclMtd,
+        revenue_mtd_incl_vat: Math.round(revInclMtd * 100) / 100,
+        orders_mtd: (finOrdersRes.data || []).length,
+        expenses_mtd: Math.round(expMtd * 100) / 100,
+        input_vat_mtd: Math.round(inputVatMtd * 100) / 100,
+        vat_output_period: Math.round(outputVat * 100) / 100,
+        vat_input_period: Math.round(inputVat * 100) / 100,
+        vat_net_period: Math.round((outputVat - inputVat) * 100) / 100,
+        note: "Revenue shown ex-VAT (÷1.15). P&L components show real-time MTD.",
       };
     }
     if (role === "hr" || isHQ) {
