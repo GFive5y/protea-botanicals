@@ -392,6 +392,40 @@ bank_accounts · bank_statement_lines · capture_queue · capture_rules · chart
 - **loyalty_dedup_guard**: This is the trigger name on loyalty_transactions. Disable before bulk seeding, re-enable after.
 - **ai-copilot v59**: increment_loyalty_points RPC signature is (p_user_id uuid, p_points integer).
 
+## Critical Discoveries (08 Apr 2026 — Session v209)
+
+- **LL-205 — HQ OPERATOR RLS BYPASS — MANDATORY FOR ALL NEW TABLES**:
+  Every new DB table that HQ operators need to read MUST have an is_hq_user() bypass policy.
+  PATTERN (copy exactly):
+  CREATE POLICY "hq_all_[tablename]" ON [tablename] FOR ALL TO public USING (is_hq_user());
+  is_hq_user() reads user_profiles.hq_access = true. Already used by orders + inventory_items.
+  ROOT CAUSE: switchTenant() only updates React context — auth.uid() never changes.
+  The standard RLS policy (tenant_id = user_profiles.tenant_id WHERE id = auth.uid()) blocks
+  all cross-tenant reads for the HQ operator unless the is_hq_user() bypass policy also exists.
+  APPLIED 08 Apr 2026 to these previously missing tables (migration: hq_operator_access_finance_tables):
+    journal_entries · journal_lines · vat_transactions · fixed_assets
+    bank_accounts · bank_statement_lines · expenses
+  SYMPTOM: HQ tab shows 0 rows / empty state despite data confirmed in DB. Always check LL-205 first.
+  CHECK: Before shipping any new table, verify it has both the tenant isolation policy AND hq_all_ policy.
+
+- **LL-206 — useTenant HOOK — CORRECT PATTERN (CODEBASE-CONFIRMED)**:
+  Import:  import { useTenant } from '../../services/tenantService';
+  NEVER:   import { useTenant } from '../../hooks/useTenant';  — wrong path, does not exist
+  Destructure:  const { tenant } = useTenant();
+                const tenantId = tenant?.id;
+  NEVER:   const { tenantId } = useTenant();  — tenantId is not directly exposed
+  Confirmed on: HQBalanceSheet.js · HQProfitLoss.js · HQJournals.js · all HQ components.
+  Adjust relative path for component depth (../../ for hq/ components).
+
+- **LL-207 — switchTenant() ARCHITECTURE — NO PROPS NEEDED ON HQ CHILDREN**:
+  HQDashboard calls switchTenant(selected) when operator changes the VIEWING dropdown.
+  This updates the global useTenant() context for ALL child components simultaneously.
+  HQ child components receive NO tenantId props — they call useTenant() directly.
+  CORRECT:   {activeTab === 'journals' && <HQJournals />}
+  WRONG:     {activeTab === 'journals' && <HQJournals tenantId={x} />}
+  If a child component shows 0 data in HQ view — check LL-205 (missing RLS policy) first,
+  not the component code or props. The architecture is correct by design.
+
 ## Locked / Protected Files
 LOCKED (never modify):
 src/components/StockItemModal.js    — 14 product worlds
@@ -427,9 +461,15 @@ Missing any one = silent failure (BUG-006 pattern)
 | 3e6aa5a | ProteaAI LL-120 fix — both handleSend + handleQuery via EF |
 | 39a29e2 | CODEBASE_FACTS — loyalty-ai v2, 50 mock customers, AI Actions Feed |
 | 944416c | SESSION-STATE v207 |
+| 1219683 | HQJournals wiring — HQDashboard + useNavConfig (pre-build commit) |
+| a42d13d | HQJournals.js v1.0 — WP-FINANCIALS Phase 5 · 660 lines |
+| [db]    | Supabase migration: hq_operator_access_finance_tables (7 tables, no code commit) |
+| [docs]  | SESSION-STATE v209 + NUAI-AGENT-BIBLE LL-205/206/207 (this commit) |
 
 ## Verified Working (screenshots confirmed 08 Apr 2026)
 P&L (R477,880 revenue · 62.13% gross margin · R296,606 net profit) · Balance Sheet · Cash Flow · Year-End Close · Smart Capture (95% confidence, auto-retry) · ProteaAI (EF-routed) · Loyalty AI Engine Tab 8 (Run Now, dedup confirmed) · Customer Profiles (50 customers) · RLS (12 finance tables)
+HQJournals.js v1.0 (WP-FINANCIALS Phase 5): journal list · expand-to-lines · type/status/FY filters · COA picker grouped by account type · post · reverse · delete draft · stats strip · audit trail
+RLS HQ bypass (LL-205): 7 tables patched — HQ operator can now read all finance tables cross-tenant
 
 ## Outstanding Owner Actions
 - **pg_cron**: Supabase Dashboard → Database → Extensions → enable pg_cron, then:
@@ -442,9 +482,9 @@ P&L (R477,880 revenue · 62.13% gross margin · R296,606 net profit) · Balance 
 - **Yoco keys**: After CIPRO → portal.yoco.com
 
 ## Next Dev Priorities
-1. HQJournals.js — WP-FINANCIALS Phase 5 (spec given, Claude Code to build)
-2. HQVat.js — WP-FINANCIALS Phase 6
-3. HQBankRecon.js — WP-FINANCIALS Phase 7
+1. HQVat.js — WP-FINANCIALS Phase 6 (DB ready: vat_transactions 6 rows · LL-205 already applied)
+2. HQBankRecon.js — WP-FINANCIALS Phase 7 (DB ready: bank_accounts 1 row · bank_statement_lines 22 rows · LL-205 applied)
+3. HQFixedAssets.js — WP-FINANCIALS Phase 4 (DB ready: fixed_assets 3 rows · LL-205 applied)
 4. monthly_visit_count + monthly_spend_zar checkout wiring (low priority — beta dev)
 
 ---
