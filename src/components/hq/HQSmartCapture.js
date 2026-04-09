@@ -251,7 +251,7 @@ export default function HQSmartCapture() {
         input_vat_claimable: enriched.input_vat_claimable||false,
         input_vat_amount:    enriched.input_vat_amount||0,
         vendor_name:         enriched.vendor_name||null,
-        vendor_matched_id:   enriched.vendor_matched_id||null,
+        vendor_matched_id:   null, // never trust EF matched_id — FK to suppliers table, EF returns non-existent UUIDs
         document_date:       enriched.document_date||null,
         document_number:     enriched.document_number||null,
         amount_incl_vat:     enriched.amount_incl_vat||0,
@@ -277,6 +277,7 @@ export default function HQSmartCapture() {
       if (cqErr) {
         console.error("[SmartCapture] capture_queue insert failed:", cqErr.message, cqErr.code, cqErr.details);
         showToast("Capture not saved \u2014 try again.", "error");
+        setProcessMsg(cqErr.message || "Database save failed \u2014 try again");
         setPhase("error"); return;
       }
       setCaptureQueueId(cqRow?.id||null);
@@ -357,7 +358,7 @@ export default function HQSmartCapture() {
 
       <div style={{marginBottom:24}}>
         <h2 style={{margin:0,fontSize:22,fontWeight:700,color:D.ink900,letterSpacing:"-0.02em"}}>Smart Capture</h2>
-        <p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>Photograph any business document \u2014 AI reads it and posts it to your books</p>
+        <p style={{margin:"4px 0 0",color:D.ink500,fontSize:13}}>Photograph any business document {"\u2014"} AI reads it and posts it to your books</p>
       </div>
 
       <div style={{display:"flex",gap:0,marginBottom:24,border:`1px solid ${D.ink150}`,borderRadius:10,overflow:"hidden"}}>
