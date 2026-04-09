@@ -890,6 +890,12 @@ export default function TenantPortal() {
     return () => window.removeEventListener("nuai:open-ai", handler);
   }, []);
 
+  // WP-AINS: reset click context when user navigates to a different tab
+  // Prevents "You clicked X" from a previous tab appearing on unrelated tabs
+  useEffect(() => {
+    setAiContext(null);
+  }, [activeTab]);
+
   // Close account bubble on outside click
   useEffect(() => {
     if (!bubbleOpen) return;
