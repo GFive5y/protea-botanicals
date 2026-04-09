@@ -59,6 +59,8 @@ import GlobalSearch from "../components/GlobalSearch";
 import AIFixture from "../components/AIFixture";
 import { IntelligenceProvider } from "../contexts/IntelligenceContext";
 import { useNavIntelligence } from "../hooks/useNavIntelligence";
+import { useIntelStrip } from "../hooks/useIntelStrip";
+import IntelStrip from "../components/IntelStrip";
 import AccountBubble from "../components/AccountBubble";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
@@ -848,6 +850,10 @@ export default function TenantPortal() {
   const intelligence = useNavIntelligence(tenantId);
   const intelData    = intelligence?.data;
 
+  // WP-AINS Phase 3 — IntelStrip pills for current tab
+  const { pills: intelPills, loading: intelStripLoading } =
+    useIntelStrip(activeTab, tenantId, intelData);
+
   const sectionBadge = (sectionId) => {
     if (!intelData) return null;
     switch (sectionId) {
@@ -1152,6 +1158,13 @@ export default function TenantPortal() {
             <div style={{ ...INNER, overflow: "hidden", padding: "0 24px", flexShrink: 0 }}>
               <PlatformBar role="tenant" tenantId={tenantId} onNavigate={() => {}} />
             </div>
+
+            {/* IntelStrip — WP-AINS Phase 3 */}
+            <IntelStrip
+              pills={intelPills}
+              loading={intelStripLoading}
+              onPillClick={null}
+            />
 
             {/* Content */}
             {fullBleed ? (
