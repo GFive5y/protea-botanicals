@@ -233,3 +233,44 @@ PlatformBar retained in AppShell for /admin /hq /hr routes.
 - WP-NAV-RESTRUCTURE: Sales channels unified, Finance section clean,
   Analytics moves to Customers, Reorder moves to Inventory
 - Scan analytics: qr_codes join for tenant-scoped scan pills in useIntelStrip
+
+---
+## Update: 10 Apr 2026 — Commercial Readiness Phase Begins
+
+### Company Name
+Legal entity registered at CIPC: **Nu Ai (Pty) Ltd.** (space between Nu and Ai)
+All commercial documents, NDAs, and external communications use this name verbatim.
+The visual brand mark (Nu white + Ai green) is unchanged.
+
+### AINS v1.0 — Complete
+See SESSION-STATE_v220.md. 6 phases, ~1,400 lines added.
+5 surfaces live: sidebar badges, IntelLines, NuAi mark, IntelStrip, panel brief.
+Full click-through depth. Zero LLM on open. SQL-computed throughout.
+
+### FIN-AUDIT v1.0 — Complete
+GAP-01: Revenue ÷1.15 fixed in HQProfitLoss (d7d2df9)
+GAP-02: Manual journal adjustments flow to P&L (c3b624c)
+GAP-03: ExpenseManager VAT Review mode (4b1a9fa) — owner action pending
+GAP-04: Depreciation running — R822.22/month posted
+
+### Stack Deep Dive — Key Findings
+File storage IS already implemented — supplier-documents bucket (26MB, 48 files).
+capture_queue has image_storage_path. Document archiving is architecturally complete.
+Current DB: 25MB. At 100 tenants: ~2.5GB (needs Supabase Pro at launch).
+8 commercial gaps identified — see COMMERCIAL-READINESS_v1_0.md.
+Stack verdict: architecture is CORRECT. Additions needed, not a rebuild.
+
+### Pricing Structure (confirmed)
+Starter: R3,500/month · Professional: R6,500/month · Enterprise: R12,500/month
+
+### Commercial Readiness Priority Build Order
+1. Mobile camera capture (PWA + camera input in HQSmartCapture.js) — 2-3 days
+2. WP-NAV-RESTRUCTURE — navigation grouping cleanup
+3. Scan analytics (qr_codes join for AINS)
+4. Email infrastructure (Resend API + send-email Edge Function) — 3-5 days
+5. Background jobs (pg_cron for depreciation, loyalty, VAT) — 1-2 weeks
+6. CA Firm Partner Portal — 4-6 weeks
+
+### VL-012
+5th RULE 0Q violation — push_files called from Claude.ai at session close.
+Self-check protocol added to VL-012. Rule is absolute. No exceptions.
