@@ -780,10 +780,12 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                 </span>
                 {tabInsights?.[tab.id] && (
                   <span style={{
-                    fontSize: 10, color: "#BBBBBB", fontStyle: "italic",
+                    fontSize: 9, color: "#888",
                     overflow: "hidden", textOverflow: "ellipsis",
-                    whiteSpace: "nowrap", flexShrink: 1, paddingLeft: 4,
-                    maxWidth: 80,
+                    whiteSpace: "nowrap", flexShrink: 1,
+                    marginLeft: "auto", paddingLeft: 6,
+                    maxWidth: 100,
+                    fontFamily: T.font,
                   }}>
                     {tabInsights[tab.id]}
                   </span>

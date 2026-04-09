@@ -133,11 +133,14 @@ export function useNavIntelligence(tenantId) {
       const lines = [];
 
       if (criticalItem) {
-        const qty = criticalItem.quantity_on_hand || 0;
+        const qty  = criticalItem.quantity_on_hand || 0;
+        const name = criticalItem.name.length > 14
+          ? criticalItem.name.slice(0, 13) + "…"
+          : criticalItem.name;
         lines.push({
           text: qty <= 0
-            ? `${criticalItem.name} · out of stock`
-            : `${criticalItem.name} · ${qty} unit${qty !== 1 ? "s" : ""} left`,
+            ? `${name} · out of stock`
+            : `${name} · ${qty} unit${qty !== 1 ? "s" : ""} left`,
           variant: qty <= 0 ? "danger" : "warning",
           context: "stock-critical",
           tab:     "stock",
@@ -153,7 +156,7 @@ export function useNavIntelligence(tenantId) {
 
       if (bestCat) {
         lines.push({
-          text:    `${bestCat} · ${fmtPct(bestCatPct)} margin · best category`,
+          text:    `${bestCat} · ${fmtPct(bestCatPct)} margin · best`,
           variant: "success",
           context: "top-category",
           tab:     "stock",
@@ -190,26 +193,33 @@ export function useNavIntelligence(tenantId) {
       // ── NuAi mark bottom line ──────────────────────────────────────
       let nuaiMark = "Ask anything";
       if (todayRev > 0 && todayVsBest != null) {
-        nuaiMark = `↑ ${fmtR(todayRev)} today · ${todayVsBest}% of best`;
+        nuaiMark = `↑ ${fmtR(todayRev)} · ${todayVsBest}% of best`;
       } else if (todayRev > 0) {
-        nuaiMark = `${fmtR(todayRev)} today · ${todayCount} orders`;
+        nuaiMark = `${fmtR(todayRev)} · ${todayCount} orders today`;
       } else if (mtdRevExcl > 0) {
-        nuaiMark = `${fmtR(mtdRevExcl)} MTD · ${mtdCount} orders`;
+        nuaiMark = `${fmtR(mtdRevExcl)} · ${mtdCount} orders MTD`;
       }
 
       // ── Sub-item insight strings ───────────────────────────────────
       const subItems = {
-        stock:    lowStock > 0 || oos > 0
-          ? `${oos + lowStock} need attention`
+        stock:    oos > 0
+          ? `${oos} OOS · ${lowStock} low`
+          : lowStock > 0 ? `${lowStock} below reorder`
           : "all stocked ✓",
-        catalog:  `${items.length} active${oos > 0 ? " · " + oos + " OOS" : ""}`,
-        pos:      todayRev > 0 ? `${fmtR(todayRev)} today` : "no sales yet",
+        catalog:  oos > 0
+          ? `${items.length} active · ${oos} OOS`
+          : `${items.length} active`,
+        pos:      todayRev > 0 ? fmtR(todayRev) + " today" : "no sales yet",
         pl:       bestCat
-          ? `${bestCat} ${fmtPct(bestCatPct)} best`
-          : mtdRevExcl > 0 ? `${fmtR(mtdRevExcl)} MTD` : "",
-        loyalty:  `${mtdCount} orders MTD`,
+          ? `${bestCat} ${fmtPct(bestCatPct)}`
+          : mtdRevExcl > 0 ? fmtR(mtdRevExcl) + " MTD" : "",
+        loyalty:  mtdCount > 0 ? `${mtdCount} orders MTD` : "",
         expenses: "",
         vat:      "",
+        trading:  todayRev > 0 ? fmtR(todayRev) + " today" : "",
+        pricing:  bestCat ? `${bestCat} ${fmtPct(bestCatPct)} best` : "",
+        analytics:"",
+        reorder:  lowStock > 0 || oos > 0 ? `${oos + lowStock} items` : "all clear",
       };
 
       // ── Badge variants ─────────────────────────────────────────────
