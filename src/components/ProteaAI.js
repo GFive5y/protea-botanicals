@@ -14,6 +14,8 @@ import { useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { useTenantConfig } from "../hooks/useTenantConfig";
 import { useAIUsage, selectModel, MODELS } from "../hooks/useAIUsage";
+import NuAiBrief from "./NuAiBrief";
+import { useIntelligence } from "../contexts/IntelligenceContext";
 
 // ── T tokens ──────────────────────────────────────────────────────────────────
 const T = {
@@ -845,6 +847,7 @@ export default function ProteaAI({
   const tab = resolveTab(location.pathname, location.search);
   const suggested = getSuggested(role, tab, isHQ, panel);
   const limitReached = remaining <= 0;
+  const { data: intelData } = useIntelligence();
 
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1413,49 +1416,16 @@ export default function ProteaAI({
               gap: 10,
             }}
           >
-            {messages.length === 0 && (
-              <div>
-                <div
-                  style={{
-                    fontFamily: T.font,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: T.ink400,
-                    letterSpacing: "0.07em",
-                    textTransform: "uppercase",
-                    marginBottom: 8,
-                  }}
-                >
-                  Suggested
-                </div>
-                {suggested.map((q, i) => (
-                  <button
-                    key={i}
-                    className="pai-sugg"
-                    onClick={() => handleSend(q)}
-                    disabled={streaming || limitReached}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      background: "#fff",
-                      border: `1px solid ${T.ink150}`,
-                      borderRadius: 8,
-                      padding: "7px 10px",
-                      marginBottom: 6,
-                      fontSize: 12,
-                      fontFamily: T.font,
-                      color: T.ink700,
-                      cursor: "pointer",
-                      transition: "all 0.12s",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
+            <NuAiBrief
+              tenantId={tenantId}
+              role={role}
+              isHQ={isHQ}
+              intel={intelData}
+              collapsed={messages.length > 0}
+              onAction={(q) => handleSend(q)}
+              limitReached={limitReached}
+              streaming={streaming}
+            />
             {messages.map((m) => (
               <div
                 key={m.id}
