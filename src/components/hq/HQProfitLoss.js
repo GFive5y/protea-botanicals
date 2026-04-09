@@ -862,6 +862,8 @@ export default function HQProfitLoss() {
   const [setupComplete, setSetupComplete] = useState(null);
   const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
   const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
+  // GAP-02: manual journal adjustments flowing to P&L
+  const [journalAdjustments, setJournalAdjustments] = useState(null);
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
@@ -880,6 +882,72 @@ export default function HQProfitLoss() {
       const { data } = await q;
       setExpenses(data || []);
     } catch (_) {}
+
+    // GAP-02: Fetch manual journal adjustments for the period.
+    // 'auto' journals are excluded — they duplicate expenses already in the expenses table
+    // (Smart Capture writes to both expenses + journal_entries simultaneously).
+    // Only manual adjustments (accruals, write-offs, corrections) flow here.
+    try {
+      const start = periodStart(period, customFrom);
+      const end   = periodEnd(period, customTo);
+      let jq = supabase
+        .from("journal_entries")
+        .select(`
+          id, journal_date, journal_type, status, description, reference,
+          journal_lines ( account_code, account_name, debit_amount, credit_amount, description )
+        `)
+        .eq("tenant_id", tenantId)
+        .eq("status", "posted")
+        .neq("journal_type", "auto");   // exclude Smart Capture auto-posts
+      if (start) jq = jq.gte("journal_date", start.slice(0, 10));
+      if (end)   jq = jq.lte("journal_date", end.slice(0, 10));
+      const { data: jData } = await jq;
+
+      // Net each line against COA account type
+      const revAdj  = [];   // credits to revenue accounts (40xxx, 49xxx, 70xxx finance)
+      const cogsAdj = [];   // debits to cogs accounts (50xxx)
+      const opexAdj = [];   // debits to opex/finance expense accounts (60xxx-70100)
+
+      (jData || []).forEach(je => {
+        (je.journal_lines || []).forEach(line => {
+          const code = parseInt(line.account_code, 10);
+          const net  = (parseFloat(line.debit_amount) || 0) - (parseFloat(line.credit_amount) || 0);
+          if (net === 0) return;
+          const entry = {
+            journalId:   je.id,
+            date:        je.journal_date,
+            ref:         je.reference,
+            journalDesc: je.description,
+            accountCode: line.account_code,
+            accountName: line.account_name,
+            lineDesc:    line.description,
+            net,
+          };
+          if (code >= 40000 && code < 50000) {
+            // Revenue account — net credit (negative net) = additional revenue
+            if (net < 0) revAdj.push({ ...entry, amount: Math.abs(net) });
+          } else if (code >= 50000 && code < 60000) {
+            // COGS account — net debit (positive net) = additional COGS
+            if (net > 0) cogsAdj.push({ ...entry, amount: net });
+          } else if ((code >= 60000 && code < 70000) || code === 70100) {
+            // OpEx or finance expense — net debit = additional expense
+            if (net > 0) opexAdj.push({ ...entry, amount: net });
+          }
+        });
+      });
+
+      setJournalAdjustments({
+        revAdj,
+        cogsAdj,
+        opexAdj,
+        totalRevAdj:  revAdj.reduce((s, x) => s + x.amount, 0),
+        totalCogsAdj: cogsAdj.reduce((s, x) => s + x.amount, 0),
+        totalOpexAdj: opexAdj.reduce((s, x) => s + x.amount, 0),
+        count: revAdj.length + cogsAdj.length + opexAdj.length,
+      });
+    } catch (_) {
+      setJournalAdjustments({ revAdj:[], cogsAdj:[], opexAdj:[], totalRevAdj:0, totalCogsAdj:0, totalOpexAdj:0, count:0 });
+    }
   }, [tenantId, period, customFrom, customTo]);
 
   useEffect(() => {
@@ -1117,9 +1185,7 @@ export default function HQProfitLoss() {
     ? oiCogsTotal
     : actualCogs !== null ? actualCogs : avgFullCogsPerUnit * totalUnitsSold;
   const cogsSource = hasOrderItemsCogs ? "actual" : actualCogs !== null ? "production" : "estimated";
-  const grossProfit = totalRevenue - totalCogs;
-  const grossMarginPct =
-    totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+  // GAP-02: grossProfit and grossMarginPct now computed below after journal adjustments
 
   // Per-product margin data for "Margin by Product" section
   const productMargins = (() => {
@@ -1166,9 +1232,15 @@ export default function HQProfitLoss() {
     0,
   );
   const loyaltyCost = earnedPoints * costPerPointIssued;
-  const totalOpexIncLoyalty = totalOpex + loyaltyCost;
-  const netProfit = grossProfit - totalOpexIncLoyalty;
-  const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  // GAP-02: include manual journal adjustments in final totals
+  const jAdj = journalAdjustments || { totalRevAdj:0, totalCogsAdj:0, totalOpexAdj:0, count:0 };
+  const totalOpexIncLoyalty = totalOpex + loyaltyCost + jAdj.totalOpexAdj;
+  const adjustedRevenue     = totalRevenue + jAdj.totalRevAdj;
+  const adjustedCogs        = totalCogs    + jAdj.totalCogsAdj;
+  const grossProfit         = adjustedRevenue - adjustedCogs;
+  const grossMarginPct      = adjustedRevenue > 0 ? (grossProfit / adjustedRevenue) * 100 : 0;
+  const netProfit           = grossProfit - totalOpexIncLoyalty;
+  const netMarginPct        = adjustedRevenue > 0 ? (netProfit / adjustedRevenue) * 100 : 0;
 
   const bestSkuMargin = (() => {
     let best = null;
@@ -1527,7 +1599,7 @@ export default function HQProfitLoss() {
           tenantName={tenant?.name}
           financialYear={`FY${new Date().getFullYear()}`}
           period={periodLabel}
-          totalRevenue={totalRevenue}
+          totalRevenue={adjustedRevenue}
           totalCogs={totalCogs}
           grossProfit={grossProfit}
           grossMarginPct={grossMarginPct}
@@ -1555,7 +1627,7 @@ export default function HQProfitLoss() {
             <div style={{ marginBottom: 24 }}>
               <ChartCard title="P&L Waterfall" subtitle="Revenue → COGS → Gross → OpEx → Net" accent="green" height={300}>
                 <WaterfallChart
-                  revenue={websiteRevenue}
+                  revenue={adjustedRevenue}
                   totalCogs={totalCogs}
                   grossProfit={grossProfit}
                   totalOpexIncLoyalty={totalOpexIncLoyalty}
@@ -1664,6 +1736,48 @@ export default function HQProfitLoss() {
                   </div>
                 )}
 
+                {/* GAP-02 — Manual journal adjustments */}
+                {jAdj.count > 0 && (
+                  <>
+                    <SectionHeader icon="📓" label="Journal Adjustments" />
+                    {jAdj.revAdj.map((e, i) => (
+                      <WRow
+                        key={i}
+                        label={e.accountName}
+                        sub={`${e.ref || e.journalDesc} · ${e.date} · ${e.accountCode}`}
+                        value={e.amount}
+                        indent={1}
+                        highlight="green"
+                      />
+                    ))}
+                    {jAdj.cogsAdj.map((e, i) => (
+                      <WRow
+                        key={i}
+                        label={e.accountName}
+                        sub={`${e.ref || e.journalDesc} · ${e.date} · ${e.accountCode}`}
+                        value={e.amount}
+                        indent={1}
+                        negative
+                        highlight="red"
+                      />
+                    ))}
+                    {jAdj.opexAdj.map((e, i) => (
+                      <WRow
+                        key={i}
+                        label={e.accountName}
+                        sub={`${e.ref || e.journalDesc} · ${e.date} · ${e.accountCode}`}
+                        value={e.amount}
+                        indent={1}
+                        negative
+                      />
+                    ))}
+                  </>
+                )}
+                {jAdj.count === 0 && (
+                  <div style={{ padding:"6px 36px", fontSize:11, color:"#ccc", fontStyle:"italic" }}>
+                    No manual journal adjustments for this period.
+                  </div>
+                )}
                 <SectionHeader icon="📊" label="Gross Profit" />
                 <WRow
                   label="Gross Profit"
