@@ -8,6 +8,35 @@
 import { useLocation } from "react-router-dom";
 import { useBrief } from "../hooks/useBrief";
 
+const CONTEXT_MAP = {
+  "oos":           { label: "Out of stock items",       query: "Which items are out of stock right now and what's the revenue impact? What should I order first?" },
+  "stock-critical":{ label: "Critical stock alert",     query: "Walk me through my most urgent stock issues and what I need to do today." },
+  "reorder":       { label: "Below reorder level",      query: "Which items are below their reorder level and how urgently do I need to act on each one?" },
+  "margin":        { label: "Best margin category",     query: "Break down my margin by category. Where are my biggest opportunities to improve profitability?" },
+  "avg-margin":    { label: "Average margin",           query: "What is driving my average margin and which products are pulling it up or down?" },
+  "value":         { label: "Stock value",              query: "Give me a breakdown of my stock value by category and highlight any concerns." },
+  "skus":          { label: "Active SKUs",              query: "How many active SKUs do I have and are there any that need attention?" },
+  "revenue":       { label: "Today's revenue",          query: "How is today's revenue tracking? Compare to yesterday and my best day this month." },
+  "revenue-mtd":   { label: "MTD revenue",             query: "Give me a full MTD revenue breakdown — orders, trends, and how I'm tracking against my best month." },
+  "orders":        { label: "Orders today",             query: "Walk me through today's orders — count, value, payment methods, and any patterns." },
+  "vs-yesterday":  { label: "vs yesterday",             query: "Compare today's sales to yesterday in detail. What's driving the difference?" },
+  "basket":        { label: "Average basket",           query: "What is my average basket size and how does it compare to recent days? What can I do to increase it?" },
+  "missing-vat":   { label: "Missing VAT on expenses",  query: "Show me all expenses missing VAT amounts and walk me through how to fix this and the impact on my P&L." },
+  "gross-profit":  { label: "Gross profit",             query: "What is my actual gross profit this month and what are the main factors affecting it?" },
+  "open-pos":      { label: "Open purchase orders",     query: "What purchase orders are open and what action do I need to take on each one?" },
+  "overdue-pos":   { label: "Overdue purchase orders",  query: "I have overdue purchase orders. Which ones need urgent follow-up and what should I do?" },
+  "suppliers":     { label: "Suppliers on file",        query: "I have no suppliers on file. Walk me through adding a supplier and what I need to prepare." },
+  "entries":       { label: "Expense entries",          query: "Give me a breakdown of my expenses this month by category." },
+  "net-vat":       { label: "VAT payable",              query: "What is my current VAT position and when is payment due?" },
+  "output-vat":    { label: "Output VAT",               query: "Explain my output VAT this period and how it was calculated." },
+  "input-vat":     { label: "Input VAT",                query: "Why is my input VAT so low? Walk me through how to fix this." },
+  "loyalty-tx":    { label: "Loyalty transactions",     query: "How is my loyalty programme performing? Show me engagement and any customers I should act on." },
+  "active-cust":   { label: "Active customers",         query: "Who are my most active customers this week and what patterns do I see?" },
+  "messages":      { label: "Unread messages",          query: "I have unread customer messages. What are they about and how should I respond?" },
+  "top-category":  { label: "Best category",            query: "Tell me more about my best performing category — what's driving it and how do I grow it?" },
+  "profiles":      { label: "Customer profiles",        query: "Give me a customer health overview — who's active, who's at risk, and who I should contact." },
+};
+
 const T = {
   accent:     "#1A3D2B",
   accentMid:  "#2D6A4F",
@@ -116,6 +145,7 @@ function Section({ label, items, onAction, limitReached, streaming }) {
 export default function NuAiBrief({
   tenantId, role, isHQ, intel,
   collapsed, onAction, limitReached, streaming,
+  briefContext,
 }) {
   const location = useLocation();
   const tabId    = new URLSearchParams(location.search).get("tab") || "overview";
@@ -142,6 +172,9 @@ export default function NuAiBrief({
     );
   }
 
+  // ── CONTEXT BAR — shown when opened via pill or IntelLine click ───────────
+  const ctxEntry = briefContext ? CONTEXT_MAP[briefContext] : null;
+
   // ── LOADING ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -163,6 +196,49 @@ export default function NuAiBrief({
   // ── FULL BRIEF ────────────────────────────────────────────────────────────
   return (
     <div style={{ paddingBottom: 8 }}>
+      {ctxEntry && (
+        <div style={{
+          background: T.accentLit,
+          border: `1px solid ${T.accentBd}`,
+          borderRadius: 8,
+          padding: "10px 12px",
+          marginBottom: 14,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: T.accentMid,
+              marginBottom: 3, fontFamily: T.font,
+            }}>
+              You clicked
+            </div>
+            <div style={{
+              fontSize: 12, color: T.accent, fontFamily: T.font,
+              fontWeight: 500,
+            }}>
+              {ctxEntry.label}
+            </div>
+          </div>
+          <button
+            className="brief-action-btn"
+            onClick={() => !limitReached && !streaming && onAction(ctxEntry.query)}
+            disabled={limitReached || streaming}
+            style={{
+              fontSize: 10, fontWeight: 700, padding: "5px 12px",
+              borderRadius: 6, border: `1px solid ${T.accentBd}`,
+              background: T.accent, color: "#fff",
+              cursor: limitReached || streaming ? "default" : "pointer",
+              fontFamily: T.font, flexShrink: 0,
+              opacity: limitReached ? 0.5 : 1,
+            }}
+          >
+            Ask this →
+          </button>
+        </div>
+      )}
       <Section
         label="Right now"
         items={brief.rightNow}

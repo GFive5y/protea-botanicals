@@ -1,4 +1,4 @@
-// src/components/ProteaAI.js — v1.6
+// src/components/ProteaAI.js — v1.8
 // WP-AI-UNIFIED: Chat · Live Query
 // v1.5: Tool use — HQ/admin Chat runs agentic tool loop before streaming synthesis.
 //        "tools active" indicator in context strip. System prompt tells AI it has tools.
@@ -818,6 +818,7 @@ export default function ProteaAI({
   role,
   isHQ,
   tenantName,
+  briefContext,
 }) {
   const location = useLocation();
   const { canUseSonnet: cfgSonnet, dailyLimit } = useTenantConfig();
@@ -1000,14 +1001,29 @@ export default function ProteaAI({
         ].slice(-12);
         logUsage?.(model, text.length);
       } catch (err) {
+        // Parse Anthropic error types into readable messages
+        let errMsg = "Something went wrong — try again in a moment.";
+        try {
+          const parsed = JSON.parse(err.message);
+          const type = parsed?.error?.type || parsed?.type;
+          if (type === "overloaded_error") {
+            errMsg = "NuAi is experiencing high demand right now. Wait a few seconds and try again.";
+          } else if (type === "rate_limit_error") {
+            errMsg = "Rate limit reached. Wait a moment and try again.";
+          } else if (type === "authentication_error") {
+            errMsg = "Authentication error — please refresh the page.";
+          } else if (parsed?.error?.message) {
+            errMsg = parsed.error.message;
+          }
+        } catch (_) {
+          if (err.message && !err.message.startsWith("{")) {
+            errMsg = err.message;
+          }
+        }
         setMessages((p) =>
           p.map((m) =>
             m.id === aid
-              ? {
-                  ...m,
-                  content: `Connection error: ${err.message || "Try again."}`,
-                  streaming: false,
-                }
+              ? { ...m, content: errMsg, streaming: false }
               : m,
           ),
         );
@@ -1425,6 +1441,7 @@ export default function ProteaAI({
               onAction={(q) => handleSend(q)}
               limitReached={limitReached}
               streaming={streaming}
+              briefContext={briefContext}
             />
             {messages.map((m) => (
               <div

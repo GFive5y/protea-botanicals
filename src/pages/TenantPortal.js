@@ -836,6 +836,7 @@ export default function TenantPortal() {
   );
   const [drawerOpen, setDrawerOpen]   = useState(false);
   const [aiOpen, setAiOpen]           = useState(false);
+  const [aiContext, setAiContext]       = useState(null);
   const [bubbleOpen, setBubbleOpen]   = useState(false);
   const [acctRect, setAcctRect]       = useState(null);
   const acctRef                       = useRef(null);
@@ -1038,7 +1039,7 @@ export default function TenantPortal() {
             {/* \u2500\u2500 NuAI FIXTURE \u2014 intelligent AI entry point \u2500\u2500\u2500\u2500\u2500 */}
             <AIFixture
               collapsed={sidebarCollapsed}
-              onOpen={() => setAiOpen(true)}
+              onOpen={(ctx) => { setAiContext(ctx || null); setAiOpen(true); }}
             />
 
             {/* Account strip */}
@@ -1228,12 +1229,13 @@ export default function TenantPortal() {
 
           <ProteaAI
             isOpen={aiOpen}
-            onClose={() => setAiOpen(false)}
+            onClose={() => { setAiOpen(false); setAiContext(null); }}
             navExpanded={!sidebarCollapsed}
             tenantId={tenantId}
             role={userRole}
             isHQ={false}
             tenantName={tenantName}
+            briefContext={aiContext}
           />
         </div>
         </IntelligenceProvider>

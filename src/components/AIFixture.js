@@ -88,7 +88,7 @@ export default function AIFixture({ collapsed, onOpen }) {
         return (
           <button
             key={i}
-            onClick={onOpen}
+            onClick={() => onOpen(line.context)}
             style={{
               width: "100%", border: "none",
               borderBottom: i < lines.length - 1 ? `0.5px solid ${T.border}` : "none",
