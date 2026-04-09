@@ -205,32 +205,32 @@ async function buildPills(tabId, tenantId, intel) {
     case "customers": {
       const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
       const [profR, newR] = await Promise.allSettled([
-        supabase.from("user_profiles").select("id", { count: "exact", head: true })
+        supabase.from("user_profiles")
+          .select("id", { count: "exact", head: true })
           .eq("tenant_id", tenantId),
-        supabase.from("user_profiles").select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId).gte("created_at", weekAgo),
+        supabase.from("user_profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .gte("created_at", weekAgo),
       ]);
-      const total   = profR.status === "fulfilled" ? profR.value.count || 0 : 0;
-      const newThis = newR.status  === "fulfilled" ? newR.value.count  || 0 : 0;
+      const total   = profR.status === "fulfilled" ? profR.value.count ?? 0 : 0;
+      const newThis = newR.status  === "fulfilled" ? newR.value.count  ?? 0 : 0;
+      const unread  = cust.unreadMessages || 0;
       return [
-        { label: "Total profiles",   value: String(total),                  variant: null,       context: "profiles" },
-        { label: "New this week",    value: String(newThis),                variant: newThis > 0 ? "info" : null, context: "new-cust" },
-        { label: "Unread messages",  value: String(cust.unreadMessages || 0), variant: cust.unreadMessages > 0 ? "warning" : "success", context: "messages" },
+        { label: "Profiles",         value: String(total),                  variant: null,       context: "profiles" },
+        { label: "New this week",    value: String(newThis),                variant: newThis > 0 ? "info" : null,    context: "new-cust" },
+        { label: "Unread messages",  value: String(unread),                 variant: unread > 0 ? "warning" : "success", context: "messages" },
       ];
     }
 
     // ── ANALYTICS ─────────────────────────────────────────────────
+    // scan_logs has no tenant_id column — rely on context data only.
     case "analytics": {
-      const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
-      const scanR = await supabase
-        .from("scan_logs")
-        .select("id,created_at")
-        .gte("created_at", weekAgo);
-      const scans7d = (scanR.data || []).length;
       return [
-        { label: "Scans (7d)",       value: String(scans7d),               variant: null,       context: "scans" },
-        { label: "Customers",        value: String(cust.badgeCount || 0),  variant: null,       context: "customers" },
-        { label: "MTD orders",       value: String(sales.mtdOrders || 0),  variant: null,       context: "orders-mtd" },
+        { label: "MTD orders",       value: String(sales.mtdOrders || 0),  variant: sales.mtdOrders > 0 ? "info" : null, context: "orders-mtd" },
+        { label: "MTD revenue",      value: fmtR(sales.mtdRevenue || 0),   variant: null,       context: "revenue-mtd" },
+        { label: "Active customers", value: String(cust.unreadMessages > 0 ? "!" : "—"), variant: null, context: "customers" },
+        { label: "Stock alerts",     value: String(inv.badgeCount || 0),   variant: inv.badgeCount > 0 ? "warning" : "success", context: "stock" },
       ];
     }
 
