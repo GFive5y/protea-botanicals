@@ -7,10 +7,13 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "../services/tenantService";
-import PlatformBar from "../components/PlatformBar";
+// PlatformBar removed — WP-AINS Phase 5
+// Jobs migrated: alerts → IntelLines, actions → IntelStrip,
+// comms → Customers nav badge, fraud → NuAiBrief (Phase 6)
+// PlatformBar retained in AppShell for /admin /hq /hr routes
 import ProteaAI from "../components/ProteaAI";
 import DevErrorCapture from "../components/DevErrorCapture";
-import { PlatformBarProvider } from "../contexts/PlatformBarContext";
+// PlatformBarContext removed — WP-AINS Phase 5
 import ToastContainer from "../components/ToastContainer";
 
 import HQOverview from "../components/hq/HQOverview";
@@ -923,7 +926,6 @@ export default function TenantPortal() {
 
   return (
     <DevErrorCapture>
-      <PlatformBarProvider>
         <IntelligenceProvider value={intelligence}>
         <style>{PORTAL_CSS}</style>
         <div style={{
@@ -1154,11 +1156,6 @@ export default function TenantPortal() {
               </div>
             </div>
 
-            {/* Platform bar */}
-            <div style={{ ...INNER, overflow: "hidden", padding: "0 24px", flexShrink: 0 }}>
-              <PlatformBar role="tenant" tenantId={tenantId} onNavigate={() => {}} />
-            </div>
-
             {/* IntelStrip — WP-AINS Phase 3 */}
             <IntelStrip
               pills={intelPills}
@@ -1241,7 +1238,6 @@ export default function TenantPortal() {
         </div>
         </IntelligenceProvider>
         <ToastContainer />
-      </PlatformBarProvider>
     </DevErrorCapture>
   );
 }
