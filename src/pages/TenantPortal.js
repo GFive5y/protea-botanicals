@@ -58,6 +58,7 @@ import HRPayroll from "../components/hq/HRPayroll";
 import GlobalSearch from "../components/GlobalSearch";
 import AIFixture from "../components/AIFixture";
 import { IntelligenceProvider } from "../contexts/IntelligenceContext";
+import { useNavIntelligence } from "../hooks/useNavIntelligence";
 import AccountBubble from "../components/AccountBubble";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
@@ -622,7 +623,7 @@ function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, sea
   }
 }
 
-function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand }) {
+function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, onExpand, badge, tabInsights }) {
   const isActiveSection = section.tabs.some((t) => t.id === activeTab);
   const [open, setOpen] = useState(defaultOpen || section.alwaysOpen || isActiveSection);
   const effectiveOpen = open || isActiveSection;
@@ -647,6 +648,7 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
             boxShadow: isActiveSection ? `inset 3px 0 0 ${section.color}` : "none",
             cursor: "pointer",
             transition: "background 0.15s, box-shadow 0.15s",
+            position: "relative",
           }}
         >
           {NavIcon && (
@@ -655,6 +657,18 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
               strokeWidth={hovering || isActiveSection ? 2.1 : 1.75}
               color={isActiveSection ? section.color : hovering ? section.color : T.ink400}
             />
+          )}
+          {badge?.count > 0 && (
+            <span style={{
+              position: "absolute", top: 6, right: 8,
+              minWidth: 14, height: 14, borderRadius: 7,
+              background: badge.variant === "danger" ? "#991B1B" : badge.variant === "warning" ? "#92400E" : "#1E3A5F",
+              color: "#fff", fontSize: 8, fontWeight: 700,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "0 3px", fontFamily: T.font,
+            }}>
+              {badge.count}
+            </span>
           )}
         </button>
         {hovering && (
@@ -723,6 +737,16 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
           }}>
             {section.label}
           </span>
+          {badge?.count > 0 && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 8,
+              background: badge.variant === "danger" ? "#FEE2E2" : badge.variant === "warning" ? "#FFF3CD" : "#E0F0FF",
+              color: badge.variant === "danger" ? "#991B1B" : badge.variant === "warning" ? "#92400E" : "#1E3A5F",
+              flexShrink: 0, marginRight: 4, fontFamily: T.font,
+            }}>
+              {badge.count}
+            </span>
+          )}
           <span style={{
             fontSize: 8, color: hovering ? section.color : T.ink300,
             transform: effectiveOpen ? "rotate(90deg)" : "rotate(0deg)",
@@ -751,9 +775,19 @@ function SidebarSection({ section, activeTab, onSelect, defaultOpen, collapsed, 
                 {section.alwaysOpen && NavIcon && (
                   <NavIcon size={14} strokeWidth={1.75} color={active ? section.color : T.ink500} style={{ marginRight: 8, flexShrink: 0 }} />
                 )}
-                <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? section.color : T.ink500 }}>
+                <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? section.color : T.ink500, flex: 1 }}>
                   {tab.label}
                 </span>
+                {tabInsights?.[tab.id] && (
+                  <span style={{
+                    fontSize: 10, color: "#BBBBBB", fontStyle: "italic",
+                    overflow: "hidden", textOverflow: "ellipsis",
+                    whiteSpace: "nowrap", flexShrink: 1, paddingLeft: 4,
+                    maxWidth: 80,
+                  }}>
+                    {tabInsights[tab.id]}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -807,6 +841,23 @@ export default function TenantPortal() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchFilter, setSearchFilter]         = useState(null);
   const [searchKey, setSearchKey]               = useState(0);
+
+  // WP-AINS Phase 2 — intelligence data for sidebar badges + sub-item insights
+  const intelligence = useNavIntelligence(tenantId);
+  const intelData    = intelligence?.data;
+
+  const sectionBadge = (sectionId) => {
+    if (!intelData) return null;
+    switch (sectionId) {
+      case "inventory":    return { count: intelData.inventory?.badgeCount,  variant: intelData.inventory?.badgeVariant };
+      case "sales":        return { count: intelData.sales?.badgeCount,      variant: intelData.sales?.badgeVariant };
+      case "procurement":  return { count: intelData.inventory?.badgeCount,  variant: intelData.inventory?.badgeVariant };
+      case "customers":    return { count: intelData.customers?.badgeCount,  variant: intelData.customers?.badgeVariant };
+      case "intelligence": return { count: intelData.reports?.badgeCount,    variant: intelData.reports?.badgeVariant };
+      default:             return null;
+    }
+  };
+  const tabInsights = intelData?.subItems || {};
 
   const handleNavigateWithFilter = useCallback((tabId, filter) => {
     setSearchFilter(filter);
@@ -865,7 +916,7 @@ export default function TenantPortal() {
   return (
     <DevErrorCapture>
       <PlatformBarProvider>
-        <IntelligenceProvider tenantId={tenantId}>
+        <IntelligenceProvider value={intelligence}>
         <style>{PORTAL_CSS}</style>
         <div style={{
           display: "flex", height: "100vh", overflow: "hidden",
@@ -968,15 +1019,14 @@ export default function TenantPortal() {
                   defaultOpen={i <= 1}
                   collapsed={sidebarCollapsed}
                   onExpand={() => setSidebarCollapsed(false)}
+                  badge={sectionBadge(section.id)}
+                  tabInsights={tabInsights}
                 />
               ))}
             </div>
 
             {/* \u2500\u2500 NuAI FIXTURE \u2014 intelligent AI entry point \u2500\u2500\u2500\u2500\u2500 */}
             <AIFixture
-              tenantId={tenantId}
-              tenantName={tenantName}
-              role={userRole}
               collapsed={sidebarCollapsed}
               onOpen={() => setAiOpen(true)}
             />
@@ -1154,7 +1204,7 @@ export default function TenantPortal() {
                 </div>
                 <div style={{ flex: 1, paddingTop: 6, paddingBottom: 16 }}>
                   {visibleSections.map((section, i) => (
-                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} />
+                    <SidebarSection key={section.id} section={section} activeTab={activeTab} onSelect={handleTabSelect} defaultOpen={i <= 1} badge={sectionBadge(section.id)} tabInsights={tabInsights} />
                   ))}
                 </div>
                 <div style={{ padding: "10px 16px 14px", borderTop: `1px solid ${T.border}`, fontSize: 10, color: T.ink300 }}>

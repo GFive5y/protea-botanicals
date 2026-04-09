@@ -1,24 +1,22 @@
 // src/contexts/IntelligenceContext.js
-// WP-AINS Phase 1 — Intelligence Foundation
-// Single provider at TenantPortal level.
-// One fetch, shared by NavSidebar, AIFixture, IntelStrip, NuAiBrief.
-// Import useIntelligence() anywhere inside TenantPortal to access data.
+// WP-AINS Phase 1 — Intelligence Foundation (updated Phase 2)
+// Provider accepts pre-computed value so TenantPortal can call
+// useNavIntelligence in its own function body and share via context.
 
 import { createContext, useContext } from "react";
-import { useNavIntelligence } from "../hooks/useNavIntelligence";
 
 export const IntelligenceContext = createContext(null);
 
-export function IntelligenceProvider({ tenantId, children }) {
-  const intelligence = useNavIntelligence(tenantId);
+// value = return value of useNavIntelligence({ data, loading, refresh })
+export function IntelligenceProvider({ value, children }) {
   return (
-    <IntelligenceContext.Provider value={intelligence}>
+    <IntelligenceContext.Provider value={value}>
       {children}
     </IntelligenceContext.Provider>
   );
 }
 
-// Safe hook — returns empty state if used outside provider
+// Safe hook — returns empty state if called outside provider
 export function useIntelligence() {
   const ctx = useContext(IntelligenceContext);
   if (!ctx) return { data: null, loading: true, refresh: () => {} };
