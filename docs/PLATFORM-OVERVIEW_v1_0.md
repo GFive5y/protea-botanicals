@@ -199,3 +199,37 @@ If you need to understand what a specific component does, read it.
 ---
 *PLATFORM-OVERVIEW v1.0 · NuAi · First produced 09 April 2026*
 *Updated: [add date-stamped entries below — never replace above]*
+
+---
+## Update: 10 Apr 2026 — AINS v1.0 + FIN-AUDIT v1.0 Complete
+
+### WP-AINS v1.0 — COMPLETE (6 phases, ~1,400 lines added)
+
+New intelligence surfaces on TenantPortal — all SQL-computed, zero LLM on open:
+- Sidebar badges (live counts per nav section)
+- Sub-item insights (1-line SQL fact per nav sub-item)
+- IntelLines (2 clickable live facts above NuAi mark)
+- NuAi mark (brand strip + today's key metric)
+- IntelStrip (4-6 tab-specific pills between breadcrumb and content)
+- NuAi panel brief (pre-loaded right now / working well / actions)
+- Click-through (pill or IntelLine → NuAi pre-focused on that context)
+
+New files: useNavIntelligence.js · IntelligenceContext.js · useIntelStrip.js
+           IntelStrip.js · useBrief.js · NuAiBrief.js
+Modified: AIFixture.js v2.0 · ProteaAI.js v1.8 · TenantPortal.js
+
+PlatformBar removed from TenantPortal. Jobs absorbed by AINS surfaces.
+PlatformBar retained in AppShell for /admin /hq /hr routes.
+
+### FIN-AUDIT v1.0 — COMPLETE (4 gaps)
+
+- GAP-01: Revenue ÷1.15 (SA VAT) in HQProfitLoss — d7d2df9
+- GAP-02: Manual journal adjustments flow to P&L — c3b624c
+- GAP-03: ExpenseManager VAT Review mode — 4b1a9fa
+- GAP-04: Depreciation run — R822.22/month — owner action
+
+### Pending next session
+
+- WP-NAV-RESTRUCTURE: Sales channels unified, Finance section clean,
+  Analytics moves to Customers, Reorder moves to Inventory
+- Scan analytics: qr_codes join for tenant-scoped scan pills in useIntelStrip
