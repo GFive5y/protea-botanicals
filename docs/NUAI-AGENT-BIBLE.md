@@ -89,7 +89,7 @@ Project: uvicrqapgzcdvozxrreo
 AI:         Anthropic Claude via ai-copilot Edge Function ONLY
 NEVER call api.anthropic.com from React (LL-120, VL-009)
 Payments:   PayFast (sandbox) · Yoco (awaiting keys — after CIPRO)
-Hosting:    Vercel · ERP: protea-botanicals.vercel.app
+Hosting:    Vercel · ERP: nuai.vercel.app
 Repo:       github.com/GFive5y/protea-botanicals · branch: main
 Fonts:      Inter for ALL HQ/admin. Cormorant Garamond + Jost for customer pages only.
 OPERATING MODE: BETA DEV MODE (locked until owner changes scope)
