@@ -57,6 +57,7 @@ import HRCalendar from "../components/hq/HRCalendar";
 import HRPayroll from "../components/hq/HRPayroll";
 import GlobalSearch from "../components/GlobalSearch";
 import AIFixture from "../components/AIFixture";
+import { IntelligenceProvider } from "../contexts/IntelligenceContext";
 import AccountBubble from "../components/AccountBubble";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
@@ -864,6 +865,7 @@ export default function TenantPortal() {
   return (
     <DevErrorCapture>
       <PlatformBarProvider>
+        <IntelligenceProvider tenantId={tenantId}>
         <style>{PORTAL_CSS}</style>
         <div style={{
           display: "flex", height: "100vh", overflow: "hidden",
@@ -1172,6 +1174,7 @@ export default function TenantPortal() {
             tenantName={tenantName}
           />
         </div>
+        </IntelligenceProvider>
         <ToastContainer />
       </PlatformBarProvider>
     </DevErrorCapture>
