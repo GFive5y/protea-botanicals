@@ -1120,7 +1120,9 @@ export default function TenantPortal() {
               background: "#faf9f6", display: "flex", alignItems: "center",
               padding: "0 20px", gap: 16,
             }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#2D6A4F", letterSpacing: "0.08em", textTransform: "uppercase" }}>NuAi</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em" }}>
+                <span style={{ color: "#1A3D2B" }}>Nu</span><span style={{ color: "#00E87A" }}>Ai</span>
+              </span>
               <span style={{ fontSize: 10, color: "#999" }}>v0.1 {"\u00b7"} dev</span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 10, color: "#999" }}>

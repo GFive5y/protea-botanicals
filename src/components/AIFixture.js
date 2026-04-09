@@ -235,17 +235,15 @@ Current data:
         fontFamily: T.font,
       }}
     >
-      {/* NuAI mark */}
+      {/* NuAi mark — Nu in brand dark, Ai in #00E87A brand green */}
       <span style={{
-        fontSize:      10,
+        fontSize:      11,
         fontWeight:    800,
-        letterSpacing: "0.12em",
-        textTransform: "uppercase",
-        color:         T.accent,
+        letterSpacing: "0.04em",
         flexShrink:    0,
         fontFamily:    T.font,
       }}>
-        NuAI
+        <span style={{ color: T.accent }}>Nu</span><span style={{ color: "#00E87A" }}>Ai</span>
       </span>
 
       {/* Separator */}
