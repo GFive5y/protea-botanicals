@@ -851,7 +851,7 @@ export default function TenantPortal() {
     switch (sectionId) {
       case "inventory":    return { count: intelData.inventory?.badgeCount,  variant: intelData.inventory?.badgeVariant };
       case "sales":        return { count: intelData.sales?.badgeCount,      variant: intelData.sales?.badgeVariant };
-      case "procurement":  return { count: intelData.inventory?.badgeCount,  variant: intelData.inventory?.badgeVariant };
+      case "procurement":  return null;
       case "customers":    return { count: intelData.customers?.badgeCount,  variant: intelData.customers?.badgeVariant };
       case "intelligence": return { count: intelData.reports?.badgeCount,    variant: intelData.reports?.badgeVariant };
       default:             return null;

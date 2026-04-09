@@ -51,17 +51,16 @@ export function useNavIntelligence(tenantId) {
         // 4 — unacknowledged system alerts
         supabase
           .from("system_alerts")
-          .select("id,severity,alert_type,message")
+          .select("id,severity,alert_type,title")
           .eq("tenant_id", tenantId)
           .is("acknowledged_at", null)
           .order("created_at", { ascending: false })
           .limit(20),
 
-        // 5 — unread customer messages
+        // 5 — unread customer messages (RLS-scoped, no tenant_id filter needed)
         supabase
           .from("customer_messages")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
           .is("read_at", null),
       ]);
 
