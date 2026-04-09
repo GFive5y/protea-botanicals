@@ -433,6 +433,10 @@ const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
 const pctColour = (pct) =>
   pct >= 35 ? "#2E7D32" : pct >= 20 ? "#E65100" : "#c62828";
 
+// GAP-01 fix — SA VAT is 15%. All orders.total values are VAT-inclusive.
+// Divide by VAT_RATE at every revenue aggregation point.
+const VAT_RATE = 1.15;
+
 // ─── WP-FIN S1: Periods — quarters + custom added ────────────────────────────
 const PERIODS = [
   { id: "30d", label: "Last 30 days" },
@@ -1019,8 +1023,11 @@ export default function HQProfitLoss() {
   const filteredOrders = orders.filter((o) =>
     periodFilter(o.created_at, period, customFrom, customTo),
   );
+  // GAP-01: orders.total is VAT-inclusive. Divide by 1.15 to get ex-VAT revenue.
+  // SA VAT = 15%. This affects all downstream calculations: grossProfit,
+  // grossMarginPct, netProfit, netMarginPct, FX scenario, loyalty cost %.
   const websiteRevenue = filteredOrders.reduce(
-    (s, o) => s + (parseFloat(o.total) || 0),
+    (s, o) => s + (parseFloat(o.total) || 0) / VAT_RATE,
     0,
   );
   const totalUnitsSold = filteredOrders.reduce(
@@ -1122,7 +1129,8 @@ export default function HQProfitLoss() {
       const avco = parseFloat(oi.product_metadata?.weighted_avg_cost || 0);
       if (!map[name]) map[name] = { units: 0, revenue: 0, cogs: 0 };
       map[name].units += oi.quantity || 0;
-      map[name].revenue += parseFloat(oi.line_total) || 0;
+      // GAP-01: line_total is VAT-inclusive — divide by VAT_RATE for ex-VAT margin calc
+      map[name].revenue += (parseFloat(oi.line_total) || 0) / VAT_RATE;
       map[name].cogs += (oi.quantity || 0) * avco;
     });
     return Object.entries(map)
@@ -1570,8 +1578,8 @@ export default function HQProfitLoss() {
               <div style={card}>
                 <SectionHeader icon="💰" label="Revenue" />
                 <WRow
-                  label="Website / direct sales"
-                  sub={`${filteredOrders.length} orders · ${totalUnitsSold} units · ${PERIODS.find((p) => p.id === period)?.label}`}
+                  label="Website / direct sales (ex-VAT)"
+                  sub={`${filteredOrders.length} orders · ${totalUnitsSold} units · ${PERIODS.find((p) => p.id === period)?.label} · VAT excluded (÷1.15)`}
                   value={websiteRevenue}
                   indent={1}
                   highlight={websiteRevenue > 0 ? "green" : undefined}

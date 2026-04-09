@@ -126,12 +126,7 @@ async function compute(tabId, tenantId, intel) {
 
   // ── P&L / EXPENSES / VAT ──────────────────────────────────────────────────
   if (["pl","expenses","vat","bank-recon","journals"].includes(tabId)) {
-    rightNow.push({
-      variant:     "warning",
-      text:        "Revenue figures include VAT — real ex-VAT revenue is ~15% lower than displayed totals. (GAP-01)",
-      actionLabel: "Explain impact",
-      actionQuery: "Explain how the VAT-inclusive revenue figures affect my P&L and what my true ex-VAT gross margin is.",
-    });
+    // GAP-01 resolved — revenue is now displayed ex-VAT (÷1.15) in HQProfitLoss.
 
     const expR = await supabase
       .from("expenses")
