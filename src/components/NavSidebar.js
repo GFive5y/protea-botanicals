@@ -295,9 +295,9 @@ export default function NavSidebar() {
           <button
             className={`nav-ai-btn${aiOpen ? " active" : ""}`}
             onClick={() => setAiOpen((v) => !v)}
-            onMouseEnter={(e) => showTip(e, "ProteaAI")}
+            onMouseEnter={(e) => showTip(e, "NuAi")}
             onMouseLeave={hideTip}
-            aria-label="ProteaAI assistant"
+            aria-label="NuAi assistant"
             aria-pressed={aiOpen}
           >
             ✦

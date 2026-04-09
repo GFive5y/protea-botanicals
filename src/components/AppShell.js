@@ -53,7 +53,7 @@ export default function AppShell({ children, maxWidth = 1400 }) {
             boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
           }}
         >
-          ← NexAI HQ
+          ← NuAi HQ
         </a>
       )}
       <NavSidebar />

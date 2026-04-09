@@ -1,4 +1,4 @@
-// src/components/ProteaAI.js — v1.5
+// src/components/ProteaAI.js — v1.6
 // WP-AI-UNIFIED: Chat · Live Query
 // v1.5: Tool use — HQ/admin Chat runs agentic tool loop before streaming synthesis.
 //        "tools active" indicator in context strip. System prompt tells AI it has tools.
@@ -764,7 +764,7 @@ function buildSystemPrompt(tenantName, role, tab, isHQ, ctx, devMode) {
 Use tools proactively. Never say "I don't have access to that data" — query it instead. Never write to DB.`
     : "";
 
-  const base = `You are ProteaAI for ${tenantName || "Protea Botanicals"}.
+  const base = `You are NuAi for ${tenantName || "NuAi"}.
 WHO: ${who} · PAGE: ${tab} · DATE: ${ctx.date || new Date().toISOString().slice(0, 10)}
 ROLE: ${roleCtx}
 LIVE DATA: ${JSON.stringify(ctx)}
@@ -1224,7 +1224,7 @@ export default function ProteaAI({
   return (
     <div
       className={`ai-pane${isOpen ? " open" : ""}${navExpanded ? " nav-open" : ""}`}
-      aria-label="ProteaAI"
+      aria-label="NuAi"
       role="complementary"
     >
       {/* ── Header ── */}
@@ -1247,11 +1247,10 @@ export default function ProteaAI({
                 fontFamily: T.font,
                 fontSize: 12,
                 fontWeight: 600,
-                color: "#fff",
                 lineHeight: 1.2,
               }}
             >
-              ProteaAI
+              <span style={{ color: "#fff" }}>Nu</span><span style={{ color: "#00E87A" }}>Ai</span>
             </div>
             <div
               style={{
@@ -1482,7 +1481,7 @@ export default function ProteaAI({
                     textTransform: "uppercase",
                   }}
                 >
-                  {m.role === "user" ? "You" : "ProteaAI"}
+                  {m.role === "user" ? "You" : <><span>Nu</span><span style={{ color: "#00E87A" }}>Ai</span></>}
                 </div>
                 <span className={m.streaming ? "pai-cursor" : ""}>
                   {m.content}

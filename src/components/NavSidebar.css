@@ -447,10 +447,10 @@
 }
 
 /* ─────────────────────────────────────────────
-   WP-AI-UNIFIED: ProteaAI third panel
+   WP-AI-UNIFIED: NuAi third panel
    ───────────────────────────────────────────── */
 
-/* ── ProteaAI slide-out panel ── */
+/* ── NuAi slide-out panel ── */
 .ai-pane {
   position: fixed;
   top: 0;
@@ -477,7 +477,7 @@
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.07);
 }
 
-/* ── ProteaAI toggle button (above account circle) ── */
+/* ── NuAi toggle button (above account circle) ── */
 .nav-ai-btn {
   width: 34px;
   height: 34px;
