@@ -96,6 +96,19 @@ const SUBCATEGORIES = {
   ],
 };
 
+// GAP-03: Subcategories that legitimately have R0 input VAT in SA
+// Wages/salaries: not subject to VAT (labour is VAT-exempt)
+// Insurance: exempt supply under SA VAT Act
+// Banking fees: financial services are VAT-exempt
+// Tax payments: not a VAT-applicable expense
+const VAT_EXEMPT_CATS    = new Set(["wages", "tax"]);
+const VAT_EXEMPT_SUBCATS = new Set([
+  "Staff Wages", "Salaries", "Commission", "Bonus", "Benefits", "Training",
+  "Insurance",
+  "Banking & Fees", "Bank charges",
+  "VAT", "Income tax", "Provisional tax", "UIF", "SDL", "PAYE",
+]);
+
 const fmtZar = (n) =>
   `R${(parseFloat(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -183,11 +196,38 @@ export default function ExpenseManager({
   const [toast, setToast] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [vatRegistered, setVatRegistered] = useState(false);
+  // GAP-03: VAT Review mode — inline entry for missing input VAT
+  const [vatFilter, setVatFilter]     = useState(false);
+  const [inlineVat, setInlineVat]     = useState({});   // { [expense_id]: string }
+  const [savingVat, setSavingVat]     = useState({});   // { [expense_id]: bool }
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   }, []);
+
+  // GAP-03: quick inline save for a single expense's input_vat_amount
+  const handleInlineVatSave = async (id) => {
+    const val = parseFloat(inlineVat[id]);
+    if (isNaN(val) || val < 0) return showToast("Enter a valid VAT amount", "error");
+    setSavingVat(p => ({ ...p, [id]: true }));
+    try {
+      const { error } = await supabase
+        .from("expenses")
+        .update({ input_vat_amount: val })
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      showToast("VAT amount saved");
+      setInlineVat(p => { const n = {...p}; delete n[id]; return n; });
+      fetchExpenses();
+      onSaved?.();
+    } catch (e) {
+      showToast(`Save failed: ${e.message}`, "error");
+    } finally {
+      setSavingVat(p => { const n = {...p}; delete n[id]; return n; });
+    }
+  };
 
   const fetchExpenses = useCallback(async () => {
     if (!tenantId) return;
@@ -382,6 +422,14 @@ export default function ExpenseManager({
   }, {});
   const grandTotal = Object.values(totalByCategory).reduce((s, v) => s + v, 0);
 
+  // GAP-03: expenses that genuinely need input VAT entered
+  const needsVatReview = expenses.filter(e =>
+    !(parseFloat(e.input_vat_amount) > 0) &&
+    !VAT_EXEMPT_CATS.has(e.category) &&
+    !VAT_EXEMPT_SUBCATS.has(e.subcategory)
+  );
+  const displayExpenses = vatFilter ? needsVatReview : filtered;
+
   // ── Shared input styles ───────────────────────────────────────────────────
   const inp = {
     padding: "8px 10px",
@@ -568,6 +616,50 @@ export default function ExpenseManager({
           {/* ── LIST TAB ── */}
           {activeTab === "list" && (
             <>
+              {/* GAP-03: Missing VAT banner */}
+              {vatRegistered && needsVatReview.length > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 14px", marginBottom: 12,
+                  background: T.warningBg, border: `1px solid ${T.warningBd}`,
+                  borderRadius: 8,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>⚠</span>
+                    <div>
+                      <div style={{ fontFamily: T.font, fontSize: 12, fontWeight: 700, color: T.warning }}>
+                        {needsVatReview.length} expense{needsVatReview.length !== 1 ? "s" : ""} missing input VAT amount
+                      </div>
+                      <div style={{ fontFamily: T.font, fontSize: 11, color: T.warning, opacity: 0.8, marginTop: 1 }}>
+                        Wages, insurance, and banking are correctly excluded as VAT-exempt.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setVatFilter(v => !v)}
+                    style={{
+                      padding: "6px 14px", borderRadius: 6, border: `1px solid ${T.warningBd}`,
+                      background: vatFilter ? T.warning : "#fff",
+                      color: vatFilter ? "#fff" : T.warning,
+                      fontFamily: T.font, fontSize: 11, fontWeight: 700,
+                      cursor: "pointer", flexShrink: 0,
+                    }}
+                  >
+                    {vatFilter ? "✓ Reviewing" : "Review →"}
+                  </button>
+                </div>
+              )}
+              {vatRegistered && needsVatReview.length === 0 && expenses.length > 0 && (
+                <div style={{
+                  padding: "8px 14px", marginBottom: 12,
+                  background: T.successBg, border: `1px solid ${T.successBd}`,
+                  borderRadius: 8, fontFamily: T.font, fontSize: 12,
+                  color: T.success, fontWeight: 600,
+                }}>
+                  ✓ All applicable expenses have VAT amounts entered
+                </div>
+              )}
+
               {/* Summary strip */}
               <div
                 style={{
@@ -634,23 +726,20 @@ export default function ExpenseManager({
                 >
                   Loading expenses…
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : displayExpenses.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40 }}>
-                  <div
-                    style={{
-                      fontFamily: T.font,
-                      fontSize: 14,
-                      color: T.ink400,
-                      marginBottom: 12,
-                    }}
-                  >
-                    {filterCat === "all"
-                      ? "No expenses yet for this period"
-                      : `No ${filterCat} expenses`}
+                  <div style={{ fontFamily: T.font, fontSize: 14, color: T.ink400, marginBottom: 12 }}>
+                    {vatFilter
+                      ? "All applicable expenses have VAT amounts — nothing to review"
+                      : filterCat === "all"
+                        ? "No expenses yet for this period"
+                        : `No ${filterCat} expenses`}
                   </div>
-                  <button onClick={() => setActiveTab("add")} style={btn()}>
-                    + Add First Expense
-                  </button>
+                  {!vatFilter && (
+                    <button onClick={() => setActiveTab("add")} style={btn()}>
+                      + Add First Expense
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div
@@ -690,7 +779,7 @@ export default function ExpenseManager({
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((e, i) => (
+                      {displayExpenses.map((e, i) => (
                         <tr
                           key={e.id}
                           style={{
@@ -757,19 +846,58 @@ export default function ExpenseManager({
                             {fmtZar(e.amount_zar)}
                           </td>
                           {vatRegistered && (
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                fontSize: 12,
-                                color: parseFloat(e.input_vat_amount) > 0
-                                  ? T.accentMid : T.ink300,
-                                fontVariantNumeric: "tabular-nums",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {parseFloat(e.input_vat_amount) > 0
-                                ? fmtZar(e.input_vat_amount)
-                                : "\u2014"}
+                            <td style={{ padding: "6px 12px", whiteSpace: "nowrap" }}>
+                              {vatFilter ? (
+                                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={inlineVat[e.id] ?? ""}
+                                    onChange={ev => setInlineVat(p => ({ ...p, [e.id]: ev.target.value }))}
+                                    style={{
+                                      width: 80, padding: "4px 6px", fontSize: 12,
+                                      border: `1px solid ${T.ink150}`, borderRadius: 4,
+                                      fontFamily: T.font,
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const amt = parseFloat(e.amount_zar);
+                                      if (amt > 0) setInlineVat(p => ({ ...p, [e.id]: ((amt * 15) / 115).toFixed(2) }));
+                                    }}
+                                    title="Auto-calculate 15% from inclusive amount"
+                                    style={{
+                                      padding: "4px 6px", fontSize: 10, borderRadius: 4,
+                                      border: `1px solid ${T.accentBd}`, background: T.accentLit,
+                                      color: T.accent, cursor: "pointer", fontFamily: T.font,
+                                      fontWeight: 600, flexShrink: 0,
+                                    }}
+                                  >
+                                    15%
+                                  </button>
+                                  <button
+                                    onClick={() => handleInlineVatSave(e.id)}
+                                    disabled={!inlineVat[e.id] || savingVat[e.id]}
+                                    style={{
+                                      padding: "4px 8px", fontSize: 10, borderRadius: 4,
+                                      border: "none", background: inlineVat[e.id] ? T.accent : T.ink150,
+                                      color: "#fff", cursor: inlineVat[e.id] ? "pointer" : "default",
+                                      fontFamily: T.font, fontWeight: 600, flexShrink: 0,
+                                    }}
+                                  >
+                                    {savingVat[e.id] ? "…" : "Save"}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{
+                                  fontSize: 12, fontVariantNumeric: "tabular-nums",
+                                  color: parseFloat(e.input_vat_amount) > 0 ? T.accentMid : T.ink300,
+                                }}>
+                                  {parseFloat(e.input_vat_amount) > 0 ? fmtZar(e.input_vat_amount) : "—"}
+                                </span>
+                              )}
                             </td>
                           )}
                           <td
@@ -855,36 +983,12 @@ export default function ExpenseManager({
                           borderTop: `2px solid ${T.ink150}`,
                         }}
                       >
-                        <td
-                          colSpan={3}
-                          style={{
-                            padding: "10px 12px",
-                            fontFamily: T.font,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: T.ink500,
-                          }}
-                        >
-                          {filtered.length} expense
-                          {filtered.length !== 1 ? "s" : ""}{" "}
-                          {filterCat !== "all" ? `(${filterCat} only)` : ""}
+                        <td colSpan={3} style={{ padding: "10px 12px", fontFamily: T.font, fontSize: 12, fontWeight: 600, color: T.ink500 }}>
+                          {displayExpenses.length} expense{displayExpenses.length !== 1 ? "s" : ""}
+                          {vatFilter ? " · missing VAT" : filterCat !== "all" ? ` (${filterCat} only)` : ""}
                         </td>
-                        <td
-                          style={{
-                            padding: "10px 12px",
-                            fontFamily: T.font,
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: T.danger,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {fmtZar(
-                            filtered.reduce(
-                              (s, e) => s + (parseFloat(e.amount_zar) || 0),
-                              0,
-                            ),
-                          )}
+                        <td style={{ padding: "10px 12px", fontFamily: T.font, fontSize: 14, fontWeight: 700, color: T.danger, fontVariantNumeric: "tabular-nums" }}>
+                          {fmtZar(displayExpenses.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0))}
                         </td>
                         <td />
                       </tr>
