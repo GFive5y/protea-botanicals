@@ -120,6 +120,8 @@ async function applyPolicyRules(tid, cap) {
 export default function HQSmartCapture() {
   const { tenant, tenantId, industryProfile } = useTenant(); // eslint-disable-line no-unused-vars
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
+  const [isMobile,setIsMobile]=useState(false);
   const [mode,setMode]=useState("capture");
   const [phase,setPhase]=useState("idle");
   const [dragOver,setDragOver]=useState(false);
@@ -144,6 +146,12 @@ export default function HQSmartCapture() {
   },[tenantId]);
 
   useEffect(()=>{if(mode==="history")loadHistory();},[mode,loadHistory]);
+  useEffect(()=>{
+    const check=()=>setIsMobile(window.innerWidth<768||/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
+    check();
+    window.addEventListener("resize",check);
+    return()=>window.removeEventListener("resize",check);
+  },[]);
 
   const processFile=async(file)=>{
     if(file.size>20*1024*1024){showToast("File exceeds 20MB.","error");return;}
@@ -361,15 +369,37 @@ export default function HQSmartCapture() {
 
       {mode==="capture"&&<>
         {phase==="idle"&&<>
-          <input ref={fileRef} type="file" accept="image/*,application/pdf,.heic" capture="environment" style={{display:"none"}} onChange={handleFileInput}/>
-          <div onClick={()=>fileRef.current?.click()} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
-            style={{borderRadius:16,padding:"48px 24px",textAlign:"center",cursor:"pointer",border:`2px dashed ${dragOver?D.accentMid:D.ink150}`,background:dragOver?D.accentLit:"#fff",boxShadow:D.shadowLg,marginBottom:20,transition:"all 0.2s"}}>
-            <div style={{fontSize:64,marginBottom:16}}>{"\uD83D\uDCF8"}</div>
-            <div style={{fontSize:18,fontWeight:700,color:D.accent,marginBottom:6}}>Take a Photo or Upload</div>
-            <div style={{fontSize:13,color:D.ink500,marginBottom:20}}>Receipts \u00b7 Invoices \u00b7 Utility Bills \u00b7 Petrol Slips</div>
-            <div style={{display:"inline-block",padding:"12px 32px",background:D.accent,color:"#fff",borderRadius:10,fontSize:15,fontWeight:700}}>{"\uD83D\uDCF7"} Open Camera / Upload File</div>
-            <div style={{marginTop:12,fontSize:11,color:D.ink300}}>PDF \u00b7 JPG \u00b7 PNG \u00b7 HEIC \u00b7 max 20MB</div>
-          </div>
+          {/* File-pick only — no capture attr — opens native file picker on all platforms */}
+          <input ref={fileRef} type="file" accept="image/*,application/pdf,.heic" style={{display:"none"}} onChange={handleFileInput}/>
+          {/* Camera only — capture="environment" opens rear camera directly on mobile */}
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFileInput}/>
+          {isMobile?(
+            <div style={{marginBottom:20}}>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:48,marginBottom:8}}>{"\uD83D\uDCF8"}</div>
+                <div style={{fontSize:16,fontWeight:700,color:D.ink700,marginBottom:4}}>Capture a Document</div>
+                <div style={{fontSize:13,color:D.ink500}}>Receipts · Invoices · Utility Bills · Petrol Slips</div>
+              </div>
+              <button onClick={()=>cameraRef.current?.click()}
+                style={{display:"block",width:"100%",padding:"18px 24px",background:D.accent,color:"#fff",border:"none",borderRadius:12,fontSize:17,fontWeight:700,cursor:"pointer",marginBottom:10,boxShadow:D.shadowLg,letterSpacing:"-0.01em"}}>
+                {"\uD83D\uDCF7"} Take Photo
+              </button>
+              <button onClick={()=>fileRef.current?.click()}
+                style={{display:"block",width:"100%",padding:"14px 24px",background:"#fff",color:D.accentMid,border:`2px solid ${D.accentMid}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                {"\uD83D\uDCC1"} Upload from Files
+              </button>
+              <div style={{textAlign:"center",fontSize:11,color:D.ink300,marginTop:8}}>PDF · JPG · PNG · HEIC · max 20MB</div>
+            </div>
+          ):(
+            <div onClick={()=>fileRef.current?.click()} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
+              style={{borderRadius:16,padding:"48px 24px",textAlign:"center",cursor:"pointer",border:`2px dashed ${dragOver?D.accentMid:D.ink150}`,background:dragOver?D.accentLit:"#fff",boxShadow:D.shadowLg,marginBottom:20,transition:"all 0.2s"}}>
+              <div style={{fontSize:64,marginBottom:16}}>{"\uD83D\uDCF8"}</div>
+              <div style={{fontSize:18,fontWeight:700,color:D.accent,marginBottom:6}}>Upload a Document</div>
+              <div style={{fontSize:13,color:D.ink500,marginBottom:20}}>Receipts · Invoices · Utility Bills · Petrol Slips</div>
+              <div style={{display:"inline-block",padding:"12px 32px",background:D.accent,color:"#fff",borderRadius:10,fontSize:15,fontWeight:700}}>{"\uD83D\uDCC1"} Choose File or Drag & Drop</div>
+              <div style={{marginTop:12,fontSize:11,color:D.ink300}}>PDF · JPG · PNG · HEIC · max 20MB</div>
+            </div>
+          )}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
             {[["\uD83E\uDDFE","Petrol slips","Auto-categorised as Vehicle & Travel"],["\uD83C\uDF7D\uFE0F","Restaurant bills","Entertainment flag"],["\u26A1","Utility bills","Auto-matched as Utilities"],["\uD83D\uDCE6","Supplier invoices","Matches open POs"]].map(([icon,title,desc])=>(
               <div key={title} style={{...card,padding:16,marginBottom:0}}>

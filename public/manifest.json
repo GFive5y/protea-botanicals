@@ -1,6 +1,13 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "name": "Nu Ai ERP",
+  "short_name": "Nu Ai",
+  "description": "AI-native ERP for specialty retail — Smart Capture, Inventory, Finance & more",
+  "start_url": "/hq",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#1A3D2B",
+  "background_color": "#1A3D2B",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +17,14 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  ]
 }
