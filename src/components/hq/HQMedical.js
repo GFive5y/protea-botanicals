@@ -2119,6 +2119,485 @@ function ComplianceTab({ prescriptions, patients, log }) {
   );
 }
 
+// ── CONTROLLED SUBSTANCE REGISTER TAB ─────────────────────────────────────────
+function CSRTab({ items, log, patients }) {
+  const { tenantId } = useTenant();
+  const [movements, setMovements] = useState([]);
+  const [loadingMov, setLoadingMov] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    setLoadingMov(true);
+    supabase
+      .from("stock_movements")
+      .select("item_id, quantity, movement_type, unit_cost, notes, created_at")
+      .in(
+        "item_id",
+        items.map((i) => i.id),
+      )
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        setMovements(data || []);
+        setLoadingMov(false);
+      });
+  }, [tenantId, items]);
+
+  // Build per-product CSR summary
+  const csrRows = items.map((item) => {
+    const itemMov = movements.filter((m) => m.item_id === item.id);
+    const received = itemMov
+      .filter((m) => m.movement_type === "purchase_in")
+      .reduce((s, m) => s + parseFloat(m.quantity || 0), 0);
+    const adjustedIn = itemMov
+      .filter((m) =>
+        ["adjustment_in", "transfer_in", "return_in"].includes(m.movement_type),
+      )
+      .reduce((s, m) => s + parseFloat(m.quantity || 0), 0);
+    const stockOut = itemMov
+      .filter((m) =>
+        ["sale_out", "adjustment_out", "transfer_out"].includes(
+          m.movement_type,
+        ),
+      )
+      .reduce((s, m) => s + Math.abs(parseFloat(m.quantity || 0)), 0);
+    const dispensed = log
+      .filter(
+        (dl) =>
+          dl.inventory_item_id === item.id &&
+          (dl.is_voided === false || dl.is_voided === null),
+      )
+      .reduce((s, dl) => s + parseFloat(dl.quantity_dispensed || 0), 0);
+    const voidedQty = log
+      .filter((dl) => dl.inventory_item_id === item.id && dl.is_voided === true)
+      .reduce((s, dl) => s + parseFloat(dl.quantity_dispensed || 0), 0);
+    const totalIn = received + adjustedIn;
+    const totalOut = stockOut + dispensed;
+    const calculatedBalance = totalIn - totalOut;
+    const bookBalance = parseFloat(item.quantity_on_hand || 0);
+    const variance = calculatedBalance - bookBalance;
+    const balanced = Math.abs(variance) < 0.001;
+    return {
+      item,
+      received,
+      adjustedIn,
+      stockOut,
+      dispensed,
+      voidedQty,
+      totalIn,
+      totalOut,
+      calculatedBalance,
+      bookBalance,
+      variance,
+      balanced,
+    };
+  });
+
+  const totalVariance = csrRows.reduce((s, r) => s + Math.abs(r.variance), 0);
+  const discrepancies = csrRows.filter((r) => !r.balanced);
+
+  // Per-product running ledger
+  const ledger = selectedItem
+    ? (() => {
+        const rows = [];
+        let running = 0;
+        // Combine stock movements and dispensing events, sort by date
+        const movEvents = movements
+          .filter((m) => m.item_id === selectedItem.id)
+          .map((m) => ({
+            date: m.created_at,
+            type: m.movement_type,
+            label: {
+              purchase_in: "Opening Stock / Received",
+              sale_out: "Dispensed (stock deduction)",
+              adjustment_in: "Adjustment In",
+              adjustment_out: "Adjustment Out",
+              transfer_in: "Transfer In",
+              transfer_out: "Transfer Out",
+            }[m.movement_type] || m.movement_type,
+            qty: parseFloat(m.quantity || 0),
+            notes: m.notes || "",
+            source: "stock",
+          }));
+        const dispEvents = log
+          .filter((dl) => dl.inventory_item_id === selectedItem.id)
+          .map((dl) => ({
+            date: dl.dispensed_at,
+            type: dl.is_voided ? "void" : "dispensing",
+            label: dl.is_voided
+              ? `VOIDED — ${patients.find((p) => p.id === dl.patient_id)?.name || "Unknown"}`
+              : `Dispensed to ${patients.find((p) => p.id === dl.patient_id)?.name || "Unknown"}`,
+            qty: dl.is_voided
+              ? 0
+              : -parseFloat(dl.quantity_dispensed || 0),
+            rawQty: parseFloat(dl.quantity_dispensed || 0),
+            notes: dl.is_voided ? dl.void_reason || "" : dl.notes || "",
+            source: "dispensing",
+            voided: dl.is_voided,
+          }));
+        const allEvents = [...movEvents, ...dispEvents].sort(
+          (a, b) => new Date(a.date) - new Date(b.date),
+        );
+        allEvents.forEach((e) => {
+          running += e.qty;
+          rows.push({ ...e, balance: running });
+        });
+        return rows;
+      })()
+    : [];
+
+  return (
+    <div style={{ display: "grid", gap: "20px" }}>
+      {/* Header */}
+      <div
+        style={{
+          ...sCard,
+          borderLeft: `3px solid ${T.info}`,
+          background: T.infoBg,
+        }}
+      >
+        <div style={{ ...sLabel, color: T.info, marginBottom: "6px" }}>
+          Controlled Substance Register — SAHPRA Compliance
+        </div>
+        <p
+          style={{
+            fontSize: "12px",
+            color: T.info,
+            fontFamily: T.fontUi,
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          Perpetual balance register for all Schedule 6 controlled substances.
+          Opening stock + received − dispensed = closing balance. Discrepancies
+          must be investigated and reported to SAHPRA within 24 hours.
+        </p>
+      </div>
+
+      {/* Variance alert */}
+      {discrepancies.length > 0 && (
+        <div
+          style={{
+            ...sCard,
+            border: `1px solid ${T.warningBd}`,
+            borderLeft: `3px solid ${T.warning}`,
+            background: T.warningBg,
+          }}
+        >
+          <div style={{ ...sLabel, color: T.warning, marginBottom: "6px" }}>
+            {discrepancies.length} Product
+            {discrepancies.length !== 1 ? "s" : ""} With Balance Discrepancy
+          </div>
+          <div
+            style={{
+              fontSize: "12px",
+              color: T.warning,
+              fontFamily: T.fontUi,
+            }}
+          >
+            Total variance: {Math.round(totalVariance * 100) / 100} units.
+            Investigate each discrepancy. Dispensing events recorded via import
+            may not have triggered stock deductions — re-record through the
+            Dispensing tab to fully reconcile.
+          </div>
+        </div>
+      )}
+
+      {/* Summary table */}
+      <div style={{ ...sCard, padding: 0, overflow: "auto" }}>
+        <div
+          style={{
+            padding: "14px 16px",
+            borderBottom: `1px solid ${T.ink150}`,
+            background: T.ink050,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <div style={sLabel}>Product Summary</div>
+          {!loadingMov && (
+            <span
+              style={{
+                fontSize: "10px",
+                color: T.ink400,
+                fontFamily: T.fontUi,
+              }}
+            >
+              {csrRows.filter((r) => r.balanced).length} balanced ·{" "}
+              {discrepancies.length} discrepanc
+              {discrepancies.length !== 1 ? "ies" : "y"}
+            </span>
+          )}
+        </div>
+        {loadingMov ? (
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: T.ink400,
+              fontFamily: T.fontUi,
+            }}
+          >
+            Loading register...
+          </div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={sTh}>Product</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Opening/Received</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Dispensed</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Voided</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Calc. Balance</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Book Balance</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Variance</th>
+                <th style={{ ...sTh, textAlign: "center" }}>Status</th>
+                <th style={sTh}>Ledger</th>
+              </tr>
+            </thead>
+            <tbody>
+              {csrRows.map((row) => (
+                <tr
+                  key={row.item.id}
+                  style={{
+                    background:
+                      selectedItem?.id === row.item.id
+                        ? T.accentLit
+                        : "transparent",
+                  }}
+                >
+                  <td style={{ ...sTd, fontWeight: 500 }}>
+                    {row.item.name}
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: T.ink400,
+                        fontFamily: T.fontData,
+                      }}
+                    >
+                      {row.item.sku}
+                    </div>
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                    }}
+                  >
+                    {row.totalIn}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                      color: row.dispensed > 0 ? T.danger : T.ink400,
+                    }}
+                  >
+                    {row.dispensed > 0 ? row.dispensed : "\u2014"}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                      color: row.voidedQty > 0 ? T.warning : T.ink400,
+                    }}
+                  >
+                    {row.voidedQty > 0 ? row.voidedQty : "\u2014"}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {row.calculatedBalance}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                    }}
+                  >
+                    {row.bookBalance}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      textAlign: "right",
+                      fontFamily: T.fontData,
+                      fontWeight: 700,
+                      color: row.balanced
+                        ? T.success
+                        : Math.abs(row.variance) > 5
+                          ? T.danger
+                          : T.warning,
+                    }}
+                  >
+                    {row.balanced ? "0" : row.variance > 0 ? `+${row.variance}` : row.variance}
+                  </td>
+                  <td style={{ ...sTd, textAlign: "center" }}>
+                    <Badge
+                      label={row.balanced ? "\u2713 Balanced" : "\u26a0 Discrepancy"}
+                      color={row.balanced ? T.success : T.warning}
+                      bg={row.balanced ? T.successBg : T.warningBg}
+                      border={row.balanced ? T.successBd : T.warningBd}
+                    />
+                  </td>
+                  <td style={sTd}>
+                    <button
+                      onClick={() =>
+                        setSelectedItem(
+                          selectedItem?.id === row.item.id ? null : row.item,
+                        )
+                      }
+                      style={{
+                        ...sBtn("outline"),
+                        fontSize: "9px",
+                        padding: "3px 8px",
+                        color:
+                          selectedItem?.id === row.item.id
+                            ? T.accent
+                            : T.ink500,
+                        borderColor:
+                          selectedItem?.id === row.item.id
+                            ? T.accentBd
+                            : T.ink150,
+                      }}
+                    >
+                      {selectedItem?.id === row.item.id ? "Close" : "View"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Per-product running ledger */}
+      {selectedItem && ledger.length > 0 && (
+        <div style={{ ...sCard, padding: 0, overflow: "auto" }}>
+          <div
+            style={{
+              padding: "14px 16px",
+              borderBottom: `1px solid ${T.ink150}`,
+              background: T.accentLit,
+            }}
+          >
+            <div style={{ ...sLabel, color: T.accent }}>
+              Running Ledger — {selectedItem.name}
+            </div>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={sTh}>Date</th>
+                <th style={sTh}>Transaction</th>
+                <th style={{ ...sTh, textAlign: "right" }}>In</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Out</th>
+                <th style={{ ...sTh, textAlign: "right" }}>Running Balance</th>
+                <th style={sTh}>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((row, i) => {
+                const isIn = row.qty > 0;
+                const isVoided = row.voided;
+                return (
+                  <tr
+                    key={i}
+                    style={{
+                      opacity: isVoided ? 0.5 : 1,
+                      background: isVoided ? T.dangerBg : "transparent",
+                    }}
+                  >
+                    <td
+                      style={{
+                        ...sTd,
+                        whiteSpace: "nowrap",
+                        fontSize: "12px",
+                        color: T.ink500,
+                      }}
+                    >
+                      {new Date(row.date).toLocaleDateString("en-ZA")}
+                    </td>
+                    <td style={{ ...sTd, fontSize: "12px" }}>
+                      {isVoided && (
+                        <Badge
+                          label="VOIDED"
+                          color={T.danger}
+                          bg={T.dangerBg}
+                          border={T.dangerBd}
+                        />
+                      )}{" "}
+                      {row.label}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        color: T.success,
+                        fontWeight: isIn ? 600 : 400,
+                      }}
+                    >
+                      {isIn && !isVoided
+                        ? `+${row.rawQty ?? row.qty}`
+                        : "\u2014"}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        color: T.danger,
+                        fontWeight: !isIn ? 600 : 400,
+                      }}
+                    >
+                      {!isIn && !isVoided
+                        ? row.rawQty ?? Math.abs(row.qty)
+                        : "\u2014"}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        textAlign: "right",
+                        fontFamily: T.fontData,
+                        fontWeight: 700,
+                        color: isVoided ? T.ink400 : T.ink900,
+                        textDecoration: isVoided ? "line-through" : "none",
+                      }}
+                    >
+                      {isVoided ? "\u2014" : row.balance}
+                    </td>
+                    <td
+                      style={{
+                        ...sTd,
+                        fontSize: "11px",
+                        color: T.ink400,
+                        maxWidth: "200px",
+                      }}
+                    >
+                      {row.notes || "\u2014"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function HQMedical() {
   const [subTab, setSubTab] = useState("patients");
@@ -2222,6 +2701,7 @@ export default function HQMedical() {
     { id: "dispensing", label: "Dispensing" },
     { id: "reports", label: "Reports" },
     { id: "compliance", label: "Compliance" },
+    { id: "csr", label: "CSR" },
   ];
 
   return (
@@ -2384,6 +2864,13 @@ export default function HQMedical() {
           prescriptions={prescriptions}
           patients={patients}
           log={dispensingLog}
+        />
+      )}
+      {subTab === "csr" && (
+        <CSRTab
+          items={items}
+          log={dispensingLog}
+          patients={patients}
         />
       )}
     </div>
