@@ -18,6 +18,7 @@ import HQPurchaseOrders from "./HQPurchaseOrders";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { SparkLine, BulletChart } from "../viz";
 import StockIntelPanel from "./StockIntelPanel";
+import ActionCentre from "../shared/ActionCentre";
 import {
   PRODUCT_WORLDS,
   itemMatchesWorld,
@@ -3087,22 +3088,6 @@ export default function HQStock() {
         action: () => setSubTab("purchase-orders"),
       });
 
-    const SEV = {
-      critical: {
-        color: T.danger,
-        bg: T.dangerBg,
-        bd: T.dangerBd,
-        label: "CRITICAL",
-      },
-      warning: {
-        color: T.warning,
-        bg: T.warningBg,
-        bd: T.warningBd,
-        label: "WARNING",
-      },
-      info: { color: T.info, bg: T.infoBg, bd: T.infoBd, label: "INFO" },
-    };
-
     const recentMov = movements.slice(0, 8);
 
     // Zone 2 — KPI tile definitions
@@ -3171,43 +3156,43 @@ export default function HQStock() {
 
     return (
       <div style={{ display: "grid", gap: 20 }}>
-        {/* ── ZONE 1: ACTION QUEUE ────────────────────────────────────────── */}
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid " + T.ink150,
-            borderRadius: 6,
-            overflow: "hidden",
-          }}
-        >
+        {/* ── ZONE 1: ACTION QUEUE — ActionCentre (collapsible, session-dismissible) ── */}
+        {queueActions.length === 0 ? (
           <div
             style={{
-              padding: "12px 20px",
-              borderBottom: "1px solid " + T.ink150,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              background: "#fff",
+              border: "1px solid " + T.ink150,
+              borderRadius: 6,
+              overflow: "hidden",
             }}
           >
-            <span
+            <div
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: T.ink400,
+                padding: "12px 20px",
+                borderBottom: "1px solid " + T.ink150,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              Action Queue
-            </span>
-            <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.mono }}>
-              {new Date().toLocaleTimeString("en-ZA", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-          {queueActions.length === 0 ? (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: T.ink400,
+                }}
+              >
+                Action Queue
+              </span>
+              <span style={{ fontSize: 10, color: T.ink300, fontFamily: T.mono }}>
+                {new Date().toLocaleTimeString("en-ZA", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            </div>
             <div
               style={{
                 padding: "14px 20px",
@@ -3244,102 +3229,21 @@ export default function HQStock() {
                 </div>
               </div>
             </div>
-          ) : (
-            queueActions.map((act, idx) => {
-              const s = SEV[act.severity];
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    padding: "12px 20px",
-                    borderLeft: "3px solid " + s.color,
-                    borderBottom:
-                      idx < queueActions.length - 1
-                        ? "1px solid " + T.ink150
-                        : "none",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 16,
-                    background: idx % 2 === 0 ? "#fff" : T.ink075,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "flex-start",
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: "0.08em",
-                        padding: "2px 6px",
-                        borderRadius: 3,
-                        background: s.bg,
-                        color: s.color,
-                        border: "1px solid " + s.bd,
-                        whiteSpace: "nowrap",
-                        marginTop: 2,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {s.label}
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          color: T.ink700,
-                        }}
-                      >
-                        {act.text}
-                      </div>
-                      {act.sub && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: T.ink400,
-                            marginTop: 2,
-                            fontFamily: T.mono,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {act.sub}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={act.action}
-                    style={{
-                      padding: "5px 12px",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: s.bg,
-                      color: s.color,
-                      border: "1px solid " + s.bd,
-                      borderRadius: 4,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      fontFamily: T.font,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {act.cta} →
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
+          </div>
+        ) : (
+          <ActionCentre
+            title="Action Queue"
+            alerts={queueActions.map((act) => ({
+              // Severity map (render-layer only): critical→critical, warning→warn, info→warn
+              severity: act.severity === "critical" ? "critical" : "warn",
+              message: act.sub ? `${act.text} · ${act.sub}` : act.text,
+              action: {
+                label: act.cta,
+                onClick: act.action,
+              },
+            }))}
+          />
+        )}
 
         {/* ── ZONE 2: COMMAND METRICS ─────────────────────────────────────── */}
         <div
