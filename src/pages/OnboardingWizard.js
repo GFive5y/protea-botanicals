@@ -677,12 +677,14 @@ export default function OnboardingWizard() {
     try {
       // If existing products are in the DB (Vozel Vapes path), nothing to write.
       if (wizardData.existingProducts.length === 0) {
-        const toInsert = (wizardData.products || []).map((p) => ({
+        const toInsert = (wizardData.products || []).map((p, i) => ({
           tenant_id: wizardData.tenantId,
           name: p.name,
           sell_price: p.price,
           category: "finished_product",
           is_active: true,
+          // Auto-generate SKU — inventory_items.sku is NOT NULL
+          sku: `WZ-${(p.name || "PROD").replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6) || "PROD"}-${String(i + 1).padStart(2, "0")}`,
         }));
         if (toInsert.length > 0) {
           const { error: insErr } = await supabase
@@ -900,6 +902,41 @@ export default function OnboardingWizard() {
       // ── 1. Save (logo upload + branding/wizard_complete) ──────────
       const uploadedUrl = await uploadLogo();
 
+      // Query live stats for hero stat keys (best-effort — non-blocking).
+      // LL-216: these populate stat_1/3/4_value for non-cannabis storefronts.
+      let productCount = 0;
+      let categoryCount = 0;
+      let minPrice = 0;
+      try {
+        const [countRes, catRes, priceRes] = await Promise.all([
+          supabase
+            .from("inventory_items")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", wizardData.tenantId)
+            .eq("is_active", true),
+          supabase
+            .from("inventory_items")
+            .select("category")
+            .eq("tenant_id", wizardData.tenantId)
+            .eq("is_active", true),
+          supabase
+            .from("inventory_items")
+            .select("sell_price")
+            .eq("tenant_id", wizardData.tenantId)
+            .eq("is_active", true)
+            .gt("sell_price", 0)
+            .order("sell_price", { ascending: true })
+            .limit(1),
+        ]);
+        productCount = countRes.count || 0;
+        categoryCount = catRes.data
+          ? new Set(catRes.data.map((r) => r.category)).size
+          : 0;
+        minPrice = priceRes.data?.[0]?.sell_price || 0;
+      } catch (_statErr) {
+        // Non-blocking — stat keys omitted if query fails
+      }
+
       // Read current branding_config so we don't clobber adjacent keys.
       const { data: tRow } = await supabase
         .from("tenants")
@@ -908,9 +945,28 @@ export default function OnboardingWizard() {
         .single();
       const mergedBranding = {
         ...(tRow?.branding_config || {}),
+        // ── Wizard keys ─────────────────────────────────────────────
         wizard_complete: true,
         launched_at: new Date().toISOString(),
         logo_url: uploadedUrl ?? tRow?.branding_config?.logo_url ?? null,
+        // ── Legacy shop keys (required by Shop.js + ClientHeader) ───
+        // LL-216: both key sets must exist for every wizard-launched tenant.
+        brand_name: wizardData.name,
+        shop_name: wizardData.name,
+        accent_color: wizardData.brandColor,
+        btn_bg: wizardData.brandColor,
+        btn_text: "#FFFFFF",
+        hero_eyebrow: `${wizardData.name} · Online Store`,
+        hero_tagline: wizardData.tagline || "Shop now",
+        nav_logo_text: wizardData.name,
+        ...(productCount > 0 && { stat_1_value: String(productCount) }),
+        stat_1_label: "Products",
+        stat_2_value: "100%",
+        stat_2_label: "Verified",
+        ...(categoryCount > 0 && { stat_3_value: String(categoryCount) }),
+        stat_3_label: "Categories",
+        ...(minPrice > 0 && { stat_4_value: `R${Math.floor(minPrice)}+` }),
+        stat_4_label: "From",
       };
       const { error: brandErr } = await supabase
         .from("tenants")
@@ -944,7 +1000,7 @@ export default function OnboardingWizard() {
     } finally {
       setLaunching(false);
     }
-  }, [wizardData.tenantId, wizardData.slug, uploadLogo, generateWelcomeQr]);
+  }, [wizardData.tenantId, wizardData.slug, wizardData.name, wizardData.brandColor, wizardData.tagline, uploadLogo, generateWelcomeQr]);
 
   // Copy live URL to clipboard
   const copyLiveUrl = useCallback(() => {
