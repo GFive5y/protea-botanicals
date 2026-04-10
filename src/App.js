@@ -73,6 +73,7 @@ import HRDashboard from "./pages/HRDashboard"; // ★ v4.0
 import StaffPortal from "./pages/StaffPortal"; // ★ v5.0
 import ShopDashboard from "./pages/ShopDashboard";
 import TerpenePage from "./pages/TerpenePage";
+import OnboardingWizard from "./pages/OnboardingWizard"; // ✦ WP-STOREFRONT-WIZARD Phase 1
 
 import PageShell from "./components/PageShell";
 import AppShell from "./components/AppShell"; // ★ v6.0
@@ -958,6 +959,9 @@ export default function App() {
                 {/* Scan routes — standalone, no nav */}
                 <Route path="/scan" element={<ScanPage />} />
                 <Route path="/scan/:qrCode" element={<ScanResult />} />
+
+                {/* ✦ WP-STOREFRONT-WIZARD Phase 1 — standalone, no nav */}
+                <Route path="/onboarding" element={<OnboardingWizard />} />
 
                 {/* ── WITH nav + auth guard ───────────────────────────── */}
                 <Route
