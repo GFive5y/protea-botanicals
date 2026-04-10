@@ -8,7 +8,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { INDUSTRY_PROFILES } from "../../constants/industryProfiles";
 import TenantSetupWizard from "./TenantSetupWizard";
-import { sendUserInvitationEmail } from "../../services/emailService";
 
 const T = {
   ink900: "#0D0D0D",
@@ -1601,23 +1600,7 @@ export default function HQTenants() {
                           showToast(`Auth invite failed: ${inviteErr?.message || inviteData?.error || "Unknown error"}`, "error");
                           return;
                         }
-                        // Step 2: send branded welcome email via send-email EF
-                        const res = await sendUserInvitationEmail({
-                          tenantId: tenant.id,
-                          recipient: { email, name },
-                          data: {
-                            tenant_name: tenant.name,
-                            invited_name: name,
-                            inviter_name: "Nu Ai HQ",
-                            role,
-                            accept_url: `${window.location.origin}/tenant-portal`,
-                          },
-                        });
-                        if (!res.ok && !res.skipped) {
-                          showToast(`Invite created — welcome email failed: ${res.error}`, "warn");
-                        } else {
-                          showToast(`✓ Invitation sent to ${email} — magic link in their inbox`);
-                        }
+                        showToast(`✓ Invitation sent to ${email} — magic link in their inbox`);
                       }}
                       style={{
                         ...sBtn("outline"),
