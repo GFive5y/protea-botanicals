@@ -420,5 +420,37 @@ service worker cache. Correct testing protocol:
   4. Fix Invite User button (LL-212 — needs real auth invite)
 
 ---
+
+## Session v229 — 11 April 2026
+HEAD start: 872f927 · HEAD end: 19f8fe5
+Type: BRAINSTORM ONLY — no src/ changes
+
+### What happened
+Full brainstorm session on WP-DEMO-FACTORY_brainstorm_v1_0.md.
+All 8 open questions answered and decided.
+WP-DEMO-FACTORY renamed to WP-INDUSTRY-SEEDS.
+Pre-build audit protocol LL-221 added to NUAI-AGENT-BIBLE.md.
+Agent Capabilities section added to NUAI-AGENT-BIBLE.md.
+
+### Decisions made
+- Three packages: General Retail (Vozel Vapes), F&B (Nourish Kitchen), Cannabis (Medi Rec medicinal)
+- Cannabis: visible always, Medi Rec framed as medicinal/dispensary
+- Trial accounts: real 30-day trial per CA scan (Option C)
+- Wizard: full 7 steps with smart defaults in demo mode
+- Professional Services: out of scope until demand signal
+- Fix D scope error identified: requires invite-user EF, not client-side call
+
+### Commits
+19f8fe5 — docs: LL-221 pre-build audit rule + agent capabilities section (v229)
+
+### DB changes
+None this session.
+
+### Owner actions pending
+- wizard_complete still false for Vozel Vapes (run /onboarding)
+- Supabase Auth SMTP → Resend
+- CIPRO + domain
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
