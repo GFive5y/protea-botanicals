@@ -352,10 +352,13 @@ export default function OnboardingWizard() {
         ? cfg.primary_color
         : DEFAULT_BRAND;
 
-      // Map existing industry_profile to a UI tile id (best guess).
-      const tileFromDb =
-        INDUSTRY_TILES.find((t) => t.dbProfile === existing.industry_profile)
-          ?.id || null;
+      // Resume the exact tile the user originally picked. terminology_profile
+      // is written to branding_config on Step 3 — that is the source of truth.
+      // Fallback to industry_profile (DB column) only if the JSON field is absent.
+      const restoredTile =
+        cfg.terminology_profile ||
+        existing.industry_profile ||
+        "general_retail";
 
       setWizardData((prev) => ({
         ...prev,
@@ -365,8 +368,8 @@ export default function OnboardingWizard() {
         brandColor: loadedBrand,
         template: cfg.template || prev.template,
         industryProfile: existing.industry_profile || null,
-        industryTileId: tileFromDb,
-        terminologyProfile: existing.industry_profile || "general_retail",
+        industryTileId: restoredTile,
+        terminologyProfile: restoredTile,
         existingProducts: invRows || [],
         products: (invRows || []).map((r) => ({
           name: r.name,
@@ -460,9 +463,23 @@ export default function OnboardingWizard() {
     setSavingStep(true);
     setStepError(null);
     try {
+      // Read branding_config so we can merge terminology_profile without
+      // clobbering keys written by other steps (primary_color, template, etc).
+      const { data: t } = await supabase
+        .from("tenants")
+        .select("branding_config")
+        .eq("id", wizardData.tenantId)
+        .single();
+      const merged = {
+        ...(t?.branding_config || {}),
+        terminology_profile: wizardData.industryTileId,
+      };
       const { error: uErr } = await supabase
         .from("tenants")
-        .update({ industry_profile: wizardData.industryProfile })
+        .update({
+          industry_profile: wizardData.industryProfile,
+          branding_config: merged,
+        })
         .eq("id", wizardData.tenantId);
       if (uErr) throw uErr;
       setStepIndex(3);
