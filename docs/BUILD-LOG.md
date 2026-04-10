@@ -547,5 +547,39 @@ user_profiles_role_check constraint: valid roles = customer/admin/retailer/staff
 invite-user EF now sanitizes role before upsert (v3).
 
 ---
+
+## Session v232/v233 continued — 11 April 2026
+HEAD start: 108c804 · HEAD end: 0c70be0
+Type: BUILD — WP-INDUSTRY-SEEDS Phase 2 + Phase 3
+
+### Commits
+ff64f6f — docs: SESSION-STATE v232 + NEXT-SESSION-PROMPT v232 + BUILD-LOG
+5842d91 — feat(wizard): Phase 2 — wire seed-tenant on Step 7 launch (general_retail)
+c6ef399 — feat(seed-tenant): v2 — food_beverage profile (HACCP, recipes, temp logs)
+0c70be0 — fix(seed-tenant): v3 — lowercase hazard_type, refrigerated location_type, remove callSim (LL-223)
+
+### EFs deployed
+seed-tenant v1 → v2 → v3 (3 iterations, v3 is authoritative)
+trigger-sim-nourish v1 (throwaway one-shot, to be deleted)
+sim-pos-sales v2.3 (already deployed, repo file still shows v2.0)
+
+### Constraint violations found and fixed
+haccp_control_points.hazard_type CHECK: biological/chemical/physical/allergen (lowercase)
+temperature_logs.location_type CHECK: refrigerated/frozen/ambient (not cold_storage)
+Both caused silent insert failures via console.error path — same pattern as LL-222.
+
+### LL-223 discovered
+Deno EFs cannot call sibling EFs via internal fetch. callSim() removed from
+seed-tenant. Orders must be triggered via client-side invoke or MCP.
+
+### Nourish Kitchen tenant
+Created + seeded manually via Supabase MCP SQL. All 8 data categories verified.
+240 orders inserted via direct SQL (pg_net + EF invocation unreliable for long-running EFs).
+
+### What works end-to-end
+Wizard → launch → seed-tenant fires → products/HACCP/recipes/temp logs/expenses/journal ✓
+HQ RUN 30 DAYS → sim-pos-sales → orders populated ✓
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
