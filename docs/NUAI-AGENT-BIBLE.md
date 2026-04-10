@@ -584,6 +584,72 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
   app route is not. The wizard success state opens the live URL via
   target="_blank" for this reason.
 
+---
+
+## Pre-Build Audit Rules (added v229 — 11 April 2026)
+
+- **LL-221 — PRE-BUILD AUDIT IS MANDATORY BEFORE EVERY WP STAGE**:
+  Before any file is opened in Claude Code, the agent must answer these five
+  questions from the actual source code — not the spec or session docs:
+  1. Which source files does this WP touch? Read each one via GitHub MCP first.
+  2. Which DB tables are involved? Verify hq_all_ RLS policies for each (LL-205).
+  3. Which Edge Functions are called? Read their index.ts to confirm exact input/output contracts.
+  4. What prerequisites must ship before this WP works correctly?
+  5. What does the spec or brainstorm doc miss?
+  The agent writes a brief audit summary in chat (10-20 lines) before the first
+  Claude Code instruction block. If the audit reveals scope errors, the scope is
+  corrected before building begins. This rule exists because sessions go long not
+  because the code is hard, but because the scope was written without reading the
+  system. Debugging is exponentially cheaper in the planning phase.
+  ROOT CAUSE this rule addresses: WP scoped too lightly → agent builds what's
+  written → hits unscoped problem → 3 sessions of debugging → realises scope
+  was wrong from the start. Never again.
+
+---
+
+## AGENT CAPABILITIES — READ THIS AT EVERY SESSION START
+
+Every Claude agent working on NuAi has two live connections available
+throughout the session. Use them proactively — never ask the owner to
+run commands or queries that these tools can answer directly.
+
+### 1 — GitHub MCP (repo read access — READ ONLY)
+Tool: GitHub:get_file_contents
+Repo: GFive5y/protea-botanicals (public)
+Use for:
+  - Reading any source file before touching it (mandatory per LL-195)
+  - Reading all docs/ files at session start
+  - Verifying current state of any component before planning a change
+  - Confirming a feature exists or doesn't before suggesting it (LL-003/004)
+Limitation: READ ONLY from Claude.ai. NEVER call push_files or
+  create_or_update_file from Claude.ai (RULE 0Q — 12 violations logged).
+  All writes go through Claude Code.
+
+### 2 — Supabase MCP (database read + write)
+Project: uvicrqapgzcdvozxrreo (eu-west-1)
+Use for:
+  - Verifying live DB state (table row counts, column names, config values)
+  - Checking RLS policies on any table (LL-205 compliance)
+  - Reading branding_config, tenant_config, wizard_complete status
+  - Applying schema changes (new tables, new columns, new policies)
+    when no migration file workflow exists (LL-213)
+  - Seeding or correcting data when a bug is in data, not code (RULE 0H)
+Limitation: Schema changes must be recorded in BUILD-LOG.md so future
+  agents can reconstruct DB state. Never apply a schema change without
+  logging it.
+
+### Correct session start sequence using both tools
+1. GitHub:get_file_contents → docs/ directory listing → read SESSION-STATE (latest N)
+2. GitHub:get_file_contents → docs/NUAI-AGENT-BIBLE.md
+3. GitHub:get_file_contents → docs/VIOLATION_LOG_v1_1.md
+4. GitHub:get_file_contents → each source file relevant to the session's WP
+5. Supabase MCP → verify any DB state the session doc references
+   (e.g. wizard_complete, vat_registered, RLS policies on new tables)
+6. Only then: produce the build plan or Claude Code instruction block
+
+Never ask the owner to run PowerShell, bash, or Supabase SQL queries
+that these tools can answer. That is Claude's job (LL-192).
+
 ## Locked / Protected Files
 LOCKED (never modify):
 src/components/StockItemModal.js    — 14 product worlds
