@@ -274,3 +274,73 @@ Starter: R3,500/month · Professional: R6,500/month · Enterprise: R12,500/month
 ### VL-012
 5th RULE 0Q violation — push_files called from Claude.ai at session close.
 Self-check protocol added to VL-012. Rule is absolute. No exceptions.
+
+---
+## UPDATE — 11 April 2026 (post WP-MEDI-CAN + WP-FINANCIAL-PROFILES)
+
+### REVISED SCALE
+| Metric | Original (09 Apr) | Current (11 Apr) |
+|---|---|---|
+| Active client tenants | 5 | **9** |
+| Industry profiles live | 4 | **4** (cannabis_dispensary now fully functional) |
+| Cloud edge functions deployed | 10 | **12** (seed-tenant v4 + trigger-sim-nourish) |
+| Database tables | 109 | **112** (+ patients, prescriptions, dispensing_log) |
+| HQ dashboard functional tabs | 41 | **41+** (F&B modules wired to tenant portal) |
+
+### NEW TENANTS
+- Medi Can Dispensary (2bd41eb7) — cannabis_dispensary profile · SAHPRA S21 · 8 products · 5 patients · 14 dispensing events · seed_complete=true · DO NOT RE-SEED
+- Nourish Kitchen & Deli (944547e3) — food_beverage profile · 240 orders · kitchen-first nav
+- Vozel Vapes (388fe654) — general_retail · 232 orders seeded (via Maxi Retail SA: 9766a3af)
+
+### NEW/UPDATED SYSTEMS
+
+**Medical Dispensary Module (WP-MEDI-CAN — COMPLETE)**
+HQMedical.js — gated (cannabis_dispensary + feature_medical=true)
+6 sub-tabs: Patients | Prescriptions | Dispensing | Reports | Compliance | CSR
+- Patients: S21 authorisation tracking, expiry alerts, SAHPRA S21 numbers
+- Prescriptions: repeat tracking, expiry enforcement, active/inactive toggle
+- Dispensing: record events, stock deduction, Rx repeat increment
+- Voiding UI: void-only workflow (LL-226), mandatory reason, audit trail
+- Reports: monthly by patient/substance, SAHPRA CSV export
+- CSR: Controlled Substance Register, perpetual balance, running ledger
+LL-226: dispensing_log is Schedule 6 — NEVER hard-delete, void only
+
+**Profile-Adaptive Financial Suite (WP-FINANCIAL-PROFILES — COMPLETE)**
+HQProfitLoss.js: 4-profile revenue routing, benchmarks, labels, Food Cost % KPI
+  cannabis_dispensary: revenue = dispensing_log × sell_price (LL-231)
+  food_beverage: Green ≥65% · Food Cost % primary KPI target <30% (LL-232)
+  cannabis_retail: Green ≥50%
+  general_retail: Green ≥35%
+ExpenseManager.js: profile-aware subcategory system
+HQForecast.js: dispensary velocity from dispensing_log, S21 + Rx clinical alerts
+
+**4-Branch Tenant Portal Navigation (WP-PROFILE-NAV — COMPLETE)**
+TenantPortal.js getWaterfall():
+  cannabis_dispensary → Clinical-first nav (Home/Clinical/Inventory/Financials/Operations/People)
+  food_beverage → Kitchen-first nav (Home/Kitchen/Food Safety/Inventory/Sales/Financials/People)
+  cannabis_retail → Budtender nav (unchanged)
+  all others → Manufacturing nav (default)
+
+### HQ SIDEBAR LABELS (renamed 11 Apr 2026)
+Finance → Financials · Intelligence → Analytics · Procurement → Purchasing
+Paths unchanged — label only.
+
+### EDGE FUNCTIONS (current)
+| Slug | Version | Notes |
+|---|---|---|
+| seed-tenant | v4 | Supports: general_retail · food_beverage · cannabis_dispensary · repo now synced |
+| process-document | v53 | Updated from v52 |
+| auto-post-capture | v2 | Updated from v1 |
+| trigger-sim-nourish | v1 | OWNER SHOULD DELETE — throwaway one-shot |
+
+### NEW DB TABLES
+patients (cannabis_dispensary): id, tenant_id, name, id_number, date_of_birth, medical_aid,
+  contact, section_21_number, s21_expiry_date, condition, authorized_practitioner, is_active
+prescriptions (cannabis_dispensary): id, tenant_id, patient_id, doctor_name, doctor_hpcsa,
+  substance, quantity_mg, repeats, repeats_used, issue_date, expiry_date, is_active
+dispensing_log (cannabis_dispensary — Schedule 6): id, tenant_id, patient_id, prescription_id,
+  inventory_item_id, batch_id, quantity_dispensed, dispensed_by, dispensed_at, notes,
+  is_voided, void_reason, void_at, void_by
+All three tables: tenant_isolation + hq_all_ bypass policies (LL-205) ✅
+
+*Update produced from live codebase · 11 April 2026*
