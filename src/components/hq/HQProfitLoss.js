@@ -882,6 +882,8 @@ export default function HQProfitLoss() {
   const [equityLedger, setEquityLedger] = useState(null);
   const [statementStatus, setStatementStatus] = useState("draft");
   const [setupComplete, setSetupComplete] = useState(null);
+  // Dismissible setup wizard — resets on tab remount so it reappears next visit
+  const [setupDismissed, setSetupDismissed] = useState(false);
   const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
   const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
   // LL-231: cannabis_dispensary revenue from dispensing_log, NOT orders
@@ -1422,8 +1424,14 @@ export default function HQProfitLoss() {
   };
 
   // WP-FINANCIALS Phase 0: show setup wizard if not configured
-  if (setupComplete === false) {
-    return <HQFinancialSetup onComplete={() => setSetupComplete(true)} />;
+  // Dismissible: user can close with ✕ — wizard reappears on next tab visit until complete
+  if (setupComplete === false && !setupDismissed) {
+    return (
+      <HQFinancialSetup
+        onComplete={() => setSetupComplete(true)}
+        onDismiss={() => setSetupDismissed(true)}
+      />
+    );
   }
 
   return (

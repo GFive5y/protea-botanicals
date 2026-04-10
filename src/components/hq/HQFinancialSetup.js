@@ -94,7 +94,7 @@ const S = {
   },
 };
 
-export default function HQFinancialSetup({ onComplete }) {
+export default function HQFinancialSetup({ onComplete, onDismiss }) {
   const { tenant } = useTenant();
   const tenantId = tenant?.id;
   const [step, setStep] = useState(0);
@@ -408,7 +408,37 @@ export default function HQFinancialSetup({ onComplete }) {
   return (
     <div style={S.overlay}>
       <div style={S.card}>
-        <div style={S.header}>
+        <div style={{ ...S.header, position: "relative" }}>
+          {onDismiss && (
+            <button
+              onClick={onDismiss}
+              aria-label="Close setup wizard"
+              title="Close (setup will reappear until complete)"
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                border: "none",
+                background: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                fontSize: 18,
+                fontWeight: 600,
+                lineHeight: 1,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.28)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+            >
+              \u2715
+            </button>
+          )}
           <p style={S.title}>Financial Statements Setup</p>
           <p style={S.subtitle}>Step {step + 1} of 5 \u2014 {STEP_LABELS[step]}</p>
           <div style={S.progress}>
