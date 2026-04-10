@@ -952,6 +952,9 @@ function DispensingTab({
 }) {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showVoided, setShowVoided] = useState(false);
+  const [voidModal, setVoidModal] = useState(null); // { entry, reason }
+  const [voiding, setVoiding] = useState(false);
   const { tenantId } = useTenant();
 
   const EMPTY = {
@@ -964,6 +967,34 @@ function DispensingTab({
   };
   const [form, setForm] = useState(EMPTY);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  // LL-226: NEVER hard-delete dispensing_log — void only (Schedule 6 requirement)
+  const handleVoid = async () => {
+    if (!voidModal || !voidModal.reason.trim()) return;
+    setVoiding(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("dispensing_log")
+        .update({
+          is_voided: true,
+          void_reason: voidModal.reason.trim(),
+          void_at: new Date().toISOString(),
+          void_by: user?.id || null,
+        })
+        .eq("id", voidModal.entry.id)
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      setVoidModal(null);
+      onRefresh();
+    } catch (err) {
+      alert("Void failed: " + err.message);
+    } finally {
+      setVoiding(false);
+    }
+  };
 
   const patientRx = prescriptions.filter(
     (rx) => rx.patient_id === form.patient_id && rx.is_active,
@@ -1229,95 +1260,359 @@ function DispensingTab({
         </div>
       )}
 
+      {/* ── VOID CONFIRMATION MODAL (LL-226) ─────────────────────────── */}
+      {voidModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "8px",
+              padding: "28px",
+              width: "460px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+              fontFamily: T.fontUi,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                color: T.danger,
+                marginBottom: "8px",
+              }}
+            >
+              Void Dispensing Event
+            </div>
+            <div
+              style={{
+                fontSize: "12px",
+                color: T.ink500,
+                marginBottom: "16px",
+                lineHeight: "1.6",
+              }}
+            >
+              This event will be marked VOIDED in the audit log. The record is
+              permanently preserved per Schedule 6 requirements. Stock and
+              prescription repeats are not automatically adjusted — record a
+              correction dispensing event if required.
+            </div>
+            <div
+              style={{
+                background: T.ink075,
+                borderRadius: "6px",
+                padding: "12px 14px",
+                marginBottom: "16px",
+                fontSize: "12px",
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 600,
+                  color: T.ink900,
+                  marginBottom: "4px",
+                }}
+              >
+                {patients.find((p) => p.id === voidModal.entry.patient_id)
+                  ?.name || "\u2014"}
+              </div>
+              <div style={{ color: T.ink500 }}>
+                {voidModal.entry.inventory_items?.name || "\u2014"} · Qty{" "}
+                {voidModal.entry.quantity_dispensed} ·{" "}
+                {new Date(voidModal.entry.dispensed_at).toLocaleDateString(
+                  "en-ZA",
+                )}
+              </div>
+            </div>
+            <label
+              style={{
+                fontSize: "11px",
+                color: T.ink500,
+                display: "block",
+                marginBottom: "6px",
+                fontWeight: 600,
+              }}
+            >
+              Void Reason * (required for SAHPRA audit trail)
+            </label>
+            <textarea
+              style={{
+                ...sInput,
+                minHeight: "70px",
+                resize: "vertical",
+                marginBottom: "16px",
+                border: `1px solid ${T.dangerBd}`,
+              }}
+              value={voidModal.reason}
+              onChange={(e) =>
+                setVoidModal((p) => ({ ...p, reason: e.target.value }))
+              }
+              placeholder="e.g. Dispensing error — wrong product selected. Correct event re-recorded separately."
+              autoFocus
+            />
+            <div
+              style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}
+            >
+              <button
+                onClick={() => setVoidModal(null)}
+                style={sBtn("outline")}
+                disabled={voiding}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleVoid}
+                disabled={!voidModal.reason.trim() || voiding}
+                style={{
+                  ...sBtn("danger"),
+                  opacity: !voidModal.reason.trim() || voiding ? 0.5 : 1,
+                }}
+              >
+                {voiding ? "Voiding..." : "Confirm Void"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ ...sCard, padding: 0, overflow: "auto" }}>
         <div
           style={{
             padding: "14px 16px",
             borderBottom: `1px solid ${T.ink150}`,
             background: T.ink050,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
           }}
         >
           <div style={sLabel}>Recent Dispensing Events</div>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={() => setShowVoided((v) => !v)}
+            style={{
+              ...sBtn("outline"),
+              fontSize: "9px",
+              padding: "4px 10px",
+              color: showVoided ? T.danger : T.ink400,
+              borderColor: showVoided ? T.dangerBd : T.ink150,
+            }}
+          >
+            {showVoided ? "Hide Voided" : "Show Voided"}
+          </button>
         </div>
-        {loading ? (
-          <div
-            style={{
-              padding: "40px",
-              textAlign: "center",
-              color: T.ink400,
-              fontFamily: T.fontUi,
-            }}
-          >
-            Loading...
-          </div>
-        ) : log.length === 0 ? (
-          <div
-            style={{
-              padding: "40px",
-              textAlign: "center",
-              color: T.ink400,
-              fontFamily: T.fontUi,
-            }}
-          >
-            No dispensing events recorded yet.
-          </div>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={sTh}>Date</th>
-                <th style={sTh}>Patient</th>
-                <th style={sTh}>Product</th>
-                <th style={sTh}>Batch / Lot</th>
-                <th style={{ ...sTh, textAlign: "right" }}>Qty</th>
-                <th style={sTh}>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {log.map((entry) => (
-                <tr key={entry.id}>
-                  <td style={{ ...sTd, whiteSpace: "nowrap" }}>
-                    {new Date(entry.dispensed_at).toLocaleDateString("en-ZA")}
-                    <div style={{ fontSize: "10px", color: T.ink400 }}>
-                      {new Date(entry.dispensed_at).toLocaleTimeString(
-                        "en-ZA",
-                        { hour: "2-digit", minute: "2-digit" },
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ ...sTd, fontWeight: 500 }}>
-                    {patients.find((p) => p.id === entry.patient_id)?.name ||
-                      "—"}
-                  </td>
-                  <td style={sTd}>{entry.inventory_items?.name || "—"}</td>
-                  <td
+        {(() => {
+          const voidedCount = log.filter((e) => e.is_voided).length;
+          const displayLog = showVoided
+            ? log
+            : log.filter((e) => !e.is_voided);
+          return loading ? (
+            <div
+              style={{
+                padding: "40px",
+                textAlign: "center",
+                color: T.ink400,
+                fontFamily: T.fontUi,
+              }}
+            >
+              Loading...
+            </div>
+          ) : displayLog.length === 0 ? (
+            <div
+              style={{
+                padding: "40px",
+                textAlign: "center",
+                color: T.ink400,
+                fontFamily: T.fontUi,
+              }}
+            >
+              {!showVoided && voidedCount > 0
+                ? `All ${voidedCount} event${voidedCount !== 1 ? "s" : ""} are voided — click "Show Voided" to view audit trail.`
+                : "No dispensing events recorded yet."}
+            </div>
+          ) : (
+            <>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={sTh}>Date</th>
+                    <th style={sTh}>Patient</th>
+                    <th style={sTh}>Product</th>
+                    <th style={sTh}>Batch / Lot</th>
+                    <th style={{ ...sTh, textAlign: "right" }}>Qty</th>
+                    <th style={sTh}>Notes / Void Reason</th>
+                    <th style={sTh}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayLog.map((entry) => (
+                    <tr
+                      key={entry.id}
+                      style={{
+                        opacity: entry.is_voided ? 0.55 : 1,
+                        background: entry.is_voided ? T.dangerBg : "transparent",
+                      }}
+                    >
+                      <td style={{ ...sTd, whiteSpace: "nowrap" }}>
+                        <div
+                          style={{
+                            textDecoration: entry.is_voided
+                              ? "line-through"
+                              : "none",
+                          }}
+                        >
+                          {new Date(entry.dispensed_at).toLocaleDateString(
+                            "en-ZA",
+                          )}
+                          <div style={{ fontSize: "10px", color: T.ink400 }}>
+                            {new Date(entry.dispensed_at).toLocaleTimeString(
+                              "en-ZA",
+                              { hour: "2-digit", minute: "2-digit" },
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontWeight: 500,
+                          textDecoration: entry.is_voided
+                            ? "line-through"
+                            : "none",
+                        }}
+                      >
+                        {patients.find((p) => p.id === entry.patient_id)
+                          ?.name || "\u2014"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textDecoration: entry.is_voided
+                            ? "line-through"
+                            : "none",
+                        }}
+                      >
+                        {entry.inventory_items?.name || "\u2014"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontSize: "11px",
+                          color: T.ink500,
+                          fontFamily: T.fontData,
+                        }}
+                      >
+                        {entry.batches?.batch_number || "\u2014"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "right",
+                          fontFamily: T.fontData,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {entry.quantity_dispensed}
+                      </td>
+                      <td style={{ ...sTd, fontSize: "12px", color: T.ink500 }}>
+                        {entry.is_voided ? (
+                          <div>
+                            <Badge
+                              label="VOIDED"
+                              color={T.danger}
+                              bg={T.dangerBg}
+                              border={T.dangerBd}
+                            />
+                            {entry.void_reason && (
+                              <div
+                                style={{
+                                  fontSize: "10px",
+                                  color: T.danger,
+                                  marginTop: "3px",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                {entry.void_reason}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          entry.notes || "\u2014"
+                        )}
+                      </td>
+                      <td style={sTd}>
+                        {!entry.is_voided ? (
+                          <button
+                            onClick={() =>
+                              setVoidModal({ entry, reason: "" })
+                            }
+                            style={{
+                              ...sBtn("outline"),
+                              fontSize: "9px",
+                              padding: "3px 8px",
+                              color: T.danger,
+                              borderColor: T.dangerBd,
+                            }}
+                          >
+                            Void
+                          </button>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              color: T.ink400,
+                              fontStyle: "italic",
+                            }}
+                          >
+                            voided
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!showVoided && voidedCount > 0 && (
+                <div
+                  style={{
+                    padding: "8px 16px",
+                    fontSize: "11px",
+                    color: T.danger,
+                    background: T.dangerBg,
+                    borderTop: `1px solid ${T.dangerBd}`,
+                  }}
+                >
+                  {voidedCount} voided event
+                  {voidedCount !== 1 ? "s" : ""} hidden ·{" "}
+                  <button
+                    onClick={() => setShowVoided(true)}
                     style={{
-                      ...sTd,
+                      background: "none",
+                      border: "none",
+                      color: T.danger,
+                      cursor: "pointer",
+                      textDecoration: "underline",
                       fontSize: "11px",
-                      color: T.ink500,
-                      fontFamily: T.fontData,
+                      fontFamily: T.fontUi,
+                      padding: 0,
                     }}
                   >
-                    {entry.batches?.batch_number || "—"}
-                  </td>
-                  <td
-                    style={{
-                      ...sTd,
-                      textAlign: "right",
-                      fontFamily: T.fontData,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {entry.quantity_dispensed}
-                  </td>
-                  <td style={{ ...sTd, fontSize: "12px", color: T.ink500 }}>
-                    {entry.notes || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                    Show voided audit trail
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
