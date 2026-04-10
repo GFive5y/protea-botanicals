@@ -2776,7 +2776,12 @@ export default function Shop() {
 
   const handleAddToCart = (product) => {
     addToCart(product);
-    setCartToast(product.name + " — " + product.formatShort);
+    // ✦ Phase 4: formatShort is a vape-specific field. Non-vape products
+    // (general_retail / food_bev) don't have it — show name only.
+    const toastLabel = product?.formatShort
+      ? `${product?.name || "Item"} — ${product.formatShort}`
+      : product?.name || "Item";
+    setCartToast(toastLabel);
     setTimeout(() => setCartToast(null), 2200);
   };
 
@@ -2812,8 +2817,12 @@ export default function Shop() {
     (filter === "all" ||
       filter === "vapes" ||
       FILTER_OPTIONS.find((f) => f.key === filter)?.line);
+  // ✦ Phase 4: COMING_SOON is cannabis-themed (terpenes/CBD/topicals/edibles).
+  // Must not contribute to count or render on a non-cannabis storefront.
   const showCS =
-    !isCannabisRetail && (filter === "all" || filter === "coming-soon");
+    isCannabis &&
+    !isCannabisRetail &&
+    (filter === "all" || filter === "coming-soon");
   const lineFilter = FILTER_OPTIONS.find((f) => f.key === filter)?.line;
   const filteredVapes = !isCannabisRetail
     ? lineFilter
@@ -3847,6 +3856,16 @@ function FoodShopCard({ product, onAddToCart }) {
 }
 
 function GeneralShopCard({ product, onAddToCart }) {
+  // ✦ Phase 4: every field accessed below is null-safe.
+  // VVZ products only carry: id, sku, name, category, sell_price,
+  // quantity_on_hand, description, brand, etc. — no strain/THC/etc.
+  // Any optional field uses ?. or a fallback so the card never throws.
+  if (!product) return null;
+  const safePrice = Number(product?.price) || 0;
+  const safeName = product?.name || "Product";
+  const safeCategory = product?.category
+    ? product.category.replace(/_/g, " ")
+    : "Product";
   return (
     <div className="shop-card">
       <div
@@ -3865,7 +3884,7 @@ function GeneralShopCard({ product, onAddToCart }) {
               border: "1px solid rgba(27,67,50,0.15)",
             }}
           >
-            {product.category ? product.category.replace(/_/g, " ") : "Product"}
+            {safeCategory}
           </span>
         </div>
         <h3
@@ -3878,9 +3897,9 @@ function GeneralShopCard({ product, onAddToCart }) {
             lineHeight: 1.2,
           }}
         >
-          {product.name}
+          {safeName}
         </h3>
-        {product.sku && (
+        {product?.sku && (
           <p
             className="body-font"
             style={{
@@ -3894,7 +3913,7 @@ function GeneralShopCard({ product, onAddToCart }) {
             SKU: {product.sku}
           </p>
         )}
-        {product.description && (
+        {product?.description && (
           <p
             className="body-font"
             style={{
@@ -3908,7 +3927,7 @@ function GeneralShopCard({ product, onAddToCart }) {
             {product.description}
           </p>
         )}
-        {product.storage_instructions && (
+        {product?.storage_instructions && (
           <div
             style={{
               marginBottom: 14,
@@ -3948,12 +3967,12 @@ function GeneralShopCard({ product, onAddToCart }) {
             className="shop-font"
             style={{ fontSize: 26, fontWeight: 400, color: "#b5935a" }}
           >
-            R{product.price.toLocaleString()}
+            R{safePrice.toLocaleString()}
           </span>
           <button
             className="shop-btn"
             style={{ padding: "8px 18px", fontSize: 10 }}
-            onClick={() => onAddToCart(product)}
+            onClick={() => onAddToCart && onAddToCart(product)}
           >
             Add to Cart
           </button>
