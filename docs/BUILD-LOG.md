@@ -104,5 +104,42 @@ create-admin-user v4, auto-post-capture v5, receive-from-capture v4, loyalty-ai 
 send-email v1
 
 ---
+
+## Session v225 — 10 April 2026 (continued)
+**WP:** WP-STOREFRONT-WIZARD Phase 1
+**Commit:** 439ac7b
+
+### What was built
+- src/styles/wizard.css — design token system,
+  .wz-root scoped, Inter @import, color-mix() for brand
+  derivatives
+- src/components/wizard/StorefrontPreview.js — live
+  consumer shop preview with browser chrome, reactive
+  to wizardData, initials fallback, slug auto-derivation
+- src/pages/OnboardingWizard.js — 7-step wizard shell,
+  Step 1 fully built (name input + logo upload + CTA),
+  Steps 2-7 placeholders, progress bar (no step count)
+- src/App.js — additive: one import + one Route at /onboarding
+
+### Design decisions
+--wz-brand hardcoded to #2D5BE3 (Vozel Vapes) for Phase 1.
+Phase 2 injects from tenant branding_config once tenant
+context is established. color-mix() generates all soft fills
+from the single brand variable. .wz-root scoping prevents
+any bleed into existing portals.
+
+### Vozel Vapes tenant (created via MCP, not code)
+tenant_id: 388fe654-ce64-4128-819a-dcf7b810280f
+slug: vozel-vapes · industry_profile: general_retail
+primary_color: #2D5BE3 · font_family: Inter
+loyalty_config and tenant_config rows exist.
+
+### Phase 2 scope (next session)
+Steps 2–5: colour picker, industry selector, template
+picker, product entry with demo seed fallback.
+--wz-brand injection from tenant branding_config.
+Requires: read tenant row after slug is confirmed in Step 1.
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
