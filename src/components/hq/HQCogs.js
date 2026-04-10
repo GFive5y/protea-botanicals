@@ -1452,10 +1452,10 @@ export default function HQCogs() {
               color: T.ink900,
             }}
           >
-            Costing
+            COGS Builder
           </h2>
           <p style={{ margin: "4px 0 0", color: T.ink500, fontSize: 13 }}>
-            Cost-of-goods-sold per finished SKU · live ZAR calculations
+            Cost-of-goods-sold per finished SKU · live ZAR · FX-linked hardware and terpene costs
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
