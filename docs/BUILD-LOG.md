@@ -141,5 +141,114 @@ picker, product entry with demo seed fallback.
 Requires: read tenant row after slug is confirmed in Step 1.
 
 ---
+
+## Session v226 — 10 April 2026
+**WP:** WP-STOREFRONT-WIZARD Phase 2
+**Commits:** ba9e521 (Phase 2 build), 8d2b8a7 (terminology_profile fix)
+**Status:** Phase 2 SHIPPED — pushed to origin
+
+### What was built
+
+**ROUTE GUARD (Gap 3)**
+OnboardingWizard now calls supabase.auth.getSession() on mount.
+No session → <Navigate to="/account?return=/onboarding"> (matches
+existing RequireAuth convention; codebase has no /login route).
+'Loading…' fullscreen state covers the auth-check race.
+
+**BACK NAVIGATION (Gap 4)**
+'← Back' link above the progress bar for stepIndex >= 1.
+Decrements stepIndex; wizardData state object preserves all
+previous values automatically (single shared object).
+
+**STEP 1 — SLUG UNIQUENESS CHECK (Gap 2)**
+Continue handler queries tenants by slug, branches three ways:
+A) No match → INSERT stub tenant (name + slug + is_active:false +
+   branding_config:{wizard_complete:false, primary_color:#2D5BE3}).
+   Stores tenantId in wizardData. Advances.
+B) Match + wizard_complete:false → resume.
+   Loads branding_config + industry_profile + existing inventory_items.
+   Injects loaded primary_color into --wz-brand. Advances.
+C) Match + wizard_complete:true → inline error + clickable suggestion
+   chips ('<name> SA' / '<name> JHB') that update the input.
+Spinner inside CTA during the check; button disabled.
+
+**DYNAMIC --wz-brand INJECTION**
+applyBrandColor(color) writes to .wz-root via style.setProperty.
+Triggered on slug-check resolve AND on every wizardData.brandColor
+change (useEffect). color-mix() derivatives in CSS recalc automatically.
+The --wz-brand hardcode from Phase 1 is now a default, not a constraint.
+
+**STEP 2 — BRAND COLOUR**
+8 preset swatches in 4-col grid (Vozel blue first as default).
+Custom hex input with live validation (^#[0-9A-Fa-f]{6}$).
+Preview updates instantly via the CSS variable.
+Continue: select → merge → update branding_config.primary_color
+(preserves other keys written by adjacent steps).
+
+**STEP 3 — INDUSTRY + TERMINOLOGY**
+4 tiles (2x2 grid): general_retail / nicotine_vape / food_beverage /
+cannabis_retail.
+nicotine_vape tile is UI-only — DB writes industry_profile='general_retail'.
+terminology_profile (UI tile id) is also written to branding_config so
+the resume path can restore the exact tile choice.
+Continue: UPDATE both industry_profile and branding_config in one call.
+
+**STEP 4 — TEMPLATE LAYOUT**
+3 cards: Minimal / Bold / Editorial.
+Visual layout previews drawn with CSS boxes (no images, no SVGs).
+Mocks tint with --wz-brand so they update live.
+Continue: merge-update branding_config.template.
+
+**STEP 5 — FIRST PRODUCTS**
+Branches on existingProducts.length:
+- > 0 (Vozel path): read-only list with SKU/name/price + 'Add more
+  in dashboard' note. Continue enabled immediately.
+- = 0 (new tenant): inline add form (name + price), max 5 local
+  products, Continue inserts to inventory_items, OR 'Skip — add
+  products later' link seeds 4 demo products (DEMO-001..004) tagged
+  ['demo','seed'] for later cleanup.
+
+**StorefrontPreview updates**
+Now consumes terminologyProfile, template, products, brandColor from
+wizardData. Product card facet labels switch per terminologyProfile.
+Hero size, text, and grid columns shift per template choice.
+
+### Targeted fix this session (commit 8d2b8a7)
+
+Step 3 originally only wrote industry_profile (DB column).
+On resume, the wizard couldn't distinguish the general_retail tile
+from the nicotine_vape tile (both map to industry_profile='general_retail').
+User's tile choice was silently lost on every reload.
+
+Fix: Step 3 Continue now ALSO writes branding_config.terminology_profile.
+Resume path reads cfg.terminology_profile first, falls back to
+industry_profile, then 'general_retail'. Both industryTileId and
+terminologyProfile restore to that value.
+
+Vozel Vapes had terminology_profile:'nicotine_vape' set via MCP before
+the fix landed, so resume now correctly pre-selects the nicotine_vape tile.
+
+### Schema notes
+- branding_config is JSONB. Always select → merge → update; never
+  blind-overwrite (would clobber sibling keys from other steps).
+- inventory_items.category is an enum (LL-182). The Supabase JS
+  client coerces string literals at PostgREST level — no ::cast
+  needed in JS-driven inserts.
+- tenants does not require tier or type for stub insert.
+- /login route does not exist. Use /account?return=... (RequireAuth
+  convention).
+
+### Build delta
+Phase 2 build (ba9e521): main.js +3.91 kB · main.css +958 B (vs Phase 1)
+Terminology fix (8d2b8a7): negligible (~+200 B JS)
+
+### Phase 3 scope (next session)
+Steps 6 (loyalty setup) + 7 (go live).
+Step 7 writes branding_config.wizard_complete:true, generates a welcome
+QR via sign-qr EF, shows live URL + QR download.
+Logo upload to Supabase Storage (Phase 1 stored as object URL only).
+isResuming flag wired into Phase 3 welcome UI.
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
