@@ -899,7 +899,7 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
 
                 <Route
-                  path="/shop"
+                  path="/shop/:slug?"
                   element={
                     <>
                       <NavBar />

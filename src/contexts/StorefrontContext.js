@@ -51,6 +51,51 @@ export function StorefrontProvider({ children }) {
         const hostname = window.location.hostname;
         let tenantId = null;
 
+        // ── Path-based slug override (Phase 4 — wizard launch URL) ────────
+        // /shop/<slug> takes precedence over hostname/dev resolution.
+        // Wizard success state opens this URL via target="_blank", so the
+        // tab is always a fresh page load — non-reactive pathname is fine.
+        const pathMatch = window.location.pathname.match(
+          /^\/shop\/([a-z0-9-]+)\/?$/i,
+        );
+        const pathSlug = pathMatch?.[1] || null;
+        if (pathSlug) {
+          const { data: slugTenant } = await supabase
+            .from("tenants")
+            .select("id, name, industry_profile, branding_config")
+            .eq("slug", pathSlug)
+            .maybeSingle();
+          if (slugTenant) {
+            tenantId = slugTenant.id;
+            setTenantName(slugTenant.name);
+            setIndustryProfile(
+              slugTenant.industry_profile || "cannabis_retail",
+            );
+            if (
+              slugTenant.branding_config &&
+              Object.keys(slugTenant.branding_config).length > 0
+            ) {
+              setBrandingConfig({
+                ...DEFAULT_BRANDING,
+                ...slugTenant.branding_config,
+              });
+            }
+            console.log(
+              "[Storefront] Resolved tenant by slug:",
+              slugTenant.name,
+              `(${pathSlug})`,
+            );
+            setStorefrontTenantId(tenantId);
+            setLoading(false);
+            return;
+          }
+          console.warn(
+            "[Storefront] No tenant for slug:",
+            pathSlug,
+            "— falling back to hostname/dev resolution",
+          );
+        }
+
         // ── Dev fallback: localhost uses env var ──────────────────────────
         if (
           hostname === "localhost" ||
