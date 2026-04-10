@@ -997,15 +997,15 @@ export default function OnboardingWizard() {
       setLaunched(true);
 
       // Fire seed-tenant EF — non-blocking, best-effort, fire and forget.
-      // v1 supports general_retail only (covers general_retail + nicotine_vape tiles
-      // since both map industryProfile to "general_retail" in the DB).
-      // Future phases will add food_beverage + cannabis_retail branches.
-      if (wizardData.industryProfile === "general_retail") {
+      // v2 supports general_retail + food_beverage.
+      // cannabis_retail seeding is manual (Medi Rec already has rich data).
+      const seedableProfiles = ["general_retail", "food_beverage"];
+      if (wizardData.industryProfile && seedableProfiles.includes(wizardData.industryProfile)) {
         supabase.functions
           .invoke("seed-tenant", {
             body: {
               tenant_id: wizardData.tenantId,
-              industry_profile: "general_retail",
+              industry_profile: wizardData.industryProfile,
               seed_days: 30,
             },
           })
@@ -1872,7 +1872,7 @@ export default function OnboardingWizard() {
                   ? `Welcome back — ${wizardData.name} is live`
                   : "Your shop is live"}
               </h2>
-              {wizardData.industryProfile === "general_retail" && !wizardData.isResuming && (
+              {wizardData.industryProfile && ["general_retail", "food_beverage"].includes(wizardData.industryProfile) && !wizardData.isResuming && (
                 <p
                   className="wz-body"
                   style={{
