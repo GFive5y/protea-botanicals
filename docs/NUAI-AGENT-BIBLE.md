@@ -881,6 +881,14 @@ Cart → /checkout → CheckoutPage.js v2.4
 - **LL-236**: clinicalAlerts (S21 expiry pipeline + Rx repeat warnings) are dispensary-only
   forecast signals. Never render for other profiles.
 
+- **LL-237 — LL-061 RELAXED (11 Apr 2026, owner authorisation)**:
+  Original LL-061: ProteaAI.js LOCKED — CODEBASE_FACTS str_replace ONLY.
+  RELAXED TO: getSuggested() return arrays MAY be updated to improve tab-specific suggestions.
+  STILL LOCKED: All hooks, streaming logic, query execution, panel UI, handleSend, handleQuery.
+  Pattern: str_replace on specific return array contents within getSuggested() only.
+  Reason: Medical/clinical tab was returning generic prescription queries instead of
+  dispensary-specific queries (patients, S21, dispensing_log, CSR, voided events).
+
 ## LL-222 — user_profiles.role CHECK CONSTRAINT (11 April 2026)
 The user_profiles table has a hard CHECK constraint on the role column.
 VALID VALUES (exact, case-sensitive):

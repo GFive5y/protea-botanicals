@@ -493,12 +493,14 @@ function getSuggested(role, tab, isHQ, panel) {
         "Show me items with reorder quantity set",
         "Which active items have no reorder level configured?",
       ];
-    // Medical
+    // Medical / Clinical (cannabis_dispensary)
     if (t.includes("medical"))
       return [
-        "Show me active medical prescriptions",
-        "Show me prescriptions expiring this month",
-        "Show me patients registered this year",
+        "Show me all active patients with S21 authorisation numbers",
+        "Show me patients with S21 expiry within the next 60 days",
+        "Show me prescriptions with 2 or fewer repeats remaining",
+        "Show me all dispensing events from this month",
+        "Show me voided dispensing events",
       ];
     // HR
     if (t.includes("hr") || t.includes("staff") || t.includes("leave"))
@@ -619,6 +621,14 @@ function getSuggested(role, tab, isHQ, panel) {
         "What is my total outstanding invoice value?",
         "Which invoices are overdue?",
         "What is my average payment turnaround?",
+      ];
+    if (t.includes("medical"))
+      return [
+        "Which patients have S21 authorisations expiring in the next 30 days?",
+        "Are there any patients approaching their prescription repeat limit?",
+        "What is this dispensary's revenue from dispensing events this month?",
+        "Which products are being dispensed most frequently?",
+        "Are there any voided dispensing events I should review?",
       ];
     if (t.includes("hr") || t.includes("staff"))
       return [
