@@ -29,6 +29,7 @@ import HQTransfer from "../components/hq/HQTransfer";
 import RetailerHealth from "../components/hq/RetailerHealth";
 import HQPricing from "../components/hq/HQPricing";
 import HQLoyalty from "../components/hq/HQLoyalty";
+import HQMedical from "../components/hq/HQMedical";
 import HQProfitLoss from "../components/hq/HQProfitLoss";
 import HQAnalytics from "../components/hq/HQAnalytics";
 import HQReorderScoring from "../components/hq/HQReorderScoring";
@@ -67,7 +68,7 @@ import IntelStrip from "../components/IntelStrip";
 import AccountBubble from "../components/AccountBubble";
 import {
   Home, Package, ShoppingCart, Activity, ShoppingBag,
-  User, Users, TrendingUp, Briefcase, Layers, Truck,
+  User, Users, TrendingUp, Briefcase, Layers, Truck, Heart,
 } from "lucide-react";
 
 const T = {
@@ -535,6 +536,89 @@ const CANNABIS_RETAIL_WATERFALL = [
   },
 ];
 
+const CANNABIS_DISPENSARY_WATERFALL = [
+  {
+    id: "home",
+    label: "Home",
+    icon: Home,
+    color: "#1A3D2B",
+    alwaysOpen: true,
+    tabs: [
+      { id: "overview", label: "Dashboard", desc: "Dispensing KPIs \u00b7 patient alerts \u00b7 S21 expiry" },
+    ],
+  },
+  {
+    id: "clinical",
+    label: "Clinical",
+    icon: Heart,
+    color: "#166534",
+    tabs: [
+      { id: "medical", label: "Medical Records", desc: "Patients \u00b7 prescriptions \u00b7 dispensing log \u00b7 S21 compliance" },
+    ],
+  },
+  {
+    id: "inventory",
+    label: "Inventory",
+    icon: Package,
+    color: "#1A3D2B",
+    tabs: [
+      { id: "stock",         label: "Formulary Stock",  desc: "Medical products \u00b7 qty on hand \u00b7 AVCO \u00b7 movements" },
+      { id: "hq-production", label: "Batch Management", desc: "Product batches \u00b7 CoA \u00b7 lab certificates \u00b7 expiry" },
+      { id: "supply-chain",  label: "Receiving (GMP)",  desc: "Goods receipt \u00b7 supplier POs \u00b7 GMP-compliant intake" },
+    ],
+  },
+  {
+    id: "financials",
+    label: "Financials",
+    icon: TrendingUp,
+    color: "#991B1B",
+    tabs: [
+      { id: "pl",           label: "Profit & Loss",   desc: "Dispensing revenue \u00b7 COGS \u00b7 net margin" },
+      { id: "expenses",     label: "Expenses",         desc: "OPEX \u00b7 pharmacist costs \u00b7 SAHPRA fees \u00b7 cold chain" },
+      { id: "invoices",     label: "Invoices",         desc: "Patient invoices \u00b7 AR \u00b7 aged debtors" },
+      { id: "journals",     label: "Journals",         desc: "Accruals \u00b7 PAYE \u00b7 prepayments \u00b7 corrections" },
+      { id: "vat",          label: "VAT",              desc: "VAT201 \u00b7 output \u00b7 input \u00b7 SARS filing" },
+      { id: "bank-recon",   label: "Bank Recon",       desc: "Statement import \u00b7 match \u00b7 reconcile" },
+      { id: "balance-sheet",label: "Balance Sheet",    desc: "Assets \u00b7 liabilities \u00b7 equity" },
+      { id: "forecast",     label: "Forecast",         desc: "30-day cash flow \u00b7 stock depletion projection" },
+      { id: "year-end",     label: "Year-End Close",   desc: "Lock year \u00b7 post retained earnings \u00b7 archive" },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Operations",
+    icon: Activity,
+    color: "#1A3D2B",
+    tabs: [
+      { id: "cashup",       label: "Cash-Up",       desc: "End of day \u00b7 till reconciliation \u00b7 variance" },
+      { id: "documents",    label: "Documents",     desc: "SAHPRA licences \u00b7 S21 authorisations \u00b7 compliance docs" },
+      { id: "smart-capture",label: "Smart Capture", desc: "Photo \u00b7 AI reads \u00b7 auto-post to books" },
+    ],
+  },
+  {
+    id: "people",
+    label: "People",
+    icon: Briefcase,
+    color: "#374151",
+    tabs: [
+      { id: "staff",       label: "Staff",       desc: "Directory \u00b7 HPCSA records \u00b7 profiles" },
+      { id: "roster",      label: "Roster",      desc: "Pharmacist rosters \u00b7 shift schedule" },
+      { id: "timesheets",  label: "Timesheets",  desc: "Track hours \u00b7 approve \u00b7 lock" },
+      { id: "leave",       label: "Leave",       desc: "Leave requests \u00b7 balances \u00b7 approval" },
+      { id: "contracts",   label: "Contracts",   desc: "Employment contracts \u00b7 HPCSA registration" },
+      { id: "payroll",     label: "Payroll",     desc: "Pay runs \u00b7 payslips" },
+      { id: "hr-calendar", label: "Calendar",    desc: "HR calendar \u00b7 public holidays \u00b7 diary" },
+    ],
+  },
+];
+
+const DISPENSARY_ROLE_SECTIONS = {
+  staff:   ["home", "clinical"],
+  manager: ["home", "clinical", "inventory", "operations", "people"],
+  owner:   ["home", "clinical", "inventory", "financials", "operations", "people"],
+  admin:   ["home", "clinical", "inventory", "financials", "operations", "people"],
+};
+
 const CANNABIS_ROLE_SECTIONS = {
   staff:      ["home", "sales", "customers"],
   hr:         ["home", "people"],
@@ -550,7 +634,10 @@ function getCannabisSections(waterfall, role) {
 }
 
 function getWaterfall(industryProfile) {
-  if (industryProfile === "cannabis_retail" || industryProfile === "cannabis_dispensary") {
+  if (industryProfile === "cannabis_dispensary") {
+    return CANNABIS_DISPENSARY_WATERFALL;
+  }
+  if (industryProfile === "cannabis_retail") {
     return CANNABIS_RETAIL_WATERFALL;
   }
   return WATERFALL;
@@ -576,6 +663,7 @@ const PROFILE_BADGE = {
 function renderTab(tabId, tenantId, industryProfile, onTabChange, searchKey, searchFilter) {
   switch (tabId) {
     case "overview":       return <HQOverview />;
+    case "medical":        return <HQMedical />;
     case "suppliers":      return <HQSuppliers />;
     case "procurement":    return <HQPurchaseOrders tenantId={tenantId} industryProfile={industryProfile} />;
     case "supply-chain":   return <SupplyChain />;
@@ -919,7 +1007,11 @@ export default function TenantPortal() {
 
   const activeWaterfall = getWaterfall(industryProfile);
   const visibleSections =
-    activeWaterfall === CANNABIS_RETAIL_WATERFALL
+    activeWaterfall === CANNABIS_DISPENSARY_WATERFALL
+      ? activeWaterfall.filter((s) =>
+          (DISPENSARY_ROLE_SECTIONS[userRole] || DISPENSARY_ROLE_SECTIONS.owner).includes(s.id)
+        )
+      : activeWaterfall === CANNABIS_RETAIL_WATERFALL
       ? getCannabisSections(activeWaterfall, userRole)
       : activeWaterfall.filter((s) =>
           (ROLE_SECTIONS[userRole] || ROLE_SECTIONS.owner).includes(s.id)

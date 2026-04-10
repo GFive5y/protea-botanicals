@@ -945,6 +945,7 @@ function DispensingTab({
   patients,
   prescriptions,
   items,
+  batches,
   log,
   loading,
   onRefresh,
@@ -957,6 +958,7 @@ function DispensingTab({
     patient_id: "",
     prescription_id: "",
     inventory_item_id: "",
+    batch_id: "",
     quantity_dispensed: "",
     notes: "",
   };
@@ -1014,6 +1016,7 @@ function DispensingTab({
         patient_id: form.patient_id,
         tenant_id: tenantId,
         inventory_item_id: form.inventory_item_id,
+        batch_id: form.batch_id || null,
         quantity_dispensed: qty,
         dispensed_by: user?.id || null,
         dispensed_at: new Date().toISOString(),
@@ -1168,6 +1171,30 @@ function DispensingTab({
               </select>
             </div>
             <div>
+              {lbl("Batch / Lot Reference")}
+              <select
+                style={sSelect}
+                value={form.batch_id}
+                onChange={(e) => set("batch_id", e.target.value)}
+                disabled={!form.inventory_item_id}
+              >
+                <option value="">— No specific batch —</option>
+                {(batches || [])
+                  .filter((b) =>
+                    !form.inventory_item_id ||
+                    b.inventory_item_id === form.inventory_item_id,
+                  )
+                  .map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.batch_number}
+                      {b.expiry_date
+                        ? ` · exp ${new Date(b.expiry_date).toLocaleDateString("en-ZA")}`
+                        : ""}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
               {lbl("Quantity Dispensed *")}
               <input
                 style={sInput}
@@ -1241,8 +1268,8 @@ function DispensingTab({
                 <th style={sTh}>Date</th>
                 <th style={sTh}>Patient</th>
                 <th style={sTh}>Product</th>
+                <th style={sTh}>Batch / Lot</th>
                 <th style={{ ...sTh, textAlign: "right" }}>Qty</th>
-                <th style={sTh}>Prescription</th>
                 <th style={sTh}>Notes</th>
               </tr>
             </thead>
@@ -1266,24 +1293,22 @@ function DispensingTab({
                   <td
                     style={{
                       ...sTd,
+                      fontSize: "11px",
+                      color: T.ink500,
+                      fontFamily: T.fontData,
+                    }}
+                  >
+                    {entry.batches?.batch_number || "—"}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
                       textAlign: "right",
                       fontFamily: T.fontData,
                       fontWeight: 600,
                     }}
                   >
                     {entry.quantity_dispensed}
-                  </td>
-                  <td
-                    style={{
-                      ...sTd,
-                      fontSize: "11px",
-                      color: T.ink500,
-                      fontFamily: T.fontData,
-                    }}
-                  >
-                    {entry.prescription_id
-                      ? entry.prescription_id.slice(0, 8) + "..."
-                      : "—"}
                   </td>
                   <td style={{ ...sTd, fontSize: "12px", color: T.ink500 }}>
                     {entry.notes || "—"}
@@ -1806,6 +1831,7 @@ export default function HQMedical() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [dispensingLog, setDispensingLog] = useState([]);
   const [items, setItems] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const { tenantId, tenantConfig, industryProfile } = useTenant();
 
@@ -1817,7 +1843,7 @@ export default function HQMedical() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [pR, rxR, logR, invR] = await Promise.all([
+      const [pR, rxR, logR, invR, batchR] = await Promise.all([
         supabase
           .from("patients")
           .select("*")
@@ -1831,7 +1857,7 @@ export default function HQMedical() {
           .order("created_at", { ascending: false }),
         supabase
           .from("dispensing_log")
-          .select("*, inventory_items(name,sku)")
+          .select("*, inventory_items(name,sku), batches(batch_number,expiry_date)")
           .eq("tenant_id", tenantId)
           .order("dispensed_at", { ascending: false })
           .limit(200),
@@ -1840,6 +1866,12 @@ export default function HQMedical() {
           .select("id,name,sku,category,quantity_on_hand")
           .eq("is_active", true)
           .order("name"),
+        supabase
+          .from("batches")
+          .select("id,batch_number,product_name,inventory_item_id,expiry_date,section_21_number")
+          .eq("tenant_id", tenantId)
+          .eq("is_archived", false)
+          .order("batch_number"),
       ]);
       if (pR.error) throw pR.error;
       if (rxR.error) throw rxR.error;
@@ -1848,6 +1880,7 @@ export default function HQMedical() {
       setPrescriptions(rxR.data || []);
       setDispensingLog(logR.data || []);
       setItems(invR.data || []);
+      setBatches(batchR.data || []);
     } catch (err) {
       console.error("[HQMedical] fetchAll error:", err.message);
     } finally {
@@ -2038,6 +2071,7 @@ export default function HQMedical() {
           patients={patients}
           prescriptions={prescriptions}
           items={items}
+          batches={batches}
           log={dispensingLog}
           loading={loading}
           onRefresh={fetchAll}
