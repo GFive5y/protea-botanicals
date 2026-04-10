@@ -138,6 +138,12 @@ const HQ_PAGES = [
   },
   {
     group: "Intelligence",
+    icon: "🗺️",
+    label: "Geo Analytics",
+    path: "/hq?tab=geo-analytics",
+  },
+  {
+    group: "Intelligence",
     icon: "🏆",
     label: "Retailer health",
     path: "/hq?tab=retailer-health",
@@ -149,10 +155,10 @@ const HQ_PAGES = [
     path: "/hq?tab=reorder",
   },
   // ── Platform ─────────────────────────────────────────────────────────────────
-  { group: "Platform", icon: "ðŸ¢", label: "Tenants", path: "/hq?tab=tenants" },
+  { group: "Platform", icon: "🏢", label: "Tenants", path: "/hq?tab=tenants" },
   {
     group: "Platform",
-    icon: "âš•ï¸",
+    icon: "⚕️",
     label: "Medical",
     path: "/hq?tab=medical",
   },
