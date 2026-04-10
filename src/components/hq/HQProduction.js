@@ -30,6 +30,7 @@ import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
+import ActionCentre from "../shared/ActionCentre";
 
 // ── Design tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -2033,132 +2034,37 @@ export default function HQProduction() {
 
   return (
     <div style={{ fontFamily: T.fontUi }}>
-      {/* ── Stock alerts — standard semantic templates ── */}
-      {(depleted.length > 0 || lowStock.length > 0) && !loading && (
-        <div style={{ marginBottom: "20px" }}>
-          {depleted.length > 0 && (
-            <div
-              style={{
-                background: T.dangerBg,
-                border: `1px solid ${T.dangerBd}`,
-                borderRadius: "6px",
-                padding: "14px 18px",
-                marginBottom: "10px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: T.danger,
-                    fontFamily: T.fontUi,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  {depleted.length} product{depleted.length > 1 ? "s" : ""} out
-                  of stock — shop hidden
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {depleted.map((i) => (
-                    <span
-                      key={i.id}
-                      style={{
-                        fontSize: "11px",
-                        background: "rgba(153,27,27,0.08)",
-                        color: T.danger,
-                        padding: "2px 10px",
-                        borderRadius: "3px",
-                        fontFamily: T.fontUi,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {i.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={() => setSubTab("new-run")}
-                style={{ ...sBtn("danger"), whiteSpace: "nowrap" }}
-              >
-                {isFoodBevMain
+      {/* ── Stock alerts — ActionCentre (collapsible, session-dismissible) ── */}
+      {!loading && (depleted.length > 0 || lowStock.length > 0) && (
+        <ActionCentre
+          title="Stock Alerts"
+          alerts={[
+            ...depleted.map((i) => ({
+              severity: "critical",
+              message: `${i.name} — out of stock · shop hidden`,
+              action: {
+                label: isFoodBevMain
                   ? "Start Recipe Run"
                   : isGeneralRetailMain
                     ? "Receive Stock"
-                    : "New Production Run"}
-              </button>
-            </div>
-          )}
-          {lowStock.length > 0 && (
-            <div
-              style={{
-                background: T.warningBg,
-                border: `1px solid ${T.warningBd}`,
-                borderRadius: "6px",
-                padding: "14px 18px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: T.warning,
-                    fontFamily: T.fontUi,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  {lowStock.length} product{lowStock.length > 1 ? "s" : ""}{" "}
-                  running low
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {lowStock.map((i) => (
-                    <span
-                      key={i.id}
-                      style={{
-                        fontSize: "11px",
-                        background: "rgba(146,64,14,0.08)",
-                        color: T.warning,
-                        padding: "2px 10px",
-                        borderRadius: "3px",
-                        fontFamily: T.fontUi,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {i.name} —{" "}
-                      {Math.floor(parseFloat(i.quantity_on_hand || 0))} left
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <button
-                onClick={() => setSubTab("new-run")}
-                style={{ ...sBtn("amber"), whiteSpace: "nowrap" }}
-              >
-                {isFoodBevMain
+                    : "New Production Run",
+                onClick: () => setSubTab("new-run"),
+              },
+            })),
+            ...lowStock.map((i) => ({
+              severity: "warn",
+              message: `${i.name} — ${Math.floor(parseFloat(i.quantity_on_hand || 0))} left (running low)`,
+              action: {
+                label: isFoodBevMain
                   ? "Start Recipe Run"
                   : isGeneralRetailMain
                     ? "Receive Stock"
-                    : "Plan Production"}
-              </button>
-            </div>
-          )}
-        </div>
+                    : "Plan Production",
+                onClick: () => setSubTab("new-run"),
+              },
+            })),
+          ]}
+        />
       )}
 
       <WorkflowGuide
