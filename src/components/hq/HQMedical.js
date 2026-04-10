@@ -149,6 +149,10 @@ function PatientsTab({ patients, loading, onRefresh }) {
     medical_aid: "",
     contact: "",
     notes: "",
+    section_21_number: "",
+    s21_expiry_date: "",
+    condition: "",
+    authorized_practitioner: "",
   };
   const [form, setForm] = useState(EMPTY);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -171,6 +175,10 @@ function PatientsTab({ patients, loading, onRefresh }) {
       medical_aid: p.medical_aid || "",
       contact: p.contact || "",
       notes: p.notes || "",
+      section_21_number: p.section_21_number || "",
+      s21_expiry_date: p.s21_expiry_date || "",
+      condition: p.condition || "",
+      authorized_practitioner: p.authorized_practitioner || "",
     });
     setShowForm(true);
   };
@@ -190,6 +198,10 @@ function PatientsTab({ patients, loading, onRefresh }) {
         contact: form.contact.trim() || null,
         notes: form.notes.trim() || null,
         is_active: true,
+        section_21_number: form.section_21_number.trim() || null,
+        s21_expiry_date: form.s21_expiry_date || null,
+        condition: form.condition.trim() || null,
+        authorized_practitioner: form.authorized_practitioner.trim() || null,
       };
       if (editPatient) {
         const { error } = await supabase
@@ -320,6 +332,42 @@ function PatientsTab({ patients, loading, onRefresh }) {
                 onChange={(e) => set("contact", e.target.value)}
               />
             </div>
+            <div>
+              {lbl("Section 21 Number")}
+              <input
+                style={sInput}
+                value={form.section_21_number}
+                onChange={(e) => set("section_21_number", e.target.value)}
+                placeholder="e.g. SAHPRA/S21/2025/001"
+              />
+            </div>
+            <div>
+              {lbl("S21 Expiry Date")}
+              <input
+                style={sInput}
+                type="date"
+                value={form.s21_expiry_date}
+                onChange={(e) => set("s21_expiry_date", e.target.value)}
+              />
+            </div>
+            <div>
+              {lbl("Condition / Diagnosis")}
+              <input
+                style={sInput}
+                value={form.condition}
+                onChange={(e) => set("condition", e.target.value)}
+                placeholder="e.g. Chronic pain — lower back"
+              />
+            </div>
+            <div>
+              {lbl("Authorised Practitioner")}
+              <input
+                style={sInput}
+                value={form.authorized_practitioner}
+                onChange={(e) => set("authorized_practitioner", e.target.value)}
+                placeholder="e.g. Dr. M. van der Berg (MP0123456)"
+              />
+            </div>
           </div>
           <div style={{ marginBottom: "12px" }}>
             {lbl("Notes")}
@@ -387,6 +435,10 @@ function PatientsTab({ patients, loading, onRefresh }) {
                 <th style={sTh}>Date of Birth</th>
                 <th style={sTh}>Medical Aid</th>
                 <th style={sTh}>Contact</th>
+                <th style={sTh}>Section 21 No.</th>
+                <th style={sTh}>S21 Expiry</th>
+                <th style={sTh}>Condition</th>
+                <th style={sTh}>Authorised By</th>
                 <th style={sTh}>Actions</th>
               </tr>
             </thead>
@@ -407,6 +459,83 @@ function PatientsTab({ patients, loading, onRefresh }) {
                   <td style={sTd}>{fmtDate(p.date_of_birth)}</td>
                   <td style={sTd}>{p.medical_aid || "—"}</td>
                   <td style={sTd}>{p.contact || "—"}</td>
+                  <td
+                    style={{
+                      ...sTd,
+                      fontFamily: T.fontData,
+                      fontSize: "11px",
+                      color: T.ink500,
+                    }}
+                  >
+                    {p.section_21_number || "—"}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      color: (() => {
+                        if (!p.s21_expiry_date) return T.ink700;
+                        const days = Math.ceil(
+                          (new Date(p.s21_expiry_date) - new Date()) / 86400000,
+                        );
+                        return days < 0
+                          ? T.danger
+                          : days <= 30
+                            ? T.warning
+                            : T.ink700;
+                      })(),
+                    }}
+                  >
+                    {fmtDate(p.s21_expiry_date)}
+                    {p.s21_expiry_date &&
+                      (() => {
+                        const days = Math.ceil(
+                          (new Date(p.s21_expiry_date) - new Date()) / 86400000,
+                        );
+                        if (days < 0)
+                          return (
+                            <div
+                              style={{
+                                fontSize: "9px",
+                                color: T.danger,
+                                fontWeight: 700,
+                              }}
+                            >
+                              EXPIRED
+                            </div>
+                          );
+                        if (days <= 30)
+                          return (
+                            <div
+                              style={{
+                                fontSize: "9px",
+                                color: T.warning,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {days}d left
+                            </div>
+                          );
+                        return null;
+                      })()}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      fontSize: "12px",
+                      color: T.ink700,
+                    }}
+                  >
+                    {p.condition || "—"}
+                  </td>
+                  <td
+                    style={{
+                      ...sTd,
+                      fontSize: "11px",
+                      color: T.ink500,
+                    }}
+                  >
+                    {p.authorized_practitioner || "—"}
+                  </td>
                   <td style={sTd}>
                     <button
                       onClick={() => openEdit(p)}
@@ -1365,11 +1494,6 @@ function ComplianceTab({ prescriptions, patients, log }) {
     if (!rx.expiry_date || !rx.is_active) return false;
     return new Date(rx.expiry_date) < new Date();
   });
-  const noRepeats = prescriptions.filter(
-    (rx) =>
-      rx.is_active &&
-      Math.max(0, (rx.repeats || 0) - (rx.repeats_used || 0)) === 0,
-  );
 
   return (
     <div style={{ display: "grid", gap: "20px" }}>
@@ -1396,7 +1520,26 @@ function ComplianceTab({ prescriptions, patients, log }) {
             color: T.info,
           },
           {
-            label: "Expiring Soon",
+            label: "S21 Expiring 60d",
+            value: patients.filter((p) => {
+              if (!p.s21_expiry_date || !p.is_active) return false;
+              const days = Math.ceil(
+                (new Date(p.s21_expiry_date) - new Date()) / 86400000,
+              );
+              return days >= 0 && days <= 60;
+            }).length,
+            color: patients.some((p) => {
+              if (!p.s21_expiry_date || !p.is_active) return false;
+              const days = Math.ceil(
+                (new Date(p.s21_expiry_date) - new Date()) / 86400000,
+              );
+              return days >= 0 && days <= 60;
+            })
+              ? T.warning
+              : T.success,
+          },
+          {
+            label: "Rx Expiring 30d",
             value: expiringSoon.length,
             color: expiringSoon.length > 0 ? T.warning : T.success,
           },
@@ -1404,11 +1547,6 @@ function ComplianceTab({ prescriptions, patients, log }) {
             label: "Expired Rx",
             value: expired.length,
             color: expired.length > 0 ? T.danger : T.success,
-          },
-          {
-            label: "No Repeats Left",
-            value: noRepeats.length,
-            color: noRepeats.length > 0 ? T.warning : T.success,
           },
           { label: "Total Dispensed", value: log.length, color: T.ink900 },
         ].map((s) => (
@@ -1443,6 +1581,105 @@ function ComplianceTab({ prescriptions, patients, log }) {
           </div>
         ))}
       </div>
+
+      {/* S21 Authorization expiry monitoring */}
+      {(() => {
+        const s21Expiring = patients.filter((p) => {
+          if (!p.s21_expiry_date || !p.is_active) return false;
+          const days = Math.ceil(
+            (new Date(p.s21_expiry_date) - new Date()) / 86400000,
+          );
+          return days >= 0 && days <= 60;
+        });
+        const s21Expired = patients.filter((p) => {
+          if (!p.s21_expiry_date || !p.is_active) return false;
+          return new Date(p.s21_expiry_date) < new Date();
+        });
+        if (s21Expiring.length === 0 && s21Expired.length === 0) return null;
+        return (
+          <div
+            style={{
+              ...sCard,
+              border: `1px solid ${s21Expired.length > 0 ? T.dangerBd : T.warningBd}`,
+              borderLeft: `3px solid ${s21Expired.length > 0 ? T.danger : T.warning}`,
+            }}
+          >
+            <div
+              style={{
+                ...sLabel,
+                color: s21Expired.length > 0 ? T.danger : T.warning,
+                marginBottom: "12px",
+              }}
+            >
+              Section 21 Authorizations —{" "}
+              {s21Expired.length > 0
+                ? `${s21Expired.length} expired, action required`
+                : `${s21Expiring.length} expiring within 60 days`}
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={sTh}>Patient</th>
+                  <th style={sTh}>S21 Number</th>
+                  <th style={sTh}>Condition</th>
+                  <th style={sTh}>Expiry Date</th>
+                  <th style={{ ...sTh, textAlign: "center" }}>Days Left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...s21Expired, ...s21Expiring].map((p) => {
+                  const days = Math.ceil(
+                    (new Date(p.s21_expiry_date) - new Date()) / 86400000,
+                  );
+                  const isExpired = days < 0;
+                  return (
+                    <tr key={p.id}>
+                      <td style={{ ...sTd, fontWeight: 500 }}>{p.name}</td>
+                      <td
+                        style={{
+                          ...sTd,
+                          fontFamily: T.fontData,
+                          fontSize: "11px",
+                          color: T.ink500,
+                        }}
+                      >
+                        {p.section_21_number || "—"}
+                      </td>
+                      <td style={{ ...sTd, fontSize: "12px" }}>
+                        {p.condition || "—"}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          color: isExpired ? T.danger : T.warning,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {fmtDate(p.s21_expiry_date)}
+                      </td>
+                      <td
+                        style={{
+                          ...sTd,
+                          textAlign: "center",
+                          fontFamily: T.fontData,
+                          fontWeight: 700,
+                          color: isExpired
+                            ? T.danger
+                            : days <= 14
+                              ? T.danger
+                              : T.warning,
+                        }}
+                      >
+                        {isExpired ? "EXPIRED" : days}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       {expiringSoon.length > 0 && (
         <div
