@@ -27,7 +27,6 @@ import {
 import { supabase } from "../../services/supabaseClient";
 import { showCannabisField } from "../../constants/industryProfiles";
 import { useTenant } from "../../services/tenantService";
-import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
 import ActionCentre from "../shared/ActionCentre";
@@ -2034,45 +2033,50 @@ export default function HQProduction() {
 
   return (
     <div style={{ fontFamily: T.fontUi }}>
-      {/* ── Stock alerts — ActionCentre (collapsible, session-dismissible) ── */}
-      {!loading && (depleted.length > 0 || lowStock.length > 0) && (
-        <ActionCentre
-          title="Stock Alerts"
-          alerts={[
-            ...depleted.map((i) => ({
-              severity: "critical",
-              message: `${i.name} — out of stock · shop hidden`,
-              action: {
-                label: isFoodBevMain
-                  ? "Start Recipe Run"
-                  : isGeneralRetailMain
-                    ? "Receive Stock"
-                    : "New Production Run",
-                onClick: () => setSubTab("new-run"),
-              },
-            })),
-            ...lowStock.map((i) => ({
-              severity: "warn",
-              message: `${i.name} — ${Math.floor(parseFloat(i.quantity_on_hand || 0))} left (running low)`,
-              action: {
-                label: isFoodBevMain
-                  ? "Start Recipe Run"
-                  : isGeneralRetailMain
-                    ? "Receive Stock"
-                    : "Plan Production",
-                onClick: () => setSubTab("new-run"),
-              },
-            })),
-          ]}
-        />
-      )}
+      {/* ── Action Centre — stock alerts + workflow warnings (collapsible, session-dismissible) ── */}
+      {/* WorkflowGuide hidden on this tab (Option A): ctx.warnings now flow into ActionCentre below */}
+      {!loading &&
+        (depleted.length > 0 ||
+          lowStock.length > 0 ||
+          (ctx && !ctx.loading && (ctx.warnings?.length ?? 0) > 0)) && (
+          <ActionCentre
+            title="Action Centre"
+            alerts={[
+              ...depleted.map((i) => ({
+                severity: "critical",
+                message: `${i.name} — out of stock · shop hidden`,
+                action: {
+                  label: isFoodBevMain
+                    ? "Start Recipe Run"
+                    : isGeneralRetailMain
+                      ? "Receive Stock"
+                      : "New Production Run",
+                  onClick: () => setSubTab("new-run"),
+                },
+              })),
+              ...lowStock.map((i) => ({
+                severity: "warn",
+                message: `${i.name} — ${Math.floor(parseFloat(i.quantity_on_hand || 0))} left (running low)`,
+                action: {
+                  label: isFoodBevMain
+                    ? "Start Recipe Run"
+                    : isGeneralRetailMain
+                      ? "Receive Stock"
+                      : "Plan Production",
+                  onClick: () => setSubTab("new-run"),
+                },
+              })),
+              // usePageContext("hq-production") warnings — zero-price / COA / expiry / no-run
+              ...(ctx && !ctx.loading
+                ? (ctx.warnings || []).map((w) => ({
+                    severity: "warn",
+                    message: String(w).replace(/^⚠\s*/, ""),
+                  }))
+                : []),
+            ]}
+          />
+        )}
 
-      <WorkflowGuide
-        context={ctx}
-        tabId="hq-production"
-        onAction={(action) => action.tab && setSubTab(action.tab)}
-        defaultOpen={true}
-      />
       <HowItWorksBanner />
 
       {/* Sub-tabs — standard underline style */}
