@@ -3440,7 +3440,9 @@ export default function Shop() {
                 fontWeight: 500,
               }}
             >
-              Protea Rewards
+              {isCannabis
+                ? "Protea Rewards"
+                : (brandingConfig?.loyalty_program_name || `${brandName} Rewards`)}
             </span>
             <h2
               className="shop-font"
@@ -3462,8 +3464,9 @@ export default function Shop() {
                 margin: 0,
               }}
             >
-              Scan your product QR code to earn loyalty points and unlock
-              exclusive rewards.
+              {isCannabis
+                ? "Scan your product QR code to earn loyalty points and unlock exclusive rewards."
+                : "Earn points on every purchase and unlock exclusive rewards."}
             </p>
           </div>
           <div
@@ -3613,7 +3616,7 @@ export default function Shop() {
               margin: 0,
             }}
           >
-            © 2026 {brandName} · Lab Verified · QR Authenticated
+            © 2026 {brandName}{isCannabis ? " · Lab Verified · QR Authenticated" : ""}
           </p>
         </div>
       </div>
