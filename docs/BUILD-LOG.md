@@ -581,5 +581,54 @@ Wizard → launch → seed-tenant fires → products/HACCP/recipes/temp logs/exp
 HQ RUN 30 DAYS → sim-pos-sales → orders populated ✓
 
 ---
+
+## Session v234 — 11 April 2026
+HEAD start: 32c7f18 · HEAD end: TBD
+Type: BUILD — WP-MEDI-CAN Stage 1
+
+### Actions completed (Claude.ai MCP — no code commits)
+
+**Schema migrations applied:**
+  medical_tables_hq_bypass_and_schema_enhancements
+  - Fixed LL-205 violation: added hq_all_ bypass policies to patients, prescriptions, dispensing_log
+  - Added to patients: section_21_number, s21_expiry_date, condition, authorized_practitioner, updated_at
+  - Added to dispensing_log: is_voided, void_reason, void_at, void_by (LL-226 compliance)
+  - Added indexes: idx_patients_s21, idx_dispensing_log_patient, idx_dispensing_log_tenant
+
+**Medi Can Dispensary tenant created + seeded:**
+  tenant_id: 2bd41eb7-1a6e-416c-905b-1358f6499d8d
+  slug: medi-can · profile: cannabis_dispensary · tier: pro
+  Products: 8 (MC-OIL-001 through MC-INH-001) ✓
+  Patients: 5 (with S21 numbers, conditions, practitioners) ✓
+  Prescriptions: 5 (active, with repeats tracking) ✓
+  Dispensing events: 14 (30 days history) ✓
+  Expenses: 6 (dispensary-specific: pharmacist, SAHPRA fees, cold chain) ✓
+  Stock movements: 8 (opening stock) ✓
+  Journal: 1 opening entry (SEED-OPEN-001, R85,000) ✓
+  seed_complete: true ✓
+
+**HQMedical.js audit findings:**
+  Component is complete — 5 tabs: Patients, Prescriptions, Dispensing, Reports, Compliance
+  Queries: patients, prescriptions, dispensing_log, inventory_items
+  Gate: feature_medical = true AND industry_profile = 'cannabis_dispensary'
+  MISSING fields now added: section_21_number, s21_expiry_date, condition, authorized_practitioner
+  These should be surfaced in the Patients tab UI in next session
+
+**WP-INDUSTRY-PROFILES v1.0 confirmed committed by Claude Code**
+
+### What HQMedical needs in next session (Stage 2)
+1. Patients tab: show section_21_number, s21_expiry_date, condition in table + form
+2. Compliance tab: S21 expiry alerts (separate from Rx expiry)
+3. Dispensing log: show batch_id linkage for CSR traceability
+4. Add sim-pos-sales support for cannabis_dispensary (dispensing revenue model)
+5. seed-tenant v4: add cannabis_dispensary branch (so wizard auto-seeds this data)
+
+### Key facts
+HQMedical gate: tenantConfig?.feature_medical !== false AND industryProfile === 'cannabis_dispensary'
+Medi Can tenant_id: 2bd41eb7-1a6e-416c-905b-1358f6499d8d
+Do NOT re-seed (idempotency: seed_complete = true)
+LL-226: dispensing_log entries must NEVER be hard-deleted — use is_voided=true + void_reason
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
