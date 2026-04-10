@@ -619,6 +619,78 @@ const DISPENSARY_ROLE_SECTIONS = {
   admin:   ["home", "clinical", "inventory", "financials", "operations", "people"],
 };
 
+const FOOD_BEVERAGE_WATERFALL = [
+  {
+    id: "home", label: "Home", icon: Home, color: "#1A3D2B", alwaysOpen: true,
+    tabs: [{ id: "overview", label: "Dashboard", desc: "Daily covers \u00b7 food cost % \u00b7 kitchen alerts" }],
+  },
+  {
+    id: "kitchen", label: "Kitchen", icon: Layers, color: "#92400E",
+    tabs: [
+      { id: "hq-production",   label: "Recipe Runs",       desc: "Production runs \u00b7 yield \u00b7 QC \u00b7 allergen log" },
+      { id: "hq-recipes",      label: "Recipes",            desc: "Recipe engine \u00b7 cost per portion \u00b7 BOM" },
+      { id: "hq-ingredients",  label: "Ingredients",        desc: "SA DAFF ingredients \u00b7 allergen matrix" },
+    ],
+  },
+  {
+    id: "food-safety", label: "Food Safety", icon: Activity, color: "#1E3A5F",
+    tabs: [
+      { id: "hq-haccp",        label: "HACCP",              desc: "Control points \u00b7 CCPs \u00b7 corrective actions" },
+      { id: "hq-food-safety",  label: "Food Safety",        desc: "R638 compliance \u00b7 certificates \u00b7 checklists" },
+      { id: "hq-cold-chain",   label: "Cold Chain",         desc: "Temperature logs \u00b7 breach alerts" },
+      { id: "hq-recall",       label: "Recall & Trace",     desc: "Lot traceability \u00b7 FSCA recall events" },
+      { id: "hq-nutrition",    label: "Nutrition Labels",   desc: "Per-portion macros \u00b7 allergen declaration" },
+    ],
+  },
+  {
+    id: "inventory", label: "Inventory", icon: Package, color: "#1A3D2B",
+    tabs: [
+      { id: "stock",           label: "Stock Control",      desc: "Raw materials \u00b7 FEFO \u00b7 movements \u00b7 AVCO" },
+      { id: "supply-chain",    label: "Suppliers & POs",    desc: "Produce orders \u00b7 delivery receipt \u00b7 GRN" },
+    ],
+  },
+  {
+    id: "sales", label: "Sales & Service", icon: ShoppingBag, color: "#065F46",
+    tabs: [
+      { id: "trading",         label: "Daily Trading",      desc: "Covers \u00b7 avg spend \u00b7 revenue vs food cost" },
+      { id: "cashup",          label: "Cash-Up",            desc: "EOD \u00b7 till reconciliation \u00b7 variance" },
+      { id: "pos",             label: "POS Till",           desc: "Table service \u00b7 takeaway \u00b7 delivery orders" },
+      { id: "loyalty",         label: "Loyalty",            desc: "Repeat customer rewards" },
+    ],
+  },
+  {
+    id: "financials", label: "Financials", icon: TrendingUp, color: "#991B1B",
+    tabs: [
+      { id: "pl",              label: "Profit & Loss",      desc: "Food cost % \u00b7 gross margin \u00b7 net profit" },
+      { id: "expenses",        label: "Expenses",           desc: "OPEX \u00b7 produce costs \u00b7 wages" },
+      { id: "invoices",        label: "Invoices",           desc: "Supplier invoices \u00b7 customer receipts" },
+      { id: "journals",        label: "Journals",           desc: "Accruals \u00b7 prepayments \u00b7 corrections" },
+      { id: "vat",             label: "VAT",                desc: "VAT201 \u00b7 output \u00b7 input \u00b7 SARS filing" },
+      { id: "bank-recon",      label: "Bank Recon",         desc: "Statement import \u00b7 match \u00b7 reconcile" },
+      { id: "balance-sheet",   label: "Balance Sheet",      desc: "Assets \u00b7 liabilities \u00b7 equity" },
+      { id: "forecast",        label: "Forecast",           desc: "Revenue projection \u00b7 food cost trend" },
+      { id: "year-end",        label: "Year-End Close",     desc: "Lock year \u00b7 retained earnings \u00b7 archive" },
+    ],
+  },
+  {
+    id: "people", label: "People", icon: Briefcase, color: "#374151",
+    tabs: [
+      { id: "staff",           label: "Staff",              desc: "Kitchen \u00b7 FOH \u00b7 delivery \u00b7 HPCSA records" },
+      { id: "roster",          label: "Roster",             desc: "Who is working this week \u00b7 shift schedule" },
+      { id: "timesheets",      label: "Timesheets",         desc: "Track hours \u00b7 approve \u00b7 lock" },
+      { id: "leave",           label: "Leave",              desc: "Leave requests \u00b7 balances \u00b7 approval" },
+      { id: "payroll",         label: "Payroll",            desc: "Pay runs \u00b7 payslips" },
+    ],
+  },
+];
+
+const FB_ROLE_SECTIONS = {
+  staff:   ["home", "kitchen", "sales"],
+  manager: ["home", "kitchen", "food-safety", "inventory", "sales", "people"],
+  owner:   ["home", "kitchen", "food-safety", "inventory", "sales", "financials", "people"],
+  admin:   ["home", "kitchen", "food-safety", "inventory", "sales", "financials", "people"],
+};
+
 const CANNABIS_ROLE_SECTIONS = {
   staff:      ["home", "sales", "customers"],
   hr:         ["home", "people"],
@@ -636,6 +708,9 @@ function getCannabisSections(waterfall, role) {
 function getWaterfall(industryProfile) {
   if (industryProfile === "cannabis_dispensary") {
     return CANNABIS_DISPENSARY_WATERFALL;
+  }
+  if (industryProfile === "food_beverage") {
+    return FOOD_BEVERAGE_WATERFALL;
   }
   if (industryProfile === "cannabis_retail") {
     return CANNABIS_RETAIL_WATERFALL;
@@ -1010,6 +1085,10 @@ export default function TenantPortal() {
     activeWaterfall === CANNABIS_DISPENSARY_WATERFALL
       ? activeWaterfall.filter((s) =>
           (DISPENSARY_ROLE_SECTIONS[userRole] || DISPENSARY_ROLE_SECTIONS.owner).includes(s.id)
+        )
+      : activeWaterfall === FOOD_BEVERAGE_WATERFALL
+      ? activeWaterfall.filter((s) =>
+          (FB_ROLE_SECTIONS[userRole] || FB_ROLE_SECTIONS.owner).includes(s.id)
         )
       : activeWaterfall === CANNABIS_RETAIL_WATERFALL
       ? getCannabisSections(activeWaterfall, userRole)
