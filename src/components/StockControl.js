@@ -27,7 +27,7 @@ import {
   INDUSTRY_PROFILES,
   CANNABIS_ONLY_CATEGORIES,
 } from "../constants/industryProfiles";
-import WorkflowGuide from "./WorkflowGuide";
+import ActionCentre from "./shared/ActionCentre";
 import { usePageContext } from "../hooks/usePageContext";
 import InfoTooltip from "./InfoTooltip";
 import { ChartCard, ChartTooltip, InlineProgressBar } from "./viz";
@@ -458,14 +458,22 @@ export default function StockControl() {
       </div>
     );
 
+  // WorkflowGuide hidden on this component (Option A): ctx.warnings → ActionCentre
+  const ctxAlerts =
+    ctx && !ctx.loading
+      ? (ctx.warnings || []).map((w) => ({
+          severity: "warn",
+          message: String(w).replace(/^⚠\s*/, ""),
+        }))
+      : [];
+
   return (
     <div style={{ fontFamily: T.fontUi }}>
-      <WorkflowGuide
-        context={ctx}
-        tabId="admin-stock"
-        onAction={() => {}}
-        defaultOpen={false}
-      />
+      {ctxAlerts.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <ActionCentre title="Stock Alerts" alerts={ctxAlerts} />
+        </div>
+      )}
 
       <div
         style={{
@@ -1053,81 +1061,7 @@ function OverviewView({ items, movements, orders }) {
         );
       })()}
 
-      {/* Low stock alert */}
-      {lowStock.length > 0 && (
-        <div
-          style={{
-            background: T.warningBg,
-            border: `1px solid ${T.warningBd}`,
-            borderRadius: "6px",
-            padding: "14px 18px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "10px",
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: T.warning,
-              marginBottom: "10px",
-            }}
-          >
-            Low Stock Alerts
-          </div>
-          {lowStock.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "8px 0",
-                borderBottom: `1px solid ${T.warningBd}`,
-              }}
-            >
-              <div>
-                <span
-                  style={{ fontSize: "13px", fontWeight: 500, color: T.ink900 }}
-                >
-                  {item.name}
-                </span>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    color: T.ink500,
-                    marginLeft: "8px",
-                    fontFamily: T.fontData,
-                  }}
-                >
-                  {item.sku}
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: T.fontData,
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: item.quantity_on_hand <= 0 ? T.danger : T.warning,
-                  }}
-                >
-                  {item.quantity_on_hand} {UNIT_LABELS[item.unit]}
-                </span>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    color: T.ink500,
-                    marginLeft: "8px",
-                  }}
-                >
-                  min: {item.reorder_level}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Inline Low Stock Alerts removed — now surfaced via ActionCentre at top (ctx.warnings) */}
 
       {/* Category breakdown */}
       <div style={sCard}>
