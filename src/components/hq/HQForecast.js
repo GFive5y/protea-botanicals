@@ -50,13 +50,15 @@ const sLabel = {
 };
 
 export default function HQForecast() {
-  const { tenantId } = useTenant();
+  const { tenantId, industryProfile } = useTenant();
   const [loading, setLoading] = useState(true);
   const [velocity, setVelocity] = useState(null); // { revenue, cogs, gp, orders, days }
   const [depletion, setDepletion] = useState([]); // per-SKU depletion data
   const [opexMonthly, setOpexMonthly] = useState(0);
   const [currentCash, setCurrentCash] = useState(null);
-  const [dataWindow, setDataWindow] = useState(0); // days of order_items data
+  const [dataWindow, setDataWindow] = useState(0); // days of data
+  // LL-235: dispensary-specific clinical alerts (S21 expiry + Rx repeat warnings)
+  const [clinicalAlerts, setClinicalAlerts] = useState({ s21Expiring: [], rxLow: [] });
 
   const fetchAll = useCallback(async () => {
     if (!tenantId) return;
@@ -65,6 +67,125 @@ export default function HQForecast() {
     const d30 = new Date();
     d30.setDate(d30.getDate() - 30);
     const d30Iso = d30.toISOString();
+
+    // LL-235: dispensary reads from dispensing_log — skip orders-based fetches entirely
+    if (industryProfile === "cannabis_dispensary") {
+      // ── Dispensary velocity: dispensing_log × sell_price ─────────────────
+      try {
+        const { data: dlData } = await supabase
+          .from("dispensing_log")
+          .select(
+            "quantity_dispensed, inventory_item_id, dispensed_at, is_voided, inventory_items(sell_price, weighted_avg_cost)",
+          )
+          .eq("tenant_id", tenantId)
+          .neq("is_voided", true)
+          .gte("dispensed_at", d30Iso)
+          .limit(500);
+
+        const events = dlData || [];
+        let dispRev = 0, dispCogs = 0;
+        const daySet = new Set();
+        const velMap = {};
+
+        events.forEach((dl) => {
+          daySet.add(dl.dispensed_at?.slice(0, 10));
+          const sell = parseFloat(dl.inventory_items?.sell_price || 0);
+          const cost = parseFloat(dl.inventory_items?.weighted_avg_cost || 0);
+          const qty = dl.quantity_dispensed || 0;
+          dispRev  += qty * sell;
+          dispCogs += qty * cost;
+          if (dl.inventory_item_id)
+            velMap[dl.inventory_item_id] = (velMap[dl.inventory_item_id] || 0) + qty;
+        });
+
+        const days = Math.max(daySet.size, 1);
+        setDataWindow(days);
+        setVelocity({
+          revenue: dispRev,
+          cogs: dispCogs,
+          gp: dispRev - dispCogs,
+          orders: events.length,
+          days,
+          dailyRev:    dispRev / days,
+          dailyCogs:   dispCogs / days,
+          dailyGP:     (dispRev - dispCogs) / days,
+          dailyOrders: events.length / days,
+        });
+
+        // ── Dispensary stock depletion from dispensing velocity ─────────────
+        const { data: items } = await supabase
+          .from("inventory_items")
+          .select("id, name, category, quantity_on_hand, sell_price, weighted_avg_cost")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .gt("quantity_on_hand", 0);
+
+        const depletionData = (items || [])
+          .filter((i) => velMap[i.id] > 0)
+          .map((i) => {
+            const vel30     = velMap[i.id] || 0;
+            const dailyVel  = vel30 / 30;
+            const daysLeft  = dailyVel > 0 ? Math.round(i.quantity_on_hand / dailyVel) : null;
+            const dailyRev  = dailyVel * parseFloat(i.sell_price || 0);
+            const restock   = Math.max(0, Math.ceil(dailyVel * 30) - i.quantity_on_hand);
+            return {
+              name:         i.name,
+              category:     i.category,
+              onHand:       i.quantity_on_hand,
+              dailyVel:     Math.round(dailyVel * 100) / 100,
+              daysLeft,
+              dailyRev:     Math.round(dailyRev),
+              restockUnits: restock,
+              restockCost:  Math.round(restock * parseFloat(i.weighted_avg_cost || 0)),
+              urgency:      daysLeft === null ? "ok" : daysLeft < 7 ? "critical" : daysLeft < 14 ? "warning" : "ok",
+            };
+          })
+          .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
+
+        setDepletion(depletionData);
+      } catch (_) {
+        setVelocity(null);
+      }
+
+      // ── S21 expiry pipeline + Prescription repeat warnings ─────────────
+      try {
+        const [pRes, rxRes] = await Promise.all([
+          supabase
+            .from("patients")
+            .select("name, s21_expiry_date, section_21_number, condition")
+            .eq("tenant_id", tenantId)
+            .eq("is_active", true)
+            .not("s21_expiry_date", "is", null),
+          supabase
+            .from("prescriptions")
+            .select("id, substance, repeats, repeats_used, expiry_date, patients(name)")
+            .eq("tenant_id", tenantId)
+            .eq("is_active", true),
+        ]);
+
+        const s21Expiring = (pRes.data || [])
+          .map((p) => ({
+            ...p,
+            daysLeft: Math.ceil((new Date(p.s21_expiry_date) - new Date()) / 86400000),
+          }))
+          .filter((p) => p.daysLeft >= 0 && p.daysLeft <= 60)
+          .sort((a, b) => a.daysLeft - b.daysLeft);
+
+        const rxLow = (rxRes.data || [])
+          .map((rx) => ({
+            ...rx,
+            remaining: (rx.repeats || 0) - (rx.repeats_used || 0),
+            patientName: rx.patients?.name || "\u2014",
+          }))
+          .filter((rx) => rx.remaining <= 2 && rx.remaining >= 0)
+          .sort((a, b) => a.remaining - b.remaining);
+
+        setClinicalAlerts({ s21Expiring, rxLow });
+      } catch (_) {
+        setClinicalAlerts({ s21Expiring: [], rxLow: [] });
+      }
+    } else {
+      // ── Non-dispensary: original orders-based velocity ──────────────────
 
     // 1. Velocity: order_items last 30 days
     try {
@@ -160,6 +281,8 @@ export default function HQForecast() {
       setDepletion([]);
     }
 
+    } // end else (non-dispensary orders-based fetches)
+
     // 3. Monthly OPEX average
     try {
       const { data: expenses } = await supabase
@@ -187,7 +310,7 @@ export default function HQForecast() {
     } catch (_) {}
 
     setLoading(false);
-  }, [tenantId]);
+  }, [tenantId, industryProfile]);
 
   useEffect(() => {
     fetchAll();
@@ -204,10 +327,15 @@ export default function HQForecast() {
   }
 
   if (!velocity) {
+    const emptyMsg = industryProfile === "cannabis_dispensary"
+      ? "Record dispensing events in the Clinical tab to generate velocity data."
+      : industryProfile === "food_beverage"
+        ? "Run the POS till or record sales to generate velocity data."
+        : "Run the sales simulator or record POS sales to generate velocity data.";
     return (
       <div style={{ padding: 40, textAlign: "center", color: T.ink500, fontFamily: T.font }}>
         <div style={{ fontSize: 14, marginBottom: 8 }}>Insufficient data for forecasting</div>
-        <div style={{ fontSize: 12, color: T.ink300 }}>Run the sales simulator or record real POS sales to generate velocity data.</div>
+        <div style={{ fontSize: 12, color: T.ink300 }}>{emptyMsg}</div>
       </div>
     );
   }
@@ -235,7 +363,9 @@ export default function HQForecast() {
     <div style={{ fontFamily: T.font, display: "grid", gap: 20 }}>
       {/* Confidence badge */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ ...sLabel }}>30-Day Forecast</span>
+        <span style={{ ...sLabel }}>
+          {industryProfile === "cannabis_dispensary" ? "Dispensing Forecast \u2014 30 Days" : "30-Day Forecast"}
+        </span>
         <span style={{
           fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3,
           background: confidenceColor + "18", color: confidenceColor,
@@ -285,7 +415,9 @@ export default function HQForecast() {
           </div>
           {depletion.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: T.ink400, fontSize: 12 }}>
-              No velocity data — run simulator or record sales
+              {industryProfile === "food_beverage"
+                ? "Raw material depletion is tracked via production runs in the Kitchen tab."
+                : "No velocity data — run simulator or record sales"}
             </div>
           ) : (
             <>
@@ -369,6 +501,120 @@ export default function HQForecast() {
           </div>
         )}
       </div>
+
+      {/* ── DISPENSARY ONLY: Section 21 Expiry Pipeline ── */}
+      {industryProfile === "cannabis_dispensary" && (
+        <div style={{ ...sCard, padding: "16px 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ ...sLabel }}>S21 Authorisation Expiry — Next 60 Days</div>
+            {clinicalAlerts.s21Expiring.length === 0 && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: T.successBg, color: T.success }}>
+                All clear
+              </span>
+            )}
+          </div>
+          {clinicalAlerts.s21Expiring.length === 0 ? (
+            <div style={{ fontSize: 12, color: T.ink300 }}>
+              No S21 authorisations expiring in the next 60 days.
+            </div>
+          ) : (
+            <div>
+              <div style={{
+                display: "grid", gridTemplateColumns: "2fr 160px 80px 80px",
+                gap: 4, padding: "6px 0 4px", ...sLabel,
+              }}>
+                <span>Patient</span>
+                <span>S21 Number</span>
+                <span style={{ textAlign: "right" }}>Expires</span>
+                <span style={{ textAlign: "right" }}>Days Left</span>
+              </div>
+              {clinicalAlerts.s21Expiring.map((p, i) => (
+                <div key={i} style={{
+                  display: "grid", gridTemplateColumns: "2fr 160px 80px 80px",
+                  gap: 4, padding: "7px 0", borderBottom: `1px solid ${T.ink075}`,
+                  fontSize: 12, alignItems: "center",
+                }}>
+                  <span style={{ fontWeight: 500, color: T.ink900 }}>{p.name}</span>
+                  <span style={{ color: T.ink400, fontSize: 10, fontVariantNumeric: "tabular-nums" }}>{p.section_21_number || "\u2014"}</span>
+                  <span style={{ textAlign: "right", color: T.ink500 }}>
+                    {new Date(p.s21_expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}
+                  </span>
+                  <span style={{ textAlign: "right" }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 3,
+                      background: p.daysLeft <= 14 ? T.dangerBg : T.warningBg,
+                      color: p.daysLeft <= 14 ? T.danger : T.warning,
+                    }}>
+                      {p.daysLeft}d
+                    </span>
+                  </span>
+                </div>
+              ))}
+              <div style={{ marginTop: 8, fontSize: 11, color: T.warning }}>
+                Expired S21 authorisations prevent dispensing. Contact authorising practitioners to renew.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DISPENSARY ONLY: Prescription Repeat Warnings ── */}
+      {industryProfile === "cannabis_dispensary" && (
+        <div style={{ ...sCard, padding: "16px 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ ...sLabel }}>Prescription Repeats — Low Stock</div>
+            {clinicalAlerts.rxLow.length === 0 && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: T.successBg, color: T.success }}>
+                All clear
+              </span>
+            )}
+          </div>
+          {clinicalAlerts.rxLow.length === 0 ? (
+            <div style={{ fontSize: 12, color: T.ink300 }}>
+              No prescriptions approaching repeat limit.
+            </div>
+          ) : (
+            <div>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1.5fr 2fr 80px 80px",
+                gap: 4, padding: "6px 0 4px", ...sLabel,
+              }}>
+                <span>Patient</span>
+                <span>Substance</span>
+                <span style={{ textAlign: "right" }}>Remaining</span>
+                <span style={{ textAlign: "right" }}>Expires</span>
+              </div>
+              {clinicalAlerts.rxLow.map((rx, i) => (
+                <div key={i} style={{
+                  display: "grid", gridTemplateColumns: "1.5fr 2fr 80px 80px",
+                  gap: 4, padding: "7px 0", borderBottom: `1px solid ${T.ink075}`,
+                  fontSize: 12, alignItems: "center",
+                }}>
+                  <span style={{ fontWeight: 500, color: T.ink900 }}>{rx.patientName}</span>
+                  <span style={{ color: T.ink400, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rx.substance}</span>
+                  <span style={{ textAlign: "right" }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 3,
+                      background: rx.remaining === 0 ? T.dangerBg : T.warningBg,
+                      color: rx.remaining === 0 ? T.danger : T.warning,
+                    }}>
+                      {rx.remaining === 0 ? "NONE" : `${rx.remaining} left`}
+                    </span>
+                  </span>
+                  <span style={{ textAlign: "right", fontSize: 11, color: T.ink400 }}>
+                    {rx.expiry_date
+                      ? new Date(rx.expiry_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })
+                      : "\u2014"}
+                  </span>
+                </div>
+              ))}
+              <div style={{ marginTop: 8, fontSize: 11, color: T.warning }}>
+                Contact prescribing practitioners to issue new scripts before repeats are exhausted.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── SECTION 4: Cash Flow Projection ── */}
       <ChartCard title="Cash Flow Projection — Next 30 Days" subtitle="Based on velocity + OPEX + restock" height="auto">
