@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { sendYearEndEmail } from "../../services/emailService";
 
 const D = {
   font:"'Inter','Helvetica Neue',Arial,sans-serif",
@@ -329,6 +330,27 @@ export default function HQYearEnd() {
               <div style={{ background: D.warningBg, borderRadius: 8, padding: 14, fontSize: 13, color: D.warning }}>
                 {"\uD83D\uDCCB"} <strong>Next step:</strong> Create a new financial year in Financial Setup to resume posting transactions.
               </div>
+              <button
+                onClick={async () => {
+                  const to = window.prompt("Email year-end notification to:", "admin@protea.dev");
+                  if (!to) return;
+                  const res = await sendYearEndEmail({
+                    tenantId,
+                    recipient: { email: to },
+                    data: {
+                      financial_year: fyLabel,
+                      message: `${fyLabel} has been closed. Net result: ${fmtZar(archiveRow.net_profit)}.`,
+                      closing_retained_earnings: archiveRow.retained_earnings_carried_forward,
+                    },
+                  });
+                  if (res.skipped) setError(`Email skipped (cooldown ${res.cooldown_hours}h)`);
+                  else if (!res.ok) setError(`Email failed: ${res.error}`);
+                  else setError(null);
+                }}
+                style={{ marginTop: 12, width: "100%", padding: "12px 0", background: D.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {"\uD83D\uDCE7"} Email Year-End Notification
+              </button>
             </div>
           </div>
         </div>

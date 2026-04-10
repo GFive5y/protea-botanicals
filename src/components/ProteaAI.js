@@ -187,12 +187,13 @@ REPO: github.com/GFive5y/protea-botanicals \u00b7 branch: main
 MEDI REC TENANT: b1bad266-ceb4-4558-bbc3-22cfeeeafe74
 HQ TENANT: 43b34c33-6864-4f02-98dd-df1d340475c3
 
-EDGE FUNCTIONS (10 active):
-ai-copilot v59 · auto-post-capture v2 (P3-C: writes expenses.input_vat_amount)
+EDGE FUNCTIONS (14 active):
+ai-copilot v67 · auto-post-capture v2 (P3-C: writes expenses.input_vat_amount)
 process-document v53 (v2.2: vat_amount extraction, supplier VAT override)
 sim-pos-sales v4 · sign-qr v36 · verify-qr v34 · send-notification v37
 get-fx-rate v35 · payfast-checkout v44 · payfast-itn v39
-receive-from-capture v1
+receive-from-capture v1 · loyalty-ai v2 · create-admin-user v1
+send-email v1 (GAP-C02: Resend email infra, verify_jwt: true)
 
 WP-FINANCIALS (ALL 10 PHASES COMPLETE — 09 Apr 2026):
 IFRS Income Statement · Balance Sheet · Fixed Assets (IAS 16) · Journals (double-entry)
@@ -204,10 +205,11 @@ P3-A: expenses.input_vat_amount → expense_vat_sync → vat_transactions
 P3-B: stock_receipts.input_vat_amount → receipt_vat_sync → vat_transactions
 P3-C: Smart Capture → auto-post-capture → expenses.input_vat_amount → trigger
 
-PLATFORM SCALE (from LIVE-AUDIT v1.0 — 09 Apr 2026):
-224,293 lines · 180 JS files · 10 TS Edge Functions · 109 DB tables (all RLS)
-6 user portals · 41 HQ tabs · 17 stock components · 13 HR modules
+PLATFORM SCALE (updated 10 Apr 2026):
+224,293+ lines · 180 JS files · 14 TS Edge Functions · 110 DB tables (all RLS)
+6 user portals · 42 HQ tabs · 17 stock components · 13 HR modules
 4 industry profiles · 5 active tenants
+GAP-C02 CLOSED: send-email EF + email_logs table + HQ Email Logs tab
 
 FINANCIAL AUDIT FINDINGS (FIN-AUDIT v1.0 — 09 Apr 2026):
 GAP-01: Revenue is VAT-inclusive — overstated ~15% (R61,758). Fix pending.

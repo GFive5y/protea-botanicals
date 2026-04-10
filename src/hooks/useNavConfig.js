@@ -170,6 +170,12 @@ const HQ_PAGES = [
     label: "Documents",
     path: "/hq?tab=documents",
   },
+  {
+    group: "Platform",
+    icon: "📧",
+    label: "Email Logs",
+    path: "/hq?tab=email-logs",
+  },
   // ── People ───────────────────────────────────────────────────────────────────
   {
     group: "People",

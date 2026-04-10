@@ -51,6 +51,7 @@ import ExpenseManager from "../components/hq/ExpenseManager";
 import HQYearEnd from "../components/hq/HQYearEnd";
 import HQVat from "../components/hq/HQVat";
 import HQTenants from "../components/hq/HQTenants";
+import HQEmailLogs from "../components/hq/HQEmailLogs";
 import LiveFXBar from "../components/hq/LiveFXBar";
 import PlatformBar from "../components/PlatformBar";
 import { PlatformBarProvider } from "../contexts/PlatformBarContext";
@@ -120,6 +121,7 @@ const TABS = [
     alert: true,
   },
   { id: "documents", label: "Documents", icon: "📄", ready: true },
+  { id: "email-logs", label: "Email Logs", icon: "📧", ready: true },
   { id: "medical", label: "Medical", ready: true },
   { id: "wholesale-orders", label: "Wholesale Orders", ready: true },
   { id: "shops", label: "Shops", icon: "🏪", ready: true },
@@ -306,6 +308,7 @@ export default function HQDashboard() {
           {activeTab === "expenses" && <ExpenseManager />}
           {activeTab === "vat" && <HQVat />}
           {activeTab === "year-end-close" && <HQYearEnd />}
+          {activeTab === "email-logs" && <HQEmailLogs />}
         </div>
       </div>
     </PlatformBarProvider>

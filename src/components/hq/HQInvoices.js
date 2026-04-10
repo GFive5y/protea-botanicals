@@ -24,6 +24,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { sendInvoiceEmail, sendOverduePaymentEmail } from "../../services/emailService";
 
 const T = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
@@ -1173,6 +1174,55 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                     ? "These clients have not paid within the agreed terms. Follow up immediately."
                     : "These supplier invoices are past due. Record payment to maintain supplier relationships."}
                 </div>
+                {direction === "ar" && (
+                  <button
+                    onClick={async () => {
+                      const overdueRows = dirInvoices.filter(
+                        (i) => i.status === "overdue",
+                      );
+                      if (overdueRows.length === 0) return;
+                      const target = overdueRows[0];
+                      const to = window.prompt(
+                        `Send overdue alert for ${target.invoice_number} to:`,
+                        "",
+                      );
+                      if (!to) return;
+                      const tenantContact = window.prompt(
+                        "Your tenant contact email (reply-to):",
+                        "",
+                      );
+                      if (!tenantContact) return;
+                      const res = await sendOverduePaymentEmail({
+                        tenantId,
+                        recipient: { email: to },
+                        tenantContactEmail: tenantContact,
+                        data: {
+                          invoice_number: target.invoice_number,
+                          customer_name: getName(target.supplier_id),
+                          days_overdue: daysOverdue(target),
+                          amount_outstanding: target.total_amount,
+                        },
+                      });
+                      if (res.skipped) showToast(`Skipped (cooldown ${res.cooldown_hours}h)`, "warn");
+                      else if (!res.ok) showToast(`Email failed: ${res.error}`, "error");
+                      else showToast(`Overdue alert sent to ${to}`);
+                    }}
+                    style={{
+                      marginTop: 8,
+                      padding: "6px 12px",
+                      background: T.danger,
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: T.font,
+                    }}
+                  >
+                    📧 Send Overdue Alert
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1463,6 +1513,54 @@ export default function HQInvoices({ tenantId: tenantIdProp } = {}) {
                                       {isPaying ? "✕" : "Pay"}
                                     </button>
                                   )}
+                                <button
+                                  onClick={async () => {
+                                    const to = window.prompt(
+                                      `Email invoice ${n._number} to:`,
+                                      ""
+                                    );
+                                    if (!to) return;
+                                    const partnerName = getName(n._partner) || "";
+                                    const tenantContact = window.prompt(
+                                      "Your tenant contact email (reply-to):",
+                                      ""
+                                    );
+                                    if (!tenantContact) return;
+                                    const res = await sendInvoiceEmail({
+                                      tenantId,
+                                      recipient: { email: to, name: partnerName },
+                                      tenantContactEmail: tenantContact,
+                                      data: {
+                                        invoice_number: n._number,
+                                        invoice_date: inv.invoice_date,
+                                        due_date: inv.due_date,
+                                        total: n._total,
+                                        customer_name: partnerName,
+                                      },
+                                    });
+                                    if (res.skipped) {
+                                      showToast(
+                                        `Skipped (cooldown ${res.cooldown_hours}h)`,
+                                        "warn"
+                                      );
+                                    } else if (!res.ok) {
+                                      showToast(
+                                        `Email failed: ${res.error}`,
+                                        "error"
+                                      );
+                                    } else {
+                                      showToast(`Email sent to ${to}`);
+                                    }
+                                  }}
+                                  style={{
+                                    ...sBtn("ghost"),
+                                    padding: "4px 10px",
+                                    fontSize: 9,
+                                  }}
+                                  title="Email this invoice"
+                                >
+                                  📧
+                                </button>
                                 <button
                                   onClick={() => handleExpand(inv.id)}
                                   style={{

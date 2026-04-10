@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
+import { sendVatReminderEmail } from "../../services/emailService";
 
 const D = {
   font: "'Inter','Helvetica Neue',Arial,sans-serif",
@@ -609,6 +610,30 @@ export default function HQVat() {
           {!filingMap[selectedPeriod] && current.count > 0 && <button onClick={() => openFilingModal(selectedPeriod)} style={{ padding: "9px 18px", border: `1px solid ${D.successBd}`, borderRadius: 8, background: D.successBg, color: D.success, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u2713"} Mark Filed</button>}
           {filingMap[selectedPeriod] && <div style={{ padding: "9px 16px", background: D.successBg, border: `1px solid ${D.successBd}`, borderRadius: 8, fontSize: 13, color: D.success, fontWeight: 600 }}>{"\u2713"} Filed · {fmtDate(filingMap[selectedPeriod].filed_at)}</div>}
           <button onClick={() => openCloseModal(selectedPeriod)} style={{ padding: "9px 18px", border: `1px solid ${D.warningBd}`, borderRadius: 8, background: D.warningBg, color: D.warning, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}>{"\u26A1"} Period Close</button>
+          <button
+            onClick={async () => {
+              const to = window.prompt("Email VAT period summary to:", "admin@protea.dev");
+              if (!to) return;
+              const p = periods.find((x) => x.id === selectedPeriod);
+              const res = await sendVatReminderEmail({
+                tenantId,
+                recipient: { email: to },
+                data: {
+                  period: p?.label || selectedPeriod,
+                  close_date: p?.dueDate || "",
+                  output_vat: current.outputVat,
+                  input_vat: current.inputVat,
+                  net_vat: current.netVat,
+                },
+              });
+              if (res.skipped) showToast(`Skipped (cooldown ${res.cooldown_hours}h)`, "warn");
+              else if (!res.ok) showToast(`Email failed: ${res.error}`, "error");
+              else showToast(`VAT reminder sent to ${to}`);
+            }}
+            style={{ padding: "9px 18px", border: `1px solid ${D.infoBd}`, borderRadius: 8, background: D.infoBg, color: D.info, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: D.font }}
+          >
+            {"\uD83D\uDCE7"} Email Reminder
+          </button>
         </div>
       </div>
 

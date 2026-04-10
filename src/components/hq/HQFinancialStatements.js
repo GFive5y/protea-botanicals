@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import HQFinancialSetup from "./HQFinancialSetup";
+import { sendStatementEmail } from "../../services/emailService";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -390,6 +391,37 @@ export default function HQFinancialStatements() {
           {!loading && incomeData && (
             <button onClick={handlePrint} disabled={printing} style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: printing ? C.ink075 : C.accentLit, color: printing ? C.ink400 : C.accent, cursor: printing ? "wait" : "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}>
               {printing ? "Preparing\u2026" : "\uD83D\uDDA8\uFE0F Print / Save PDF"}
+            </button>
+          )}
+          {!loading && incomeData && (
+            <button
+              onClick={async () => {
+                const to = window.prompt(`Email statement to:`, "");
+                if (!to) return;
+                const tenantContact = window.prompt(
+                  "Your tenant contact email (reply-to):",
+                  tenant?.email || "",
+                );
+                if (!tenantContact) return;
+                const fyOpt = FY_OPTIONS.find((o) => o.id === selectedFY);
+                const res = await sendStatementEmail({
+                  tenantId,
+                  recipient: { email: to },
+                  tenantContactEmail: tenantContact,
+                  data: {
+                    period: fyOpt?.label || selectedFY,
+                    customer_name: tenantName,
+                    opening_balance: 0,
+                    closing_balance: incomeData?.netProfit || 0,
+                  },
+                });
+                if (res.skipped) window.alert(`Skipped (cooldown ${res.cooldown_hours}h)`);
+                else if (!res.ok) window.alert(`Email failed: ${res.error}`);
+                else window.alert(`Statement email sent to ${to}`);
+              }}
+              style={{ padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${C.accentMid}`, background: "#fff", color: C.accent, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: C.font, display: "flex", alignItems: "center", gap: 6 }}
+            >
+              {"\uD83D\uDCE7"} Email Statement
             </button>
           )}
         </div>

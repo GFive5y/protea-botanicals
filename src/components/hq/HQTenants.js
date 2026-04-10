@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { INDUSTRY_PROFILES } from "../../constants/industryProfiles";
 import TenantSetupWizard from "./TenantSetupWizard";
+import { sendUserInvitationEmail } from "../../services/emailService";
 
 const T = {
   ink900: "#0D0D0D",
@@ -1581,6 +1582,39 @@ export default function HQTenants() {
                         </div>
                       </div>
                     )}
+                    <button
+                      onClick={async () => {
+                        const email = window.prompt(
+                          `Invite a user to ${tenant.name} — email:`,
+                          ""
+                        );
+                        if (!email) return;
+                        const name = window.prompt("Invitee name (optional):", "") || "";
+                        const role = window.prompt("Role (e.g. owner, manager, staff):", "manager") || "manager";
+                        const res = await sendUserInvitationEmail({
+                          tenantId: tenant.id,
+                          recipient: { email, name },
+                          data: {
+                            tenant_name: tenant.name,
+                            invited_name: name,
+                            inviter_name: "Nu Ai HQ",
+                            role,
+                            accept_url: `${window.location.origin}/signup?tenant=${tenant.slug || tenant.id}`,
+                          },
+                        });
+                        if (res.skipped) showToast(`Skipped (cooldown ${res.cooldown_hours}h)`, "warn");
+                        else if (!res.ok) showToast(`Invite failed: ${res.error}`, "error");
+                        else showToast(`Invitation sent to ${email}`);
+                      }}
+                      style={{
+                        ...sBtn("outline"),
+                        padding: "5px 12px",
+                        fontSize: "9px",
+                      }}
+                      title="Invite a user to this tenant"
+                    >
+                      {"\u2709 Invite User"}
+                    </button>
                     <button
                       onClick={() => setExpanded(isOpen ? null : tenant.id)}
                       style={{
