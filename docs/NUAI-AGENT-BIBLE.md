@@ -75,10 +75,15 @@ into live intelligence — replacing R1.4M of bespoke software at R3,500–R12,0
 | Entity | ID | Role |
 |---|---|---|
 | Protea Botanicals HQ | 43b34c33-6864-4f02-98dd-df1d340475c3 | Internal operator, never public |
-| Medi Recreational | b1bad266-ceb4-4558-bbc3-22cfeeeafe74 | Client 2, cannabis_retail |
-| Pure Premium THC Vapes | f8ff8d07-7688-44a7-8714-5941ab4ceaa5 | Client 1, cannabis_retail |
+| Medi Recreational | b1bad266-ceb4-4558-bbc3-22cfeeeafe74 | cannabis_retail |
+| Pure Premium THC Vapes | f8ff8d07-7688-44a7-8714-5941ab4ceaa5 | cannabis_retail |
 | Test Dispensary CT | 064adbdc-faaf-4949-9c4b-b5a927b7f2d1 | cannabis_retail |
 | TEST SHOP | 4a6c7d5c-a66a-4a13-b39a-fe836104000c | cannabis_retail |
+| **Medi Can Dispensary** | **2bd41eb7-1a6e-416c-905b-1358f6499d8d** | **cannabis_dispensary — seed_complete=true, DO NOT RE-SEED** |
+| Nourish Kitchen & Deli | 944547e3-ce9f-44e0-a284-43ebe1ed898f | food_beverage — 240 orders seeded |
+| Vozel Vapes | 388fe654-... | general_retail |
+| Maxi Retail SA | 9766a3af-... | general_retail — 232 orders |
+Total: 9 tenants (1 operator + 8 clients)
 
 ---
 
@@ -105,19 +110,22 @@ Physical contact points (Yoco, real deliveries) = skip.
 Data is Claude's responsibility — keep it coherent.
 
 
-**Edge Functions — all active as of 08 Apr 2026:**
+**Edge Functions — 12 active as of 11 Apr 2026:**
 | EF | Version | Purpose |
 |---|---|---|
 | ai-copilot | v59 | All Claude API calls. systemOverride param added. |
 | loyalty-ai | v2 | Nightly AI engine. RPC bug fixed. try/catch per user. |
-| process-document | v52 | Smart Capture AI extraction. SARS compliance + fingerprint. |
-| auto-post-capture | v1 | Atomic accounting on Smart Capture approve. |
+| process-document | v53 | Smart Capture AI extraction. SARS compliance + fingerprint. |
+| auto-post-capture | v2 | Atomic accounting on Smart Capture approve. writes input_vat_amount. |
 | receive-from-capture | v1 | Stock receipt + AVCO on delivery note capture. |
 | sim-pos-sales | v4 | POS sales simulator. |
 | sign-qr | v36 | QR HMAC signing. |
 | verify-qr | v34 | QR validation. |
 | send-notification | v37 | WhatsApp via Twilio. |
 | get-fx-rate | v35 | Live FX rates. 60s cache. R18.50 fallback. |
+| **seed-tenant** | **v4** | **Multi-profile seeder: general_retail + food_beverage + cannabis_dispensary** |
+| trigger-sim-nourish | v1 | Throwaway one-shot — OWNER SHOULD DELETE |
+NOTE: LL-223 — Deno EFs cannot call sibling EFs via internal fetch. sim-pos-sales must be triggered from client or MCP.
 
 ---
 
@@ -337,8 +345,23 @@ tenant_config.settings (JSONB): EOD thresholds — ALWAYS read from here, never 
 
 **order_items:** id, order_id, product_name (TEXT — no inventory_item_id FK), line_total (GENERATED — NEVER INSERT)
 
-**inventory_items:** id, tenant_id, name, category (ENUM::inventory_category), loyalty_category (SEPARATE — TEXT), quantity_on_hand (NUMERIC), reserved_qty (NUMERIC), weighted_avg_cost (NUMERIC), sell_price (NUMERIC), is_active (BOOLEAN)
+**inventory_items:** id, tenant_id, name, category (ENUM::inventory_category), loyalty_category (SEPARATE — TEXT), quantity_on_hand (NUMERIC), reserved_qty (NUMERIC), weighted_avg_cost (NUMERIC), sell_price (NUMERIC — used by dispensary revenue calc: dispensing_log × sell_price), cost_price (NUMERIC), is_active (BOOLEAN)
 NOTE: NO 'notes' column on inventory_items (LL-181)
+
+**patients** (cannabis_dispensary only):
+id, tenant_id, name, id_number, date_of_birth (DATE), medical_aid, contact, notes, is_active (BOOLEAN),
+section_21_number (SAHPRA S21 authorisation ref), s21_expiry_date (DATE), condition, authorized_practitioner, created_at
+
+**prescriptions** (cannabis_dispensary only):
+id, tenant_id, patient_id (FK→patients), doctor_name, doctor_hpcsa, substance, quantity_mg (NUMERIC),
+repeats (INT), repeats_used (INT), issue_date (DATE), expiry_date (DATE), is_active (BOOLEAN), notes, created_at
+
+**dispensing_log** (cannabis_dispensary only — SCHEDULE 6 CLINICAL RECORD):
+id, tenant_id, patient_id (FK→patients), prescription_id (FK→prescriptions),
+inventory_item_id (FK→inventory_items), batch_id (FK→batches, nullable),
+quantity_dispensed (NUMERIC), dispensed_by (UUID→auth.users), dispensed_at (TIMESTAMPTZ), notes,
+is_voided (BOOLEAN default false), void_reason (TEXT), void_at (TIMESTAMPTZ), void_by (UUID)
+LL-226: NEVER hard-delete rows from this table — void only. It is a Schedule 6 legal document.
 
 **scan_logs:** NO tenant_id column — NEVER filter by it (LL-056)
 
@@ -454,13 +477,18 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
   SYMPTOM: HQ tab shows 0 rows / empty state despite data confirmed in DB. Always check LL-205 first.
   CHECK: Before shipping any new table, verify it has both the tenant isolation policy AND hq_all_ policy.
 
-- **LL-206 — useTenant HOOK — CORRECT PATTERN (CODEBASE-CONFIRMED)**:
+- **LL-206 — useTenant HOOK — CORRECT PATTERN (CODEBASE-CONFIRMED 11 Apr 2026)**:
   Import:  import { useTenant } from '../../services/tenantService';
   NEVER:   import { useTenant } from '../../hooks/useTenant';  — wrong path, does not exist
-  Destructure:  const { tenant } = useTenant();
-                const tenantId = tenant?.id;
-  NEVER:   const { tenantId } = useTenant();  — tenantId is not directly exposed
-  Confirmed on: HQBalanceSheet.js · HQProfitLoss.js · HQJournals.js · all HQ components.
+  The context value exposes BOTH patterns — both are valid:
+    const { tenant } = useTenant(); const tenantId = tenant?.id;   // verbose, also correct
+    const { tenantId } = useTenant();                               // direct, also correct
+    const { tenantId, industryProfile } = useTenant();             // preferred for profile-aware components
+  tenantId: tenant?.id || null  — exposed directly in tenantService.js context value (line 154).
+  industryProfile: tenant?.industry_profile || 'cannabis_retail'  — also directly exposed.
+  CORRECTION: Previous rule said tenantId is not directly exposed. This was WRONG.
+  tenantService.js v1.1 confirmed: tenantId, tenantName, tenantSlug, tenantType, industryProfile,
+  isHQ, allTenants, switchTenant, loading, reload, tenantConfig, isOperator, role — all exposed.
   Adjust relative path for component depth (../../ for hq/ components).
 
 - **LL-208 — ALWAYS PATCH ALL FINANCE TABLES IN ONE MIGRATION**:
@@ -675,7 +703,32 @@ Missing any one = silent failure (BUG-006 pattern)
 
 # SECTION 8 — CURRENT STATE (08 Apr 2026)
 
-## HEAD: 944416c · Repo: github.com/GFive5y/protea-botanicals
+## HEAD: see latest SESSION-STATE doc · Repo: github.com/GFive5y/protea-botanicals
+## Last major session: 11 April 2026 (v235–v238)
+
+## Work Packages COMPLETE as of 11 Apr 2026
+- WP-MEDI-CAN Stage 1 + Stage 2: full clinical module (Patients/Rx/Dispensing/Reports/Compliance/CSR)
+- WP-FINANCIAL-PROFILES: profile-adaptive P&L, ExpenseManager, HQForecast, HQCogs header
+- WP-PROFILE-NAV: FOOD_BEVERAGE_WATERFALL, CANNABIS_DISPENSARY_WATERFALL, all F&B modules wired
+- HQMedical Voiding UI: LL-226 compliant void-only workflow with SAHPRA audit trail
+- HQMedical CSR: Controlled Substance Register 6th sub-tab with perpetual balance + running ledger
+
+## TENANT PORTAL — 4-branch waterfall routing (TenantPortal.js getWaterfall())
+cannabis_dispensary → CANNABIS_DISPENSARY_WATERFALL (Clinical-first nav)
+food_beverage       → FOOD_BEVERAGE_WATERFALL (Kitchen-first · 7 sections · all F&B modules wired)
+cannabis_retail     → CANNABIS_RETAIL_WATERFALL (unchanged)
+all others          → WATERFALL (manufacturing nav — default)
+
+## HQ SIDEBAR LABELS (renamed 11 Apr 2026)
+Finance → Financials · Intelligence → Analytics · Procurement → Purchasing
+(Paths unchanged: /hq?tab=finance → /hq?tab=procurement. Label only.)
+
+## Next Dev Priorities (11 Apr 2026)
+1. WP-WIZARD-V2 — TenantSetupWizard.js must branch by cannabis_dispensary (52KB — read first)
+2. HQOverview / HQTradingDashboard — dispensary profile shows empty (reads orders table only)
+3. SAHPRA export — Reports tab in HQMedical has no export button despite compliance note promising one
+4. ProteaAI dispensary query suggestions — getSuggested() medical tab needs updated queries
+5. Owner: delete trigger-sim-nourish EF · SMTP → Resend · CIPRO + nuai.co.za domain
 
 ## Commits This Session (on top of v206)
 | SHA | What |
@@ -787,6 +840,46 @@ Cart → /checkout → CheckoutPage.js v2.4
 → loyalty_transactions + user_profiles.loyalty_points update
 
 ---
+
+## LL rules added 11 April 2026 (WP-MEDI-CAN + WP-FINANCIAL-PROFILES + WP-PROFILE-NAV)
+
+- **LL-224 — CLOSED**: All 4 industry profiles now have profile-adaptive P&L in HQProfitLoss.js.
+  pctColour(pct, industryProfile) takes two args. PROFILE_LABELS constant → PL object controls all labels.
+
+- **LL-225**: cannabis_dispensary nav waterfall NEVER includes Wholesale, Distribution, or Retailers tabs.
+
+- **LL-226 — DISPENSING_LOG IS SCHEDULE 6**: NEVER hard-delete rows from dispensing_log.
+  Void only: UPDATE is_voided=true, void_reason, void_at, void_by. The record is a legal clinical document.
+  No DELETE button should ever exist in the dispensing UI.
+
+- **LL-227**: Medi Can tenant_id 2bd41eb7-1a6e-416c-905b-1358f6499d8d has seed_complete=true.
+  DO NOT RE-SEED. Doing so will create duplicate patients, products, and dispensing events.
+
+- **LL-228**: HQMedical.js is gated: tenantConfig?.feature_medical !== false AND
+  industryProfile === 'cannabis_dispensary'. Both conditions required.
+
+- **LL-229**: seed-tenant v4 uses SUPABASE_SERVICE_ROLE_KEY — bypasses RLS on all inserts.
+  Regular anon key would block cross-table inserts in the dispensary branch.
+
+- **LL-230**: dispensing_log.batch_id links to batches.id (nullable). Batch is optional at dispensing time.
+
+- **LL-231 — CLOSED**: cannabis_dispensary P&L revenue = dispensing_log × inventory_items.sell_price.
+  NOT from orders table. Implemented in HQProfitLoss.js fetchDispensingRevenue callback.
+  HQForecast.js also uses dispensing_log velocity for dispensary profile.
+
+- **LL-232 — CLOSED**: food_beverage gross margin benchmarks: Green ≥65% / Amber 55-65% / Red <55%.
+  Food Cost % (target <30%) is the primary F&B KPI card in HQProfitLoss.js.
+
+- **LL-233**: HQCogs.js is 145KB / 3,912 lines. READ IN FULL before any edit. LL-221 critical here.
+
+- **LL-234**: SUBCATEGORY_TO_ACCOUNT in HQProfitLoss.js is ADDITIVE ONLY.
+  Never remove existing entries. Append new profile-specific entries after the existing list.
+
+- **LL-235**: HQForecast.js dispensary velocity = dispensing_log × sell_price (not orders table).
+  For all other profiles, orders table is correct.
+
+- **LL-236**: clinicalAlerts (S21 expiry pipeline + Rx repeat warnings) are dispensary-only
+  forecast signals. Never render for other profiles.
 
 ## LL-222 — user_profiles.role CHECK CONSTRAINT (11 April 2026)
 The user_profiles table has a hard CHECK constraint on the role column.
