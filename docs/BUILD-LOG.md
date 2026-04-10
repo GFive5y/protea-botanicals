@@ -452,5 +452,38 @@ None this session.
 - CIPRO + domain
 
 ---
+
+## Session v230 — 11 April 2026
+HEAD start: f5be68b · HEAD end: ee01a8f
+Type: BUILD — WP-STOREFRONT-WIZARD Phase 4
+
+### What happened
+LL-221 pre-build audit completed before any code written.
+All four Phase 4 fixes shipped and verified via incognito testing.
+invite-user EF deployed via Supabase MCP (Claude.ai, not CLI).
+Session also validated LL-221 protocol works in practice.
+
+### Commits
+bebb083 — Fix A: OnboardingWizard Step 7 legacy shop keys + auto-SKU
+9115c84 — Fix B+C: Shop.js loyalty rebrand + footer isCannabis gate
+ee01a8f — Fix D: invite-user EF code + HQTenants two-step invite
+
+### EF deployed
+invite-user v1 — deployed via Supabase MCP, ACTIVE, verify_jwt: false
+
+### DB changes
+Maxi Retail SA branding_config patched via SQL (legacy shop keys).
+No schema changes.
+
+### Bugs found during testing
+SKU null constraint on Step 5 manual product insert — fixed in bebb083.
+Fix D scope error (client-side auth.admin) — caught in v229 audit,
+  resolved correctly with EF architecture in v230.
+
+### Owner actions pending
+- Test Fix D end-to-end (Invite User button → check inbox)
+- Vozel Vapes wizard check (confirm Outcome D, welcome QR exists)
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
