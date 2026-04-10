@@ -54,7 +54,7 @@ const CATEGORIES = [
   { value: "other", label: "Other", desc: "Miscellaneous business costs" },
 ];
 
-const SUBCATEGORIES = {
+const SUBCATEGORIES_BASE = {
   opex: [
     "Rent",
     "Utilities",
@@ -96,6 +96,27 @@ const SUBCATEGORIES = {
   ],
 };
 
+const PROFILE_SUBCATS = {
+  cannabis_dispensary: {
+    opex:  ["SAHPRA Licensing Fees", "Cold Chain Equipment", "Professional Indemnity", "Patient Education Materials", "Controlled Substance Security", "Rent", "Utilities", "Insurance", "Marketing", "Software subscriptions"],
+    wages: ["Pharmacist Salary", "Dispensary Assistant", "Salaries", "Contractor fees", "Benefits", "Training"],
+    capex: ["Cold Chain Equipment", "Dispensary Fittings", "Computer hardware", "Security Equipment", "Furniture", "Machinery"],
+    tax:   SUBCATEGORIES_BASE.tax,
+    other: SUBCATEGORIES_BASE.other,
+  },
+  food_beverage: {
+    opex:  ["Produce & Ingredients", "Gas & Cooking Fuel", "FSCA Compliance Fees", "Cleaning & Hygiene Supplies", "Equipment Maintenance", "Rent", "Utilities", "Marketing", "Insurance", "Software subscriptions"],
+    wages: ["Kitchen Wages", "Front-of-House Wages", "Chef Salary", "Salaries", "Contractor fees", "Benefits", "Training"],
+    capex: ["Kitchen Equipment", "Refrigeration", "POS Hardware", "Leasehold improvements", "Furniture", "Vehicles"],
+    tax:   SUBCATEGORIES_BASE.tax,
+    other: SUBCATEGORIES_BASE.other,
+  },
+};
+
+function getSubcategories(industryProfile) {
+  return PROFILE_SUBCATS[industryProfile] || SUBCATEGORIES_BASE;
+}
+
 // GAP-03: Subcategories that legitimately have R0 input VAT in SA
 // Wages/salaries: not subject to VAT (labour is VAT-exempt)
 // Insurance: exempt supply under SA VAT Act
@@ -104,6 +125,8 @@ const SUBCATEGORIES = {
 const VAT_EXEMPT_CATS    = new Set(["wages", "tax"]);
 const VAT_EXEMPT_SUBCATS = new Set([
   "Staff Wages", "Salaries", "Commission", "Bonus", "Benefits", "Training",
+  "Pharmacist Salary", "Dispensary Assistant", "Kitchen Wages", "Front-of-House Wages", "Chef Salary",
+  "Professional Indemnity",
   "Insurance",
   "Banking & Fees", "Bank charges",
   "VAT", "Income tax", "Provisional tax", "UIF", "SDL", "PAYE",
@@ -181,7 +204,7 @@ export default function ExpenseManager({
   periodStart,
   periodEnd,
 }) {
-  const { tenant } = useTenant();
+  const { tenant, industryProfile } = useTenant();
   const tenantId = tenant?.id;
 
   const [expenses, setExpenses] = useState([]);
@@ -1070,7 +1093,7 @@ export default function ExpenseManager({
                     style={inp}
                   >
                     <option value="">— None —</option>
-                    {(SUBCATEGORIES[form.category] || []).map((s) => (
+                    {(getSubcategories(industryProfile)[form.category] || []).map((s) => (
                       <option key={s} value={s}>
                         {s}
                       </option>
