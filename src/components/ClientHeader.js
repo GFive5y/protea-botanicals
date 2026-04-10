@@ -8,6 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { useCart } from "../contexts/CartContext";
+import { useStorefront } from "../contexts/StorefrontContext"; // ✦ slug-resolved brand
 import { getInboxUnreadCount } from "./CustomerInbox";
 
 const HEADER_HEIGHT = 60;
@@ -52,6 +53,8 @@ export default function ClientHeader({ variant = "light" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { getCartCount } = useCart();
+  const { brandingConfig } = useStorefront(); // ✦ slug-resolved brand name
+  const brandLabel = brandingConfig?.brand_name || "Protea Botanicals";
   const cartCount = getCartCount();
 
   const [scrolled, setScrolled] = useState(false);
@@ -322,7 +325,7 @@ export default function ClientHeader({ variant = "light" }) {
               whiteSpace: "nowrap",
             }}
           >
-            Protea Botanicals
+            {brandLabel}
           </button>
         </div>
 
@@ -644,7 +647,7 @@ export default function ClientHeader({ variant = "light" }) {
               color: "#fff",
             }}
           >
-            Protea Botanicals
+            {brandLabel}
           </span>
           <button
             onClick={() => setDrawerOpen(false)}
@@ -968,7 +971,7 @@ export default function ClientHeader({ variant = "light" }) {
               color: T.muted,
             }}
           >
-            © {new Date().getFullYear()} Protea Botanicals
+            © {new Date().getFullYear()} {brandLabel}
           </div>
         </div>
       </nav>
