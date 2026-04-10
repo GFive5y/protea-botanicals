@@ -1589,7 +1589,7 @@ export default function HQTenants() {
                         );
                         if (!email) return;
                         const name = window.prompt("Invitee name (optional):", "") || "";
-                        const role = window.prompt("Role (e.g. owner, manager, staff):", "manager") || "manager";
+                        const role = window.prompt("Role — valid values: admin, management, staff, hr, retailer", "admin") || "admin";
                         // Step 1: create real Supabase auth account via invite-user EF
                         // (LL-212: cannot be done client-side — requires service_role key)
                         showToast("Sending invite…");
