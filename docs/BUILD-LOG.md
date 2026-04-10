@@ -250,5 +250,57 @@ Logo upload to Supabase Storage (Phase 1 stored as object URL only).
 isResuming flag wired into Phase 3 welcome UI.
 
 ---
+
+## Session v227 — 10 April 2026
+**WP:** WP-STOREFRONT-WIZARD Phase 3
+**Commit:** 1df00c0
+
+### What was built
+- Step 6: Loyalty preset selection (Starter/Standard/Generous)
+  upserts loyalty_config. Cards stacked vertically.
+  StorefrontPreview loyalty strip driven by loyaltyWelcomePoints.
+- Step 7: Launch flow — logo upload → QR generation → go live.
+  Three-step labelled progress (not spinner). is_active flipped
+  as a separate UPDATE in the "Going live" step.
+- Success state: live URL, QRCodeSVG render, PNG download,
+  dashboard CTA.
+- Outcome D: slug match + wizard_complete:true + ownership
+  check via user_profiles.tenant_id. Correctly separates
+  "your tenant already launched" from "slug taken by someone else".
+- Resume banner: color-mix() brand-tinted, appears Step 2+ when
+  isResuming:true.
+- Logo upload to storefront-assets/{tenant_id}/logo.{ext},
+  best-effort, inline error if fails, launch proceeds regardless.
+
+### QR generation approach
+Dual path: (1) try sign-qr EF with welcome payload,
+(2) always INSERT qr_codes directly as fallback.
+Idempotent — duplicate constraint error swallowed on collision.
+qr_codes RLS: admin_write_qr policy is permissive (qual:true),
+INSERT works for any authenticated session.
+QR encodes: https://nuai-gfive5ys-projects.vercel.app/scan/{code}
+fgColor = wizardData.brandColor.
+
+### Infrastructure confirmed this session
+storefront-assets bucket: created via MCP, public, 2MB,
+JPEG/PNG/SVG/WebP, RLS policies applied.
+qr_codes RLS: permissive write for authenticated users.
+user_profiles.tenant_id: confirmed — ownership check valid.
+
+### Known deferred items
+- sign-qr v39 welcome payload acceptance: not verified
+  end-to-end. Fallback path covers this.
+- wizard_complete:true not yet set for Vozel Vapes — will flip
+  when wizard is run end-to-end by owner.
+- /shop/vozel-vapes route: wizard generates the URL but the
+  consumer shop must actually resolve /shop/:slug — verify
+  this route exists in App.js before the CA demo.
+
+### Phase 4 scope (if needed)
+- Verify /shop/:slug routing for tenant storefronts
+- WP-NAV-RESTRUCTURE (CA meeting prep)
+- Fix Invite User button (LL-212 — real auth invite)
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
