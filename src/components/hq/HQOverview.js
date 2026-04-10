@@ -263,6 +263,10 @@ export default function HQOverview({ onNavigate }) {
   const [cannabisStock, setCannabisStock] = useState(null);
   const [cannabisPOs, setCannabisPOs] = useState(null);
 
+  // LL-231: dispensary revenue from dispensing_log (not orders)
+  const [dispensingRevMTD, setDispensingRevMTD] = useState(null);   // { revenue, count }
+  const [dispensingRevToday, setDispensingRevToday] = useState(null); // { revenue, count }
+
   const [scanTrend, setScanTrend] = useState([]);
   const [revenueTrend, setRevenueTrend] = useState([]);
   const [qrTypeDist, setQrTypeDist] = useState([]);
@@ -377,6 +381,52 @@ export default function HQOverview({ onNavigate }) {
       setBirthdayStats({ today: todayCount, thisWeek: weekCount });
     } catch (_) {}
   }, []);
+
+  // LL-231: fetch dispensing revenue for cannabis_dispensary overview tiles
+  const fetchDispensingRevenue = useCallback(async () => {
+    if (industryProfile !== "cannabis_dispensary" || !tenantId) return;
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+      const { data } = await supabase
+        .from("dispensing_log")
+        .select(
+          "quantity_dispensed, dispensed_at, is_voided, inventory_items(sell_price)",
+        )
+        .eq("tenant_id", tenantId)
+        .neq("is_voided", true)
+        .gte("dispensed_at", monthStart);
+
+      const events = data || [];
+      const mtdRev = events.reduce(
+        (s, dl) =>
+          s +
+          (dl.quantity_dispensed || 0) *
+            parseFloat(dl.inventory_items?.sell_price || 0),
+        0,
+      );
+      setDispensingRevMTD({ revenue: mtdRev, count: events.length });
+
+      const todayEvents = events.filter((dl) => dl.dispensed_at >= todayStart);
+      const todayRev = todayEvents.reduce(
+        (s, dl) =>
+          s +
+          (dl.quantity_dispensed || 0) *
+            parseFloat(dl.inventory_items?.sell_price || 0),
+        0,
+      );
+      setDispensingRevToday({ revenue: todayRev, count: todayEvents.length });
+    } catch (_) {
+      setDispensingRevMTD(null);
+      setDispensingRevToday(null);
+    }
+  }, [industryProfile, tenantId]);
+
+  useEffect(() => {
+    fetchDispensingRevenue();
+  }, [fetchDispensingRevenue]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -1277,11 +1327,13 @@ export default function HQOverview({ onNavigate }) {
       <SectionLabel label="Today" />
       <div style={{ ...tileGrid, marginBottom: 20 }}>
         <MetricTile
-          label="Today's Sales"
-          value={todaySummary
-            ? `R${Math.round(todaySummary.rev).toLocaleString("en-ZA")}`
-            : "R0"}
-          subLabel="today's revenue"
+          label={industryProfile === "cannabis_dispensary" ? "Today's Dispensing" : "Today's Sales"}
+          value={industryProfile === "cannabis_dispensary"
+            ? (dispensingRevToday ? `R${Math.round(dispensingRevToday.revenue).toLocaleString("en-ZA")}` : "R0")
+            : (todaySummary ? `R${Math.round(todaySummary.rev).toLocaleString("en-ZA")}` : "R0")}
+          subLabel={industryProfile === "cannabis_dispensary"
+            ? `${dispensingRevToday?.count ?? 0} events today`
+            : "today's revenue"}
           sub={
             <span style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
               {todaySummary?.ydayDelta != null && (
@@ -1332,11 +1384,15 @@ export default function HQOverview({ onNavigate }) {
           hint="Daily Trading"
         />
         <MetricTile
-          label="Transactions"
-          value={todaySummary ? todaySummary.txns : 0}
-          subLabel="orders today"
+          label={industryProfile === "cannabis_dispensary" ? "Events This Month" : "Transactions"}
+          value={industryProfile === "cannabis_dispensary"
+            ? (dispensingRevMTD?.count ?? 0)
+            : (todaySummary ? todaySummary.txns : 0)}
+          subLabel={industryProfile === "cannabis_dispensary"
+            ? "total dispensing events"
+            : "orders today"}
           sub={
-            todayPayments && Object.keys(todayPayments).length > 0 ? (
+            industryProfile !== "cannabis_dispensary" && todayPayments && Object.keys(todayPayments).length > 0 ? (
               <span style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 2 }}>
                 {[
                   { key: "cash", label: "Cash", color: "#059669" },
@@ -1392,18 +1448,32 @@ export default function HQOverview({ onNavigate }) {
               </span>
             ) : null
           }
-          semantic={todaySummary?.txns > 0 ? "success" : null}
+          semantic={industryProfile === "cannabis_dispensary"
+            ? ((dispensingRevMTD?.count ?? 0) > 0 ? "success" : null)
+            : (todaySummary?.txns > 0 ? "success" : null)}
           onClick={() => nav("trading")}
           hint="Daily Trading"
         />
         <MetricTile
-          label="Avg Basket"
-          value={todaySummary && todaySummary.txns > 0
-            ? `R${Math.round(todaySummary.avgBasket).toLocaleString("en-ZA")}`
-            : "\u2014"}
-          subLabel="per transaction"
+          label={industryProfile === "cannabis_dispensary" ? "Avg Dispensing Value" : "Avg Basket"}
+          value={(() => {
+            if (industryProfile === "cannabis_dispensary") {
+              if (!dispensingRevMTD || dispensingRevMTD.count === 0) return "\u2014";
+              return `R${Math.round(dispensingRevMTD.revenue / dispensingRevMTD.count).toLocaleString("en-ZA")}`;
+            }
+            return todaySummary && todaySummary.txns > 0
+              ? `R${Math.round(todaySummary.avgBasket).toLocaleString("en-ZA")}`
+              : "\u2014";
+          })()}
+          subLabel={industryProfile === "cannabis_dispensary"
+            ? "per dispensing event"
+            : "per transaction"}
           sub={
-            todaySummary?.txns > 0 ? (() => {
+            industryProfile === "cannabis_dispensary"
+              ? (dispensingRevMTD?.count > 0
+                  ? `${dispensingRevMTD.count} events · R${Math.round(dispensingRevMTD.revenue).toLocaleString("en-ZA")} total`
+                  : "no events yet")
+              : todaySummary?.txns > 0 ? (() => {
               const vsSevenD = (todaySummary.avg7d || 0) > 0
                 ? ((todaySummary.avgBasket - todaySummary.avg7d) / todaySummary.avg7d * 100)
                 : null;
@@ -1447,7 +1517,7 @@ export default function HQOverview({ onNavigate }) {
       </div>
 
       {/* ── REVENUE — ComposedChart: bars + last month line ── */}
-      {revenueTrend.length > 0 && (
+      {revenueTrend.length > 0 && industryProfile !== "cannabis_dispensary" && (
         <div style={{ marginBottom: 28 }}>
           <ChartCard
             title="Revenue — Last 30 Days"
@@ -1660,13 +1730,19 @@ export default function HQOverview({ onNavigate }) {
           </>
         )}
         <MetricTile
-          label="Revenue MTD"
-          value={
-            plStats
+          label={industryProfile === "cannabis_dispensary" ? "Dispensing Revenue MTD" : "Revenue MTD"}
+          value={(() => {
+            if (industryProfile === "cannabis_dispensary") {
+              if (!dispensingRevMTD) return "—";
+              return `R${Math.round(dispensingRevMTD.revenue).toLocaleString("en-ZA")}`;
+            }
+            return plStats
               ? `R${plStats.revenueMTD.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-              : "—"
-          }
-          subLabel="this month"
+              : "—";
+          })()}
+          subLabel={industryProfile === "cannabis_dispensary"
+            ? `${dispensingRevMTD?.count ?? 0} dispensing events this month`
+            : "this month"}
           sub={(() => {
             const margin = isCannabisRetail
               ? cannabisStock?.avgMargin
@@ -1674,9 +1750,13 @@ export default function HQOverview({ onNavigate }) {
             const marginLine = margin != null
               ? `${margin.toFixed(1)}% avg margin`
               : "margin loading…";
-            if (!plStats?.revenueMTD) return marginLine;
+            // LL-231: use dispensing revenue for run-rate when profile is dispensary
+            const baseMTD = industryProfile === "cannabis_dispensary"
+              ? (dispensingRevMTD?.revenue ?? 0)
+              : (plStats?.revenueMTD ?? 0);
+            if (!baseMTD) return marginLine;
             const daysElapsed = new Date().getDate();
-            const runRate = plStats.revenueMTD / daysElapsed;
+            const runRate = baseMTD / daysElapsed;
             const projected = runRate * 30;
             const fmt = (n) =>
               n >= 1000000
