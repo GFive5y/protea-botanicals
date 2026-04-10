@@ -788,6 +788,28 @@ Cart → /checkout → CheckoutPage.js v2.4
 
 ---
 
+## LL-222 — user_profiles.role CHECK CONSTRAINT (11 April 2026)
+The user_profiles table has a hard CHECK constraint on the role column.
+VALID VALUES (exact, case-sensitive):
+  customer · admin · retailer · staff · hr · management
+ANY other value (including manager, owner, operator, chairman, director)
+will cause the INSERT/UPDATE to fail with a constraint violation error.
+Supabase/PostgREST returns this as a silent error when using .upsert()
+without explicit error surfacing — the row simply does not get created.
+ALWAYS validate against this list before inserting into user_profiles.role.
+Common aliases to map:
+  manager → management
+  owner → management
+  chairman → management
+  director → management
+  employee → staff
+  worker → staff
+ROOT CAUSE: invite-user EF silently failed to create user_profiles rows
+for all invites during v230 session because the HQ prompt defaulted to
+"manager" (invalid). Caught via DB inspection, not runtime error.
+
+---
+
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
 *Maintained by: Claude Code after each major session*
 *Owner reviews: after each WP completion*

@@ -485,5 +485,31 @@ Fix D scope error (client-side auth.admin) — caught in v229 audit,
 - Vozel Vapes wizard check (confirm Outcome D, welcome QR exists)
 
 ---
+
+## Session v230 — addendum (11 April 2026)
+Fix D debugging continued after initial session close.
+
+### Root cause found: user_profiles_role_check constraint
+The user_profiles table has a CHECK constraint limiting role to:
+  customer, admin, retailer, staff, hr, management
+The HQ invite prompt defaulted to "manager" (invalid) causing
+every user_profiles upsert to fail silently.
+
+### Fixes applied
+1. invite-user EF v3 deployed via Supabase MCP:
+   - sanitizeRole() maps aliases to valid values
+     (manager/owner/chairman/director → management)
+   - Prevents silent constraint failures on any input
+2. HQTenants.js prompt updated (1355170):
+   - Shows valid roles: admin, management, staff, hr, retailer
+   - Default changed from "manager" to "admin"
+3. Two invited users patched manually via SQL:
+   - jgfivaz@mweb.co.za → management / Maxi Retail SA
+   - bio_duck@hotmail.com → admin / Maxi Retail SA
+
+### New LL rule: LL-222
+See NUAI-AGENT-BIBLE.md — user_profiles_role_check constraint.
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
