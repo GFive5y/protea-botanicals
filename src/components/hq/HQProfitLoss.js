@@ -52,6 +52,20 @@ const SUBCATEGORY_TO_ACCOUNT = {
   "Professional Fees": { code: "60900", ifrsLabel: "Professional fees" },
   "Cleaning & Hygiene":{ code: "61000", ifrsLabel: "Cleaning and hygiene" },
   "Equipment":         { code: "61900", ifrsLabel: "Other operating expenses" },
+  // cannabis_dispensary additions
+  "SAHPRA Licensing Fees":         { code: "60150", ifrsLabel: "Regulatory licensing fees" },
+  "Pharmacist Salary":             { code: "60110", ifrsLabel: "Employee benefits \u2014 responsible pharmacist" },
+  "Cold Chain Equipment":          { code: "61500", ifrsLabel: "Medical equipment and maintenance" },
+  "Professional Indemnity":        { code: "60410", ifrsLabel: "Professional indemnity insurance" },
+  "Patient Education Materials":   { code: "60510", ifrsLabel: "Clinical education materials" },
+  "Controlled Substance Security": { code: "60210", ifrsLabel: "Controlled substance security" },
+  // food_beverage additions
+  "Produce & Ingredients":         { code: "50100", ifrsLabel: "Raw material \u2014 food ingredients" },
+  "Kitchen Wages":                 { code: "60105", ifrsLabel: "Employee benefits \u2014 kitchen and FOH staff" },
+  "Gas & Cooking Fuel":            { code: "60305", ifrsLabel: "Gas and cooking fuel" },
+  "FSCA Compliance Fees":          { code: "60155", ifrsLabel: "Food safety compliance and certification fees" },
+  "Cleaning & Hygiene Supplies":   { code: "61005", ifrsLabel: "Cleaning and hygiene materials" },
+  "Equipment Maintenance":         { code: "61505", ifrsLabel: "Kitchen equipment maintenance and calibration" },
 };
 
 const STATUS_CONFIG = {
@@ -78,6 +92,7 @@ function StatusBadge({ status }) {
 // ─── WP-FINANCIALS Phase 2: IFRS Statement View ───────────────────────────────
 function IFRSStatementView({
   tenantName, financialYear, period,
+  revenueIfrsLabel = "Revenue from contracts with customers",
   totalRevenue, totalCogs, grossProfit, grossMarginPct,
   depreciationTotal, expensesBySubcategory, loyaltyCost,
   totalOpexIncLoyalty, netProfit, netMarginPct,
@@ -181,7 +196,7 @@ function IFRSStatementView({
 
         <div style={IS.sectionLabel}>Revenue</div>
         <div style={IS.row(false,0)}>
-          <span style={IS.lbl(false)}>Revenue from contracts with customers</span>
+          <span style={IS.lbl(false)}>{revenueIfrsLabel}</span>
           <span style={IS.amt(false,"#059669")}>{fmtZar(totalRevenue)}</span>
           <span style={IS.dash}>\u2014</span>
         </div>
@@ -430,8 +445,15 @@ const fmtZar = (n, abs = false) => {
   return `R${val.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 const fmt = (n, dp = 2) => (parseFloat(n) || 0).toFixed(dp);
-const pctColour = (pct) =>
-  pct >= 35 ? "#2E7D32" : pct >= 20 ? "#E65100" : "#c62828";
+const pctColour = (pct, profile = "general_retail") => {
+  if (profile === "food_beverage")
+    return pct >= 65 ? "#2E7D32" : pct >= 55 ? "#E65100" : "#c62828";
+  if (profile === "cannabis_retail")
+    return pct >= 50 ? "#2E7D32" : pct >= 30 ? "#E65100" : "#c62828";
+  if (profile === "cannabis_dispensary")
+    return pct >= 50 ? "#2E7D32" : pct >= 35 ? "#E65100" : "#c62828";
+  return pct >= 35 ? "#2E7D32" : pct >= 20 ? "#E65100" : "#c62828";
+};
 
 // GAP-01 fix — SA VAT is 15%. All orders.total values are VAT-inclusive.
 // Divide by VAT_RATE at every revenue aggregation point.
@@ -826,7 +848,7 @@ function DataBadge({ label, ok, count }) {
 export default function HQProfitLoss() {
   const { fxRate, fxLoading } = useFxRate();
   const usdZar = fxRate?.usd_zar || 18.5;
-  const { tenant } = useTenant();
+  const { tenant, industryProfile } = useTenant();
   const tenantId = tenant?.id;
 
   const ctx = usePageContext("pl", null);
@@ -862,6 +884,9 @@ export default function HQProfitLoss() {
   const [setupComplete, setSetupComplete] = useState(null);
   const [orderItemsCogs, setOrderItemsCogs] = useState(null); // { revenue, cogs, byProduct }
   const [marginSortMode, setMarginSortMode] = useState("gp"); // "gp" or "margin"
+  // LL-231: cannabis_dispensary revenue from dispensing_log, NOT orders
+  const [dispensingRevenue, setDispensingRevenue] = useState(0);
+  const [dispensingCount, setDispensingCount] = useState(0);
   // GAP-02: manual journal adjustments flowing to P&L
   const [journalAdjustments, setJournalAdjustments] = useState(null);
 
@@ -953,6 +978,42 @@ export default function HQProfitLoss() {
   useEffect(() => {
     fetchExpenses();
   }, [fetchExpenses]);
+
+  // LL-231: cannabis_dispensary revenue source — dispensing_log × sell_price
+  const fetchDispensingRevenue = useCallback(async () => {
+    if (!tenantId || industryProfile !== "cannabis_dispensary") return;
+    try {
+      let q = supabase
+        .from("dispensing_log")
+        .select("quantity_dispensed, inventory_item_id, dispensed_at, is_voided")
+        .eq("tenant_id", tenantId)
+        .neq("is_voided", true);
+      const start = periodStart(period, customFrom);
+      const end = periodEnd(period, customTo);
+      if (start) q = q.gte("dispensed_at", start);
+      if (end) q = q.lte("dispensed_at", end);
+      const { data: dlData } = await q;
+      const itemPrices = {};
+      inventoryItems.forEach((i) => {
+        itemPrices[i.id] = parseFloat(i.sell_price || 0);
+      });
+      const events = dlData || [];
+      const rev = events.reduce(
+        (s, dl) =>
+          s + (dl.quantity_dispensed || 0) * (itemPrices[dl.inventory_item_id] || 0),
+        0,
+      );
+      setDispensingRevenue(rev);
+      setDispensingCount(events.length);
+    } catch (_) {
+      setDispensingRevenue(0);
+      setDispensingCount(0);
+    }
+  }, [tenantId, industryProfile, period, customFrom, customTo, inventoryItems]);
+
+  useEffect(() => {
+    fetchDispensingRevenue();
+  }, [fetchDispensingRevenue]);
 
   // ── WP-FINANCIALS Phase 2: fetch depreciation + equity ledger ──────────
   useEffect(() => {
@@ -1237,10 +1298,10 @@ export default function HQProfitLoss() {
   const totalOpexIncLoyalty = totalOpex + loyaltyCost + jAdj.totalOpexAdj;
   const adjustedRevenue     = totalRevenue + jAdj.totalRevAdj;
   const adjustedCogs        = totalCogs    + jAdj.totalCogsAdj;
-  const grossProfit         = adjustedRevenue - adjustedCogs;
-  const grossMarginPct      = adjustedRevenue > 0 ? (grossProfit / adjustedRevenue) * 100 : 0;
+  const grossProfit         = profileRevenue - adjustedCogs;
+  const grossMarginPct      = profileRevenue > 0 ? (grossProfit / profileRevenue) * 100 : 0;
   const netProfit           = grossProfit - totalOpexIncLoyalty;
-  const netMarginPct        = adjustedRevenue > 0 ? (netProfit / adjustedRevenue) * 100 : 0;
+  const netMarginPct        = profileRevenue > 0 ? (netProfit / profileRevenue) * 100 : 0;
 
   const bestSkuMargin = (() => {
     let best = null;
@@ -1302,6 +1363,47 @@ export default function HQProfitLoss() {
       return acc;
     }, {});
   const periodLabel = PERIODS.find(p => p.id === period)?.label || period;
+
+  // WP-FINANCIAL-PROFILES: profile-adaptive labels and revenue source
+  const PROFILE_LABELS = {
+    cannabis_dispensary: {
+      revenue: "Dispensing Revenue",
+      revDesc: `${dispensingCount} dispensing event${dispensingCount !== 1 ? "s" : ""} \u00b7 Schedule 6 clinical records`,
+      cogs: "Product Acquisition Cost",
+      cogsDesc: "AVCO-weighted acquisition cost of dispensed products",
+      gross: "Dispensing Margin",
+      ifrsRev: "Revenue \u2014 medical dispensing services",
+    },
+    food_beverage: {
+      revenue: "Food & Beverage Sales",
+      revDesc: `${filteredOrders.length} orders \u00b7 ${totalUnitsSold} covers \u00b7 ex-VAT`,
+      cogs: "Food Cost",
+      cogsDesc: "Cost of food ingredients \u00b7 AVCO or recipe estimate",
+      gross: "Gross Profit",
+      ifrsRev: "Revenue \u2014 food and beverage sales",
+    },
+    cannabis_retail: {
+      revenue: "Product Sales",
+      revDesc: `${filteredOrders.length} orders \u00b7 ${totalUnitsSold} units \u00b7 ex-VAT`,
+      cogs: "Cost of Goods Sold (AVCO)",
+      cogsDesc: "Weighted average cost of goods sold",
+      gross: "Gross Profit",
+      ifrsRev: "Revenue from contracts with customers",
+    },
+    general_retail: {
+      revenue: "Product Sales",
+      revDesc: `${filteredOrders.length} orders \u00b7 ${totalUnitsSold} units \u00b7 ex-VAT`,
+      cogs: "Cost of Goods Sold (AVCO)",
+      cogsDesc: "Weighted average cost of goods sold",
+      gross: "Gross Profit",
+      ifrsRev: "Revenue from contracts with customers",
+    },
+  };
+  const PL = PROFILE_LABELS[industryProfile] || PROFILE_LABELS.general_retail;
+  // LL-231: dispensary revenue = dispensing_log × sell_price; all others = orders
+  const baseRevenue =
+    industryProfile === "cannabis_dispensary" ? dispensingRevenue : websiteRevenue;
+  const profileRevenue = baseRevenue + jAdj.totalRevAdj;
 
   const card = {
     background: "#fff",
@@ -1599,7 +1701,8 @@ export default function HQProfitLoss() {
           tenantName={tenant?.name}
           financialYear={`FY${new Date().getFullYear()}`}
           period={periodLabel}
-          totalRevenue={adjustedRevenue}
+          revenueIfrsLabel={PL.ifrsRev}
+          totalRevenue={profileRevenue}
           totalCogs={totalCogs}
           grossProfit={grossProfit}
           grossMarginPct={grossMarginPct}
@@ -1650,21 +1753,21 @@ export default function HQProfitLoss() {
               <div style={card}>
                 <SectionHeader icon="💰" label="Revenue" />
                 <WRow
-                  label="Website / direct sales (ex-VAT)"
-                  sub={`${filteredOrders.length} orders · ${totalUnitsSold} units · ${PERIODS.find((p) => p.id === period)?.label} · VAT excluded (÷1.15)`}
-                  value={websiteRevenue}
+                  label={PL.revenue}
+                  sub={PL.revDesc}
+                  value={baseRevenue}
                   indent={1}
-                  highlight={websiteRevenue > 0 ? "green" : undefined}
+                  highlight={baseRevenue > 0 ? "green" : undefined}
                 />
                 {/* Wholesale revenue: placeholder until wholesale_orders table is populated */}
                 <WRow
-                  label="Total Revenue"
-                  value={totalRevenue}
+                  label={`Total ${PL.revenue}`}
+                  value={profileRevenue}
                   bold
-                  highlight={totalRevenue > 0 ? "green" : undefined}
+                  highlight={profileRevenue > 0 ? "green" : undefined}
                 />
 
-                <SectionHeader icon="📦" label="Cost of Goods Sold" />
+                <SectionHeader icon="📦" label={PL.cogs} />
                 <WRow
                   label={
                     hasActualCogs
@@ -1778,22 +1881,86 @@ export default function HQProfitLoss() {
                     No manual journal adjustments for this period.
                   </div>
                 )}
-                <SectionHeader icon="📊" label="Gross Profit" />
+                <SectionHeader icon="📊" label={PL.gross} />
                 <WRow
-                  label="Gross Profit"
+                  label={PL.gross}
                   sub={`Gross margin: ${fmt(grossMarginPct)}%`}
                   value={grossProfit}
                   bold
                   borderTop
                   highlight={
-                    grossMarginPct >= 35
+                    pctColour(grossMarginPct, industryProfile) === "#2E7D32"
                       ? "green"
-                      : grossMarginPct >= 20
+                      : pctColour(grossMarginPct, industryProfile) === "#E65100"
                         ? "orange"
                         : "red"
                   }
                 />
 
+                {/* F&B primary KPI: Food Cost % */}
+                {industryProfile === "food_beverage" && profileRevenue > 0 && (
+                  <div
+                    style={{
+                      margin: "0 16px 12px",
+                      padding: "12px 16px",
+                      borderRadius: 8,
+                      background:
+                        (totalCogs / profileRevenue) * 100 < 30
+                          ? "#F0FDF4"
+                          : (totalCogs / profileRevenue) * 100 < 35
+                            ? "#FFFBEB"
+                            : "#FEF2F2",
+                      border: `1px solid ${
+                        (totalCogs / profileRevenue) * 100 < 30
+                          ? "#BBF7D0"
+                          : (totalCogs / profileRevenue) * 100 < 35
+                            ? "#FDE68A"
+                            : "#FECACA"
+                      }`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#92400E",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            marginBottom: 3,
+                          }}
+                        >
+                          Food Cost % — Primary KPI
+                        </div>
+                        <div style={{ fontSize: 11, color: "#555" }}>
+                          Target: &lt;30% · Danger: &gt;35%
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 28,
+                          fontWeight: 700,
+                          fontVariantNumeric: "tabular-nums",
+                          color:
+                            (totalCogs / profileRevenue) * 100 < 30
+                              ? "#166534"
+                              : (totalCogs / profileRevenue) * 100 < 35
+                                ? "#92400E"
+                                : "#991B1B",
+                        }}
+                      >
+                        {((totalCogs / profileRevenue) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <SectionHeader icon="⚙️" label="Operating Costs" />
 
                 {/* Loyalty cost */}
@@ -2152,9 +2319,9 @@ export default function HQProfitLoss() {
                         value={grossMarginPct}
                         label="Gross Margin"
                         color={
-                          grossMarginPct >= 35
+                          pctColour(grossMarginPct, industryProfile) === "#2E7D32"
                             ? CC.success
-                            : grossMarginPct >= 20
+                            : pctColour(grossMarginPct, industryProfile) === "#E65100"
                               ? CC.warning
                               : CC.danger
                         }
@@ -2477,8 +2644,8 @@ export default function HQProfitLoss() {
                       ["Est. Programme Cost", fmtZar(loyaltyCost), "#c62828"],
                       [
                         "Cost/Revenue %",
-                        totalRevenue > 0
-                          ? `${fmt((loyaltyCost / totalRevenue) * 100)}%`
+                        profileRevenue > 0
+                          ? `${fmt((loyaltyCost / profileRevenue) * 100)}%`
                           : "—",
                         "#E65100",
                       ],
