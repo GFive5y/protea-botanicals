@@ -1298,6 +1298,10 @@ export default function HQProfitLoss() {
   const totalOpexIncLoyalty = totalOpex + loyaltyCost + jAdj.totalOpexAdj;
   const adjustedRevenue     = totalRevenue + jAdj.totalRevAdj;
   const adjustedCogs        = totalCogs    + jAdj.totalCogsAdj;
+  // LL-231: route revenue source by profile — must be declared before grossProfit
+  const baseRevenue = industryProfile === "cannabis_dispensary" ? dispensingRevenue : websiteRevenue;
+  const profileRevenue = baseRevenue + jAdj.totalRevAdj;
+
   const grossProfit         = profileRevenue - adjustedCogs;
   const grossMarginPct      = profileRevenue > 0 ? (grossProfit / profileRevenue) * 100 : 0;
   const netProfit           = grossProfit - totalOpexIncLoyalty;
@@ -1400,10 +1404,6 @@ export default function HQProfitLoss() {
     },
   };
   const PL = PROFILE_LABELS[industryProfile] || PROFILE_LABELS.general_retail;
-  // LL-231: dispensary revenue = dispensing_log × sell_price; all others = orders
-  const baseRevenue =
-    industryProfile === "cannabis_dispensary" ? dispensingRevenue : websiteRevenue;
-  const profileRevenue = baseRevenue + jAdj.totalRevAdj;
 
   const card = {
     background: "#fff",
