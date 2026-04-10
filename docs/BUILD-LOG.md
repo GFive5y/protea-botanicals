@@ -511,5 +511,41 @@ every user_profiles upsert to fail silently.
 See NUAI-AGENT-BIBLE.md — user_profiles_role_check constraint.
 
 ---
+
+## Session v231/v232 — 11 April 2026
+HEAD start: 6076510 · HEAD end: 108c804
+Type: BUILD — WP-INDUSTRY-SEEDS Phase 1 + Phase 4 Fix D debugging
+
+### What happened
+LL-221 pre-build audit caught sim-pos-sales hardcoded tenant — critical blocker.
+sim-pos-sales v2.3 deployed via Supabase MCP (accepts tenant_id from body).
+trial_expires_at column added to tenants table.
+seed-tenant EF v1 built + deployed + validated.
+
+### Commits
+bfbff3d — Fix D v2: remove broken client-side send-email step
+1355170 — Fix D v3: valid role prompt (admin, management, staff, hr, retailer)
+6076510 — docs: LL-222 role constraint + Fix D addendum
+108c804 — feat(seed-tenant): seed-tenant EF v1 + sim-pos-sales v2.3 repo sync
+
+### EFs deployed this session
+invite-user v3 — role validation (LL-222)
+sim-pos-sales v2.3 — accepts tenant_id from body
+seed-tenant v1 — general_retail seed, 7-step orchestration
+
+### DB changes
+tenants.trial_expires_at (TIMESTAMPTZ, nullable) — migration applied.
+Maxi Retail SA seeded via seed-tenant EF for validation.
+
+### Validation results
+Maxi Retail SA: 6 SEED-* products, 6 expenses, 1 journal, 232 sim orders,
+  seed_complete=true, trial_expires_at=2026-05-10 ✓
+
+### Bugs / discoveries
+sim-pos-sales had hardcoded Medi Rec tenant_id — fixed in deployed v2.3.
+user_profiles_role_check constraint: valid roles = customer/admin/retailer/staff/hr/management.
+invite-user EF now sanitizes role before upsert (v3).
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
