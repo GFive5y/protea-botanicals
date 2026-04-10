@@ -483,3 +483,380 @@
   color: var(--wz-text-secondary);
   line-height: 1.4;
 }
+
+/* ── Phase 2 ─────────────────────────────────────────────────────── */
+
+/* Back link */
+.wz-back {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--wz-font);
+  font-size: 13px;
+  color: var(--wz-text-secondary);
+  cursor: pointer;
+  align-self: flex-start;
+  letter-spacing: 0.01em;
+}
+.wz-back:hover {
+  color: var(--wz-text-primary);
+}
+
+/* Inline error / status text */
+.wz-error-text {
+  font-size: 13px;
+  color: var(--wz-danger);
+  margin-top: var(--wz-space-2);
+}
+.wz-status-text {
+  font-size: 13px;
+  color: var(--wz-text-secondary);
+}
+
+/* Slug suggestion chips */
+.wz-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wz-space-2);
+  margin-top: var(--wz-space-2);
+}
+.wz-suggest-chip {
+  font-family: var(--wz-font);
+  font-size: 13px;
+  padding: var(--wz-space-1) var(--wz-space-3);
+  background: var(--wz-surface-card);
+  border: 1px solid var(--wz-border);
+  border-radius: var(--wz-radius-pill);
+  color: var(--wz-text-primary);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.wz-suggest-chip:hover {
+  border-color: var(--wz-brand);
+  background: color-mix(in srgb, var(--wz-brand) 6%, var(--wz-surface-card));
+}
+
+/* Spinner inside CTA */
+.wz-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: var(--wz-radius-pill);
+  animation: wz-spin 700ms linear infinite;
+  vertical-align: middle;
+  margin-right: var(--wz-space-2);
+}
+@keyframes wz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Step 2 — colour picker ───────────────────────────────────── */
+.wz-color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--wz-space-3);
+}
+.wz-color-swatch {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--wz-radius-2);
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: transform 120ms ease, border-color 160ms ease;
+  padding: 0;
+}
+.wz-color-swatch:hover {
+  transform: translateY(-1px);
+}
+.wz-color-swatch.is-selected {
+  border-color: var(--wz-text-primary);
+}
+.wz-color-swatch.is-selected::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.wz-hex-row {
+  display: flex;
+  gap: var(--wz-space-3);
+  align-items: center;
+}
+.wz-hex-input {
+  width: 100%;
+  height: var(--wz-touch-min);
+  padding: 0 var(--wz-space-3);
+  font-family: var(--wz-font);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--wz-text-primary);
+  background: var(--wz-surface-card);
+  border: 1px solid var(--wz-border);
+  border-radius: var(--wz-radius-2);
+  outline: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.wz-hex-input:focus {
+  border-color: var(--wz-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wz-brand) 18%, transparent);
+}
+.wz-hex-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--wz-radius-2);
+  border: 1px solid var(--wz-border);
+  flex-shrink: 0;
+}
+
+/* ── Step 3 — industry tiles ──────────────────────────────────── */
+.wz-tile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--wz-space-3);
+}
+.wz-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wz-space-2);
+  padding: var(--wz-space-4);
+  background: var(--wz-surface-card);
+  border: 2px solid var(--wz-border);
+  border-radius: var(--wz-radius-3);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--wz-font);
+  transition: border-color 160ms ease, background 160ms ease;
+  min-height: 132px;
+}
+.wz-tile:hover {
+  border-color: var(--wz-text-tertiary);
+}
+.wz-tile.is-selected {
+  border-color: var(--wz-brand);
+  background: color-mix(in srgb, var(--wz-brand) 5%, var(--wz-surface-card));
+}
+.wz-tile-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wz-text-primary);
+  line-height: 1.2;
+}
+.wz-tile-desc {
+  font-size: 13px;
+  color: var(--wz-text-secondary);
+  line-height: 1.4;
+}
+.wz-tile-example {
+  margin-top: auto;
+  padding-top: var(--wz-space-2);
+  font-size: 11px;
+  color: var(--wz-text-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Step 4 — template cards ──────────────────────────────────── */
+.wz-template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--wz-space-3);
+}
+@media (max-width: 720px) {
+  .wz-template-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.wz-template-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wz-space-2);
+  padding: var(--wz-space-3);
+  background: var(--wz-surface-card);
+  border: 2px solid var(--wz-border);
+  border-radius: var(--wz-radius-3);
+  cursor: pointer;
+  font-family: var(--wz-font);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.wz-template-card:hover {
+  border-color: var(--wz-text-tertiary);
+}
+.wz-template-card.is-selected {
+  border-color: var(--wz-brand);
+  background: color-mix(in srgb, var(--wz-brand) 5%, var(--wz-surface-card));
+}
+.wz-template-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wz-text-primary);
+}
+.wz-template-card-desc {
+  font-size: 12px;
+  color: var(--wz-text-secondary);
+  line-height: 1.4;
+}
+
+/* Mini visual representation of each template layout */
+.wz-template-mock {
+  background: var(--wz-surface-page);
+  border: 1px solid var(--wz-border);
+  border-radius: var(--wz-radius-1);
+  height: 90px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.wz-template-mock .bar {
+  background: var(--wz-border);
+  border-radius: 1px;
+  height: 6px;
+}
+.wz-template-mock .bar.brand { background: var(--wz-brand); }
+.wz-template-mock .bar.short { width: 30%; }
+.wz-template-mock .bar.med   { width: 60%; }
+.wz-template-mock .row {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.wz-template-mock .col {
+  flex: 1;
+  background: var(--wz-border);
+  border-radius: 1px;
+}
+.wz-template-mock .hero {
+  background: color-mix(in srgb, var(--wz-brand) 30%, var(--wz-surface-page));
+  border-radius: 1px;
+  height: 32px;
+}
+.wz-template-mock .hero-tall {
+  background: color-mix(in srgb, var(--wz-brand) 30%, var(--wz-surface-page));
+  border-radius: 1px;
+  flex: 1;
+}
+.wz-template-mock .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ── Step 5 — products ────────────────────────────────────────── */
+.wz-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wz-space-2);
+}
+.wz-product-row {
+  display: flex;
+  align-items: center;
+  gap: var(--wz-space-3);
+  padding: var(--wz-space-2) var(--wz-space-3);
+  background: var(--wz-surface-card);
+  border: 1px solid var(--wz-border);
+  border-radius: var(--wz-radius-2);
+  font-family: var(--wz-font);
+}
+.wz-product-row-name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--wz-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wz-product-row-sku {
+  font-size: 12px;
+  color: var(--wz-text-tertiary);
+  font-family: var(--wz-font);
+}
+.wz-product-row-price {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wz-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.wz-product-row-remove {
+  background: none;
+  border: none;
+  color: var(--wz-text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: var(--wz-space-1);
+}
+.wz-product-row-remove:hover {
+  color: var(--wz-danger);
+}
+
+.wz-product-add {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: var(--wz-space-2);
+  align-items: end;
+}
+@media (max-width: 720px) {
+  .wz-product-add {
+    grid-template-columns: 1fr;
+  }
+}
+.wz-add-btn {
+  height: var(--wz-touch-min);
+  padding: 0 var(--wz-space-3);
+  font-family: var(--wz-font);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wz-text-primary);
+  background: var(--wz-surface-card);
+  border: 1px solid var(--wz-border);
+  border-radius: var(--wz-radius-2);
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+.wz-add-btn:hover {
+  border-color: var(--wz-brand);
+}
+
+.wz-skip-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--wz-font);
+  font-size: 14px;
+  color: var(--wz-text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  align-self: flex-start;
+}
+.wz-skip-link:hover {
+  color: var(--wz-text-primary);
+}
+
+.wz-help-text {
+  font-size: 13px;
+  color: var(--wz-text-tertiary);
+  line-height: 1.5;
+}
+
+/* ── Auth gate full-screen state ──────────────────────────────── */
+.wz-fullscreen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--wz-font);
+  color: var(--wz-text-secondary);
+  background: var(--wz-surface-page);
+}
