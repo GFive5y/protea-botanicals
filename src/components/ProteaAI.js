@@ -183,50 +183,89 @@ async function executeQuerySpec(spec) {
 // ── Codebase facts for dev mode ───────────────────────────────────────────────
 const CODEBASE_FACTS = `
 STACK: React 18 + Supabase JS v2 + React Router v6. Auto-deploys via Vercel on git push.
-REPO: github.com/GFive5y/protea-botanicals \u00b7 branch: main
-MEDI REC TENANT: b1bad266-ceb4-4558-bbc3-22cfeeeafe74
-HQ TENANT: 43b34c33-6864-4f02-98dd-df1d340475c3
+REPO: github.com/GFive5y/protea-botanicals · branch: main
+SUPABASE: uvicrqapgzcdvozxrreo (eu-west-1)
+LIVE URL: https://nuai-gfive5ys-projects.vercel.app
 
-EDGE FUNCTIONS (14 active):
-ai-copilot v67 · auto-post-capture v2 (P3-C: writes expenses.input_vat_amount)
-process-document v53 (v2.2: vat_amount extraction, supplier VAT override)
-sim-pos-sales v4 · sign-qr v36 · verify-qr v34 · send-notification v37
-get-fx-rate v35 · payfast-checkout v44 · payfast-itn v39
-receive-from-capture v1 · loyalty-ai v2 · create-admin-user v1
-send-email v1 (GAP-C02: Resend email infra, verify_jwt: true)
+KEY TENANT IDs:
+  HQ operator:          43b34c33-6864-4f02-98dd-df1d340475c3
+  Medi Recreational:    b1bad266-ceb4-4558-bbc3-22cfeeeafe74 (cannabis_retail)
+  Medi Can Dispensary:  2bd41eb7-1a6e-416c-905b-1358f6499d8d (cannabis_dispensary — seed_complete, DO NOT RE-SEED)
+  Nourish Kitchen:      944547e3-ce9f-44e0-a284-43ebe1ed898f (food_beverage — 240 orders)
+  Vozel Vapes:          388fe654 (general_retail) · Maxi Retail: 9766a3af (general_retail — 232 orders)
+  Total tenants: 9
 
-WP-FINANCIALS (ALL 10 PHASES COMPLETE — 09 Apr 2026):
-IFRS Income Statement · Balance Sheet · Fixed Assets (IAS 16) · Journals (double-entry)
-VAT201 Module · Bank Recon · Financial Notes (15 IFRS) · PDF Export · Year-End Close
-Financial Setup Wizard · R477,880 revenue · 62.13% GM · R296,606 net profit
+EDGE FUNCTIONS (12 active as of 11 Apr 2026):
+  ai-copilot v59 · process-document v53 · auto-post-capture v2
+  sim-pos-sales v4 · sign-qr v36 · verify-qr v34 · send-notification v37
+  get-fx-rate v35 · payfast-checkout v44 · payfast-itn v39
+  seed-tenant v4 (general_retail + food_beverage + cannabis_dispensary)
+  trigger-sim-nourish v1 (throwaway — owner should delete)
+
+INDUSTRY PROFILES — 4 LIVE (WP-INDUSTRY-PROFILES v1.0):
+  cannabis_retail     → CANNABIS_RETAIL_WATERFALL (budtender nav · orders revenue)
+  cannabis_dispensary → CANNABIS_DISPENSARY_WATERFALL (clinical nav · dispensing_log revenue — LL-231)
+  food_beverage       → FOOD_BEVERAGE_WATERFALL (kitchen-first nav · HACCP + cold chain + recall)
+  general_retail      → WATERFALL (manufacturing nav · orders revenue)
+  Routing: TenantPortal.js getWaterfall(industryProfile) → 4-branch switch
+
+DISPENSARY CLINICAL MODULE (WP-MEDI-CAN — COMPLETE):
+  HQMedical.js — 5 sub-tabs: Patients · Prescriptions · Dispensing · Reports · Compliance
+  Gate: tenantConfig.feature_medical !== false AND industryProfile === 'cannabis_dispensary'
+  Dispensing revenue: dispensing_log × inventory_items.sell_price (LL-231)
+  LL-226: dispensing_log is Schedule 6 — NEVER hard-delete, void only (is_voided + void_reason)
+  Medi Can: 5 patients (S21 data) · 14 dispensing events · R20,000 revenue / 30 days
+
+WP-FINANCIALS (ALL 10 PHASES COMPLETE):
+  IFRS Income Statement · Balance Sheet · Fixed Assets (IAS 16) · Journals (double-entry)
+  VAT201 Module · Bank Recon · Financial Notes (15 IFRS) · PDF Export · Year-End Close
+  Financial Setup Wizard · Profile-adaptive P&L (WP-FINANCIAL-PROFILES — LL-224 CLOSED)
+
+WP-FINANCIAL-PROFILES (COMPLETE — 11 Apr 2026):
+  HQProfitLoss.js: profile-adaptive revenue source + gross margin thresholds + Food Cost % KPI
+    cannabis_dispensary: Green ≥50% · revenue from dispensing_log (LL-231/232)
+    food_beverage:       Green ≥65% · Food Cost % primary KPI (target <30%)
+    cannabis_retail:     Green ≥50%
+    general_retail:      Green ≥35%
+  ExpenseManager.js: profile-aware subcategory lists (SAHPRA/pharmacist for dispensary · kitchen wages for F&B)
+  HQForecast.js: dispensary velocity from dispensing_log · S21 expiry pipeline · Rx repeat warnings (LL-235/236)
+  SUBCATEGORY_TO_ACCOUNT: 12 new IFRS entries (dispensary + F&B specific — LL-234 additive only)
 
 VAT PIPELINE (3-POINT, ALL LIVE):
-P3-A: expenses.input_vat_amount → expense_vat_sync → vat_transactions
-P3-B: stock_receipts.input_vat_amount → receipt_vat_sync → vat_transactions
-P3-C: Smart Capture → auto-post-capture → expenses.input_vat_amount → trigger
+  P3-A: expenses.input_vat_amount → expense_vat_sync → vat_transactions
+  P3-B: stock_receipts.input_vat_amount → receipt_vat_sync → vat_transactions
+  P3-C: Smart Capture → auto-post-capture → expenses.input_vat_amount → trigger
 
-PLATFORM SCALE (updated 10 Apr 2026):
-224,293+ lines · 180 JS files · 14 TS Edge Functions · 110 DB tables (all RLS)
-6 user portals · 42 HQ tabs · 17 stock components · 13 HR modules
-4 industry profiles · 5 active tenants
-GAP-C02 CLOSED: send-email EF + email_logs table + HQ Email Logs tab
+PLATFORM SCALE (11 Apr 2026):
+  224,293+ lines · 180+ JS files · 12 Edge Functions · 111 DB tables (all RLS)
+  6 user portals · HQ sidebar: Financials · Analytics · Purchasing (renamed from Finance/Intelligence/Procurement)
+  4 industry profiles live · 9 tenants · 17 stock components · 13 HR modules
 
-FINANCIAL AUDIT FINDINGS (FIN-AUDIT v1.0 — 09 Apr 2026):
-GAP-01: Revenue is VAT-inclusive — overstated ~15% (R61,758). Fix pending.
-GAP-02: Journal entries not flowing to P&L/BS. Fix pending.
-GAP-03: 47 expenses have input_vat_amount = 0. Owner action needed.
-GAP-04: Depreciation never run — 0 entries, 3 assets. Owner action needed.
+KEY LL RULES (most critical):
+  LL-205: Every new DB table needs hq_all_ RLS bypass policy (is_hq_user())
+  LL-206: const { tenant } = useTenant(); const tenantId = tenant?.id;
+  LL-207: No tenantId props on HQ child components
+  LL-221: Read the actual file before any edit (LL-075: disk is truth)
+  LL-224: CLOSED — all profiles now have profile-adaptive P&L
+  LL-225: cannabis_dispensary nav NEVER shows Wholesale/Distribution/Retailers
+  LL-226: dispensing_log = Schedule 6 — void only, never hard-delete
+  LL-231: Dispensary revenue = dispensing_log × sell_price (not orders table)
+  LL-233: HQCogs.js is 145KB — read in full before touching
+  LL-234: SUBCATEGORY_TO_ACCOUNT additions are additive only, never remove entries
+  LL-235: HQForecast dispensary velocity = dispensing_log (not orders)
+  RULE 0Q: NEVER push_files or create_or_update_file from Claude.ai — all writes via Claude Code
 
-KEY RULES (additions):
-LL-205: Every new DB table needs hq_all_ RLS bypass policy (is_hq_user())
-LL-206: const { tenant } = useTenant(); const tenantId = tenant?.id;
-LL-207: No tenantId props on HQ child components
-LL-208: Enumerate ALL tables before any migration
-RULE 0Q: NEVER push_files or create_or_update_file from Claude.ai
+LOCKED FILES (never rewrite, str_replace only):
+  StockItemModal.js · ProteaAI.js (CODEBASE_FACTS str_replace only — LL-061)
+  PlatformBar.js · supabaseClient.js
 
-LOCKED: StockItemModal.js · ProteaAI.js · PlatformBar.js · LiveFXBar.js · HQStock.js (protected)
-TENANT: Medi Recreational · b1bad266-ceb4-4558-bbc3-22cfeeeafe74
-SUPABASE: uvicrqapgzcdvozxrreo · 5 tenants
+PROTECTED FILES (read full before any edit):
+  HQStock.js (208KB) · HQProfitLoss.js (112KB+) · HQCogs.js (145KB) · LiveFXBar.js · HQMedical.js (~68KB)
+
+NEXT PRIORITIES (11 Apr 2026):
+  1. Dispensary voiding UI — LL-226 compliance (is_voided/void_reason columns exist, no UI yet)
+  2. Controlled Substance Register (CSR) — 6th sub-tab in HQMedical.js
+  3. WP-WIZARD-V2 — TenantSetupWizard.js must pass cannabis_dispensary profile to seed-tenant
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
