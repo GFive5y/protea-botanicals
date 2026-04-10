@@ -37,6 +37,35 @@ const DEFAULT_BRANDING = {
   btn_text: "#FFFFFF",
 };
 
+// ── Wizard → storefront branding mapper ────────────────────────────────────
+// The onboarding wizard writes its own keys to branding_config:
+//   { primary_color, font_family, terminology_profile, template,
+//     logo_url, wizard_complete, launched_at }
+// Storefront consumers (Shop.js, ClientHeader) read different keys:
+//   brand_name, accent_color, btn_bg, btn_text, etc.
+// This mapper merges DEFAULT_BRANDING ← wizard keys ← raw branding_config
+// so that wizard-launched tenants render correctly without forcing the
+// owner to fill every legacy field.
+function mergeBranding(tenantRow) {
+  const cfg = (tenantRow && tenantRow.branding_config) || {};
+  const merged = { ...DEFAULT_BRANDING, ...cfg };
+
+  // brand_name falls back to tenants.name when not in JSON
+  if (!cfg.brand_name && tenantRow?.name) {
+    merged.brand_name = tenantRow.name;
+  }
+  // wizard primary_color drives accent + button background
+  if (cfg.primary_color) {
+    merged.accent_color = cfg.accent_color || cfg.primary_color;
+    merged.btn_bg = cfg.btn_bg || cfg.primary_color;
+    if (!cfg.btn_text) merged.btn_text = "#FFFFFF";
+  }
+  return merged;
+}
+
+// Hard fallback tenant — Pure PTV — used only when every other path fails
+const HARD_FALLBACK_ID = "f8ff8d07-7688-44a7-8714-5941ab4ceaa5";
+
 // ── Provider ────────────────────────────────────────────────────────────────
 export function StorefrontProvider({ children }) {
   const [storefrontTenantId, setStorefrontTenantId] = useState(null);
@@ -46,145 +75,121 @@ export function StorefrontProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
+    // Single source-of-truth decision tree:
+    //   1. /shop/<slug> path  → query by slug
+    //   2. real hostname       → query by domain
+    //   3. dev hostname        → REACT_APP_DEV_TENANT_ID or hard fallback
+    //   4. anything still null → hard fallback
+    // ALL state is applied in a single batch at the very end. No partial
+    // updates, no early returns, no race between paths.
     async function resolveStorefront() {
+      let resolved = null; // {id, name, industry_profile, branding_config}
+
       try {
         const hostname = window.location.hostname;
-        let tenantId = null;
+        const isDevHost =
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname.includes("vercel.app");
 
-        // ── Path-based slug override (Phase 4 — wizard launch URL) ────────
-        // /shop/<slug> takes precedence over hostname/dev resolution.
-        // Wizard success state opens this URL via target="_blank", so the
-        // tab is always a fresh page load — non-reactive pathname is fine.
+        // ── 1. Path-slug — wins over everything else ────────────────────
         const pathMatch = window.location.pathname.match(
           /^\/shop\/([a-z0-9-]+)\/?$/i,
         );
         const pathSlug = pathMatch?.[1] || null;
         if (pathSlug) {
-          const { data: slugTenant } = await supabase
+          const { data, error } = await supabase
             .from("tenants")
             .select("id, name, industry_profile, branding_config")
             .eq("slug", pathSlug)
             .maybeSingle();
-          if (slugTenant) {
-            tenantId = slugTenant.id;
-            setTenantName(slugTenant.name);
-            setIndustryProfile(
-              slugTenant.industry_profile || "cannabis_retail",
-            );
-            if (
-              slugTenant.branding_config &&
-              Object.keys(slugTenant.branding_config).length > 0
-            ) {
-              setBrandingConfig({
-                ...DEFAULT_BRANDING,
-                ...slugTenant.branding_config,
-              });
-            }
+          if (data) {
+            resolved = data;
             console.log(
-              "[Storefront] Resolved tenant by slug:",
-              slugTenant.name,
+              "[Storefront] Resolved by slug:",
+              data.name,
               `(${pathSlug})`,
             );
-            setStorefrontTenantId(tenantId);
-            setLoading(false);
-            return;
+          } else if (error) {
+            console.warn("[Storefront] Slug query error:", error.message);
+          } else {
+            console.warn(
+              "[Storefront] No tenant for slug:",
+              pathSlug,
+              "— falling through",
+            );
           }
-          console.warn(
-            "[Storefront] No tenant for slug:",
-            pathSlug,
-            "— falling back to hostname/dev resolution",
-          );
         }
 
-        // ── Dev fallback: localhost uses env var ──────────────────────────
-        if (
-          hostname === "localhost" ||
-          hostname === "127.0.0.1" ||
-          hostname.includes("vercel.app")
-        ) {
-          // On localhost or Vercel preview: use env var or fall back to Pure PTV
-          tenantId =
-            process.env.REACT_APP_DEV_TENANT_ID ||
-            "f8ff8d07-7688-44a7-8714-5941ab4ceaa5";
-          console.log("[Storefront] Dev mode — using tenant:", tenantId);
-        } else {
-          // ── Production: resolve from domain ────────────────────────────
-          const { data, error } = await supabase
+        // ── 2. Real production hostname ─────────────────────────────────
+        if (!resolved && !isDevHost) {
+          const { data } = await supabase
             .from("tenants")
             .select("id, name, industry_profile, branding_config")
             .eq("domain", hostname)
-            .single();
-
-          if (error || !data) {
-            console.warn(
-              "[Storefront] No tenant found for domain:",
-              hostname,
-              error?.message,
-            );
-            // Fall back to Pure PTV so shop doesn't break
-            tenantId = "f8ff8d07-7688-44a7-8714-5941ab4ceaa5";
-          } else {
-            tenantId = data.id;
-            setTenantName(data.name);
-            setIndustryProfile(data.industry_profile || "cannabis_retail");
-            if (
-              data.branding_config &&
-              Object.keys(data.branding_config).length > 0
-            ) {
-              setBrandingConfig({
-                ...DEFAULT_BRANDING,
-                ...data.branding_config,
-              });
-            }
+            .maybeSingle();
+          if (data) {
+            resolved = data;
             console.log(
-              "[Storefront] Resolved tenant:",
+              "[Storefront] Resolved by hostname:",
               data.name,
-              "for",
-              hostname,
+              `(${hostname})`,
             );
           }
         }
 
-        // If dev mode, still load branding from DB
-        if (
-          hostname === "localhost" ||
-          hostname === "127.0.0.1" ||
-          hostname.includes("vercel.app")
-        ) {
-          const { data: tenantData } = await supabase
+        // ── 3. Dev fallback (localhost / vercel.app) ────────────────────
+        if (!resolved && isDevHost) {
+          const fallbackId =
+            process.env.REACT_APP_DEV_TENANT_ID || HARD_FALLBACK_ID;
+          const { data } = await supabase
             .from("tenants")
-            .select("name, industry_profile, branding_config")
-            .eq("id", tenantId)
-            .single();
-
-          if (tenantData) {
-            setTenantName(tenantData.name);
-            setIndustryProfile(
-              tenantData.industry_profile || "cannabis_retail",
-            );
-            if (
-              tenantData.branding_config &&
-              Object.keys(tenantData.branding_config).length > 0
-            ) {
-              setBrandingConfig({
-                ...DEFAULT_BRANDING,
-                ...tenantData.branding_config,
-              });
-            }
+            .select("id, name, industry_profile, branding_config")
+            .eq("id", fallbackId)
+            .maybeSingle();
+          if (data) {
+            resolved = data;
+            console.log("[Storefront] Dev fallback:", data.name);
           }
         }
 
-        setStorefrontTenantId(tenantId);
+        // ── 4. Hard fallback — never leave null ─────────────────────────
+        if (!resolved) {
+          const { data } = await supabase
+            .from("tenants")
+            .select("id, name, industry_profile, branding_config")
+            .eq("id", HARD_FALLBACK_ID)
+            .maybeSingle();
+          resolved = data;
+          if (data) {
+            console.log("[Storefront] Hard fallback:", data.name);
+          }
+        }
       } catch (err) {
         console.error("[Storefront] Resolution error:", err);
-        // Hard fallback — never leave storefrontTenantId null
-        setStorefrontTenantId("f8ff8d07-7688-44a7-8714-5941ab4ceaa5");
-      } finally {
-        setLoading(false);
       }
+
+      if (cancelled) return;
+
+      // ── Single state batch — applied once, atomically ────────────────
+      if (resolved) {
+        setStorefrontTenantId(resolved.id);
+        setTenantName(resolved.name || "");
+        setIndustryProfile(resolved.industry_profile || "cannabis_retail");
+        setBrandingConfig(mergeBranding(resolved));
+      } else {
+        // Last-resort: even the hard fallback failed (network error, etc.)
+        setStorefrontTenantId(HARD_FALLBACK_ID);
+      }
+      setLoading(false);
     }
 
     resolveStorefront();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const value = {
