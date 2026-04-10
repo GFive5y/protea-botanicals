@@ -2597,6 +2597,13 @@ export default function Shop() {
   const isCannabisRetail =
     effectiveProfile === "cannabis_retail" ||
     effectiveProfile === "cannabis_dispensary";
+  // ✦ Phase 4: storefront-only cannabis check, ignores HQ user's useTenant() profile.
+  // Used by hero stats, filter tabs, Coming Soon, and footer tagline so a non-cannabis
+  // storefront never bleeds cannabis content even if the viewer is logged into an HQ
+  // session whose tenant happens to be cannabis_retail.
+  const isCannabis =
+    sfProfile === "cannabis_retail" ||
+    sfProfile === "cannabis_dispensary";
 
   const [filter, setFilter] = useState("all");
   const [cartToast, setCartToast] = useState(null);
@@ -2709,7 +2716,15 @@ export default function Shop() {
                   "accessory",
                   "finished_product",
                 ]
-              : ["finished_product"],
+              : // ✦ Phase 4: widen for general / nicotine_vape / food_bev tenants
+                // so device kits, pods, accessories etc. all surface.
+                [
+                  "finished_product",
+                  "hardware",
+                  "accessory",
+                  "raw_material",
+                  "other",
+                ],
           )
           .eq("is_active", true)
           .gt("sell_price", 0)
@@ -2993,25 +3008,45 @@ export default function Shop() {
               flexWrap: "wrap",
             }}
           >
-            {(isCannabisRetail
-              ? [
+            {(isCannabis
+              ? isCannabisRetail
+                ? [
+                    {
+                      value:
+                        liveProducts.length > 0
+                          ? `${liveProducts.length}`
+                          : "182",
+                      label: "Products",
+                    },
+                    { value: "100%", label: "Lab Tested" },
+                    { value: "6", label: "Categories" },
+                    { value: "R180+", label: "From" },
+                  ]
+                : [
+                    { value: "18", label: "Strains" },
+                    { value: "93.55%", label: "D9-THC" },
+                    { value: "5", label: "Eybna Lines" },
+                    { value: "R800+", label: "From" },
+                  ]
+              : // Non-cannabis tenants — pull from branding_config (Phase 4)
+                [
                   {
-                    value:
-                      liveProducts.length > 0
-                        ? `${liveProducts.length}`
-                        : "182",
-                    label: "Products",
+                    value: brandingConfig?.stat_1_value,
+                    label: brandingConfig?.stat_1_label,
                   },
-                  { value: "100%", label: "Lab Tested" },
-                  { value: "6", label: "Categories" },
-                  { value: "R180+", label: "From" },
-                ]
-              : [
-                  { value: "18", label: "Strains" },
-                  { value: "93.55%", label: "D9-THC" },
-                  { value: "5", label: "Eybna Lines" },
-                  { value: "R800+", label: "From" },
-                ]
+                  {
+                    value: brandingConfig?.stat_2_value,
+                    label: brandingConfig?.stat_2_label,
+                  },
+                  {
+                    value: brandingConfig?.stat_3_value,
+                    label: brandingConfig?.stat_3_label,
+                  },
+                  {
+                    value: brandingConfig?.stat_4_value,
+                    label: brandingConfig?.stat_4_label,
+                  },
+                ].filter((s) => s.value && s.label)
             ).map((s) => (
               <div
                 key={s.label}
@@ -3067,13 +3102,13 @@ export default function Shop() {
                 { key: "coming-soon", label: "Coming Soon" },
               ]
             : isGeneral
-              ? [
-                  { key: "all", label: "All Products" },
-                  { key: "coming-soon", label: "Coming Soon" },
-                ]
-              : isCannabisRetail
-                ? CANNABIS_FILTER_OPTIONS
-                : FILTER_OPTIONS
+              ? [{ key: "all", label: "All Products" }]
+              : isCannabis
+                ? isCannabisRetail
+                  ? CANNABIS_FILTER_OPTIONS
+                  : FILTER_OPTIONS
+                : // Unknown profile — safe fallback (Phase 4)
+                  [{ key: "all", label: "All Products" }]
           ).map((f) => (
             <button
               key={f.key}
@@ -3272,7 +3307,9 @@ export default function Shop() {
           </>
         )}
 
-        {filteredCS.length > 0 && !loadingInventory && (
+        {/* ✦ Phase 4: Coming Soon section is cannabis-themed (terpenes, CBD,
+              edibles, topicals) — must not appear on a non-cannabis storefront */}
+        {isCannabis && filteredCS.length > 0 && !loadingInventory && (
           <>
             {filteredVapes.length > 0 && <div className="section-divider" />}
             <div style={{ marginBottom: 16 }}>
@@ -3522,7 +3559,9 @@ export default function Shop() {
                 marginTop: 8,
               }}
             >
-              Premium Cannabis · South Africa
+              {isCannabis
+                ? "Premium Cannabis · South Africa"
+                : brandingConfig?.tagline || "South Africa"}
             </p>
           </div>
           <nav
