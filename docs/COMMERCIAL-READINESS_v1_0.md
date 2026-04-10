@@ -80,12 +80,18 @@ This triggers the native camera on mobile browsers without a native app.
 Also add PWA manifest for home screen installation.
 File: src/components/hq/HQSmartCapture.js
 
-### GAP-C02: Email Infrastructure (Priority 1 — 3-5 days)
+### GAP-C02: Email Infrastructure (Priority 1 — 3-5 days) — ✅ CLOSED
 No email sending exists. Twilio handles WhatsApp only.
 Commercial need: invoice delivery, statement emails, VAT reminders,
 year-end notifications, user invitations, overdue alerts.
 Fix: Resend API (resend.com) via new Edge Function send-email.
 ~R200/month at moderate commercial volume.
+
+> **CLOSED — 10 April 2026 — commit e61d7e6**
+> send-email EF v1 deployed. email_logs table live. 6 email buttons across HQ.
+> HQEmailLogs cross-tenant viewer. Resend sandbox active.
+> Known gap: user_invitation type sends email only — does not create auth account.
+> Full auth invite (supabase.auth.admin.inviteUserByEmail) is next-session fix.
 
 ### GAP-C03: Supabase Plan Upgrade (Priority 1 — do when ready)
 Currently FREE tier: 500MB DB, 1GB storage, 50K EF calls/month.

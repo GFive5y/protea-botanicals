@@ -372,6 +372,30 @@ bank_accounts · bank_statement_lines · capture_queue · capture_rules · chart
 
 ---
 
+# SECTION 6.5 — GLOSSARY / TERMINOLOGY
+
+Read once. Used throughout this Bible and BUILD-LOG.md.
+
+| Term | Meaning |
+|---|---|
+| **EF** | Edge Function — Supabase TypeScript serverless function in supabase/functions/. NuAi has 14 EFs as of v224. Each lives in its own directory with index.ts. Deployed with: `supabase functions deploy <name> --project-ref uvicrqapgzcdvozxrreo` |
+| **WP** | Work Package — a named body of work spanning multiple sessions (e.g. WP-FINANCIALS, WP-NAV-RESTRUCTURE) |
+| **GAP-Xnn** | A commercial-readiness gap from COMMERCIAL-READINESS_v1_0.md that must be closed before launch (e.g. GAP-C02 = email infrastructure) |
+| **LL-nnn** | Lesson Learned — a numbered rule derived from a past mistake. Listed in Section 7 below |
+| **RLS** | Row Level Security — Postgres policy restricting which rows each user/role can read or write |
+| **LL-205** | Every new DB table needs a `hq_all_<table>` policy using `is_hq_user()` so the HQ operator can read across tenants |
+| **AVCO** | Average Cost — inventory valuation method, recalculated by DB trigger on every stock movement |
+| **IFRS** | International Financial Reporting Standards — accounting framework NuAi's financial suite targets |
+| **HQ** | The internal operator portal at /hq. Cross-tenant. 41+ tabs. Not a tenant — it is the platform operator's command centre |
+| **VAT201** | SARS bi-monthly VAT return form. NuAi auto-populates fields 1, 4, 12, 16 from vat_transactions |
+| **SARS** | South African Revenue Service — tax authority |
+| **SAHPRA** | South African Health Products Regulatory Authority (medical cannabis compliance) |
+| **POPIA** | Protection of Personal Information Act (SA equivalent of GDPR) |
+| **BCEA** | Basic Conditions of Employment Act (SA) — drives HR Leave module rules |
+| **Smart Capture** | Document AI ingestion: photo of invoice → process-document EF → auto-post-capture EF → atomic expense + journal + VAT |
+
+---
+
 # SECTION 7 — CRITICAL RULES (CONSOLIDATED)
 
 ## Architecture Rules
@@ -454,6 +478,28 @@ bank_accounts · bank_statement_lines · capture_queue · capture_rules · chart
   WRONG:     {activeTab === 'journals' && <HQJournals tenantId={x} />}
   If a child component shows 0 data in HQ view — check LL-205 (missing RLS policy) first,
   not the component code or props. The architecture is correct by design.
+
+## GAP-C02 Discoveries (10 Apr 2026 — Session v224)
+
+- **LL-211 — send-email EF deployed with verify_jwt: true (all others are false)**:
+  Test email flows from production URL, not localhost — JWT may not pass correctly
+  from local dev, causing silent EF failures (email_logs remains empty).
+  When debugging an email send that "did nothing", first check: are you on localhost?
+  If yes, retry from nuai-gfive5ys-projects.vercel.app before suspecting code.
+
+- **LL-212 — user_invitation email type sends a notification only**:
+  It does NOT create a Supabase auth account or grant portal access.
+  Real tenant onboarding requires supabase.auth.admin.inviteUserByEmail()
+  PLUS a send-email call for the branded welcome. Never conflate the two.
+  The HQTenants Invite User button currently sends email only — auth invite
+  is the next-session fix tracked in BUILD-LOG.md.
+
+- **LL-213 — email_logs table has no migration file**:
+  Project has no migrations directory. email_logs was applied directly via
+  Supabase MCP. Future DB changes follow the same pattern: SQL applied via
+  MCP or Supabase dashboard SQL editor, not migration files in the repo.
+  Always record schema changes in BUILD-LOG.md so future agents can reconstruct
+  current DB state without grep'ing for non-existent migration files.
 
 ## Locked / Protected Files
 LOCKED (never modify):
