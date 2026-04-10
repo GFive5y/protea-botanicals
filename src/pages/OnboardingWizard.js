@@ -995,12 +995,30 @@ export default function OnboardingWizard() {
         logoUploadedUrl: uploadedUrl,
       }));
       setLaunched(true);
+
+      // Fire seed-tenant EF — non-blocking, best-effort, fire and forget.
+      // v1 supports general_retail only (covers general_retail + nicotine_vape tiles
+      // since both map industryProfile to "general_retail" in the DB).
+      // Future phases will add food_beverage + cannabis_retail branches.
+      if (wizardData.industryProfile === "general_retail") {
+        supabase.functions
+          .invoke("seed-tenant", {
+            body: {
+              tenant_id: wizardData.tenantId,
+              industry_profile: "general_retail",
+              seed_days: 30,
+            },
+          })
+          .catch((err) =>
+            console.error("[wizard] seed-tenant non-blocking error:", err),
+          );
+      }
     } catch (e) {
       setLaunchError(e.message || "Launch failed.");
     } finally {
       setLaunching(false);
     }
-  }, [wizardData.tenantId, wizardData.slug, wizardData.name, wizardData.brandColor, wizardData.tagline, uploadLogo, generateWelcomeQr]);
+  }, [wizardData.tenantId, wizardData.slug, wizardData.name, wizardData.brandColor, wizardData.tagline, wizardData.industryProfile, uploadLogo, generateWelcomeQr]);
 
   // Copy live URL to clipboard
   const copyLiveUrl = useCallback(() => {
@@ -1854,6 +1872,19 @@ export default function OnboardingWizard() {
                   ? `Welcome back — ${wizardData.name} is live`
                   : "Your shop is live"}
               </h2>
+              {wizardData.industryProfile === "general_retail" && !wizardData.isResuming && (
+                <p
+                  className="wz-body"
+                  style={{
+                    color: "var(--wz-text-secondary)",
+                    fontSize: 12,
+                    marginTop: 4,
+                    marginBottom: 0,
+                  }}
+                >
+                  ✦ Seeding your industry data in the background…
+                </p>
+              )}
 
               <div className="wz-success-url">
                 <a
