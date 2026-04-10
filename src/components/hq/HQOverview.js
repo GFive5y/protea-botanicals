@@ -26,6 +26,7 @@ import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip, SparkLine, DeltaBadge } from "../viz";
 import { PRODUCT_WORLDS, worldForItem } from "./ProductWorlds";
+import ActionCentre from "../shared/ActionCentre";
 
 const SUPABASE_FUNCTIONS_URL =
   process.env.REACT_APP_SUPABASE_FUNCTIONS_URL ||
@@ -525,7 +526,7 @@ export default function HQOverview({ onNavigate }) {
           .eq("is_active", true)
           .lt("quantity_on_hand", 10)
           .order("quantity_on_hand", { ascending: true })
-          .limit(5);
+          .limit(50);
         if (!r.error) lowStockData = r.data || [];
       } catch (_) {}
 
@@ -2529,11 +2530,36 @@ export default function HQOverview({ onNavigate }) {
         </>
       )}
 
-      {/* ── PANELS: Recent Scans + Low Stock ── */}
+      {/* ── ACTION CENTRE: Low Stock Alerts (collapsible, session-dismissible) ── */}
+      {lowStock.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <ActionCentre
+            title="Low Stock Alerts"
+            alerts={lowStock.map((item) => {
+              const qty = parseFloat(item.quantity_on_hand || 0);
+              const isOut = qty <= 0;
+              const unit = item.unit ? ` ${item.unit}` : "";
+              const skuPart = item.sku ? ` · ${item.sku}` : "";
+              return {
+                severity: isOut ? "critical" : "warn",
+                message: isOut
+                  ? `${item.name || "Unnamed"}${skuPart} — out of stock`
+                  : `${item.name || "Unnamed"}${skuPart} — ${qty}${unit} left`,
+                action: {
+                  label: "Supply Chain",
+                  onClick: () => nav("supply-chain"),
+                },
+              };
+            })}
+          />
+        </div>
+      )}
+
+      {/* ── PANEL: Recent Scans (full-width; Low Stock moved to ActionCentre above) ── */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "1fr",
           gap: 20,
           marginBottom: 24,
         }}
@@ -2660,164 +2686,6 @@ export default function HQOverview({ onNavigate }) {
           </div>
         </div>
 
-        {/* Low Stock */}
-        <div
-          style={{
-            background: "white",
-            border: `1px solid ${T.ink150}`,
-            borderRadius: 6,
-            overflow: "hidden",
-            boxShadow: T.shadowCard,
-          }}
-        >
-          <div
-            onClick={() => nav("supply-chain")}
-            style={{
-              padding: "14px 20px",
-              borderBottom: `1px solid ${T.ink150}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = T.ink075)}
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            <span style={{ fontSize: 13, fontWeight: 600, color: T.ink900 }}>
-              Low Stock Alerts
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: lowStock.length > 0 ? T.danger : T.accentMid,
-                  fontWeight: 500,
-                }}
-              >
-                Supply Chain
-              </span>
-              {lowStock.length > 0 && (
-                <span
-                  style={{
-                    background: T.dangerBg,
-                    color: T.danger,
-                    padding: "1px 7px",
-                    borderRadius: 2,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  {lowStock.length}
-                </span>
-              )}
-            </div>
-          </div>
-          <div>
-            {lowStock.length === 0 ? (
-              <div
-                style={{
-                  padding: 24,
-                  textAlign: "center",
-                  color: T.ink500,
-                  fontSize: 13,
-                }}
-              >
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    background: T.successBg,
-                    borderRadius: "50%",
-                    margin: "0 auto 10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M3 8l3.5 3.5 6.5-7"
-                      stroke={T.success}
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                All stock levels healthy
-              </div>
-            ) : (
-              lowStock.map((item, i) => (
-                <div
-                  key={item.id}
-                  onClick={() => nav("supply-chain")}
-                  style={{
-                    padding: "10px 20px",
-                    borderBottom:
-                      i < lowStock.length - 1
-                        ? `1px solid ${T.ink075}`
-                        : "none",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = T.dangerBg)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "transparent")
-                  }
-                >
-                  <div>
-                    <span style={{ color: T.ink900, fontWeight: 500 }}>
-                      {item.name || item.sku || "Unnamed"}
-                    </span>
-                    {item.sku && (
-                      <span
-                        style={{
-                          marginLeft: 8,
-                          fontSize: 10,
-                          color: T.ink400,
-                          fontFamily: T.fontData,
-                        }}
-                      >
-                        {item.sku}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <span
-                      style={{
-                        color:
-                          (item.quantity_on_hand || 0) === 0
-                            ? T.danger
-                            : T.warning,
-                        fontWeight: 600,
-                        fontSize: 14,
-                        fontFamily: T.fontData,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {item.quantity_on_hand ?? 0}
-                    </span>
-                    {item.unit && (
-                      <span
-                        style={{ marginLeft: 4, fontSize: 10, color: T.ink400 }}
-                      >
-                        {item.unit}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
 
       {/* ── QUICK ACTIONS ── */}
