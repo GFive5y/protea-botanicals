@@ -393,6 +393,7 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
 | **POPIA** | Protection of Personal Information Act (SA equivalent of GDPR) |
 | **BCEA** | Basic Conditions of Employment Act (SA) — drives HR Leave module rules |
 | **Smart Capture** | Document AI ingestion: photo of invoice → process-document EF → auto-post-capture EF → atomic expense + journal + VAT |
+| **WP-STOREFRONT-WIZARD** | Self-service tenant onboarding wizard at /onboarding. 7 steps: brand → colour → industry → template → products → loyalty → go live. Phases 1–3 shipped (HEAD: 872f927). Phase 4 pending: legacy shop-key writes in Step 7 launch handler, "Protea Rewards" rebrand on /shop, HQTenants Invite User real auth invite (LL-212). |
 
 ---
 
@@ -500,6 +501,88 @@ Read once. Used throughout this Bible and BUILD-LOG.md.
   MCP or Supabase dashboard SQL editor, not migration files in the repo.
   Always record schema changes in BUILD-LOG.md so future agents can reconstruct
   current DB state without grep'ing for non-existent migration files.
+
+## WP-STOREFRONT-WIZARD Discoveries (10 Apr 2026 — Session v228)
+
+- **LL-214 — TESTING PROTOCOL — MANDATORY**:
+  Never test a Vercel deployment with Ctrl+R. The browser serves cached JS
+  bundles — fixes appear to do nothing. ALWAYS test in incognito after
+  confirming the Vercel dashboard shows "Ready" for your commit hash. This
+  rule prevented multiple wasted sessions of correct code appearing broken.
+  Correct protocol:
+    1. Wait for Vercel dashboard "Ready" status on the target commit
+    2. Open an incognito window
+    3. Hard reload only if needed (DevTools → Network → Disable cache)
+    4. If service worker persists: Application → Service Workers → Unregister
+  NEVER trust a regular-window Ctrl+R reload to verify a fix.
+
+- **LL-215 — PostgREST enum filter — CRITICAL**:
+  When using .in() on an enum-typed column in Supabase JS, PostgREST casts
+  EVERY value to the Postgres enum type. An invalid enum value causes the
+  ENTIRE query to return 0 rows with no error thrown. Always validate filter
+  values against the actual enum before using them in .in() queries.
+  Valid inventory_category values (as of 10 Apr 2026):
+    finished_product, raw_material, terpene, hardware, packaging,
+    concentrate, flower, edible, topical, medical_consumable,
+    accessory, service
+  NEVER add 'other' or any unlisted value to category filters. The bug
+  that prompted this rule: 'other' in Shop.js category filter caused the
+  Vozel Vapes product grid to return 0 rows silently for multiple sessions
+  while other fixes were chased in the wrong file.
+
+- **LL-216 — branding_config DUAL-KEY SYSTEM**:
+  Wizard writes:
+    primary_color, font_family, template, terminology_profile,
+    wizard_complete, launched_at, logo_url
+  Shop.js and ClientHeader read:
+    brand_name, accent_color, btn_bg, btn_text, hero_eyebrow,
+    hero_tagline, nav_logo_text, stat_1_value/label … stat_4_value/label
+  BOTH key sets must exist in branding_config for wizard-launched tenants.
+  Step 7 launch handler in OnboardingWizard.js must write BOTH sets using
+  select → merge → update (never overwrite the whole branding_config column).
+  Vozel Vapes was patched manually via MCP — Phase 4 must fix this in code
+  for all new tenants.
+
+- **LL-217 — ClientHeader vs NavBar — the visible shop header**:
+  On /shop/* routes the visible fixed header is ClientHeader.js, NOT NavBar
+  from App.js. ClientHeader sits above NavBar with position:fixed. When
+  fixing shop branding issues, always look at ClientHeader first. The
+  correct hook is useStorefront() (public, slug/domain-resolved) — NOT
+  useTenant() (which is for authenticated portals). This rule cost multiple
+  sessions: the navbar was being "fixed" in the wrong component for days.
+
+- **LL-218 — StorefrontContext is CONSUMER-SIDE ONLY**:
+  useStorefront() is for consumer shop context (anonymous visitors at /shop).
+  useTenant() is for authenticated portal context (HQ/admin/tenant/HR/staff).
+  Never mix them. StorefrontContext resolves tenant from URL slug or hostname
+  on mount. useTenant() resolves from the authenticated user's session via
+  user_profiles.tenant_id. They answer different questions and live in
+  different providers.
+
+- **LL-219 — DIAGNOSTIC BEFORE FIX PROTOCOL**:
+  When a bug survives multiple fix attempts:
+    1. Stop writing fixes
+    2. Ask Claude Code to answer 4 specific diagnostic questions with
+       exact line numbers
+    3. Add ONE console.log and deploy to read runtime state in incognito
+    4. Only then write the targeted fix
+  The Q1–Q4 diagnostic approach (session v228) identified the 'other' enum
+  bug in one round after 8 failed fix attempts. "Stop guessing, read the
+  runtime" is always cheaper than another speculative patch.
+
+- **LL-220 — WP-STOREFRONT-WIZARD ARCHITECTURE**:
+  The wizard (Phases 1–3) creates tenants via a stub-first approach: a
+  minimal row is created on Step 1 Continue, enriched as the wizard
+  progresses. wizard_complete stays false until Step 7 launch, which flips
+  it true AND writes launched_at + (Phase 4 target) the legacy shop keys.
+  The consumer shop at /shop/:slug resolves via
+  StorefrontContext.resolveStorefront() which matches
+  window.location.pathname on mount. StorefrontProvider wraps the entire
+  app and runs ONCE on mount — it does NOT re-run on client-side route
+  changes. Direct navigation (target="_blank", window.open, or fresh tab)
+  is therefore always reliable; client-routed navigation from another
+  app route is not. The wizard success state opens the live URL via
+  target="_blank" for this reason.
 
 ## Locked / Protected Files
 LOCKED (never modify):

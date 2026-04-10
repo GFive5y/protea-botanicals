@@ -302,5 +302,123 @@ user_profiles.tenant_id: confirmed — ownership check valid.
 - Fix Invite User button (LL-212 — real auth invite)
 
 ---
+
+## Session v228 — 10 April 2026 (extended)
+**Commits this session:** ba9e521 → 872f927 (13 commits)
+**HEAD:** 872f927 on origin/main
+**WP:** WP-STOREFRONT-WIZARD Phase 2 + Phase 3 + shop integration
+
+---
+
+### Phase 2 (commit ba9e521 + 8d2b8a7)
+Full wizard Steps 2–5 built. Auth guard (/onboarding is
+post-auth only, redirects to /account?return=/onboarding).
+Slug uniqueness check with 4 outcomes: A=new, B=resume,
+C=taken, D=already launched. Dynamic --wz-brand injection
+from tenant branding_config.primary_color. Steps built:
+  Step 2: colour picker (8 presets + hex input)
+  Step 3: industry + terminology selector (4 tiles)
+  Step 4: template layout (3 CSS-only mock layouts)
+  Step 5: product entry (or read-only if products exist)
+terminology_profile stored in branding_config so resume
+path restores the correct industry tile.
+Bug fix (8d2b8a7): Step 3 saves terminology_profile to
+branding_config. Resume path reads cfg.terminology_profile
+?? cfg.industry_profile ?? 'general_retail'.
+
+### Phase 3 (commits 1df00c0 + fix commits)
+Steps 6–7 built. Launch flow:
+  Step 6: Loyalty preset (Starter/Standard/Generous)
+    upserts loyalty_config via onConflict:'tenant_id'
+  Step 7: Go live — logo upload → QR generation → launch
+QR generation: dual path — tries sign-qr EF, always inserts
+to qr_codes directly as fallback. idempotent.
+Logo: uploaded to storefront-assets/{tenant_id}/logo.{ext}
+on Step 7, best-effort (launch proceeds on failure).
+wizard_complete: true written on successful launch.
+Outcome D: wizard_complete=true + ownership check via
+user_profiles.tenant_id → "Your shop is already live" screen.
+Resume banner: shows "Continuing where you left off" when
+isResuming=true (outcome B slug check).
+
+### /shop/:slug route fix (b77bd48)
+App.js: Route path="/shop" → path="/shop/:slug?"
+StorefrontContext.js: resolveStorefront() now tries
+/shop/<slug> path regex match FIRST before hostname/dev
+fallback. Single-decision-tree resolver — one setState
+batch, cancelled cleanup flag on unmount.
+
+### RLS fixes (applied via MCP — no code commit)
+Added to Supabase (project uvicrqapgzcdvozxrreo):
+  tenants_public_read_active — anon SELECT where is_active
+  inventory_items_public_read_active — anon SELECT where is_active
+  storefront-assets bucket — created public, 2MB, RLS applied
+Without these, /shop/:slug returned no data for anonymous users.
+
+### branding_config dual-key fix (MCP + StorefrontContext)
+Vozel Vapes branding_config populated with legacy shop keys:
+  brand_name, shop_name, accent_color, btn_bg, btn_text,
+  hero_eyebrow, hero_tagline, nav_logo_text, stat_*_value/label,
+  hide_cannabis_content, shop_categories, terminology_profile
+Legacy keys are what Shop.js and ClientHeader actually read.
+Wizard uses new keys (primary_color, font_family, etc.).
+Both sets must coexist in branding_config for wizard-launched
+tenants. Step 7 launch handler must write both key sets.
+This is a known gap — currently only fixed manually in DB
+for Vozel Vapes. New tenants will need code fix in Phase 4.
+
+### ClientHeader fix (368b3d3)
+ClientHeader.js had 3 hardcoded "Protea Botanicals" literals.
+Fixed to read brandingConfig.brand_name via useStorefront().
+Root cause: ClientHeader is the visible header on /shop routes,
+not the NavBar from App.js. The wrong component was being fixed
+for multiple sessions.
+
+### Shop.js cannabis content gating (faab475)
+All cannabis-specific content wrapped in isCannabis conditional:
+  Hero stats (strains, THC%, Eybna lines, price)
+  Category tabs (Flower, Concentrates, Edibles, etc.)
+  Coming Soon sections (6 cannabis product categories)
+  Footer tagline ("Premium Cannabis · South Africa")
+General_retail tenants now see clean neutral content.
+
+### The 'other' enum bug — root cause of blank products (872f927)
+CRITICAL LESSON: PostgREST casts .in() filter values to the
+column's Postgres type. inventory_category enum has no 'other'
+member. When 'other' was included in the category filter array,
+PostgREST failed the cast and returned 0 rows SILENTLY with no
+error. This caused the entire product grid to be blank.
+Fix: removed 'other' from the filter array.
+Valid inventory_category enum values:
+  finished_product, raw_material, terpene, hardware, packaging,
+  concentrate, flower, edible, topical, medical_consumable,
+  accessory, service
+
+### Testing process failure — resolved
+Multiple "fixes" appeared to do nothing because the browser
+served cached JS bundles. Ctrl+R does not clear Vercel CDN or
+service worker cache. Correct testing protocol:
+  1. Wait for Vercel dashboard to show "Ready" for the commit
+  2. Test in incognito window ONLY (no service worker, no cache)
+  3. DevTools → Application → Service Workers → Unregister if needed
+  4. OR: DevTools → Network → tick "Disable cache" then refresh
+
+### Live state at session close
+  HEAD: 872f927
+  Vozel Vapes tenant: 388fe654-ce64-4128-819a-dcf7b810280f
+  wizard_complete: false (not yet run through wizard end-to-end)
+  launched_at: null
+  vozel_products: 4 (VVZ-001, VVZ-002, VVZ-003, VVZ-004)
+  vozel_qr_codes: 0 (generated when wizard is run)
+  /shop/vozel-vapes: LIVE and showing 4 products correctly
+
+### Outstanding before CA demo
+  1. Run wizard end-to-end as admin@protea.dev on production URL
+     This flips wizard_complete=true and generates the welcome QR
+  2. WP-NAV-RESTRUCTURE — HQ nav grouping for demo flow
+  3. Fix "PROTEA REWARDS" label on shop loyalty section
+  4. Fix Invite User button (LL-212 — needs real auth invite)
+
+---
 *BUILD-LOG.md · NuAi · Created 10 April 2026*
 *Append new sessions below — never edit entries above the line*
