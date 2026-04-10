@@ -79,7 +79,7 @@ import PageShell from "./components/PageShell";
 import AppShell from "./components/AppShell"; // ★ v6.0
 import { CartProvider, useCart } from "./contexts/CartContext";
 import { TenantProvider, useTenant } from "./services/tenantService";
-import { StorefrontProvider } from "./contexts/StorefrontContext"; // ✦ WP-MULTISITE v1.0
+import { StorefrontProvider, useStorefront } from "./contexts/StorefrontContext"; // ✦ WP-MULTISITE v1.0
 
 export const RoleContext = createContext(null);
 
@@ -96,6 +96,7 @@ function NavBar() {
     useContext(RoleContext);
   const { getCartCount } = useCart();
   const { isHQ } = useTenant();
+  const { brandingConfig } = useStorefront(); // ✦ slug-resolved brand name
   const navigate = useNavigate();
 
   const isLoggedIn = !!role;
@@ -231,7 +232,7 @@ function NavBar() {
               transition: "color 0.4s ease",
             }}
           >
-            Protea Botanicals
+            {brandingConfig?.brand_name || "Protea Botanicals"}
           </Link>
 
           <NavLink to="/" scrolled={scrolled}>
