@@ -24,9 +24,9 @@ import {
 } from "recharts";
 import { useSystemHealth } from "../../services/systemHealthContext";
 import StockControl from "../StockControl";
-import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
+import ActionCentre from "../shared/ActionCentre";
 
 const T = {
   ink900: "#0D0D0D",
@@ -63,14 +63,31 @@ export default function SupplyChain() {
   const { inventory, purchaseOrders } = stats;
   const ctx = usePageContext("hq-supply-chain", null);
 
+  // Build ActionCentre alerts: out-of-stock items (critical) + ctx.warnings (warn)
+  const outOfStockItems = stats?.alerts?.outOfStockItems || [];
+  const stockAlerts = !statsLoading
+    ? outOfStockItems.map((i) => ({
+        severity: "critical",
+        message: `${i.name || "Unnamed"} — out of stock`,
+      }))
+    : [];
+  const ctxAlerts =
+    ctx && !ctx.loading
+      ? (ctx.warnings || []).map((w) => ({
+          severity: "warn",
+          message: String(w).replace(/^⚠\s*/, ""),
+        }))
+      : [];
+  const allAlerts = [...stockAlerts, ...ctxAlerts];
+
   return (
     <div style={{ fontFamily: T.fontUi }}>
-      <WorkflowGuide
-        context={ctx}
-        tabId="hq-supply-chain"
-        onAction={() => {}}
-        defaultOpen={false}
-      />
+      {/* WorkflowGuide hidden on this tab: ctx.warnings folded into ActionCentre below */}
+      {allAlerts.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <ActionCentre title="Supply Chain Alerts" alerts={allAlerts} />
+        </div>
+      )}
       {/* ── Header ── */}
       <div style={{ marginBottom: "20px" }}>
         <h2
@@ -299,59 +316,6 @@ export default function SupplyChain() {
             </div>
           );
         })()}
-
-      {/* ── Out of stock alert ── */}
-      {!statsLoading && inventory.outOfStock > 0 && (
-        <div
-          style={{
-            background: T.dangerBg,
-            border: `1px solid ${T.dangerBd}`,
-            borderRadius: "6px",
-            padding: "12px 16px",
-            marginBottom: "16px",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "10px",
-          }}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            style={{ flexShrink: 0, marginTop: 1 }}
-          >
-            <circle cx="8" cy="8" r="6" stroke={T.danger} strokeWidth="1.5" />
-            <path
-              d="M8 5v3M8 10.5v.5"
-              stroke={T.danger}
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-          <div>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: T.danger }}>
-              {inventory.outOfStock} item{inventory.outOfStock !== 1 ? "s" : ""}{" "}
-              out of stock
-            </div>
-            <div
-              style={{
-                fontSize: "12px",
-                color: T.danger,
-                opacity: 0.8,
-                marginTop: 2,
-              }}
-            >
-              {stats.alerts.outOfStockItems
-                .slice(0, 3)
-                .map((i) => i.name)
-                .join(", ")}
-              {stats.alerts.outOfStockItems.length > 3 &&
-                ` +${stats.alerts.outOfStockItems.length - 3} more`}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Supply Chain flow ── */}
       <div
