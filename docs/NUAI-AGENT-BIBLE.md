@@ -808,6 +808,19 @@ ROOT CAUSE: invite-user EF silently failed to create user_profiles rows
 for all invites during v230 session because the HQ prompt defaulted to
 "manager" (invalid). Caught via DB inspection, not runtime error.
 
+## LL-223 — Deno EF cannot call sibling EFs via internal fetch (11 April 2026)
+Supabase Deno Edge Functions CANNOT call other EFs in the same project via
+fetch(${SUPABASE_URL}/functions/v1/...). The call silently fails — no error,
+no log, callSim() returns null, orders=0. Discovered: seed-tenant v2 → sim-pos-sales.
+sim-pos-sales for seeded tenants must be triggered externally:
+  - From Claude.ai via Supabase MCP (execute_sql + pg_net.http_post)
+  - From the client browser via supabase.functions.invoke()
+  - From the Supabase dashboard manually
+The wizard does NOT call sim-pos-sales. The HQ dev simulator buttons (RUN 30 DAYS /
+RUN 7 DAYS) in HQTenants.js ARE client-side and work correctly — they bypass this limit.
+Demo path: after wizard launches, HQ operator uses the RUN 30 DAYS button to populate
+orders for any seed tenant in one click.
+
 ---
 
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*

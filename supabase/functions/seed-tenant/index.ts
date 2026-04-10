@@ -58,7 +58,7 @@ const FB_HACCP = [
     step_name: 'Receiving Temperature Check',
     step_number: 1,
     process_stage: 'Receiving',
-    hazard_type: 'Biological',
+    hazard_type: 'biological',
     hazard_description: 'Pathogen growth if perishables received above safe temperature',
     critical_limit: 'Cold items ≤ 4°C. Hot items ≥ 60°C. Reject if non-compliant.',
     monitoring_procedure: 'Check temperature of each delivery with calibrated probe thermometer',
@@ -70,7 +70,7 @@ const FB_HACCP = [
     step_name: 'Cold Storage Monitoring',
     step_number: 2,
     process_stage: 'Storage',
-    hazard_type: 'Biological',
+    hazard_type: 'biological',
     hazard_description: 'Pathogen multiplication if cold storage temperature rises above limit',
     critical_limit: 'Fridge ≤ 4°C. Freezer ≤ -18°C.',
     monitoring_procedure: 'Check and log refrigeration unit temperatures',
@@ -82,7 +82,7 @@ const FB_HACCP = [
     step_name: 'Hot Holding Temperature',
     step_number: 3,
     process_stage: 'Service',
-    hazard_type: 'Biological',
+    hazard_type: 'biological',
     hazard_description: 'Pathogen survival and growth if food held below safe serving temperature',
     critical_limit: 'Hot food ≥ 60°C throughout service.',
     monitoring_procedure: 'Probe hot-held food with calibrated thermometer before service',
@@ -94,7 +94,7 @@ const FB_HACCP = [
     step_name: 'Cross-Contamination Prevention',
     step_number: 4,
     process_stage: 'Preparation',
-    hazard_type: 'Biological',
+    hazard_type: 'biological',
     hazard_description: 'Cross-contamination of allergens and pathogens between raw and ready-to-eat food',
     critical_limit: 'Colour-coded boards and utensils used correctly. No contact between raw and RTE food.',
     monitoring_procedure: 'Visual inspection of workstation setup and board usage',
@@ -106,7 +106,7 @@ const FB_HACCP = [
     step_name: 'Final Product Temperature Check',
     step_number: 5,
     process_stage: 'Production',
-    hazard_type: 'Biological',
+    hazard_type: 'biological',
     hazard_description: 'Undercooked product reaching consumer — pathogen survival',
     critical_limit: 'Chicken ≥ 75°C at thickest point. All hot dishes ≥ 75°C before plating.',
     monitoring_procedure: 'Probe finished dish before plating or packaging',
@@ -269,9 +269,8 @@ Deno.serve(async (req) => {
       results.expenses = await seedExpenses(sb, tenant_id, GR_EXPENSES, now)
       await sb.from('tenant_config').upsert({ tenant_id, vat_registered: true }, { onConflict: 'tenant_id' })
       results.journal_entries = await seedJournal(sb, tenant_id, GR_PRODUCTS, now)
-      simSummary = await callSim(supabaseUrl, serviceKey, tenant_id, seed_days)
-      results.orders = simSummary?.orders_created ?? 0
-      results.revenue = simSummary?.total_revenue_simulated ?? 'R0'
+      // LL-223: EF-to-EF callSim removed — trigger sim-pos-sales externally after seed.
+      results.orders_note = 'Call sim-pos-sales separately with this tenant_id'
     }
 
     if (industry_profile === 'food_beverage') {
@@ -309,7 +308,7 @@ Deno.serve(async (req) => {
           date.setHours(hour, 0, 0, 0)
           const temp = parseFloat((2.5 + Math.random() * 1.5).toFixed(1)) // 2.5–4.0°C (within limit)
           tempLogs.push({
-            tenant_id, location: label, location_type: 'cold_storage',
+            tenant_id, location: label, location_type: 'refrigerated',
             temperature_c: temp, recorded_at: date.toISOString(),
             min_limit_c: 0, max_limit_c: 4, is_breach: false,
           })
@@ -320,9 +319,8 @@ Deno.serve(async (req) => {
       results.temperature_logs = tempLogs.length
 
       // Step 8: sim-pos-sales (only finished products have sell_price > 0)
-      simSummary = await callSim(supabaseUrl, serviceKey, tenant_id, seed_days)
-      results.orders = simSummary?.orders_created ?? 0
-      results.revenue = simSummary?.total_revenue_simulated ?? 'R0'
+      // LL-223: EF-to-EF callSim removed — trigger sim-pos-sales externally after seed.
+      results.orders_note = 'Call sim-pos-sales separately with this tenant_id'
     }
 
     // Mark seed complete
