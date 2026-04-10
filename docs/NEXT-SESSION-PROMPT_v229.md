@@ -16,6 +16,10 @@ Confirm you have read all five. State:
 - What LL-215 is (critical for this session)
 - The correct testing protocol (LL-214)
 
+Priority 0 (before all else): Read docs/WP-DEMO-FACTORY_brainstorm_v1_0.md
+in full. This session is a brainstorm on that document.
+No code. No Claude Code. Strategy and architecture only.
+
 ## THE MISSION
 
 NuAi is being built as the first truly AI-native ERP SaaS.
