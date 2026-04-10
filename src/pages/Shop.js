@@ -2718,12 +2718,13 @@ export default function Shop() {
                 ]
               : // ✦ Phase 4: widen for general / nicotine_vape / food_bev tenants
                 // so device kits, pods, accessories etc. all surface.
+                // NOTE: 'other' is NOT a valid inventory_category enum value —
+                // including it causes PostgREST to silently return 0 rows.
                 [
                   "finished_product",
                   "hardware",
                   "accessory",
                   "raw_material",
-                  "other",
                 ],
           )
           .eq("is_active", true)
@@ -3302,7 +3303,9 @@ export default function Shop() {
                   className="body-font"
                   style={{ color: "#888", fontSize: 15, fontWeight: 300 }}
                 >
-                  No vape products currently in stock. Check back soon!
+                  {isCannabis
+                    ? "No vape products currently in stock. Check back soon!"
+                    : "No products in stock right now. Check back soon!"}
                 </p>
                 <button
                   className="shop-btn"
