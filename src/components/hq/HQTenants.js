@@ -1591,6 +1591,17 @@ export default function HQTenants() {
                         if (!email) return;
                         const name = window.prompt("Invitee name (optional):", "") || "";
                         const role = window.prompt("Role (e.g. owner, manager, staff):", "manager") || "manager";
+                        // Step 1: create real Supabase auth account via invite-user EF
+                        // (LL-212: cannot be done client-side — requires service_role key)
+                        showToast("Sending invite…");
+                        const { data: inviteData, error: inviteErr } = await supabase.functions.invoke("invite-user", {
+                          body: { email, tenant_id: tenant.id, full_name: name, role },
+                        });
+                        if (inviteErr || !inviteData?.success) {
+                          showToast(`Auth invite failed: ${inviteErr?.message || inviteData?.error || "Unknown error"}`, "error");
+                          return;
+                        }
+                        // Step 2: send branded welcome email via send-email EF
                         const res = await sendUserInvitationEmail({
                           tenantId: tenant.id,
                           recipient: { email, name },
@@ -1599,12 +1610,14 @@ export default function HQTenants() {
                             invited_name: name,
                             inviter_name: "Nu Ai HQ",
                             role,
-                            accept_url: `${window.location.origin}/signup?tenant=${tenant.slug || tenant.id}`,
+                            accept_url: `${window.location.origin}/tenant-portal`,
                           },
                         });
-                        if (res.skipped) showToast(`Skipped (cooldown ${res.cooldown_hours}h)`, "warn");
-                        else if (!res.ok) showToast(`Invite failed: ${res.error}`, "error");
-                        else showToast(`Invitation sent to ${email}`);
+                        if (!res.ok && !res.skipped) {
+                          showToast(`Invite created — welcome email failed: ${res.error}`, "warn");
+                        } else {
+                          showToast(`✓ Invitation sent to ${email} — magic link in their inbox`);
+                        }
                       }}
                       style={{
                         ...sBtn("outline"),
