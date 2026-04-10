@@ -157,7 +157,9 @@ export default function StorefrontPreview({ wizardData }) {
             ★
           </div>
           <div className="wz-preview-loyalty-text">
-            Earn points with every purchase
+            {wizardData?.loyaltyWelcomePoints
+              ? `Earn ${wizardData.loyaltyWelcomePoints} points on your first scan`
+              : "Earn points with every purchase"}
           </div>
         </div>
       </div>
