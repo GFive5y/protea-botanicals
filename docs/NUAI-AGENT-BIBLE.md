@@ -956,7 +956,7 @@ not fixed in Phase 4. Documented here for the future fix session.
 Source: Claude Code pre-build audit of HQTransfer.js (1,692 lines),
 11 April 2026. Confirmed by owner before Phase 4 build.
 
-**FIXED: HQTransfer.js handleReceive — `fix(LL-242)` commit, 11 April 2026.**
+**FIXED: HQTransfer.js handleReceive — `fix(LL-242)` commit `713ef3a`, 11 April 2026.**
 Three coordinated edits to handleReceive: the SKU SELECT and the
 name-fallback SELECT now both fetch `weighted_avg_cost`; a new
 `shopCurrentAvco` local captures it in both match branches; the UPDATE
