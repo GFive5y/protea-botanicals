@@ -148,9 +148,10 @@ Key innovation: First cross-tenant comparison surface in NuAi.
                Benchmarks every store against network average.
 
 ### Module 2 — Combined P&L (WP-ANALYTICS-2)
-File: docs/WP-ANALYTICS-2.md (to be written before build)
+File: docs/WP-ANALYTICS-2.md (full spec — read this)
 Tab: /group-portal?tab=financials
-Status: SPECCED IN MASTER DOC — detailed spec not yet written
+Status: COMPLETE — CombinedPL.js live, verified in browser. HEAD: 5ba63b5
+        Spec: docs/WP-ANALYTICS-2.md
 Primary question: "Is my franchise network profitable as a whole?"
 Key features:
   - Network consolidated P&L (revenue, COGS, gross profit,
@@ -165,9 +166,9 @@ Key innovation: COGS % flagged automatically when a store runs
 Data sources: orders, dispensing_log, expenses, stock_movements
 
 ### Module 3 — Revenue Intelligence (WP-ANALYTICS-3)
-File: docs/WP-ANALYTICS-3.md (to be written before build)
+File: docs/WP-ANALYTICS-3.md (full spec — read this)
 Tab: New tab — /group-portal?tab=revenue (add to GroupPortal)
-Status: SPECCED IN MASTER DOC — detailed spec not yet written
+Status: SPEC COMPLETE — docs/WP-ANALYTICS-3.md committed 12 Apr 2026. Ready to build.
 Primary question: "Is my network growing or shrinking, and where?"
 Key features:
   - Same-Store Sales Growth (SSSG) per store — the gold standard
@@ -244,8 +245,8 @@ EF: ai-copilot v70 (already deployed, already tested in tenant portals)
 | Phase | Module | Sessions | Status |
 |---|---|---|---|
 | WP-ANALYTICS-1 | Store Comparison | 1 | ✅ COMPLETE — HEAD 8221177 |
-| WP-ANALYTICS-2 | Combined P&L | 1 | Pending |
-| WP-ANALYTICS-3 | Revenue Intelligence | 2 | Pending |
+| WP-ANALYTICS-2 | Combined P&L | 1 | ✅ COMPLETE — HEAD 5ba63b5 |
+| WP-ANALYTICS-3 | Revenue Intelligence | 2 | SPEC COMPLETE — ready to build |
 | WP-ANALYTICS-4 | Stock Intelligence | 2 | Pending |
 | WP-ANALYTICS-5 | Customer & Loyalty | 1 | Pending |
 | WP-ANALYTICS-6 | NuAi Network Intelligence | 2 | Pending |

@@ -1,6 +1,6 @@
 # WP-ANALYTICS-2 — Combined P&L
 ## NuAi Franchise Analytics Suite — Module 2
-## Status: SPEC COMPLETE — ready to build
+## Status: COMPLETE — shipped 5ba63b5, verified in browser (12 April 2026)
 ## Written: 12 April 2026 · HEAD at time of writing: 8221177
 ## Replaces: PlaceholderTab at GroupPortal.js activeTab === "financials"
 

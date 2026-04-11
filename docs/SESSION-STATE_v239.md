@@ -1786,3 +1786,176 @@ figures.
 *8 repo commits in Addendum 5 · WP-TENANT-GROUPS 5/6 phases complete · WP-ANALYTICS-1 COMPLETE*
 *Addendum 5 commit chain: 787b97f → 617a2ac → 713ef3a → 20dff82 → 61632a6 → 30d6c1a → 908a30b → 8221177*
 *First cross-tenant analytics surface live · LL-242 HQTransfer fixed · 2-store franchise network operational*
+
+---
+
+# ADDENDUM 6 — 12 April 2026: WP-ANALYTICS-2 Combined P&L complete
+
+## HEAD AT CLOSE: `5ba63b5` (doc commit to follow)
+
+This addendum covers the WP-ANALYTICS-2 build session. Priority 1 from
+NEXT-SESSION-PROMPT_v242 is complete.
+
+## COMMIT CHAIN (Addendum 6)
+
+```
+8221177 → ec3b5d3 → 5ba63b5
+```
+
+1. **`ec3b5d3`** — docs: WP-ANALYTICS-2 spec (Combined P&L — 818 lines)
+2. **`5ba63b5`** — feat(WP-A2): CombinedPL.js + fetchStoreFinancials helper + GroupPortal mount
+
+## WHAT SHIPPED
+
+### WP-ANALYTICS-2 spec (`ec3b5d3`, +818 lines)
+
+Full pre-build reconnaissance completed in Claude.ai before any code was written.
+Spec committed before any build artefact. Reconnaissance findings preserved permanently.
+
+Key architectural decisions locked in spec:
+- New sibling helper `fetchStoreFinancials.js` (not extending fetchStoreSummary)
+- order_items × product_metadata.weighted_avg_cost for retail COGS (LL-203)
+- dispensing_log × inventory_items.weighted_avg_cost for dispensary COGS (LL-231)
+- Loyalty cost excluded with footnote (avoids N×2 extra queries per store)
+- 4 pre-set date ranges (MTD / Last Month / Last 3M / YTD), no custom picker
+- COGS% benchmark flag: AMBER at +2%, RED at +3% above network avg
+
+### Step 0 schema check (no commit — 4 Supabase MCP queries)
+
+All 4 checks passed. No spec corrections needed.
+
+| Check | Result |
+|---|---|
+| expenses table | 25 columns. expense_date is type date — Gap 3 from spec confirmed. |
+| order_items.product_metadata | JSONB with top-level weighted_avg_cost. LL-203 confirmed. |
+| dispensing_log | 15 columns, inventory_item_id FK, is_voided boolean, dispensed_at timestamptz. |
+| inventory_items | weighted_avg_cost + sell_price both present. |
+
+### WP-ANALYTICS-2 feature commit (`5ba63b5`, +1,390 / −3)
+
+Three new files, two edits:
+
+**src/components/group/_helpers/fetchStoreFinancials.js** (NEW, 176 lines)
+- Named export: `fetchStoreFinancials(tenantId, industryProfile, startISO, endISO)`
+- Returns: revenue, cogs, grossProfit, grossMarginPct, totalOpex, netProfit,
+  netMarginPct, orderCount, cogsSource, expenseCount, err
+- Retail COGS: two-step (paid order IDs → order_items × product_metadata.weighted_avg_cost)
+- Dispensary COGS: dispensing_log × inventory_items.weighted_avg_cost
+- VAT_RATE = 1.15 applied to orders.total and order_items.line_total (GAP-01)
+- Expenses: category IN ('opex','wages','tax','other'), expense_date filtered
+- Contract: never throws, errors in result.err
+
+**src/components/group/CombinedPL.js** (NEW, 1,208 lines)
+Section 1 — 4 KPI tiles: Network Revenue · Gross Profit · Net Profit · Avg COGS%
+Section 2 — Consolidated P&L table: 9 rows × (1 network + N store columns)
+  - Network column: T.accentLight background, bold
+  - Subtotal rows (Gross Profit, Net Profit): T.surfaceAlt shading
+  - COGS% flag: RED column header bg when store COGS > networkAvg + 0.03, AMBER when > +0.02
+  - Flag applied to: column header background, COGS% cell, store card banner
+  - Prescriptive flag text: RED = "Investigate pricing or verify AVCO in HQ → Inventory",
+    AMBER = "Trending above network average — monitor pricing"
+Section 3 — Per-store P&L cards (auto-fit grid)
+  - cogsSource chip: AVCO (successLight) or Unavailable (neutralLight)
+  - Gross margin horizontal progress bar, colour-coded by band
+  - Per-store error banner for Supabase fetch failures
+Date range: 4 pre-set buttons (This month / Last month / Last 3 months / This year)
+CSV export: client-side blob, escaped values, auto-named by period label
+Footnote: "Loyalty programme cost is excluded. Depreciation and CAPEX also excluded."
+
+**GroupPortal.js** (EDITED, +8 / −5)
+- Import CombinedPL added
+- PlaceholderTab for "financials" replaced with `<CombinedPL ... />`
+- Props: { groupId, groupName, members, onNavigate } — matches StoreComparison
+
+Build: `CI=false npm run build` — zero new warnings.
+
+Browser verified (medican@nuai.dev → /group-portal?tab=financials):
+- 2-store network renders: Medi Can Dispensary (dispensary COGS path) +
+  Medi Recreational (order_items COGS path)
+- Date range selector triggers fresh fetch on change
+- CSV export produces properly-escaped .csv file
+- Loading state shows while fetches run
+- COGS% benchmark flag fires correctly based on deviation from network avg
+
+## GROUP PORTAL TAB STATUS AT ADDENDUM 6 CLOSE
+
+| Tab | Component | Status |
+|---|---|---|
+| Network Dashboard | NetworkDashboard.js | ✅ Live |
+| Stock Transfers | GroupTransfer.js | ✅ Live (AVCO-correct) |
+| Compare Stores | StoreComparison.js | ✅ Live |
+| Combined P&L | CombinedPL.js | ✅ **Live (this addendum)** |
+| Shared Loyalty | disabled nav | Phase 2+ deferred |
+| Group Settings | GroupSettings.js | ✅ Live |
+
+**The original WP-TENANT-GROUPS spec is now functionally complete.** Every
+non-deferred tab has a real component backed by live Supabase data against the
+Medi Can Franchise Network. The Shared Loyalty tab remains explicitly disabled
+per the original scope decision.
+
+## WP-ANALYTICS SUITE PROGRESS AT ADDENDUM 6 CLOSE
+
+| Module | Status |
+|---|---|
+| WP-ANALYTICS-1 Store Comparison | ✅ COMPLETE — HEAD 8221177 |
+| WP-ANALYTICS-2 Combined P&L | ✅ **COMPLETE — HEAD 5ba63b5** |
+| WP-ANALYTICS-3 Revenue Intelligence | SPEC COMPLETE — ready to build |
+| WP-ANALYTICS-4 Stock Intelligence | Pending — no detailed spec yet |
+| WP-ANALYTICS-5 Customer & Loyalty | Pending — no detailed spec yet |
+| WP-ANALYTICS-6 NuAi Network Intelligence | Pending — no detailed spec yet |
+
+## `_helpers/` DIRECTORY — CURRENT OCCUPANTS
+
+| File | Purpose |
+|---|---|
+| fetchStoreSummary.js | MTD summary (revenue, stock margin, AOV, health) |
+| industryBadge.js | Profile → badge component map |
+| fetchStoreFinancials.js | P&L for a date range (COGS, expenses, margins) |
+
+Module 3 will add `fetchStoreTrend.js` beside these.
+
+## WP-ANALYTICS-3 SPEC WRITTEN (session close protocol)
+
+`docs/WP-ANALYTICS-3.md` committed as part of this session close. Revenue
+Intelligence is a 2-session module. Primary question: "Is my network growing,
+and where?" Key features: fetchStoreTrend.js helper · SSSG MoM + WoW · revenue
+trend overlay chart · predictive month-end projection · peak trading heat matrix
+· per-store growth cards. Session 1 = core trend + SSSG, Session 2 = predictive
++ peak trading + CSV export.
+
+## KNOWN ISSUES (no change from v242)
+
+1. HQTransfer historical AVCO corruption — forward-fix at 713ef3a, pre-fix data
+   not remediated. Priority 4 in v243.
+2. Per-line atomicity gap in HQTransfer and GroupTransfer ship/receive/cancel.
+   LL-242 open.
+3. Email-based invite for GroupSettings — LL-243 open. Deliberately scoped out.
+4. Cross-tenant View store navigation — Phase 4b, Priority 2 in v243.
+5. Transfer pre-selection from StoreComparison — Phase 4b, Priority 3 in v243.
+6. Sender email not on brand domain — blocked on CIPRO + nuai.co.za.
+7. `docs/.claude/worktrees/` disk cleanup — rm -rf, never commit, still deferred.
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `5ba63b5`** (plus one doc commit this close). Confirm with
+   `git log --oneline -1`.
+2. **WP-ANALYTICS-2 is DONE.** Combined P&L is the 4th live analytics surface
+   in the Group Portal. Do not rebuild it.
+3. **3 helpers now in `_helpers/`**: `fetchStoreSummary` · `industryBadge` ·
+   `fetchStoreFinancials`. Module 3 adds `fetchStoreTrend.js` beside them.
+4. **fetchStoreFinancials contract**: `(tenantId, industryProfile, startISO,
+   endISO)` — never throws, err in result.err.
+5. **COGS% flag thresholds**: AMBER > +2% above network avg, RED > +3%. Do
+   not change — agreed during spec.
+6. **WP-ANALYTICS-3 spec is ready**: `docs/WP-ANALYTICS-3.md`. `fetchStoreTrend.js`
+   is the new helper needed.
+7. **Test credentials**: `medican@nuai.dev` / `MediCan2026!` → `/group-portal`.
+   All 5 non-deferred tabs work.
+
+---
+
+*Addendum 6 written 12 April 2026 · HEAD at close: 5ba63b5 (pre-doc-commit)*
+*2 feature commits + 1 doc commit · WP-ANALYTICS-2 COMPLETE · Group Portal 5/5 non-deferred tabs live*
+*Original WP-TENANT-GROUPS scope functionally complete*
+*Addendum 6 commit chain: ec3b5d3 → 5ba63b5*
+*WP-ANALYTICS-3 spec committed alongside this addendum*
