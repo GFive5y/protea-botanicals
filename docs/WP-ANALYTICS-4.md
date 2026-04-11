@@ -1,6 +1,6 @@
 # WP-ANALYTICS-4 — Stock Intelligence
 ## NuAi Franchise Analytics Suite — Module 4
-## Status: SPEC COMPLETE — ready to build (2 sessions)
+## Status: IN PROGRESS — Session 1 HEAD 3ec1d32 · Session 2 pending
 ## Written: 12 April 2026 · HEAD at time of writing: 5352d96
 ## New tab: /group-portal?tab=stock (add to GroupPortal.js)
 
