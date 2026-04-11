@@ -167,8 +167,8 @@ Data sources: orders, dispensing_log, expenses, stock_movements
 
 ### Module 3 — Revenue Intelligence (WP-ANALYTICS-3)
 File: docs/WP-ANALYTICS-3.md (full spec — read this)
-Tab: New tab — /group-portal?tab=revenue (add to GroupPortal)
-Status: SPEC COMPLETE — docs/WP-ANALYTICS-3.md committed 12 Apr 2026. Ready to build.
+Tab: /group-portal?tab=revenue
+Status: IN PROGRESS — Session 1 HEAD 5352d96 · Session 2 pending
 Primary question: "Is my network growing or shrinking, and where?"
 Key features:
   - Same-Store Sales Growth (SSSG) per store — the gold standard
@@ -185,8 +185,8 @@ Data sources: orders, dispensing_log (grouped by day/week/month)
 
 ### Module 4 — Stock Intelligence (WP-ANALYTICS-4)
 File: docs/WP-ANALYTICS-4.md (to be written before build)
-Tab: New tab — /group-portal?tab=stock
-Status: SPECCED IN MASTER DOC — detailed spec not yet written
+Tab: /group-portal?tab=stock
+Status: SPEC COMPLETE — docs/WP-ANALYTICS-4.md committed 12 Apr 2026. Ready to build.
 Primary question: "Where is stock stuck and where is it needed?"
 Key features:
   - Network-wide stock heatmap — every store, every SKU, one view
@@ -246,8 +246,8 @@ EF: ai-copilot v70 (already deployed, already tested in tenant portals)
 |---|---|---|---|
 | WP-ANALYTICS-1 | Store Comparison | 1 | ✅ COMPLETE — HEAD 8221177 |
 | WP-ANALYTICS-2 | Combined P&L | 1 | ✅ COMPLETE — HEAD 5ba63b5 |
-| WP-ANALYTICS-3 | Revenue Intelligence | 2 | SPEC COMPLETE — ready to build |
-| WP-ANALYTICS-4 | Stock Intelligence | 2 | Pending |
+| WP-ANALYTICS-3 | Revenue Intelligence | 2 | IN PROGRESS — Session 1 HEAD 5352d96 |
+| WP-ANALYTICS-4 | Stock Intelligence | 2 | SPEC COMPLETE — ready to build |
 | WP-ANALYTICS-5 | Customer & Loyalty | 1 | Pending |
 | WP-ANALYTICS-6 | NuAi Network Intelligence | 2 | Pending |
 

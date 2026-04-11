@@ -1959,3 +1959,121 @@ trend overlay chart · predictive month-end projection · peak trading heat matr
 *Original WP-TENANT-GROUPS scope functionally complete*
 *Addendum 6 commit chain: ec3b5d3 → 5ba63b5*
 *WP-ANALYTICS-3 spec committed alongside this addendum*
+
+---
+
+# ADDENDUM 7 — 12 April 2026: WP-ANALYTICS-3 Session 1 complete
+
+## HEAD AT CLOSE: 5352d96
+
+## COMMIT CHAIN (Addendum 7)
+
+`205074e → 5352d96`
+
+1. **`5352d96`** — feat(WP-A3/S1): RevenueIntelligence — SSSG tiles, trend overlay, per-store growth cards
+
+## WHAT SHIPPED
+
+### Step 0 schema check (no commit — live DB queries)
+
+All checks passed:
+- `orders.created_at` → timestamptz ✅
+- `dispensing_log.dispensed_at` → timestamptz ✅
+- Medi Recreational 90d: 468 orders, 32 distinct dates → client-side bucketing safe ✅
+- Medi Can Dispensary 90d: 14 events, 10 distinct dates ✅
+- Data gap documented: simulator data starts March 9, not March 1. MoM SSSG shows partial-data context label rather than a misleading %.
+
+### WP-ANALYTICS-3 Session 1 feature (`5352d96`, +1,173 / -1)
+
+**`src/components/group/_helpers/fetchStoreTrend.js`** (NEW, 276 lines)
+Six named exports: `fetchStoreTrend`, `toDailyBuckets`, `buildNetworkDailyAxis`,
+`calcSSSGMoM`, `calcSSSGWoW`, `projectMonthEnd`. Retail: orders.total / 1.15,
+status='paid'. Dispensary: dispensing_log × sell_price, is_voided != true.
+Contract: never throws — errors in result.err.
+
+**`src/components/group/RevenueIntelligence.js`** (NEW, 887 lines after fixes)
+Section 1: 4 KPI tiles (Network MTD · MoM SSSG · WoW SSSG · Top Growth Store / Network Avg MTD fallback).
+Section 2: Recharts LineChart overlay — all stores on a unified date axis built by
+buildNetworkDailyAxis. 30/60/90d window toggle pills. One Line per store with
+distinct STORE_PALETTE colour. Legend renders store names.
+Section 3: Per-store growth cards with DeltaBadge SSSG, projected month-end panel
+(from projectMonthEnd helper, already shipped in S1), 7-day mini BarChart sparkline,
+data coverage footnote.
+
+**`src/components/group/GroupPortal.js`** (EDITED, +10/-1)
+Import + `{ id: "revenue", label: "Revenue Intelligence" }` nav item + tab router block.
+
+### Five paste-bugs fixed by Claude Code before commit (permanent reference)
+
+1. **INDUSTRY_BADGE rendering** — spec tried `<BadgeComp />` where BadgeComp is a plain
+   `{bg, fg, label}` data object. Fixed with an IndustryPill helper rendering an inline
+   styled span. This pattern is now the canonical usage for all future components.
+
+2. **Unused `todayStr`** — two declarations (StoreGrowthCard + main component), neither
+   referenced. Removed to satisfy ESLint no-unused-vars.
+
+3. **Unused props `groupId` + `onNavigate`** — destructured but not referenced.
+   Fixed with `void groupId; void onNavigate;` per the CombinedPL.js pattern.
+
+4. **Missing `groupName` in header** — every other Group Portal tab shows `· {groupName}`.
+   Added for consistency.
+
+5. **LineChart tooltip UUID leak** — `<Line name={tenant_id}>` caused raw UUIDs to appear
+   in chart tooltips. Fixed by passing `<Line name={m.tenants?.name}>` directly and
+   simplifying the formatter to `(val) => fmtR(val)`.
+
+Build: zero new warnings. All five fixes were cosmetic or additive — no logic changes.
+
+### Projection already shipped in Session 1
+
+`projectMonthEnd` (7-day rolling average) is implemented in fetchStoreTrend.js and
+wired into StoreGrowthCard. Session 2 scope is therefore: peak trading heat matrix +
+top products per store + CSV export only. No projection work needed in S2.
+
+### Group Portal tab status at Addendum 7 close
+
+| Tab | Component | Status |
+|---|---|---|
+| Network Dashboard | NetworkDashboard.js | ✅ Live |
+| Stock Transfers | GroupTransfer.js | ✅ Live |
+| Compare Stores | StoreComparison.js | ✅ Live |
+| Combined P&L | CombinedPL.js | ✅ Live |
+| Revenue Intelligence | RevenueIntelligence.js | ✅ Live (this commit) |
+| Shared Loyalty | disabled nav | Phase 2+ deferred |
+| Group Settings | GroupSettings.js | ✅ Live |
+
+### _helpers/ directory at Addendum 7 close
+
+| File | Purpose | Consumers |
+|---|---|---|
+| fetchStoreSummary.js | MTD summary (revenue, margin, AOV, health) | NetworkDashboard, StoreComparison |
+| industryBadge.js | Profile → {bg, fg, label} map | NetworkDashboard, StoreComparison, RevenueIntelligence |
+| fetchStoreFinancials.js | P&L for a date range | CombinedPL |
+| fetchStoreTrend.js | Timestamped revenue rows + bucketing helpers | RevenueIntelligence |
+
+### WP-ANALYTICS suite progress at Addendum 7 close
+
+| Module | Status |
+|---|---|
+| WP-ANALYTICS-1 Store Comparison | ✅ COMPLETE — HEAD 8221177 |
+| WP-ANALYTICS-2 Combined P&L | ✅ COMPLETE — HEAD 5ba63b5 |
+| WP-ANALYTICS-3 Revenue Intelligence | IN PROGRESS — S1 HEAD 5352d96 · S2 pending |
+| WP-ANALYTICS-4 Stock Intelligence | SPEC COMPLETE — docs/WP-ANALYTICS-4.md |
+| WP-ANALYTICS-5 Customer & Loyalty | Pending |
+| WP-ANALYTICS-6 NuAi Network Intelligence | Pending |
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `5352d96`**.
+2. **Projection is already in Session 1.** `projectMonthEnd` is implemented. S2 = peak trading heat matrix + top products + CSV only.
+3. **INDUSTRY_BADGE is a data object `{bg, fg, label}`, NOT a React component.** Use IndustryPill helper or inline styled span. See paste-bug list above.
+4. **fetchStoreTrend.js exports 6 functions** — all named, no default export.
+5. **WP-ANALYTICS-4 spec is locked** in docs/WP-ANALYTICS-4.md. `last_movement_at` is the key efficiency win — zero stock_movements queries for Session 1.
+6. **Medi Recreational AVCO = 0** for all simulator items. Dead stock value = R0. Expected — show data quality note, do not suppress.
+7. **Test credentials unchanged**: medican@nuai.dev / MediCan2026! → /group-portal?tab=revenue.
+
+---
+
+*Addendum 7 written 12 April 2026 · HEAD at close: 5352d96*
+*1 commit · WP-ANALYTICS-3 Session 1 COMPLETE · 4 _helpers/ files established*
+*Five paste-bugs documented — apply checklist to all future Claude.ai-generated components*

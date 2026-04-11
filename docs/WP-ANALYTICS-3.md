@@ -1,6 +1,6 @@
 # WP-ANALYTICS-3 — Revenue Intelligence
 ## NuAi Franchise Analytics Suite — Module 3
-## Status: SPEC COMPLETE — ready to build (2 sessions)
+## Status: IN PROGRESS — Session 1 HEAD 5352d96 · Session 2 pending
 ## Written: 12 April 2026 · HEAD at time of writing: 5ba63b5
 ## New tab: /group-portal?tab=revenue (add to GroupPortal.js)
 
