@@ -407,11 +407,82 @@ Every new agent starting work on this WP must:
 
 | Sub-WP | Name | Status | Commit | Date |
 |---|---|---|---|---|
-| WP-DS-1 | Shared Token File | NOT STARTED | — | — |
+| WP-DS-1 | Shared Token File | **COMPLETE** | *(this commit)* | 11 Apr 2026 |
 | WP-DS-2 | Component Migration | NOT STARTED | — | — |
 | WP-DS-3 | Profile-Aware Tokens | NOT STARTED | — | — |
 | WP-DS-4 | Unified Component Library | NOT STARTED | — | — |
 | WP-DS-5 | Ambient Intelligence Layer | FUTURE | — | — |
+
+---
+
+## WP-DS-1 COMPLETION NOTE + CORRECTION (11 Apr 2026)
+
+### What was actually shipped
+`src/styles/tokens.js` **was extended additively**, not created from scratch. The file already existed (107 lines) and was load-bearing infrastructure for the legacy `C` token system. It now contains both:
+- **NEW** at top: `T`, `profileOverrides`, `getTokens`, `getSeverityTokens` — per the WP-DS-1 spec
+- **LEGACY** at bottom (preserved byte-for-byte): `FONTS`, `C`, `makeBtn`, `inputStyle`, `labelStyle`, `sectionLabel`, `TIER_COLORS`, `LS`, `BANNER_H`, `POINTS_PER_SCAN`, default export
+
+File grew from 107 → 386 lines. Zero consumer breaks. Zero runtime impact. Zero visual change.
+
+### Correction to original WP text
+The original WP-DS-1 planning text (this document, first commit `0c78e50`) contained a factual error:
+
+> *"The old C object (Jost font, legacy palette) is deprecated. AdminQrGenerator.js was the last consumer — deprecated 91c452f."*
+
+**This was wrong.** Pre-flight grep during WP-DS-1 implementation found **4 live C consumers** still importing `{ C }` from `src/styles/tokens.js`:
+
+| File | Route | Import |
+|---|---|---|
+| `src/pages/CheckoutPage.js` | `/checkout` | `import { C } from "../styles/tokens"` |
+| `src/pages/Redeem.js` | `/redeem` | `import { C } from "../styles/tokens"` |
+| `src/pages/WholesalePortal.js` | `/wholesale` | `import { C } from "../styles/tokens"` |
+| `src/components/PageShell.js` | *shared layout wrapper* | `import { FONTS, C } from "../styles/tokens"` |
+
+Plus 12+ additional files that use non-C exports from this file (`LS`, `makeBtn`, `TIER_COLORS`, `BANNER_H`, `POINTS_PER_SCAN`) including `src/App.js` (auth persistence via `LS.ROLE` + `LS.DEV_MODE`).
+
+Writing the WP-DS-1 spec verbatim (which asserted "C is not exported from this file intentionally") would have crashed all 4 routes above and logged every user out at next page load. The verbatim spec was rejected and Option A (additive) was adopted instead. The legacy section header in `src/styles/tokens.js` now carries the full corrected consumer list so future agents reading the file directly see the truth.
+
+### WP-DS-2 scope update — priority migration list
+WP-DS-2 ("Component Migration") is now scoped to handle the legacy consumers above as **Priority 1 migrations** ahead of the general HQ/Admin component sweep. Revised priority order:
+
+**Priority 1 — Legacy `{ C }` consumers (4 files — WP-DS-2 blocker)**
+1. `src/components/PageShell.js` — highest blast radius (shared layout wrapper, also imports `FONTS`)
+2. `src/pages/CheckoutPage.js` — critical revenue path (`/checkout`)
+3. `src/pages/WholesalePortal.js` — B2B revenue path (`/wholesale`)
+4. `src/pages/Redeem.js` — loyalty redemption (`/redeem`)
+
+**Priority 2 — Non-C legacy consumers (`LS`, `makeBtn`, `TIER_COLORS`, etc.)**
+- `src/App.js` — `LS.ROLE` + `LS.DEV_MODE` auth persistence (keep or move to dedicated auth constants file — decide during WP-DS-2)
+- `src/pages/AdminDashboard.js`
+- `src/pages/AdminQrGenerator.js` (already deprecated `91c452f` — remove imports during WP-DS-2 or archive entirely)
+- `src/components/hq/HQFraud.js`
+- `src/components/hq/HQDocuments.js`
+- `src/components/AdminCustomerEngagement.js`
+- `src/components/AdminShipments.js`
+- `src/components/AdminFraudSecurity.js`
+- `src/components/AdminBatchManager.js`
+- `src/components/AdminNotifications.js`
+- `src/components/AdminProductionModule.js`
+
+**Priority 3 — Shared components without legacy imports** (original WP-DS-2 Priority 1)
+- `src/components/shared/ActionCentre.js` (built with self-contained T tokens — migrate to import from this file)
+- `src/components/WorkflowGuide.js`
+- Rest of `src/components/shared/*`
+
+**Priority 4 — HQ components** (original WP-DS-2 Priority 4)
+- HQProduction, HQStock, HQOverview, etc. — all currently define `const T = {...}` locally. Migrate to `import { T } from "../../styles/tokens";` one file at a time.
+
+**Priority 5 — Tenant portal + Admin components** (original WP-DS-2 Priority 5–6)
+
+**Only after all 5 priorities are clear can the legacy section at the bottom of `src/styles/tokens.js` be deleted.** Until then, it stays.
+
+### Invariants preserved by this commit
+- `src/styles/tokens.js` exports `{ T, profileOverrides, getTokens, getSeverityTokens, FONTS, C, makeBtn, inputStyle, labelStyle, sectionLabel, TIER_COLORS, LS, BANNER_H, POINTS_PER_SCAN }` plus the default export. 15 named exports, 1 default.
+- All 4 C-consuming pages still work identically at runtime.
+- `LS.ROLE` + `LS.DEV_MODE` auth persistence unchanged.
+- Pre-existing ESLint warning at `export default {...}` (now line 375, shifted from 96) left alone — out of scope per owner instruction.
+- No component file touched. No business logic touched.
+- Build: clean. No new warnings introduced.
 
 ---
 
