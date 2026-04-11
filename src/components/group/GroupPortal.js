@@ -25,6 +25,7 @@ import StoreComparison from "./StoreComparison";
 import CombinedPL from "./CombinedPL";
 import RevenueIntelligence from "./RevenueIntelligence";
 import StockIntelligence from "./StockIntelligence";
+import CustomerIntelligence from "./CustomerIntelligence";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { id: "financials", label: "Combined P&L" },
   { id: "revenue",    label: "Revenue Intelligence" },
   { id: "stock",      label: "Stock Intelligence" },
+  { id: "customers",  label: "Customer Intelligence" },
   { id: "loyalty",    label: "Shared Loyalty", disabled: true }, // Phase 2+
   { id: "settings",   label: "Group Settings" },
 ];
@@ -415,6 +417,14 @@ export default function GroupPortal() {
         )}
         {activeTab === "stock" && (
           <StockIntelligence
+            groupId={groupId}
+            groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
+          />
+        )}
+        {activeTab === "customers" && (
+          <CustomerIntelligence
             groupId={groupId}
             groupName={groupName}
             members={members}
