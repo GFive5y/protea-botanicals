@@ -174,6 +174,30 @@ export const T = {
   // slots — only light surfaces and bright semantic tiers.
   warningBorder:  "#FDE68A",   // mid-yellow warning border
   dangerBorder:   "#FECACA",   // light-pink danger border
+
+  // WP-DS-6 — Layout & Container Tokens (11 Apr 2026)
+  container: {
+    narrow:  900,
+    default: 1200,
+    wide:    1400,
+    full:    "100%",
+  },
+  page: {
+    gutterX:     24,
+    gutterY:     40,
+    sectionGap:  32,
+    cardGap:     16,
+  },
+  sidebar: {
+    collapsed:  64,
+    expanded:  220,
+  },
+  breakpoint: {
+    mobile:   768,
+    tablet:  1024,
+    desktop: 1280,
+    wide:    1440,
+  },
 };
 
 // ─── PROFILE-AWARE TOKEN OVERRIDES ────────────────────────────
