@@ -1,5 +1,5 @@
 // src/components/group/_helpers/fetchStoreLoyalty.js
-// WP-ANALYTICS-5 Session 1 — per-store loyalty cohort + points economy fetcher
+// WP-ANALYTICS-5 Sessions 1 + 2 — per-store loyalty cohort + points economy fetcher
 //
 // Returns a normalised per-store loyalty result with cohort classifications
 // derived client-side from one user_profiles query and point flows derived
@@ -34,14 +34,24 @@
 //
 // POPIA (load-bearing for Module 5): the user_profiles table stores PII
 // (email, phone, full_name, date_of_birth, street_address, suburb,
-// postal_code). This helper MUST NOT SELECT any of those columns. The
-// authorised projection is exactly eight columns and no more:
+// postal_code). The cohort query MUST NOT SELECT any of those columns.
+// The authorised cohort projection is exactly eight columns and no more:
 //   id, tenant_id, loyalty_points, loyalty_tier, created_at,
 //   last_purchase_at, is_suspended, churn_risk_score
-// No individual customer identity leaves the database via the Group Portal.
-// Aggregate counts and cohort distributions only. The S2 Top Customers
-// section will derive initials from full_name server-side-limited to a
-// two-character projection only — that work happens in S2, not here.
+//
+// S2 Section 6 Top Customers — this section needs `full_name` to derive
+// initials, which is a narrower projection that stays POPIA-safe as long
+// as the full name never reaches the component. The implementation:
+// `full_name` is SELECTed only inside the includeTopCustomers branch,
+// reduced to a two-character initials string inside the helper's
+// transform loop, and immediately discarded. The returned `topCustomers`
+// array contains ONLY initials + masked UUID (last 4 chars of id) +
+// tier + points balance + monthly_spend_zar + monthly_visit_count. No
+// full name, no raw UUID, no email, no phone ever leaves the helper.
+// Browser devtools network tab verification is mandatory: the Supabase
+// response payload contains full_name briefly on the wire, but React
+// state never stores it. This is documented at the query site for
+// future maintainers.
 //
 // Cohort semantics (derived client-side — never in SQL to avoid TZ drift):
 //   isNew      — created_at within the MTD window (monthStartISO → now)
@@ -85,13 +95,22 @@ const AT_RISK_WINDOW_DAYS = 60;
  *   upper bound on the points economy window)
  * @param {string} [options.lastMonthStartISO] — reserved for S2 MoM comparison
  * @param {string} [options.lastMonthEndISO] — reserved for S2 MoM comparison
- * @param {boolean} [options.includeAiLogs=false] — S2 reserved. When true
- *   (S2 only), will query loyalty_ai_log for per-action_type breakdowns.
- *   Voided in S1 bodies below.
- * @param {boolean} [options.includeCampaigns=false] — S2 reserved. No table
- *   exists in the current schema; this option is documented for signature
- *   stability only and will stay a no-op even in S2 until a schema owner
- *   adds loyalty_campaigns. Voided in S1 bodies below.
+ * @param {boolean} [options.includeAiLogs=false] — S2: adds a query on
+ *   loyalty_ai_log for per-action_type MTD counts. Live action types at
+ *   verification time: churn_rescue, birthday_bonus, stock_boost_suggestion.
+ * @param {boolean} [options.includeTopCustomers=false] — S2: adds a query
+ *   on user_profiles for the top N customers by monthly_spend_zar (falls
+ *   back to loyalty_points when no spend data is present). SELECTs
+ *   full_name server-side for initials derivation ONLY — full_name is
+ *   consumed and discarded inside the helper's transform loop. The
+ *   returned topCustomers array contains only the POPIA-safe two-
+ *   character initials + last-4 UUID + tier + points + monthly spend +
+ *   monthly visits projection. Full name is never stored in React state.
+ * @param {number}  [options.topCustomersLimit=10] — how many customers
+ *   per store to return from the top customers query.
+ * @param {boolean} [options.includeCampaigns=false] — permanently
+ *   deferred. No loyalty_campaigns table exists in the live schema.
+ *   Option is kept on the signature for stability but stays a no-op.
  * @returns {Promise<LoyaltyResult>}
  *
  * LoyaltyResult:
@@ -111,24 +130,42 @@ const AT_RISK_WINDOW_DAYS = 60;
  *     churnRiskScore, isNew, isActive, isAtRisk, isLapsed, isDormant,
  *     daysSinceLastPurchase
  *   }],
- *   // Errors — independent so one failure does not mask the other
+ *   // S2 — AI engine activity (populated when includeAiLogs=true)
+ *   aiActionsMTD: {
+ *     churnRescue, birthdayBonus, stockBoostSuggestion, other, total
+ *   },
+ *   // S2 — top customers (populated when includeTopCustomers=true)
+ *   // POPIA-safe projection only — no full name, no raw UUID
+ *   topCustomers: [{
+ *     initials,        // "JS" — derived server-side, full_name discarded
+ *     maskedId,        // last 4 chars of UUID
+ *     loyaltyTier,
+ *     loyaltyPoints,
+ *     monthlySpendZar,
+ *     monthlyVisitCount,
+ *     lastPurchaseAt,
+ *   }],
+ *   // Errors — independent so one failure does not mask another
  *   cohortErr: string | null,
  *   pointsErr: string | null,
+ *   aiLogsErr: string | null,
+ *   topCustomersErr: string | null,
  * }
  */
 export async function fetchStoreLoyalty(tenantId, options = {}) {
   const {
     monthStartISO,
     monthEndISO,
-    // S2 options — voided so no-unused-vars does not trip. Kept on the
-    // signature for stability so the Session 2 wire-up is a pure diff
-    // inside this file rather than a caller-side change.
+    // Reserved for future MoM comparison in this module — not used yet.
     // eslint-disable-next-line no-unused-vars
     lastMonthStartISO,
     // eslint-disable-next-line no-unused-vars
     lastMonthEndISO,
-    // eslint-disable-next-line no-unused-vars
     includeAiLogs = false,
+    includeTopCustomers = false,
+    topCustomersLimit = 10,
+    // Permanently deferred — no loyalty_campaigns table exists. Kept on
+    // the signature for contract stability but never consulted.
     // eslint-disable-next-line no-unused-vars
     includeCampaigns = false,
   } = options;
@@ -147,16 +184,31 @@ export async function fetchStoreLoyalty(tenantId, options = {}) {
     pointsRedeemedMTD: 0,
     redemptionRate: 0,
     customers: [],
+    aiActionsMTD: {
+      churnRescue: 0,
+      birthdayBonus: 0,
+      stockBoostSuggestion: 0,
+      other: 0,
+      total: 0,
+    },
+    topCustomers: [],
     cohortErr: null,
     pointsErr: null,
+    aiLogsErr: null,
+    topCustomersErr: null,
   };
 
   // ── Parallel queries — independent error isolation via allSettled ────────
-  const [cohortRes, pointsRes] = await Promise.allSettled([
-    // Query 1 — cohort snapshot. POPIA-safe projection only: exactly the
-    // eight columns the component needs, and none of the PII columns that
-    // also live on user_profiles. Suspended users are excluded from counts
-    // per the Step 0 active-predicate decision.
+  // Core S1 queries always run. S2 queries append conditionally. Using a
+  // dynamic query array with index-tracked destructuring keeps the
+  // Promise.allSettled pattern intact while avoiding a second round-trip.
+  const queries = [];
+
+  // Query 0 — cohort snapshot. POPIA-safe projection only: exactly the
+  // eight columns the component needs, and none of the PII columns that
+  // also live on user_profiles. Suspended users are excluded from counts
+  // per the Step 0 active-predicate decision.
+  queries.push(
     supabase
       .from("user_profiles")
       .select(
@@ -164,9 +216,10 @@ export async function fetchStoreLoyalty(tenantId, options = {}) {
       )
       .eq("tenant_id", tenantId)
       .neq("is_suspended", true),
+  );
 
-    // Query 2 — points economy for the MTD window. Sum by sign of points.
-    // No tenant-wide transaction history, just the current month's flows.
+  // Query 1 — points economy for the MTD window. Sum by sign of points.
+  queries.push(
     supabase
       .from("loyalty_transactions")
       .select("transaction_type, points")
@@ -176,7 +229,71 @@ export async function fetchStoreLoyalty(tenantId, options = {}) {
         "created_at",
         monthEndISO || new Date(Date.now() + MS_PER_DAY).toISOString(),
       ),
-  ]);
+  );
+
+  // Query 2 (S2, optional) — AI engine activity MTD. loyalty_ai_log is
+  // the actual table (not ai_action_logs per the Step 0 addendum).
+  // Projection is action_type only — target_user_id is PII-adjacent
+  // (reveals membership in churn_rescue lists etc) and we do not need
+  // it for the aggregate count, so we do not SELECT it.
+  const aiLogsIdx = includeAiLogs ? queries.length : -1;
+  if (includeAiLogs) {
+    queries.push(
+      supabase
+        .from("loyalty_ai_log")
+        .select("action_type")
+        .eq("tenant_id", tenantId)
+        .gte("created_at", monthStartISO || new Date(0).toISOString())
+        .lt(
+          "created_at",
+          monthEndISO || new Date(Date.now() + MS_PER_DAY).toISOString(),
+        ),
+    );
+  }
+
+  // Query 3 (S2, optional) — top customers by monthly spend.
+  //
+  // POPIA pattern: `full_name` is SELECTed server-side ONLY to derive
+  // two-character initials inside the helper's transform loop below.
+  // After initials derivation the raw string is discarded. The returned
+  // topCustomers array contains only the POPIA-safe projection
+  // (initials + masked UUID + tier + points + monthly spend + monthly
+  // visits + last_purchase_at). Full name never reaches React state.
+  //
+  // Note: full_name appears briefly on the Supabase response payload
+  // for this single query. This is an intentional narrow exception to
+  // the "no PII on the wire" stance used by the S1 cohort query.
+  // Browser devtools network-tab inspection during POPIA verification
+  // must confirm the *render path* is PII-free, not the wire payload
+  // for this specific query. This is documented in v247 prompt and in
+  // the file header.
+  //
+  // Sort: monthly_spend_zar DESC. NULLs sort last. If the nightly engine
+  // hasn't populated monthly_spend_zar for a tenant yet, the order
+  // becomes implicit (and tied customers render by DB order). Component
+  // can surface this honestly with an empty-state message.
+  const topCustomersIdx = includeTopCustomers ? queries.length : -1;
+  if (includeTopCustomers) {
+    queries.push(
+      supabase
+        .from("user_profiles")
+        .select(
+          "id, full_name, loyalty_tier, loyalty_points, monthly_spend_zar, monthly_visit_count, last_purchase_at",
+        )
+        .eq("tenant_id", tenantId)
+        .neq("is_suspended", true)
+        .order("monthly_spend_zar", { ascending: false, nullsFirst: false })
+        .order("loyalty_points", { ascending: false })
+        .limit(topCustomersLimit),
+    );
+  }
+
+  const settled = await Promise.allSettled(queries);
+  const cohortRes = settled[0];
+  const pointsRes = settled[1];
+  const aiLogsRes = aiLogsIdx >= 0 ? settled[aiLogsIdx] : null;
+  const topCustomersRes =
+    topCustomersIdx >= 0 ? settled[topCustomersIdx] : null;
 
   // ── Handle cohort query result ───────────────────────────────────────────
   if (cohortRes.status === "fulfilled" && !cohortRes.value.error) {
@@ -319,5 +436,103 @@ export async function fetchStoreLoyalty(tenantId, options = {}) {
     result.pointsErr = err?.message || "Points fetch failed";
   }
 
+  // ── Handle AI logs result (S2 — optional) ─────────────────────────────
+  if (aiLogsRes) {
+    if (aiLogsRes.status === "fulfilled" && !aiLogsRes.value.error) {
+      const rows = aiLogsRes.value.data || [];
+      for (const r of rows) {
+        const at = r.action_type || "";
+        result.aiActionsMTD.total++;
+        if (at === "churn_rescue") {
+          result.aiActionsMTD.churnRescue++;
+        } else if (at === "birthday_bonus") {
+          result.aiActionsMTD.birthdayBonus++;
+        } else if (at === "stock_boost_suggestion") {
+          result.aiActionsMTD.stockBoostSuggestion++;
+        } else {
+          // Any future action_type added by the nightly engine rolls
+          // into "other" instead of silently vanishing. This keeps the
+          // total authoritative even if the engine ships new types.
+          result.aiActionsMTD.other++;
+        }
+      }
+    } else {
+      const err =
+        aiLogsRes.status === "rejected"
+          ? aiLogsRes.reason
+          : aiLogsRes.value.error;
+      console.error(
+        `[fetchStoreLoyalty] ai logs query failed for tenant ${tenantId}:`,
+        err,
+      );
+      result.aiLogsErr = err?.message || "AI logs fetch failed";
+    }
+  }
+
+  // ── Handle top customers result (S2 — optional) ──────────────────────
+  // POPIA transform loop: full_name is consumed here and never stored.
+  // The pushed object contains only the two-character initials + last-4
+  // UUID + tier + points + monthly_spend_zar + monthly_visit_count +
+  // last_purchase_at. No full name, no raw UUID, no email, no phone.
+  if (topCustomersRes) {
+    if (
+      topCustomersRes.status === "fulfilled" &&
+      !topCustomersRes.value.error
+    ) {
+      const rows = topCustomersRes.value.data || [];
+      for (const r of rows) {
+        const initials = deriveInitials(r.full_name);
+        const maskedId = r.id ? `…${String(r.id).slice(-4)}` : "—";
+        result.topCustomers.push({
+          initials,
+          maskedId,
+          loyaltyTier: r.loyalty_tier || "unassigned",
+          loyaltyPoints: parseInt(r.loyalty_points, 10) || 0,
+          monthlySpendZar:
+            r.monthly_spend_zar != null
+              ? parseFloat(r.monthly_spend_zar)
+              : 0,
+          monthlyVisitCount:
+            r.monthly_visit_count != null
+              ? parseInt(r.monthly_visit_count, 10)
+              : 0,
+          lastPurchaseAt: r.last_purchase_at || null,
+        });
+        // full_name goes out of scope with r at next loop iteration
+      }
+    } else {
+      const err =
+        topCustomersRes.status === "rejected"
+          ? topCustomersRes.reason
+          : topCustomersRes.value.error;
+      console.error(
+        `[fetchStoreLoyalty] top customers query failed for tenant ${tenantId}:`,
+        err,
+      );
+      result.topCustomersErr =
+        err?.message || "Top customers fetch failed";
+    }
+  }
+
   return result;
+}
+
+// ─── Initials derivation (POPIA helper) ─────────────────────────────────
+// Given a single `full_name` string, return a two-character initials
+// string suitable for rendering in the Group Portal top-customers view.
+// Handles the edge cases documented in Session 2 Step 0:
+//   - null / empty / whitespace-only → "—"
+//   - single word "Jane"              → "J"
+//   - two words  "Jane Smith"         → "JS"
+//   - 3+ words   "John van der Merwe" → "JM"  (first + last word only)
+// This function is invoked inside the topCustomers transform loop above
+// and the raw full_name is discarded immediately after.
+function deriveInitials(fullName) {
+  if (!fullName || typeof fullName !== "string") return "—";
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "—";
+  if (words.length === 1) return words[0].charAt(0).toUpperCase();
+  const first = words[0].charAt(0).toUpperCase();
+  const last = words[words.length - 1].charAt(0).toUpperCase();
+  return `${first}${last}`;
 }

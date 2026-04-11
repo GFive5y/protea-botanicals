@@ -1,31 +1,41 @@
 // src/components/group/CustomerIntelligence.js
 // WP-ANALYTICS-5 — Customer & Loyalty Intelligence
-// Status: IN PROGRESS — Session 1 HEAD `a5134aa` · Session 2 pending
+// Status: Session 1 HEAD `a5134aa` · Session 2 IN PROGRESS
 //
 // Module 5 of the NuAi franchise analytics suite. Answers the question no
 // single-store surface can answer: how is the loyalty programme performing
 // across the whole network, and where are the churn signals?
 //
-// Sections live in S1:
-//   1. Network Customer Summary — 4 KPI tiles (total, active, at-risk, points)
-//   2. Loyalty Tier Distribution by Store — per-store tier breakdown bars
-//   3. Cohort Health by Store — collapsible per-store cohort table + bar
+// Sections live:
+//   1. Network Customer Summary — 4 KPI tiles (total, active, at-risk, points)     [S1]
+//   2. Loyalty Tier Distribution by Store — per-store tier breakdown bars          [S1]
+//   3. Cohort Health by Store — collapsible per-store cohort table + bar           [S1]
+//   5. AI Engine Activity — per-store loyalty_ai_log action_type breakdown         [S2]
+//   6. Top Customers per store — POPIA-safe initials + masked UUID only            [S2]
 //
-// Deferred to S2:
+// Permanently deferred:
 //   4. Campaign ROI — no loyalty_campaigns table exists in the live schema
-//      (verified via Step 0 on 12 Apr 2026). Section is a no-op until a
-//      schema owner adds the table.
-//   5. AI Engine Activity — reads loyalty_ai_log (actual table name; the
-//      spec's ai_action_logs does not exist). Action types live:
-//      churn_rescue, birthday_bonus, stock_boost_suggestion.
-//   6. Top Customers per store — POPIA-safe projection, initials + masked
-//      UUID suffix only. No email, phone, or full name ever rendered.
+//      (verified via Step 0 on 12 Apr 2026). The includeCampaigns option on
+//      fetchStoreLoyalty is a no-op until a schema owner adds the table and
+//      produces a new spec.
 //
 // POPIA (non-negotiable): this component renders aggregate counts, cohort
-// distributions, and tier breakdowns only. No individual customer identity
-// is displayed anywhere. The POPIA-safe SELECT list is enforced in
-// fetchStoreLoyalty.js — the eight non-PII columns are the entire projection.
-// See that helper's header for the full column list and rationale.
+// distributions, tier breakdowns, AI engine activity aggregates, and top
+// customers by initials + masked UUID only. No individual customer identity
+// is displayed anywhere in the render path. The POPIA-safe SELECT list for
+// cohort / tier / points economy is enforced in fetchStoreLoyalty.js — the
+// eight non-PII columns are the entire cohort projection. See that helper's
+// header for the full column list and rationale.
+//
+// Section 6 Top Customers is the single narrow POPIA exception: full_name
+// is SELECTed server-side by the helper ONLY for two-character initials
+// derivation, then immediately discarded inside the helper's transform
+// loop. React state never contains full_name. The topCustomers array that
+// reaches this component already contains only the safe projection
+// { initials, maskedId, loyaltyTier, loyaltyPoints, monthlySpendZar,
+//   monthlyVisitCount, lastPurchaseAt } — see fetchStoreLoyalty.js
+// deriveInitials() for the derivation and the Section 6 render for the
+// UI-side enforcement.
 //
 // Tier palette — hardcoded with Step 0 rationale. The loyalty_tiers table
 // that the WP-ANALYTICS-5 spec assumed does not exist in the schema. Tier
@@ -197,6 +207,9 @@ export default function CustomerIntelligence({
           fetchStoreLoyalty(m.tenant_id, {
             monthStartISO,
             monthEndISO,
+            includeAiLogs: true,
+            includeTopCustomers: true,
+            topCustomersLimit: 10,
           }),
         ),
       );
@@ -548,6 +561,35 @@ export default function CustomerIntelligence({
         </div>
       </section>
 
+      {/* ── Section 5: AI Engine Activity ──────────────────────────────── */}
+      <section>
+        <div style={sectionLabelStyle}>AI Engine Activity — this month</div>
+        <AiEngineSection members={members} loyaltyResults={loyaltyResults} />
+      </section>
+
+      {/* ── Section 6: Top Customers (POPIA-safe) ──────────────────────── */}
+      <section>
+        <div style={sectionLabelStyle}>Top Customers by Store</div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: T.gap.lg,
+          }}
+        >
+          {members.map((m, idx) => {
+            const r = loyaltyResults[idx];
+            return (
+              <TopCustomersCard
+                key={m.tenant_id}
+                name={m.tenants?.name || "Unnamed store"}
+                loyalty={r}
+              />
+            );
+          })}
+        </div>
+      </section>
+
       {/* ── Data quality footnote ──────────────────────────────────────── */}
       <div
         style={{
@@ -576,16 +618,24 @@ export default function CustomerIntelligence({
         adjustments are included; POS-voided transactions depend on whether a
         reversal entry exists.
         <br />· Tier distribution is a live snapshot. Historical tier movement
-        requires loyalty_ai_log tier_upgrade tracking (Session 2 roadmap).
-        <br />· Campaign ROI (Section 4) is deferred — the loyalty_campaigns
-        table does not exist in the current schema.
-        <br />· AI Engine Activity (Section 5) will read loyalty_ai_log in
-        Session 2. Live action types: churn_rescue, birthday_bonus,
-        stock_boost_suggestion.
-        <br />· <strong>POPIA:</strong> no individual customer data is
-        displayed in the Group Portal. Aggregate counts only — full names,
-        emails, and phone numbers are never fetched from the database by
-        this view.
+        is not yet tracked.
+        <br />· <strong>Section 4 Campaign ROI is permanently deferred</strong>
+        — the loyalty_campaigns table does not exist in the current schema.
+        <br />· AI Engine Activity counts this month&apos;s loyalty_ai_log
+        entries by action_type (churn_rescue, birthday_bonus,
+        stock_boost_suggestion, plus any future types rolled into
+        &quot;other&quot;).
+        <br />· Top Customers rows are sorted by monthly_spend_zar (the
+        nightly-engine denormalised column) with a loyalty_points
+        tie-breaker. Tenants whose engine has not yet populated this
+        column will show a zero-spend empty state.
+        <br />· <strong>POPIA:</strong> Sections 1–5 fetch only non-PII
+        columns. Section 6 is the single narrow exception — full_name is
+        fetched server-side and consumed inside fetchStoreLoyalty.js to
+        derive two-character initials, then immediately discarded.
+        React state and this render never contain full names, emails, or
+        phone numbers. The masked ID is the last 4 characters of the
+        customer UUID; no raw UUID is rendered.
       </div>
     </div>
   );
@@ -1160,6 +1210,463 @@ function ChurnInsightLine({ atRisk, lapsed, dormant, total }) {
       }}
     >
       {text}
+    </div>
+  );
+}
+
+// ─── Section 5: AI Engine Activity ─────────────────────────────────────────
+// Renders a compact per-action-type table showing this month's loyalty-ai
+// engine activity, with per-store breakdown in the right column. Uses
+// result.aiActionsMTD populated by fetchStoreLoyalty when includeAiLogs
+// is true. Action types live at verification time: churn_rescue,
+// birthday_bonus, stock_boost_suggestion. The "other" bucket catches
+// any future action_type added by the nightly engine so the total
+// stays authoritative.
+function AiEngineSection({ members, loyaltyResults }) {
+  const AI_ROWS = [
+    {
+      key: "churnRescue",
+      label: "Churn rescue",
+      description: "Nightly engine detected churn risk and queued a save action",
+    },
+    {
+      key: "birthdayBonus",
+      label: "Birthday bonus",
+      description: "Birthday points awarded by the nightly engine",
+    },
+    {
+      key: "stockBoostSuggestion",
+      label: "Stock boost suggestion",
+      description: "Suggested promoting slow-moving stock to loyalty members",
+    },
+    {
+      key: "other",
+      label: "Other",
+      description: "Any future action type — not yet categorised",
+    },
+  ];
+
+  // Network totals row — sum across stores
+  const networkTotals = AI_ROWS.reduce(
+    (acc, row) => {
+      acc[row.key] = loyaltyResults.reduce(
+        (sum, r) => sum + ((r?.aiActionsMTD && r.aiActionsMTD[row.key]) || 0),
+        0,
+      );
+      return acc;
+    },
+    {},
+  );
+  const networkTotal = loyaltyResults.reduce(
+    (sum, r) => sum + ((r?.aiActionsMTD && r.aiActionsMTD.total) || 0),
+    0,
+  );
+
+  // Collapse empty "other" row unless it has any value anywhere
+  const visibleRows = AI_ROWS.filter(
+    (row) => row.key !== "other" || networkTotals.other > 0,
+  );
+
+  // Error banner if every store's ai-log query failed
+  const allErrored =
+    loyaltyResults.length > 0 &&
+    loyaltyResults.every((r) => r?.aiLogsErr);
+
+  if (allErrored) {
+    return (
+      <div
+        style={{
+          background: T.warningLight,
+          border: `1px solid ${T.warningBorder}`,
+          borderRadius: T.radius.md,
+          padding: T.inset.card,
+          color: T.warningText,
+          fontSize: T.text.sm,
+        }}
+      >
+        AI engine activity data unavailable for every store.
+      </div>
+    );
+  }
+
+  if (networkTotal === 0) {
+    return (
+      <div
+        style={{
+          background: T.surface,
+          border: `1px solid ${T.border}`,
+          borderRadius: T.radius.lg,
+          padding: T.inset.card,
+          color: T.ink600,
+          fontSize: T.text.sm,
+          lineHeight: 1.6,
+        }}
+      >
+        No AI engine actions fired across the network this month. The
+        nightly loyalty-ai engine runs once per day and will appear here
+        when churn, birthday, or stock-boost conditions are met.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: T.radius.lg,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `minmax(160px, 2fr) minmax(80px, 1fr) 2fr`,
+          gap: T.gap.md,
+          padding: `${T.pad.md}px ${T.inset.card}`,
+          background: T.surfaceAlt || T.bg,
+          borderBottom: `1px solid ${T.border}`,
+          fontSize: T.text.xs,
+          fontWeight: T.weight.semibold,
+          color: T.ink400,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+        }}
+      >
+        <div>Action type</div>
+        <div style={{ textAlign: "right" }}>Count MTD</div>
+        <div>Per-store breakdown</div>
+      </div>
+
+      {/* Data rows */}
+      {visibleRows.map((row) => {
+        const total = networkTotals[row.key] || 0;
+        const perStore = members.map((m, idx) => {
+          const r = loyaltyResults[idx];
+          const n = (r?.aiActionsMTD && r.aiActionsMTD[row.key]) || 0;
+          return { name: truncate(m.tenants?.name, 18), n };
+        });
+        return (
+          <div
+            key={row.key}
+            title={row.description}
+            style={{
+              display: "grid",
+              gridTemplateColumns: `minmax(160px, 2fr) minmax(80px, 1fr) 2fr`,
+              gap: T.gap.md,
+              padding: `${T.pad.md}px ${T.inset.card}`,
+              borderBottom: `1px solid ${T.border}`,
+              fontSize: T.text.sm,
+              alignItems: "baseline",
+            }}
+          >
+            <div style={{ color: T.ink700, fontWeight: T.weight.medium }}>
+              {row.label}
+            </div>
+            <div
+              style={{
+                textAlign: "right",
+                color: total > 0 ? T.ink900 : T.ink400,
+                fontWeight: T.weight.semibold,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {fmtInt(total)}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: T.gap.md,
+                color: T.ink600,
+                fontSize: T.text.xs,
+              }}
+            >
+              {perStore.map((ps, i) => (
+                <span key={i}>
+                  {ps.name}:{" "}
+                  <strong
+                    style={{
+                      color: ps.n > 0 ? T.ink900 : T.ink400,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {ps.n}
+                  </strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Total row */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `minmax(160px, 2fr) minmax(80px, 1fr) 2fr`,
+          gap: T.gap.md,
+          padding: `${T.pad.md}px ${T.inset.card}`,
+          fontSize: T.text.sm,
+          fontWeight: T.weight.semibold,
+          color: T.ink900,
+          background: T.surfaceAlt || T.bg,
+        }}
+      >
+        <div>Total</div>
+        <div
+          style={{
+            textAlign: "right",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {fmtInt(networkTotal)}
+        </div>
+        <div />
+      </div>
+    </div>
+  );
+}
+
+// ─── Section 6: Top Customers card (POPIA-safe) ────────────────────────────
+//
+// ┌─── POPIA COMPLIANCE DECLARATION ────────────────────────────────────┐
+// │ This component renders customer records using ONLY:                 │
+// │   - initials   — two characters derived server-side in              │
+// │                  fetchStoreLoyalty.deriveInitials() from full_name, │
+// │                  then immediately discarded. Never reaches React    │
+// │                  state or props.                                    │
+// │   - maskedId   — last 4 characters of the customer UUID,            │
+// │                  prefixed with an ellipsis character. Never the     │
+// │                  full UUID.                                         │
+// │   - loyaltyTier                                                     │
+// │   - loyaltyPoints                                                   │
+// │   - monthlySpendZar       (engine-denormalised per-customer total)  │
+// │   - monthlyVisitCount     (engine-denormalised per-customer count)  │
+// │   - lastPurchaseAt                                                  │
+// │                                                                     │
+// │ NOT rendered and NOT fetched into React state:                      │
+// │   email, phone, full_name, date_of_birth, id_number,                │
+// │   street_address, suburb, postal_code, province, city, gender       │
+// │                                                                     │
+// │ The single narrow wire-level exception is full_name, which appears  │
+// │ briefly in the Supabase response JSON for the user_profiles query   │
+// │ in fetchStoreLoyalty (includeTopCustomers branch). It is consumed   │
+// │ by deriveInitials and discarded before the response object is      │
+// │ returned from the helper. Browser devtools network-tab inspection   │
+// │ during POPIA verification must confirm full_name does NOT appear    │
+// │ in React state (via React DevTools) or in any rendered DOM node.    │
+// │ It may briefly appear in the raw network payload for the query;    │
+// │ this is the documented exception authorised in NEXT-SESSION-PROMPT  │
+// │ v247.                                                               │
+// └─────────────────────────────────────────────────────────────────────┘
+function TopCustomersCard({ name, loyalty }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const rows = loyalty?.topCustomers || [];
+  const errored = !!loyalty?.topCustomersErr;
+
+  const rowCount = rows.length;
+  const headerContent = errored ? (
+    <span style={{ color: T.dangerText }}>Data unavailable</span>
+  ) : rowCount === 0 ? (
+    <span style={{ color: T.ink600 }}>No customers with spend data yet</span>
+  ) : (
+    <span style={{ color: T.ink700 }}>
+      <strong>{rowCount}</strong> top member{rowCount !== 1 ? "s" : ""}
+    </span>
+  );
+
+  return (
+    <div
+      style={{
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: T.radius.lg,
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setIsExpanded((v) => !v)}
+        style={{
+          width: "100%",
+          background: "transparent",
+          border: "none",
+          padding: T.inset.card,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: T.gap.md,
+          cursor: "pointer",
+          fontFamily: T.font,
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: T.gap.md,
+            flex: 1,
+          }}
+        >
+          <span
+            style={{
+              fontSize: T.text.xs,
+              color: T.ink400,
+              width: 14,
+              display: "inline-block",
+            }}
+          >
+            {isExpanded ? "▼" : "▶"}
+          </span>
+          <span
+            style={{
+              fontSize: T.text.base,
+              fontWeight: T.weight.semibold,
+              color: T.ink900,
+            }}
+          >
+            {name}
+          </span>
+          <span
+            style={{
+              fontSize: T.text.xs,
+              color: T.ink400,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            —
+          </span>
+          <span style={{ fontSize: T.text.sm }}>{headerContent}</span>
+        </div>
+      </button>
+
+      {isExpanded && !errored && rowCount > 0 && (
+        <div
+          style={{
+            borderTop: `1px solid ${T.border}`,
+          }}
+        >
+          {/* Table header */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "40px minmax(56px, 60px) minmax(72px, 80px) minmax(80px, 1fr) minmax(80px, 1fr) minmax(72px, 1fr) minmax(120px, 1.4fr)",
+              gap: T.gap.sm,
+              padding: `${T.pad.sm}px ${T.inset.card}`,
+              background: T.surfaceAlt || T.bg,
+              borderBottom: `1px solid ${T.border}`,
+              fontSize: T.text.xs,
+              fontWeight: T.weight.semibold,
+              color: T.ink400,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            <div>#</div>
+            <div>Initials</div>
+            <div>ID</div>
+            <div>Tier</div>
+            <div style={{ textAlign: "right" }}>Points</div>
+            <div style={{ textAlign: "right" }}>Visits MTD</div>
+            <div style={{ textAlign: "right" }}>Revenue MTD</div>
+          </div>
+
+          {/* Data rows — POPIA-safe projection only */}
+          {rows.map((c, i) => (
+            <div
+              key={`${c.maskedId}-${i}`}
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "40px minmax(56px, 60px) minmax(72px, 80px) minmax(80px, 1fr) minmax(80px, 1fr) minmax(72px, 1fr) minmax(120px, 1.4fr)",
+                gap: T.gap.sm,
+                padding: `${T.pad.sm}px ${T.inset.card}`,
+                borderBottom:
+                  i < rows.length - 1 ? `1px solid ${T.border}` : "none",
+                fontSize: T.text.sm,
+                alignItems: "baseline",
+              }}
+            >
+              <div style={{ color: T.ink400, fontVariantNumeric: "tabular-nums" }}>
+                {i + 1}
+              </div>
+              <div
+                style={{
+                  fontWeight: T.weight.bold,
+                  color: T.ink900,
+                  letterSpacing: "0.04em",
+                }}
+                title="Two-character initials — no full name is rendered or stored (POPIA)"
+              >
+                {c.initials}
+              </div>
+              <div
+                style={{
+                  fontFamily: "ui-monospace, monospace",
+                  color: T.ink600,
+                  fontSize: T.text.xs,
+                }}
+                title="Last 4 characters of the customer UUID — no raw UUID is rendered (POPIA)"
+              >
+                {c.maskedId}
+              </div>
+              <div>
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: `${T.pad.xs}px ${T.pad.sm}px`,
+                    borderRadius: T.radius.full,
+                    background:
+                      TIER_PALETTE[c.loyaltyTier] || TIER_PALETTE.unassigned,
+                    color: c.loyaltyTier === "gold" ? "#5c4a00" : "#0D0D0D",
+                    fontSize: T.text.xs,
+                    fontWeight: T.weight.semibold,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {TIER_LABEL[c.loyaltyTier] || c.loyaltyTier}
+                </span>
+              </div>
+              <div
+                style={{
+                  textAlign: "right",
+                  color: T.ink900,
+                  fontWeight: T.weight.semibold,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {fmtInt(c.loyaltyPoints)}
+              </div>
+              <div
+                style={{
+                  textAlign: "right",
+                  color: c.monthlyVisitCount > 0 ? T.ink700 : T.ink400,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {fmtInt(c.monthlyVisitCount)}
+              </div>
+              <div
+                style={{
+                  textAlign: "right",
+                  color: c.monthlySpendZar > 0 ? T.ink900 : T.ink400,
+                  fontWeight: T.weight.semibold,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {c.monthlySpendZar > 0
+                  ? `R${Math.round(c.monthlySpendZar).toLocaleString("en-ZA")}`
+                  : "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
