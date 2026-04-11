@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { RoleContext } from "../App";
 import { supabase } from "../services/supabaseClient";
-import { C } from "../styles/tokens";
+import { T } from "../styles/tokens";
 import ClientHeader from "../components/ClientHeader";
 import { useStorefront } from "../contexts/StorefrontContext"; // ✦ WP-MULTISITE
 
@@ -460,7 +460,7 @@ export default function CheckoutPage() {
             fontSize: "11px",
             letterSpacing: "0.35em",
             textTransform: "uppercase",
-            color: C.accent,
+            color: T.accent,
             marginBottom: "24px",
           }}
         >
@@ -471,7 +471,7 @@ export default function CheckoutPage() {
           style={{
             fontSize: "32px",
             fontWeight: 300,
-            color: C.text,
+            color: T.ink900,
             marginBottom: "8px",
           }}
         >
@@ -481,7 +481,7 @@ export default function CheckoutPage() {
           className="body-font"
           style={{
             fontSize: "14px",
-            color: C.muted,
+            color: T.ink600,
             fontWeight: 300,
             marginBottom: "36px",
           }}
@@ -536,7 +536,7 @@ export default function CheckoutPage() {
                 fontSize: "10px",
                 letterSpacing: "0.25em",
                 textTransform: "uppercase",
-                color: C.muted,
+                color: T.ink600,
                 fontWeight: "600",
                 marginBottom: "16px",
               }}
@@ -551,7 +551,7 @@ export default function CheckoutPage() {
                   gap: "14px",
                   alignItems: "center",
                   padding: "14px 0",
-                  borderBottom: `1px solid ${C.border}`,
+                  borderBottom: `1px solid ${T.border}`,
                 }}
               >
                 <div
@@ -578,7 +578,7 @@ export default function CheckoutPage() {
                     style={{
                       fontSize: "15px",
                       fontWeight: 400,
-                      color: C.text,
+                      color: T.ink900,
                       margin: 0,
                     }}
                   >
@@ -586,14 +586,14 @@ export default function CheckoutPage() {
                   </p>
                   <span
                     className="body-font"
-                    style={{ fontSize: "11px", color: C.muted }}
+                    style={{ fontSize: "11px", color: T.ink600 }}
                   >
                     Qty: {item.quantity} × R{item.price.toLocaleString()}
                   </span>
                 </div>
                 <span
                   className="shop-font"
-                  style={{ fontSize: "16px", fontWeight: 600, color: C.text }}
+                  style={{ fontSize: "16px", fontWeight: 600, color: T.ink900 }}
                 >
                   R{(item.price * item.quantity).toLocaleString()}
                 </span>
@@ -605,7 +605,7 @@ export default function CheckoutPage() {
           <div
             style={{
               background: "#f4f0e8",
-              border: `1px solid ${C.border}`,
+              border: `1px solid ${T.border}`,
               borderRadius: "2px",
               padding: "28px",
               position: "sticky",
@@ -618,7 +618,7 @@ export default function CheckoutPage() {
                 fontSize: "10px",
                 letterSpacing: "0.25em",
                 textTransform: "uppercase",
-                color: C.muted,
+                color: T.ink600,
                 fontWeight: "600",
                 marginBottom: "20px",
               }}
@@ -641,7 +641,7 @@ export default function CheckoutPage() {
               </span>
               <span
                 className="body-font"
-                style={{ fontSize: "13px", color: C.text, fontWeight: 500 }}
+                style={{ fontSize: "13px", color: T.ink900, fontWeight: 500 }}
               >
                 R{total.toLocaleString()}
               </span>
@@ -661,7 +661,7 @@ export default function CheckoutPage() {
               </span>
               <span
                 className="body-font"
-                style={{ fontSize: "13px", color: C.accent, fontWeight: 500 }}
+                style={{ fontSize: "13px", color: T.accent, fontWeight: 500 }}
               >
                 FREE
               </span>
@@ -697,7 +697,7 @@ export default function CheckoutPage() {
 
             <div
               style={{
-                borderTop: `1px solid ${C.border}`,
+                borderTop: `1px solid ${T.border}`,
                 paddingTop: "16px",
                 marginTop: "12px",
                 display: "flex",
@@ -713,7 +713,7 @@ export default function CheckoutPage() {
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
                   fontWeight: "600",
-                  color: C.text,
+                  color: T.ink900,
                 }}
               >
                 Total (ZAR)
@@ -735,7 +735,7 @@ export default function CheckoutPage() {
               <div
                 style={{
                   background: "#fff",
-                  border: `1px solid ${C.border}`,
+                  border: `1px solid ${T.border}`,
                   borderRadius: "2px",
                   padding: "12px 14px",
                   marginBottom: "16px",
@@ -911,7 +911,7 @@ export default function CheckoutPage() {
                   fontSize: "10px",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: T.ink600,
                   fontWeight: 600,
                   marginBottom: 6,
                 }}
@@ -930,7 +930,7 @@ export default function CheckoutPage() {
                   style={{
                     width: "100%",
                     padding: "9px 36px 9px 12px",
-                    border: `1.5px solid ${referralValid === "valid" ? "#52b788" : referralValid === "invalid" ? "#c0392b" : C.border}`,
+                    border: `1.5px solid ${referralValid === "valid" ? "#52b788" : referralValid === "invalid" ? "#c0392b" : T.border}`,
                     borderRadius: "2px",
                     fontFamily: "Jost, sans-serif",
                     fontSize: "14px",
@@ -1013,7 +1013,7 @@ export default function CheckoutPage() {
                 <div
                   style={{
                     fontSize: 10,
-                    color: C.muted,
+                    color: T.ink600,
                     marginTop: 4,
                     fontFamily: "Jost, sans-serif",
                   }}
@@ -1075,7 +1075,7 @@ export default function CheckoutPage() {
                   }}
                 />
                 <style>{`@keyframes protea-spin { to { transform: rotate(360deg); } }`}</style>
-                <span style={{ fontSize: "11px", color: C.muted }}>
+                <span style={{ fontSize: "11px", color: T.ink600 }}>
                   Creating your order & redirecting to PayFast…
                 </span>
               </div>
@@ -1086,7 +1086,7 @@ export default function CheckoutPage() {
                 className="body-font"
                 style={{
                   fontSize: "11px",
-                  color: C.muted,
+                  color: T.ink600,
                   textAlign: "center",
                   marginTop: "14px",
                   lineHeight: 1.5,
@@ -1111,7 +1111,7 @@ export default function CheckoutPage() {
                   fontSize: "9px",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: T.ink600,
                 }}
               >
                 🔒 SSL Secured
@@ -1122,7 +1122,7 @@ export default function CheckoutPage() {
                   fontSize: "9px",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
-                  color: C.muted,
+                  color: T.ink600,
                 }}
               >
                 Visa · Mastercard · EFT
