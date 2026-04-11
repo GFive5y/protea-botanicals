@@ -787,3 +787,212 @@ Sections 5 and 6.
 *Addendum 2 of v240 written 12 April 2026 · HEAD at close: `a5134aa` (pre-doc-commit)*
 *Three commits in Addendum 2 · WP-ANALYTICS-5 Session 1 shipped · Module 5 S2 remains*
 *Section 4 Campaign ROI permanently deferred · Step 0 divergence locked in WP-ANALYTICS-5 addendum*
+
+---
+
+# ADDENDUM 3 — 12 April 2026 · WP-ANALYTICS-5 S2 + NUAI-STRAT-INTEL integration
+
+## HEAD chain this addendum
+
+`cf58f5f → 388520c → [this session close doc commit]`
+
+Two commits:
+
+1. **`388520c`** — `feat(WP-A5/S2): CustomerIntelligence AI engine +
+   top customers`. WP-ANALYTICS-5 Session 2 of the NuAi franchise
+   analytics suite. 2 files changed, 776 insertions / 54 deletions.
+   Adds Sections 5 (AI Engine Activity reading loyalty_ai_log) and 6
+   (Top Customers POPIA-safe via deriveInitials pattern) to the
+   existing CustomerIntelligence component. No new tab added — the
+   sections extend the existing component inline. Section 4 Campaign
+   ROI remains permanently deferred (no loyalty_campaigns table).
+
+2. **This session close doc commit** — 11 doc items bundled into a
+   single commit (see full list in the commit message). This is an
+   expanded session close per new owner instructions integrating the
+   NUAI-STRATEGIC-INTELLIGENCE v1.0 document into the handover loop
+   at every agent-touch surface.
+
+## WP-ANALYTICS-5 Session 2 detail (commit `388520c`)
+
+### Lightweight Step 0 findings
+
+Two confirmation-only queries run before writing a line:
+
+1. **`full_name` column format:** Single combined TEXT field on
+   `user_profiles`. No first_name / last_name split. Also has
+   `display_name` TEXT. The Section 6 initials-derivation logic
+   must split `full_name` on whitespace client-side.
+
+2. **Current-month AI action counts (MTD):** Confirmed all three
+   action types from the S1 Step 0 addendum are still live and
+   unchanged: `churn_rescue` (4 on Medi Rec), `birthday_bonus` (5
+   on Medi Rec), `stock_boost_suggestion` (181 on Medi Rec), 0
+   actions on Medi Can Dispensary. The spec's `stock_boost` value
+   remains incorrect — actual live value is `stock_boost_suggestion`.
+
+No schema surprises beyond the S1 addendum. Proceeded directly to
+the build.
+
+### POPIA pattern — the narrow wire-level exception
+
+Sections 1-5 of Customer Intelligence maintain the strict "no PII on
+the wire" stance from S1. Section 6 is the single intentional
+exception authorised in v247:
+
+- `fetchStoreLoyalty.js` SELECTs `full_name` server-side only in the
+  `includeTopCustomers` branch
+- `deriveInitials(fullName)` helper consumes the raw string and
+  produces a two-character initials projection (edge cases: null/
+  empty → "—", "Jane" → "J", "Jane Smith" → "JS", "John van der
+  Merwe" → "JM")
+- The raw `full_name` goes out of scope at the next loop iteration
+- The returned `topCustomers` array contains only the POPIA-safe
+  7-field projection: `initials`, `maskedId`, `loyaltyTier`,
+  `loyaltyPoints`, `monthlySpendZar`, `monthlyVisitCount`,
+  `lastPurchaseAt`
+- The `maskedId` field is `…` + last 4 chars of the UUID — no raw
+  UUID in state or DOM
+
+The `TopCustomersCard` render function opens with a POPIA Compliance
+Declaration comment block (ASCII box drawing) documenting the
+projection and the wire-level exception so future maintainers cannot
+accidentally widen the SELECT list.
+
+Browser verification confirmed:
+- Section 5: AI engine empty-state honest and correct (0 actions
+  fired on Medi Can this month, matching the MTD filter)
+- Section 6: React DevTools state tree is PII-free; no `full_name`
+  field appears on any `topCustomers[i]` object in the `CustomerIntelligence`
+  component state. The Supabase network payload for the top customers
+  query briefly contains `full_name` as the documented exception.
+- POPIA DOM inspection clean — no full name text in any rendered node
+
+## NUAI-STRATEGIC-INTELLIGENCE integration (this commit)
+
+New permanent document `docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md`
+landed as the mandatory first orientation read for every agent. The
+document is owner-directed, never replaced, only appended with
+date-stamped addendums. Integrated at every agent-touch surface:
+
+1. **CLAUDE.md** — Step 0 orientation read added before the existing
+   5 actions. Note: the actual file is at repo root `/CLAUDE.md`, not
+   `docs/CLAUDE.md` as prior session docs incorrectly referenced.
+2. **docs/NUAI-AGENT-BIBLE.md** — header reference added before the
+   existing "READ THIS FIRST" block explaining that the LL rules
+   exist because of the system described in NUAI-STRAT-INTEL.
+3. **docs/PLATFORM-OVERVIEW_v1_0.md** — footer addendum added
+   referencing NUAI-STRAT-INTEL as the strategic framing layer to
+   read before PLATFORM-OVERVIEW for full context.
+4. **docs/NEXT-SESSION-PROMPT_v248.md** — new prompt template with
+   Step 0 of the mandatory reads being NUAI-STRAT-INTEL (7 actions
+   total now, step 0 + 6 steps).
+5. **This SESSION-STATE addendum** — adds the new Session Close
+   Protocol Step 3b (see below).
+6. **NUAI-STRAT-INTEL Addendum 1** — date-stamped addendum inside
+   the document itself, documenting the S2 capability update and
+   running the first instance of the Step 3b review.
+
+## NEW: Session Close Protocol Step 3b — NUAI-STRAT-INTEL review
+
+Every session close must now run this review **between** existing
+Step 3 (write next module spec) and Step 4 (SESSION-STATE addendum):
+
+**Step 3b — Review `docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md`.
+Answer these 5 questions:**
+
+1. **Did we ship a new capability?**
+   → If yes, update the Group Portal capability map section of
+     NUAI-STRAT-INTEL
+2. **Did we fix a known issue?**
+   → If yes, remove or update it in the "What's known to be wrong"
+     section of NUAI-STRAT-INTEL
+3. **Did Step 0 reveal new schema facts?**
+   → If yes and material, update relevant sections of NUAI-STRAT-INTEL
+4. **Did the live data snapshot change materially?**
+   → If yes, update the Medi Can snapshot in "The Live Data" section
+5. **Did a new LL rule emerge this session?**
+   → If yes, add it to the canonical rules table (or to the
+     NUAI-AGENT-BIBLE if that's where it belongs)
+
+**Decision rule:**
+- If any answer is yes → append a date-stamped addendum to
+  NUAI-STRATEGIC-INTELLIGENCE_v1_0.md (never replace the v1.0 body
+  or any prior addendum)
+- If all answers are no → note "NUAI-STRAT-INTEL reviewed, no
+  updates required" in the session close commit message
+
+The first instance of Step 3b was run for the WP-A5/S2 close in
+this addendum — answers: YES (Customer Intelligence S2 shipped),
+NO, CONFIRMATION-ONLY (no new facts, both Step 0 queries validated
+existing findings), NO (snapshot unchanged), NO new LL.
+NUAI-STRAT-INTEL Addendum 1 was written to reflect the S2 capability
+update.
+
+## WP-ANALYTICS SUITE PROGRESS AT ADDENDUM 3 CLOSE
+
+| Module | Name | Status |
+|---|---|---|
+| 1 | Store Comparison | ✅ COMPLETE — `8221177` |
+| 2 | Combined P&L | ✅ COMPLETE — `5ba63b5` |
+| 3 | Revenue Intelligence | ✅ COMPLETE — `6ea2493` |
+| 4 | Stock Intelligence | ✅ COMPLETE — `e55961f` |
+| 5 | **Customer & Loyalty Intelligence** | **✅ COMPLETE — S1 `a5134aa` · S2 `388520c`** |
+| 6 | **NuAi Network Intelligence** | **SPEC COMPLETE — ready for Session 1 · docs/WP-ANALYTICS-6.md** |
+
+Five of six modules complete. Module 6 spec is on disk and is the
+Priority 1 build target for the next session. When Module 6 ships
+the WP-ANALYTICS suite is DONE.
+
+## `_helpers/` DIRECTORY (unchanged occupants, S2 extended one file)
+
+| File | Purpose | Extended in this addendum? |
+|---|---|---|
+| `fetchStoreSummary.js` | MTD summary + extended top products | No |
+| `industryBadge.js` | Profile → badge data | No |
+| `fetchStoreFinancials.js` | P&L for a date range | No |
+| `fetchStoreTrend.js` | Timestamped revenue rows + bucketing | No |
+| `fetchStoreInventory.js` | Inventory snapshot + velocity | No |
+| `fetchStoreLoyalty.js` | Cohort + points + **AI logs + top customers** | **Yes — +~180 lines for S2** |
+
+Six helpers in place. Module 6 will add `fetchNetworkIntelligence.js`
+as a seventh — but it's an aggregator, not a new data fetcher.
+
+## Group Portal nav (unchanged)
+
+Seven content tabs plus Settings. Customer Intelligence S2 does not
+add a new tab; it extends the existing component inline. Module 6
+will add Network Intelligence as the 8th content tab.
+
+## KNOWN ISSUES (updated at Addendum 3)
+
+1. HQTransfer historical AVCO corruption — forward-fix at `713ef3a`, pre-fix data not remediated
+2. Per-line atomicity gap in HQTransfer + GroupTransfer ship/receive/cancel
+3. GroupSettings email-invite gap — LL-243 open
+4. Cross-tenant "View store →" navigation placeholders (NetworkDashboard, StoreComparison, StockIntelligence)
+5. Transfer pre-selection from StoreComparison / StockIntelligence
+6. Medi Recreational AVCO gap (172 of 186 items — simulator data)
+7. Sender email not on brand domain
+8. `docs/.claude/worktrees/` disk cleanup
+9. `loyalty_campaigns` table does not exist — WP-ANALYTICS-5 Section 4 permanently blocked until schema owner adds it
+10. Medi Can Dispensary has only 1 user_profiles row — cohort render is technically correct but not visually informative. Real dispensary test data would improve verification.
+11. **NEW — Medi Can cohort overlap UX (non-blocking).** When a store has overlapping cohort membership (Medi Can Dispensary has 1 member who is BOTH `isNew` AND `isDormant` — never purchased, joined in April), the Section 3 cohort bar renders segments that visually sum to > 100% because `isNew` overlaps the other cohorts at the classification level while the bar renders them as disjoint. Underlying data is honest and correct — the `isNew` flag is intentionally orthogonal to the active/dormant classification per the helper's documented semantics. Fix options: exclude `isNew` from the bar, or render it as a stacked overlay, or annotate it separately. Deferred to a small UX-fix session. Surfaced during S2 browser verification by the owner.
+12. **NEW — Documentation drift on CLAUDE.md path.** Prior session docs refer to `docs/CLAUDE.md` but the actual file is at repo root (`/CLAUDE.md`). Not a functional bug — Claude Code loads the root file automatically — but the references should be corrected in a future doc pass to avoid confusing future agents.
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `388520c`** (plus this doc commit). Confirm with `git log --oneline -1`.
+2. **Read NUAI-STRATEGIC-INTELLIGENCE Step 0** — it is now the mandatory first orientation read at every session.
+3. **WP-ANALYTICS-5 is DONE.** Both sessions shipped. Read the Step 0 addendum at the bottom of `docs/WP-ANALYTICS-5.md` if you need the schema truth.
+4. **Module 6 is next.** Spec at `docs/WP-ANALYTICS-6.md`. Step 0 schema check (4 queries in the spec) is the first action. Module 6 REUSES existing helpers — do not write new queries that duplicate fetchStoreSummary/Inventory/Loyalty.
+5. **Session Close Protocol Step 3b** is now mandatory — run the 5-question NUAI-STRAT-INTEL review at every session close.
+6. **The onNavigate prop is USED in Module 6** — Alert Centre "Go to {tab}" links and Section 3 "Go to Settings" button. Do not void it.
+7. **Seven helpers** after Module 6 ships — fetchNetworkIntelligence is an aggregator, not a new data fetcher.
+8. **POPIA stance is preserved from Module 5** — Module 6 does not add new PII surface. Health scores and alert counts are aggregates only.
+9. **POPIA narrow exception pattern** (Section 6 `deriveInitials`) is the template for any future customer-level Group Portal rendering.
+
+---
+
+*Addendum 3 of v240 written 12 April 2026 · HEAD at close: `388520c` (pre-doc-commit)*
+*Two commits in Addendum 3 · WP-ANALYTICS-5 COMPLETE · NUAI-STRAT-INTEL landed · Module 6 spec on disk*
+*Session Close Protocol Step 3b is now mandatory · First instance run in this addendum*

@@ -402,3 +402,16 @@ src/components/hq/HQOverview.js
 src/components/hq/HQProfitLoss.js
 
 *Appended: 11 April 2026 · HEAD: 46d9a20*
+
+---
+
+## ADDENDUM — Strategic Intelligence Layer (12 April 2026)
+
+Strategic intelligence layer: **docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md**
+— full capability map, design system standards, known issues, and quality
+expectations for every agent. Read this **before** PLATFORM-OVERVIEW for
+full context. PLATFORM-OVERVIEW provides the scale snapshot; NUAI-STRAT-INTEL
+provides the strategic framing and the quality standard every new commit
+is measured against. NUAI-STRAT-INTEL is never replaced — only addended.
+
+*Appended: 12 April 2026 · NUAI-STRAT-INTEL v1.0 landed in the handover loop*

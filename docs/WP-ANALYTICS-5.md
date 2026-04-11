@@ -1,9 +1,10 @@
 # WP-ANALYTICS-5 — Customer & Loyalty Intelligence
-## Status: IN PROGRESS — Session 1 HEAD `a5134aa` · Session 2 pending
+## Status: ✅ COMPLETE — S1 `a5134aa` · S2 `388520c`
 ## Produced: 12 April 2026 · Claude.ai strategic spec session
 ## Author: Claude.ai (spec) — implementation by Claude Code
 ## Companion modules: WP-ANALYTICS-3 (Revenue) · WP-ANALYTICS-4 (Stock)
 ## Session 1 shipped: 12 April 2026 · `a5134aa`
+## Session 2 shipped: 12 April 2026 · `388520c`
 ## Step 0 addendum: see bottom of file — the live schema differs materially
 ## from the pre-Step-0 body above, which is preserved as historical reference
 

@@ -1,5 +1,13 @@
 ## ⚠️ READ THIS FIRST — BEFORE ANY RULE
 
+Before reading the LL rules below, read
+**docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md**.
+The rules in this file exist because of the system described there.
+Understanding the system makes the rules make sense. Strategic
+intelligence is Step 0 of every session per docs/CLAUDE.md — read
+it in full including any date-stamped addendums appended to the v1.0
+body before acting on a single LL rule.
+
 This platform has 224,293 lines of production code across 190 files.
 It is a complete multi-tenant SaaS ERP. It is NOT a dev project building features.
 Before you form any opinion about a task, read docs/PLATFORM-OVERVIEW_v1_0.md.

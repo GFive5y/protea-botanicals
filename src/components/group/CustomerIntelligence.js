@@ -1,6 +1,6 @@
 // src/components/group/CustomerIntelligence.js
 // WP-ANALYTICS-5 — Customer & Loyalty Intelligence
-// Status: Session 1 HEAD `a5134aa` · Session 2 IN PROGRESS
+// Status: ✅ COMPLETE — S1 HEAD `a5134aa` · S2 HEAD `388520c`
 //
 // Module 5 of the NuAi franchise analytics suite. Answers the question no
 // single-store surface can answer: how is the loyalty programme performing

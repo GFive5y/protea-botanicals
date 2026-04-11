@@ -28,6 +28,12 @@ two-agent operating procedure. See docs/CLAUDE-COLLABORATION-PROTOCOL.md.
 
 ## YOUR FIRST ACTIONS — EVERY SESSION, NO EXCEPTIONS
 
+0. Read docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md (+ any date-stamped
+   addendums appended below the v1.0 body)
+   → what this system is, what it can do, the quality standard expected
+   → read before anything else; every other rule makes sense because of
+     the system described in this file
+
 1. git log --oneline -1
    → confirm HEAD before touching anything
 
