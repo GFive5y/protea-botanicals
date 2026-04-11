@@ -456,3 +456,348 @@ When Session 2 ships:
 *2-session module: S1 = health snapshot + slow movers · S2 = velocity + transfer opportunities*
 *Key efficiency: last_movement_at on inventory_items → zero stock_movements queries for S1*
 *Author: George Fivaz + Claude.ai (Sonnet 4.6)*
+
+---
+
+## SESSION 2 ADDENDUM — Gap Closure (12 April 2026)
+## Produced by Claude.ai spec review before S2 build start
+## Append this section to docs/WP-ANALYTICS-4.md before Claude Code reads the file
+
+---
+
+## S2 SPEC GAP CLOSURE — LOCKED DECISIONS
+
+Read this section AFTER the base S2 spec above. Where this addendum
+contradicts the base spec, this addendum wins. These decisions are final.
+
+---
+
+### GAP 1 — Dispensary velocity sourcing (CRITICAL — silent data corruption risk)
+
+**Problem:** Medi Can Dispensary (`cannabis_dispensary` profile) records sales
+via `dispensing_log`, not via `stock_movements`. The base S2 velocity query:
+```js
+.in("movement_type", ["sale_pos", "sale_out"])
+```
+...returns zero rows for dispensary items if dispensing events do not write a
+`stock_movements` row. Result: dispensary appears to have zero fast movers
+and all items appear idle in slow movers. Silent, no error thrown.
+
+**Step 0 check (mandatory before writing a line):**
+```sql
+-- Does Medi Can Dispensary have sale_out rows in stock_movements?
+SELECT COUNT(*), movement_type
+FROM stock_movements
+WHERE tenant_id = '2bd41eb7-1a6e-416c-905b-1358f6499d8d'
+  AND movement_type IN ('sale_pos', 'sale_out')
+GROUP BY movement_type;
+
+-- And how many dispensing_log rows exist for this tenant?
+SELECT COUNT(*), SUM(quantity_dispensed) AS total_units
+FROM dispensing_log
+WHERE tenant_id = '2bd41eb7-1a6e-416c-905b-1358f6499d8d'
+  AND is_voided != true;
+```
+
+**Decision — branch on industryProfile in fetchStoreInventory.js:**
+
+When `options.includeVelocity = true`:
+```js
+// Retail branch (cannabis_retail, food_beverage, general_retail)
+if (industryProfile !== 'cannabis_dispensary') {
+  // existing query: stock_movements WHERE movement_type IN ('sale_pos','sale_out')
+}
+
+// Dispensary branch (LL-231 pattern)
+if (industryProfile === 'cannabis_dispensary') {
+  const { data } = await supabase
+    .from('dispensing_log')
+    .select('item_id, quantity_dispensed')
+    .eq('tenant_id', tenantId)
+    .neq('is_voided', true)
+    .gte('dispensed_at', last30DaysISO);   // confirm column name in Step 0
+
+  // Aggregate: velocityMap[item_id] = Σ quantity_dispensed
+}
+```
+
+If `dispensed_at` column name differs — check in Step 0, use actual name.
+Never alias silently. Report the actual column name in Step 0 output.
+
+---
+
+### GAP 2 — Cross-store SKU join key (CRITICAL — transfer logic depends on it)
+
+**Problem:** Transfer opportunities require matching the same product across
+two stores. Medi Recreational uses `MC-*` SKU prefixes; Medi Can Dispensary
+uses `MED-*` prefixes. No shared key is confirmed.
+
+**Step 0 check (mandatory):**
+```sql
+-- What columns exist on inventory_items that could serve as a cross-tenant key?
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'inventory_items'
+  AND column_name IN (
+    'sku', 'barcode', 'product_template_id', 'supplier_sku',
+    'product_code', 'global_sku', 'parent_id'
+  );
+
+-- Sample: do any values appear in both tenants?
+SELECT sku, COUNT(DISTINCT tenant_id) AS tenant_count
+FROM inventory_items
+WHERE sku IS NOT NULL
+GROUP BY sku
+HAVING COUNT(DISTINCT tenant_id) > 1
+LIMIT 10;
+```
+
+**Decision tree based on Step 0 result:**
+
+- If a `product_template_id` or equivalent cross-tenant key exists with
+  shared values — use it as the join key. Document the column name.
+- If `barcode` has shared values across tenants — use barcode as join key.
+- If `sku` has shared values — use sku (strip tenant prefix if needed).
+- If NO shared key exists — transfer opportunity engine renders the honest
+  empty state for ALL stores: "No shared SKUs detected across network —
+  transfer opportunities require matching products in both stores."
+  Do NOT fake opportunities. Do NOT match by name (fuzzy name matching
+  is a future enhancement, not S2 scope).
+
+**Surplus and need formulas (locked):**
+```
+surplus = currentQty - reorderLevel - reorderQty
+  (if reorderQty IS NULL → use reorderLevel as the buffer → surplus = currentQty - (reorderLevel * 2))
+
+needed = reorderLevel - currentQty
+  (only computed when currentQty <= reorderLevel → i.e. store is in need)
+
+suggestedQty = FLOOR(MIN(surplus, needed))
+  (never strip sender below their own reorderLevel)
+```
+
+**Performance note:** Transfer matching runs entirely client-side from
+already-loaded inventory data — no extra Supabase query. O(n×m) where n
+and m are item counts per store. At current scale (8 × 186 = 1,488 pairs)
+this is trivial. Document the approach in a comment block at the top of
+the matching function so future agents understand why no query is needed.
+
+---
+
+### GAP 3 — Fast movers filter, cap, and edge cases (Section 4)
+
+**Qualifying criteria (items that appear in Section 4):**
+- `velocityUnits30d >= 3` (minimum threshold — 1-2 units/month is noise)
+- OR `daysOfStockLeft < 14` regardless of velocity (critical restock
+  even if historically slow)
+- Sort: `daysOfStockLeft ASC NULLS LAST` (most urgent first)
+- Cap: show top 25 items. If more qualify, add "+ N more items" link
+  that expands inline (same collapse pattern as slow movers).
+
+**Zero-velocity divide guard (mandatory):**
+```js
+const daysOfStockLeft = velocityUnits30d > 0
+  ? Math.floor(quantityOnHand / (velocityUnits30d / 30))
+  : Infinity;
+```
+Items with `Infinity` daysOfStockLeft are excluded from Section 4.
+They belong in Section 1 slow movers (already handled in S1).
+
+**"Selling with no stock" edge case — named, styled, required:**
+Items where `quantityOnHand === 0` AND `velocityUnits30d > 0`:
+- Row background: `T.dangerLight` (same as dead stock)
+- Days of stock column: renders `OUT` chip in `T.dangerText` instead of a number
+- Status chip: "Active — no stock" in danger colour
+- This is a critical operational signal: POS is selling something that
+  doesn't exist in the system. Do not suppress. Do not skip. Surface it first
+  (sort above items with stock).
+
+**Daily rate display:** render as `~{N}/mo` (monthly units, rounded to nearest
+integer). More intuitive than `0.23/day` for retail context.
+```js
+const monthlyRate = Math.round(velocityUnits30d);
+// renders: "~14/mo"
+```
+
+---
+
+### GAP 4 — Network-level velocity KPI additions (Section 1 update)
+
+The existing Section 1 has 4 KPI tiles. S2 adds 2 more tiles to make 6,
+OR adds a network insight banner between Section 1 and Section 2.
+
+**Decision: add a network insight banner** (not more tiles — 6 tiles is
+visually crowded at 280px min-width).
+
+Render between Section 1 and Section 2, styled as a horizontal bar
+with `T.surfaceAlt` background, `T.pad.md` vertical padding:
+
+```
+▸   RESTOCK ALERTS   {criticalCount} items critical (< 7 days stock) across network
+    DEAD STOCK       R{totalDeadValue} tied up in {deadCount} items · {deadPct}% of network inventory value
+```
+
+- `criticalCount` = items where `daysOfStockLeft < 7` across all stores
+- `totalDeadValue` = Σ (qty × weightedAvgCost) where `isDeadStock = true`
+  (show R0 with data-quality note if AVCO missing — same pattern as S1 tiles)
+- `deadPct` = totalDeadValue / totalNetworkInventoryValue × 100
+
+Only renders when `criticalCount > 0` OR `totalDeadValue > 0`.
+If both are zero — banner does not render (not an empty banner — absent).
+
+---
+
+### GAP 5 — Dead stock section full UI spec (Section 6)
+
+The base spec was underspecced. This is the full spec.
+
+**Structure:** One collapsible `DeadStockSection` per store — same pattern
+as `SlowMoversSection` in S1.
+
+**Collapsed header:**
+```
+▶ Medi Recreational  —  R{deadValue} in {deadCount} dead items  ({deadPct}% of store value)
+```
+If no dead stock:
+```
+✓ Medi Can Dispensary  —  No dead stock · all items moved within 60 days
+```
+(green, no chevron, not expandable)
+
+**Expanded table — 7 columns:**
+
+| Column | Value | Notes |
+|---|---|---|
+| SKU | `sku` | monospace, truncated to 12 chars |
+| Item name | `name` | truncated to 35 chars |
+| Days idle | `daysSinceMovement` | coloured by age band (see below) |
+| Qty on hand | `quantityOnHand` | plain integer |
+| Stock value | `qty × weightedAvgCost` | shows `—` with tooltip if AVCO = 0 |
+| Age band | chip | see below |
+| % of store value | `itemValue / storeTotal × 100` | fixed-1, muted colour |
+
+**Age bands (row background + chip colour):**
+- 60–90 days: `T.warningLight` background · "Dead stock" chip in `T.warningText`
+- 91–180 days: `T.dangerLight` background (light) · "Very dead" chip in `T.dangerText`
+- 181+ days: `T.dangerLight` background (same) · "Write-off risk" chip in `T.dangerText`
+  with `font-weight: T.weight.semibold`
+
+Sort: `daysSinceMovement DESC` (oldest first — worst problem at top).
+
+**Duplication resolution (dead stock appears in S1 slow movers AND S2 Section 6):**
+Decision: **keep both, add a visual note.**
+In the S1 slow movers table, items that are `isDeadStock = true` already
+render with a "Dead stock" chip. In S2 Section 6, add a footnote below the
+table header:
+```
+Items marked dead stock also appear in the Slow Movers section above.
+Section 6 groups them by age band and shows capital exposure.
+```
+Do NOT retroactively modify S1's slow movers rendering. The duplication is
+intentional — different analytical lens on the same data.
+
+**"Flag for review" — visual only in S2:**
+A toggle button per row: "🚩 Flag" → toggles to "Flagged ✓" with
+`T.warningText` colour. State lives in React `useState` (local, not
+persisted to DB). A tooltip on the flagged state reads: "Flagged for review
+— export CSV to share with your team." This is a visual workflow aid only.
+No DB write, no notification trigger in S2. A future session can wire it
+to `send-notification` EF if needed.
+
+**Capital as percentage — always shown:**
+```
+{deadCount} items · R{deadValue} · {deadPct}% of store inventory value
+```
+Rendered in the section sub-header, visible even when collapsed.
+If `totalStoreValue === 0` (all AVCO missing) — show `—%` not `NaN%`.
+
+---
+
+### GAP 6 — reorderQty null handling
+
+Throughout the velocity logic, `reorderQty` may be null (not configured).
+Anywhere `reorderQty` is used in a calculation, apply:
+```js
+const safeReorderQty = item.reorder_qty ?? item.reorder_level ?? 0;
+```
+Never let null propagate into arithmetic. NaN in the UI is a failed build.
+
+---
+
+### S2 BUILD SEQUENCE (replaces base spec build steps)
+
+```
+Step 0-A  Dispensary velocity check (2 SQL queries — Gap 1)
+Step 0-B  Cross-store join key check (2 SQL queries — Gap 2)
+Step 0-C  Report all Step 0 findings before writing any code
+
+Step 1    Extend fetchStoreInventory.js — includeVelocity opt-in
+            · retail branch: stock_movements query
+            · dispensary branch: dispensing_log query (if Step 0-A confirms needed)
+            · client-side velocity aggregation + daysOfStockLeft + daysOfStockLeft < 7 flag
+            · reorderQty null guard throughout
+
+Step 2    Update StockIntelligence.js — call fetchStoreInventory with
+            { includeVelocity: true } for all stores (replaces the S1 call)
+
+Step 3    Add network insight banner (Gap 4) between Section 1 and Section 2
+            · criticalCount + totalDeadValue + deadPct computed in useMemo
+
+Step 4    Section 4 — Fast Movers per store
+            · qualify: velocityUnits30d >= 3 OR daysOfStockLeft < 14
+            · "selling with no stock" edge case rows (sorted first)
+            · top 25 cap with expand toggle
+            · monthly rate display (~N/mo)
+
+Step 5    Section 5 — Transfer Opportunities
+            · only if Step 0-B found a cross-store join key
+            · if no join key found — render honest empty state for all stores
+            · surplus/need/suggestedQty formulas from Gap 2
+
+Step 6    Section 6 — Dead Stock Breakdown
+            · collapsible per store
+            · 7-column table, age bands, flag toggle
+            · footnote linking back to slow movers
+
+Step 7    CI=false npm run build — zero new warnings
+Step 8    Paste-bug checklist (all 5 patterns)
+Step 9    Single commit: feat(WP-A4/S2): StockIntelligence velocity,
+            transfer opportunities, dead stock breakdown
+```
+
+---
+
+### BROWSER VERIFICATION TARGETS (S2)
+
+Test at `medican@nuai.dev / MediCan2026!` → `/group-portal?tab=stock`
+
+1. **Network banner:** renders with critical restock count and dead stock
+   capital. If Medi Recreational has items with < 7 days stock, count
+   is non-zero. If all AVCO missing on dead items, shows R0 with note.
+
+2. **Section 4 — Fast Movers:** Medi Recreational (468 orders/90d) should
+   have qualifying fast movers. Verify "selling with no stock" rows appear
+   in danger tint if any item has qty = 0 with recent sales. Monthly rate
+   column shows `~N/mo` format not decimals.
+
+3. **Section 5 — Transfer Opportunities:** Expected result for current
+   Medi Can network is the honest empty state — no shared SKUs between
+   MC-* and MED-* prefixes. Confirm the empty state message renders
+   cleanly, not a blank section.
+
+4. **Section 6 — Dead Stock:** Medi Recreational has 10 slow movers from S1.
+   Subset of those (qty > 0 AND > 60 days idle) qualify as dead stock.
+   Verify age bands render correctly. Flag toggle works locally. Capital
+   percentage shown in collapsed header.
+
+5. **Dispensary S2 data quality:** Medi Can Dispensary has 8 items, all
+   with recent AVCO (S1 confirmed). Verify its fast-movers section renders
+   from dispensing_log data (if Step 0-A confirms the branch is needed)
+   rather than showing empty (which would indicate the branch is missing).
+
+---
+
+*WP-ANALYTICS-4.md S2 Addendum · 12 April 2026*
+*Produced by Claude.ai spec review — append to end of docs/WP-ANALYTICS-4.md*
+*All gaps from the pre-S2 review are closed with concrete decisions.*
+*Claude Code reads this BEFORE starting any S2 code.*
