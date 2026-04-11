@@ -18,6 +18,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useTenant } from "../../services/tenantService";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
+import NetworkDashboard from "./NetworkDashboard";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -365,9 +366,11 @@ export default function GroupPortal() {
         }}
       >
         {activeTab === "dashboard" && (
-          <PlaceholderTab
-            title="Network Dashboard"
-            description="NuAi insight bar · 4 combined KPI tiles · store comparison grid · quick actions. Coming in Phase 3."
+          <NetworkDashboard
+            groupId={groupId}
+            groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
           />
         )}
         {activeTab === "transfers" && (
