@@ -502,6 +502,33 @@ function getSuggested(role, tab, isHQ, panel) {
         "Show me all dispensing events from this month",
         "Show me voided dispensing events",
       ];
+    // CSR — Controlled Substance Register
+    if (t.includes("csr"))
+      return [
+        "Show me the current controlled substance register balance for each product",
+        "Show me all CSR entries from this month with opening and closing balances",
+        "Are there any products where the CSR balance does not match stock on hand?",
+        "Show me all dispensing events that affected the controlled substance register today",
+        "Which products have the highest controlled substance dispensing volume this month?",
+      ];
+    // Compliance
+    if (t.includes("compliance"))
+      return [
+        "Show me all S21 authorisations expiring within the next 30 days",
+        "Show me prescriptions with fewer than 2 repeats remaining",
+        "Are there any dispensing events against expired S21 authorisations?",
+        "Show me a summary of SAHPRA-reportable events for this month",
+        "Which patients have not collected a dispensing in the last 60 days?",
+      ];
+    // Forecast
+    if (t.includes("forecast"))
+      return [
+        "What is the projected dispensing revenue for next month based on current velocity?",
+        "Show me the average dispensing events per day over the last 30 days",
+        "Which products are running low based on current dispensing velocity?",
+        "How many S21 renewals are due in the next 90 days?",
+        "Show me the dispensing trend — is volume increasing or decreasing week on week?",
+      ];
     // HR
     if (t.includes("hr") || t.includes("staff") || t.includes("leave"))
       return [
@@ -629,6 +656,30 @@ function getSuggested(role, tab, isHQ, panel) {
         "What is this dispensary's revenue from dispensing events this month?",
         "Which products are being dispensed most frequently?",
         "Are there any voided dispensing events I should review?",
+      ];
+    if (t.includes("csr"))
+      return [
+        "Is the controlled substance register balanced for all products today?",
+        "Which products have the highest dispensing volume in the register this month?",
+        "Are there any variances between the CSR balance and physical stock on hand?",
+        "Walk me through this month's controlled substance movements",
+        "Are there any CSR entries that look unusual or need review?",
+      ];
+    if (t.includes("compliance"))
+      return [
+        "Which patients have S21 authorisations expiring in the next 30 days?",
+        "Are there any prescriptions at risk of running out of repeats?",
+        "Have there been any dispensing events against expired authorisations?",
+        "What does this month's SAHPRA compliance picture look like?",
+        "Are there any patients who haven't collected in over 60 days?",
+      ];
+    if (t.includes("forecast"))
+      return [
+        "What is the dispensing revenue forecast for next month?",
+        "Is dispensing volume trending up or down week on week?",
+        "Which products will need restocking first based on current dispensing rate?",
+        "How many S21 renewals should we expect in the next quarter?",
+        "What is the average revenue per dispensing event this month?",
       ];
     if (t.includes("hr") || t.includes("staff"))
       return [
