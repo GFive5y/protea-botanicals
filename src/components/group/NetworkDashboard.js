@@ -24,6 +24,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
+import { fetchStoreSummary } from "./_helpers/fetchStoreSummary";
 
 // ─── Industry profile badge map ─────────────────────────────────────────────
 // Maps industry_profile → { bg, fg, label } using WP-DS-6 tokens only.
@@ -88,114 +89,11 @@ export default function NetworkDashboard({
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   })();
 
-  // ── Per-store fetcher ────────────────────────────────────────────────────
-  // Returns { tenantId, revenue, orderCount, stockMarginPct, stockHealth, err }
-  // Never throws — wraps every Supabase call in try/catch and returns "—" shape.
-  const fetchStoreSummary = useCallback(
-    async (tenantId, industryProfile) => {
-      const result = {
-        tenantId,
-        revenue: null,
-        orderCount: null,
-        stockMarginPct: null,
-        stockHealth: { critical: 0, low: 0, total: 0 },
-        err: null,
-      };
-
-      try {
-        // ── Revenue + count (branch by industry profile per LL-231) ───────
-        if (industryProfile === "cannabis_dispensary") {
-          // Dispensary: dispensing_log × inventory_items.sell_price, exclude voided
-          const { data, error: dispErr } = await supabase
-            .from("dispensing_log")
-            .select(
-              "quantity_dispensed, is_voided, inventory_items(sell_price)",
-            )
-            .eq("tenant_id", tenantId)
-            .gte("dispensed_at", monthStartISO);
-          if (dispErr) throw dispErr;
-
-          const rows = (data || []).filter(
-            (r) => r.is_voided !== true,
-          );
-          result.revenue = rows.reduce((sum, r) => {
-            const qty = parseFloat(r.quantity_dispensed) || 0;
-            const price = parseFloat(r.inventory_items?.sell_price) || 0;
-            return sum + qty * price;
-          }, 0);
-          result.orderCount = rows.length;
-        } else {
-          // Retail / other: orders.total where status = "paid"
-          const { data, error: ordErr } = await supabase
-            .from("orders")
-            .select("total")
-            .eq("tenant_id", tenantId)
-            .eq("status", "paid")
-            .gte("created_at", monthStartISO);
-          if (ordErr) throw ordErr;
-
-          const rows = data || [];
-          result.revenue = rows.reduce(
-            (sum, r) => sum + (parseFloat(r.total) || 0),
-            0,
-          );
-          result.orderCount = rows.length;
-        }
-
-        // ── Stock margin + stock health (both from one inventory query) ───
-        const { data: items, error: invErr } = await supabase
-          .from("inventory_items")
-          .select(
-            "id, quantity_on_hand, reorder_level, sell_price, weighted_avg_cost, is_active",
-          )
-          .eq("tenant_id", tenantId)
-          .eq("is_active", true);
-        if (invErr) throw invErr;
-
-        const activeItems = items || [];
-
-        // Stock margin: avg of (sell_price - weighted_avg_cost) / sell_price * 100
-        // across items where both values > 0 (matches HQOverview convention)
-        const priced = activeItems.filter(
-          (i) =>
-            parseFloat(i.sell_price) > 0 &&
-            parseFloat(i.weighted_avg_cost) > 0,
-        );
-        if (priced.length > 0) {
-          const margins = priced.map((i) => {
-            const sp = parseFloat(i.sell_price);
-            const wac = parseFloat(i.weighted_avg_cost);
-            return ((sp - wac) / sp) * 100;
-          });
-          result.stockMarginPct =
-            margins.reduce((a, b) => a + b, 0) / margins.length;
-        }
-
-        // Stock health: count critical (qty <= 0) and low (qty <= reorder, > 0)
-        result.stockHealth.total = activeItems.length;
-        for (const i of activeItems) {
-          const qty = parseFloat(i.quantity_on_hand) || 0;
-          const reorder = parseFloat(i.reorder_level) || 0;
-          if (qty <= 0) {
-            result.stockHealth.critical++;
-          } else if (reorder > 0 && qty <= reorder) {
-            result.stockHealth.low++;
-          }
-        }
-      } catch (err) {
-        console.error(
-          `[NetworkDashboard] fetch failed for tenant ${tenantId}:`,
-          err,
-        );
-        result.err = err.message || "Fetch failed";
-      }
-
-      return result;
-    },
-    [monthStartISO],
-  );
-
   // ── Fetch everything in parallel ─────────────────────────────────────────
+  // Per-store fetcher now lives in ./_helpers/fetchStoreSummary.js — shared
+  // with StoreComparison and any future group portal analytics surface.
+  // NetworkDashboard calls it in core mode (no options) so the landing page
+  // stays fast; extended fields (revenueLastMonth, topProducts) are opt-in.
   const fetchAll = useCallback(async () => {
     if (!members || members.length === 0) {
       setStoreData([]);
@@ -210,7 +108,11 @@ export default function NetworkDashboard({
       // Parallel per-store fetches (Promise.allSettled — resilient)
       const settled = await Promise.allSettled(
         members.map((m) =>
-          fetchStoreSummary(m.tenant_id, m.tenants?.industry_profile),
+          fetchStoreSummary(
+            m.tenant_id,
+            m.tenants?.industry_profile,
+            monthStartISO,
+          ),
         ),
       );
       const data = settled.map((s, i) =>
@@ -248,7 +150,7 @@ export default function NetworkDashboard({
     } finally {
       setLoading(false);
     }
-  }, [members, fetchStoreSummary]);
+  }, [members, monthStartISO]);
 
   useEffect(() => {
     fetchAll();
