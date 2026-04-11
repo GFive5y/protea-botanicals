@@ -26,6 +26,7 @@ import CombinedPL from "./CombinedPL";
 import RevenueIntelligence from "./RevenueIntelligence";
 import StockIntelligence from "./StockIntelligence";
 import CustomerIntelligence from "./CustomerIntelligence";
+import NetworkIntelligence from "./NetworkIntelligence";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { id: "revenue",    label: "Revenue Intelligence" },
   { id: "stock",      label: "Stock Intelligence" },
   { id: "customers",  label: "Customer Intelligence" },
+  { id: "network",    label: "Network Intelligence" },
   { id: "loyalty",    label: "Shared Loyalty", disabled: true }, // Phase 2+
   { id: "settings",   label: "Group Settings" },
 ];
@@ -50,6 +52,7 @@ export default function GroupPortal() {
   const [groupId, setGroupId] = useState(null);
   const [groupName, setGroupName] = useState(null);
   const [groupType, setGroupType] = useState(null);
+  const [groupRoyaltyPct, setGroupRoyaltyPct] = useState(0);
   const [members, setMembers] = useState([]);
 
   // Active tab from ?tab= query param — default "dashboard"
@@ -62,10 +65,13 @@ export default function GroupPortal() {
     setLoading(true);
     setError(null);
     try {
-      // Step 1: find a group where this tenant is a member
+      // Step 1: find a group where this tenant is a member. royalty_percentage
+      // is included in the subselect so Module 6 NetworkIntelligence can use
+      // it via the groupMeta prop without a second round-trip (WP-A6 Step 0
+      // confirmed the column exists on tenant_groups as numeric).
       const { data: membershipData, error: membershipErr } = await supabase
         .from("tenant_group_members")
-        .select("group_id, role, tenant_groups(id, name, group_type)")
+        .select("group_id, role, tenant_groups(id, name, group_type, royalty_percentage)")
         .eq("tenant_id", tenantId)
         .limit(1);
 
@@ -76,6 +82,7 @@ export default function GroupPortal() {
         setGroupId(null);
         setGroupName(null);
         setGroupType(null);
+        setGroupRoyaltyPct(0);
         setMembers([]);
         return;
       }
@@ -85,6 +92,7 @@ export default function GroupPortal() {
       setGroupId(group.id);
       setGroupName(group.name);
       setGroupType(group.group_type);
+      setGroupRoyaltyPct(parseFloat(group.royalty_percentage) || 0);
 
       // Step 2: fetch all members of the group (joined to tenants for store names)
       const { data: memberData, error: memberErr } = await supabase
@@ -427,6 +435,15 @@ export default function GroupPortal() {
           <CustomerIntelligence
             groupId={groupId}
             groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
+          />
+        )}
+        {activeTab === "network" && (
+          <NetworkIntelligence
+            groupId={groupId}
+            groupName={groupName}
+            groupMeta={{ royaltyPct: groupRoyaltyPct, groupName }}
             members={members}
             onNavigate={handleNavClick}
           />
