@@ -96,6 +96,23 @@ const T = {
 - Button styles differ across 6 portals
 - Status pills have 5 different implementations
 
+### Tokens added during WP-DS-2 PageShell migration (`846280c`)
+Three additional tokens were added to the T object in `src/styles/tokens.js` to handle PageShell's dark footer and Protea Botanicals brand gold accent — both of which had no equivalent in the WP-DS-1 base token set:
+
+```javascript
+// ─── DARK SURFACES ───────────────────────────────────────────
+surfaceDark:    "#1a1a1a",   // dark footer / dark hero surfaces
+surfaceDarkAlt: "#060e09",   // deepest surface (Redeem.js footer)
+
+// ─── BRAND ACCENTS ───────────────────────────────────────────
+brandGold:      "#b5935a",   // Protea Botanicals brand accent (warm gold)
+```
+
+**Correction to original WP-DS-2 mapping rule:**
+The original rule table included `C.footer → T.surfaceAlt`, but this was **incorrect**: `C.footer = "#1a1a1a"` (near-black) and `T.surfaceAlt = "#f1f3f5"` (near-white) — opposite ends of the palette. Applying the rule literally would have inverted PageShell's footer and made its white text unreadable. The correct mapping is `C.footer → T.surfaceDark` (new token). Similarly, `C.gold` was NOT mapped in the original spec — it maps to the new `T.brandGold`, not to `T.warning` (which is semantic orange, wrong for a brand accent).
+
+All future PageShell-style dark-surface work should use `T.surfaceDark` and `T.brandGold`. Any reference to `T.warning` for brand gold is wrong.
+
 ---
 
 ## THE PLAN — 5 SUB-WORK-PACKAGES
@@ -407,8 +424,8 @@ Every new agent starting work on this WP must:
 
 | Sub-WP | Name | Status | Commit | Date |
 |---|---|---|---|---|
-| WP-DS-1 | Shared Token File | **COMPLETE** | *(this commit)* | 11 Apr 2026 |
-| WP-DS-2 | Component Migration | NOT STARTED | — | — |
+| WP-DS-1 | Shared Token File | **COMPLETE** | `4a6f451` | 11 Apr 2026 |
+| WP-DS-2 | Component Migration | **IN PROGRESS — Priority 1 COMPLETE (4/4 files)** | `021b5dd → 846280c` | 11 Apr 2026 |
 | WP-DS-3 | Profile-Aware Tokens | NOT STARTED | — | — |
 | WP-DS-4 | Unified Component Library | NOT STARTED | — | — |
 | WP-DS-5 | Ambient Intelligence Layer | FUTURE | — | — |
@@ -445,11 +462,15 @@ Writing the WP-DS-1 spec verbatim (which asserted "C is not exported from this f
 ### WP-DS-2 scope update — priority migration list
 WP-DS-2 ("Component Migration") is now scoped to handle the legacy consumers above as **Priority 1 migrations** ahead of the general HQ/Admin component sweep. Revised priority order:
 
-**Priority 1 — Legacy `{ C }` consumers (4 files — WP-DS-2 blocker)**
-1. `src/components/PageShell.js` — highest blast radius (shared layout wrapper, also imports `FONTS`)
-2. `src/pages/CheckoutPage.js` — critical revenue path (`/checkout`)
-3. `src/pages/WholesalePortal.js` — B2B revenue path (`/wholesale`)
-4. `src/pages/Redeem.js` — loyalty redemption (`/redeem`)
+**Priority 1 — Legacy `{ C }` consumers (4 files — WP-DS-2 blocker) — ✅ COMPLETE**
+1. ✅ `src/pages/CheckoutPage.js` — commit `021b5dd` (22 C refs + 1 import, strict mapping)
+2. ✅ `src/pages/Redeem.js` — commit `b205c33` (12 C refs, 2 hero-gradient exceptions: lines 194/227 `C.accent → T.accentLight` for contrast)
+3. ✅ `src/pages/WholesalePortal.js` — commit `3cff956` (31 C refs, 1 hero exception line 200 same pattern)
+4. ✅ `src/components/PageShell.js` — commit `846280c` (3 C refs + 3 new tokens added to tokens.js for dark surfaces / brand gold; FONTS import preserved because PageShell IS the global loader)
+
+Order changed from original doc: PageShell was moved to last (not first) because it is the highest blast radius (7 routes) and needed new tokens added to the T system before it could be migrated cleanly.
+
+**Priority 1 total: 68 C references migrated across 4 files. 3 new tokens added (`T.surfaceDark`, `T.surfaceDarkAlt`, `T.brandGold`). 1 mapping rule correction documented (`C.footer → T.surfaceDark`, not `T.surfaceAlt`). 3 hero-gradient exception lines documented (`C.accent → T.accentLight` on dark backgrounds where strict mapping produces 1.0:1 invisible contrast).**
 
 **Priority 2 — Non-C legacy consumers (`LS`, `makeBtn`, `TIER_COLORS`, etc.)**
 - `src/App.js` — `LS.ROLE` + `LS.DEV_MODE` auth persistence (keep or move to dedicated auth constants file — decide during WP-DS-2)
