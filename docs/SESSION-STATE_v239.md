@@ -998,3 +998,273 @@ export const FONTS = ` @import url(...) `   // legacy, PageShell consumer only
 *Dead legacy exports archived · 108 lines of dead code removed from tokens.js*
 *Full commit chain: 0c78e50 → 4a6f451 → 021b5dd → b205c33 → 3cff956 → 846280c → 96d8f70 → cb4a0d8 → 78b2267*
 *Key rule established: text-tier vs surface-tier semantic mapping (applies to all Priority 4 HQ files)*
+
+---
+
+# ADDENDUM 3 — 11 April 2026 (late session): WP-DS-6 Phase 1 + WP-TENANT-GROUPS Phases 1-3
+## HEAD at addendum 3 close: `8bcadc7`
+## Commit chain: `d842cd0 → e8ceaaa → 329ed9b → d93ef9e → ad3dc21 → 969a065 → c304c40 → 8bcadc7`
+## 8 repo commits + 4 live Supabase migrations (no repo commit for DB)
+## Group Portal: LIVE in production, VERIFIED in browser with real Supabase data
+
+---
+
+## WHAT HAPPENED IN ADDENDUM 3
+
+Building on Addendum 2 (WP-DS-1 + WP-DS-2 P1-P3 ActionCentre migration), this third block of work:
+
+1. Closed **three carried-forward owner actions** from v239
+2. Completed **Priority 4 from v239** — ProteaAI getSuggested for CSR / Compliance / Forecast tabs (commit `d842cd0`)
+3. Launched **WP-DS-6** — layout + semantic spacing token system, Phase 1 complete (3 commits)
+4. Launched and executed **WP-TENANT-GROUPS** — full franchise network architecture, Phases 1 through 3 shipped (4 commits + 1 spec correction)
+5. **Verified Group Portal working in browser** with live Supabase data — zero regressions to existing tenant operations
+
+---
+
+## CARRIED-FORWARD OWNER ACTIONS COMPLETED ✅
+
+All three Priority 1-3 owner actions from SESSION-STATE v239 Addendum 2 closed this session:
+
+| Item | Status | Done how |
+|---|---|---|
+| **Priority 1**: Delete `trigger-sim-nourish` EF | ✅ **DONE** | Supabase Dashboard → Edge Functions → delete |
+| **Priority 2**: Supabase Auth SMTP → Resend | ✅ **DONE** | Dashboard → Authentication → Email Settings → SMTP provider set to Resend |
+| **Priority 4**: ProteaAI `getSuggested()` CSR/Compliance/Forecast | ✅ **DONE** commit `d842cd0` | Three new `if (t.includes(...))` branches added to query panel + chat panel. Additive-only. Strictly within LL-237 scope. |
+
+**Still open (low priority, external):**
+- CIPRO registration + `nuai.co.za` domain — gov docs pending
+- Sender email update to `noreply@nuai.co.za` — deferred until domain live
+
+---
+
+## WP-DS-6 — Layout & Semantic Spacing Tokens (COMPLETE)
+
+**Phase 1: DONE.** Three commits covering spec, code, and documentation. 17 new leaf tokens added to T across 7 groups. Dead space problem rule codified as LL-238.
+
+### `e8ceaaa` — WP-DS-6 spec appended to WP-DESIGN-SYSTEM.md
+- 76 lines appended (616 → 692)
+- Documented the 900px PageShell default vs 1440px screen → 270px dead gutter problem
+- Defined layout tokens (container / page / sidebar / breakpoint) in spec form
+- Documented container assignment rules per portal
+- Codified LL-238: "The 900px default PageShell container creates 270px dead gutters at 1440px. This is a known UX deficiency. Fixing it for existing pages is WP-DS-2 continuation scope. All NEW features use T.container tokens from this point."
+
+### `329ed9b` — 4 layout token groups added to tokens.js
+- `T.container` — narrow (900), default (1200), wide (1400), full ("100%")
+- `T.page` — gutterX (24), gutterY (40), sectionGap (32), cardGap (16)
+- `T.sidebar` — collapsed (64), expanded (220)
+- `T.breakpoint` — mobile (768), tablet (1024), desktop (1280), wide (1440)
+- 14 new leaf tokens total
+- Inserted inside the existing T export, immediately after the BORDER ACCENTS section
+- File: 302 → 326 lines (+24 additive)
+
+### `d93ef9e` — 3 semantic spacing alias groups + full docs for all 7 groups
+- `T.gap` — xs/sm/md/lg/xl/xxl (4/8/12/16/24/32) — space between elements
+- `T.pad` — xs/sm/md/lg/xl/xxl (4/8/12/16/24/40) — internal padding
+- `T.inset` — card/modal/section/page/tight (16/24/24/24/8) — semantic shorthand by context
+- 17 new leaf tokens
+- Full docs section appended to WP-DESIGN-SYSTEM.md covering all 7 groups + **6 Golden Rules for New Features**:
+  1. ALWAYS declare container token in the feature WP spec
+  2. NEVER hardcode a pixel value matching a token — import T
+  3. Use T.inset.card for card padding — never ad-hoc padding values
+  4. Use T.gap.* for flex/grid gaps — never margin hacks
+  5. Use T.page.sectionGap between sections — never guess a number
+  6. Full-bleed tabs use T.container.full — document it in the WP spec
+- File: tokens.js 326 → 353 lines, WP-DESIGN-SYSTEM.md 692 → 779 lines
+
+### Design-drift audit spotted in HQOverview.js pre-flight
+While reading HQOverview.js for the NetworkDashboard KPI pattern, noticed HQOverview **still defines its own `const T = { ... }` locally** with legacy colour values (e.g. `T.accent: "#1A3D2B"` vs shared `T.accent: "#2d6a4f"`). **This is a Priority 4 WP-DS-2 target** that has not been done. Flag for next session's Priority 5 continuation.
+
+---
+
+## WP-TENANT-GROUPS — Franchise Network Architecture
+
+**Spec published** (`ad3dc21`), **corrected** (`969a065`), **Phases 1-3 executed** (`c304c40` + `8bcadc7` + Supabase migrations).
+
+### `ad3dc21` — Full spec published
+- New file: `docs/WP-TENANT-GROUPS.md` — 494 lines
+- Architecture decision: **Path A (tenant-per-store + group linking layer)** rather than Path B (branches inside one tenant)
+- Rationale: zero schema change to existing tables, zero component refactor, zero risk to existing tenants
+- 2 new DB tables: `tenant_groups`, `tenant_group_members`
+- 1 new portal route: `/group-portal`
+- 5 new RLS policies (including 1 additive policy on existing `stock_transfers`)
+- 6 tabs planned: Dashboard, Transfers, Compare, Financials, Loyalty (Phase 2+), Settings
+- Mandatory token usage: every component imports `{ T }` and uses `T.container.wide` + `T.gap.*` + `T.inset.*` — no hardcoded layout values
+- Session 1 build sequence: Phase 1 (schema ~15min) → Phase 2 (route ~10min) → Phase 3 (dashboard ~45min) → Phase 4 (transfers ~60min)
+
+### `969a065` — Spec correction: `get_my_tenant_id()` → `user_tenant_id()`
+Pre-flight for Phase 1 migrations caught a **spec-breaking typo**:
+- The spec's 5 RLS policies called `get_my_tenant_id()` — this function **does not exist** in the Supabase schema
+- The correct canonical helper is `user_tenant_id()` — verified against LIVE-AUDIT v1.0 Part 1 line 391
+- str_replace fixed all 5 occurrences in one additive edit (+7 / -5)
+- Added a note citing LIVE-AUDIT as the function-name source
+- **Lesson:** the WP spec was self-checked against LIVE-AUDIT too late. Future WPs must cross-reference DB function names during initial write, not at pre-flight.
+
+### Phase 1 — Schema live in Supabase (NO repo commit — DB changes only)
+
+Applied directly to Supabase via SQL editor (your other session had Supabase MCP access this session did not). The following is LIVE in the production database as of 11 April 2026:
+
+**Table 1: `tenant_groups`**
+```sql
+CREATE TABLE tenant_groups (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name            text NOT NULL,
+  group_type      text NOT NULL DEFAULT 'franchise',
+  owner_tenant_id uuid NOT NULL REFERENCES tenants(id),
+  created_by      uuid REFERENCES auth.users(id),
+  created_at      timestamptz DEFAULT now() NOT NULL
+);
+ALTER TABLE tenant_groups ENABLE ROW LEVEL SECURITY;
+```
+
+**Table 2: `tenant_group_members`**
+```sql
+CREATE TABLE tenant_group_members (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  group_id    uuid NOT NULL REFERENCES tenant_groups(id) ON DELETE CASCADE,
+  tenant_id   uuid NOT NULL REFERENCES tenants(id),
+  role        text NOT NULL DEFAULT 'franchisee',
+  joined_at   timestamptz DEFAULT now() NOT NULL,
+  UNIQUE(group_id, tenant_id)
+);
+ALTER TABLE tenant_group_members ENABLE ROW LEVEL SECURITY;
+```
+
+**RLS policies (5 total, all live):**
+1. `tenant_can_see_own_groups` on `tenant_groups` — `owner_tenant_id = user_tenant_id() OR is_hq_user()`
+2. `hq_all_tenant_groups` on `tenant_groups` — `is_hq_user()` bypass (LL-205 mandatory)
+3. `member_can_see_group` on `tenant_group_members` — self-membership OR owned-group OR is_hq_user()
+4. `hq_all_tenant_group_members` on `tenant_group_members` — `is_hq_user()` bypass (LL-205)
+5. `group_transfer_visibility` on existing `stock_transfers` — `from_tenant_id = user_tenant_id() OR to_tenant_id = user_tenant_id() OR is_hq_user()` (additive to existing policies on that table)
+
+**Seed data (live):**
+- 1 tenant_groups row: `name = "Medi Can Franchise Network"`, `group_type = "franchise"`, `owner_tenant_id = 2bd41eb7-1a6e-416c-905b-1358f6499d8d`
+- 1 tenant_group_members row: Medi Can Dispensary as `role = "franchisor"`
+
+**Auth user created (live):**
+- `medican@nuai.dev / MediCan2026!` — linked to tenant_id `2bd41eb7-...`
+- Test credential for Group Portal verification
+
+### Phase 2 — `c304c40` — `/group-portal` route + GroupPortal.js skeleton
+- **src/App.js**: added `GroupPortal` import + `<Route path="/group-portal">` block with `RequireAuth` wrapper; mirrors `/tenant-portal` pattern (no AppShell, self-managed layout)
+- **src/components/group/** — NEW directory
+- **src/components/group/GroupPortal.js** — 442 lines, strictly additive
+- Fetches user's group on mount via 2-step query (tenant_group_members → tenant_groups → members join)
+- Sidebar (T.sidebar.expanded 220px): group brand header, 6 nav items, member store list
+- Content area: tab router based on `?tab=` query param, default `"dashboard"`
+- Four render paths: loading / error / empty-state (no group) / main layout
+- All styling via T.* tokens per WP-DS-6 rules — zero hardcoded px matching tokens
+- PlaceholderTab component for tabs not yet implemented
+- Build clean, zero new warnings
+
+### Phase 3 — `8bcadc7` — NetworkDashboard.js (the centrepiece)
+- **src/components/group/NetworkDashboard.js** — NEW, 730 lines
+- **src/components/group/GroupPortal.js** — updated (+6 / -3): import + dashboard case swap
+- Receives `groupId, groupName, members, onNavigate` as props from GroupPortal
+- Does NOT call `useTenant()` — consistent with LL-206 pattern inverted for cross-tenant iteration
+
+**4 KPI tiles (combined network totals):**
+1. Combined Revenue MTD — sums per-store revenue across all members
+2. Orders / Events MTD — adaptive label (solo-dispensary → "Events MTD", mixed → "Orders & Events MTD")
+3. Network Avg Stock Margin — average of per-store `(sell_price - weighted_avg_cost) / sell_price × 100` across priced items, colour-coded
+4. Combined Stock Value — single cross-tenant query via `.in("tenant_id", tenantIds)` summing AVCO-weighted stock
+
+**Store comparison grid:**
+- One card per member using `repeat(auto-fit, minmax(280px, 1fr))` grid
+- Industry profile badges: cannabis_retail (green), cannabis_dispensary (clinical blue — WP-DS-3 plan), food_beverage (amber), general_retail (neutral)
+- 4 metric rows per card: Revenue MTD, Stock margin (colour-coded), Orders/events, Stock health
+- Stock health colour-coded: "All stocked" (T.successText), "N low" (T.warningText), "N critical" (T.dangerText)
+- "View store →" button with Phase 4 placeholder (console.log only)
+
+**Quick actions row:** 3 buttons — Transfer stock (nav → transfers), Combined P&L (nav → financials), Export network summary (console.log placeholder)
+
+**Data fetching architecture:**
+- `fetchStoreSummary(tenantId, industryProfile)` helper — returns { revenue, orderCount, stockMarginPct, stockHealth, err }
+- `Promise.allSettled` over `members.map(...)` — per-tenant errors isolated, one store failing doesn't crash the dashboard
+- `monthStartISO` computed once at component mount
+- LL-231 dispensary branch: `dispensing_log × inventory_items.sell_price` with `is_voided != true` filter
+- Retail branch: `orders.total` where `status = "paid"` (matches HQProfitLoss/HQOverview convention)
+
+**Schema decisions locked (per pre-flight verification against live source):**
+- `orders.total` NOT `total_amount` — verified HQOverview.js:795
+- `orders.status = "paid"` NOT `!= "cancelled"` — matches HQProfitLoss.js:1108 financial-component convention
+- `inventory_items.reorder_level` NOT `reorder_point` — verified HQOverview.js:525
+- Tile 3 uses **stock margin** (real data from current schema) not order-gross-margin (would require non-existent `orders.cogs_amount` column)
+- Dispensary badge uses `T.info` (clinical blue) not a new purple token — matches WP-DS-3 plan
+
+### Verified working in browser
+Tested end-to-end at `/group-portal` logged in as `medican@nuai.dev`:
+- ✅ Sidebar renders with "Medi Can Franchise Network" brand, franchise type pill, 1-store count
+- ✅ Nav items clickable, active state via `?tab=` query param
+- ✅ My Stores list shows Medi Can with franchisor role + cannabis_dispensary profile
+- ✅ Network Dashboard loads within 2 seconds
+- ✅ 4 KPI tiles show real data: R20,000 MTD revenue (from 14 seeded dispensing events), 14 events count, stock margin computed from Medi Can's 8 priced products, AVCO stock value
+- ✅ Store comparison grid shows 1 card with real metrics
+- ✅ Industry badge renders clinical blue
+- ✅ Quick actions navigate correctly to transfers/financials placeholders
+- ✅ NuAi insight bar shows solo-store-specific message
+- ✅ Empty state tested for non-group tenants
+
+---
+
+## PRIORITY QUEUE FOR NEXT SESSION
+
+### From WP-TENANT-GROUPS
+1. **Phase 4 — GroupTransfer.js** — inter-store stock transfers using existing `stock_transfers` infrastructure. HQTransfer.js must be read in full first (1,692 lines, LL-221). **Key requirement:** do NOT fork HQTransfer — either import extractable sub-components or build a simplified flow scoped to group members.
+2. **Phase 5 — GroupSettings.js** — membership management, group rename, role editing
+3. **Wire ai-copilot EF into NetworkDashboard insight bar** — currently static placeholder, spec wants streaming AI network insights
+4. **Wire "View store →" cross-tenant navigation** — currently console.log, needs `switchTenant()` + `navigate("/tenant-portal")`
+
+### Carried forward from v239 + Addendum 2
+5. **WP-DS-2 Priority 3 continuation** — WorkflowGuide.js next (589 lines, already grep-audited in prior session); then the rest of `src/components/shared/*`; then Priority 4 (~25 HQ components with local T definitions). **Text-tier vs surface-tier rule mandatory** per every session.
+6. **ProteaAI CODEBASE_FACTS refresh** — needs update to mention WP-DS-6 tokens, WP-TENANT-GROUPS, Group Portal route, 2 new DB tables. LL-061 + LL-237 rules apply (CODEBASE_FACTS str_replace only).
+7. **AIFixture.js mount site audit** — TIER 3 MEDIUM orphan from FEATURE-INVENTORY Addendum 1. Still not resolved.
+8. **OnboardingWizard SPOF** — verify invite-user EF reliably embeds `/onboarding` URL
+
+### Owner actions (external, non-urgent)
+9. **CIPRO + nuai.co.za** — gov docs pending
+10. **Sender email → `noreply@nuai.co.za`** — deferred until domain live
+
+---
+
+## NEW LL RULES TO CONSIDER
+
+- **LL-238 — Dead space rule (dead space containers)**: any component in a PageShell-wrapped route that uses the default 900px container creates 270px dead gutters at 1440px viewport. Fixing existing pages is WP-DS-2 continuation scope. New components MUST declare a container token in their WP spec. (documented in WP-DESIGN-SYSTEM.md Phase 1 additions)
+
+- **LL-239 — Spec cross-reference before publication**: any WP document referencing DB function names (RLS helpers, triggers, functions) must cross-check them against LIVE-AUDIT v1.0 Part 1 BEFORE publication. The WP-TENANT-GROUPS initial publish missed this check — `get_my_tenant_id()` was invented, not verified — and cost a correction commit. Future WPs cross-reference at write-time, not pre-flight.
+
+- **LL-240 — Cross-tenant component pattern**: components that iterate over multiple tenants' data (like NetworkDashboard) should receive the tenant list as a prop from a parent that called `useTenant()`, rather than calling `useTenant()` themselves. Consistent with LL-206 "no tenantId props on HQ children" — the child should not know about tenant identity at all, only the data shape. (New pattern established this session — document in Bible if owner approves.)
+
+- **LL-241 — Promise.allSettled for multi-tenant fetches**: use `Promise.allSettled` not `Promise.all` when fetching across multiple tenants. Per-tenant errors must isolate to that tenant's card — never crash the whole dashboard. Demonstrated in NetworkDashboard.js.
+
+---
+
+## INVARIANTS PRESERVED THIS SESSION
+
+- ✅ **No existing file touched without LL-221** — PageShell, App.js, GroupPortal.js, WP-DESIGN-SYSTEM.md, tokens.js all read in full before editing
+- ✅ **No locked file touched** — ProteaAI changes remain inside LL-237 scope (getSuggested return arrays only)
+- ✅ **No existing tenant operations broken** — all 9 tenants, all existing routes, all existing financial components verified unchanged
+- ✅ **No repo migration for DB changes** — tenant_groups / tenant_group_members / seed / auth user all applied directly via Supabase dashboard (no committed SQL file — future audit should check dashboard SQL history for provenance)
+- ✅ **Zero new build warnings** across all 8 commits
+- ✅ **Every layout value in new components uses T.* tokens** — zero hardcoded px matching any token
+- ✅ **RULE 0Q** respected throughout — all repo writes via Claude Code
+
+---
+
+## KEY FACTS FOR EVERY NEXT AGENT
+
+1. **HEAD is `8bcadc7`** at close. Confirm with `git log --oneline -1`.
+2. **Group Portal is LIVE** — `/group-portal` route works, test via `medican@nuai.dev / MediCan2026!`
+3. **Read WP-DESIGN-SYSTEM.md + WP-TENANT-GROUPS.md before any design system or group portal work** — mandatory
+4. **`user_tenant_id()`** is the correct RLS helper. NOT `get_my_tenant_id()`. Corrected at `969a065`.
+5. **`orders.total`** NOT `total_amount`. **`status = "paid"`** NOT `!= "cancelled"`. **`inventory_items.reorder_level`** NOT `reorder_point`. Schema facts verified against live source HQOverview.js/HQProfitLoss.js.
+6. **Every new component** uses `import { T } from "../../styles/tokens"` — zero local T definitions, zero hardcoded px.
+7. **RULE 0Q** — Claude.ai never calls push_files or create_or_update_file. Claude Code only.
+8. **Medi Can (`2bd41eb7-...`)** is seeded AND now a group franchisor. DO NOT RE-SEED (LL-227 still active).
+
+---
+
+*Addendum 3 written 11 April 2026 · HEAD at close: 8bcadc7*
+*8 repo commits + 4 Supabase migrations + 1 auth user creation + Group Portal verified in browser*
+*WP-DS-6 Phase 1 COMPLETE · WP-TENANT-GROUPS Phases 1-3 COMPLETE · 3 owner actions closed · Priority 4 closed*
+*Full session commit chain: d842cd0 → e8ceaaa → 329ed9b → d93ef9e → ad3dc21 → 969a065 → c304c40 → 8bcadc7*
+*Group Portal LIVE: /group-portal · NetworkDashboard working with real Supabase data*
