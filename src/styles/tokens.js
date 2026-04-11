@@ -198,6 +198,33 @@ export const T = {
     desktop: 1280,
     wide:    1440,
   },
+
+  // WP-DS-6 — Semantic Spacing Aliases (11 Apr 2026)
+  // Maps purpose-named tokens onto the existing space scale.
+  // Use these in new features — never raw space[n] for layout.
+  gap: {
+    xs:   4,   // space[1] — icon-to-label, tight inline
+    sm:   8,   // space[2] — between related items (badge + text)
+    md:  12,   // space[3] — between form fields, list items
+    lg:  16,   // space[4] — between cards, between sections within a card
+    xl:  24,   // space[6] — between major UI blocks
+    xxl: 32,   // space[7] — between page sections
+  },
+  pad: {
+    xs:   4,   // space[1] — chip/tag internal padding
+    sm:   8,   // space[2] — compact button, tight badge
+    md:  12,   // space[3] — default button, small card
+    lg:  16,   // space[4] — standard card internal padding
+    xl:  24,   // space[6] — generous card, modal body
+    xxl: 40,   // space[8] — page-level section padding
+  },
+  inset: {
+    card:    16,  // T.pad.lg  — standard card padding (all sides)
+    modal:   24,  // T.pad.xl  — modal/drawer body padding
+    section: 24,  // T.pad.xl  — section header padding
+    page:    24,  // T.page.gutterX — page edge padding
+    tight:    8,  // T.pad.sm  — compact contexts (table cells, pills)
+  },
 };
 
 // ─── PROFILE-AWARE TOKEN OVERRIDES ────────────────────────────

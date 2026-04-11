@@ -690,3 +690,90 @@ at 1440px. This is a known UX deficiency. Fixing it for existing pages
 is WP-DS-2 continuation scope. All NEW features use T.container tokens  
 from this point. A full container-width audit of existing pages is  
 scheduled as WP-DS-6 Phase 2 (future session).
+
+---
+
+### WP-DS-6 Phase 1 — Semantic Spacing Aliases
+**Added to tokens.js:** 11 April 2026
+**Status:** COMPLETE — import T and use directly in all new features
+
+#### The Problem with Raw Space Scale
+`T.space[4]` means nothing to a reader.
+`T.pad.lg` means "standard card internal padding" — self-documenting.
+The space scale (space[0]–space[12]) remains in tokens.js as the
+source of truth. Semantic aliases map purpose to value.
+Never remove the space scale — legacy code references it.
+New code uses aliases only.
+
+#### T.gap — Space Between Elements
+| Token | Value | Use for |
+|---|---|---|
+| T.gap.xs | 4px | Icon-to-label, tight inline spacing |
+| T.gap.sm | 8px | Between related items (badge + text) |
+| T.gap.md | 12px | Between form fields, list items |
+| T.gap.lg | 16px | Between cards, between sections within a card |
+| T.gap.xl | 24px | Between major UI blocks |
+| T.gap.xxl | 32px | Between page sections |
+
+#### T.pad — Internal Element Padding
+| Token | Value | Use for |
+|---|---|---|
+| T.pad.xs | 4px | Chip/tag internal padding |
+| T.pad.sm | 8px | Compact button, tight badge |
+| T.pad.md | 12px | Default button, small card |
+| T.pad.lg | 16px | Standard card internal padding |
+| T.pad.xl | 24px | Generous card, modal body |
+| T.pad.xxl | 40px | Page-level section padding |
+
+#### T.inset — Semantic Shorthand by Context
+| Token | Value | Use for |
+|---|---|---|
+| T.inset.card | 16px | Any card — all four sides |
+| T.inset.modal | 24px | Modal/drawer body padding |
+| T.inset.section | 24px | Section header padding |
+| T.inset.page | 24px | Page edge padding (= T.page.gutterX) |
+| T.inset.tight | 8px | Table cells, pills, compact rows |
+
+#### T.container — Page Container Widths
+| Token | Value | Portal |
+|---|---|---|
+| T.container.narrow | 900px | Consumer: shop, checkout, account |
+| T.container.default | 1200px | Admin, Tenant Portal |
+| T.container.wide | 1400px | HQ, HR, Group Portal |
+| T.container.full | 100% | Full-bleed data tables, stock grids |
+
+#### T.page — Page Rhythm
+| Token | Value | Use for |
+|---|---|---|
+| T.page.gutterX | 24px | Horizontal padding inside any container |
+| T.page.gutterY | 40px | Vertical section padding (top of content) |
+| T.page.sectionGap | 32px | Gap between major page sections |
+| T.page.cardGap | 16px | Gap between cards in a grid |
+
+#### T.sidebar — Navigation Widths
+| Token | Value | State |
+|---|---|---|
+| T.sidebar.collapsed | 64px | Icon-only mode |
+| T.sidebar.expanded | 220px | Full navigation labels |
+
+#### T.breakpoint — Responsive Thresholds
+| Token | Value | Context |
+|---|---|---|
+| T.breakpoint.mobile | 768px | Single column layouts |
+| T.breakpoint.tablet | 1024px | Two column transition |
+| T.breakpoint.desktop | 1280px | Full layout |
+| T.breakpoint.wide | 1440px | Where dead space begins on narrow containers |
+
+#### Golden Rules for New Features
+1. ALWAYS declare container token in the feature WP spec
+2. NEVER hardcode a pixel value matching a token — import T
+3. Use T.inset.card for card padding — never ad-hoc padding values
+4. Use T.gap.* for flex/grid gaps — never margin hacks
+5. Use T.page.sectionGap between sections — never guess a number
+6. Full-bleed tabs use T.container.full — document it in the WP spec
+
+#### What These Tokens Do NOT Cover (yet)
+- Component-level variant sizing (WP-DS-4 scope)
+- Responsive layout switching (WP-DS-6 Phase 2)
+- Animation/transition timing (WP-DS-5 / WP-PULSE scope)
+- Print/PDF layout (separate concern)
