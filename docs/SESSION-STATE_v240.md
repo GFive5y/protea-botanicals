@@ -574,3 +574,216 @@ Module 5 will add `fetchStoreLoyalty.js` as the sixth sibling.
 *Addendum 1 of v240 written 12 April 2026 · HEAD at close: `e55961f` (pre-doc-commit)*
 *Five commits in Addendum 1 · WP-ANALYTICS-4 COMPLETE · Module 5 spec locked and ready*
 *Dispensary velocity branch confirmed live · Transfer opportunities empty state confirmed · Six gaps closed*
+
+---
+
+# ADDENDUM 2 — 12 April 2026 · WP-ANALYTICS-5 Session 1 + Pre-flight bug fix
+
+## HEAD chain this addendum
+
+`c2fed3b → 7c8e8e4 → a5134aa → [this doc commit]`
+
+Three commits covering two distinct pieces of work:
+
+1. **`7c8e8e4`** — Pre-flight bug fix identified by a Group Portal audit
+   before WP-A5 work began. Two bugs in one commit per the single-commit
+   rule: NetworkDashboard was missing a Top Products block entirely, and
+   a `<span>Phase 4</span>` placeholder was leaking into the production
+   View Store button row. Plus UX-1 — StoreComparison chart title now
+   reflects the active sort instead of the hardcoded "Revenue comparison
+   — MTD". 98 insertions / 20 deletions across two files. Browser-
+   verified against the Medi Can Franchise Network.
+
+2. **`a5134aa`** — `feat(WP-A5/S1): CustomerIntelligence — cohort
+   health, tier distribution, points economy`. Module 5 Session 1 of
+   the NuAi franchise analytics suite. 1,507 insertions across three
+   files (two new, one surgical edit). Addresses the question no
+   single-store surface can answer: how is the loyalty programme
+   performing across the franchise network, and where are the churn
+   signals?
+
+3. **This doc commit** — WP-ANALYTICS-5 S1 complete + SESSION-STATE
+   v240 Addendum 2 + NEXT-SESSION-PROMPT v247.
+
+## Bug fix detail (commit `7c8e8e4`)
+
+Pre-flight audit flagged two bugs plus one UX improvement:
+
+- **Bug 1 (mis-diagnosed by the spec):** The spec assumed Top Products
+  was rendering "—" on both NetworkDashboard and Compare Stores. Step 0
+  reads revealed the real root cause: NetworkDashboard had **no top
+  products UI element at all**. StoreComparison was already passing
+  `includeExtended: true`. The fix was a feature-add, not a bug fix
+  — top products block was added to NetworkDashboard's StoreCard with
+  a new `TopProductsBlock` helper component rendering top 3 by
+  revenue MTD, with "No orders this period" empty state (never "—").
+
+- **Bug 2:** A `<span>Phase 4</span>` placeholder at
+  [NetworkDashboard.js:562-570](src/components/group/NetworkDashboard.js#L562-L570)
+  was visible to production users. Removed in the same commit.
+
+- **UX-1:** StoreComparison chart title was hardcoded
+  "Revenue comparison — MTD" regardless of the active sort pill.
+  Now reads `Revenue MTD — sorted by {label}` where label is the
+  current `SORT_OPTIONS` entry.
+
+Browser-verified all four checks pass on the Medi Can Franchise Network.
+
+## WP-ANALYTICS-5 Session 1 detail (commit `a5134aa`)
+
+### Step 0 schema check — material divergence
+
+The spec's pre-Step-0 body assumed a schema that does not exist. Claude
+Code ran all 8 Step 0 queries via Supabase MCP before writing code and
+reported every divergence:
+
+| Spec name | Actual | Impact |
+|---|---|---|
+| `customers` | `user_profiles` | Helper rewritten to query correct table |
+| `loyalty_tiers` | **does not exist** | `TIER_PALETTE` hardcoded in component with rationale comment |
+| `loyalty_campaigns` | **does not exist** | **Section 4 permanently deferred** — no table to build against |
+| `ai_action_logs` | `loyalty_ai_log` | S2 Section 5 must use actual name |
+| `stock_boost` (action_type) | `stock_boost_suggestion` | S2 Section 5 must use actual value |
+
+Full divergence report appended to
+[docs/WP-ANALYTICS-5.md](docs/WP-ANALYTICS-5.md) as "Step 0 Addendum"
+at the bottom of the file. Session 2 must build from that addendum,
+not the pre-Step-0 body above it.
+
+### Files shipped
+
+1. **`src/components/group/_helpers/fetchStoreLoyalty.js`** (new, 265
+   lines) — sixth sibling in the `_helpers/` directory. Two queries
+   per store via `Promise.allSettled` (independent error isolation),
+   client-side cohort derivation from `last_purchase_at`, POPIA-safe
+   8-column projection from `user_profiles`. Sign-of-points authoritative
+   classification for the mixed-case (`BONUS`/`EARNED`/`PURCHASE`/
+   `REDEEMED`/`earn_purchase`) `transaction_type` column. `includeAiLogs`
+   and `includeCampaigns` options voided on the signature for S2
+   stability.
+
+2. **`src/components/group/CustomerIntelligence.js`** (new, ~880 lines)
+   — three sections plus CSV export and data-quality footnote:
+   - Section 1: 4 KPI tiles (Total, Active, At-Risk, Points Economy)
+     with per-store breakdown sub-labels on Tile 1 and adaptive
+     colouring (redemption rate < 10% = danger, active rate bands
+     at 30% and 60%)
+   - Section 2: Loyalty Tier Distribution — per-store cards with
+     proportional horizontal tier bars, legend rows, 5-tier palette
+     (bronze/silver/gold/platinum/harvest_club) hardcoded with Step 0
+     rationale comment
+   - Section 3: Cohort Health by Store — collapsible per-store cards
+     (auto-expand when at-risk or lapsed > 0), cohort table with row
+     colouring, proportional cohort bar with 2% minimum segment width,
+     static churn insight line, high-risk annotation on the At-risk
+     row (`churn_risk_score >= 0.5` from the nightly AI engine)
+   - 8-column CSV export with UTF-8 BOM for Excel compatibility
+   - Data quality footnote documenting POPIA stance, deferred Section
+     4 (no campaigns table), and the loyalty_ai_log action-type naming
+     for Session 2
+
+3. **`src/components/group/GroupPortal.js`** (3 surgical edits):
+   import, NAV_ITEMS entry (position 7, after `stock`), tab router
+   block before the `loyalty` placeholder.
+
+### POPIA compliance verified
+
+The `fetchStoreLoyalty` SELECT lists are both PII-free:
+- `user_profiles`: `id, tenant_id, loyalty_points, loyalty_tier, created_at, last_purchase_at, is_suspended, churn_risk_score` (8 columns, zero PII)
+- `loyalty_transactions`: `transaction_type, points` (2 columns, zero PII)
+
+Browser devtools network-tab inspection confirmed at verification
+time: no email, phone, or full_name appears in any response payload
+from the Customer Intelligence tab.
+
+### Live render values at verification
+
+Matched the Step 0 snapshot exactly:
+- Network totals: 51 members (50 Medi Rec + 1 Medi Can Dispensary),
+  45 active (88.2%), 4 at-risk, 0 lapsed, 2 dormant
+- Medi Rec tier distribution: Bronze 21, Silver 14, Gold 7, Platinum 8,
+  Harvest Club 1
+- Section 3 Medi Rec auto-expanded; churn insight: "8% of members show
+  churn signals · below rescue threshold" (4/50 below the 30% rescue
+  threshold)
+
+## WP-ANALYTICS SUITE PROGRESS AT ADDENDUM 2 CLOSE
+
+| Module | Name | Status |
+|---|---|---|
+| 1 | Store Comparison | ✅ COMPLETE — `8221177` |
+| 2 | Combined P&L | ✅ COMPLETE — `5ba63b5` |
+| 3 | Revenue Intelligence | ✅ COMPLETE — `6ea2493` |
+| 4 | Stock Intelligence | ✅ COMPLETE — `e55961f` |
+| 5 | **Customer & Loyalty Intelligence** | **IN PROGRESS — Session 1 `a5134aa` · Session 2 pending** |
+| 6 | NuAi Network Intelligence | Pending — no detailed spec yet |
+
+Five of six modules have at least one session shipped. Module 5 S2
+remains (Section 5 AI Engine Activity + Section 6 Top Customers;
+Section 4 Campaign ROI permanently deferred). Module 6 still needs
+a detailed spec from the owner via the Claude.ai strategic spec
+pattern before any code.
+
+## `_helpers/` DIRECTORY (Addendum 2 adds one file)
+
+| File | Purpose | Changed in this addendum? |
+|---|---|---|
+| `fetchStoreSummary.js` | MTD summary + extended top products | No |
+| `industryBadge.js` | Profile → badge data | No |
+| `fetchStoreFinancials.js` | P&L for a date range | No |
+| `fetchStoreTrend.js` | Timestamped revenue rows + bucketing | No |
+| `fetchStoreInventory.js` | Inventory snapshot + velocity | No |
+| **`fetchStoreLoyalty.js`** | **Cohort snapshot + points economy** | **NEW this addendum** |
+
+Six helpers in place. Pattern is well-established — each new
+analytics module adds a sibling.
+
+## Group Portal nav (Addendum 2 adds one tab)
+
+| Position | Tab | Component | Status |
+|---|---|---|---|
+| 1 | Network Dashboard | NetworkDashboard.js | ✅ Live (top products added in `7c8e8e4`) |
+| 2 | Stock Transfers | GroupTransfer.js | ✅ Live |
+| 3 | Compare Stores | StoreComparison.js | ✅ Live (chart title UX-1 `7c8e8e4`) |
+| 4 | Combined P&L | CombinedPL.js | ✅ Live |
+| 5 | Revenue Intelligence | RevenueIntelligence.js | ✅ Live |
+| 6 | Stock Intelligence | StockIntelligence.js | ✅ Live |
+| 7 | **Customer Intelligence** | **CustomerIntelligence.js** | **✅ Live — Session 1 `a5134aa`** |
+| — | Shared Loyalty | disabled nav | Phase 2+ deferred |
+| 8 | Group Settings | GroupSettings.js | ✅ Live |
+
+Seven content tabs plus Settings. Module 5 Session 2 does not add a
+new tab; it extends the existing Customer Intelligence component with
+Sections 5 and 6.
+
+## KNOWN ISSUES (updated at Addendum 2)
+
+1. HQTransfer historical AVCO corruption — forward-fix at `713ef3a`, pre-fix data not remediated
+2. Per-line atomicity gap in HQTransfer + GroupTransfer ship/receive/cancel
+3. GroupSettings email-invite gap — LL-243 open
+4. Cross-tenant "View store →" navigation placeholders (NetworkDashboard, StoreComparison, StockIntelligence)
+5. Transfer pre-selection from StoreComparison / StockIntelligence
+6. Medi Recreational AVCO gap (172 of 186 items — simulator data)
+7. Sender email not on brand domain
+8. `docs/.claude/worktrees/` disk cleanup
+9. **NEW:** `loyalty_campaigns` table does not exist — WP-ANALYTICS-5 Section 4 permanently blocked until schema owner adds it
+10. **NEW:** Medi Can Dispensary has only 1 user_profiles row — cohort render is technically correct but not visually informative. Real dispensary test data would improve S2 verification.
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `a5134aa`** (plus this doc commit). Confirm with `git log --oneline -1`.
+2. **WP-ANALYTICS-5 S1 is DONE.** Don't rebuild. Read the file if you need the pattern.
+3. **WP-ANALYTICS-5 Step 0 addendum** is at the bottom of `docs/WP-ANALYTICS-5.md`. Session 2 builds from that addendum, not the pre-Step-0 body above it. Section 4 Campaign ROI is permanently deferred (no `loyalty_campaigns` table).
+4. **POPIA is non-negotiable** — `fetchStoreLoyalty.js` enforces the 8-column non-PII projection. Any Session 2 query additions must preserve this.
+5. **Tier palette is hardcoded** in `CustomerIntelligence.js` with Step 0 rationale — `loyalty_tiers` table does not exist, 5-tier enum is fixed in schema (`bronze`/`silver`/`gold`/`platinum`/`harvest_club`).
+6. **loyalty_ai_log (not ai_action_logs)** and **stock_boost_suggestion (not stock_boost)** — Session 2 Section 5 must use the actual names. Documented in the WP-ANALYTICS-5 Step 0 addendum.
+7. **Six helpers in `_helpers/`** — `fetchStoreLoyalty.js` is the newest sibling.
+8. **Paste-bug checklist + POPIA check** is the canonical pre-commit discipline. Five paste-bug checks plus the POPIA network-tab inspection.
+9. **Module 6 still has no detailed spec.** Do NOT start Module 6 until the owner produces `docs/WP-ANALYTICS-6.md` via the Claude.ai strategic spec pattern.
+10. **Analytics Suite Session Close Protocol** — every session must update the master doc, the module doc, SESSION-STATE, and write the next NEXT-SESSION-PROMPT.
+
+---
+
+*Addendum 2 of v240 written 12 April 2026 · HEAD at close: `a5134aa` (pre-doc-commit)*
+*Three commits in Addendum 2 · WP-ANALYTICS-5 Session 1 shipped · Module 5 S2 remains*
+*Section 4 Campaign ROI permanently deferred · Step 0 divergence locked in WP-ANALYTICS-5 addendum*

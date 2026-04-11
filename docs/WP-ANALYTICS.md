@@ -204,7 +204,12 @@ Data sources: inventory_items, stock_movements, orders
 ### Module 5 — Customer & Loyalty Intelligence (WP-ANALYTICS-5)
 File: docs/WP-ANALYTICS-5.md (full spec — read this)
 Tab: /group-portal?tab=customers
-Status: SPEC COMPLETE — docs/WP-ANALYTICS-5.md committed at e237fdd. Ready for Session 1 after WP-A4/S2.
+Status: IN PROGRESS — Session 1 HEAD a5134aa · Session 2 pending
+        Step 0 addendum appended to docs/WP-ANALYTICS-5.md documenting
+        material schema divergence (customers → user_profiles, no
+        loyalty_tiers, no loyalty_campaigns, loyalty_ai_log not
+        ai_action_logs, stock_boost_suggestion not stock_boost).
+        Section 4 Campaign ROI permanently deferred — no table exists.
 Primary question: "Are my customers loyal and growing?"
 Key features:
   - Network loyalty members: total, active (30d), at-risk
@@ -248,7 +253,7 @@ EF: ai-copilot v70 (already deployed, already tested in tenant portals)
 | WP-ANALYTICS-2 | Combined P&L | 1 | ✅ COMPLETE — HEAD 5ba63b5 |
 | WP-ANALYTICS-3 | Revenue Intelligence | 2 | ✅ COMPLETE — HEAD 6ea2493 |
 | WP-ANALYTICS-4 | Stock Intelligence | 2 | ✅ COMPLETE — HEAD e55961f |
-| WP-ANALYTICS-5 | Customer & Loyalty | 1 | SPEC COMPLETE — ready for Session 1 · e237fdd |
+| WP-ANALYTICS-5 | Customer & Loyalty | 2 | IN PROGRESS — Session 1 HEAD `a5134aa` · Session 2 pending |
 | WP-ANALYTICS-6 | NuAi Network Intelligence | 2 | Pending |
 
 Total: ~9 sessions for the complete suite.

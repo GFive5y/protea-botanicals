@@ -1,8 +1,11 @@
 # WP-ANALYTICS-5 — Customer & Loyalty Intelligence
-## Status: SPEC COMPLETE — ready for Session 1
+## Status: IN PROGRESS — Session 1 HEAD `a5134aa` · Session 2 pending
 ## Produced: 12 April 2026 · Claude.ai strategic spec session
 ## Author: Claude.ai (spec) — implementation by Claude Code
 ## Companion modules: WP-ANALYTICS-3 (Revenue) · WP-ANALYTICS-4 (Stock)
+## Session 1 shipped: 12 April 2026 · `a5134aa`
+## Step 0 addendum: see bottom of file — the live schema differs materially
+## from the pre-Step-0 body above, which is preserved as historical reference
 
 ---
 
@@ -567,4 +570,175 @@ When `CI=false npm run build` is clean and browser verification passes:
 
 *WP-ANALYTICS-5.md · NuAi Group Portal · Customer & Loyalty Intelligence*
 *Spec produced: 12 April 2026 · Claude.ai strategic session*
-*Implementation: Claude Code — S1 target this session, S2 next session*
+*Implementation: Claude Code — S1 shipped `a5134aa`, S2 pending*
+
+---
+
+# STEP 0 ADDENDUM — SCHEMA DIVERGENCE (12 April 2026)
+## Appended at Session 1 close. Overrides the pre-Step-0 body above.
+
+The spec body above refers to tables and columns that do not exist in
+the live schema. Claude Code ran the 8 Step 0 queries via Supabase MCP
+against the production database (`uvicrqapgzcdvozxrreo`) before writing
+a single line of code and documented every divergence. This addendum
+is the truth Session 2 must build against. The body above is preserved
+for historical context — do not act on it.
+
+## Table name divergences
+
+| Spec name | Actual table | Notes |
+|---|---|---|
+| `customers` | `user_profiles` | Global, tenant-scoped via `tenant_id` |
+| `loyalty_tiers` | **does not exist** | Tiers are inline text; thresholds/multipliers in `loyalty_config` |
+| `loyalty_campaigns` | **does not exist** | **Section 4 permanently deferred** until schema owner adds a table |
+| `ai_action_logs` | `loyalty_ai_log` | Different column shape — see below |
+| `loyalty_transactions` | exists ✓ | `user_id` (not `customer_id`), mixed-case `transaction_type` |
+| `scan_logs` | exists ✓ | **No `tenant_id` column** — uses `user_id` + `scanned_at` |
+| `patients` | exists ✓ | SAHPRA table, **zero loyalty columns** — not a loyalty surface |
+
+## Column facts verified live
+
+### `user_profiles` — the actual customer table
+
+Projection POPIA-safe subset (the only columns Session 1's
+`fetchStoreLoyalty` is permitted to SELECT):
+
+```
+id, tenant_id, loyalty_points, loyalty_tier, created_at,
+last_purchase_at, is_suspended, churn_risk_score
+```
+
+Additional columns that exist on the table but **must never be
+SELECTed from the Group Portal** (PII — POPIA non-negotiable):
+
+```
+email, phone, full_name, date_of_birth, id_number (via patients FK),
+street_address, suburb, postal_code, province, city, gender,
+preferred_type, acquisition_channel, referral_code, referred_by
+```
+
+**No `is_active` column exists.** Active-customer predicate is
+`is_suspended IS NOT TRUE`. Suspended users are excluded from all
+cohort counts because a suspended account is an enforcement action,
+not a churn signal.
+
+### `loyalty_transactions` — sign-based classification
+
+Live values for `transaction_type` (both legacy uppercase and new
+lowercase exist side by side):
+
+| Value | Medi Rec count at spec time |
+|---|---|
+| `earn_purchase` | 124 |
+| `PURCHASE` (legacy) | 86 |
+| `EARNED` (legacy) | 30 |
+| `BONUS` (legacy) | 18 |
+| `REDEEMED` (legacy) | 1 |
+
+Authoritative classifier is the **sign of `points`**, not the
+string: positive = earn, negative = redeem. The type string is
+only consulted when `points = 0` (rare no-op edge cases).
+
+### `loyalty_config` — tier architecture
+
+No per-row tier table. Instead `loyalty_config` has fixed per-tier
+columns baked into the schema:
+
+```
+mult_bronze, mult_silver, mult_gold, mult_platinum,
+mult_tier_harvest_club,
+threshold_silver, threshold_gold, threshold_platinum,
+threshold_harvest_club
+```
+
+**Fixed 5-tier enum:** `bronze`, `silver`, `gold`, `platinum`,
+`harvest_club`. There is **no `colour` column anywhere** — the
+spec instruction "tier colours come from the DB, never hardcode"
+is not achievable. The implemented workaround is a hardcoded
+`TIER_PALETTE` in `CustomerIntelligence.js` with a rationale
+comment citing Step 0.
+
+### `loyalty_ai_log` — actual shape
+
+```
+id, tenant_id, action_type, target_user_id, target_item_id,
+payload (jsonb), outcome, created_at, actioned_at
+```
+
+Note `target_user_id` (not `customer_id`). Live `action_type`
+values across the whole network at Step 0 time:
+
+| Action type | Count |
+|---|---|
+| `stock_boost_suggestion` | 181 |
+| `birthday_bonus` | 5 |
+| `churn_rescue` | 4 |
+| `point_expiry` | 0 (spec expected, not present) |
+
+The spec's `stock_boost` is actually `stock_boost_suggestion`.
+Session 2 Section 5 must use the correct value.
+
+### `orders` — customer linkage column name
+
+`orders.user_id` (not `customer_id`). Not used by Session 1 but
+relevant for any future customer-to-revenue join in Session 2.
+
+### `scan_logs` — missing tenant_id
+
+`scan_logs` has no `tenant_id` column. Tenant scoping would require
+joining through `user_profiles.tenant_id`. Not used by Session 1.
+Also: column is `scanned_at`, not `created_at`.
+
+## Section 4 Campaign ROI — permanently deferred
+
+There is no `loyalty_campaigns` table in the live schema. Section 4
+is not just "deferred to Session 2" — it is **permanently blocked**
+until a schema owner designs and creates the campaigns table. The
+`includeCampaigns` option on `fetchStoreLoyalty` is kept on the
+signature for stability but is a no-op in both S1 and S2. The
+component's data-quality footnote states this explicitly so the
+visible roadmap matches reality.
+
+Session 2 scope is therefore:
+- Section 5: AI Engine Activity (`loyalty_ai_log`, action type
+  `stock_boost_suggestion` not `stock_boost`)
+- Section 6: Top Customers per store (POPIA-safe initials + masked
+  UUID suffix only)
+
+## Live cohort snapshot at Step 0 (reference values)
+
+| Tenant | Total | New 30d | Active | At-risk | Lapsed | Dormant |
+|---|---|---|---|---|---|---|
+| Medi Can Dispensary | 1 | 1 | 0 | 0 | 0 | 1 |
+| Medi Recreational | 50 | 50 | 45 | 4 | 0 | 1 |
+| **Network** | **51** | **51** | **45** | **4** | **0** | **2** |
+
+Tier distribution at Step 0:
+
+| Tenant | bronze | silver | gold | platinum | harvest_club |
+|---|---|---|---|---|---|
+| Medi Can Dispensary | 1 | – | – | – | – |
+| Medi Recreational | 21 | 14 | 7 | 8 | 1 |
+
+Medi Recreational shows 50 of 50 members created in the last 30 days
+— it is a seeded snapshot, which is a deliberate business choice
+for test data. The cohort derivation still works correctly;
+`isNew` and `isActive` are orthogonal and a member can be both.
+
+## Owner's explicit S1 decisions (locked and shipped)
+
+1. **Hardcode TIER_PALETTE with 5 values** including `harvest_club`,
+   with a rationale comment citing Step 0.
+2. **Section 4** is deferred text in the footer notes — "loyalty_campaigns
+   table does not exist in the current schema".
+3. **Active predicate** is `is_suspended IS NOT TRUE`.
+4. **Additional:** SELECT `churn_risk_score` in the cohort query
+   and surface the high-churn-risk member count on the At-risk row
+   in Section 3 — it is already computed by the nightly AI engine,
+   is not PII, and is a meaningful operational signal.
+
+---
+
+*Step 0 addendum written 12 April 2026 at Session 1 close*
+*HEAD at addendum write: `a5134aa`*
+*Session 2 starts from this addendum, not the spec body above*
