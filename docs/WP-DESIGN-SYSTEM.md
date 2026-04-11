@@ -113,6 +113,44 @@ The original rule table included `C.footer → T.surfaceAlt`, but this was **inc
 
 All future PageShell-style dark-surface work should use `T.surfaceDark` and `T.brandGold`. Any reference to `T.warning` for brand gold is wrong.
 
+### Tokens added during WP-DS-2/P3 ActionCentre migration
+Two additional tokens were added for mid-tier alert borders — T had light surfaces and bright semantic tiers but no border-weight colours in between:
+
+```javascript
+// ─── BORDER ACCENTS ──────────────────────────────────────────
+warningBorder:  "#FDE68A",   // mid-yellow warning border
+dangerBorder:   "#FECACA",   // light-pink danger border
+```
+
+### ⚠ CRITICAL SEMANTIC RULE — text-tier vs surface-tier (applies to all Priority 4)
+
+When migrating legacy `C.warning` or `C.danger` references, **the correct target depends on how the colour is used**:
+
+| Original use | Map to | Example |
+|---|---|---|
+| **TEXT colour** (foreground ink on a pale semantic background) | `T.warningText` / `T.dangerText` | `color: C.warning` → `color: T.warningText` |
+| **BORDER colour** (outline on a pale semantic background) | `T.warningBorder` / `T.dangerBorder` | `border: 1px solid C.warningBd` → `border: 1px solid T.warningBorder` |
+| **LIGHT BACKGROUND** (pale alert / pill background) | `T.warningLight` / `T.dangerLight` | `background: C.warningBg` → `background: T.warningLight` |
+| **BRIGHT SURFACE** (full-saturation accent, banner, CTA) | `T.warning` / `T.danger` | rare — most uses are text-tier |
+
+**WRONG — naive mapping:**
+```javascript
+// ❌ Produces alarming bright orange text on pale background
+color: C.warning → color: T.warning   // #92400E → #e67e22
+```
+
+**RIGHT — semantic-tier mapping:**
+```javascript
+// ✓ Preserves muted dark amber text
+color: C.warning → color: T.warningText   // #92400E → #7d4a00
+```
+
+**Why this matters:** the legacy `C.warning = "#92400E"` is a dark amber text colour. The new `T.warning = "#e67e22"` is a bright orange surface/accent colour — a different tier in the WP-DS-1 semantic scale. A naive rename produces visually alarming text. Same logic applies to `C.danger` (`#991B1B` dark red text) → `T.dangerText` (`#7b1a11` dark red text), NOT → `T.danger` (`#c0392b` bright red surface).
+
+**This rule applies to every HQ component in Priority 4.** HQ components frequently render status pills, alert banners, and section headers with coloured text on pale backgrounds — all are text-tier uses. Future Priority 4 sessions MUST apply the text-tier rule, not the naive rule.
+
+**First application:** ActionCentre.js migration (this session) — `C.warning → T.warningText`, `C.danger → T.dangerText`, `C.warningBd → T.warningBorder`, `C.dangerBd → T.dangerBorder`, `C.warningBg → T.warningLight`, `C.dangerBg → T.dangerLight`. Six semantic-tier mappings, each verified correct by visual intent.
+
 ---
 
 ## THE PLAN — 5 SUB-WORK-PACKAGES
@@ -425,7 +463,7 @@ Every new agent starting work on this WP must:
 | Sub-WP | Name | Status | Commit | Date |
 |---|---|---|---|---|
 | WP-DS-1 | Shared Token File | **COMPLETE** | `4a6f451` | 11 Apr 2026 |
-| WP-DS-2 | Component Migration | **IN PROGRESS — Priority 1 + 2 CLOSED, Priority 3 next** | `021b5dd → 846280c → (cleanup)` | 11 Apr 2026 |
+| WP-DS-2 | Component Migration | **IN PROGRESS — P1+P2 CLOSED, P3 started (1/~8 done: ActionCentre)** | `021b5dd → cb4a0d8 → (P3-1)` | 11 Apr 2026 |
 | WP-DS-3 | Profile-Aware Tokens | NOT STARTED | — | — |
 | WP-DS-4 | Unified Component Library | NOT STARTED | — | — |
 | WP-DS-5 | Ambient Intelligence Layer | FUTURE | — | — |
@@ -521,12 +559,12 @@ All three are indistinguishable to identifier-grep. Only import-statement grep t
 
 ---
 
-**Priority 3 — Shared components with LOCAL T definitions** (original WP-DS-2 Priority 1)
-- `src/components/shared/ActionCentre.js` (built with self-contained `const C = {...}` inline — migrate to import T from tokens)
-- `src/components/WorkflowGuide.js`
-- Rest of `src/components/shared/*`
+**Priority 3 — Shared components with LOCAL T definitions** (original WP-DS-2 Priority 1) — **IN PROGRESS**
+- ✅ `src/components/shared/ActionCentre.js` — *(this commit)* · 9 C.x refs migrated (text-tier rule applied), 1 hardcoded Badge font migrated, local `const C = {...}` deleted, `import { T }` added. 2 new tokens added (`T.warningBorder`, `T.dangerBorder`). 4 unused C keys dropped (`C.ink500`, `C.ink400`, `C.ink150`, `C.ink050` were declared but never referenced in the component body — dead-declaration cleanup as a side effect).
+- ⏳ `src/components/WorkflowGuide.js` (next)
+- ⏳ Rest of `src/components/shared/*`
 
-Estimated: **1 session, ~5–10 files**.
+Estimated: **1 session, ~5–10 files**. ActionCentre complete (1/~8).
 
 **Priority 4 — HQ components with LOCAL T definitions** (original WP-DS-2 Priority 4)
 - HQProduction, HQStock, HQOverview, HQCogs, HQProfitLoss, HQMedical, etc. — each file currently defines `const T = {...}` locally at the top. Migrate to `import { T } from "../../styles/tokens";` one file at a time. Some use the new T object shape, some drift — each file needs LL-221 pre-flight read to identify drift.

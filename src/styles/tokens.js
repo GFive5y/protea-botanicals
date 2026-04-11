@@ -165,6 +165,15 @@ export const T = {
   // Used for brand name treatment, footer hover highlights, and
   // luxury accent moments that are NOT semantic warnings.
   brandGold:      "#b5935a",   // Protea Botanicals brand accent (warm gold)
+
+  // ─── BORDER ACCENTS ──────────────────────────────────────────
+  // Added WP-DS-2/P3 (ActionCentre migration). Mid-tier border
+  // colours for pill/badge/alert block outlines — sit between
+  // the surface-light backgrounds and the deeper text-tier
+  // colours. Required because T had no warning/danger border
+  // slots — only light surfaces and bright semantic tiers.
+  warningBorder:  "#FDE68A",   // mid-yellow warning border
+  dangerBorder:   "#FECACA",   // light-pink danger border
 };
 
 // ─── PROFILE-AWARE TOKEN OVERRIDES ────────────────────────────

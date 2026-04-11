@@ -5,23 +5,7 @@
 //   title?: string   — optional header label (defaults to "Action Centre")
 
 import React, { useState } from "react";
-
-// Platform colour tokens (matched to existing HQ components)
-const C = {
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  ink900: "#0D0D0D",
-  ink500: "#5A5A5A",
-  ink400: "#6B7280",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-};
+import { T } from "../../styles/tokens";
 
 export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
   const [open, setOpen] = useState(false);
@@ -34,9 +18,9 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
 
   // Bar tone: critical dominates, otherwise warn
   const hasCritical = criticalCount > 0;
-  const barBg = hasCritical ? C.dangerBg : C.warningBg;
-  const barBd = hasCritical ? C.dangerBd : C.warningBd;
-  const barText = hasCritical ? C.danger : C.warning;
+  const barBg = hasCritical ? T.dangerLight : T.warningLight;
+  const barBd = hasCritical ? T.dangerBorder : T.warningBorder;
+  const barText = hasCritical ? T.dangerText : T.warningText;
 
   return (
     <div
@@ -45,7 +29,7 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
         border: `1px solid ${barBd}`,
         borderRadius: 6,
         background: barBg,
-        fontFamily: C.font,
+        fontFamily: T.font,
         overflow: "hidden",
       }}
     >
@@ -63,7 +47,7 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
           display: "flex",
           alignItems: "center",
           gap: 12,
-          fontFamily: C.font,
+          fontFamily: T.font,
           textAlign: "left",
         }}
       >
@@ -80,10 +64,10 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
         </span>
 
         {criticalCount > 0 && (
-          <Badge count={criticalCount} bg={C.danger} fg="#fff" label="critical" />
+          <Badge count={criticalCount} bg={T.dangerText} fg="#fff" label="critical" />
         )}
         {warnCount > 0 && (
-          <Badge count={warnCount} bg={C.warning} fg="#fff" label="warn" />
+          <Badge count={warnCount} bg={T.warningText} fg="#fff" label="warn" />
         )}
 
         <span
@@ -153,8 +137,8 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
         >
           {alerts.map((a, i) => {
             const sevIsCritical = a.severity === "critical";
-            const rowBg = sevIsCritical ? C.dangerBg : C.warningBg;
-            const rowText = sevIsCritical ? C.danger : C.warning;
+            const rowBg = sevIsCritical ? T.dangerLight : T.warningLight;
+            const rowText = sevIsCritical ? T.dangerText : T.warningText;
             return (
               <div
                 key={i}
@@ -163,7 +147,7 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
                   alignItems: "center",
                   gap: 10,
                   padding: "8px 14px",
-                  borderBottom: i < alerts.length - 1 ? `1px solid ${C.ink075}` : "none",
+                  borderBottom: i < alerts.length - 1 ? `1px solid ${T.surfaceAlt}` : "none",
                   fontSize: 12,
                   background: i % 2 === 0 ? "#fff" : rowBg,
                 }}
@@ -181,7 +165,7 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
                 <span
                   style={{
                     flex: 1,
-                    color: C.ink900,
+                    color: T.ink900,
                     fontWeight: 500,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -206,7 +190,7 @@ export default function ActionCentre({ alerts = [], title = "Action Centre" }) {
                       background: "transparent",
                       color: rowText,
                       cursor: "pointer",
-                      fontFamily: C.font,
+                      fontFamily: T.font,
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -239,7 +223,7 @@ function Badge({ count, bg, fg, label }) {
         fontSize: 10,
         fontWeight: 700,
         letterSpacing: "0.04em",
-        fontFamily: "'Inter','Helvetica Neue',Arial,sans-serif",
+        fontFamily: T.font,
       }}
     >
       {count}
