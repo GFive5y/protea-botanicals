@@ -221,6 +221,49 @@ Triggered by the setup wizard on demo session completion.
 Accepts: `{ tenantId, industry, scenarioKey, sessionTag }`
 Idempotent: can be re-run without creating duplicates.
 
+**⚠ CRITICAL SEEDING RULE — LL-203 COGS key (correction 12 Apr 2026):**
+
+When seeding `order_items` rows, the `product_metadata` jsonb column
+MUST use the key `weighted_avg_cost` (not `cost`, not `avco`, not
+`unit_cost`). `HQProfitLoss.js` reads the value via
+`oi.product_metadata?.weighted_avg_cost` — any other key name
+produces silent R0 COGS on the income statement because the UI
+fallback chain (production_out movements → estimated) fails for
+demo tenants that have no production runs and no recipe estimates.
+
+Correct shape for every seeded order_items row:
+
+```json
+{
+  "sim": true,
+  "weighted_avg_cost": <numeric_cost_per_unit>
+}
+```
+
+Reference implementation — see the fix commit that landed for
+The Garden Bistro (first demo tenant seeded). The initial seed used
+`{"sim": true, "cost": N}` which produced R0 COGS and a phantom
+R287k "profit" on the P&L. A single UPDATE renamed the key:
+
+```sql
+UPDATE order_items oi
+SET product_metadata = (product_metadata - 'cost')
+  || jsonb_build_object('weighted_avg_cost', (product_metadata->>'cost')::numeric)
+FROM orders o
+WHERE oi.order_id = o.id
+  AND o.tenant_id = '<demo_tenant_uuid>'
+  AND o.notes = 'sim_demo_v1'
+  AND oi.product_metadata ? 'cost';
+```
+
+**This correction applies to ALL four demo tenants:**
+The Garden Bistro (food_beverage) · Greenleaf Trading (cannabis_retail)
+· MediCare Pharmacy (cannabis_dispensary) · Metro Hardware (general_retail).
+
+When Greenleaf, MediCare, and Metro Hardware are seeded, the
+seeder code must use `weighted_avg_cost` from the start. Do not
+repeat the mistake.
+
 ### GAP 3 — Notification badge system on Tenant Portal nav (NEW FEATURE, high scope)
 
 **Currently:** The tenant portal nav has no notification badges.
