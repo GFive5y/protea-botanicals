@@ -1268,3 +1268,216 @@ Tested end-to-end at `/group-portal` logged in as `medican@nuai.dev`:
 *WP-DS-6 Phase 1 COMPLETE · WP-TENANT-GROUPS Phases 1-3 COMPLETE · 3 owner actions closed · Priority 4 closed*
 *Full session commit chain: d842cd0 → e8ceaaa → 329ed9b → d93ef9e → ad3dc21 → 969a065 → c304c40 → 8bcadc7*
 *Group Portal LIVE: /group-portal · NetworkDashboard working with real Supabase data*
+
+---
+
+# ADDENDUM 4 — 11 April 2026 (extended session close)
+
+## HEAD AT CLOSE: `5668e03`
+
+This addendum covers the extended work after Addendum 3 closed at `8bcadc7`.
+The session continued into orientation refresh, a platform overview
+update, and the full Phase 4 of WP-TENANT-GROUPS (GroupTransfer.js).
+
+## COMMIT CHAIN (Addendum 4)
+
+`8bcadc7 → 11f12b4 → 5668e03`
+
+1. **`11f12b4`** — CLAUDE.md v2.0 (slim+delegate rewrite) + PLATFORM-OVERVIEW update block
+2. **`5668e03`** — WP-TG Phase 4: GroupTransfer.js + GroupPortal mount + LL-242
+
+## WHAT SHIPPED
+
+### 1. CLAUDE.md v2.0 (`11f12b4`)
+
+Full structural rewrite of the session-start orientation file. v1.0 had
+drifted into a 286-line state document containing a stale HEAD hash, an
+incorrect LL-206 example (showing the deprecated destructure form as
+canonical), multiple outdated EF version numbers, and conflicting WP
+priority lists.
+
+v2.0 is 222 lines, version-free, and delegates all volatile state to
+dedicated docs:
+
+- Rules → `docs/NUAI-AGENT-BIBLE.md` (canonical source, 930+ lines)
+- State → `docs/SESSION-STATE_v[latest].md` (this file)
+- Priorities → `docs/NEXT-SESSION-PROMPT_v[latest].md`
+- HEAD → `git log --oneline -1` (not any document)
+- EF versions → Supabase MCP query or SESSION-STATE
+
+LL-206 corrected at the source: `const { tenantId, industryProfile } = useTenant()`
+is the canonical form (direct TenantContext exposure at
+tenantService.js:154). The old `const { tenant } = useTenant(); tenant?.id`
+shape is documented as deprecated but still functional.
+
+CLAUDE.md v2.0 is the first orientation file that will not rot between
+sessions — every volatile field is either in a dedicated doc or generated
+by a shell command at read time.
+
+### 2. PLATFORM-OVERVIEW update (`11f12b4`)
+
+Appended an update block to `docs/PLATFORM-OVERVIEW_v1_0.md` correcting
+scale figures and adding the seventh portal (/group-portal) to the
+high-level architecture summary. The overview document now reflects
+WP-DS-6, WP-TENANT-GROUPS, and the 11 April 2026 design system work.
+
+### 3. WP-TENANT-GROUPS Phase 4: GroupTransfer.js (`5668e03`)
+
+The largest single-component build of the session — **1,815 lines** in
+`src/components/group/GroupTransfer.js` — and the first component to
+fix a silent financial correctness bug that was living in the HQ
+parallel component.
+
+**Component structure (4 sub-tabs):**
+
+- **Overview** — 4 KPI tiles (Total Transfers · Active · Completed · Stock Value Moved via received transfers) + recent 5 transfers table + primary "+ New Transfer" button
+- **New Transfer** — FROM / TO store dropdowns scoped to group members only (TO filters out the FROM store to prevent self-transfers), optional notes textarea, line-item builder with product picker limited to FROM store inventory, **dual quantity display** on the lines table showing both "At FROM" and "At TO" per line. Items not yet at destination render as a blue "New to store" pill; items depleting a near-reorder-level line at source render in warning text.
+- **Active** — filtered to draft + in_transit. Expandable cards with full line-level table and action buttons (Ship / Mark Received ✓ / Cancel with inline reason input).
+- **History** — filtered to received + cancelled. Read-only expandable cards with all timestamps and cancellation reasons visible.
+
+**State shape:**
+
+```js
+const { tenantId } = useTenant(); // LL-206 direct form
+activeSubTab, transfers, fromInventory, toInventory (map {sku: qty}),
+loading, actionLoading, toast,
+form: { from_tenant_id, to_tenant_id, notes, lines, lineItem, lineQty },
+expandedId, cancellingId, cancelReason
+```
+
+Note: `tenantId` is not used in any of the transfer handlers — FROM
+always comes from `form.from_tenant_id` (never the current user's
+tenant). This is the structural difference from HQTransfer.js, which
+hardcodes `from_tenant_id: tenantId` because HQ is always the source.
+`tenantId` is retained only for future created_by attribution.
+
+**Data fetching:**
+
+- `fetchTransfers()` — scoped to group member tenant ids via `.or('from_tenant_id.in.(ids),to_tenant_id.in.(ids)')`. A transfer shows up if any store in the group is either origin or destination.
+- `fetchFromInventory(fromId)` — runs when the FROM dropdown changes. Filters to `is_active=true` and `quantity_on_hand > 0`, ordered by name.
+- `fetchToInventory(toId, skus)` — runs when TO changes or lines change. Builds a `{ [sku]: quantity_on_hand }` map for O(1) lookup in the dual-qty display.
+
+**Three-step workflow:**
+
+- `handleCreateTransfer()` — inserts `stock_transfers` row with `from_tenant_id` from form state, then bulk-inserts `stock_transfer_items` with the line snapshot. Sets status `draft`.
+- `handleShip(transfer)` — per line: re-fetch source inventory, check available (quantity_on_hand - reserved_qty), throw if insufficient with source store name in error, deduct quantity_on_hand, insert transfer_out stock_movement. Updates status → in_transit + shipped_at.
+- `handleReceive(transfer)` — per line: two-step destination match (SKU first, name fallback). If destination item exists: **correct AVCO recalculation** (see LL-242 below) plus quantity update. If not: create new inventory_items row with transferred cost as AVCO, sell_price=0 (LL-024). Insert transfer_in stock_movement. Updates status → received + received_at.
+- `handleCancel(transfer)` — draft case: plain status update. in_transit case: reverse source deduction (add qty back, insert reversal stock_movement), then status update. Requires cancellation reason.
+
+**LL-242 AVCO FIX (the financial correctness moment):**
+
+HQTransfer.js `handleReceive()` around line 449-456 updates only
+`quantity_on_hand` on the destination row. It never recalculates
+`weighted_avg_cost`. Every inbound transfer to a store that already
+carries the SKU silently corrupts that store's AVCO.
+
+Worked example of the bug:
+
+```
+Destination holds 10 units at R100 AVCO.
+Transfer arrives: 5 units at R150 unit_cost_zar.
+
+Correct AVCO post-receive:
+  newQty = 10 + 5 = 15
+  newAvco = ((10 × 100) + (5 × 150)) / 15 = 1750 / 15 = R116.67
+
+HQTransfer result:  R100 (unchanged — WRONG)
+GroupTransfer result: R116.67 (correct)
+```
+
+GroupTransfer.js implements the correct formula unconditionally:
+
+```js
+const newQty  = destQty + confirmedQty;
+const newAvco = newQty > 0
+  ? (destQty * destAvco + confirmedQty * inUnitCost) / newQty
+  : inUnitCost;
+UPDATE inventory_items
+  SET quantity_on_hand = newQty,
+      weighted_avg_cost = newAvco
+  WHERE id = destItemId AND tenant_id = transfer.to_tenant_id;
+```
+
+The HQTransfer.js fix was deliberately NOT applied in the same commit
+to keep Phase 4 scoped and reviewable. It's documented as LL-242 in the
+Bible for a dedicated future session. The rule in LL-242 is explicit:
+**do not propagate the HQTransfer receive pattern to any new transfer
+component**.
+
+**Per-line atomicity gap** also documented as a known issue in LL-242.
+Both HQTransfer and GroupTransfer ship/receive/cancel in per-line
+loops with no database transaction wrapper. A partial failure mid-loop
+can leave transfers in an inconsistent state. Not addressed in Phase 4.
+
+**GroupPortal.js mount:**
+
+The `transfers` tab in GroupPortal.js previously rendered the
+`PlaceholderTab` component. That branch was replaced with
+`<GroupTransfer groupId={groupId} groupName={groupName} members={members} onNavigate={handleNavClick} />`.
+Two-line import added at the top. No other changes to GroupPortal.
+
+**Build:**
+
+Zero new warnings. One initial warning during development
+(`newToStore` unused after a ternary simplification) was caught and
+fixed before commit. All layout tokens verified against tokens.js. All
+semantic colours use the correct text-tier (successText, dangerText,
+warningText, infoText) with their paired *Light backgrounds.
+
+### 4. LL-242 added to NUAI-AGENT-BIBLE.md (`5668e03`)
+
+Full entry including:
+- The bug description with worked example
+- The correct formula
+- Which file ships the fix (GroupTransfer.js)
+- Which file is still broken (HQTransfer.js line 449-456)
+- The rule: do not propagate the HQTransfer pattern to new transfer components
+- The per-line atomicity gap also flagged for the same future session
+- Source citation: Claude Code pre-build audit, 11 April 2026
+
+## WHAT IS NOT DONE (carried into v241)
+
+1. **HQTransfer.js AVCO fix** — still broken. Deferred to a dedicated session because it touches HQ financial code and requires its own pre-flight + test plan. LL-242 is the watchlist anchor.
+2. **Per-line atomicity** — no transaction wrapper on ship/receive/cancel in either HQTransfer or GroupTransfer. Partial failures possible. Logged in LL-242.
+3. **Phase 5: GroupSettings.js** — not started. Brief needs to cover member management (add/remove stores), group type edit, network-level settings.
+4. **ai-copilot wiring into NetworkDashboard insight bar** — the insight bar currently renders a static placeholder. Needs to call the ai-copilot EF scoped to the group.
+5. **Cross-tenant "View store →" navigation** — currently `console.log` only. Needs a real route handoff pattern (likely a secure tenant-switch action).
+6. **Smart transfer suggestions (Phase 4b)** — auto-suggest transfers based on low stock at potential receiver vs surplus at potential sender. Deferred per owner decision; ships after manual flow has seen real use.
+7. **WP-DS-2 continuation** — WorkflowGuide.js is the next legacy-C migration target, then the shared/ directory, then the 25 HQ components.
+
+## HEAD CHAIN SUMMARY (Addendum 4)
+
+```
+8bcadc7  Phase 3 NetworkDashboard (Addendum 3 close)
+  ↓
+11f12b4  docs: CLAUDE.md v2.0 + PLATFORM-OVERVIEW update
+  ↓
+5668e03  feat(WP-TG/P4): GroupTransfer.js — 3-step inter-store transfer with AVCO fix (LL-242)
+```
+
+## INVARIANTS STILL HOLDING
+
+- ✅ **RULE 0Q** — every repo write in Addendum 4 went through Claude Code
+- ✅ **LL-221** — every file touched was read in full first (HQTransfer read before GroupTransfer was written)
+- ✅ **LL-238** — all GroupTransfer layout uses T.* tokens; zero hardcoded px matching a token
+- ✅ **LL-205** — no new tables this addendum, existing RLS unchanged, GroupTransfer inherits the group_transfer_visibility policy from Phase 1
+- ✅ **LL-206** — `const { tenantId } = useTenant()` direct form used in GroupTransfer
+- ✅ **Zero new build warnings** introduced across `11f12b4` and `5668e03`
+- ✅ **No locked file touched** — ProteaAI, StockItemModal, PlatformBar, supabaseClient untouched
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `5668e03`** at close. Confirm with `git log --oneline -1`.
+2. **Group Portal full workflow is LIVE** — dashboard + inter-store transfers both functional. Test via `medican@nuai.dev / MediCan2026!`.
+3. **HQTransfer.js has a known AVCO bug at line 449-456** — do not copy that pattern. LL-242 is the canonical reference.
+4. **CLAUDE.md v2.0 is the current orientation file** — do not trust v1.0, which referenced a stale HEAD and had factual errors. v2.0 is version-free and delegates all volatile state.
+5. **NUAI-AGENT-BIBLE.md now includes LL-242** — the franchise-era AVCO correctness rule.
+6. **WP-TENANT-GROUPS is 4 of 6 phases complete** — Phase 5 is GroupSettings.js, Phase 6 is the network-wide settings/admin surface.
+7. **Per-line atomicity is a documented known issue** — do not paper over it with silent catches. If it matters for a future feature, design a real transaction wrapper.
+
+---
+
+*Addendum 4 written 11 April 2026 (extended close) · HEAD at close: 5668e03*
+*2 repo commits in Addendum 4 · CLAUDE.md v2.0 shipped · WP-TENANT-GROUPS Phase 4 COMPLETE*
+*Full day commit chain: d842cd0 → e8ceaaa → 329ed9b → d93ef9e → ad3dc21 → 969a065 → c304c40 → 8bcadc7 → 11f12b4 → 5668e03*
+*Franchise network portal: dashboard + inter-store transfers both LIVE with correct AVCO math*
