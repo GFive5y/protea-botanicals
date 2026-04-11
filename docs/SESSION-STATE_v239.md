@@ -775,3 +775,226 @@ Building on the original v239 priority queue, these are the live follow-ups as o
 *9 commits · 11 files · ActionCentre shared component + 5 rollouts + feature inventory + orphan audit + AdminQrGenerator retirement*
 *Zero new build warnings · data logic frozen across all commits*
 *Full commit chain: 3a9941d → 79d8416 → ec4a04f → e601079 → 8aa92fd → 8ce9979 → d589af5 → 98c51c6 → 91c452f*
+
+---
+
+# ADDENDUM 2 — 11 April 2026 (continued): WP-DESIGN-SYSTEM launch + WP-DS-1/2 execution
+## HEAD at addendum 2 close: `78b2267`
+## New commit chain: `0c78e50 → 4a6f451 → 021b5dd → b205c33 → 3cff956 → 846280c → 96d8f70 → cb4a0d8 → 78b2267`
+## 9 commits · 8 files touched · Design token unification begun · Zero new build warnings
+
+---
+
+## WHAT HAPPENED IN ADDENDUM 2
+
+Building on the ActionCentre rollout and orphan audit from Addendum 1, this second block of work launched the NuAi Design System WP and executed the first two sub-WPs (WP-DS-1 shared token file + WP-DS-2 Priority 1 component migration), plus started Priority 3 with the ActionCentre component migration as proof-of-pattern.
+
+## WP-DESIGN-SYSTEM — launched (`0c78e50`)
+
+**File:** `docs/WP-DESIGN-SYSTEM.md` (NEW, 439 lines, grew to 500+ via WP-DS-2 execution)
+
+Long-lived work package document that survives agent turnover. Defines 5 sub-WPs:
+
+| Sub-WP | Name | Status after Addendum 2 |
+|---|---|---|
+| WP-DS-1 | Shared Token File | **COMPLETE** (`4a6f451`) |
+| WP-DS-2 | Component Migration | **IN PROGRESS** — P1 done, P2 retracted, P3 started (1/~8 files) |
+| WP-DS-3 | Profile-Aware Tokens | NOT STARTED |
+| WP-DS-4 | Unified Component Library | NOT STARTED |
+| WP-DS-5 | Ambient Intelligence Layer | FUTURE (codename WP-PULSE) |
+
+Every new agent starting work on the design system MUST read `docs/WP-DESIGN-SYSTEM.md` in full first. The doc documents: current token state, 5 sub-WP plan, status table, handoff protocol, and all rule corrections/retractions discovered during execution.
+
+---
+
+## WP-DS-1 — SHARED TOKEN FILE (COMPLETE, `4a6f451`)
+
+Extended `src/styles/tokens.js` additively with new T tokens while preserving every legacy export byte-for-byte. File grew from 107 → 386 lines.
+
+**New exports added (WP-DS-1):**
+- `T` — complete design token object (typography, type scale, spacing, radius, shadows, z-index, backgrounds, borders, ink scale, brand accent, 5 semantic tiers)
+- `profileOverrides` — 4 industry-profile token override sets (cannabis_retail, cannabis_dispensary, food_beverage, general_retail)
+- `getTokens(profile)` — merged-token helper for profile-aware components
+- `getSeverityTokens(severity)` — semantic colour helper for ActionCentre/StatusPill/alerts
+
+**Factual correction during WP-DS-1 implementation:** the WP-DESIGN-SYSTEM.md planning doc claimed "AdminQrGenerator.js was the last C consumer" — this was wrong. Pre-flight grep found 4 live C consumers (CheckoutPage.js, Redeem.js, WholesalePortal.js, PageShell.js). The WP doc was corrected alongside the token file extension.
+
+---
+
+## WP-DS-2 — COMPONENT MIGRATION
+
+### Priority 1: legacy C consumers (COMPLETE — 4/4 files)
+
+Four files migrated from `import { C }` to `import { T }`, each with its own mapping decisions and one-file commits.
+
+| Commit | File | C refs | Key decisions |
+|---|---|---|---|
+| `021b5dd` | `src/pages/CheckoutPage.js` | 22 refs + 1 import = 23 edits | Strict mapping. Visible brand-green shift (bright mint `#52b788` → deep forest `#2d6a4f`) accepted as intentional unification. |
+| `b205c33` | `src/pages/Redeem.js` | 12 refs + 1 import | **Hero gradient exception** — lines 194 (tracking label) + 227 (points counter) mapped `C.accent → T.accentLight` instead of `T.accent` to preserve contrast. Strict `T.accent` would produce 1.0:1 contrast ratio (invisible text) against the lightened gradient. Contrast analysis documented in commit body. |
+| `3cff956` | `src/pages/WholesalePortal.js` | 31 refs + 1 import | Same hero exception pattern (line 200 trade-account label). Strict mapping for line 284 success message accepted despite minor 5.6:1 → 3.4:1 contrast regression (legible, deferred to WP-DS-4 StatusPill component). |
+| `846280c` | `src/components/PageShell.js` | 3 refs + 1 import + 3 new tokens | **Highest blast radius** — 7 routes wrap PageShell. Required 3 new T tokens added pre-migration: `T.surfaceDark (#1a1a1a)`, `T.surfaceDarkAlt (#060e09)`, `T.brandGold (#b5935a)`. **Corrected the original WP-DS-2 mapping rule**: `C.footer → T.surfaceAlt` was wrong (near-black → near-white inversion would invert the footer). Correct mapping is `C.footer → T.surfaceDark`. Similarly `C.gold → T.brandGold` (NOT `T.warning`). FONTS import preserved — PageShell is the global font loader. |
+
+**Priority 1 totals:** 68 C refs migrated across 4 files. 3 new T tokens added. 2 hero-gradient exception lines documented. 1 mapping rule correction documented.
+
+### Priority 2: false positive — RETRACTED (`cb4a0d8`)
+
+The WP-DESIGN-SYSTEM.md pre-flight list claimed 11 files were Priority 2 consumers of `LS`, `makeBtn`, `TIER_COLORS`, `BANNER_H`, and `POINTS_PER_SCAN` exports:
+
+> ~~`src/App.js`, `src/pages/AdminDashboard.js`, `src/pages/AdminQrGenerator.js`, `src/components/hq/HQFraud.js`, `src/components/hq/HQDocuments.js`, `src/components/AdminCustomerEngagement.js`, `src/components/AdminShipments.js`, `src/components/AdminFraudSecurity.js`, `src/components/AdminBatchManager.js`, `src/components/AdminNotifications.js`, `src/components/AdminProductionModule.js`~~
+
+**False positive.** The list was produced by grepping for identifier **usages** (`LS.ROLE`, `makeBtn(`, etc.) rather than import **statements** (`from ".../styles/tokens"`). Example: `src/App.js` defines its own `const LS = { ROLE: "protea_role", DEV_MODE: "protea_dev_mode" }` locally at line 85 and never imports from tokens.js. The local `LS` happens to share name and keys with the tokens.js export, but they are two independent constants.
+
+Exhaustive `grep "styles/tokens"` across the entire `src/` tree returns only 5 files: tokens.js itself plus the 4 Priority 1 files already migrated. **Priority 2 has zero consumers.**
+
+### LL-221 lesson learned — extended
+
+When auditing which files consume a module, **grep for import statements, not for identifier usages**. Identifier grep cannot distinguish between files that import the symbol, files that define their own local symbol with the same name, and files that contain the substring in comments. Only import-statement grep tells the truth about module consumers.
+
+**Proposed Bible addition (pending):** *"LL-221 extended — grep imports not identifiers. Use `from.*/styles/tokens` or `import.*\{.*FOO.*\}.*from` patterns when auditing consumers. Never use bare identifier grep as a consumer list."*
+
+### Dead legacy export cleanup (`cb4a0d8`)
+
+After retracting Priority 2, exhaustive consumer verification confirmed that the entire legacy section of `src/styles/tokens.js` was dead except for `FONTS`. Archived in same commit:
+
+- Removed: `C`, `makeBtn`, `inputStyle`, `labelStyle`, `sectionLabel`, `TIER_COLORS`, `LS`, `BANNER_H`, `POINTS_PER_SCAN`, default export
+- Preserved: `FONTS` (1 consumer: PageShell.js, the global font loader — scheduled for removal in a future PageShell refactor)
+- File shrank from 401 → 293 lines
+- **Bonus:** pre-existing ESLint warning `Line 96:1: Assign object to a variable before exporting as module default` was eliminated as a side effect (the offending `export default {...}` block was the default export that got removed)
+
+### Priority 3: Shared components (IN PROGRESS — 1/~8 files, `78b2267`)
+
+First Priority 3 migration: `src/components/shared/ActionCentre.js`.
+
+**Critical new rule established** (applies to all remaining WP-DS-2 migrations, especially the ~25 HQ files in Priority 4):
+
+#### Text-tier vs surface-tier semantic mapping rule
+
+When migrating legacy `C.warning` or `C.danger` references, the correct target depends on how the colour is USED:
+
+| Original use | Map to | Example |
+|---|---|---|
+| **TEXT colour** (foreground ink on pale background) | `T.warningText` / `T.dangerText` | `color: C.warning` → `color: T.warningText` |
+| **BORDER colour** (outline on pale background) | `T.warningBorder` / `T.dangerBorder` | `border: 1px solid C.warningBd` → `T.warningBorder` |
+| **LIGHT BACKGROUND** (pale alert / pill) | `T.warningLight` / `T.dangerLight` | `background: C.warningBg` → `T.warningLight` |
+| **BRIGHT SURFACE** (saturated accent/banner/CTA) | `T.warning` / `T.danger` | rare — most uses are text-tier |
+
+**Why this matters:** `C.warning = #92400E` is a dark amber *text* colour. `T.warning = #e67e22` is a bright orange *surface* colour — different semantic tier. A naive `C.warning → T.warning` rename produces visually alarming bright orange text everywhere. Same logic for danger. **Every HQ component in Priority 4 renders coloured status text on pale backgrounds** — all are text-tier uses. Priority 4 sessions MUST apply this rule.
+
+**New tokens added in `78b2267`** under a new `BORDER ACCENTS` section in T:
+- `T.warningBorder = "#FDE68A"` — mid-yellow warning border
+- `T.dangerBorder = "#FECACA"` — light-pink danger border
+
+These sit between the pale light backgrounds and the bright semantic surface tiers — the missing "border weight" tier the WP-DS-1 token set didn't include.
+
+**ActionCentre substitution applied:**
+| Local `C.x` | Maps to |
+|---|---|
+| `C.font` | `T.font` |
+| `C.ink900` | `T.ink900` |
+| `C.ink075` | `T.surfaceAlt` |
+| `C.warning` | `T.warningText` |
+| `C.warningBg` | `T.warningLight` |
+| `C.warningBd` | `T.warningBorder` |
+| `C.danger` | `T.dangerText` |
+| `C.dangerBg` | `T.dangerLight` |
+| `C.dangerBd` | `T.dangerBorder` |
+| Hardcoded Badge font (line 242) | `T.font` |
+
+**Dead-code side effect:** 4 local C keys (`ink500`, `ink400`, `ink150`, `ink050`) were declared in the original `const C = {...}` object but never referenced anywhere in the component body. The Edit tool surfaced this by failing to match them. They were dropped as part of the local-C cleanup. This is a quiet proof that local component token definitions drift from actual usage — reinforcing the WP-DS-2 rationale.
+
+---
+
+## Current state of `src/styles/tokens.js` at Addendum 2 close
+
+**302 lines. 5 live exports only:**
+
+```js
+export const T = { ... }                    // 172 lines — all tokens
+export const profileOverrides = { ... }     // 4 industry profile overrides
+export const getTokens = (profile) => ...   // merge helper
+export const getSeverityTokens = (severity) => ...  // semantic colour helper
+export const FONTS = ` @import url(...) `   // legacy, PageShell consumer only
+```
+
+**Dead legacy section: gone.** The file is now clean, documented, and consumable by any component that wants unified tokens.
+
+**T object additions during WP-DS-2** (all additive, zero consumers broken):
+- `T.surfaceDark`, `T.surfaceDarkAlt` (WP-DS-2/P1, PageShell)
+- `T.brandGold` (WP-DS-2/P1, PageShell)
+- `T.warningBorder`, `T.dangerBorder` (WP-DS-2/P3, ActionCentre)
+
+5 new tokens total. Each added because a genuine consumer had no existing T equivalent and would otherwise require a semantic-tier mismatch.
+
+---
+
+## Build + test status at Addendum 2 close
+
+- **Build: clean** across all 9 commits in this addendum block. Zero new ESLint warnings introduced. One pre-existing warning **retired** (anonymous-default-export in tokens.js).
+- **Data logic frozen** everywhere. Every WP-DS-2 migration touched render-layer styles only. No Supabase queries, triggers, business logic, prop contracts, or state shapes changed.
+- **Zero consumer breakage.** Priority 1 migrations preserved all routes; tokens.js cleanup verified dead-code-only before deletion; ActionCentre migration re-verified via build.
+- **LL-221 honoured** for every file touched: PageShell (182 lines read in full), ActionCentre (248 lines read in full), all Priority 1 pages grep-audited before editing.
+
+---
+
+## Priority queue for next session (refreshed for Addendum 2)
+
+### WP-DS-2 Priority 3 continues
+**Next file: `src/components/WorkflowGuide.js`** (589 lines). Follow the ActionCentre pattern:
+1. Read file in full (LL-221)
+2. Audit local T/C object against tokens.js T
+3. Report drift before editing
+4. Apply text-tier vs surface-tier rule for any warning/danger references
+5. Report + migrate + commit
+
+**Mandatory reading order for next agent starting WP-DS-2 P3:**
+1. `docs/WP-DESIGN-SYSTEM.md` — full status, rules, corrections, text-tier rule
+2. This SESSION-STATE (Addendum 2 specifically)
+3. `src/styles/tokens.js` — know the current T shape
+4. The actual target file — LL-221 always
+
+### Priority 4 blocker (must be addressed before starting 25 HQ file migrations)
+- **Text-tier vs surface-tier rule** is now formal WP doc. Every Priority 4 session must apply it. Do NOT naively `C.warning → T.warning`.
+- **Pre-flight audit strategy:** for each HQ file, grep local `const T = {...}` or `const C = {...}` and compare byte-by-byte against the shared T in `src/styles/tokens.js`. Note every drift before editing.
+
+### Carried from Addendum 1 priority queue (still open)
+1. AIFixture.js mount site confirmation (TIER 3 orphan)
+2. OnboardingWizard SPOF — verify invite-user EF v3 embeds /onboarding reliably
+3. ShopDashboard dormancy check
+4. LL-238 through LL-242 — add to NUAI-AGENT-BIBLE.md (pending owner approval)
+5. ActionCentre rollout to remaining 8 candidate components
+
+### Owner actions (carried from original v239)
+- Delete `trigger-sim-nourish` EF
+- Supabase Auth SMTP → Resend
+- CIPRO + `nuai.co.za` domain
+- HQForecast dispensary enhancement
+- ProteaAI `getSuggested()` updates for CSR/Compliance/Forecast tabs
+
+---
+
+## What every next agent must know before touching anything
+
+1. **HEAD is `78b2267`** at the close of this addendum. Confirm with `git log --oneline -1` before any work.
+
+2. **READ `docs/WP-DESIGN-SYSTEM.md` FIRST** if the task involves any component style, token, theme file, colour, or visual change. Always. It contains the text-tier rule, the Priority 1/2/3 status, the 5 WP-DS sub-WPs, and every correction/retraction discovered during execution. Future agents will destroy work if they skip it.
+
+3. **`src/styles/tokens.js` is the single source of truth for colours, spacing, radius, type, shadows, z-index.** Do not introduce local `const T = {...}` in new components. Do not introduce `const C = {...}` at all (legacy C is dead). Import `{ T }` from `"../../styles/tokens"` (adjust depth).
+
+4. **Never map `C.warning` or `C.danger` to `T.warning`/`T.danger` naively.** Text-tier colours map to `T.warningText` / `T.dangerText`. Border colours map to `T.warningBorder` / `T.dangerBorder`. See the rule table above and in WP-DESIGN-SYSTEM.md.
+
+5. **AdminQrGenerator.js is retired** (91c452f). `/admin/qr` redirects to `/admin?tab=qr_codes&sub=generate`. The modern QR engine is `src/components/AdminQRCodes.js` with an internal Generate sub-tab. A new "Generate QR" sidebar entry was added to `useNavConfig.js`.
+
+6. **ActionCentre is the standard for collapsible alert blocks.** Used by HQProduction, HQOverview, HQStock, HQSupplyChain, StockControl (visible on 5+ routes). New alert UI should use `<ActionCentre>` from `src/components/shared/ActionCentre.js` — now importing from the shared T token system.
+
+7. **RULE 0Q still stands:** Claude.ai NEVER calls push_files or create_or_update_file. All repo writes via Claude Code only.
+
+8. **The text-tier rule is the most valuable artifact of this session.** It prevents a catastrophic class of mistake (bright orange warning text) across 25 Priority 4 HQ files. Respect it.
+
+---
+
+*Addendum 2 written 11 April 2026 · HEAD at close: 78b2267*
+*9 commits · 8 files · WP-DESIGN-SYSTEM launch · WP-DS-1 complete · WP-DS-2 P1 complete · P2 retracted · P3 started (ActionCentre done)*
+*5 new T tokens added: surfaceDark · surfaceDarkAlt · brandGold · warningBorder · dangerBorder*
+*Dead legacy exports archived · 108 lines of dead code removed from tokens.js*
+*Full commit chain: 0c78e50 → 4a6f451 → 021b5dd → b205c33 → 3cff956 → 846280c → 96d8f70 → cb4a0d8 → 78b2267*
+*Key rule established: text-tier vs surface-tier semantic mapping (applies to all Priority 4 HQ files)*
