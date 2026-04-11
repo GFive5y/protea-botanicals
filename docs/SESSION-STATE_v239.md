@@ -580,3 +580,198 @@ CREATE POLICY "hq_all_{table}" ON {table} FOR ALL TO public USING (is_hq_user())
 *Sessions covered: v235 → v239 — full 11 April 2026 build day.*
 *HEAD at close: dd9f751*
 *Commit chain: 4d151bb → 09facc9 → 7a053c1 → f894b9d → 9d941af → 7ab9736 → 12d7683 → dd9f751*
+
+---
+
+# ADDENDUM — 11 April 2026 (later session): ActionCentre Rollout + Orphan Audit
+## HEAD at addendum close: `91c452f`
+## Commit chain: `3a9941d → 79d8416 → ec4a04f → e601079 → 8aa92fd → 8ce9979 → d589af5 → 98c51c6 → 91c452f`
+## 9 commits · 11 files touched · zero new build warnings · no data logic changes
+
+---
+
+## WP-ACTIONCENTRE — New shared component
+
+### `src/components/shared/ActionCentre.js` (NEW, ~250 lines)
+
+Reusable collapsible alert stack. **Zero external dependencies** — plain React + inline styles with self-contained colour tokens matching the platform palette.
+
+**Props:**
+```js
+<ActionCentre
+  title?: string                // header label, default "Action Centre"
+  alerts: Array<{
+    severity: "critical" | "warn",
+    message: string,
+    action?: { label: string, onClick: () => void },
+  }>
+/>
+```
+
+**Behaviour:**
+- **Collapsed by default** — single slim bar with amber warn count badge + red critical badge + "N active alerts" + chevron + ✕ dismiss
+- **Expanded**: `maxHeight: 30vh`, scrollable, one row per alert (severity dot · message · optional action button)
+- **Session-dismissible** via local `useState` (resets on remount — no localStorage)
+- Accessible: `aria-expanded`, `aria-label`, `role="button"` on dismiss, keyboard handler
+- Supports 2 severities only: `critical` (red) and `warn` (amber). `info` alerts from legacy callers must be mapped to `warn` at the call site
+
+### Rollout — 5 commits, 5 components converted
+
+| Commit | File | Scope | Lines changed |
+|---|---|---|---|
+| `3a9941d` | `src/components/shared/ActionCentre.js` (NEW) + `src/components/hq/HQProduction.js` | Shared component created; replaced 2 inline alert blocks (depleted stock + lowStock) in HQProduction with one `<ActionCentre>` call | +274 / -120 |
+| `79d8416` | `src/components/hq/HQProduction.js` | Fold `ctx.warnings` from `usePageContext("hq-production")` into the existing ActionCentre as warn severity; hide WorkflowGuide render on this tab only; remove WorkflowGuide import (Option A pattern) | +43 / -39 |
+| `ec4a04f` | `src/components/hq/HQOverview.js` | Replace "Low Stock Alerts" card (lines 2663-2820, ~158 lines) with full-width ActionCentre above 2-col panel grid; 2-col grid → 1-col (Recent Scans full-width); lift `.limit(5)` → `.limit(50)` on lowStock query | +29 / -161 |
+| `e601079` | `src/components/hq/HQStock.js` | Replace Zone 1 "Action Queue" card (lines 3174-3342, ~168 lines of JSX) with `<ActionCentre>`; preserve "All good" green success card for empty state; map `critical → critical`, `warning → warn`, `info → warn`; fold `sub` into message via `${text} · ${sub}`; remove dead SEV lookup | +46 / -142 |
+| `8aa92fd` | `src/components/hq/SupplyChain.js` | Convert Block 2 out-of-stock banner to ActionCentre; fold ctx.warnings (warn severity); hide WorkflowGuide on this tab only; remove WorkflowGuide import | +24 / -60 |
+| `8ce9979` | `src/components/StockControl.js` | Replace `<WorkflowGuide>` render (lines 463-468) with `<ActionCentre>` mapping `ctx.warnings`; delete redundant inline "Low Stock Alerts" block (lines 1056-1130, ~75 lines); keep Cost Drift + Dead Stock + Overstock blocks intact; keep `stockAlerts` state + fetchAlerts + realtime subscription frozen (feeds global AlertsBar) | +16 / -82 |
+
+**Total across 5 components:** approximately `+432 / -604` — net **-172 lines** while adding new functionality (collapse/dismiss/badges).
+
+### Reach of the StockControl change (`8ce9979`)
+
+StockControl is imported from TWO live sites:
+1. `src/pages/AdminDashboard.js:32` → `/admin` (Admin Portal stock tab)
+2. `src/components/hq/SupplyChain.js:26` → imported by HQDashboard for `/hq?tab=supply-chain` AND by TenantPortal for `/tenant-portal?tab=supply-chain`
+
+**Single commit affects three user-facing routes.**
+
+### Components NOT yet covered (follow-up candidates)
+
+Documented in `docs/FEATURE-INVENTORY.md` §"WHAT IS NOT YET COVERED BY ACTIONCENTRE":
+
+- `HQForecast.js` — S21 Expiry + Rx Repeat cards (dispensary-only, clinical visibility justifies keeping expanded)
+- `HQMedical.js` — Compliance sub-tab expiry tables
+- `HQVat.js` — filing status banners
+- `HQBankRecon.js` — unmatched lines panel
+- `HQFixedAssets.js` — "Run Depreciation" prompt
+- `HQCogs.js` — AVCO variance warnings
+- `AdminDashboard.js` overview alert cards (Comms/Fraud/Security)
+- **All ~25 HQ tabs with `usePageContext(tabId)` still render WorkflowGuide with `ctx.warnings[]` by default** — any of them could adopt the Option A pattern on demand
+
+---
+
+## WP-INVENTORY-AUDIT — Feature inventory + orphan risk
+
+### `docs/FEATURE-INVENTORY.md` (NEW, 526 lines)
+
+Read-only audit produced by `d589af5` + `98c51c6`. Organises every user-facing feature by portal and tab with: feature name · component file · route/tab · nav entry? · live data?
+
+**8 portals documented:**
+1. Consumer (public + authenticated) — 22 routes
+2. Wholesale (`/wholesale`) — 2 tabs
+3. Staff (`/staff`) — 3 sub-tabs
+4. HR (`/hr`) — 14 modules, 21,583 lines
+5. Admin (`/admin`) — 14 tabs + `/admin/qr` standalone (RETIRED this session — see below)
+6. HQ Dashboard (`/hq`) — 43 tabs across Operations / Finance / Stock & Production / F&B Suite / Dispensary Clinical Suite / Intelligence
+7. Tenant Portal (`/tenant-portal`) — 4-branch waterfall (CANNABIS_RETAIL / CANNABIS_DISPENSARY / FOOD_BEVERAGE / default)
+8. Shop Dashboard — conditional dispatch
+
+**Summary counts:**
+- ~130 user-facing features with live data
+- 22 top-level App.js routes
+- HQ 43 tabs · Admin 14 tabs · HR 14 tabs
+- F&B exclusive: 8 components, 16,085 lines
+- HR Suite: 13 components, 21,583 lines
+
+### Orphan Risk section (`98c51c6`) — features with no nav entry
+
+Three tiers identified:
+
+**TIER 1 — Confirmed direct-URL-only (HIGH risk)**
+- `pages/AdminQrGenerator.js` (1,218 lines) — `/admin/qr` route, no sidebar entry → **RETIRED this session** (see below)
+- `pages/OnboardingWizard.js` — `/onboarding`, only reached via post-signup email redirect from `invite-user` EF (v3). If that EF fails, no one can reach the wizard. **Still HIGH risk — follow-up needed.**
+
+**TIER 2 — Conditional dispatch (LOW risk, not dead code)**
+- `pages/ShopDashboard.js` (228) + `components/shop/ShopInventory.js` (850) + `ShopAnalytics.js` (844) + `ShopSettings.js` (597) + `ShopOverview.js` (503)
+- Mount chain verified: `src/App.js:1021-1031` → `AdminDashboardRouter` at `:742-787` → `if (tenantType === "shop") return <ShopDashboard />` — conditional dispatch. Not dead code.
+- **BUT**: none of the 9 current tenants in this SESSION-STATE have `tenantType === "shop"` — so the entire 2,794-line `components/shop/` tree may be rendering for nobody right now. Data/seed question, not dead-code question.
+
+**TIER 3 — Event-driven / ambiguous**
+- `CustomerSupportWidget.js`, `CustomerInbox.js`, `SurveyWidget.js`, `PromoBanner.js`, `DevErrorCapture.js` — all confirmed intentional floating/event-driven mounts (not orphans)
+- **`AIFixture.js` (301 lines) — mount site unconfirmed**, flagged MEDIUM risk, grep recommended as follow-up
+
+---
+
+## AdminQrGenerator retirement — `91c452f`
+
+Finding from the orphan audit acted on. AdminQrGenerator is a **legacy predecessor** of the `GenerateTab` sub-tab inside `AdminQRCodes.js` ("QR Engine v2.0"). Evidence:
+
+1. Feature superset — every function in AdminQrGenerator (single/bulk modes, batch dropdown, sign-qr EF call) is present inside AdminQRCodes' GenerateTab (line 1594), plus AdminQRCodes has 4 additional sub-tabs (Registry, Print Sheet, Security & Settings, Banners)
+2. Design-token drift — AdminQrGenerator uses the old `C = { green, mid, accent }` + Jost palette; AdminQRCodes uses the modern `T = { ink900, accent, ... }` + Inter palette
+3. AdminDashboard imports AdminQRCodes (line 40) but does NOT import AdminQrGenerator — no cross-link
+4. AdminQrGenerator header says "Staff-friendly QR Generator — no Supabase copy-paste required" (signature of an earlier, simpler tool)
+5. AdminQRCodes v2.0 header says "Full QR engine: 6 types, scan action stack, banner library, 3-step wizard" (language consistent with a ground-up rewrite that absorbed the older tool)
+
+### Retirement — 4-file change (`91c452f`, +39/-9)
+
+| File | Change |
+|---|---|
+| `src/App.js` | Removed `import AdminQrGenerator` (line 69); replaced `/admin/qr` Route element with `<Navigate to="/admin?tab=qr_codes&sub=generate" replace />`; added deprecation comment |
+| `src/pages/AdminQrGenerator.js` | Prepended 15-line ⚠ DEPRECATED header block explaining retirement; preserved original v4.0 history below; function body untouched (legacy reference only) |
+| `src/hooks/useNavConfig.js` | Added new `ADMIN_PAGES` entry "Generate QR" in Customers group pointing at `/admin?tab=qr_codes&sub=generate` — Admin sidebar now 14 entries (was 13) |
+| `src/components/AdminQRCodes.js` | Added `import { useLocation }` from react-router-dom; added 7-line useEffect inside the component that reads `?sub=` query param and calls `setTab(sub)` if valid. Hardcodes 5 valid keys inline. Preserves existing `initialTab` prop path. **Strictly additive — zero existing behaviour changed.** |
+
+### User-visible behaviour after deploy
+
+| URL / action | Before | After |
+|---|---|---|
+| `/admin/qr` | AdminQrGenerator legacy tool | Redirects to `/admin?tab=qr_codes&sub=generate` → modern Generate sub-tab |
+| `/admin?tab=qr_codes` | AdminQRCodes Registry | Unchanged |
+| `/admin?tab=qr_codes&sub=generate` | Registry (ignored sub) | Generate sub-tab |
+| "QR Codes" sidebar link | Registry | Unchanged |
+| "Generate QR" sidebar link | (didn't exist) | Lands directly on Generate sub-tab |
+
+One TIER 1 orphan closed. AdminQrGenerator.js remains in the tree as 1,218 lines of clearly-marked legacy code — safe to delete in a future cleanup pass.
+
+---
+
+## Build + test status at addendum close
+
+- **Build:** clean across all 9 commits. No new ESLint warnings introduced. Pre-existing warnings only: `App.js:94` `loading` unused, `AdminQRCodes.js:66` `C` unused, `AdminQRCodes.js:86` `FONTS` unused, `AdminQRCodes.js:781` useCallback missing `tenantId` dep, plus the session-long `StockControl.js`, `HQStock.js`, `HQOverview.js` pre-existing warnings (`CATEGORY_ICONS`, `C`, `F`, `DONUT_COLOURS`, `wkTxns`).
+- **Data logic frozen everywhere:** every ActionCentre conversion touched only render paths. All `useMemo`/`useState`/`useCallback`/`useEffect` computations, Supabase queries, trigger writes, and side-effect pipelines were preserved exactly. The one exception was HQOverview's `.limit(5)` → `.limit(50)` — a query parameter change, not logic change, and explicitly authorised by the owner before the edit.
+- **No files deleted.** AdminQrGenerator.js is deprecated but retained.
+- **LL-221 honoured** for every protected/locked file touched (HQStock 5,890 lines, HQProduction 8,949 lines, HQOverview 3,320 lines, StockControl 4,759 lines, AdminQRCodes 4,750 lines) via grep-first pragmatic reads.
+
+---
+
+## New LL rules to consider (not yet added to Bible)
+
+- **LL-238 — ActionCentre is the standard for collapsible alert blocks.** New blocking alert blocks in HQ/Admin/Tenant portal components should use `<ActionCentre>` from `src/components/shared/ActionCentre.js` with 2 severities (`critical`, `warn`). `info` from legacy usePageContext callers maps to `warn`. Data logic stays frozen — ActionCentre is render-layer only.
+
+- **LL-239 — WorkflowGuide + ActionCentre Option A pattern.** When a component renders `<WorkflowGuide context={ctx}>` and a local inline alert block simultaneously, the preferred fix is: remove WorkflowGuide from that component, fold `ctx.warnings` into the ActionCentre alerts array as warn severity, keep `usePageContext` hook call, never touch `usePageContext.js` or `WorkflowGuide.js`. One-file change per target, zero blast radius.
+
+- **LL-240 — Never extend ActionCentre severity tiers.** ActionCentre supports `critical` + `warn` only. Callers with 3+ tiers (e.g. HQStock's `info` tier) must map at the call site. Extending the shared component adds blast radius across all call sites.
+
+- **LL-241 — AdminQRCodes.js is the single source of truth for QR generation.** `AdminQrGenerator.js` is deprecated (91c452f). Never reference `/admin/qr` as a live route — it's a redirect. Any new QR functionality goes into AdminQRCodes sub-tabs.
+
+- **LL-242 — Protected-file pragmatic read.** For files >4,000 lines (HQStock, HQProduction, HQCogs, AdminQRCodes, StockControl), LL-221's "read the actual file" is satisfied by grep + targeted range reads that cover the edit scope + surrounding context + imports + state/hook setup, not by a literal full-file dump. Cite line numbers in the pre-edit report.
+
+These five rules should be added to `docs/NUAI-AGENT-BIBLE.md` in the next session as LL-238 through LL-242 if the owner approves.
+
+---
+
+## Priority queue for next session (refreshed)
+
+Building on the original v239 priority queue, these are the live follow-ups as of `91c452f`:
+
+### From this session
+1. **AIFixture.js mount site confirmation** (TIER 3 MEDIUM orphan) — grep `rg "AIFixture" src/` to confirm where it mounts. If no mount site found, archive or remove. 301 lines of potentially dead code.
+2. **OnboardingWizard SPOF** (TIER 1 HIGH orphan) — verify `invite-user` EF v3 embeds `/onboarding` in its emails reliably. If that's the only path, consider adding a fallback nav entry or admin-only direct link.
+3. **ShopDashboard dormancy check** (TIER 2 LOW) — confirm whether any tenant currently has `tenantType === "shop"`. If not, the entire `components/shop/` tree is dormant — decide archive vs seed a shop-type tenant.
+4. **LL-238 through LL-242** — add to NUAI-AGENT-BIBLE.md (optional — these are derived, not mandatory).
+5. **ActionCentre rollout to remaining candidates** — 8 components listed in FEATURE-INVENTORY §"WHAT IS NOT YET COVERED BY ACTIONCENTRE". Prioritise by user pain — which tabs currently show walls of text the user wants collapsed first.
+
+### Carried from original v239 priority queue
+- Delete `trigger-sim-nourish` EF (owner action — Supabase Dashboard)
+- Supabase Auth SMTP → Resend (owner action)
+- CIPRO + `nuai.co.za` domain (owner action)
+- HQForecast dispensary enhancement
+- ProteaAI `getSuggested()` updates for CSR/Compliance/Forecast tabs
+
+---
+
+*Addendum written 11 April 2026 · HEAD at close: 91c452f*
+*9 commits · 11 files · ActionCentre shared component + 5 rollouts + feature inventory + orphan audit + AdminQrGenerator retirement*
+*Zero new build warnings · data logic frozen across all commits*
+*Full commit chain: 3a9941d → 79d8416 → ec4a04f → e601079 → 8aa92fd → 8ce9979 → d589af5 → 98c51c6 → 91c452f*
