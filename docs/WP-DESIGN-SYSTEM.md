@@ -614,3 +614,79 @@ The dead legacy section at the bottom of `src/styles/tokens.js` was removed in t
 ---
 *WP-DESIGN-SYSTEM v1.0 · NuAi · Created 11 April 2026*
 *Next review: start of WP-DS-1 session*
+
+---
+
+## WP-DS-6 — Layout & Container Tokens
+**Status:** TOKENS DEFINED — adopt in all new features from this point  
+**Prerequisite:** WP-DS-1 complete ✅  
+**Added:** 11 April 2026
+
+### The Problem
+PageShell defaults to maxWidth=900px centered in the viewport.  
+At 1440px screen width this produces 270px dead gutters on each side.  
+Container widths are hardcoded at route level — 900 / 1000 / 1200 / 1400 — 
+none tokenised, none documented. New features invented values ad-hoc.
+
+### Layout Tokens — Add to tokens.js T object
+
+```js
+container: {
+  narrow:  900,   // consumer-facing: shop, checkout, account
+  default: 1200,  // standard portals: admin, staff
+  wide:    1400,  // power portals: HQ, HR, group dashboard
+  full:   "100%", // full-bleed: data-heavy tabs needing every pixel
+},
+page: {
+  gutterX:  24,   // horizontal padding inside any container
+  gutterY:  40,   // vertical section padding (top of content area)
+  sectionGap: 32, // gap between major page sections
+  cardGap:  16,   // gap between cards in a grid
+},
+sidebar: {
+  collapsed:  64, // icon-only sidebar width
+  expanded:  220, // full sidebar width (current TenantPortal nav)
+},
+breakpoint: {
+  mobile:   768,
+  tablet:  1024,
+  desktop: 1280,
+  wide:    1440,
+},
+```
+
+### Container Assignment Rules
+| Portal | Route | Container | Token |
+|---|---|---|---|
+| Consumer Shop | /shop | 900px | T.container.narrow |
+| Staff Portal | /staff | 1000px | T.container.default (close enough) |
+| Admin Dashboard | /admin | 1200px | T.container.default |
+| Tenant Portal | /tenant-portal | 1200px | T.container.default ← FIX from undocumented |
+| HQ Command Centre | /hq | 1400px | T.container.wide |
+| HR Suite | /hr | 1400px | T.container.wide |
+| Group Portal (NEW) | /group-portal | 1400px | T.container.wide |
+
+### The Dead Space Fix
+TenantPortal's content container is currently undocumented and inconsistent.  
+Standard: adopt T.container.default (1200px) for all TenantPortal tab content.  
+This recovers ~150px of dead space per side at 1440px screen width.  
+Do NOT migrate existing tabs now — adopt on new features, fix in WP-DS-2 continuation.
+
+### Rules
+- All new features MUST declare their container token in their WP spec
+- Never hardcode a pixel width that matches a container token — import T
+- Group Portal uses T.container.wide (1400px) — same as HQ
+- Full-bleed tabs (large data tables, stock grids) may use T.container.full
+- Page gutter T.page.gutterX (24px) always applied — never 0 except noPadding
+- Card grids use T.page.cardGap (16px) as gap — never ad-hoc margins between cards
+
+### Also add to tokens.js under the existing T export:
+These tokens go AFTER the existing spacing/radius/shadow/z sections.
+Use the same export pattern — additive, no existing tokens removed.
+
+### Dead Space Recording (for future UX audit — LL-238)
+LL-238: The 900px default PageShell container creates 270px dead gutters  
+at 1440px. This is a known UX deficiency. Fixing it for existing pages  
+is WP-DS-2 continuation scope. All NEW features use T.container tokens  
+from this point. A full container-width audit of existing pages is  
+scheduled as WP-DS-6 Phase 2 (future session).
