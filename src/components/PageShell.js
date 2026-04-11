@@ -8,7 +8,7 @@
 // Usage: Wrap page content → <PageShell><YourPage /></PageShell>
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { FONTS, C } from "../styles/tokens";
+import { FONTS, T } from "../styles/tokens";
 
 // Inject Google Fonts once
 const fontsInjected = (() => {
@@ -36,7 +36,7 @@ export default function PageShell({
     <div
       style={{
         minHeight: "calc(100vh - 56px)", // 56px = NavBar height from App.js v3.2
-        background: C.cream,
+        background: T.bg,
         display: "flex",
         flexDirection: "column",
         fontFamily: "Jost, sans-serif",
@@ -59,7 +59,7 @@ export default function PageShell({
       {/* ── Footer ────────────────────────────────────────────────────── */}
       <footer
         style={{
-          background: C.footer,
+          background: T.surfaceDark,
           padding: "48px 24px 32px",
           marginTop: "auto",
         }}
@@ -82,7 +82,7 @@ export default function PageShell({
                 fontFamily: "'Cormorant Garamond', Georgia, serif",
                 fontSize: "20px",
                 fontWeight: "700",
-                color: C.gold,
+                color: T.brandGold,
                 letterSpacing: "0.05em",
                 marginBottom: "8px",
               }}
@@ -129,7 +129,7 @@ export default function PageShell({
                   textTransform: "uppercase",
                   transition: "color 0.15s",
                 }}
-                onMouseEnter={(e) => (e.target.style.color = C.gold)}
+                onMouseEnter={(e) => (e.target.style.color = T.brandGold)}
                 onMouseLeave={(e) =>
                   (e.target.style.color = "rgba(255,255,255,0.5)")
                 }

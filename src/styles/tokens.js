@@ -150,6 +150,21 @@ export const T = {
   neutral:      "#6c757d",
   neutralLight: "#f1f3f5",
   neutralText:  "#212529",
+
+  // ─── DARK SURFACES ───────────────────────────────────────────
+  // Added WP-DS-2 (PageShell migration). No dark-surface token
+  // existed in WP-DS-1 base T. Required by: PageShell footer,
+  // Redeem.js dark footer band, future modal overlays (WP-DS-4),
+  // ambient danger state (WP-DS-5).
+  surfaceDark:    "#1a1a1a",   // dark footer / dark hero surfaces
+  surfaceDarkAlt: "#060e09",   // deepest surface (e.g. Redeem.js footer)
+
+  // ─── BRAND ACCENTS ───────────────────────────────────────────
+  // Added WP-DS-2 (PageShell migration). Protea Botanicals brand
+  // gold — distinct from T.warning (which is WCAG warning orange).
+  // Used for brand name treatment, footer hover highlights, and
+  // luxury accent moments that are NOT semantic warnings.
+  brandGold:      "#b5935a",   // Protea Botanicals brand accent (warm gold)
 };
 
 // ─── PROFILE-AWARE TOKEN OVERRIDES ────────────────────────────
