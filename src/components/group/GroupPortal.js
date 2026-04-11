@@ -22,6 +22,7 @@ import NetworkDashboard from "./NetworkDashboard";
 import GroupTransfer from "./GroupTransfer";
 import GroupSettings from "./GroupSettings";
 import StoreComparison from "./StoreComparison";
+import CombinedPL from "./CombinedPL";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -393,9 +394,11 @@ export default function GroupPortal() {
           />
         )}
         {activeTab === "financials" && (
-          <PlaceholderTab
-            title="Combined P&L"
-            description="Consolidated P&L across all group stores. Read-only. Coming in later phase."
+          <CombinedPL
+            groupId={groupId}
+            groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
           />
         )}
         {activeTab === "loyalty" && (
