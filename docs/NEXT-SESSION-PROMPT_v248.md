@@ -22,8 +22,6 @@ exists because of the system described there.
    a post-close doc commit has landed)
 
 2. Read **CLAUDE.md** (at repo root, v2.0) — operational instructions.
-   Note: prior session docs sometimes reference `docs/CLAUDE.md` which
-   is documentation drift — the actual file is `CLAUDE.md` at repo root.
 
 3. Read **docs/SESSION-STATE_v240.md** — now has **Addendum 3** covering
    WP-A5/S2 and the NUAI-STRAT-INTEL integration. Read the baseline

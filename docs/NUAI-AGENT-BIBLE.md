@@ -4,7 +4,7 @@ Before reading the LL rules below, read
 **docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md**.
 The rules in this file exist because of the system described there.
 Understanding the system makes the rules make sense. Strategic
-intelligence is Step 0 of every session per docs/CLAUDE.md — read
+intelligence is Step 0 of every session per CLAUDE.md (at repo root) — read
 it in full including any date-stamped addendums appended to the v1.0
 body before acting on a single LL rule.
 

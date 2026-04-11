@@ -474,7 +474,7 @@ They are the difference between a compliant business and a liability.
 
 1. Read this document (done)
 2. Read `docs/PLATFORM-OVERVIEW_v1_0.md` — scale and system overview
-3. Read `docs/CLAUDE.md` (v2.0) — your operational instructions
+3. Read `CLAUDE.md` (at repo root, v2.0) — your operational instructions
 4. Read `docs/SESSION-STATE_v240.md` — current state + all addendums
 5. Read `docs/NUAI-AGENT-BIBLE.md` — the LL rules, patterns, violations
 6. Read the current `docs/NEXT-SESSION-PROMPT_v{N}.md` — your priority queue

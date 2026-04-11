@@ -875,9 +875,11 @@ landed as the mandatory first orientation read for every agent. The
 document is owner-directed, never replaced, only appended with
 date-stamped addendums. Integrated at every agent-touch surface:
 
-1. **CLAUDE.md** — Step 0 orientation read added before the existing
-   5 actions. Note: the actual file is at repo root `/CLAUDE.md`, not
-   `docs/CLAUDE.md` as prior session docs incorrectly referenced.
+1. **CLAUDE.md** (at repo root) — Step 0 orientation read added
+   before the existing 5 actions. A prior-sessions documentation
+   drift that referenced this file under a `docs/` prefix was also
+   corrected in the follow-up `fix: CLAUDE.md path drift` commit —
+   see Known Issue 12 below (resolved).
 2. **docs/NUAI-AGENT-BIBLE.md** — header reference added before the
    existing "READ THIS FIRST" block explaining that the LL rules
    exist because of the system described in NUAI-STRAT-INTEL.
@@ -977,7 +979,7 @@ will add Network Intelligence as the 8th content tab.
 9. `loyalty_campaigns` table does not exist — WP-ANALYTICS-5 Section 4 permanently blocked until schema owner adds it
 10. Medi Can Dispensary has only 1 user_profiles row — cohort render is technically correct but not visually informative. Real dispensary test data would improve verification.
 11. **NEW — Medi Can cohort overlap UX (non-blocking).** When a store has overlapping cohort membership (Medi Can Dispensary has 1 member who is BOTH `isNew` AND `isDormant` — never purchased, joined in April), the Section 3 cohort bar renders segments that visually sum to > 100% because `isNew` overlaps the other cohorts at the classification level while the bar renders them as disjoint. Underlying data is honest and correct — the `isNew` flag is intentionally orthogonal to the active/dormant classification per the helper's documented semantics. Fix options: exclude `isNew` from the bar, or render it as a stacked overlay, or annotate it separately. Deferred to a small UX-fix session. Surfaced during S2 browser verification by the owner.
-12. **NEW — Documentation drift on CLAUDE.md path.** Prior session docs refer to `docs/CLAUDE.md` but the actual file is at repo root (`/CLAUDE.md`). Not a functional bug — Claude Code loads the root file automatically — but the references should be corrected in a future doc pass to avoid confusing future agents.
+12. ~~**Documentation drift on CLAUDE.md path.**~~ **RESOLVED** — follow-up `fix: CLAUDE.md path drift` commit corrected the four live references in NUAI-STRAT-INTEL, NUAI-AGENT-BIBLE, NEXT-SESSION-PROMPT_v248, and this Addendum 3 narrative. Historical session prompts (v241 and earlier) preserve the drifted path as a frozen archaeological record and were intentionally not edited.
 
 ## KEY FACTS FOR THE NEXT AGENT
 
