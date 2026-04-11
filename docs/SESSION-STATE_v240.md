@@ -370,3 +370,207 @@ accumulated state had become unreliable.
 *SESSION-STATE_v240.md v1.0 · 12 April 2026*
 *HEAD at snapshot: `3ec1d32` · Consolidated from v239 Addendums 1-7 plus WP-A3/S2 + WP-A4/S1*
 *Next addendum (Addendum 1 of v240) on the next session close*
+
+---
+
+# ADDENDUM 1 — 12 April 2026: WP-ANALYTICS-4 Session 2 complete
+
+## HEAD AT CLOSE: `e55961f`
+
+## COMMIT CHAIN (Addendum 1 of v240)
+
+```
+fa207c7 (v240 baseline)
+  → e237fdd  docs: WP-ANALYTICS-5 spec committed (Claude.ai strategic session)
+  → c724432  docs: WP-ANALYTICS-5 spec status — SPEC COMPLETE, gate lifted
+  → 01f0111  docs: WP-ANALYTICS-4 S2 gap closure addendum — locked decisions before build
+  → e55961f  feat(WP-A4/S2): StockIntelligence velocity, transfer opportunities, dead stock breakdown
+```
+
+Five commits. Two spec commits for Module 5 (arrival + gate-lift), one
+S2 gap-closure addendum commit on Module 4, and one feature commit
+shipping Module 4 Session 2 in full.
+
+## WHAT SHIPPED
+
+### Module 5 spec landed and gated (commits `e237fdd` + `c724432`)
+
+WP-ANALYTICS-5 Customer & Loyalty Intelligence detailed spec committed
+from the Claude.ai strategic spec session. 570 lines covering:
+network cohort analytics, loyalty tier distribution per store, cohort
+health collapsible sections, CSV export, POPIA compliance rules, and
+a Session 2 roadmap covering campaign ROI + AI engine activity + top
+customers. Mojibake cleaned during the save.
+
+Gate-lift commit updated `docs/WP-ANALYTICS.md` Module 5 status,
+`docs/SESSION-STATE_v240.md` Module 5 row, and `docs/NEXT-SESSION-PROMPT_v245.md`
+Priority 2 (three separate references — table row, section status,
+key facts list, footer strapline) from "SPEC PENDING FROM CLAUDE.AI"
++ "Do NOT start Module 5" gate to "SPEC COMPLETE — ready for Session 1 · e237fdd".
+
+### WP-ANALYTICS-4 S2 gap closure addendum (`01f0111`)
+
+Before any S2 code, the Claude.ai spec review produced a 345-line
+addendum appended to `docs/WP-ANALYTICS-4.md` that closed six gaps
+from the base S2 spec with locked decisions:
+
+- **Gap 1** — Dispensary velocity sourcing (CRITICAL silent-corruption
+  risk): branch on industryProfile, retail queries stock_movements,
+  dispensary queries dispensing_log with is_voided filter
+- **Gap 2** — Cross-store SKU join key (CRITICAL): Step 0-B probes
+  inventory_items for candidate shared keys; if none found, render
+  honest empty state across all stores — no fuzzy name matching
+- **Gap 3** — Fast movers filter + partition order:
+  velocityUnits30d ≥ 3 OR daysOfStockLeft < 14, with
+  isSellingWithNoStock items surfaced first (dangerLight row tint,
+  "Active — no stock" chip, OUT pill), cap 25 with "+ N more" expand
+- **Gap 4** — Network KPI decision: banner (not more tiles) between
+  Section 1 and Section 2, only renders when a signal is non-zero
+- **Gap 5** — Dead stock full UI: 7-column table with age bands
+  (60-90d warning / 91-180d danger / 181+d danger semibold), local
+  flag toggle as visual workflow aid, capital % always shown
+- **Gap 6** — reorderQty null guard: `safeReorderQty = reorder_qty
+  ?? reorder_level ?? 0` pattern everywhere reorderQty enters arithmetic
+
+### Step 0 schema verification (Supabase MCP, 12 Apr 2026)
+
+Both critical schema checks ran before any code:
+
+**Step 0-A — Dispensary velocity** (Gap 1):
+- `stock_movements` for Medi Can Dispensary WHERE `movement_type IN (sale_pos, sale_out)`: **0 rows**
+- `dispensing_log` for Medi Can Dispensary WHERE `is_voided != true`: **14 rows, 14 total units**
+- **Dispensary branch is MANDATORY.** Retail-only velocity query would silently return empty for the dispensary store.
+
+**Step 0-B — Cross-store SKU join key** (Gap 2):
+- Candidate columns on `inventory_items`: only `sku` (text). No `barcode`, `product_template_id`, `supplier_sku`, `product_code`, `global_sku`, or `parent_id`.
+- SKUs appearing in 2+ tenants: **0 rows**
+- **No cross-store join key exists.** Transfer opportunity engine renders honest empty state for the entire network per the Gap 2 decision tree.
+
+### WP-ANALYTICS-4 Session 2 feature (`e55961f`, +1,677 / −201)
+
+Two files changed:
+
+**`src/components/group/_helpers/fetchStoreInventory.js` (174 → 335 lines, +161)**
+
+- Removed the S1 `void industryProfile` and `void options` directives; both now consumed in the velocity layer
+- Destructures `options.includeVelocity` (default `false` — S1 callers keep working with zero regression)
+- Seven named constants at module scope for all thresholds: `SLOW_MOVER_DAYS`, `DEAD_STOCK_DAYS`, `VELOCITY_WINDOW_DAYS`, `FAST_MOVER_MIN_UNITS`, `CRITICAL_RESTOCK_DAYS`, `LOW_STOCK_DAYS`, `MS_PER_DAY`
+- Core inventory query stays in its own try/catch — S1 error semantics preserved bit-for-bit
+- NEW: velocity query is a separate try/catch inside the core try/catch so failure is isolated. Errors land in `result.velocityErr` (not `result.err`), core items still render. UI can surface "velocity unavailable" per store without hiding the health snapshot.
+- Profile-branched velocity fetch: retail path queries `stock_movements` WHERE `movement_type IN ('sale_pos','sale_out')` with `Math.abs()` on `quantity`; dispensary path queries `dispensing_log` WHERE `.neq("is_voided", true)` plus client-side `is_voided !== true` re-filter for NULL safety
+- Row loop enriched with 6 new S2 fields per item: `velocityUnits30d`, `monthlyRate`, `daysOfStockLeft`, `isCriticalRestock`, `isFastMover`, `isSellingWithNoStock`, plus the `safeReorderQty` Gap 6 arithmetic-safe fallback
+- Summary aggregates 4 new counters: `fastMovers`, `criticalRestock`, `sellingWithNoStock`, `velocityQueried` (bool)
+
+**`src/components/group/StockIntelligence.js` (1,007 → 2,322 lines, +1,315)**
+
+- S1 components preserved bit-for-bit per Gap 5's "keep both, add a visual note" decision — `SlowMoversSection`, `StoreStockCard`, `HealthBar`, `StatusChip`, `KpiTile`, `IndustryPill` all unchanged
+- New helpers: `fmtPct`, `fmtDaysOfStock`, `fmtMonthlyRate`, `getAgeBand`, `buildTransferOpportunities`
+- New sub-components: `NetworkInsightBanner`, `FastMoversSection`, `TransferOpportunitiesSection`, `DeadStockSection`
+- Main component: call site now passes `{ includeVelocity: true }`; `network` useMemo extended with `criticalRestock`, `deadStockValue`, `deadPct`, `avcoMissingInDead`; `opportunities` useMemo added; three new section renders after Section 3; data quality footnote updated
+- `NetworkInsightBanner` renders between Section 1 and Section 2 — only when `criticalCount > 0` OR `deadCount > 0`. Absent (not empty) when both are zero.
+- `FastMoversSection` applies the Gap 3 partition order: `isSellingWithNoStock` first (sorted by velocity DESC, rendered with dangerLight row tint and "Active — no stock" chip), then `isFastMover && !isSellingWithNoStock` (sorted by `daysOfStockLeft` ASC, most urgent first). Cap at 25 with "+ N more items" expand toggle.
+- `TransferOpportunitiesSection` calls `buildTransferOpportunities(resultByTenant, members)` which builds a cross-store SKU map, partitions into `needs` vs `haves`, and applies the Gap 2 surplus/need/suggestedQty formulas with the `safeReorderQty` fallback. For the current Medi Can network (no shared SKUs) it returns empty and the honest empty state renders.
+- `DeadStockSection` uses `getAgeBand(days)` to assign row background + chip colour per age band. Local `flaggedIds` `Set` in `useState` for the visual flag toggle. Collapsed header shows capital as percentage of store value with `—%` fallback when `totalStoreValue === 0`. Expanded section footnote links back to the S1 Slow Movers section explaining the intentional duplication.
+
+### Paste-bug checklist walked pre-commit
+
+All 5 canonical patterns green. One catch during the walk:
+`network` useMemo was accumulating `fastMovers` and `sellingWithNoStock`
+totals that were returned in the object but never consumed by the
+render (per-store values read directly from `inventoryResult.summary`
+in each section component, not from the network aggregate). Removed
+before commit — 3-edit cleanup on the `let` declarations, `+=`
+accumulator lines, return-object keys, and fallback-object default
+keys. ESLint wouldn't have flagged it (dead object properties, not
+dead top-level variables), but the checklist spirit of "walk every
+const for actual usage" caught it. Post-cleanup rebuild confirmed
+still zero new warnings.
+
+### Browser verification (confirmed by owner at HEAD `e55961f`)
+
+All four S2 features verified live against the Medi Can Franchise Network:
+
+1. **Network Insight Banner** renders with critical restock count and
+   dead stock capital disclosure. AVCO-missing footnote surfaces
+   correctly for Medi Recreational's 172 items without AVCO.
+2. **Section 4 Fast Movers** populates on BOTH stores — Medi
+   Recreational from `stock_movements`, Medi Can Dispensary from
+   `dispensing_log` via the Gap 1 branch. **Dispensary velocity branch
+   confirmed live** — without it, Medi Can Dispensary would show empty.
+3. **Section 5 Transfer Opportunities** renders the honest empty state
+   exactly as specified by Gap 2's decision tree. **No shared SKUs →
+   no fake opportunities.** Confirmed the empty state message, not a
+   blank section.
+4. **Section 6 Dead Stock Breakdown** — Medi Recreational shows dead
+   stock items with correct age band colouring; Medi Can Dispensary
+   shows the green "no dead stock" empty state. Flag toggle works
+   locally.
+
+## GROUP PORTAL TAB STATUS (unchanged since v240 baseline)
+
+| Tab | Component | Status |
+|---|---|---|
+| Network Dashboard | NetworkDashboard.js | ✅ Live |
+| Stock Transfers | GroupTransfer.js | ✅ Live (AVCO-correct) |
+| Compare Stores | StoreComparison.js | ✅ Live |
+| Combined P&L | CombinedPL.js | ✅ Live |
+| Revenue Intelligence | RevenueIntelligence.js | ✅ Live (S1+S2) |
+| Stock Intelligence | StockIntelligence.js | ✅ **Live (S1+S2 as of this addendum)** |
+| Shared Loyalty | disabled nav | Phase 2+ deferred |
+| Group Settings | GroupSettings.js | ✅ Live |
+
+Module 4 Session 2 closes the last active Analytics build. Next
+session starts Module 5 Session 1 from the spec committed at
+`e237fdd`.
+
+## WP-ANALYTICS SUITE PROGRESS AT ADDENDUM 1 CLOSE
+
+| Module | Name | Status |
+|---|---|---|
+| 1 | Store Comparison | ✅ COMPLETE — `8221177` |
+| 2 | Combined P&L | ✅ COMPLETE — `5ba63b5` |
+| 3 | Revenue Intelligence | ✅ COMPLETE — `6ea2493` |
+| 4 | **Stock Intelligence** | ✅ **COMPLETE — `e55961f`** |
+| 5 | Customer & Loyalty Intelligence | SPEC COMPLETE — `e237fdd` · ready for Session 1 |
+| 6 | NuAi Network Intelligence | Pending — no detailed spec yet |
+
+Four of six modules complete. Module 5 spec locked and on disk.
+
+## `_helpers/` DIRECTORY (unchanged occupants, S2 extended one file)
+
+| File | Purpose | Extended in this addendum? |
+|---|---|---|
+| `fetchStoreSummary.js` | MTD summary | No |
+| `industryBadge.js` | Profile → badge map | No |
+| `fetchStoreFinancials.js` | P&L for a date range | No |
+| `fetchStoreTrend.js` | Timestamped revenue rows + bucketing | No |
+| `fetchStoreInventory.js` | Inventory snapshot + velocity | **Yes — +161 lines for S2 velocity opt-in** |
+
+Module 5 will add `fetchStoreLoyalty.js` as the sixth sibling.
+
+## KNOWN ISSUES (no change from v240 baseline)
+
+1. HQTransfer historical AVCO corruption — forward-fix at `713ef3a`, pre-fix data not remediated
+2. Per-line atomicity gap in HQTransfer + GroupTransfer ship/receive/cancel
+3. GroupSettings email-invite gap — LL-243 open
+4. Cross-tenant "View store →" navigation placeholders
+5. Transfer pre-selection from StoreComparison / StockIntelligence
+6. Medi Recreational AVCO gap (172 of 186 items — simulator data)
+7. Sender email not on brand domain
+8. `docs/.claude/worktrees/` disk cleanup
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `e55961f`** (plus one doc commit this close). Confirm with `git log --oneline -1`.
+2. **WP-ANALYTICS-4 is DONE.** Both sessions complete. Stock Intelligence is the 5th complete analytics module.
+3. **Dispensary velocity branch** in `fetchStoreInventory.js` is the Gap 1 implementation — verified live with Medi Can Dispensary data. Pattern: branch on `industryProfile === 'cannabis_dispensary'` inside `options.includeVelocity`.
+4. **Transfer opportunity engine** in `buildTransferOpportunities` is correctly built but renders empty for the current network. When a future network adds stores with shared SKUs, it will automatically start producing matched opportunities.
+5. **Paste-bug checklist caught one dead-code issue** (fastMovers/sellingWithNoStock accumulators with no consumer) before commit. Checklist is working; trust it on future builds.
+6. **6 helpers in `_helpers/`** after Module 5 ships — the pattern is well-established. Each new analytics module adds a sibling `fetchStoreX.js`.
+7. **Module 5 is next.** Spec at `docs/WP-ANALYTICS-5.md`, HEAD `e237fdd`. Step 0 schema check (8 SQL queries in the spec) is the first action when implementation starts — includes POPIA compliance verification (no individual customer PII in the Group Portal view).
+
+---
+
+*Addendum 1 of v240 written 12 April 2026 · HEAD at close: `e55961f` (pre-doc-commit)*
+*Five commits in Addendum 1 · WP-ANALYTICS-4 COMPLETE · Module 5 spec locked and ready*
+*Dispensary velocity branch confirmed live · Transfer opportunities empty state confirmed · Six gaps closed*

@@ -186,7 +186,7 @@ Data sources: orders, dispensing_log (grouped by day/week/month)
 ### Module 4 — Stock Intelligence (WP-ANALYTICS-4)
 File: docs/WP-ANALYTICS-4.md (to be written before build)
 Tab: /group-portal?tab=stock
-Status: IN PROGRESS — Session 1 HEAD 3ec1d32 · Session 2 pending
+Status: COMPLETE — shipped e55961f, verified in browser (both sessions)
 Primary question: "Where is stock stuck and where is it needed?"
 Key features:
   - Network-wide stock heatmap — every store, every SKU, one view
@@ -247,7 +247,7 @@ EF: ai-copilot v70 (already deployed, already tested in tenant portals)
 | WP-ANALYTICS-1 | Store Comparison | 1 | ✅ COMPLETE — HEAD 8221177 |
 | WP-ANALYTICS-2 | Combined P&L | 1 | ✅ COMPLETE — HEAD 5ba63b5 |
 | WP-ANALYTICS-3 | Revenue Intelligence | 2 | ✅ COMPLETE — HEAD 6ea2493 |
-| WP-ANALYTICS-4 | Stock Intelligence | 2 | IN PROGRESS — Session 1 HEAD 3ec1d32 |
+| WP-ANALYTICS-4 | Stock Intelligence | 2 | ✅ COMPLETE — HEAD e55961f |
 | WP-ANALYTICS-5 | Customer & Loyalty | 1 | SPEC COMPLETE — ready for Session 1 · e237fdd |
 | WP-ANALYTICS-6 | NuAi Network Intelligence | 2 | Pending |
 
