@@ -104,20 +104,22 @@ CREATE TABLE tenant_group_members (
 ### RLS — 3 new policies (LL-205: every new table needs both policies)
 
 ```sql
+-- Note: use user_tenant_id() not get_my_tenant_id()
+--   Source: LIVE-AUDIT v1.0 Part 1 line 391 (LL-221)
 -- tenant_groups: owner can see and manage their own groups
 CREATE POLICY "tenant_can_see_own_groups" ON tenant_groups
   FOR ALL USING (
-    owner_tenant_id = get_my_tenant_id()
+    owner_tenant_id = user_tenant_id()
     OR is_hq_user()
   );
 
 -- tenant_group_members: members can see their group
 CREATE POLICY "member_can_see_group" ON tenant_group_members
   FOR ALL USING (
-    tenant_id = get_my_tenant_id()
+    tenant_id = user_tenant_id()
     OR group_id IN (
       SELECT id FROM tenant_groups 
-      WHERE owner_tenant_id = get_my_tenant_id()
+      WHERE owner_tenant_id = user_tenant_id()
     )
     OR is_hq_user()
   );
@@ -134,8 +136,8 @@ CREATE POLICY "hq_all_tenant_group_members" ON tenant_group_members
 -- This new policy allows group members to see sibling transfers.
 CREATE POLICY "group_transfer_visibility" ON stock_transfers
   FOR SELECT USING (
-    from_tenant_id = get_my_tenant_id()
-    OR to_tenant_id = get_my_tenant_id()
+    from_tenant_id = user_tenant_id()
+    OR to_tenant_id = user_tenant_id()
     OR is_hq_user()
   );
 ```
