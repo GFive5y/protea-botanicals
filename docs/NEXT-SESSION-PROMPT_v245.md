@@ -186,16 +186,15 @@ Per-store total capital tied up (`Σ stockValue`). Action: flag for review.
 
 6. `CI=false npm run build` → zero new warnings.
 
-### Priority 2 — WP-ANALYTICS-5 Customer & Loyalty Intelligence (when spec arrives)
+### Priority 2 — WP-ANALYTICS-5 Customer & Loyalty Intelligence
 
-**Status: SPEC PENDING FROM CLAUDE.AI.**
+**Status: SPEC COMPLETE — `docs/WP-ANALYTICS-5.md` committed at `e237fdd`. Module 5 is ready to build after WP-A4/S2.**
 
-Do NOT start Module 5 before the spec doc is committed to
-`docs/WP-ANALYTICS-5.md`. The Analytics Suite Session Close Protocol
-requires each module's detailed spec to exist on disk before any code
-is written. If the spec has landed by the time this session starts,
-treat Module 5 as Priority 1.5 — after WP-A4/S2 but before the other
-priorities.
+Read `docs/WP-ANALYTICS-5.md` in full (LL-221) before any code. The spec
+includes a Step 0 schema check (8 SQL queries) that must run and report
+results before `fetchStoreLoyalty.js` is written. POPIA compliance is
+non-negotiable — aggregate counts and cohort distributions only, no
+individual customer PII rendered anywhere in the Group Portal view.
 
 Master suite overview features (from WP-ANALYTICS.md):
 - Network loyalty members: total, active (30d), at-risk
@@ -276,8 +275,9 @@ arrives during the session):
 6. **WP-ANALYTICS-4 S1 is live** — fetchStoreInventory helper has an
    `options` parameter ready for S2's `includeVelocity` opt-in. Signature
    is stable.
-7. **WP-ANALYTICS-5 spec is pending** from Claude.ai. Do NOT start
-   Module 5 code before `docs/WP-ANALYTICS-5.md` is committed.
+7. **WP-ANALYTICS-5 spec is committed** at `e237fdd`. Module 5 is ready
+   to build after WP-A4/S2 completes. Step 0 schema check (8 SQL
+   queries) is the first action when implementation starts.
 8. **`last_movement_at` efficiency win** — zero stock_movements queries
    for S1 stock intelligence. Session 2 adds one aggregation query per
    store for velocity but only behind the `includeVelocity` opt-in.
@@ -295,4 +295,4 @@ arrives during the session):
 *NEXT-SESSION-PROMPT_v245.md · 12 April 2026*
 *HEAD at write: `3ec1d32` · WP-ANALYTICS-3 COMPLETE · WP-ANALYTICS-4 S1 LIVE*
 *SESSION-STATE migrated to v240 clean consolidated snapshot*
-*Priority 1: WP-A4/S2 velocity + transfer opportunities. Priority 2: WP-A5 when spec arrives.*
+*Priority 1: WP-A4/S2 velocity + transfer opportunities. Priority 2: WP-A5 S1 — spec locked at e237fdd, ready to build.*

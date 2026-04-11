@@ -130,7 +130,7 @@ Do NOT suppress or fake AVCO values — honest data is correct output.
 | 2 | Combined P&L | 1 | ✅ COMPLETE — HEAD `5ba63b5` |
 | 3 | Revenue Intelligence | 2 | ✅ COMPLETE — HEAD `6ea2493` (S1: `5352d96` · S2: `6ea2493`) |
 | 4 | Stock Intelligence | 2 | ⚙️ IN PROGRESS — S1 HEAD `3ec1d32` · S2 pending |
-| 5 | Customer & Loyalty Intelligence | ~1 | Pending — detailed spec coming from Claude.ai |
+| 5 | Customer & Loyalty Intelligence | ~1 | SPEC COMPLETE — ready for Session 1 · e237fdd |
 | 6 | NuAi Network Intelligence | ~2 | Pending — no detailed spec yet |
 
 Per-module detailed specs live in `docs/WP-ANALYTICS-N.md`. The master
