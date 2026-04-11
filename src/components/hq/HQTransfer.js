@@ -418,17 +418,19 @@ export default function HQTransfer() {
         // First: try match by sku, then by name
         let shopItemId = null;
         let shopCurrentQty = 0;
+        let shopCurrentAvco = 0; // LL-242 — captured for AVCO recalc
 
         if (line.sku) {
           const { data: bySkuArr } = await supabase
             .from("inventory_items")
-            .select("id, quantity_on_hand")
+            .select("id, quantity_on_hand, weighted_avg_cost")
             .eq("tenant_id", transfer.to_tenant_id)
             .eq("sku", line.sku);
           const bySku = bySkuArr?.[0] || null;
           if (bySku) {
             shopItemId = bySku.id;
             shopCurrentQty = bySku.quantity_on_hand || 0;
+            shopCurrentAvco = bySku.weighted_avg_cost || 0;
           }
         }
 
@@ -436,21 +438,38 @@ export default function HQTransfer() {
           // Try name match as fallback
           const { data: byNameArr } = await supabase
             .from("inventory_items")
-            .select("id, quantity_on_hand")
+            .select("id, quantity_on_hand, weighted_avg_cost")
             .eq("tenant_id", transfer.to_tenant_id)
             .eq("name", line.item_name);
           const byName = byNameArr?.[0] || null;
           if (byName) {
             shopItemId = byName.id;
             shopCurrentQty = byName.quantity_on_hand || 0;
+            shopCurrentAvco = byName.weighted_avg_cost || 0;
           }
         }
 
         if (shopItemId) {
-          // Update existing shop item
+          // LL-242 AVCO FIX — recalculate weighted_avg_cost on receive.
+          // newAvco = ((destQty × destAvco) + (confirmedQty × unit_cost_zar))
+          //           / newQty
+          // Prior versions updated only quantity_on_hand, silently corrupting
+          // destination AVCO. See LL-242 in NUAI-AGENT-BIBLE.md.
+          const inUnitCost = line.unit_cost_zar || 0;
+          const newQty = shopCurrentQty + confirmedQty;
+          const newAvco =
+            newQty > 0
+              ? (shopCurrentQty * shopCurrentAvco +
+                  confirmedQty * inUnitCost) /
+                newQty
+              : inUnitCost;
+
           const { error: updErr } = await supabase
             .from("inventory_items")
-            .update({ quantity_on_hand: shopCurrentQty + confirmedQty })
+            .update({
+              quantity_on_hand: newQty,
+              weighted_avg_cost: newAvco,
+            })
             .eq("id", shopItemId)
             .eq("tenant_id", transfer.to_tenant_id); // RULE 0F
           if (updErr) throw updErr;

@@ -956,6 +956,25 @@ not fixed in Phase 4. Documented here for the future fix session.
 Source: Claude Code pre-build audit of HQTransfer.js (1,692 lines),
 11 April 2026. Confirmed by owner before Phase 4 build.
 
+**FIXED: HQTransfer.js handleReceive — `fix(LL-242)` commit, 11 April 2026.**
+Three coordinated edits to handleReceive: the SKU SELECT and the
+name-fallback SELECT now both fetch `weighted_avg_cost`; a new
+`shopCurrentAvco` local captures it in both match branches; the UPDATE
+now writes both `quantity_on_hand` and `weighted_avg_cost` using the
+LL-242 formula above. The new-item INSERT
+branch and the transfer_in stock_movement INSERT were already correct
+and were not touched.
+
+Going-forward fix only — historical AVCO data corrupted by prior HQ
+receives is NOT retroactively corrected. Historical remediation (walk
+`stock_movements` where type = `transfer_in`, recompute weighted_avg_cost
+per affected destination row, write back) is a separate future task and
+is not in scope for this fix.
+
+Atomicity gap (per-line loop on ship/receive/cancel with no transaction
+wrapper) remains open in both HQTransfer and GroupTransfer. Not addressed
+by this fix. Still a named future build item.
+
 ## LL-243 — GroupSettings.js INVITE GAP · KNOWN SHORTFALL (11 April 2026)
 GroupSettings Phase 5 (WP-TG/P5) supports adding existing tenants to a
 group by pasting their tenant_id (UUID) only. The Add-a-Store section
