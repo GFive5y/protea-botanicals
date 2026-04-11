@@ -7,6 +7,7 @@
 // v2.0 — Full QR engine: 6 types, scan action stack, banner library, 3-step wizard
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import {
   PieChart,
   Pie,
@@ -4633,6 +4634,14 @@ export default function AdminQRCodes({
   const [batches, setBatches] = useState([]);
   const [banners, setBanners] = useState([]);
   const ctx = usePageContext("admin-qr", null);
+
+  // Read ?sub= from URL to deep-link into a specific sub-tab (e.g. ?sub=generate)
+  const location = useLocation();
+  useEffect(() => {
+    const sub = new URLSearchParams(location.search).get("sub");
+    const validKeys = ["registry", "generate", "print", "security", "banners"];
+    if (sub && validKeys.includes(sub)) setTab(sub);
+  }, [location.search]);
 
   const fetchBatches = useCallback(async () => {
     const { data } = await supabase

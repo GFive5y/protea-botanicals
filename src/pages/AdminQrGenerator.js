@@ -1,5 +1,21 @@
 // src/pages/AdminQrGenerator.js
-// v4.0 — March 2026
+//
+// ⚠ DEPRECATED — 11 April 2026
+// ────────────────────────────────────────────────────────────────────────────
+// This file is NO LONGER MOUNTED. Its functionality is fully superseded by
+// the Generate sub-tab inside src/components/AdminQRCodes.js (QR Engine v2.0,
+// 4,750 lines) which provides: Registry + Generate + Print Sheet +
+// Security & Settings + Banners, with modern Inter/T design tokens,
+// WorkflowGuide integration, and usePageContext("admin-qr") intelligence.
+//
+// The /admin/qr route now redirects via <Navigate> to
+// /admin?tab=qr_codes&sub=generate — see src/App.js.
+//
+// This file is retained as legacy reference only. Do not re-mount without
+// first confirming with the owner that the modern QR Engine is insufficient.
+// ────────────────────────────────────────────────────────────────────────────
+//
+// v4.0 — March 2026 (legacy history, for reference)
 // Staff-friendly QR Generator — no Supabase copy-paste required
 //
 // Changes from v3.0:

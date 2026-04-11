@@ -242,6 +242,12 @@ const ADMIN_PAGES = [
     path: "/admin?tab=qr_codes",
   },
   {
+    group: "Customers",
+    icon: "➕",
+    label: "Generate QR",
+    path: "/admin?tab=qr_codes&sub=generate",
+  },
+  {
     group: "Analytics",
     icon: "▲",
     label: "Analytics",

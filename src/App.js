@@ -66,7 +66,6 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import OrderSuccess from "./pages/OrderSuccess";
 
-import AdminQrGenerator from "./pages/AdminQrGenerator";
 import HQDashboard from "./pages/HQDashboard";
 import TenantPortal from "./pages/TenantPortal";
 import HRDashboard from "./pages/HRDashboard"; // ★ v4.0
@@ -1029,16 +1028,16 @@ export default function App() {
                     </AppShell>
                   }
                 />
+                {/* DEPRECATED: /admin/qr now redirects to the modern QR Engine
+                    (AdminQRCodes.js) Generate sub-tab. AdminQrGenerator.js is
+                    retained as legacy code but no longer mounted. */}
                 <Route
                   path="/admin/qr"
                   element={
-                    <AppShell maxWidth={1200}>
-                      <RequireAuth>
-                        <RequireRole allowedRoles={["admin"]}>
-                          <AdminQrGenerator />
-                        </RequireRole>
-                      </RequireAuth>
-                    </AppShell>
+                    <Navigate
+                      to="/admin?tab=qr_codes&sub=generate"
+                      replace
+                    />
                   }
                 />
                 <Route
