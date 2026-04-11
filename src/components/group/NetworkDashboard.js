@@ -58,17 +58,23 @@ export default function NetworkDashboard({
   const [storeData, setStoreData] = useState([]);
   const [networkStockValue, setNetworkStockValue] = useState(0);
 
-  // ── Compute monthStart once ──────────────────────────────────────────────
-  const monthStartISO = (() => {
+  // ── Compute monthStart + last-month range once ───────────────────────────
+  const { monthStartISO, lastMonthStartISO, lastMonthEndISO } = (() => {
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return {
+      monthStartISO: monthStart.toISOString(),
+      lastMonthStartISO: lastMonthStart.toISOString(),
+      lastMonthEndISO: monthStart.toISOString(),
+    };
   })();
 
   // ── Fetch everything in parallel ─────────────────────────────────────────
-  // Per-store fetcher now lives in ./_helpers/fetchStoreSummary.js — shared
+  // Per-store fetcher lives in ./_helpers/fetchStoreSummary.js — shared
   // with StoreComparison and any future group portal analytics surface.
-  // NetworkDashboard calls it in core mode (no options) so the landing page
-  // stays fast; extended fields (revenueLastMonth, topProducts) are opt-in.
+  // Extended mode is enabled so every store card can render its top 3
+  // products alongside the core KPI rows.
   const fetchAll = useCallback(async () => {
     if (!members || members.length === 0) {
       setStoreData([]);
@@ -87,6 +93,11 @@ export default function NetworkDashboard({
             m.tenant_id,
             m.tenants?.industry_profile,
             monthStartISO,
+            {
+              includeExtended: true,
+              lastMonthStartISO,
+              lastMonthEndISO,
+            },
           ),
         ),
       );
@@ -99,6 +110,7 @@ export default function NetworkDashboard({
               orderCount: null,
               stockMarginPct: null,
               stockHealth: { critical: 0, low: 0, total: 0 },
+              topProducts: [],
               err: s.reason?.message || "Unknown error",
             },
       );
@@ -125,7 +137,7 @@ export default function NetworkDashboard({
     } finally {
       setLoading(false);
     }
-  }, [members, monthStartISO]);
+  }, [members, monthStartISO, lastMonthStartISO, lastMonthEndISO]);
 
   useEffect(() => {
     fetchAll();
@@ -529,12 +541,15 @@ function StoreCard({ name, badge, data }) {
         ))}
       </div>
 
-      {/* View store button — Phase 4 placeholder */}
+      {/* Top products (top 3 by revenue MTD) */}
+      <TopProductsBlock items={data.topProducts} />
+
+      {/* View store button */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           marginTop: T.gap.sm,
         }}
       >
@@ -543,7 +558,7 @@ function StoreCard({ name, badge, data }) {
           onClick={() => {
             // eslint-disable-next-line no-console
             console.log(
-              "TODO Phase 4: switch tenant context and navigate to /tenant-portal",
+              "TODO: switch tenant context and navigate to /tenant-portal",
             );
           }}
           style={{
@@ -559,15 +574,6 @@ function StoreCard({ name, badge, data }) {
         >
           View store →
         </button>
-        <span
-          style={{
-            fontSize: T.text.xs,
-            color: T.ink400,
-            fontStyle: "italic",
-          }}
-        >
-          Phase 4
-        </span>
       </div>
 
       {/* Per-store fetch error (if any) */}
@@ -586,6 +592,73 @@ function StoreCard({ name, badge, data }) {
         >
           Some metrics unavailable
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Top products block (inline top 3 by revenue MTD) ─────────────────────
+function TopProductsBlock({ items }) {
+  const list = Array.isArray(items) ? items.slice(0, 3) : [];
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: T.gap.xs,
+        paddingTop: T.gap.sm,
+        borderTop: `1px solid ${T.border}`,
+      }}
+    >
+      <div
+        style={{
+          fontSize: T.text.xs,
+          fontWeight: T.weight.semibold,
+          color: T.ink400,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        Top products
+      </div>
+      {list.length === 0 ? (
+        <div style={{ fontSize: T.text.sm, color: T.ink600 }}>
+          No orders this period
+        </div>
+      ) : (
+        list.map((p, idx) => (
+          <div
+            key={`${p.name}-${idx}`}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              fontSize: T.text.sm,
+              gap: T.gap.sm,
+            }}
+          >
+            <span
+              style={{
+                color: T.ink700,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {idx + 1}. {p.name}
+            </span>
+            <span
+              style={{
+                color: T.ink900,
+                fontWeight: T.weight.semibold,
+                fontVariantNumeric: "tabular-nums",
+                flexShrink: 0,
+              }}
+            >
+              {fmtR(p.revenue)}
+            </span>
+          </div>
+        ))
       )}
     </div>
   );

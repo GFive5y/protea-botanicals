@@ -455,7 +455,12 @@ export default function StoreComparison({
           })}
         </div>
 
-        <ChartCard title="Revenue comparison — MTD" height={240}>
+        <ChartCard
+          title={`Revenue MTD — sorted by ${(
+            SORT_OPTIONS.find((o) => o.id === sortBy)?.label || "Revenue"
+          ).toLowerCase()}`}
+          height={240}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
