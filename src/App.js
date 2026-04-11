@@ -73,6 +73,7 @@ import StaffPortal from "./pages/StaffPortal"; // ★ v5.0
 import ShopDashboard from "./pages/ShopDashboard";
 import TerpenePage from "./pages/TerpenePage";
 import OnboardingWizard from "./pages/OnboardingWizard"; // ✦ WP-STOREFRONT-WIZARD Phase 1
+import GroupPortal from "./components/group/GroupPortal"; // ✦ WP-TENANT-GROUPS Phase 2
 
 import PageShell from "./components/PageShell";
 import AppShell from "./components/AppShell"; // ★ v6.0
@@ -1061,6 +1062,16 @@ export default function App() {
                   element={
                     <RequireAuth>
                       <TenantPortal />
+                    </RequireAuth>
+                  }
+                />
+
+                {/* ✦ WP-TENANT-GROUPS Phase 2: Franchise network portal */}
+                <Route
+                  path="/group-portal"
+                  element={
+                    <RequireAuth>
+                      <GroupPortal />
                     </RequireAuth>
                   }
                 />
