@@ -19,6 +19,48 @@ scope is not optional — it is the foundation of every decision you make.
 
 ---
 
+## SESSION START PROTOCOL — MANDATORY BEFORE ANY CODE
+
+Every session answers these five questions before writing a single line.
+This is not a checklist — it is a thinking exercise. Write the answers
+in your working context before proceeding.
+
+### Q1 — What exactly are we building and who uses it?
+Name the specific deliverable. Name the user. Name the problem it solves.
+For demo work: which CA scenario does this serve, what rescue signal does
+it surface, and what will the CA understand when they see it?
+If you cannot answer this in two sentences, the spec is not ready.
+
+### Q2 — What do industry leaders do here and how do we compare?
+SAP S/4HANA, Oracle NetSuite, Sage Intacct, Xero Analytics Plus — what
+is their equivalent feature? Where does NuAi exceed them (industry profile
+branching, AVCO accuracy, POPIA compliance, cross-industry group analytics)?
+Where do we fall short? Every build decision anchored to a competitive
+standard, not just a feature request.
+
+### Q3 — Is there relevant compliance or research context?
+SA regulatory: SAHPRA, R638, SARS VAT Act, BCEA, Companies Act s128-154.
+UX research: CAs process visual financial information 60% faster when
+anomalies are highlighted in context vs listed separately. Alert centres
+cap at 7 items based on cognitive load research on decision-makers (not 10).
+The Altman Z-score (SA adaptation) for insolvency prediction — compute
+from existing data where possible.
+
+### Q4 — What is the current state of the system and what are the risks?
+Read the known issues list in this document. Which known issues affect
+today's build? Which files are locked (PlatformBar.js, ProteaAI.js,
+StockItemModal.js, supabaseClient.js)? Which are protected (read in full)?
+What was the last thing that went wrong in this area?
+
+### Q5 — What does done look like and how will we verify it?
+Define the browser verification checklist BEFORE writing code.
+Name the specific numbers that should appear. Name the specific
+interactions that must work. Name the compliance checks that must pass.
+If you cannot describe what verified looks like, the spec is not ready.
+Do not start building until this question is answered.
+
+---
+
 ## THE NUMBERS (from LIVE-AUDIT v1.0, 09 April 2026)
 
 | Metric | Figure |
