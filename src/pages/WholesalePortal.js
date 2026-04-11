@@ -7,14 +7,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
-import { C } from "../styles/tokens";
+import { T } from "../styles/tokens";
 
 // CSS classes only — font @import removed (PageShell handles Google Fonts)
 const sharedStyles = `
   .pb-btn {
     font-family: 'Jost', sans-serif;
     padding: 12px 32px;
-    background: ${C.green};
+    background: ${T.accent};
     color: white;
     border: none;
     border-radius: 2px;
@@ -24,21 +24,21 @@ const sharedStyles = `
     cursor: pointer;
     transition: background 0.2s;
   }
-  .pb-btn:hover { background: ${C.mid}; }
+  .pb-btn:hover { background: ${T.accentMid}; }
   .pb-input {
     font-family: 'Jost', sans-serif;
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid ${C.border};
+    border: 1px solid ${T.border};
     border-radius: 2px;
     font-size: 14px;
     box-sizing: border-box;
     outline: none;
     transition: border-color 0.2s;
   }
-  .pb-input:focus { border-color: ${C.mid}; }
+  .pb-input:focus { border-color: ${T.accentMid}; }
   .row-hover { transition: background 0.15s; }
-  .row-hover:hover { background: ${C.warm} !important; }
+  .row-hover:hover { background: ${T.warningLight} !important; }
 `;
 
 const WHOLESALE_PRODUCTS = [
@@ -171,9 +171,9 @@ export default function WholesalePortal() {
   };
 
   const statusColor = {
-    pending: C.gold,
-    confirmed: C.mid,
-    shipped: C.blue,
+    pending: T.warning,
+    confirmed: T.accentMid,
+    shipped: T.info,
     delivered: "#555",
   };
 
@@ -184,7 +184,7 @@ export default function WholesalePortal() {
       {/* Hero — sits inside PageShell's 900px content area */}
       <div
         style={{
-          background: `linear-gradient(135deg, ${C.green} 0%, ${C.mid} 100%)`,
+          background: `linear-gradient(135deg, ${T.accent} 0%, ${T.accentMid} 100%)`,
           padding: "64px 24px",
           textAlign: "center",
           borderRadius: "2px",
@@ -197,7 +197,7 @@ export default function WholesalePortal() {
             fontSize: "11px",
             letterSpacing: "0.35em",
             textTransform: "uppercase",
-            color: C.accent,
+            color: T.accentLight,
           }}
         >
           🏪 TRADE ACCOUNT
@@ -207,7 +207,7 @@ export default function WholesalePortal() {
           style={{
             fontSize: "clamp(36px, 6vw, 56px)",
             fontWeight: 300,
-            color: C.cream,
+            color: T.bg,
             margin: "12px 0",
           }}
         >
@@ -228,7 +228,7 @@ export default function WholesalePortal() {
       {/* Tabs */}
       <div
         style={{
-          background: C.warm,
+          background: T.warningLight,
           borderBottom: "1px solid #e0d8cc",
           padding: "0",
         }}
@@ -253,9 +253,9 @@ export default function WholesalePortal() {
                 border: "none",
                 borderBottom:
                   activeTab === key
-                    ? `2px solid ${C.green}`
+                    ? `2px solid ${T.accent}`
                     : "2px solid transparent",
-                color: activeTab === key ? C.green : C.muted,
+                color: activeTab === key ? T.accent : T.ink600,
                 fontSize: "11px",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
@@ -275,13 +275,13 @@ export default function WholesalePortal() {
           <div
             style={{
               background: "#e8f5e9",
-              border: `1px solid ${C.mid}`,
+              border: `1px solid ${T.accentMid}`,
               borderRadius: "2px",
               padding: "16px 24px",
               marginBottom: "24px",
             }}
           >
-            <p className="body-font" style={{ color: C.mid, fontSize: "14px" }}>
+            <p className="body-font" style={{ color: T.accentMid, fontSize: "14px" }}>
               ✓ {success}
             </p>
           </div>
@@ -317,7 +317,7 @@ export default function WholesalePortal() {
                   style={{
                     fontSize: "24px",
                     fontWeight: 400,
-                    color: C.text,
+                    color: T.ink900,
                   }}
                 >
                   Product Catalogue
@@ -345,7 +345,7 @@ export default function WholesalePortal() {
                       className="shop-font"
                       style={{
                         fontSize: "18px",
-                        color: C.text,
+                        color: T.ink900,
                         fontWeight: 400,
                       }}
                     >
@@ -366,7 +366,7 @@ export default function WholesalePortal() {
                     className="shop-font"
                     style={{
                       fontSize: "18px",
-                      color: C.mid,
+                      color: T.accentMid,
                       fontWeight: 600,
                       whiteSpace: "nowrap",
                     }}
@@ -385,8 +385,8 @@ export default function WholesalePortal() {
                       style={{
                         width: "28px",
                         height: "28px",
-                        background: C.warm,
-                        border: `1px solid ${C.border}`,
+                        background: T.warningLight,
+                        border: `1px solid ${T.border}`,
                         borderRadius: "2px",
                         cursor: "pointer",
                         fontSize: "16px",
@@ -409,7 +409,7 @@ export default function WholesalePortal() {
                       style={{
                         width: "28px",
                         height: "28px",
-                        background: C.green,
+                        background: T.accent,
                         border: "none",
                         borderRadius: "2px",
                         cursor: "pointer",
@@ -438,7 +438,7 @@ export default function WholesalePortal() {
             >
               <div
                 style={{
-                  background: `linear-gradient(135deg, ${C.green}, ${C.mid})`,
+                  background: `linear-gradient(135deg, ${T.accent}, ${T.accentMid})`,
                   padding: "24px 28px",
                 }}
               >
@@ -502,7 +502,7 @@ export default function WholesalePortal() {
                     >
                       <span
                         className="shop-font"
-                        style={{ fontSize: "18px", color: C.text }}
+                        style={{ fontSize: "18px", color: T.ink900 }}
                       >
                         Total
                       </span>
@@ -510,7 +510,7 @@ export default function WholesalePortal() {
                         className="shop-font"
                         style={{
                           fontSize: "22px",
-                          color: C.mid,
+                          color: T.accentMid,
                           fontWeight: 600,
                         }}
                       >
@@ -550,7 +550,7 @@ export default function WholesalePortal() {
             >
               <h2
                 className="shop-font"
-                style={{ fontSize: "24px", fontWeight: 400, color: C.text }}
+                style={{ fontSize: "24px", fontWeight: 400, color: T.ink900 }}
               >
                 Order History
               </h2>
@@ -582,7 +582,7 @@ export default function WholesalePortal() {
                   <div>
                     <p
                       className="shop-font"
-                      style={{ fontSize: "17px", color: C.text }}
+                      style={{ fontSize: "17px", color: T.ink900 }}
                     >
                       Order #{order.id.slice(-6).toUpperCase()}
                     </p>
@@ -609,7 +609,7 @@ export default function WholesalePortal() {
                   >
                     <span
                       className="shop-font"
-                      style={{ fontSize: "18px", color: C.mid }}
+                      style={{ fontSize: "18px", color: T.accentMid }}
                     >
                       R{order.total?.toLocaleString()}
                     </span>
