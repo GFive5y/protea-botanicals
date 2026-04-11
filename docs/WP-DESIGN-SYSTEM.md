@@ -425,7 +425,7 @@ Every new agent starting work on this WP must:
 | Sub-WP | Name | Status | Commit | Date |
 |---|---|---|---|---|
 | WP-DS-1 | Shared Token File | **COMPLETE** | `4a6f451` | 11 Apr 2026 |
-| WP-DS-2 | Component Migration | **IN PROGRESS — Priority 1 COMPLETE (4/4 files)** | `021b5dd → 846280c` | 11 Apr 2026 |
+| WP-DS-2 | Component Migration | **IN PROGRESS — Priority 1 + 2 CLOSED, Priority 3 next** | `021b5dd → 846280c → (cleanup)` | 11 Apr 2026 |
 | WP-DS-3 | Profile-Aware Tokens | NOT STARTED | — | — |
 | WP-DS-4 | Unified Component Library | NOT STARTED | — | — |
 | WP-DS-5 | Ambient Intelligence Layer | FUTURE | — | — |
@@ -472,30 +472,77 @@ Order changed from original doc: PageShell was moved to last (not first) because
 
 **Priority 1 total: 68 C references migrated across 4 files. 3 new tokens added (`T.surfaceDark`, `T.surfaceDarkAlt`, `T.brandGold`). 1 mapping rule correction documented (`C.footer → T.surfaceDark`, not `T.surfaceAlt`). 3 hero-gradient exception lines documented (`C.accent → T.accentLight` on dark backgrounds where strict mapping produces 1.0:1 invisible contrast).**
 
-**Priority 2 — Non-C legacy consumers (`LS`, `makeBtn`, `TIER_COLORS`, etc.)**
-- `src/App.js` — `LS.ROLE` + `LS.DEV_MODE` auth persistence (keep or move to dedicated auth constants file — decide during WP-DS-2)
-- `src/pages/AdminDashboard.js`
-- `src/pages/AdminQrGenerator.js` (already deprecated `91c452f` — remove imports during WP-DS-2 or archive entirely)
-- `src/components/hq/HQFraud.js`
-- `src/components/hq/HQDocuments.js`
-- `src/components/AdminCustomerEngagement.js`
-- `src/components/AdminShipments.js`
-- `src/components/AdminFraudSecurity.js`
-- `src/components/AdminBatchManager.js`
-- `src/components/AdminNotifications.js`
-- `src/components/AdminProductionModule.js`
+**Priority 2 — ❌ RETRACTED (false positive) — ✅ effectively COMPLETE — zero consumers**
 
-**Priority 3 — Shared components without legacy imports** (original WP-DS-2 Priority 1)
-- `src/components/shared/ActionCentre.js` (built with self-contained T tokens — migrate to import from this file)
+An earlier pre-flight report (commit `4a6f451`) claimed 11 files were Priority 2 consumers of legacy `LS`, `makeBtn`, `TIER_COLORS`, `BANNER_H`, and `POINTS_PER_SCAN` exports from `src/styles/tokens.js`:
+
+> ~~`src/App.js`, `src/pages/AdminDashboard.js`, `src/pages/AdminQrGenerator.js`, `src/components/hq/HQFraud.js`, `src/components/hq/HQDocuments.js`, `src/components/AdminCustomerEngagement.js`, `src/components/AdminShipments.js`, `src/components/AdminFraudSecurity.js`, `src/components/AdminBatchManager.js`, `src/components/AdminNotifications.js`, `src/components/AdminProductionModule.js`~~
+
+**This list was a false positive.** It was produced by grepping for **identifier usages** (`LS.ROLE`, `makeBtn(`, `BANNER_H`, etc.) rather than for **import statements** (`from ".../styles/tokens"`). The grep matched local variable definitions and coincidentally-named symbols. For example:
+
+- **`src/App.js`** defines its own `const LS = { ROLE: "protea_role", DEV_MODE: "protea_dev_mode" }` **locally at line 85**. It never imports from `styles/tokens`. The local `LS` happens to share its name and keys with the tokens.js export, but they are two independent constants. App.js is NOT a tokens.js consumer.
+- None of the other 10 files import from `styles/tokens` either. Verified via direct `grep "from.*styles/tokens"` on each file in commit `96d8f70`.
+
+**Definitive audit (post-PageShell-migration, `846280c`):** exhaustive `grep "styles/tokens"` across the entire `src/` tree returns exactly 5 files:
+1. `src/styles/tokens.js` (the source file itself)
+2. `src/components/PageShell.js` — `import { FONTS, T }` ✅
+3. `src/pages/CheckoutPage.js` — `import { T }` ✅
+4. `src/pages/Redeem.js` — `import { T }` ✅
+5. `src/pages/WholesalePortal.js` — `import { T }` ✅
+
+All 5 are the 4 Priority 1 files (already migrated) plus tokens.js itself. **Priority 2 as described in this document does not exist.** All legacy C consumers were Priority 1. Priority 2 is effectively COMPLETE with zero files to migrate.
+
+### LL-221 lesson learned — grep imports, not identifiers
+
+When auditing which files consume a module, **grep for import statements**, not for identifier usages:
+
+**WRONG (produces false positives):**
+```
+grep "LS\.ROLE" src/    # matches local const LS definitions
+grep "makeBtn("  src/    # matches any function named makeBtn
+```
+
+**CORRECT:**
+```
+grep "from.*/styles/tokens" src/              # catches any import path depth
+grep "import.*\{.*LS.*\}.*from.*tokens" src/  # catches named import of LS
+```
+
+Identifier-usage grep cannot distinguish between:
+- A file that **imports** `LS` from tokens.js and uses it
+- A file that **defines its own** `LS` locally and uses that
+- A file that contains the substring `LS` anywhere (comments, variable names, etc.)
+
+All three are indistinguishable to identifier-grep. Only import-statement grep tells the truth about module consumers. **This failure wasted a session planning Priority 2 that did not exist.** Future agents: grep imports.
+
+**Consequences of this correction:**
+- The "legacy section" at the bottom of `src/styles/tokens.js` is **entirely dead code** except for `FONTS` (1 consumer: PageShell.js) and the new WP-DS-1 exports (T, profileOverrides, getTokens, getSeverityTokens). All other legacy exports (`C`, `makeBtn`, `inputStyle`, `labelStyle`, `sectionLabel`, `TIER_COLORS`, `LS`, `BANNER_H`, `POINTS_PER_SCAN`, default export) have **zero consumers** and were archived in this commit.
+- Priority 2 WP-DS-2 scope is closed. Proceed directly to Priority 3.
+
+---
+
+**Priority 3 — Shared components with LOCAL T definitions** (original WP-DS-2 Priority 1)
+- `src/components/shared/ActionCentre.js` (built with self-contained `const C = {...}` inline — migrate to import T from tokens)
 - `src/components/WorkflowGuide.js`
 - Rest of `src/components/shared/*`
 
-**Priority 4 — HQ components** (original WP-DS-2 Priority 4)
-- HQProduction, HQStock, HQOverview, etc. — all currently define `const T = {...}` locally. Migrate to `import { T } from "../../styles/tokens";` one file at a time.
+Estimated: **1 session, ~5–10 files**.
 
-**Priority 5 — Tenant portal + Admin components** (original WP-DS-2 Priority 5–6)
+**Priority 4 — HQ components with LOCAL T definitions** (original WP-DS-2 Priority 4)
+- HQProduction, HQStock, HQOverview, HQCogs, HQProfitLoss, HQMedical, etc. — each file currently defines `const T = {...}` locally at the top. Migrate to `import { T } from "../../styles/tokens";` one file at a time. Some use the new T object shape, some drift — each file needs LL-221 pre-flight read to identify drift.
 
-**Only after all 5 priorities are clear can the legacy section at the bottom of `src/styles/tokens.js` be deleted.** Until then, it stays.
+Estimated: **3–4 sessions, ~25 files**.
+
+**Priority 5 — Tenant portal + Admin + root components** (original WP-DS-2 Priority 5–6)
+- TenantPortal.js, AdminDashboard.js, HQDashboard.js, AppShell.js, NavSidebar.js, etc.
+- Consumer pages not yet touched: Shop.js, Account.js, CartPage.js, OrderSuccess.js, Loyalty.js, Leaderboard.js, MoleculesPage.js, TerpenePage.js, ScanResult.js, ProductVerification.js, Welcome.js, etc.
+- HR Suite (13 modules), Admin components (14 tabs), rest of HQ
+
+Estimated: **2 sessions, ~15 files** (the rest are large but most are consumer/HR/Admin with smaller local T definitions).
+
+**Total remaining WP-DS-2 sessions: 6–7.**
+
+The dead legacy section at the bottom of `src/styles/tokens.js` was removed in this same commit — no longer gating anything. Only `FONTS` remains and its removal is scheduled for a future PageShell refactor session.
 
 ### Invariants preserved by this commit
 - `src/styles/tokens.js` exports `{ T, profileOverrides, getTokens, getSeverityTokens, FONTS, C, makeBtn, inputStyle, labelStyle, sectionLabel, TIER_COLORS, LS, BANNER_H, POINTS_PER_SCAN }` plus the default export. 15 named exports, 1 default.

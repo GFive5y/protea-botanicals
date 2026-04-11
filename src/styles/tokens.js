@@ -260,142 +260,34 @@ export const getSeverityTokens = (severity) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// LEGACY — MIGRATION IN PROGRESS (WP-DS-2)
+// LEGACY — FONTS loader only (final surviving pre-WP-DS-1 export)
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Everything below this banner is the pre-WP-DS-1 token system.
-// It is STILL LOAD-BEARING. Do not remove.
+// The WP-DS-1 → WP-DS-2 migration closed all C consumers in Priority 1:
+//   - src/pages/CheckoutPage.js    (021b5dd)
+//   - src/pages/Redeem.js          (b205c33)
+//   - src/pages/WholesalePortal.js (3cff956)
+//   - src/components/PageShell.js  (846280c — also added T.surfaceDark/brandGold)
 //
-// Live C consumers (4 files — priority migration targets for WP-DS-2):
-//   - src/pages/CheckoutPage.js       (imports { C })
-//   - src/pages/Redeem.js             (imports { C })
-//   - src/pages/WholesalePortal.js    (imports { C })
-//   - src/components/PageShell.js     (imports { FONTS, C })
+// An earlier "Priority 2" claim of 11 additional consumer files was a FALSE
+// POSITIVE from identifier-grep (matching local variable definitions rather
+// than import statements). Exhaustive `grep "styles/tokens"` across src/ in
+// commit 96d8f70 confirmed only the 4 Priority 1 files ever imported from
+// this module. See docs/WP-DESIGN-SYSTEM.md for the full retraction and the
+// LL-221 "grep imports, not identifiers" lesson.
 //
-// Live non-C consumers of this file (widespread, also covered in WP-DS-2):
-//   - src/App.js                      (LS.ROLE + LS.DEV_MODE — auth persistence)
-//   - src/pages/AdminDashboard.js
-//   - src/pages/AdminQrGenerator.js   (deprecated 91c452f, still imported — removal pending)
-//   - src/components/hq/HQFraud.js
-//   - src/components/hq/HQDocuments.js
-//   - src/components/AdminCustomerEngagement.js
-//   - src/components/AdminShipments.js
-//   - src/components/AdminFraudSecurity.js
-//   - src/components/AdminBatchManager.js
-//   - src/components/AdminNotifications.js
-//   - src/components/AdminProductionModule.js
+// Archived in this cleanup commit (all had zero consumers, verified safe):
+//   C, makeBtn, inputStyle, labelStyle, sectionLabel,
+//   TIER_COLORS, LS, BANNER_H, POINTS_PER_SCAN, and the default export.
 //
-// The earlier WP-DS-1 planning doc stated "AdminQrGenerator.js was the last
-// consumer — deprecated 91c452f". That claim was FALSE — see the list above.
-// The correction is documented in docs/WP-DESIGN-SYSTEM.md alongside the
-// WP-DS-1 status update.
-//
-// WP-DS-2 will migrate these consumers to import from T one file at a time.
-// Until WP-DS-2 ships, every legacy export below must remain byte-for-byte
-// identical to avoid runtime crashes on /checkout, /redeem, /wholesale, and
-// every PageShell-wrapped route.
-// ─────────────────────────────────────────────────────────────────────────────
-// CENTRAL DESIGN SYSTEM — Protea Botanicals QR Tracking System (legacy)
-// All colours, fonts, button factory, form styles, and constants live here.
+// Only FONTS survives below — last surviving legacy export. PageShell.js is
+// its only consumer and is the global font loader for all WithNav routes
+// (/loyalty, /redeem, /checkout, /order-success, /wholesale, /account,
+// /welcome). Remove when PageShell's font loading is refactored in a future
+// session (e.g. switch to a <link rel="stylesheet"> in public/index.html or
+// a dedicated font-loading hook).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const FONTS = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Jost:wght@300;400;500;600&display=swap');
 `;
-
-// ── Colour palette ──────────────────────────────────────────────────────────
-export const C = {
-  green: "#1b4332",
-  mid: "#2d6a4f",
-  accent: "#52b788",
-  gold: "#b5935a",
-  blue: "#2c4a6e",
-  orange: "#e67e22",
-  cream: "#faf9f6",
-  footer: "#1a1a1a",
-  text: "#1a1a1a",
-  muted: "#474747",
-  error: "#c0392b",
-  warm: "#f4f0e8",
-  border: "#e0dbd2",
-};
-
-// ── Button factory ──────────────────────────────────────────────────────────
-export const makeBtn = (bg, color = "#fff", extra = {}) => ({
-  background: bg,
-  color,
-  border: "none",
-  borderRadius: "2px",
-  padding: "10px 20px",
-  fontFamily: "Jost, sans-serif",
-  fontSize: "11px",
-  fontWeight: "600",
-  letterSpacing: "0.2em",
-  textTransform: "uppercase",
-  cursor: "pointer",
-  transition: "all 0.2s",
-  ...extra,
-});
-
-// ── Common form & UI styles ─────────────────────────────────────────────────
-export const inputStyle = {
-  width: "100%",
-  padding: "11px 14px",
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
-  fontFamily: "Jost, sans-serif",
-  fontSize: "14px",
-  color: C.text,
-  background: "#fdfcfa",
-  boxSizing: "border-box",
-  marginBottom: "12px",
-};
-
-export const labelStyle = {
-  fontSize: "11px",
-  letterSpacing: "0.2em",
-  textTransform: "uppercase",
-  color: C.muted,
-  fontWeight: "600",
-  display: "block",
-  marginBottom: "6px",
-};
-
-export const sectionLabel = {
-  fontSize: "11px",
-  letterSpacing: "0.35em",
-  textTransform: "uppercase",
-  color: C.accent,
-  marginBottom: "16px",
-};
-
-// ── Loyalty tier colours ────────────────────────────────────────────────────
-export const TIER_COLORS = {
-  bronze: "#cd7f32",
-  silver: "#9e9e9e",
-  gold: C.gold,
-};
-
-// ── LocalStorage keys (prefixed to avoid conflicts) ─────────────────────────
-export const LS = {
-  ROLE: "protea_role",
-  DEV_MODE: "protea_dev_mode",
-};
-
-// ── Constants ───────────────────────────────────────────────────────────────
-export const BANNER_H = 40; // TEST MODE banner height
-export const POINTS_PER_SCAN =
-  Number(process.env.REACT_APP_POINTS_PER_SCAN) || 10;
-
-export default {
-  FONTS,
-  C,
-  makeBtn,
-  inputStyle,
-  labelStyle,
-  sectionLabel,
-  TIER_COLORS,
-  LS,
-  BANNER_H,
-  POINTS_PER_SCAN,
-};
