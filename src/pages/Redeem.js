@@ -12,7 +12,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
-import { C } from "../styles/tokens";
+import { T } from "../styles/tokens";
 import ClientHeader from "../components/ClientHeader";
 
 const sharedStyles = `
@@ -25,7 +25,7 @@ const sharedStyles = `
   .pb-btn {
     font-family: 'Jost', sans-serif;
     padding: 12px 32px;
-    background: ${C.green};
+    background: ${T.accent};
     color: white;
     border: none;
     border-radius: 2px;
@@ -35,7 +35,7 @@ const sharedStyles = `
     cursor: pointer;
     transition: background 0.2s;
   }
-  .pb-btn:hover { background: ${C.mid}; }
+  .pb-btn:hover { background: ${T.accentMid}; }
   .pb-btn:disabled { background: #ccc; cursor: not-allowed; }
   .reward-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
   .reward-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
@@ -156,7 +156,7 @@ export default function Redeem() {
           <p
             className="body-font"
             style={{
-              color: C.muted,
+              color: T.ink600,
               letterSpacing: "0.2em",
               fontSize: "12px",
               textTransform: "uppercase",
@@ -178,7 +178,7 @@ export default function Redeem() {
       {/* ─── HERO ─── */}
       <div
         style={{
-          background: `linear-gradient(135deg, ${C.green} 0%, ${C.mid} 100%)`,
+          background: `linear-gradient(135deg, ${T.accent} 0%, ${T.accentMid} 100%)`,
           padding: "clamp(40px, 6vw, 64px) 24px",
           textAlign: "center",
           borderRadius: "2px",
@@ -191,7 +191,7 @@ export default function Redeem() {
             fontSize: "10px",
             letterSpacing: "0.35em",
             textTransform: "uppercase",
-            color: C.accent,
+            color: T.accentLight,
           }}
         >
           Loyalty Rewards
@@ -201,7 +201,7 @@ export default function Redeem() {
           style={{
             fontSize: "clamp(30px, 5vw, 48px)",
             fontWeight: 300,
-            color: C.cream,
+            color: T.bg,
             margin: "12px 0 8px",
           }}
         >
@@ -224,7 +224,7 @@ export default function Redeem() {
             style={{
               fontSize: "clamp(36px, 8vw, 56px)",
               fontWeight: 300,
-              color: C.accent,
+              color: T.accentLight,
               lineHeight: 1,
             }}
           >
@@ -254,7 +254,7 @@ export default function Redeem() {
           >
             <p
               className="body-font"
-              style={{ color: C.green, fontSize: "14px", margin: 0 }}
+              style={{ color: T.accent, fontSize: "14px", margin: 0 }}
             >
               ✓ {success}
             </p>
@@ -367,7 +367,7 @@ export default function Redeem() {
                     style={{
                       fontSize: "20px",
                       fontWeight: 400,
-                      color: C.text,
+                      color: T.ink900,
                       marginBottom: "8px",
                       lineHeight: 1.3,
                     }}
@@ -378,7 +378,7 @@ export default function Redeem() {
                     className="body-font"
                     style={{
                       fontSize: "13px",
-                      color: C.muted,
+                      color: T.ink600,
                       fontWeight: 300,
                       lineHeight: 1.6,
                       marginBottom: "20px",
@@ -416,7 +416,7 @@ export default function Redeem() {
                     className="pb-btn"
                     style={{
                       padding: "8px 20px",
-                      background: canAfford ? C.green : "#ccc",
+                      background: canAfford ? T.accent : "#ccc",
                     }}
                     disabled={!canAfford || redeeming === reward.id}
                     onClick={() => handleRedeem(reward)}
