@@ -190,12 +190,18 @@ Add one new field to the return shape:
 
 NOTE: topProducts query is the most complex addition.
 For cannabis_retail/general_retail/food_beverage:
-  SELECT product_name, SUM(qty * unit_price) as revenue, SUM(qty)
+  SELECT product_name, SUM(line_total) as revenue, SUM(quantity)
   FROM order_items
   JOIN orders ON order_items.order_id = orders.id
   WHERE orders.tenant_id = X AND orders.status = "paid"
   AND orders.created_at >= monthStart
+  GROUP BY product_name
   ORDER BY revenue DESC LIMIT 5
+
+Schema verified 11 Apr 2026 via Supabase MCP:
+  order_items columns: id, order_id, product_name, quantity,
+    unit_price, line_total, product_metadata, created_at
+  Use line_total (pre-computed qty × price) over quantity × unit_price.
 
 For cannabis_dispensary:
   SELECT inventory_items.name, 
@@ -361,12 +367,19 @@ screen that is both cannabis-compliant and IFRS-aware.
 
 ---
 
-## KNOWN GAPS TO RECORD (LL-244 candidate)
+## KNOWN GAPS (resolved during Step 0)
 
-order_items table existence is unverified. topProducts query
-branches on this. Must be checked in Step 0 before any code.
-If the table does not exist, top products requires a separate
-approach (stock_movements of type "sale" or similar).
+~~order_items table existence is unverified.~~ **RESOLVED 11 Apr 2026.**
+Schema verified via Supabase MCP. Table exists with columns:
+id, order_id, product_name, quantity, unit_price, line_total,
+product_metadata, created_at. topProducts uses line_total and
+quantity columns — verified against live schema, not assumed.
+
+Remaining note: marginLastMonth is NOT in scope. It would require
+historical inventory snapshots that don't exist — current AVCO
+values reflect present state only. revenueLastMonth IS in scope
+via a second orders/dispensing_log query with the prior-month
+date range.
 
 ---
 *WP-ANALYTICS-1 v1.0 · NuAi · 11 April 2026*
