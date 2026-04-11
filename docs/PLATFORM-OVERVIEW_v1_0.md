@@ -344,3 +344,61 @@ dispensing_log (cannabis_dispensary — Schedule 6): id, tenant_id, patient_id, 
 All three tables: tenant_isolation + hq_all_ bypass policies (LL-205) ✅
 
 *Update produced from live codebase · 11 April 2026*
+
+---
+## UPDATE — 11 April 2026 (HEAD: 46d9a20)
+
+### Scale corrections (live verified)
+| Metric | v1.0 figure | Corrected |
+|---|---|---|
+| Edge functions | 10 | 16 (trigger-sim-nourish deleted) |
+| Portals | 6 | 7 (+ /group-portal) |
+| Active tenants | 5 | 9 |
+| DB tables | 109 | 111 (+ tenant_groups + tenant_group_members) |
+| ai-copilot EF | v59 | v70 |
+| process-document EF | v53 | v56 |
+| auto-post-capture EF | v2 | v5 |
+| sign-qr EF | v36 | v39 |
+| verify-qr EF | v34 | v37 |
+| send-notification EF | v37 | v40 |
+| loyalty-ai EF | v2 | v5 |
+
+### New portal — /group-portal
+Franchise & Group Owner Portal — added 11 April 2026.
+tenant_groups + tenant_group_members tables (RLS-secured).
+NetworkDashboard: combined KPIs, store comparison, quick actions.
+WP-TENANT-GROUPS Phases 1-3 complete. Phase 4 in progress.
+Test user: medican@nuai.dev / MediCan2026! (franchisor role).
+
+### New tenants (total now 9)
+Medi Can Dispensary (2bd41eb7) · cannabis_dispensary · 14 events · R20k
+Nourish Kitchen (944547e3) · food_beverage · 240 orders · R43k
+Maxi Retail SA (9766a3af) · general_retail · 232 orders · R186k
+Pure Premium THC Vapes (f8ff8d07) · cannabis_retail
+Vozel Vapes (388fe654) · general_retail
++ Nu Ai HQ + Medi Recreational + Test Dispensary CT + TEST SHOP
+
+### LL-206 CORRECTION (critical — old rule was wrong)
+Old (wrong): const { tenant } = useTenant(); const tenantId = tenant?.id;
+Correct: const { tenantId, industryProfile } = useTenant();
+Both are directly exposed on TenantContext. Verified 11 April 2026.
+
+### RLS helper correction
+user_tenant_id() is the correct function name.
+get_my_tenant_id() does NOT exist. Never use it.
+
+### Design system — WP-DS-6 Phase 1 complete
+7 new token groups in src/styles/tokens.js:
+T.container · T.page · T.sidebar · T.breakpoint
+T.gap · T.pad · T.inset
+All new features must use T.* tokens. No hardcoded px values.
+Dead space rule: LL-238. Full ref: docs/WP-DESIGN-SYSTEM.md
+
+### New protected files
+src/components/group/GroupPortal.js (445 lines)
+src/components/group/NetworkDashboard.js (730 lines)
+src/components/hq/HQMedical.js
+src/components/hq/HQOverview.js
+src/components/hq/HQProfitLoss.js
+
+*Appended: 11 April 2026 · HEAD: 46d9a20*
