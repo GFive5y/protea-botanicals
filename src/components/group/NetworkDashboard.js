@@ -25,32 +25,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
 import { fetchStoreSummary } from "./_helpers/fetchStoreSummary";
-
-// ─── Industry profile badge map ─────────────────────────────────────────────
-// Maps industry_profile → { bg, fg, label } using WP-DS-6 tokens only.
-// Dispensary uses T.info (clinical blue) per WP-DS-3 plan — no new token needed.
-const INDUSTRY_BADGE = {
-  cannabis_retail: {
-    bg: T.accentLight,
-    fg: T.accentText,
-    label: "Cannabis Retail",
-  },
-  cannabis_dispensary: {
-    bg: T.infoLight,
-    fg: T.infoText,
-    label: "Medical Dispensary",
-  },
-  food_beverage: {
-    bg: T.warningLight,
-    fg: T.warningText,
-    label: "Food & Beverage",
-  },
-  general_retail: {
-    bg: T.neutralLight,
-    fg: T.neutralText,
-    label: "General Retail",
-  },
-};
+import { INDUSTRY_BADGE } from "./_helpers/industryBadge";
 
 // ─── Currency formatter ────────────────────────────────────────────────────
 const fmtR = (n) => {

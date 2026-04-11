@@ -21,6 +21,7 @@ import { T } from "../../styles/tokens";
 import NetworkDashboard from "./NetworkDashboard";
 import GroupTransfer from "./GroupTransfer";
 import GroupSettings from "./GroupSettings";
+import StoreComparison from "./StoreComparison";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -384,9 +385,11 @@ export default function GroupPortal() {
           />
         )}
         {activeTab === "compare" && (
-          <PlaceholderTab
-            title="Compare Stores"
-            description="Side-by-side comparison of revenue, margin, top products, stock efficiency. Coming in later phase."
+          <StoreComparison
+            groupId={groupId}
+            groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
           />
         )}
         {activeTab === "financials" && (
