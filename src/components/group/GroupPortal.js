@@ -23,6 +23,7 @@ import GroupTransfer from "./GroupTransfer";
 import GroupSettings from "./GroupSettings";
 import StoreComparison from "./StoreComparison";
 import CombinedPL from "./CombinedPL";
+import RevenueIntelligence from "./RevenueIntelligence";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { id: "transfers",  label: "Stock Transfers" },
   { id: "compare",    label: "Compare Stores" },
   { id: "financials", label: "Combined P&L" },
+  { id: "revenue",    label: "Revenue Intelligence" },
   { id: "loyalty",    label: "Shared Loyalty", disabled: true }, // Phase 2+
   { id: "settings",   label: "Group Settings" },
 ];
@@ -395,6 +397,14 @@ export default function GroupPortal() {
         )}
         {activeTab === "financials" && (
           <CombinedPL
+            groupId={groupId}
+            groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
+          />
+        )}
+        {activeTab === "revenue" && (
+          <RevenueIntelligence
             groupId={groupId}
             groupName={groupName}
             members={members}
