@@ -416,6 +416,65 @@ These components still render blocking alert blocks or WorkflowGuide-driven warn
 
 ---
 
+## Orphan Risk — Features With No Nav Entry
+
+Features reachable only by direct URL, conditional dispatch, or event-driven mount — with no persistent sidebar, tab-bar, or waterfall entry the user can click to discover them.
+
+**Two risk tiers:**
+- **Direct URL only** — typed into the address bar or reached via deep link. If the link is lost, the feature is effectively invisible.
+- **Conditional dispatch** — automatically mounted when a runtime condition holds (e.g., tenant type). Discoverable for the matching users only; invisible to everyone else.
+
+### Verification methodology
+Each candidate below was verified by grep of `src/App.js` and all portal entry points for the component import and mount site. Evidence is cited with `file:line`.
+
+### TIER 1 — Confirmed direct-URL-only features
+
+| Feature | Component | Route | Mount evidence | Nav entry? | Discovery risk |
+|---|---|---|---|---|---|
+| **QR Generator (standalone)** | `pages/AdminQrGenerator.js` (1,218 lines) | `/admin/qr` | [src/App.js:1033-1042](src/App.js#L1033-L1042) — dedicated Route with `RequireAuth` + `RequireRole(["admin"])` + AppShell wrapper | ✗ no tab bar entry in AdminDashboard's 14-tab switch | **HIGH** — admin users must know the URL. The `qr_codes` tab in AdminDashboard renders `AdminQRCodes.js` (4,750 lines — different component). `AdminQrGenerator.js` is a separate, older admin-only tool. |
+| **Onboarding Wizard (WP-STOREFRONT-WIZARD v239)** | `pages/OnboardingWizard.js` | `/onboarding` | [src/App.js:76](src/App.js#L76) import + [src/App.js:965](src/App.js#L965) `<Route path="/onboarding" element={<OnboardingWizard />} />` — public route, no auth guard | ✗ no sidebar entry anywhere | **HIGH** — typically the post-signup redirect from `invite-user` EF (v3). If the invite-email link is lost or the EF fails, no one can reach it. |
+
+### TIER 2 — Conditional dispatch (NOT dead code, but not nav-reachable)
+
+| Feature | Component | Route | Mount evidence | Nav entry? | Discovery risk |
+|---|---|---|---|---|---|
+| **ShopDashboard** | `pages/ShopDashboard.js` (228 lines) | `/admin` (conditional) | [src/App.js:74](src/App.js#L74) import + [src/App.js:742-787](src/App.js#L742-L787) `AdminDashboardRouter`: `if (isHQ) return <AdminDashboard />;` `if (tenantType === "shop") return <ShopDashboard />;` `return <AdminDashboard />;` (default) | ✗ no sidebar entry — auto-selected by tenant type at `/admin` | **LOW** — **NOT dead code.** Mounts automatically for tenants where `useTenant().tenantType === "shop"` (sub-shops of a parent tenant). Reachable by navigating to `/admin` given the right tenant context. No discovery problem for the target audience. |
+| `components/shop/ShopInventory.js` (850) | — | — | rendered inside ShopDashboard | ✗ | **LOW (by inheritance)** — mounted when ShopDashboard mounts |
+| `components/shop/ShopAnalytics.js` (844) | — | — | rendered inside ShopDashboard | ✗ | **LOW (by inheritance)** |
+| `components/shop/ShopSettings.js` (597) | — | — | rendered inside ShopDashboard | ✗ | **LOW (by inheritance)** |
+| `components/shop/ShopOverview.js` (503) | — | — | rendered inside ShopDashboard | ✗ | **LOW (by inheritance)** |
+
+**Correction to earlier inventory claim:** An earlier version of this inventory listed ShopDashboard as "not directly exposed in App.js main routes". This was incomplete. `ShopDashboard` IS reached via the `/admin` route through the `AdminDashboardRouter` dispatcher at [App.js:742](src/App.js#L742). It is a live code path, not an orphan. It is, however, invisible to anyone whose tenant does not have `tenantType === "shop"`. None of the current 9 tenants in SESSION-STATE v239 list `shop` as a tenant type — so in practice this component may not be rendering for any live tenant right now, but that's a data/seed question, not a dead-code question.
+
+### TIER 3 — Event-driven / ambiguous mount sites
+
+These components are listed in LIVE-AUDIT Part 3 but their exact mount site in the portal sidebar is either event-driven (floating widget, modal, toast), prop-passed from a parent, or uninventoried. Not orphans in the strict sense — but not discoverable via any sidebar either.
+
+| Component | Lines | Mount pattern | Confirmed site | Discovery risk |
+|---|---|---|---|---|
+| `CustomerSupportWidget.js` | 900 | floating overlay | Shop + Account area (confirmed in inventory) | LOW — visible as a floating button |
+| `CustomerInbox.js` | 793 | nested in Account | Account page deep-link | LOW — reached via Account |
+| `SurveyWidget.js` | 292 | post-purchase trigger | OrderSuccess flow | LOW — auto-triggered |
+| `PromoBanner.js` | 164 | embedded in Shop | Shop component, prop-passed | LOW |
+| `AIFixture.js` | 301 | "Proactive AI daily brief fixture" | **Mount site not yet confirmed** — follow-up grep needed | MEDIUM — may be dead code |
+| `DevErrorCapture.js` | 149 | React error boundary | Wraps sensitive routes | LOW — invisible by design until an error fires |
+
+**AIFixture.js is the only real ambiguous case.** A follow-up grep `rg "AIFixture" src/` would confirm whether it has a live mount site or was left in the codebase after an abandoned feature. Not done in this pass — read-only audit.
+
+### Recommended follow-ups
+
+1. **AdminQrGenerator** (TIER 1, HIGH): either add a "QR Tools" tab to AdminDashboard's sidebar (14→15 tabs), or confirm it's intentionally admin-only-by-URL and add a note to the admin onboarding doc. Don't leave a 1,218-line tool invisible to its users.
+
+2. **OnboardingWizard** (TIER 1, HIGH): confirm the `invite-user` EF (v3) always embeds the `/onboarding` URL in its emails. If that's the only path in, the EF is a single point of failure for the entire tenant-onboarding flow.
+
+3. **ShopDashboard + shop/ family** (TIER 2, LOW): if no current tenant has `tenantType === "shop"`, the entire 2,794-line `components/shop/` tree is rendering for nobody. Either (a) create a shop-type tenant to exercise the code path, (b) confirm the feature is scheduled for a future tenant, or (c) consider archiving the tree if the shop-dispatch pattern has been superseded.
+
+4. **AIFixture.js** (TIER 3, MEDIUM): grep to confirm mount site. If none found, archive or remove.
+
+5. **Rename clarification**: AdminDashboard has a `qr_codes` tab that renders `AdminQRCodes.js` (4,750 lines, the active QR management tool). The older `AdminQrGenerator.js` (1,218 lines, at `/admin/qr`) may be a legacy precursor. Consider marking the older one deprecated in its file header if that's the case.
+
+---
+
 ## SUMMARY COUNTS
 
 | Dimension | Count |
