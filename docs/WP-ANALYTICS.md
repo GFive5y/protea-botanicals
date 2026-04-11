@@ -141,7 +141,8 @@ AI-native. That is the product.
 ### Module 1 — Store Comparison (WP-ANALYTICS-1)
 File: docs/WP-ANALYTICS-1.md (full spec — read this)
 Tab: /group-portal?tab=compare
-Status: IN PROGRESS — spec committed, build pending
+Status: COMPLETE — StoreComparison.js live, verified in browser
+        with 2 stores. HEAD: 8221177
 Primary question: "Which store is performing best and why?"
 Key innovation: First cross-tenant comparison surface in NuAi.
                Benchmarks every store against network average.
@@ -242,7 +243,7 @@ EF: ai-copilot v70 (already deployed, already tested in tenant portals)
 
 | Phase | Module | Sessions | Status |
 |---|---|---|---|
-| WP-ANALYTICS-1 | Store Comparison | 1 | IN PROGRESS |
+| WP-ANALYTICS-1 | Store Comparison | 1 | ✅ COMPLETE — HEAD 8221177 |
 | WP-ANALYTICS-2 | Combined P&L | 1 | Pending |
 | WP-ANALYTICS-3 | Revenue Intelligence | 2 | Pending |
 | WP-ANALYTICS-4 | Stock Intelligence | 2 | Pending |

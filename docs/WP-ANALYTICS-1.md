@@ -1,7 +1,7 @@
 # WP-ANALYTICS-1 — Store Comparison
 ## NuAi Franchise Analytics Suite — Module 1
-## Status: SPEC COMPLETE — ready to build
-## Written: 11 April 2026 · HEAD at time of writing: 20dff82
+## Status: COMPLETE — shipped 8221177, verified in browser
+## Written: 11 April 2026 · Shipped: 12 April 2026 · HEAD at time of writing: 20dff82 → 8221177
 
 ---
 

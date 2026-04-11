@@ -1481,3 +1481,308 @@ Full entry including:
 *2 repo commits in Addendum 4 · CLAUDE.md v2.0 shipped · WP-TENANT-GROUPS Phase 4 COMPLETE*
 *Full day commit chain: d842cd0 → e8ceaaa → 329ed9b → d93ef9e → ad3dc21 → 969a065 → c304c40 → 8bcadc7 → 11f12b4 → 5668e03*
 *Franchise network portal: dashboard + inter-store transfers both LIVE with correct AVCO math*
+
+---
+
+# ADDENDUM 5 — 12 April 2026 (WP-ANALYTICS-1 milestone close)
+
+## HEAD AT CLOSE: `8221177` (doc commit to follow)
+
+This addendum covers the extended session that continued past the
+Addendum 4 close at `5668e03`. The work fell into two phases:
+(1) finishing WP-TENANT-GROUPS with Phase 5 GroupSettings and the
+LL-242 HQTransfer AVCO fix, and (2) launching the NuAi Franchise
+Analytics Suite with WP-ANALYTICS-1 Store Comparison — the first
+genuine cross-tenant analytical surface in the NuAi codebase.
+
+## COMMIT CHAIN (Addendum 5)
+
+```
+5668e03 → 787b97f → 617a2ac → 713ef3a → 20dff82 → 61632a6 →
+30d6c1a → 908a30b → 8221177
+```
+
+1. **`787b97f`** — SESSION-STATE Addendum 4 + NEXT-SESSION-PROMPT v241
+2. **`617a2ac`** — feat(WP-TG/P5): GroupSettings.js + royalty migration + LL-243 invite gap recorded
+3. **`713ef3a`** — fix(LL-242): HQTransfer AVCO recalculation on receive
+4. **`20dff82`** — docs(LL-242): add fix commit hash 713ef3a to Bible closing note
+5. **`61632a6`** — docs: WP-ANALYTICS master suite + WP-ANALYTICS-1 spec
+6. **`30d6c1a`** — docs(WP-ANALYTICS-1): correct order_items column names after Step 0 schema check
+7. **`908a30b`** — refactor(WP-A1/S1): extract fetchStoreSummary to shared helper + extend with aov/lastMonth/topProducts
+8. **`8221177`** — feat(WP-A1): StoreComparison.js — cross-store analytics with bar chart, delta badges, top products
+
+## WHAT SHIPPED
+
+### 1. WP-TENANT-GROUPS Phase 5 — GroupSettings.js (`617a2ac`)
+
+First task of the addendum. 1,001-line single-page settings surface
+completing the /group-portal nav structure:
+
+- **Group Details section** — editable name, type (franchise / corporate /
+  cooperative), royalty percentage. Owner-only; non-owners see a
+  read-only "Only the group owner can edit these settings." note.
+- **Member Stores table** — full list with industry badge, role pill,
+  joined date, "(you)" marker. Owner-only Remove action with inline
+  amber confirm band. Cannot remove the last member. Cannot remove
+  other owners.
+- **Add a Store section** — OWNER-ONLY, hidden entirely from
+  franchisees (per mid-task addendum). Paste a tenant_id UUID, handler
+  validates format, checks not-already-member, verifies tenant exists
+  via `.maybeSingle()`, then inserts `tenant_group_members` with role
+  `franchisee`. Shortfall note below the form acknowledges the
+  email-invite gap (LL-243).
+- **Danger Zone — Leave network** — gated against last-member and
+  owner cases; click-to-confirm pattern.
+
+**Migration applied via Supabase MCP** before the build:
+`royalty_percentage numeric(5,2) DEFAULT 0 CHECK (0..100)` added to
+`tenant_groups`. Backfilled to 0 for the existing Medi Can Franchise
+Network row via the DEFAULT clause.
+
+**LL-243 added to NUAI-AGENT-BIBLE.md** documenting the invite gap
+(no email-invite, no new-tenant creation from within GroupSettings,
+no tenant-name search) and the full Phase 5 permission model.
+
+### 2. LL-242 HQTransfer AVCO fix (`713ef3a` + `20dff82`)
+
+Pre-flight audit of HQTransfer.js handleReceive revealed the bug was
+in an unexpected place: both SELECT statements (SKU-match at line
+425, name-match at line 439) fetched only `"id, quantity_on_hand"` —
+they never captured the destination's `weighted_avg_cost` at all.
+The UPDATE at line 453 therefore had no AVCO value to work with, and
+only wrote `quantity_on_hand`. Every inbound HQ→store transfer
+silently corrupted destination AVCO whenever the store already
+carried the SKU.
+
+Four coordinated edits landed in a single atomic Edit operation:
+
+1. Added `let shopCurrentAvco = 0;` state local
+2. SKU SELECT now fetches `"id, quantity_on_hand, weighted_avg_cost"`
+3. Name SELECT now fetches the same three columns
+4. UPDATE computes `newAvco = ((destQty × destAvco) + (confirmedQty ×
+   unit_cost_zar)) / newQty` and writes both `quantity_on_hand` and
+   `weighted_avg_cost` back to the destination row
+
+Bit-for-bit identical to the formula GroupTransfer.js already uses
+(its own LL-242 preventative fix, written during Phase 4 pre-flight).
+HQTransfer and GroupTransfer are now mathematically consistent.
+
+**LL-242 in NUAI-AGENT-BIBLE.md updated** with a FIXED closing note
+citing commit `713ef3a`. Going-forward fix only — historical AVCO
+data corrupted by prior receives is NOT retroactively corrected.
+Historical remediation (walk stock_movements type=transfer_in,
+recompute per affected destination row) is a separate future task.
+Per-line atomicity gap remains open in both HQTransfer and
+GroupTransfer.
+
+### 3. WP-ANALYTICS launch — the NuAi Franchise Analytics Suite (`61632a6`)
+
+Two new specification documents establishing the full analytics
+vision before any analytics code was written:
+
+**`docs/WP-ANALYTICS.md` (321 lines)** — master suite vision document.
+Captures the strategic framing (reporting vs analytics — what
+happened vs what it means and what to do), the four analytics types
+(descriptive / diagnostic / predictive / prescriptive) as a design
+framework, six non-negotiable UX principles (one primary question
+per screen, progressive disclosure, every metric has context, every
+insight implies an action, leading+lagging balance, benchmarking is
+the value), the 10 core network KPIs, competitive landscape analysis
+(what Flowhub / Cova / BLAZE / FranConnect can't do and what NuAi
+owns exclusively), six-module overview (Store Comparison, Combined
+P&L, Revenue Intelligence, Stock Intelligence, Customer & Loyalty,
+Network Intelligence), phased delivery plan, prerequisite
+architecture audit, suite-wide rules, and the session-close protocol
+for the suite.
+
+**`docs/WP-ANALYTICS-1.md` (388 lines — 375 after hash correction)**
+— Module 1 Store Comparison detailed spec. Captures the full
+reconnaissance report, locks five architectural decisions (shared
+fetcher extraction via Option A, metrics scope with delta badges,
+chart types, sort/filter model, single-page progressive disclosure
+layout), documents the data architecture with the exact per-store
+fetch shape, and specifies the complete StoreComparison.js component
+down to every section, every row, every button, every token.
+
+### 4. Step 0 schema check → doc correction (`30d6c1a`)
+
+Before any WP-ANALYTICS-1 code: owner verified `order_items` schema
+via Supabase MCP from their side, then fed the exact column list
+back to Claude Code: `id, order_id, product_name, quantity,
+unit_price, line_total, product_metadata, created_at`.
+
+WP-ANALYTICS-1.md corrected: the topProducts query now uses
+`SUM(line_total)` (pre-computed qty × price) instead of
+`SUM(qty × unit_price)` and `SUM(quantity)` instead of `SUM(qty)`.
+LL-244 candidate (order_items existence unverified) **resolved** —
+table exists, columns verified against live schema.
+
+Also flagged in the same commit: `marginLastMonth` is NOT in scope
+because computing it would require historical inventory snapshots
+that don't exist. `revenueLastMonth` IS in scope via a second
+orders/dispensing_log query with the prior-month date range.
+
+### 5. Step 1 — fetchStoreSummary extraction (`908a30b`)
+
+Extracted the per-store summary fetcher from NetworkDashboard.js
+into `src/components/group/_helpers/fetchStoreSummary.js` — a new
+250-line standalone module. First helper in a new `_helpers/`
+directory pattern that every future group analytics surface will
+share.
+
+Signature changed from `(tenantId, industryProfile)` closing over
+`monthStartISO` via useCallback, to `(tenantId, industryProfile,
+monthStartISO, options = {})` where `options` is
+`{ includeExtended, lastMonthStartISO, lastMonthEndISO }`.
+
+**Design decision: extended mode is opt-in, not always-on.** Default
+behaviour (no options) runs exactly the same two Supabase queries
+per store that NetworkDashboard ran before extraction — zero
+regression on the landing page. Extended mode runs 2-3 additional
+queries per store and is only invoked when a caller explicitly asks
+for it. The `aov` field is always populated because it's a
+zero-cost division.
+
+This deliberately diverged from a literal reading of the brief
+("add 3 new fields to the return shape") in favour of preserving
+its "everything else in NetworkDashboard untouched" constraint.
+
+NetworkDashboard.js refactor: 4 surgical edits (import added,
+inline useCallback block removed, call site updated to pass
+monthStartISO explicitly, fetchAll dep array changed). Net −98
+lines. NetworkDashboard still renders identically with the same
+Supabase call pattern.
+
+### 6. Step 2 — StoreComparison.js + INDUSTRY_BADGE extraction (`8221177`)
+
+**The milestone commit. 996 lines. First genuine cross-tenant
+analytics surface in the NuAi codebase.**
+
+INDUSTRY_BADGE constant also extracted to
+`_helpers/industryBadge.js` in the same commit. Both NetworkDashboard
+and StoreComparison now import it — second source of truth
+eliminated before it could drift.
+
+StoreComparison.js layout (progressive disclosure, single scrolling
+page):
+
+- **Section 1 — Network Summary**: 4 KPI tiles across the top.
+  Combined Revenue MTD · Network Avg Margin (semantic-coloured) ·
+  Best Store (accent left-border) · Needs Attention (dangerBorder
+  left-border, only renders when worst-margin store is <50%,
+  otherwise falls back to Network Avg Revenue tile).
+
+- **Section 2 — Revenue Bar Chart**: Recharts horizontal BarChart
+  inside ChartCard at 240px height. User's own store highlighted in
+  T.accent, others in T.neutralLight. Dashed ReferenceLine at
+  network-average revenue. ChartTooltip with R-formatted value
+  (`fmtR(val)`). Sort control row above: Revenue | Margin | Orders
+  | Stock health — pill buttons, Revenue default. Sort re-orders
+  both the bar chart and the grid below in a single gesture.
+
+- **Section 3 — Store Comparison Grid**: `auto-fit, minmax(300px,
+  1fr)`. Per-store card with absolute top-right rank badge, self-
+  card outlined in T.accent, industry badge pill. 5 metric rows:
+  Revenue MTD + DeltaBadge, Gross margin + InlineProgressBar +
+  coloured %, AOV, Orders/Events (label adapts by profile), Stock
+  health (critical/low/all-stocked semantic-coloured). Collapsible
+  Top 5 Products section (rank/name/revenue/qty). Footer: Transfer
+  stock → (wired to onNavigate) and View store (Phase 4b cross-
+  tenant nav placeholder). Per-store error banner when fetch fails.
+
+**Three viz prop-signature corrections against the brief**,
+discovered during pre-build reads of the actual components and
+documented in the commit message:
+
+1. DeltaBadge prop is `value`, not `delta` (passing `delta` triggers
+   the undefined guard and silently renders nothing)
+2. InlineProgressBar has no `colour`/`width` props — colour comes
+   from `dangerAt`/`warnAt` thresholds, overridden to `40`/`55` to
+   invert the default low-stock semantics into margin-band
+   semantics; width constrained via parent wrapper
+3. ChartTooltip formatter returns a plain string, not a `[val,
+   name]` array — series label comes from the `Bar name` prop
+   which ChartTooltip reads from `entry.name`
+
+All layout via WP-DS-6 T.* tokens — zero hardcoded px matching a
+token. LL-231 and LL-226 enforced inside fetchStoreSummary; this
+component is profile-agnostic at the render layer. LL-242 AVCO-
+correct margin preserved end-to-end. Zero new build warnings.
+
+### 7. Second store added to Medi Can Franchise Network
+
+Owner added a second tenant to the network via Supabase MCP from
+their side during this session: **Medi Recreational
+(`b1bad266`)** joined as a `franchisee` alongside the existing
+**Medi Can Dispensary (`2bd41eb7`)** franchisor.
+
+This is now the first franchise network on NuAi with real cross-
+store data. StoreComparison was verified in the browser after the
+second store was added — both stores render in the revenue bar
+chart, the grid, and all delta calculations against MTD+last-month
+figures.
+
+## WHAT IS NOT DONE (carried into v242)
+
+1. **WP-ANALYTICS-2 Combined P&L** — next priority. The financials
+   tab in GroupPortal.js still renders a PlaceholderTab. Module 2
+   of the six-module suite.
+2. **WP-ANALYTICS-3 through 6** — specced in the master suite
+   document, detailed specs not yet written. Session close protocol
+   requires each module's detailed spec doc before the build
+   session that implements it.
+3. **Cross-tenant View store navigation** — still a console.log
+   placeholder in both NetworkDashboard and StoreComparison store
+   cards. Phase 4b work — requires a secure tenant-switch action.
+4. **Transfer pre-selection from Compare Stores** — the
+   `Transfer stock →` button in a StoreComparison card currently
+   navigates to the transfers tab without pre-populating the TO
+   store. Phase 4b for GroupTransfer.
+5. **HQTransfer historical AVCO reconciliation** — LL-242 is closed
+   forward but pre-fix data corruption is not remediated.
+6. **Per-line atomicity** on ship/receive/cancel in both HQTransfer
+   and GroupTransfer — known issue, documented in LL-242.
+7. **Sender email domain** — still pending owner's external action
+   (CIPRO + nuai.co.za purchase).
+8. **`docs/.claude/worktrees/` disk cleanup** — untracked, needs
+   rm -rf, still deferred.
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `8221177`** before the session-close doc commit. Will
+   shift by one after this addendum lands.
+2. **The Group Portal now has 4 of 6 tabs fully live**: Network
+   Dashboard, Stock Transfers, Compare Stores, Group Settings.
+   Only Combined P&L remains before the portal is feature-complete
+   against the original WP-TENANT-GROUPS spec.
+3. **`_helpers/` pattern is now established** under
+   `src/components/group/`. Current occupants:
+   `fetchStoreSummary.js` and `industryBadge.js`. Future analytics
+   modules reuse these and add their own helpers beside them.
+4. **fetchStoreSummary opt-in extended mode** is the contract —
+   pass `{ includeExtended: true, lastMonthStartISO,
+   lastMonthEndISO }` when the analytics module needs per-store
+   last-month revenue and top-5 products. Do NOT unconditionally
+   enable extended mode in landing surfaces.
+5. **WP-ANALYTICS.md is the master vision doc** — read it before
+   any analytics work. WP-ANALYTICS-N.md documents are the
+   per-module detailed specs. Write the next module's detailed
+   spec BEFORE closing any analytics build session.
+6. **Medi Can Franchise Network now has 2 members**: Medi Can
+   Dispensary (2bd41eb7, franchisor) and Medi Recreational
+   (b1bad266, franchisee). First cross-store data in production.
+7. **Test credentials unchanged**: `medican@nuai.dev` /
+   `MediCan2026!` → `/group-portal` for the full franchise view.
+8. **LL-242 is FIXED** in HQTransfer. Both HQTransfer and
+   GroupTransfer now use the same AVCO recalculation formula.
+9. **LL-243 is open** — GroupSettings email-invite gap,
+   deliberately scoped out of Phase 5 as a named future build.
+10. **LL-244 was resolved during Step 0** — order_items schema
+    verified, not a candidate rule anymore.
+
+---
+
+*Addendum 5 written 12 April 2026 · HEAD at close: 8221177 (pre-doc-commit)*
+*8 repo commits in Addendum 5 · WP-TENANT-GROUPS 5/6 phases complete · WP-ANALYTICS-1 COMPLETE*
+*Addendum 5 commit chain: 787b97f → 617a2ac → 713ef3a → 20dff82 → 61632a6 → 30d6c1a → 908a30b → 8221177*
+*First cross-tenant analytics surface live · LL-242 HQTransfer fixed · 2-store franchise network operational*
