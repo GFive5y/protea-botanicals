@@ -256,7 +256,11 @@ EF: ai-copilot v70 (already deployed, already tested in tenant portals)
 | WP-ANALYTICS-3 | Revenue Intelligence | 2 | ✅ COMPLETE — HEAD 6ea2493 |
 | WP-ANALYTICS-4 | Stock Intelligence | 2 | ✅ COMPLETE — HEAD e55961f |
 | WP-ANALYTICS-5 | Customer & Loyalty | 2 | ✅ COMPLETE — S1 `a5134aa` · S2 `388520c` |
-| WP-ANALYTICS-6 | NuAi Network Intelligence | 1 | SPEC COMPLETE — ready for Session 1 · docs/WP-ANALYTICS-6.md |
+| WP-ANALYTICS-6 | NuAi Network Intelligence | 1 | ✅ COMPLETE — S1 `acb007c` |
+
+**✅ WP-ANALYTICS SUITE COMPLETE — 12 April 2026**
+All 6 modules live. From one isolated tenant view on 9 April to a
+complete 6-module cross-store franchise intelligence suite on 12 April.
 
 Total: ~9 sessions for the complete suite.
 Each phase ships something complete and immediately useful.

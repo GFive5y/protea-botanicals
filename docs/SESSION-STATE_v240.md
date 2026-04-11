@@ -998,3 +998,229 @@ will add Network Intelligence as the 8th content tab.
 *Addendum 3 of v240 written 12 April 2026 · HEAD at close: `388520c` (pre-doc-commit)*
 *Two commits in Addendum 3 · WP-ANALYTICS-5 COMPLETE · NUAI-STRAT-INTEL landed · Module 6 spec on disk*
 *Session Close Protocol Step 3b is now mandatory · First instance run in this addendum*
+
+---
+
+# ADDENDUM 4 — 12 April 2026 · WP-ANALYTICS SUITE COMPLETE
+
+**The WP-ANALYTICS arc is closed. All 6 modules live. This addendum
+documents the final module's session and the completion of the
+suite.**
+
+## HEAD chain this addendum
+
+`00e6656 → acb007c → [this session close doc commit]`
+
+Two commits:
+
+1. **`acb007c`** — `feat(WP-A6/S1): NetworkIntelligence — alert
+   centre, health scores, benchmarking, royalty calculator`.
+   WP-ANALYTICS-6 Session 1 and the final module of the suite.
+   3 files changed, 2,171 insertions / 2 deletions.
+
+2. **This session close doc commit** — bundles Addendum 4 to
+   SESSION-STATE, Addendum 2 to NUAI-STRAT-INTEL (suite-complete
+   narrative), WP-ANALYTICS.md + WP-ANALYTICS-6.md status bumps,
+   NetworkIntelligence.js file header bump, NEXT-SESSION-PROMPT_v249
+   (priority queue is now the deferred items backlog, not a new
+   module), and v248 deletion.
+
+## WP-ANALYTICS-6 Session 1 detail (commit `acb007c`)
+
+### Step 0 schema check
+
+All 4 queries run before a line of code, zero divergence from the
+spec body:
+
+- `tenant_groups.royalty_percentage` exists as numeric
+- `tenant_group_members.role` is text; live values `franchisor` and
+  `franchisee` (no DB enum, string comparison is the agreed convention)
+- Medi Can Franchise Network `royalty_percentage = 0.00` — exactly
+  the "not yet configured" case Section 3 handles via the configure
+  note path with the "Go to Group Settings" button
+- No new network-analytics tables (`network_alerts`, `network_scores`,
+  `franchise_fees`, `royalty_ledger`, `compliance_log` all absent)
+  — confirms the client-side-only no-persistence design
+
+No spec rewrite needed. Built directly from WP-ANALYTICS-6.md body.
+
+### Files shipped
+
+1. **`src/components/group/_helpers/fetchNetworkIntelligence.js`**
+   (new, 563 lines) — pure aggregator calling three existing
+   helpers in parallel across all member stores. Phase 1 data fetch,
+   Phase 2 per-store 5-dimension health score with exclusion-based
+   denominator scaling, Phase 3 severity-sorted alert generation,
+   Phase 4 royalty calculation for franchisees only. Never throws.
+   Partial failures land in store.err fields and the store still
+   renders with available data.
+
+2. **`src/components/group/NetworkIntelligence.js`** (new,
+   1,606 lines) — the renderer. Four sections plus CSV export:
+   Alert Centre (absent when healthy), Section 1 health scorecards
+   with network average bar, Section 2 sortable benchmarking table
+   with overflowX wrapper and pinned network total row, Section 3
+   royalty calculator with configure-note path for royaltyPct=0.
+   CSV export as 10-column numeric format with UTF-8 BOM. Data
+   quality footnote documenting the aggregator pattern, exclusion
+   guard, and POPIA stance.
+
+3. **`src/components/group/GroupPortal.js`** (5 surgical edits):
+   import NetworkIntelligence; add "network" to NAV_ITEMS between
+   "customers" and disabled "loyalty"; add `groupRoyaltyPct` state;
+   extend fetchGroup query to include `royalty_percentage` in the
+   existing tenant_groups subselect (no new useEffect, per spec);
+   add network tab router branch passing `groupMeta` prop only to
+   NetworkIntelligence.
+
+### Reuse-over-requery architectural decision
+
+Module 6 is the strongest instance in the suite of the "reuse over
+requery" principle. It calls `fetchStoreSummary` (extended mode),
+`fetchStoreInventory` (with velocity), and `fetchStoreLoyalty`
+(cohort + points economy) in parallel via a single outer Promise.all
+over three inner Promise.alls — 3 × 2 = 6 parallel queries for the
+Medi Can network. Zero new Supabase queries beyond the one-time
+`royalty_percentage` extension in GroupPortal's existing fetchGroup.
+
+This architectural decision is worth locking in as a principle for
+any future aggregator helper: **if the data exists in an existing
+helper's return shape, use it; do not requery.** The principle
+applies specifically to aggregators — data fetchers in other
+components should continue to have focused, purpose-specific
+queries.
+
+### POPIA stance
+
+Module 6 does not fetch or render any customer-level data. Health
+scores and alert counts are aggregates only. No new PII surface
+area. The POPIA narrow exception pattern locked in by
+Customer Intelligence Section 6 (deriveInitials + masked UUID) is
+the reference for any future customer-level Group Portal rendering.
+
+## WP-ANALYTICS SUITE — FINAL STATUS
+
+| Module | Name | Status |
+|---|---|---|
+| 1 | Store Comparison | ✅ COMPLETE — `8221177` |
+| 2 | Combined P&L | ✅ COMPLETE — `5ba63b5` |
+| 3 | Revenue Intelligence | ✅ COMPLETE — `6ea2493` |
+| 4 | Stock Intelligence | ✅ COMPLETE — `e55961f` |
+| 5 | Customer & Loyalty Intelligence | ✅ COMPLETE — S1 `a5134aa` · S2 `388520c` |
+| 6 | **NuAi Network Intelligence** | ✅ **COMPLETE — `acb007c`** |
+
+**Six of six modules live. The WP-ANALYTICS arc is closed.** From
+one isolated tenant view on 9 April to a complete 6-module
+cross-store franchise intelligence suite on 12 April. Four days,
+seven feature commits, six spec documents, one production
+franchise network end-to-end verifying every module.
+
+Full arc narrative lives in `docs/NUAI-STRATEGIC-INTELLIGENCE_v1_0.md`
+Addendum 2 — the definitive record of what shipped, what the suite
+delivers, and what architectural patterns are locked in.
+
+## `_helpers/` DIRECTORY — FINAL (7 siblings)
+
+| File | Purpose | Extended this addendum? |
+|---|---|---|
+| `fetchStoreSummary.js` | MTD summary + extended top products + MoM revenue | No |
+| `industryBadge.js` | Profile → badge data | No |
+| `fetchStoreFinancials.js` | P&L for a date range | No |
+| `fetchStoreTrend.js` | Timestamped revenue rows + bucketing | No |
+| `fetchStoreInventory.js` | Inventory snapshot + velocity + health flags | No |
+| `fetchStoreLoyalty.js` | Cohort + points economy + AI logs + top customers | No |
+| **`fetchNetworkIntelligence.js`** | **Aggregator over the six above** | **NEW this addendum** |
+
+Seven helpers. The seventh is an aggregator, not a new data fetcher
+— it synthesises over the first six rather than querying directly.
+
+## Group Portal nav — FINAL (8 content tabs + Settings)
+
+| Position | Tab | Component | Status |
+|---|---|---|---|
+| 1 | Network Dashboard | NetworkDashboard.js | ✅ Live |
+| 2 | Stock Transfers | GroupTransfer.js | ✅ Live |
+| 3 | Compare Stores | StoreComparison.js | ✅ Live |
+| 4 | Combined P&L | CombinedPL.js | ✅ Live |
+| 5 | Revenue Intelligence | RevenueIntelligence.js | ✅ Live |
+| 6 | Stock Intelligence | StockIntelligence.js | ✅ Live |
+| 7 | Customer Intelligence | CustomerIntelligence.js | ✅ Live |
+| 8 | **Network Intelligence** | **NetworkIntelligence.js** | **✅ Live — `acb007c`** |
+| — | Shared Loyalty | disabled nav | Phase 2+ deferred |
+| 9 | Group Settings | GroupSettings.js | ✅ Live |
+
+Eight content tabs plus Settings. The nav is feature-complete for
+the WP-ANALYTICS arc.
+
+## Session Close Protocol Step 3b — second instance
+
+Ran for this addendum. Answers:
+
+1. **Did we ship a new capability?** **YES** — Module 6 Network
+   Intelligence, and the entire WP-ANALYTICS suite is now complete.
+   NUAI-STRAT-INTEL Addendum 2 documents the full suite-complete
+   narrative and updates the capability map.
+2. **Did we fix a known issue?** NO material fix. Known Issues
+   list stays at 11 active entries (12 was resolved in the earlier
+   path-drift fix commit `00e6656`).
+3. **Did Step 0 reveal new schema facts?** CONFIRMATION-ONLY. The
+   4-query WP-A6 Step 0 verified spec assumptions against live
+   schema with zero divergence.
+4. **Did the live data snapshot change materially?** NO — Medi Can
+   Franchise Network snapshot unchanged.
+5. **Did a new LL rule emerge this session?** NO new canonical LL.
+   The "aggregator helpers reuse data, never requery" principle is
+   documented in the `fetchNetworkIntelligence.js` header and in
+   WP-ANALYTICS-6.md — it is scoped to aggregators and does not
+   generalise as a blanket LL.
+
+**Outcome:** NUAI-STRAT-INTEL Addendum 2 written to document the
+completed suite (answer 1 was yes and is significant enough to
+warrant a full arc narrative).
+
+## KNOWN ISSUES — updated at Addendum 4
+
+1. HQTransfer historical AVCO corruption — forward-fix at `713ef3a`, pre-fix data not remediated (NOW PRIORITY 3 in v249)
+2. Per-line atomicity gap in HQTransfer + GroupTransfer ship/receive/cancel
+3. GroupSettings email-invite gap — LL-243 open
+4. Cross-tenant "View store →" navigation placeholders (NetworkDashboard, StoreComparison, StockIntelligence, NetworkIntelligence Alert Centre) (NOW PRIORITY 1 in v249)
+5. Transfer pre-selection from StoreComparison / StockIntelligence
+6. Medi Recreational AVCO gap (172 of 186 items — simulator data)
+7. Sender email not on brand domain
+8. `docs/.claude/worktrees/` disk cleanup
+9. `loyalty_campaigns` table does not exist — WP-ANALYTICS-5 Section 4 permanently blocked (NOW PRIORITY 2 in v249)
+10. Medi Can Dispensary sparse user_profiles (1 row) — visually minimal cohort rendering
+11. Medi Can cohort overlap UX (non-blocking) — Section 3 cohort bar renders segments summing > 100% when `isNew` overlaps other cohorts. Surfaced during WP-A5/S2 verification. Fix options documented in Addendum 3.
+12. ~~Documentation drift on CLAUDE.md path.~~ **RESOLVED** in commit `00e6656`.
+
+## KEY FACTS FOR THE NEXT AGENT
+
+1. **HEAD is `acb007c`** (plus this doc commit). Confirm with `git log --oneline -1`.
+2. **The WP-ANALYTICS suite is DONE.** All 6 modules live. Don't
+   start a Module 7 — none is planned. If a new strategic surface
+   is genuinely needed, produce a detailed spec via the Claude.ai
+   strategic spec pattern first.
+3. **Read NUAI-STRATEGIC-INTELLIGENCE Addendum 2** for the full
+   suite-complete narrative — what shipped, what it delivers,
+   which architectural patterns are locked in.
+4. **Priority 1 for v249 is the deferred items queue** — Phase 4b
+   cross-tenant navigation, loyalty_campaigns schema design,
+   HQTransfer AVCO reconciliation. No new analytics module.
+5. **Seven helpers** in `_helpers/`. The seventh is an aggregator
+   — reuse over requery is the principle for any future aggregator.
+6. **POPIA narrow exception pattern** (Module 5 Section 6
+   `deriveInitials`) is the template for any future customer-level
+   Group Portal rendering.
+7. **Session Close Protocol Step 3b** is permanent. Run the
+   5-question NUAI-STRAT-INTEL review at every session close.
+8. **Module 6 `onNavigate` wiring** — Alert Centre "Go to {tab}"
+   links call `onNavigate(alert.action)` which currently routes
+   in-portal only. Cross-tenant navigation (Phase 4b) will need
+   a different mechanism (`switchTenant()` from `tenantService.js`).
+
+---
+
+*Addendum 4 of v240 written 12 April 2026 · HEAD at close: `acb007c` (pre-doc-commit)*
+*Two commits in Addendum 4 · WP-ANALYTICS-6 SHIPPED · WP-ANALYTICS SUITE COMPLETE*
+*All 6 modules live · Session Close Protocol Step 3b second instance run*
+*Next session Priority 1: deferred items queue — cross-tenant nav, loyalty_campaigns schema, HQTransfer AVCO*

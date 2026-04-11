@@ -396,7 +396,9 @@ never went through the receiving workflow. The UI surfaces this honestly via
 | 3 | Revenue Intelligence | ✓ COMPLETE | SSSG growth, peak trading, top products, 30/60/90d windows, projections |
 | 4 | Stock Intelligence | ✓ COMPLETE | Slow movers, fast movers, transfer opportunities, dead stock, velocity |
 | 5 | Customer Intelligence | ✓ COMPLETE | Cohort health, tier distribution, points economy, AI engine activity, top customers |
-| 6 | Network Intelligence | ▶ SPEC READY | Health scores, alert centre, benchmarking, royalty calculator |
+| 6 | Network Intelligence | ✓ COMPLETE | Health scores, alert centre, benchmarking, royalty calculator |
+
+**✅ WP-ANALYTICS SUITE COMPLETE** — all 6 modules live as of `acb007c`.
 
 When Module 6 ships, the Group Portal will give a franchise owner a complete
 cross-store intelligence layer that no single-store view can provide. They
@@ -577,3 +579,209 @@ Per the new protocol added to SESSION-STATE v240:
 *Session close commit integrates this addendum + 10 other structural*
 *changes in a single bundle. NUAI-STRAT-INTEL is now a living document*
 *reviewed at every session close per Protocol Step 3b.*
+
+---
+
+## ADDENDUM 2 — 12 April 2026 (WP-ANALYTICS SUITE COMPLETE)
+
+### What just shipped
+
+WP-ANALYTICS-6 Session 1 landed at commit `acb007c` —
+NetworkIntelligence with the Alert Centre, 5-dimension health scores,
+sortable benchmarking table, and royalty calculator. All six modules
+of the WP-ANALYTICS suite are now live.
+
+**This addendum closes the WP-ANALYTICS arc.**
+
+### The arc — 9 April to 12 April 2026
+
+Four days. From one isolated tenant view to a complete cross-store
+franchise intelligence suite. This is the arc:
+
+| Date | Commit | What landed |
+|---|---|---|
+| 09 April | — | Group Portal did not exist. Each tenant saw only their own data. No cross-store visibility. Franchise owners had no network view. |
+| 11 April | Phase 3 | Group Portal skeleton + Network Dashboard — first cross-tenant surface. Per-store KPI cards. |
+| 11 April | `8221177` | **WP-ANALYTICS-1** Store Comparison — first cross-tenant analytics surface. Sortable, benchmarked against network average. |
+| 11 April | `5ba63b5` | **WP-ANALYTICS-2** Combined P&L — IFRS-compliant consolidated P&L with profile-branched COGS. |
+| 12 April | `6ea2493` | **WP-ANALYTICS-3** Revenue Intelligence — SSSG growth, peak trading heat matrix, top products per store, 30/60/90d trend windows. First predictive module. |
+| 12 April | `e55961f` | **WP-ANALYTICS-4** Stock Intelligence (S1+S2) — slow movers, fast movers with profile-branched velocity, transfer opportunities, dead stock breakdown. Gap 1 dispensary branch (dispensing_log) verified live. |
+| 12 April | `a5134aa` | **WP-ANALYTICS-5 S1** Customer Intelligence — cohort health, tier distribution, points economy. POPIA-compliant 8-column projection. |
+| 12 April | `388520c` | **WP-ANALYTICS-5 S2** — AI engine activity (loyalty_ai_log) + POPIA-safe top customers (deriveInitials pattern, narrow wire-level exception). Section 4 Campaign ROI permanently deferred — no loyalty_campaigns table. |
+| 12 April | **`acb007c`** | **WP-ANALYTICS-6** Network Intelligence — alert centre, health scores (5-dimension with exclusion-based denominator), benchmarking table, royalty calculator. Reuses all existing helpers; zero new queries. |
+
+Seven feature commits. Six modules. Six `_helpers/` siblings.
+One production franchise network verifying the whole thing
+end-to-end at every checkpoint.
+
+### What the completed suite delivers
+
+A franchise owner logging in to `/group-portal` now has eight
+operational surfaces plus Settings:
+
+1. **Network Dashboard** — first glance. Combined revenue, orders,
+   margin, stock value. Per-store cards with top-3 products.
+
+2. **Stock Transfers** — AVCO-correct cross-store movements, fully
+   wired with LL-242 recalculation on receive. The operational
+   action layer. Not analytics — the *doing* layer.
+
+3. **Compare Stores** — dynamic sort (revenue, margin, orders, stock
+   health). Network-average reference line. Per-store breakdown
+   cards. Transfer and View-store actions.
+
+4. **Combined P&L** — IFRS consolidated statement. Period toggles.
+   Revenue correctly sourced per profile (LL-231). AVCO-correct COGS.
+   Honest data-quality disclosures.
+
+5. **Revenue Intelligence** — SSSG cohort, week-on-week and
+   month-on-month deltas, peak trading heat matrix, top products
+   per store, projected month-end. Predictive as well as descriptive.
+
+6. **Stock Intelligence** — network insight banner, slow movers,
+   fast movers with profile-branched velocity, transfer
+   opportunities with honest empty-state, dead stock breakdown
+   with age bands.
+
+7. **Customer Intelligence** — cohort health (new/active/at-risk/
+   lapsed/dormant), tier distribution with 5-tier palette, points
+   economy with redemption rate, AI engine activity from
+   loyalty_ai_log, top customers with POPIA-safe initials + masked
+   UUID.
+
+8. **Network Intelligence** — the executive synthesis layer. Alert
+   Centre (absent when healthy), 5-dimension health scores per
+   store with exclusion-based denominator scaling, network-average
+   summary, sortable benchmarking table, royalty calculator
+   rendering correctly at 0% with a configure-note path.
+
+9. **Group Settings** — network name, group type, royalty rate,
+   member management, leave-network protection for owner.
+
+### The four questions this suite answers
+
+Before 9 April, a franchise owner could only answer these questions
+by switching tenant context one store at a time and holding the
+numbers in their head. After 12 April:
+
+1. **"Where should I look first?"** → Alert Centre ranks the most
+   urgent signals across the whole network, severity-sorted, with
+   one-click routing to the relevant analytics tab.
+
+2. **"How is each store performing holistically?"** → Health Score
+   gives a 0–100 number per store with 5-dimension breakdown, so
+   the owner can see at a glance which stores are HEALTHY / STABLE
+   / WATCH / CRITICAL.
+
+3. **"How do metrics compare across the network?"** → Benchmarking
+   table with sortable columns, network total/average row, and
+   10-column CSV export ready for the bank, the accountant, or
+   the quarterly review.
+
+4. **"What am I owed?"** → Royalty calculator applying the
+   configured percentage to franchisee revenue, with an honest
+   zero-rate path when the percentage has not yet been set.
+
+And the deep analytics behind each question live in Modules 1–5,
+one click away.
+
+### Architectural wins locked into this suite
+
+- **`_helpers/` pattern** — six siblings, each non-throwing, each
+  shaped consistently. Module 6 reuses all of them rather than
+  writing a seventh data fetcher.
+
+- **Profile-adaptive branching** — every helper that reads
+  revenue branches on `cannabis_dispensary` vs retail. Gap 1 in
+  Module 4 Session 2 verified the dispensary velocity branch
+  against live dispensing_log data; silent zero-velocity bugs
+  would have been undetectable without the spec pattern.
+
+- **POPIA narrow exception pattern** — Customer Intelligence
+  Section 6 `deriveInitials` locks in the canonical way to derive
+  display values from PII server-side and discard the raw string
+  before it reaches React state. This pattern is reusable anywhere
+  the Group Portal ever needs customer-level rendering.
+
+- **Paste-bug checklist** — 5 canonical patterns caught real bugs
+  before multiple commits. The checklist walk is now codified in
+  every component's build sequence.
+
+- **Session Close Protocol Step 3b** — the 5-question NUAI-STRAT-INTEL
+  review is now a required step at every session close, and this
+  addendum is the second instance of running it.
+
+- **Honest empty states** — every module surfaces absence-of-data
+  correctly: "No orders this period" (not "—"), "No AI engine
+  actions fired" (not 0 tiles), "Royalty rate is set to 0%" (not
+  hidden section), Transfer opportunities "honest empty state"
+  when no shared SKUs exist. This is non-negotiable and is now
+  the expected standard.
+
+### Step 3b review — 5 questions
+
+1. **Did we ship a new capability?** **YES** — WP-ANALYTICS-6
+   Network Intelligence. The entire WP-ANALYTICS master suite is
+   now complete. The Group Portal capability map above has been
+   updated.
+2. **Did we fix a known issue?** NO material fix this session.
+   The loyalty_campaigns permanent deferral and the Medi Can
+   cohort overlap UX remain in the Known Issues list.
+3. **Did Step 0 reveal new schema facts?** CONFIRMATION-ONLY. The
+   4-query WP-A6 schema check verified `tenant_groups.royalty_percentage`
+   exists as numeric (live value 0.00 for Medi Can), confirmed
+   `tenant_group_members.role` is text with values `franchisor`
+   and `franchisee`, and confirmed that none of the speculative
+   network-analytics tables (`network_alerts`, `network_scores`,
+   `franchise_fees`, `royalty_ledger`, `compliance_log`) exist —
+   confirming the client-side-only no-persistence design decision.
+4. **Did the live data snapshot change materially?** NO — Medi
+   Can Franchise Network snapshot unchanged from the prior close.
+   Module 6 rendered against the same live data used by
+   Modules 4 and 5 for verification.
+5. **Did a new LL rule emerge this session?** NO new canonical LL.
+   The "reuse helpers, never requery" principle for Module 6 is
+   documented in WP-ANALYTICS-6.md and in the
+   `fetchNetworkIntelligence.js` header — it applies specifically
+   to aggregator helpers and does not generalise as a blanket LL.
+
+### What's next
+
+The WP-ANALYTICS suite is done. The next session's Priority 1 is
+the deferred items queue — not a new analytics module:
+
+- **Phase 4b Cross-tenant navigation** — the "View store →"
+  buttons in NetworkDashboard, StoreComparison, StockIntelligence,
+  and the Alert Centre "Go to {tab}" links currently route
+  in-portal only. Real cross-tenant navigation needs
+  `switchTenant()` from `tenantService.js`.
+- **loyalty_campaigns schema design** — if Campaign ROI
+  (WP-ANALYTICS-5 Section 4) becomes load-bearing, a schema owner
+  must design and create the table and produce a new spec.
+- **HQTransfer historical AVCO reconciliation** — LL-242
+  forward-fix is done; pre-fix corruption in destination
+  `weighted_avg_cost` values is not retroactively corrected.
+  Dedicated session with owner approval before any UPDATE.
+
+Module 6 is the final WP-ANALYTICS module. No Module 7 is planned.
+If and when a new strategic surface is needed, it will require
+its own detailed spec via the Claude.ai strategic spec pattern
+that produced Modules 1–6.
+
+### What this means for the platform
+
+NuAi now has eight live portals serving a production multi-tenant
+SaaS ERP, and the Group Portal — the newest portal, built across
+three weeks in April 2026 — has the complete analytics capability
+planned in the WP-ANALYTICS master vision. The arc from zero
+cross-store visibility to complete franchise intelligence took
+four days of deliberate work across seven feature commits, six
+spec documents, and one production franchise network verifying
+the whole thing end-to-end.
+
+That is the system you are working on.
+
+*Addendum 2 written 12 April 2026 · HEAD at write: `acb007c`*
+*WP-ANALYTICS SUITE COMPLETE · 6 of 6 modules live · 0 modules remaining*
+*Session close commit bundles this addendum + Addendum 4 to SESSION-STATE*
+*+ WP-ANALYTICS.md + WP-ANALYTICS-6.md + NEXT-SESSION-PROMPT_v249 + file header bump*

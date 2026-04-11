@@ -1,6 +1,6 @@
 // src/components/group/NetworkIntelligence.js
-// WP-ANALYTICS-6 Session 1 — NuAi Network Intelligence
-// Status: IN PROGRESS — Session 1
+// WP-ANALYTICS-6 — NuAi Network Intelligence
+// Status: ✅ COMPLETE — Session 1 HEAD `acb007c` · final module of the suite
 //
 // Module 6 of the NuAi franchise analytics suite — the executive
 // synthesis layer. Answers the question a franchise owner asks before
