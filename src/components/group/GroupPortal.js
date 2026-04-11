@@ -20,6 +20,7 @@ import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
 import NetworkDashboard from "./NetworkDashboard";
 import GroupTransfer from "./GroupTransfer";
+import GroupSettings from "./GroupSettings";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -401,9 +402,13 @@ export default function GroupPortal() {
           />
         )}
         {activeTab === "settings" && (
-          <PlaceholderTab
-            title="Group Settings"
-            description="Manage group membership, add/remove stores, configure group type. Coming in later phase."
+          <GroupSettings
+            groupId={groupId}
+            groupName={groupName}
+            groupType={groupType}
+            members={members}
+            onGroupUpdated={fetchGroup}
+            onNavigate={handleNavClick}
           />
         )}
       </main>

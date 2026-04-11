@@ -956,6 +956,43 @@ not fixed in Phase 4. Documented here for the future fix session.
 Source: Claude Code pre-build audit of HQTransfer.js (1,692 lines),
 11 April 2026. Confirmed by owner before Phase 4 build.
 
+## LL-243 — GroupSettings.js INVITE GAP · KNOWN SHORTFALL (11 April 2026)
+GroupSettings Phase 5 (WP-TG/P5) supports adding existing tenants to a
+group by pasting their tenant_id (UUID) only. The Add-a-Store section
+is OWNER-ONLY — franchisee members never see the form at all.
+
+GroupSettings does NOT support:
+  - Inviting a new store by email
+  - Creating a new tenant from within GroupSettings
+  - Searching tenants by name (RLS blocks tenant list for non-HQ users)
+
+The invite-by-email flow requires a new Edge Function, or an extension
+of the existing invite-user EF, to atomically create a new tenant AND
+insert a tenant_group_members row. This is a named future build item
+(Phase 5b) and is NOT a bug — it is a deliberately scoped shortfall.
+
+The gap is documented in the GroupSettings UI itself, via a visible
+note below the Add Store form:
+  "Want to invite a new store by email? This feature is coming in a
+   future release. For now, new stores must be registered on NuAi
+   first."
+
+Permission model locked by Phase 5:
+  - Any group member can VIEW settings (name, type, royalty, member list)
+  - Only roles "franchisor" / "owner" can EDIT (name, type, royalty)
+  - Only owners can REMOVE other members
+  - Cannot remove the last member of a group (hard guard)
+  - Owners cannot self-remove via "Leave network" — transfer ownership
+    first, or contact NuAi support
+  - The Add-a-Store section does not render at all for non-owners
+
+Database: royalty_percentage column added to tenant_groups in Phase 5
+as numeric(5,2) DEFAULT 0 with CHECK (0..100). Stored only — no
+calculation yet. Intended consumer is a future royalty-calculation WP.
+
+Source: WP-TENANT-GROUPS Phase 5 build decision + owner addendum,
+11 April 2026.
+
 ---
 
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
