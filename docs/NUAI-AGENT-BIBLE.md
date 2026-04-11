@@ -922,6 +922,40 @@ RUN 7 DAYS) in HQTenants.js ARE client-side and work correctly — they bypass t
 Demo path: after wizard launches, HQ operator uses the RUN 30 DAYS button to populate
 orders for any seed tenant in one click.
 
+## LL-242 — HQTransfer.js AVCO BUG · KNOWN ISSUE (11 April 2026)
+HQTransfer.js handleReceive() updates the destination inventory_items row
+with quantity_on_hand only. It does NOT recalculate weighted_avg_cost when
+the destination already holds stock of the same item. This silently
+corrupts destination AVCO every time a transfer lands at a store that
+already carries the SKU.
+
+EXAMPLE OF THE BUG:
+  Destination holds 10 units at R100 AVCO.
+  Transfer arrives: 5 units at R150 unit_cost_zar.
+  Correct AVCO post-receive: ((10 × 100) + (5 × 150)) / 15 = R116.67
+  HQTransfer result:          R100 (unchanged — WRONG)
+
+CORRECT FORMULA (use on receive when destination item already exists):
+  newQty  = dest_qty + confirmed_qty
+  newAvco = ((dest_qty × dest_avco) + (confirmed_qty × unit_cost_zar))
+            / newQty
+  Then UPDATE both quantity_on_hand AND weighted_avg_cost.
+
+FIXED IN: src/components/group/GroupTransfer.js (WP-TG Phase 4, this commit).
+STILL BROKEN IN: src/components/hq/HQTransfer.js handleReceive()
+  (around line 449-456 — UPDATE statement only sets quantity_on_hand).
+
+RULE: Do NOT propagate the HQTransfer.js receive pattern to any new
+transfer component. The HQTransfer fix is deferred to a dedicated session.
+
+Also note: both HQTransfer.js and GroupTransfer.js use a per-line loop
+on ship/receive with no database transaction wrapper. Partial failures
+can leave transfers in an inconsistent state. Atomicity is a known gap,
+not fixed in Phase 4. Documented here for the future fix session.
+
+Source: Claude Code pre-build audit of HQTransfer.js (1,692 lines),
+11 April 2026. Confirmed by owner before Phase 4 build.
+
 ---
 
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*

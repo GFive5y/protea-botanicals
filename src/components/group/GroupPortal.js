@@ -19,6 +19,7 @@ import { useTenant } from "../../services/tenantService";
 import { supabase } from "../../services/supabaseClient";
 import { T } from "../../styles/tokens";
 import NetworkDashboard from "./NetworkDashboard";
+import GroupTransfer from "./GroupTransfer";
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -374,9 +375,11 @@ export default function GroupPortal() {
           />
         )}
         {activeTab === "transfers" && (
-          <PlaceholderTab
-            title="Stock Transfers"
-            description="Move stock between group stores. Reuses existing stock_transfers infrastructure. Coming in Phase 4."
+          <GroupTransfer
+            groupId={groupId}
+            groupName={groupName}
+            members={members}
+            onNavigate={handleNavClick}
           />
         )}
         {activeTab === "compare" && (
