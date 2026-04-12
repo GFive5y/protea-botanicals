@@ -1109,6 +1109,34 @@ column will compute correctly on first SELECT.
 
 ---
 
+## LL-NEW-5 — hq_all_ policies must use is_hq_user() (13 April 2026)
+
+**Rule:** All `hq_all_*` RLS bypass policies MUST use `is_hq_user()` as their
+USING clause. Never use the non-standard
+`EXISTS (... WHERE t.industry_profile = 'operator')` pattern.
+
+**Why this matters:** Three tables (`dispensing_log`, `patients`, `prescriptions`)
+had `hq_all_` policies using `industry_profile = 'operator'` instead of
+`is_hq_user()`. The admin user (admin@protea.dev) belongs to a `cannabis_retail`
+tenant, not an `operator` tenant, so the bypass never fired. This caused silent
+RLS blocking: the Supabase client returned `data: []` with `error: null`,
+making the balance sheet LL-231 dispensary revenue branch compute R0 instead of
+R299k. The fix was DROP + CREATE with `is_hq_user()` on all three tables.
+
+`is_hq_user()` checks `user_profiles.hq_access = true` — this is the canonical
+cross-tenant bypass. The `operator` pattern was a legacy mistake from before
+`is_hq_user()` was standardised.
+
+**How to apply:** When creating any `hq_all_*` policy, always use:
+```sql
+CREATE POLICY hq_all_{tablename} ON {tablename} FOR ALL USING (is_hq_user());
+```
+Never use `industry_profile` checks in HQ bypass policies. If you encounter
+an existing `hq_all_` policy that does not use `is_hq_user()`, fix it
+immediately — it is silently broken for all HQ users.
+
+---
+
 *NUAI-AGENT-BIBLE.md v1.0 · 08 Apr 2026*
 *Maintained by: Claude Code after each major session*
 *Owner reviews: after each WP completion*

@@ -298,7 +298,7 @@ function KPI({ label, value, sub, color }) {
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
 export default function HQBalanceSheet() {
-  const { tenant } = useTenant();
+  const { tenant, industryProfile } = useTenant();
   const tenantId = tenant?.id;
 
   const [activeTab, setActiveTab] = useState("balance");
@@ -325,6 +325,7 @@ export default function HQBalanceSheet() {
   const [payables, setPayables] = useState(0);
   const [payablesCount, setPayablesCount] = useState(0);
   const [opexAccruals, setOpexAccruals] = useState(0);
+  const [cashAtBank, setCashAtBank] = useState(0);
 
   // Cash flow state
   const [cfData, setCfData] = useState(null);
@@ -433,6 +434,25 @@ export default function HQBalanceSheet() {
         );
       }
 
+      // Cash at Bank — last statement line balance, fallback to opening_balance
+      const [bankAccRes, bankLineRes] = await Promise.all([
+        supabase.from("bank_accounts")
+          .select("opening_balance")
+          .eq("tenant_id", tenantId)
+          .eq("is_primary", true)
+          .maybeSingle(),
+        supabase.from("bank_statement_lines")
+          .select("balance")
+          .eq("tenant_id", tenantId)
+          .order("statement_date", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const bankBal = bankLineRes.data?.balance != null
+        ? parseFloat(bankLineRes.data.balance)
+        : parseFloat(bankAccRes.data?.opening_balance || 0);
+      setCashAtBank(bankBal);
+
       // ── WP-FINANCIALS Phase 3: fixed_assets, equity_ledger, vat ──
       const yr = `FY${new Date().getFullYear()}`;
       const yrStart = `${new Date().getFullYear()}-01-01`;
@@ -478,8 +498,28 @@ export default function HQBalanceSheet() {
         .reduce((s, t) => s + (parseFloat(t.input_vat) || 0), 0);
       setVatSummary({ output: vatOutput, input: vatInput });
 
-      if (ordersYtdRes.data && expYtdRes.data) {
-        const ytdRev = ordersYtdRes.data.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+      // LL-231: cannabis_dispensary revenue from dispensing_log, not orders
+      let ytdRev = 0;
+      if (industryProfile === "cannabis_dispensary") {
+        const dlRes = await supabase
+          .from("dispensing_log")
+          .select("quantity_dispensed, inventory_item_id")
+          .eq("tenant_id", tenantId)
+          .neq("is_voided", true)
+          .gte("dispensed_at", yrStart);
+        const priceRes = await supabase
+          .from("inventory_items")
+          .select("id, sell_price")
+          .eq("tenant_id", tenantId);
+        const prices = {};
+        (priceRes.data || []).forEach((i) => { prices[i.id] = parseFloat(i.sell_price || 0); });
+        ytdRev = (dlRes.data || []).reduce(
+          (s, dl) => s + (dl.quantity_dispensed || 0) * (prices[dl.inventory_item_id] || 0), 0,
+        );
+      } else if (ordersYtdRes.data) {
+        ytdRev = ordersYtdRes.data.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+      }
+      if (expYtdRes.data) {
         const ytdExp = expYtdRes.data.reduce((s, e) => s + (parseFloat(e.amount_zar) || 0), 0);
         setYtdNetProfit(ytdRev - ytdExp);
       }
@@ -489,7 +529,7 @@ export default function HQBalanceSheet() {
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [tenantId, industryProfile]);
 
   // ── Fetch cash flow data ──────────────────────────────────────────────────
   const fetchCashFlow = useCallback(async () => {
@@ -588,7 +628,7 @@ export default function HQBalanceSheet() {
     (s, e) => s + parseFloat(e.amount_zar || 0),
     0,
   );
-  const totalCurrentAssets = inventoryValue + receivables;
+  const totalCurrentAssets = inventoryValue + receivables + cashAtBank;
   const totalFixedAssets = totalCapex;
   const totalAssets = totalCurrentAssets + totalFixedAssets;
   const totalLiabilities = payables;
@@ -609,13 +649,13 @@ export default function HQBalanceSheet() {
   const equityFromLedger = shareCapital + openingRetained + currentYearPL;
   const equityAvailable  = equityLedger !== null || ytdNetProfit !== null;
 
-  const totalLiabilities2 = payables + vatLiability + payePayable;
+  const totalLiabilities2 = payables + vatLiability + payePayable + opexAccruals;
   const netEquity2        = equityAvailable ? equityFromLedger : totalAssets - totalLiabilities2;
 
   const balanced =
     Math.abs(totalAssets - (totalLiabilities + netEquity)) < 0.01;
   const balanced2 =
-    Math.abs((inventoryValue + receivables + fixedAssetsValue) - (totalLiabilities2 + netEquity2)) < 1.0;
+    Math.abs((inventoryValue + receivables + cashAtBank + fixedAssetsValue) - (totalLiabilities2 + netEquity2)) < 1.0;
 
   // ── CSV export ────────────────────────────────────────────────────────────
   const exportCSV = () => {
@@ -626,6 +666,7 @@ export default function HQBalanceSheet() {
       ["Current Assets"],
       ["Inventory (at AVCO)", inventoryValue.toFixed(2)],
       ["Accounts Receivable", receivables.toFixed(2)],
+      ["Cash at Bank", cashAtBank.toFixed(2)],
       ["Total Current Assets", totalCurrentAssets.toFixed(2)],
       [],
       ["Fixed Assets"],
@@ -976,6 +1017,14 @@ export default function HQBalanceSheet() {
                         : "No outstanding invoices"
                     }
                   />
+                  {cashAtBank > 0 && (
+                    <BSRow label="Cash at Bank" value={cashAtBank} indent={1}
+                      sub="Closing balance from bank reconciliation" />
+                  )}
+                  {vatRegistered && vatReceivable > 0 && (
+                    <BSRow label="VAT Receivable" value={vatReceivable} indent={1}
+                      sub="Input VAT exceeds output VAT" />
+                  )}
                   <BSRow
                     label="Total Current Assets"
                     value={totalCurrentAssets}
