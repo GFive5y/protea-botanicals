@@ -308,40 +308,135 @@ NEVER use thick borders between rows. NEVER use alternating background colours
 
 ---
 
-## PART 5 — THE BLAST ZONE AUDIT
+## PART 5 — THE FULL BLAST ZONE AUDIT
 
-### What "blast zone" means
+### What WP-DS-6 actually did vs what remains
 
-A blast zone is a component or file where the absence of the design system
-is visible enough to break the professional impression of the platform.
-Priority is ranked by demo exposure — what the CA will see on 12 May.
+WP-DS-6 (Phases 1-4) fixed the SHELL — the navigation layers, layout
+containers, AINSBar, and profile tokens on the sidebar. This is the part
+users see when they open a portal. It is important and correct.
 
-### Tier 1 — Demo critical (must be migrated before 12 May)
+WP-DS-6 did NOT touch the CONTENT — the actual tab components that render
+when a user clicks any nav item. Every tab component remains pre-token.
 
-| Component | Primary violation |
-|---|---|
-| HQOverview.js | Local C tokens, mixed weights, hardcoded hex — FIRST screen CA sees |
-| HQStock.js (7 sub-tabs) | Local tokens, heavy table borders, wrong header weight |
-| HQProfitLoss.js | Mixed token usage, table headers wrong weight |
-| HQBalanceSheet.js | Local tokens, correct data in wrong container |
-| HQDocuments.js (Smart Capture) | Pre-token, inconsistent with everything around it |
-| ExpenseManager.js | Local tokens, font size jumps between sections |
+This means the correct mental model is:
+  WP-DS-6: painted the house exterior — clean, professional, correct.
+  WP-UNIFY: paints the interior — every room, every wall, same paint.
 
-### Tier 2 — Demo adjacent (migrate in first 3 sessions post-demo)
+The interior has approximately 90 components still to migrate.
 
-| Component | Primary violation |
-|---|---|
-| HQAnalytics.js (6 sub-tabs) | Mixed token systems |
-| HQVat.js | Pre-token |
-| HQLoyalty.js (10 tabs) | Mostly pre-token |
-| SmartInventory.js | Local C tokens, inconsistent card radius |
-| HQProduction.js | Local tokens, heavy table borders |
-| AdminQRCodes.js | Completely pre-token |
+### THE COMPLETE INVENTORY — ALL PORTALS
 
-### Tier 3 — Systematic (migrate progressively, one per session)
+**What is DONE (built inside T from the start or migrated):**
 
-All 13 HR modules, HQCogs.js (PROTECTED — read LL-233 first),
-Shop.js (consumer register, different priority), AdminDashboard.js
+  src/styles/tokens.js                   -- source of truth, complete
+  src/contexts/TokenContext.js            -- Phase 3, complete
+  src/components/shared/AINSBar.js        -- Phase 2, complete
+  src/pages/HQDashboard.js               -- Phase 1 shell, complete
+  src/pages/TenantPortal.js              -- Phase 3 shell, complete
+  src/hooks/useBadges.js                  -- Phase 4, complete
+  src/components/shared/ (all group/)    -- built inside T, complete
+    GroupPortal.js, NetworkDashboard.js, GroupTransfer.js,
+    GroupSettings.js, StoreComparison.js, CombinedPL.js,
+    RevenueIntelligence.js, StockIntelligence.js,
+    CustomerIntelligence.js, NetworkIntelligence.js
+
+**BLAST ZONE — src/components/hq/ (75 files, all pre-token)**
+
+HQ TAB CONTENT (41 tabs):
+
+  Priority 1 — CA sees in demo (migrate before 12 May):
+  HQOverview.js         114KB   Local C tokens, first screen CA sees
+  HQStock.js            205KB   PROTECTED (RULE 0L), 7 sub-tabs, local tokens
+  HQProfitLoss.js       120KB   Local tokens, P&L is core demo path
+  HQBalanceSheet.js      61KB   Local tokens, demo path
+  HQDocuments.js        102KB   Local tokens, Smart Capture demo path
+  ExpenseManager.js      57KB   Local tokens, demo path
+
+  Priority 2 — Migrate sessions 1-5 post-demo:
+  HQAnalytics.js        105KB   Local tokens, 6 sub-tabs
+  HQTradingDashboard.js  71KB   Local tokens
+  HQFraud.js             92KB   Local tokens, security module
+  HQLoyalty.js          149KB   Local tokens, 10 tabs
+  HQVat.js               46KB   Local tokens
+  HQBankRecon.js         24KB   Local tokens
+  HQFixedAssets.js       30KB   Local tokens
+  HQJournals.js          40KB   Local tokens
+  HQForecast.js          28KB   Local tokens
+  HQYearEnd.js           19KB   Local tokens
+  HQInvoices.js          63KB   Local tokens
+  HQPricing.js           68KB   Local tokens
+  HQMedical.js           94KB   Local tokens (has local const T)
+  HQTenants.js           64KB   Local tokens (recently touched, still local T)
+  HQEmailLogs.js         13KB   Local tokens
+  HQFinancialNotes.js    14KB   Local tokens
+  HQFinancialSetup.js    19KB   Local tokens
+  HQFinancialStatements  43KB   Local tokens
+  HQWholesaleOrders.js   64KB   Local tokens
+  HQReorderScoring.js    52KB   Local tokens
+  HQSmartCapture.js      40KB   Local tokens
+  GeoAnalyticsDashboard  38KB   Local tokens
+  RetailerHealth.js      58KB   Local tokens
+  ShopManager.js         26KB   Local tokens
+  Distribution.js        67KB   Local tokens
+  SupplyChain.js         13KB   Local tokens
+  HQTransfer.js          62KB   Local tokens
+  EODCashUp.js           42KB   Local tokens
+  POSScreen.js           49KB   Local tokens
+  HQSuppliers.js         79KB   Local tokens
+  HQPurchaseOrders.js   119KB   Local tokens
+
+  Priority 3 — PROTECTED or F&B only (read special rules first):
+  HQCogs.js             144KB   PROTECTED, LL-233: read in full first
+  HQProduction.js       307KB   LARGEST FILE, read in full, plan carefully
+  SmartInventory.js     180KB   Local C tokens, complex multi-view
+  HQFoodIngredients.js  158KB   F&B profile only, local tokens
+  HQRecipeEngine.js      73KB   F&B profile only, local tokens
+  HQHaccp.js             84KB   F&B profile only, local tokens
+  HQFoodSafety.js        44KB   F&B profile only, local tokens
+  HQNutritionLabel.js    41KB   F&B profile only, local tokens
+  HQColdChain.js         44KB   F&B profile only, local tokens
+  HQRecall.js            60KB   F&B profile only, local tokens
+  HQFoodIntelligence.js  45KB   F&B profile only, local tokens
+
+  Stock sub-panel components (inside HQStock, migrate WITH HQStock):
+  StockAIAnalysis.js, StockChannelPanel.js, StockIntelPanel.js,
+  StockItemPanel.js, StockPricingPanel.js, StockReceiveModal.js,
+  StockReceiveHistoryPanel.js, StockOpeningCalibration.js
+
+  Other hq/ components:
+  CannabisDetailView.js, LiveFXBar.js (PROTECTED), ProductWorlds.js,
+  ReorderPanel.js, TenantSetupWizard.js
+
+HR SUITE (14 modules, all in src/components/hq/, all pre-token):
+  HRTimesheets.js, HRLeave.js, HRRoster.js, HRCalendar.js,
+  HRStaffDirectory.js, HRStaffProfile.js, HRContracts.js,
+  HRDisciplinary.js, HRComms.js, HRLoans.js, HRPayroll.js,
+  HRPerformance.js, HRSettings.js, HRStockView.js
+
+**Admin Portal:** AdminDashboard.js, AdminQRCodes.js,
+  AdminCustomerEngagement.js, AdminCommsCenter.js
+
+**Staff Portal:** StaffPortal.js
+
+**Consumer pages (different register, lowest priority):**
+  Shop.js, Loyalty.js, Account.js, CheckoutPage.js
+
+### TOTAL SCOPE SUMMARY
+
+| Zone | Files | Approx KB | Priority |
+|---|---|---|---|
+| HQ tab content | 41 | ~2,800 | P1-P3 |
+| HQ sub-panels | 8 | ~350 | P3 (with HQStock) |
+| HQ other | 5 | ~215 | P3-P4 |
+| HR suite | 14 | ~720 | P4 |
+| Admin portal | 4 | ~170 | P4 |
+| Staff portal | 1 | ~39 | P5 |
+| Consumer pages | 4+ | ~350 | P5 (different register) |
+| **TOTAL** | **~77** | **~4,600** | — |
+
+At one component per session (UNIFY-2 migrate-on-touch strategy), this
+takes approximately 20-25 sessions to complete.
 
 ### Cross-cutting blast zones (affect everything)
 
@@ -356,11 +451,13 @@ Shop.js (consumer register, different priority), AdminDashboard.js
 
 4. RADIUS INCONSISTENCY — values 2,3,4,5,6,8,10,12,20,9999 all exist.
    Must be: T.radius.sm=4, T.radius.md=8, T.radius.lg=12, T.radius.full=9999.
-   Nothing else.
 
 5. MODAL/DRAWER INCONSISTENCY — all modals must use identical structure:
    padding T.inset.modal (24px), header with borderBottom T.border,
    close button T.ink600, footer with borderTop T.border.
+
+6. FONT FAMILY — Jost must not appear in any authenticated portal component.
+   Every authenticated route uses T.font (Inter).
 
 ---
 
@@ -576,18 +673,29 @@ that doesn't feel like it was designed in the same room on the same day.
 | AINSBar.js | COMPLETE — profileOverrides, T tokens | 1c2d51e | 13 Apr 2026 |
 | HQDashboard.js | COMPLETE — WP-DS-6 Phase 1 | cf9241e | 13 Apr 2026 |
 | GroupPortal.js + all group/ | COMPLETE — built inside T from start | various | Apr 2026 |
+| **P1: Demo path (before 12 May)** | | | |
 | HQOverview.js | NOT STARTED | — | — |
-| HQStock.js | NOT STARTED | — | — |
+| HQStock.js + 8 sub-panels | NOT STARTED | — | — |
 | HQProfitLoss.js | NOT STARTED | — | — |
 | HQBalanceSheet.js | NOT STARTED | — | — |
 | HQDocuments.js | NOT STARTED | — | — |
 | ExpenseManager.js | NOT STARTED | — | — |
+| **P2: Post-demo sessions 1-5** | | | |
 | HQAnalytics.js | NOT STARTED | — | — |
+| HQTradingDashboard.js | NOT STARTED | — | — |
+| HQFraud.js | NOT STARTED | — | — |
+| HQLoyalty.js (10 tabs) | NOT STARTED | — | — |
 | HQVat.js | NOT STARTED | — | — |
-| HQLoyalty.js | NOT STARTED | — | — |
-| SmartInventory.js | NOT STARTED | — | — |
-| HQProduction.js | NOT STARTED | — | — |
-| All HR modules (13) | NOT STARTED | — | — |
+| + 23 more P2 files | NOT STARTED | — | — |
+| **P3: Protected + large + F&B** | | | |
+| HQCogs.js (PROTECTED) | NOT STARTED | — | — |
+| HQProduction.js (307KB) | NOT STARTED | — | — |
+| SmartInventory.js (180KB) | NOT STARTED | — | — |
+| + 18 more P3 files | NOT STARTED | — | — |
+| **P4: HR Suite + Admin + Staff** | | | |
+| 14 HR modules + 4 Admin + 1 Staff | NOT STARTED | — | — |
+| **P5: Consumer pages** | | | |
+| Shop.js + Loyalty.js + Account.js + CheckoutPage.js | NOT STARTED | — | — |
 
 ---
 *WP-UNIFY v1.0 · NuAi · 13 April 2026*
