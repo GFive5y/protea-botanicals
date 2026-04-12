@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { useTenant } from '../../services/tenantService';
+import { T } from "../../styles/tokens";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 
@@ -359,13 +360,19 @@ export default function HQBankRecon() {
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 
+// WP-UNIFY: TK palette aliased to src/styles/tokens.js values
 const TK = {
-  ink900: '#111827', ink700: '#374151', ink500: '#6b7280',
-  ink300: '#d1d5db', ink200: '#e5e7eb', ink100: '#f3f4f6',
-  green:  '#15803d', greenLt: '#dcfce7',
-  red:    '#b91c1c', redLt:   '#fee2e2',
-  blue:   '#1d4ed8', blueLt:  '#dbeafe',
-  amber:  '#b45309', amberLt: '#fef3c7',
+  ...T,
+  ink200:  T.border,
+  ink100:  T.bg,
+  green:   T.success,
+  greenLt: T.successLight,
+  red:     T.danger,
+  redLt:   T.dangerLight,
+  blue:    T.info,
+  blueLt:  T.infoLight,
+  amber:   T.warning,
+  amberLt: T.warningLight,
 };
 
 const S = {
