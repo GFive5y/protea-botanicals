@@ -676,7 +676,7 @@ that doesn't feel like it was designed in the same room on the same day.
 | **P1: Demo path (before 12 May)** | | | |
 | HQOverview.js | COMPLETE | dbb3e95 | 13 Apr 2026 |
 | HQStock.js + 8 sub-panels | NOT STARTED | — | — |
-| HQProfitLoss.js | NOT STARTED | — | — |
+| HQProfitLoss.js | COMPLETE | cb6e625 | 13 Apr 2026 |
 | HQBalanceSheet.js | NOT STARTED | — | — |
 | HQDocuments.js | NOT STARTED | — | — |
 | ExpenseManager.js | NOT STARTED | — | — |
