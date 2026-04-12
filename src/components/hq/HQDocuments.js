@@ -15,37 +15,9 @@ import { supabase } from "../../services/supabaseClient";
 import { useTenant } from "../../services/tenantService";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
+import { T } from "../../styles/tokens";
 
-// ─── THEME ────────────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 12px rgba(0,0,0,0.08)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // Legacy colour aliases — keeps every C.xxx reference working unchanged
 const C = {
@@ -53,18 +25,18 @@ const C = {
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
+  cream: T.surface,
   white: "#ffffff",
-  border: T.ink150,
-  muted: T.ink400,
+  border: T.border,
+  muted: T.ink500,
   text: T.ink700,
   red: T.danger,
-  lightRed: T.dangerBg,
-  lightGreen: T.accentLit,
+  lightRed: T.dangerLight,
+  lightGreen: T.accentLight,
   blue: T.info,
-  lightBlue: T.infoBg,
+  lightBlue: T.infoLight,
   amber: T.warning,
-  lightAmber: T.warningBg,
+  lightAmber: T.warningLight,
   purple: "#6c3483",
   lightPurple: "#f5eef8",
   orange: "#c0560a",
@@ -182,10 +154,10 @@ const DOC_TYPE_ICONS = {
   unknown: "📄",
 };
 const STATUS_COLORS = {
-  pending_review: { bg: T.warningBg, color: T.warning, border: T.warning },
-  confirmed: { bg: T.accentLit, color: T.accentMid, border: T.accentBd },
-  rejected: { bg: T.dangerBg, color: T.danger, border: T.danger },
-  partially_applied: { bg: T.infoBg, color: T.info, border: T.info },
+  pending_review: { bg: T.warningLight, color: T.warning, border: T.warning },
+  confirmed: { bg: T.accentLight, color: T.accentMid, border: T.accentBd },
+  rejected: { bg: T.dangerLight, color: T.danger, border: T.danger },
+  partially_applied: { bg: T.infoLight, color: T.info, border: T.info },
 };
 const STATUS_LABELS = {
   pending_review: "Pending Review",
@@ -195,7 +167,7 @@ const STATUS_LABELS = {
 };
 
 const confidenceColor = (score) => {
-  if (score === null || score === undefined) return T.ink400;
+  if (score === null || score === undefined) return T.ink500;
   if (score >= 0.85) return T.accentMid;
   if (score >= 0.7) return T.warning;
   return T.danger;
@@ -206,7 +178,7 @@ const confidencePct = (score) =>
 // ─── SHARED STYLE HELPERS ─────────────────────────────────────────────────────
 const inputStyle = {
   padding: "7px 10px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: 4,
   fontSize: 12,
   fontFamily: T.font,
@@ -219,7 +191,7 @@ const makeBtn = (bg = T.accentMid, color = "#fff", disabled = false) => ({
   padding: "7px 14px",
   backgroundColor: disabled ? "#ccc" : bg,
   color,
-  border: bg === "transparent" ? `1px solid ${T.ink150}` : "none",
+  border: bg === "transparent" ? `1px solid ${T.border}` : "none",
   borderRadius: 4,
   fontSize: 10,
   fontWeight: 700,
@@ -289,7 +261,7 @@ function ConfidenceBar({ score }) {
         style={{
           flex: 1,
           height: 5,
-          background: T.ink150,
+          background: T.border,
           borderRadius: 3,
           overflow: "hidden",
         }}
@@ -346,7 +318,7 @@ function SupplierCreateForm({
         fontWeight: 700,
         letterSpacing: "0.12em",
         textTransform: "uppercase",
-        color: T.ink400,
+        color: T.ink500,
         fontFamily: T.font,
         display: "block",
         marginBottom: 3,
@@ -375,7 +347,7 @@ function SupplierCreateForm({
       style={{
         padding: "12px 14px",
         background: "#f5eef8",
-        borderTop: `1px solid ${T.ink150}`,
+        borderTop: `1px solid ${T.border}`,
       }}
     >
       <div
@@ -520,8 +492,8 @@ function SupplierCreateForm({
             flex: 1,
             padding: "8px 0",
             background: "transparent",
-            color: T.ink400,
-            border: `1px solid ${T.ink150}`,
+            color: T.ink500,
+            border: `1px solid ${T.border}`,
             borderRadius: 4,
             fontSize: 10,
             cursor: "pointer",
@@ -560,12 +532,12 @@ function UploadZone({ onFileSelected, disabled }) {
       onDrop={handleDrop}
       onClick={() => !disabled && fileRef.current?.click()}
       style={{
-        border: `2px dashed ${dragOver ? T.accentMid : T.ink150}`,
+        border: `2px dashed ${dragOver ? T.accentMid : T.border}`,
         borderRadius: 6,
         padding: "20px 16px",
         textAlign: "center",
         cursor: disabled ? "not-allowed" : "pointer",
-        background: dragOver ? T.accentLit : T.ink050,
+        background: dragOver ? T.accentLight : T.surface,
         transition: "all 0.2s",
         opacity: disabled ? 0.5 : 1,
       }}
@@ -584,7 +556,7 @@ function UploadZone({ onFileSelected, disabled }) {
       <div
         style={{
           fontSize: 10,
-          color: T.ink400,
+          color: T.ink500,
           marginTop: 4,
           fontFamily: T.font,
         }}
@@ -611,14 +583,14 @@ function DocListItem({ doc, selected, onClick }) {
         padding: "10px 12px",
         cursor: "pointer",
         borderRadius: 2,
-        background: selected ? T.accentLit : "transparent",
+        background: selected ? T.accentLight : "transparent",
         borderLeft: selected
           ? `3px solid ${T.accentMid}`
           : "3px solid transparent",
         transition: "all 0.15s",
       }}
       onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.background = T.ink050;
+        if (!selected) e.currentTarget.style.background = T.surface;
       }}
       onMouseLeave={(e) => {
         if (!selected) e.currentTarget.style.background = "transparent";
@@ -653,7 +625,7 @@ function DocListItem({ doc, selected, onClick }) {
       <div
         style={{
           fontSize: 10,
-          color: T.ink400,
+          color: T.ink500,
           fontFamily: T.font,
           marginBottom: 4,
           overflow: "hidden",
@@ -671,7 +643,7 @@ function DocListItem({ doc, selected, onClick }) {
         }}
       >
         <StatusBadge status={doc.status} />
-        <span style={{ fontSize: 9, color: T.ink400, fontFamily: T.font }}>
+        <span style={{ fontSize: 9, color: T.ink500, fontFamily: T.font }}>
           {fmtDate(doc.uploaded_at)}
         </span>
       </div>
@@ -727,18 +699,18 @@ function ReviewPanel({
     fontWeight: 700,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
-    color: T.ink400,
+    color: T.ink500,
     fontFamily: T.font,
     padding: "10px 14px 6px",
-    borderBottom: `1px solid ${T.ink150}`,
-    background: T.ink050,
+    borderBottom: `1px solid ${T.border}`,
+    background: T.surface,
   };
   const fieldRow = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
     padding: "5px 14px",
-    borderBottom: `1px solid ${T.ink075}`,
+    borderBottom: `1px solid ${T.bg}`,
     fontSize: 12,
     fontFamily: T.font,
   };
@@ -749,14 +721,14 @@ function ReviewPanel({
     borderRadius: 3,
     background:
       action === "receive_delivery_item"
-        ? T.accentLit
+        ? T.accentLight
         : action === "update_batch_coa"
           ? "#f5eef8"
           : action === "update_po_shipping"
             ? C.lightOrange
             : action === "create_expense"
-              ? T.warningBg
-              : T.infoBg,
+              ? T.warningLight
+              : T.infoLight,
     color:
       action === "receive_delivery_item"
         ? T.accentMid
@@ -790,7 +762,7 @@ function ReviewPanel({
       style={{
         width: 320,
         minWidth: 320,
-        borderLeft: `1px solid ${T.ink150}`,
+        borderLeft: `1px solid ${T.border}`,
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
@@ -801,8 +773,8 @@ function ReviewPanel({
       <div
         style={{
           padding: "14px",
-          borderBottom: `1px solid ${T.ink150}`,
-          background: T.ink050,
+          borderBottom: `1px solid ${T.border}`,
+          background: T.surface,
         }}
       >
         <div
@@ -827,7 +799,7 @@ function ReviewPanel({
             >
               {DOC_TYPE_LABELS[extraction.document_type] || "Document"}
             </div>
-            <div style={{ fontSize: 10, color: T.ink400, fontFamily: T.font }}>
+            <div style={{ fontSize: 10, color: T.ink500, fontFamily: T.font }}>
               {extraction.supplier?.name || "Unknown supplier"}
             </div>
           </div>
@@ -840,7 +812,7 @@ function ReviewPanel({
           <div
             style={{
               fontSize: 10,
-              color: T.ink400,
+              color: T.ink500,
               fontFamily: T.font,
               marginTop: 6,
               fontStyle: "italic",
@@ -855,7 +827,7 @@ function ReviewPanel({
       <div style={sectionHead}>Extracted Fields</div>
       {extraction.reference?.number && (
         <div style={fieldRow}>
-          <span style={{ color: T.ink400 }}>Reference</span>
+          <span style={{ color: T.ink500 }}>Reference</span>
           <span style={{ fontWeight: 600, color: T.ink700 }}>
             {extraction.reference.number}
           </span>
@@ -863,19 +835,19 @@ function ReviewPanel({
       )}
       {extraction.reference?.date && (
         <div style={fieldRow}>
-          <span style={{ color: T.ink400 }}>Date</span>
+          <span style={{ color: T.ink500 }}>Date</span>
           <span style={{ color: T.ink700 }}>{extraction.reference.date}</span>
         </div>
       )}
       {extraction.currency && (
         <div style={fieldRow}>
-          <span style={{ color: T.ink400 }}>Currency</span>
+          <span style={{ color: T.ink500 }}>Currency</span>
           <span style={{ color: T.ink700 }}>{extraction.currency}</span>
         </div>
       )}
       {extraction.total_amount != null && (
         <div style={fieldRow}>
-          <span style={{ color: T.ink400 }}>Total</span>
+          <span style={{ color: T.ink500 }}>Total</span>
           <span style={{ fontWeight: 600, color: T.accent }}>
             {extraction.currency} {Number(extraction.total_amount).toFixed(2)}
           </span>
@@ -884,7 +856,7 @@ function ReviewPanel({
 
       {extraction.supplier?.matched_id ? (
         <div style={fieldRow}>
-          <span style={{ color: T.ink400 }}>Supplier</span>
+          <span style={{ color: T.ink500 }}>Supplier</span>
           <ConfidenceDot score={extraction.supplier.confidence} />
         </div>
       ) : extraction.supplier?.name ? (
@@ -897,7 +869,7 @@ function ReviewPanel({
               alignItems: "center",
             }}
           >
-            <span style={{ color: T.ink400 }}>Supplier</span>
+            <span style={{ color: T.ink500 }}>Supplier</span>
             <div
               style={{
                 display: "flex",
@@ -962,7 +934,7 @@ function ReviewPanel({
                 key={i}
                 style={{
                   padding: "7px 14px",
-                  borderBottom: `1px solid ${T.ink075}`,
+                  borderBottom: `1px solid ${T.bg}`,
                   fontSize: 11,
                   fontFamily: T.font,
                 }}
@@ -994,7 +966,7 @@ function ReviewPanel({
                     display: "flex",
                     gap: 10,
                     marginTop: 2,
-                    color: T.ink400,
+                    color: T.ink500,
                     flexWrap: "wrap",
                   }}
                 >
@@ -1010,7 +982,7 @@ function ReviewPanel({
                         fontSize: 9,
                         padding: "1px 6px",
                         borderRadius: 3,
-                        background: T.warningBg,
+                        background: T.warningLight,
                         color: T.warning,
                         fontWeight: 700,
                         fontFamily: T.font,
@@ -1049,9 +1021,9 @@ function ReviewPanel({
                         fontSize: 10,
                         padding: "2px 6px",
                         borderRadius: 3,
-                        border: `1px solid ${T.ink150}`,
+                        border: `1px solid ${T.border}`,
                         fontFamily: T.font,
-                        background: catOverrides[i] ? T.accentLit : "#fff",
+                        background: catOverrides[i] ? T.accentLight : "#fff",
                         color: catOverrides[i] ? T.accentMid : T.ink500,
                         cursor: "pointer",
                       }}
@@ -1089,9 +1061,9 @@ function ReviewPanel({
                           fontSize: 10,
                           padding: "2px 6px",
                           borderRadius: 3,
-                          border: `1px solid ${T.ink150}`,
+                          border: `1px solid ${T.border}`,
                           fontFamily: T.font,
-                          background: medOverrides[i] ? T.accentLit : "#fff",
+                          background: medOverrides[i] ? T.accentLight : "#fff",
                           color: medOverrides[i] ? T.accentMid : T.ink500,
                           cursor: "pointer",
                         }}
@@ -1134,11 +1106,11 @@ function ReviewPanel({
                 key={i}
                 style={{
                   padding: "8px 14px",
-                  borderBottom: `1px solid ${T.ink075}`,
+                  borderBottom: `1px solid ${T.bg}`,
                   background: checkedUpdates.has(i)
                     ? update.action === "update_po_shipping"
                       ? "#fff7f2"
-                      : T.accentLit
+                      : T.accentLight
                     : "#fff",
                   opacity: isReadOnly ? 0.7 : 1,
                 }}
@@ -1197,7 +1169,7 @@ function ReviewPanel({
           style={{
             padding: 14,
             fontSize: 12,
-            color: T.ink400,
+            color: T.ink500,
             fontFamily: T.font,
             textAlign: "center",
           }}
@@ -1211,8 +1183,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "8px 14px",
-            borderTop: `1px solid ${T.ink075}`,
-            background: T.warningBg,
+            borderTop: `1px solid ${T.bg}`,
+            background: T.warningLight,
           }}
         >
           {warnings.map((w, i) => (
@@ -1236,8 +1208,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "8px 14px",
-            borderTop: `1px solid ${T.ink075}`,
-            background: T.dangerBg,
+            borderTop: `1px solid ${T.bg}`,
+            background: T.dangerLight,
           }}
         >
           <div
@@ -1277,8 +1249,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "10px 14px",
-            background: T.accentLit,
-            borderTop: `1px solid ${T.ink075}`,
+            background: T.accentLight,
+            borderTop: `1px solid ${T.bg}`,
           }}
         >
           <div
@@ -1296,7 +1268,7 @@ function ReviewPanel({
             <div
               style={{
                 fontSize: 9,
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 2,
                 fontFamily: T.font,
               }}
@@ -1312,8 +1284,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "10px 14px",
-            background: T.dangerBg,
-            borderTop: `1px solid ${T.ink075}`,
+            background: T.dangerLight,
+            borderTop: `1px solid ${T.bg}`,
           }}
         >
           <div
@@ -1348,8 +1320,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "10px 14px",
-            borderTop: `1px solid ${T.ink150}`,
-            background: T.ink050,
+            borderTop: `1px solid ${T.border}`,
+            background: T.surface,
           }}
         >
           <button
@@ -1358,8 +1330,8 @@ function ReviewPanel({
               width: "100%",
               padding: 8,
               background: "transparent",
-              color: T.ink400,
-              border: `1px solid ${T.ink150}`,
+              color: T.ink500,
+              border: `1px solid ${T.border}`,
               borderRadius: 4,
               fontSize: 10,
               fontWeight: 700,
@@ -1378,8 +1350,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "10px 14px",
-            borderTop: `1px solid ${T.ink075}`,
-            background: T.dangerBg,
+            borderTop: `1px solid ${T.bg}`,
+            background: T.dangerLight,
           }}
         >
           <div
@@ -1436,8 +1408,8 @@ function ReviewPanel({
               style={{
                 padding: "8px 12px",
                 background: "transparent",
-                color: T.ink400,
-                border: `1px solid ${T.ink150}`,
+                color: T.ink500,
+                border: `1px solid ${T.border}`,
                 borderRadius: 4,
                 fontSize: 10,
                 cursor: "pointer",
@@ -1455,8 +1427,8 @@ function ReviewPanel({
         <div
           style={{
             padding: "12px 14px",
-            borderTop: `1px solid ${T.ink150}`,
-            background: T.ink050,
+            borderTop: `1px solid ${T.border}`,
+            background: T.surface,
           }}
         >
           {confirmError && (
@@ -1595,15 +1567,15 @@ function DocumentLogTable({ documents, onSelectDoc }) {
     fontWeight: 700,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
-    color: T.ink400,
-    borderBottom: `2px solid ${T.ink150}`,
+    color: T.ink500,
+    borderBottom: `2px solid ${T.border}`,
     textAlign: "left",
     fontFamily: T.font,
-    background: T.ink075,
+    background: T.bg,
   };
   const sTd = {
     padding: "8px 12px",
-    borderBottom: `1px solid ${T.ink075}`,
+    borderBottom: `1px solid ${T.bg}`,
     fontSize: 12,
     fontFamily: T.font,
     color: T.ink700,
@@ -1652,7 +1624,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
           ))}
         </select>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: T.ink400, fontFamily: T.font }}>
+        <span style={{ fontSize: 11, color: T.ink500, fontFamily: T.font }}>
           {filtered.length} records
         </span>
         <button
@@ -1668,10 +1640,10 @@ function DocumentLogTable({ documents, onSelectDoc }) {
       <div
         style={{
           background: "#fff",
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           borderRadius: 6,
           overflowX: "auto",
-          boxShadow: T.shadow,
+          boxShadow: T.shadow.sm,
         }}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1701,7 +1673,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   style={{
                     ...sTd,
                     textAlign: "center",
-                    color: T.ink400,
+                    color: T.ink500,
                     padding: 40,
                   }}
                 >
@@ -1714,7 +1686,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   key={doc.id}
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = T.accentLit)
+                    (e.currentTarget.style.background = T.accentLight)
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.background = "transparent")
@@ -1727,7 +1699,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                   </td>
                   <td style={sTd}>
                     {doc.supplier_name || (
-                      <span style={{ color: T.ink400 }}>—</span>
+                      <span style={{ color: T.ink500 }}>—</span>
                     )}
                   </td>
                   <td
@@ -1737,7 +1709,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      color: T.ink400,
+                      color: T.ink500,
                       fontSize: 11,
                     }}
                   >
@@ -1755,7 +1727,7 @@ function DocumentLogTable({ documents, onSelectDoc }) {
                         {doc.applied_updates.length}
                       </span>
                     ) : (
-                      <span style={{ color: T.ink400 }}>—</span>
+                      <span style={{ color: T.ink500 }}>—</span>
                     )}
                   </td>
                   <td style={sTd}>
@@ -2669,7 +2641,7 @@ export default function HQDocuments({ initialDocId = null }) {
           >
             Document Ingestion
           </h2>
-          <div style={{ fontSize: 13, color: T.ink400, fontFamily: T.font }}>
+          <div style={{ fontSize: 13, color: T.ink500, fontFamily: T.font }}>
             Upload any business document · AI extracts data · Review and confirm
             DB updates
           </div>
@@ -2677,7 +2649,7 @@ export default function HQDocuments({ initialDocId = null }) {
         <div
           style={{
             display: "flex",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 6,
             overflow: "hidden",
           }}
@@ -2700,7 +2672,7 @@ export default function HQDocuments({ initialDocId = null }) {
                 fontFamily: T.font,
                 transition: "all 0.15s",
                 background: view === t.id ? T.accent : "#fff",
-                color: view === t.id ? "#fff" : T.ink400,
+                color: view === t.id ? "#fff" : T.ink500,
               }}
             >
               {t.label}
@@ -2738,11 +2710,11 @@ export default function HQDocuments({ initialDocId = null }) {
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: 8,
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: 20,
         }}
       >
@@ -2796,7 +2768,7 @@ export default function HQDocuments({ initialDocId = null }) {
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginTop: 6,
                 fontFamily: T.font,
               }}
@@ -2821,12 +2793,12 @@ export default function HQDocuments({ initialDocId = null }) {
         <div
           style={{
             display: "flex",
-            border: `1px solid ${T.ink150}`,
+            border: `1px solid ${T.border}`,
             borderRadius: 8,
             background: "#fff",
             minHeight: 600,
             overflow: "hidden",
-            boxShadow: T.shadow,
+            boxShadow: T.shadow.sm,
           }}
         >
           {/* Left panel */}
@@ -2834,7 +2806,7 @@ export default function HQDocuments({ initialDocId = null }) {
             style={{
               width: 220,
               minWidth: 220,
-              borderRight: `1px solid ${T.ink150}`,
+              borderRight: `1px solid ${T.border}`,
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",
@@ -2843,8 +2815,8 @@ export default function HQDocuments({ initialDocId = null }) {
             <div
               style={{
                 padding: 10,
-                borderBottom: `1px solid ${T.ink150}`,
-                background: T.ink050,
+                borderBottom: `1px solid ${T.border}`,
+                background: T.surface,
               }}
             >
               <div style={{ marginBottom: 8 }}>
@@ -2855,7 +2827,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   style={{
                     width: "100%",
                     padding: "5px 8px",
-                    border: `1px solid ${T.ink150}`,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 4,
                     fontSize: 11,
                     fontFamily: T.font,
@@ -2885,7 +2857,7 @@ export default function HQDocuments({ initialDocId = null }) {
                     <div
                       style={{
                         height: 4,
-                        background: T.ink150,
+                        background: T.border,
                         borderRadius: 2,
                         overflow: "hidden",
                         marginBottom: 6,
@@ -2912,7 +2884,7 @@ export default function HQDocuments({ initialDocId = null }) {
                           ? T.danger
                           : uploadState === "done"
                             ? T.accentMid
-                            : T.ink400,
+                            : T.ink500,
                     }}
                   >
                     {uploadState === "error"
@@ -2931,7 +2903,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   style={{
                     padding: 20,
                     textAlign: "center",
-                    color: T.ink400,
+                    color: T.ink500,
                     fontSize: 12,
                     fontFamily: T.font,
                   }}
@@ -2943,7 +2915,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   style={{
                     padding: 20,
                     textAlign: "center",
-                    color: T.ink400,
+                    color: T.ink500,
                     fontSize: 12,
                     fontFamily: T.font,
                   }}
@@ -2979,8 +2951,8 @@ export default function HQDocuments({ initialDocId = null }) {
                 <div
                   style={{
                     padding: "10px 16px",
-                    borderBottom: `1px solid ${T.ink150}`,
-                    background: T.ink050,
+                    borderBottom: `1px solid ${T.border}`,
+                    background: T.surface,
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
@@ -3003,7 +2975,7 @@ export default function HQDocuments({ initialDocId = null }) {
                     <div
                       style={{
                         fontSize: 10,
-                        color: T.ink400,
+                        color: T.ink500,
                         fontFamily: T.font,
                       }}
                     >
@@ -3048,7 +3020,7 @@ export default function HQDocuments({ initialDocId = null }) {
                         alignItems: "center",
                         justifyContent: "center",
                         height: "100%",
-                        color: T.ink400,
+                        color: T.ink500,
                         fontSize: 13,
                         fontFamily: T.font,
                       }}
@@ -3090,7 +3062,7 @@ export default function HQDocuments({ initialDocId = null }) {
                         alignItems: "center",
                         justifyContent: "center",
                         height: "100%",
-                        color: T.ink400,
+                        color: T.ink500,
                       }}
                     >
                       <div style={{ fontSize: 36, marginBottom: 10 }}>🔒</div>
@@ -3118,7 +3090,7 @@ export default function HQDocuments({ initialDocId = null }) {
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: T.ink400,
+                  color: T.ink500,
                   textAlign: "center",
                   padding: 40,
                 }}
@@ -3159,11 +3131,11 @@ export default function HQDocuments({ initialDocId = null }) {
               style={{
                 width: 320,
                 minWidth: 320,
-                borderLeft: `1px solid ${T.ink150}`,
+                borderLeft: `1px solid ${T.border}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: T.ink400,
+                color: T.ink500,
                 fontSize: 12,
                 fontFamily: T.font,
                 textAlign: "center",
