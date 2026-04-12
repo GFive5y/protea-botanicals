@@ -674,7 +674,7 @@ that doesn't feel like it was designed in the same room on the same day.
 | HQDashboard.js | COMPLETE — WP-DS-6 Phase 1 | cf9241e | 13 Apr 2026 |
 | GroupPortal.js + all group/ | COMPLETE — built inside T from start | various | Apr 2026 |
 | **P1: Demo path (before 12 May)** | | | |
-| HQOverview.js | NOT STARTED | — | — |
+| HQOverview.js | COMPLETE | dbb3e95 | 13 Apr 2026 |
 | HQStock.js + 8 sub-panels | NOT STARTED | — | — |
 | HQProfitLoss.js | NOT STARTED | — | — |
 | HQBalanceSheet.js | NOT STARTED | — | — |
