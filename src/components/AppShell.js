@@ -21,7 +21,7 @@ import { T } from "../styles/tokens";
  * Public routes (/, /shop, /scan, /verify, /terpenes, /cart,
  * /leaderboard, /account, /welcome) must NOT use AppShell.
  */
-export default function AppShell({ children, maxWidth = 1400 }) {
+export default function AppShell({ children }) {
   const { isOperator } = useTenant(); // ✦ WP-MULTISITE
   const hostname = window.location.hostname;
   const isOnClientSite =
@@ -61,9 +61,8 @@ export default function AppShell({ children, maxWidth = 1400 }) {
       <main className="app-shell-content">
         <div
           style={{
-            maxWidth,
-            margin: "0 auto",
-            padding: `${T.page.gutterY}px ${T.page.gutterX}px ${Math.round(T.page.gutterY * 1.2)}px`,
+            width: "100%",
+            padding: `${T.page.gutterY}px ${T.page.gutterX}px`,
             background: T.bg,
             minHeight: "100%",
           }}
