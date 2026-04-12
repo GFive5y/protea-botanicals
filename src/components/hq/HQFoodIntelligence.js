@@ -6,9 +6,10 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T } from "../../styles/tokens";
 
-// ─── T TOKEN SYSTEM (locked — WP-VISUAL-SYSTEM v1.0) ─────────────────────────
-const T = {
+// ─── FI_T TOKEN SYSTEM (WP-UNIFY: slate palette, intentionally different from tokens.js)
+const FI_T = {
   accent: "#1A3D2B",
   accentMid: "#2D6A4F",
   accentBd: "#A7D9B8",
@@ -96,10 +97,10 @@ const T = {
 };
 
 const badgeMap = {
-  good: { bg: T.successBg, bd: T.successBd, color: T.success },
-  warning: { bg: T.warningBg, bd: T.warningBd, color: T.warning },
-  critical: { bg: T.dangerBg, bd: T.dangerBd, color: T.danger },
-  info: { bg: T.infoBg, bd: T.infoBd, color: T.info },
+  good: { bg: FI_T.successBg, bd: FI_T.successBd, color: FI_T.success },
+  warning: { bg: FI_T.warningBg, bd: FI_T.warningBd, color: FI_T.warning },
+  critical: { bg: FI_T.dangerBg, bd: FI_T.dangerBd, color: FI_T.danger },
+  info: { bg: FI_T.infoBg, bd: FI_T.infoBd, color: FI_T.info },
 };
 
 const SA_ALLERGENS = [
@@ -126,7 +127,7 @@ function Badge({ label, variant = "info" }) {
   return (
     <span
       style={{
-        ...T.label,
+        ...FI_T.label,
         fontSize: 10,
         padding: "2px 8px",
         borderRadius: 3,
@@ -143,19 +144,19 @@ function Badge({ label, variant = "info" }) {
 function KpiTile({ label, value, sub, variant }) {
   const color =
     variant === "danger"
-      ? T.danger
+      ? FI_T.danger
       : variant === "warning"
-        ? T.warning
+        ? FI_T.warning
         : variant === "success"
-          ? T.success
-          : T.ink900;
+          ? FI_T.success
+          : FI_T.ink900;
   return (
     <div style={{ background: "#fff", padding: "18px 20px" }}>
-      <div style={{ ...T.label, color: T.ink500, marginBottom: 6 }}>
+      <div style={{ ...FI_T.label, color: FI_T.ink500, marginBottom: 6 }}>
         {label}
       </div>
-      <div style={{ ...T.kpi, color, marginBottom: 2 }}>{value}</div>
-      {sub && <div style={{ ...T.caption, color: T.ink500 }}>{sub}</div>}
+      <div style={{ ...FI_T.kpi, color, marginBottom: 2 }}>{value}</div>
+      {sub && <div style={{ ...FI_T.caption, color: FI_T.ink500 }}>{sub}</div>}
     </div>
   );
 }
@@ -166,9 +167,9 @@ function CardShell({ title, badge, children }) {
       style={{
         background: "#fff",
         borderRadius: 8,
-        border: `1px solid ${T.ink150}`,
+        border: `1px solid ${FI_T.ink150}`,
         padding: 20,
-        boxShadow: T.shadow,
+        boxShadow: FI_T.shadow,
       }}
     >
       <div
@@ -179,7 +180,7 @@ function CardShell({ title, badge, children }) {
           marginBottom: 16,
         }}
       >
-        <div style={{ ...T.heading, color: T.ink900 }}>{title}</div>
+        <div style={{ ...FI_T.heading, color: FI_T.ink900 }}>{title}</div>
         {badge}
       </div>
       {children}
@@ -189,7 +190,7 @@ function CardShell({ title, badge, children }) {
 
 function ProgressBar({ pct, color }) {
   return (
-    <div style={{ height: 6, background: T.ink150, borderRadius: 3 }}>
+    <div style={{ height: 6, background: FI_T.ink150, borderRadius: 3 }}>
       <div
         style={{
           height: 6,
@@ -204,8 +205,8 @@ function ProgressBar({ pct, color }) {
 }
 
 function ScoreRow({ score, label }) {
-  const color = score >= 85 ? T.success : score >= 65 ? T.warning : T.danger;
-  const bg = score >= 85 ? T.successBg : score >= 65 ? T.warningBg : T.dangerBg;
+  const color = score >= 85 ? FI_T.success : score >= 65 ? FI_T.warning : FI_T.danger;
+  const bg = score >= 85 ? FI_T.successBg : score >= 65 ? FI_T.warningBg : FI_T.dangerBg;
   return (
     <div
       style={{
@@ -225,7 +226,7 @@ function ScoreRow({ score, label }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          ...T.kpiSm,
+          ...FI_T.kpiSm,
           color,
           fontWeight: 600,
         }}
@@ -235,8 +236,8 @@ function ScoreRow({ score, label }) {
       <div style={{ flex: 1 }}>
         <div
           style={{
-            ...T.body,
-            color: T.ink700,
+            ...FI_T.body,
+            color: FI_T.ink700,
             fontWeight: 500,
             marginBottom: 4,
           }}
@@ -253,8 +254,8 @@ function EmptyState({ message }) {
   return (
     <div
       style={{
-        ...T.body,
-        color: T.ink500,
+        ...FI_T.body,
+        color: FI_T.ink500,
         padding: "20px 0",
         textAlign: "center",
       }}
@@ -271,7 +272,7 @@ function ComplianceCard({ d }) {
   const variant =
     overall >= 85 ? "good" : overall >= 65 ? "warning" : "critical";
   const bigColor =
-    overall >= 85 ? T.success : overall >= 65 ? T.warning : T.danger;
+    overall >= 85 ? FI_T.success : overall >= 65 ? FI_T.warning : FI_T.danger;
   return (
     <CardShell
       title="Compliance Score"
@@ -284,7 +285,7 @@ function ComplianceCard({ d }) {
         />
       }
     >
-      <div style={{ ...T.display, color: bigColor, marginBottom: 18 }}>
+      <div style={{ ...FI_T.display, color: bigColor, marginBottom: 18 }}>
         {overall}%
       </div>
       <ScoreRow score={d.haccpPass ?? 0} label="HACCP Pass Rate" />
@@ -294,29 +295,29 @@ function ComplianceCard({ d }) {
         style={{
           marginTop: 12,
           padding: "10px 12px",
-          background: T.ink050,
+          background: FI_T.ink050,
           borderRadius: 6,
-          ...T.caption,
-          color: T.ink500,
+          ...FI_T.caption,
+          color: FI_T.ink500,
           display: "flex",
           flexDirection: "column",
           gap: 3,
         }}
       >
         {d.expiredCerts > 0 && (
-          <div style={{ color: T.danger }}>
+          <div style={{ color: FI_T.danger }}>
             ⚠ {d.expiredCerts} expired cert{d.expiredCerts > 1 ? "s" : ""} —
             action required
           </div>
         )}
         {d.expiringSoonCerts > 0 && (
-          <div style={{ color: T.warning }}>
+          <div style={{ color: FI_T.warning }}>
             △ {d.expiringSoonCerts} cert{d.expiringSoonCerts > 1 ? "s" : ""}{" "}
             expiring within 30 days
           </div>
         )}
         {d.openNcrs > 0 && (
-          <div style={{ color: T.warning }}>
+          <div style={{ color: FI_T.warning }}>
             △ {d.openNcrs} open HACCP non-conformance{d.openNcrs > 1 ? "s" : ""}{" "}
             unresolved
           </div>
@@ -324,7 +325,7 @@ function ComplianceCard({ d }) {
         {d.expiredCerts === 0 &&
           d.expiringSoonCerts === 0 &&
           d.openNcrs === 0 && (
-            <div style={{ color: T.success }}>
+            <div style={{ color: FI_T.success }}>
               ✓ All compliance indicators clear
             </div>
           )}
@@ -353,13 +354,13 @@ function AllergenCard({ d }) {
         <EmptyState message="No allergen data. Add recipes with allergen flags in the Recipes tab." />
       ) : (
         <>
-          <div style={{ ...T.caption, color: T.ink500, marginBottom: 12 }}>
+          <div style={{ ...FI_T.caption, color: FI_T.ink500, marginBottom: 12 }}>
             Allergens ranked by recipe exposure — {highRisk} recipe
             {highRisk !== 1 ? "s" : ""} carry 4+ allergens
           </div>
           {top.map((a) => {
             const barColor =
-              a.count >= 4 ? T.danger : a.count >= 2 ? T.warning : T.accentMid;
+              a.count >= 4 ? FI_T.danger : a.count >= 2 ? FI_T.warning : FI_T.accentMid;
             return (
               <div key={a.key} style={{ marginBottom: 9 }}>
                 <div
@@ -369,8 +370,8 @@ function AllergenCard({ d }) {
                     marginBottom: 3,
                   }}
                 >
-                  <span style={{ ...T.body, color: T.ink700 }}>{a.label}</span>
-                  <span style={{ ...T.data, color: T.ink500 }}>
+                  <span style={{ ...FI_T.body, color: FI_T.ink700 }}>{a.label}</span>
+                  <span style={{ ...FI_T.data, color: FI_T.ink500 }}>
                     {a.count} recipe{a.count !== 1 ? "s" : ""}
                   </span>
                 </div>
@@ -385,9 +386,9 @@ function AllergenCard({ d }) {
             <div
               style={{
                 marginTop: 12,
-                ...T.caption,
-                color: T.ink500,
-                borderTop: `1px solid ${T.ink150}`,
+                ...FI_T.caption,
+                color: FI_T.ink500,
+                borderTop: `1px solid ${FI_T.ink150}`,
                 paddingTop: 10,
               }}
             >
@@ -426,7 +427,7 @@ function CostCard({ d }) {
       title="Recipe Cost Trends"
       badge={<Badge label={`AVG R${avgCost.toFixed(2)}`} variant="info" />}
     >
-      <div style={{ ...T.caption, color: T.ink500, marginBottom: 12 }}>
+      <div style={{ ...FI_T.caption, color: FI_T.ink500, marginBottom: 12 }}>
         Cost per unit (R) — {costs.length} recipes with BOM data
       </div>
       {/* Bar chart */}
@@ -442,10 +443,10 @@ function CostCard({ d }) {
         {costs.map((c, i) => {
           const barColor =
             c.cost > avgCost * 1.25
-              ? T.danger
+              ? FI_T.danger
               : c.cost > avgCost
-                ? T.warning
-                : T.accentMid;
+                ? FI_T.warning
+                : FI_T.accentMid;
           return (
             <div
               key={i}
@@ -477,8 +478,8 @@ function CostCard({ d }) {
             key={i}
             style={{
               flex: 1,
-              ...T.caption,
-              color: T.ink500,
+              ...FI_T.caption,
+              color: FI_T.ink500,
               textAlign: "center",
               fontSize: 9,
               overflow: "hidden",
@@ -493,7 +494,7 @@ function CostCard({ d }) {
       {/* Min / Avg / Max strip */}
       <div
         style={{
-          borderTop: `1px solid ${T.ink150}`,
+          borderTop: `1px solid ${FI_T.ink150}`,
           paddingTop: 10,
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
@@ -501,15 +502,15 @@ function CostCard({ d }) {
         }}
       >
         {[
-          { lab: "LOWEST", val: `R${minCost.toFixed(2)}`, col: T.success },
-          { lab: "AVERAGE", val: `R${avgCost.toFixed(2)}`, col: T.ink700 },
-          { lab: "HIGHEST", val: `R${maxCost.toFixed(2)}`, col: T.danger },
+          { lab: "LOWEST", val: `R${minCost.toFixed(2)}`, col: FI_T.success },
+          { lab: "AVERAGE", val: `R${avgCost.toFixed(2)}`, col: FI_T.ink700 },
+          { lab: "HIGHEST", val: `R${maxCost.toFixed(2)}`, col: FI_T.danger },
         ].map(({ lab, val, col }) => (
           <div key={lab} style={{ textAlign: "center" }}>
-            <div style={{ ...T.label, color: T.ink400, marginBottom: 2 }}>
+            <div style={{ ...FI_T.label, color: FI_T.ink400, marginBottom: 2 }}>
               {lab}
             </div>
-            <div style={{ ...T.data, color: col, fontWeight: 600 }}>{val}</div>
+            <div style={{ ...FI_T.data, color: col, fontWeight: 600 }}>{val}</div>
           </div>
         ))}
       </div>
@@ -551,17 +552,17 @@ function ColdChainCard({ d }) {
             lab: "CRITICAL",
             val: cc.critBreaches,
             active: cc.critBreaches > 0,
-            activeBg: T.dangerBg,
-            activeBd: T.dangerBd,
-            activeCol: T.danger,
+            activeBg: FI_T.dangerBg,
+            activeBd: FI_T.dangerBd,
+            activeCol: FI_T.danger,
           },
           {
             lab: "WARNINGS",
             val: cc.warnBreaches,
             active: cc.warnBreaches > 0,
-            activeBg: T.warningBg,
-            activeBd: T.warningBd,
-            activeCol: T.warning,
+            activeBg: FI_T.warningBg,
+            activeBd: FI_T.warningBd,
+            activeCol: FI_T.warning,
           },
         ].map(({ lab, val, active, activeBg, activeBd, activeCol }) => (
           <div
@@ -569,23 +570,23 @@ function ColdChainCard({ d }) {
             style={{
               padding: "10px 12px",
               borderRadius: 6,
-              background: active ? activeBg : T.successBg,
-              border: `1px solid ${active ? activeBd : T.successBd}`,
+              background: active ? activeBg : FI_T.successBg,
+              border: `1px solid ${active ? activeBd : FI_T.successBd}`,
             }}
           >
-            <div style={{ ...T.label, color: active ? activeCol : T.success }}>
+            <div style={{ ...FI_T.label, color: active ? activeCol : FI_T.success }}>
               {lab}
             </div>
             <div
               style={{
-                ...T.kpiSm,
-                color: active ? activeCol : T.success,
+                ...FI_T.kpiSm,
+                color: active ? activeCol : FI_T.success,
                 margin: "2px 0",
               }}
             >
               {val}
             </div>
-            <div style={{ ...T.caption, color: T.ink500 }}>
+            <div style={{ ...FI_T.caption, color: FI_T.ink500 }}>
               {lab === "CRITICAL" ? "temp breaches" : "exceedances"}
             </div>
           </div>
@@ -593,18 +594,18 @@ function ColdChainCard({ d }) {
       </div>
       {/* Location health */}
       {cc.coldHealthByLocation.length === 0 ? (
-        <div style={{ ...T.caption, color: T.ink500 }}>
+        <div style={{ ...FI_T.caption, color: FI_T.ink500 }}>
           No locations configured. Use "Load Default Locations" in the Cold
           Chain tab.
         </div>
       ) : (
         <>
-          <div style={{ ...T.label, color: T.ink400, marginBottom: 8 }}>
+          <div style={{ ...FI_T.label, color: FI_T.ink400, marginBottom: 8 }}>
             LOCATION HEALTH
           </div>
           {cc.coldHealthByLocation.map((loc, i) => {
             const barColor =
-              loc.pct >= 95 ? T.success : loc.pct >= 80 ? T.warning : T.danger;
+              loc.pct >= 95 ? FI_T.success : loc.pct >= 80 ? FI_T.warning : FI_T.danger;
             return (
               <div
                 key={i}
@@ -617,8 +618,8 @@ function ColdChainCard({ d }) {
               >
                 <div
                   style={{
-                    ...T.body,
-                    color: T.ink700,
+                    ...FI_T.body,
+                    color: FI_T.ink700,
                     width: 110,
                     flexShrink: 0,
                     overflow: "hidden",
@@ -633,8 +634,8 @@ function ColdChainCard({ d }) {
                 </div>
                 <div
                   style={{
-                    ...T.data,
-                    color: T.ink500,
+                    ...FI_T.data,
+                    color: FI_T.ink500,
                     width: 38,
                     textAlign: "right",
                   }}
@@ -646,7 +647,7 @@ function ColdChainCard({ d }) {
           })}
         </>
       )}
-      <div style={{ marginTop: 10, ...T.caption, color: T.ink500 }}>
+      <div style={{ marginTop: 10, ...FI_T.caption, color: FI_T.ink500 }}>
         {cc.totalReadings} total readings analysed
       </div>
     </CardShell>
@@ -679,18 +680,18 @@ function RecallCard({ d }) {
       {r.openRecalls.length > 0 && (
         <div
           style={{
-            background: T.dangerBg,
-            border: `1px solid ${T.dangerBd}`,
+            background: FI_T.dangerBg,
+            border: `1px solid ${FI_T.dangerBd}`,
             borderRadius: 6,
             padding: "10px 12px",
             marginBottom: 12,
           }}
         >
-          <div style={{ ...T.label, color: T.danger, marginBottom: 4 }}>
+          <div style={{ ...FI_T.label, color: FI_T.danger, marginBottom: 4 }}>
             ACTIVE RECALL IN PROGRESS
           </div>
           {r.openRecalls.map((rc, i) => (
-            <div key={i} style={{ ...T.body, color: T.danger }}>
+            <div key={i} style={{ ...FI_T.body, color: FI_T.danger }}>
               Class {rc.severity_class?.toUpperCase() || "—"} — initiated{" "}
               {rc.initiated_at?.slice(0, 10)}
             </div>
@@ -707,8 +708,8 @@ function RecallCard({ d }) {
             marginBottom: 6,
           }}
         >
-          <span style={{ ...T.label, color: T.ink400 }}>READINESS SCORE</span>
-          <span style={{ ...T.data, color: T.ink700 }}>
+          <span style={{ ...FI_T.label, color: FI_T.ink400 }}>READINESS SCORE</span>
+          <span style={{ ...FI_T.data, color: FI_T.ink700 }}>
             {r.recallScore} / 100
           </span>
         </div>
@@ -716,10 +717,10 @@ function RecallCard({ d }) {
           pct={r.recallScore}
           color={
             r.recallScore >= 80
-              ? T.success
+              ? FI_T.success
               : r.recallScore >= 50
-                ? T.warning
-                : T.danger
+                ? FI_T.warning
+                : FI_T.danger
           }
         />
       </div>
@@ -737,23 +738,23 @@ function RecallCard({ d }) {
           {
             lab: "OPEN",
             val: r.openRecalls.length,
-            col: r.openRecalls.length > 0 ? T.danger : T.success,
+            col: r.openRecalls.length > 0 ? FI_T.danger : FI_T.success,
           },
-          { lab: "CLOSED", val: r.closedRecalls.length, col: T.ink700 },
-          { lab: "DRILLS", val: r.drills.length, col: T.ink700 },
+          { lab: "CLOSED", val: r.closedRecalls.length, col: FI_T.ink700 },
+          { lab: "DRILLS", val: r.drills.length, col: FI_T.ink700 },
         ].map(({ lab, val, col }) => (
           <div
             key={lab}
             style={{
               textAlign: "center",
               padding: "10px 8px",
-              background: T.ink050,
+              background: FI_T.ink050,
               borderRadius: 6,
             }}
           >
-            <div style={{ ...T.kpiSm, color: col }}>{val}</div>
+            <div style={{ ...FI_T.kpiSm, color: col }}>{val}</div>
             <div
-              style={{ ...T.label, color: T.ink400, fontSize: 9, marginTop: 2 }}
+              style={{ ...FI_T.label, color: FI_T.ink400, fontSize: 9, marginTop: 2 }}
             >
               {lab}
             </div>
@@ -763,21 +764,21 @@ function RecallCard({ d }) {
 
       {/* Last drill */}
       <div
-        style={{ padding: "10px 12px", background: T.ink050, borderRadius: 6 }}
+        style={{ padding: "10px 12px", background: FI_T.ink050, borderRadius: 6 }}
       >
-        <div style={{ ...T.label, color: T.ink400, marginBottom: 4 }}>
+        <div style={{ ...FI_T.label, color: FI_T.ink400, marginBottom: 4 }}>
           LAST MOCK DRILL
         </div>
         {r.lastDrill ? (
           <div
             style={{
-              ...T.body,
+              ...FI_T.body,
               color:
                 r.daysSinceDrill > 180
-                  ? T.danger
+                  ? FI_T.danger
                   : r.daysSinceDrill > 90
-                    ? T.warning
-                    : T.success,
+                    ? FI_T.warning
+                    : FI_T.success,
             }}
           >
             {r.daysSinceDrill} days ago (
@@ -787,7 +788,7 @@ function RecallCard({ d }) {
             {r.daysSinceDrill <= 90 && " — within recommended 90-day window"}
           </div>
         ) : (
-          <div style={{ ...T.body, color: T.warning }}>
+          <div style={{ ...FI_T.body, color: FI_T.warning }}>
             No drill on record — schedule one via Recall tab
           </div>
         )}
@@ -837,26 +838,26 @@ function WasteCard({ d }) {
               style={{
                 padding: "10px 12px",
                 borderRadius: 6,
-                background: T.ink050,
+                background: FI_T.ink050,
               }}
             >
-              <div style={{ ...T.label, color: T.ink400, marginBottom: 2 }}>
+              <div style={{ ...FI_T.label, color: FI_T.ink400, marginBottom: 2 }}>
                 AVG YIELD
               </div>
               <div
                 style={{
-                  ...T.kpiSm,
+                  ...FI_T.kpiSm,
                   color:
                     w.avgYield >= 90
-                      ? T.success
+                      ? FI_T.success
                       : w.avgYield >= 80
-                        ? T.warning
-                        : T.danger,
+                        ? FI_T.warning
+                        : FI_T.danger,
                 }}
               >
                 {w.avgYield}%
               </div>
-              <div style={{ ...T.caption, color: T.ink500 }}>
+              <div style={{ ...FI_T.caption, color: FI_T.ink500 }}>
                 {w.avgYield >= 92
                   ? "Target met"
                   : w.avgYield >= 80
@@ -868,30 +869,30 @@ function WasteCard({ d }) {
               style={{
                 padding: "10px 12px",
                 borderRadius: 6,
-                background: T.ink050,
+                background: FI_T.ink050,
               }}
             >
-              <div style={{ ...T.label, color: T.ink400, marginBottom: 2 }}>
+              <div style={{ ...FI_T.label, color: FI_T.ink400, marginBottom: 2 }}>
                 RUNS ANALYSED
               </div>
-              <div style={{ ...T.kpiSm, color: T.ink700 }}>{w.totalRuns}</div>
-              <div style={{ ...T.caption, color: T.ink500 }}>
+              <div style={{ ...FI_T.kpiSm, color: FI_T.ink700 }}>{w.totalRuns}</div>
+              <div style={{ ...FI_T.caption, color: FI_T.ink500 }}>
                 with yield data
               </div>
             </div>
           </div>
 
           {/* Per-run waste bars */}
-          <div style={{ ...T.label, color: T.ink400, marginBottom: 8 }}>
+          <div style={{ ...FI_T.label, color: FI_T.ink400, marginBottom: 8 }}>
             WASTE % PER RUN (RECENT)
           </div>
           {w.wasteByRun.slice(0, 6).map((run, i) => {
             const barColor =
               run.wastePct > 15
-                ? T.danger
+                ? FI_T.danger
                 : run.wastePct > 8
-                  ? T.warning
-                  : T.accentMid;
+                  ? FI_T.warning
+                  : FI_T.accentMid;
             return (
               <div
                 key={i}
@@ -904,8 +905,8 @@ function WasteCard({ d }) {
               >
                 <div
                   style={{
-                    ...T.caption,
-                    color: T.ink500,
+                    ...FI_T.caption,
+                    color: FI_T.ink500,
                     width: 62,
                     flexShrink: 0,
                   }}
@@ -920,8 +921,8 @@ function WasteCard({ d }) {
                 </div>
                 <div
                   style={{
-                    ...T.data,
-                    color: run.wastePct > 15 ? T.danger : T.ink500,
+                    ...FI_T.data,
+                    color: run.wastePct > 15 ? FI_T.danger : FI_T.ink500,
                     width: 36,
                     textAlign: "right",
                   }}
@@ -931,7 +932,7 @@ function WasteCard({ d }) {
               </div>
             );
           })}
-          <div style={{ marginTop: 8, ...T.caption, color: T.ink500 }}>
+          <div style={{ marginTop: 8, ...FI_T.caption, color: FI_T.ink500 }}>
             Waste target: &lt;8% per run · Trigger investigation: &gt;15%
           </div>
         </>
@@ -1268,7 +1269,7 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
   if (loading) {
     return (
       <div
-        style={{ padding: 40, textAlign: "center", ...T.body, color: T.ink500 }}
+        style={{ padding: 40, textAlign: "center", ...FI_T.body, color: FI_T.ink500 }}
       >
         Loading Food Intelligence…
       </div>
@@ -1280,12 +1281,12 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
       <div style={{ padding: 24 }}>
         <div
           style={{
-            background: T.dangerBg,
-            border: `1px solid ${T.dangerBd}`,
+            background: FI_T.dangerBg,
+            border: `1px solid ${FI_T.dangerBd}`,
             borderRadius: 8,
             padding: "16px 20px",
-            ...T.body,
-            color: T.danger,
+            ...FI_T.body,
+            color: FI_T.danger,
           }}
         >
           {fetchError}
@@ -1297,7 +1298,7 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
   if (!data) {
     return (
       <div
-        style={{ padding: 40, textAlign: "center", ...T.body, color: T.ink500 }}
+        style={{ padding: 40, textAlign: "center", ...FI_T.body, color: FI_T.ink500 }}
       >
         No food & beverage data found. Ensure the F&amp;B module migrations have
         been run.
@@ -1318,7 +1319,7 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
       style={{
         padding: "24px 28px",
         fontFamily: "Inter, sans-serif",
-        background: T.ink050,
+        background: FI_T.ink050,
         minHeight: "100vh",
       }}
     >
@@ -1332,8 +1333,8 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
         }}
       >
         <div>
-          <div style={{ ...T.title, color: T.ink900 }}>Food Intelligence</div>
-          <div style={{ ...T.caption, color: T.ink500, marginTop: 3 }}>
+          <div style={{ ...FI_T.title, color: FI_T.ink900 }}>Food Intelligence</div>
+          <div style={{ ...FI_T.caption, color: FI_T.ink500, marginTop: 3 }}>
             Aggregated view across S1–S7 · Refreshed{" "}
             {new Date().toLocaleTimeString("en-ZA", {
               hour: "2-digit",
@@ -1345,13 +1346,13 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
           <button
             onClick={fetchAll}
             style={{
-              ...T.body,
+              ...FI_T.body,
               background: "#fff",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${FI_T.ink150}`,
               borderRadius: 6,
               padding: "8px 14px",
               cursor: "pointer",
-              color: T.ink700,
+              color: FI_T.ink700,
             }}
           >
             ↻ Refresh
@@ -1360,8 +1361,8 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
             onClick={fetchAiInsight}
             disabled={aiLoading}
             style={{
-              ...T.body,
-              background: T.accent,
+              ...FI_T.body,
+              background: FI_T.accent,
               color: "#fff",
               border: "none",
               borderRadius: 6,
@@ -1379,25 +1380,25 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
       {(aiInsight || aiLoading) && (
         <div
           style={{
-            background: T.accentLit,
-            border: `1px solid ${T.accentBd}`,
+            background: FI_T.accentLit,
+            border: `1px solid ${FI_T.accentBd}`,
             borderRadius: 8,
             padding: "16px 20px",
             marginBottom: 24,
           }}
         >
-          <div style={{ ...T.label, color: T.accentMid, marginBottom: 8 }}>
+          <div style={{ ...FI_T.label, color: FI_T.accentMid, marginBottom: 8 }}>
             ✦ AI Intelligence Brief
           </div>
           {aiLoading ? (
-            <div style={{ ...T.body, color: T.ink500 }}>
+            <div style={{ ...FI_T.body, color: FI_T.ink500 }}>
               Generating analysis from live data…
             </div>
           ) : (
             <div
               style={{
-                ...T.body,
-                color: T.ink700,
+                ...FI_T.body,
+                color: FI_T.ink700,
                 lineHeight: 1.75,
                 whiteSpace: "pre-line",
               }}
@@ -1414,11 +1415,11 @@ Use plain language. No markdown formatting, no bullet points, no headers. Just c
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
           gap: "1px",
-          background: T.ink150,
-          border: `1px solid ${T.ink150}`,
+          background: FI_T.ink150,
+          border: `1px solid ${FI_T.ink150}`,
           borderRadius: 8,
           overflow: "hidden",
-          boxShadow: T.shadow,
+          boxShadow: FI_T.shadow,
           marginBottom: 24,
         }}
       >
