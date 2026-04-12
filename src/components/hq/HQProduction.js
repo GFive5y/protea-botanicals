@@ -30,38 +30,9 @@ import { useTenant } from "../../services/tenantService";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
 import ActionCentre from "../shared/ActionCentre";
+import { T } from "../../styles/tokens";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// Design tokens — imported from src/styles/tokens.js (WP-UNIFY)
 
 // Legacy aliases — keeps all internal logic unchanged
 const C = {
@@ -69,10 +40,10 @@ const C = {
   mid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
-  cream: T.ink050,
-  warm: T.ink075,
+  cream: T.surface,
+  warm: T.bg,
   white: "#fff",
-  border: T.ink150,
+  border: T.border,
   muted: T.ink500,
   text: T.ink900,
   error: T.danger,
@@ -80,19 +51,19 @@ const C = {
   blue: T.info,
   purple: T.info, // ★ purple → info-blue
   orange: T.warning,
-  lightOrange: T.warningBg,
+  lightOrange: T.warningLight,
 };
 const F = {
-  heading: T.fontUi, // ★ Outfit replaces Cormorant everywhere
-  body: T.fontUi,
+  heading: T.font, // ★ Outfit replaces Cormorant everywhere
+  body: T.font,
 };
 
 const sCard = {
   background: "#fff",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "6px",
   padding: "20px",
-  boxShadow: T.shadow,
+  boxShadow: T.shadow.sm,
 };
 const sBtn = (v = "primary") => ({
   padding: "8px 16px",
@@ -114,15 +85,15 @@ const sBtn = (v = "primary") => ({
   textTransform: "uppercase",
   fontWeight: 600,
   cursor: "pointer",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   transition: "all 0.15s",
 });
 const sInput = {
   padding: "8px 12px",
-  border: `1px solid ${T.ink150}`,
+  border: `1px solid ${T.border}`,
   borderRadius: "4px",
   fontSize: "13px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   background: "#fff",
   outline: "none",
   width: "100%",
@@ -133,9 +104,9 @@ const sLabel = {
   fontSize: "10px",
   letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: T.ink400,
+  color: T.ink500,
   marginBottom: "6px",
-  fontFamily: T.fontUi,
+  fontFamily: T.font,
   fontWeight: 700,
 };
 const sTh = {
@@ -144,13 +115,13 @@ const sTh = {
   fontSize: "9px",
   letterSpacing: "0.15em",
   textTransform: "uppercase",
-  color: T.ink400,
-  borderBottom: `2px solid ${T.ink150}`,
+  color: T.ink500,
+  borderBottom: `2px solid ${T.border}`,
   fontWeight: 700,
 };
 const sTd = {
   padding: "10px 12px",
-  borderBottom: `1px solid ${T.ink075}`,
+  borderBottom: `1px solid ${T.bg}`,
   color: T.ink700,
   verticalAlign: "middle",
 };
@@ -305,11 +276,11 @@ function calcYield(actual, planned) {
 // ─── Lifecycle badge ─────────────────────────────────────────────────────────
 function LifecycleBadge({ status }) {
   const map = {
-    active: { bg: T.successBg, color: T.success, label: "Active" },
-    in_production: { bg: T.infoBg, color: T.info, label: "In Production" },
-    low_stock: { bg: T.warningBg, color: T.warning, label: "Low Stock" },
-    depleted: { bg: T.dangerBg, color: T.danger, label: "Depleted" },
-    archived: { bg: T.ink075, color: T.ink500, label: "Archived" },
+    active: { bg: T.successLight, color: T.success, label: "Active" },
+    in_production: { bg: T.infoLight, color: T.info, label: "In Production" },
+    low_stock: { bg: T.warningLight, color: T.warning, label: "Low Stock" },
+    depleted: { bg: T.dangerLight, color: T.danger, label: "Depleted" },
+    archived: { bg: T.bg, color: T.ink500, label: "Archived" },
   };
   const s = map[status || "active"] || map.active;
   return (
@@ -323,7 +294,7 @@ function LifecycleBadge({ status }) {
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         fontWeight: 700,
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {s.label}
@@ -334,27 +305,27 @@ function LifecycleBadge({ status }) {
 function StatusBadge({ status, yieldPct }) {
   let bg, color, label;
   if (status === "completed" && yieldPct !== null && yieldPct < 95) {
-    bg = T.warningBg;
+    bg = T.warningLight;
     color = T.warning;
     label = "Yield Flagged";
   } else if (status === "completed") {
-    bg = T.successBg;
+    bg = T.successLight;
     color = T.success;
     label = "Completed";
   } else if (status === "in_progress") {
-    bg = T.warningBg;
+    bg = T.warningLight;
     color = T.warning;
     label = "In Progress";
   } else if (status === "active") {
-    bg = T.successBg;
+    bg = T.successLight;
     color = T.success;
     label = "Active";
   } else if (status === "archived") {
-    bg = T.ink075;
+    bg = T.bg;
     color = T.ink500;
     label = "Archived";
   } else {
-    bg = T.ink075;
+    bg = T.bg;
     color = T.ink500;
     label = status || "Draft";
   }
@@ -369,7 +340,7 @@ function StatusBadge({ status, yieldPct }) {
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         fontWeight: 700,
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {label}
@@ -390,14 +361,14 @@ function StockGauge({ label, available, needed, unit, color = T.accentMid }) {
         }}
       >
         <span
-          style={{ fontSize: "12px", fontFamily: T.fontUi, color: T.ink700 }}
+          style={{ fontSize: "12px", fontFamily: T.font, color: T.ink700 }}
         >
           {label}
         </span>
         <span
           style={{
             fontSize: "12px",
-            fontFamily: T.fontData,
+            fontFamily: T.font,
             fontWeight: 600,
             color: ok ? T.success : T.danger,
           }}
@@ -406,7 +377,7 @@ function StockGauge({ label, available, needed, unit, color = T.accentMid }) {
           {typeof available === "number" ? available.toFixed(2) : available}
           {unit} available
           {needed > 0 && (
-            <span style={{ color: T.ink400, fontWeight: 400 }}>
+            <span style={{ color: T.ink500, fontWeight: 400 }}>
               {" "}
               / {needed}
               {unit} needed
@@ -417,7 +388,7 @@ function StockGauge({ label, available, needed, unit, color = T.accentMid }) {
       <div
         style={{
           height: "6px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "3px",
           overflow: "hidden",
         }}
@@ -518,7 +489,7 @@ function HowItWorksBanner() {
         >
           <div
             style={{
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: 13,
               fontWeight: 600,
               color: T.info,
@@ -557,7 +528,7 @@ function HowItWorksBanner() {
                       flex: 1,
                       minWidth: 200,
                       background: "#fff",
-                      border: `1px solid ${T.ink150}`,
+                      border: `1px solid ${T.border}`,
                       borderLeft: `3px solid ${s.color}`,
                       borderRadius: 6,
                       padding: "14px 16px",
@@ -569,7 +540,7 @@ function HowItWorksBanner() {
                         letterSpacing: "0.2em",
                         textTransform: "uppercase",
                         color: s.color,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontWeight: 700,
                         marginBottom: 4,
                       }}
@@ -578,7 +549,7 @@ function HowItWorksBanner() {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontSize: 13,
                         fontWeight: 700,
                         color: T.ink900,
@@ -589,7 +560,7 @@ function HowItWorksBanner() {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontSize: 11,
                         fontWeight: 600,
                         color: T.ink700,
@@ -600,7 +571,7 @@ function HowItWorksBanner() {
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontSize: 11,
                         color: T.ink500,
                         lineHeight: 1.7,
@@ -616,7 +587,7 @@ function HowItWorksBanner() {
                         border: `1px solid ${s.color}30`,
                         borderRadius: 4,
                         padding: "6px 10px",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontSize: 11,
                         color: s.color,
                         fontWeight: 600,
@@ -653,15 +624,15 @@ function HowItWorksBanner() {
                 <div
                   key={g.term}
                   style={{
-                    background: T.ink075,
-                    border: `1px solid ${T.ink150}`,
+                    background: T.bg,
+                    border: `1px solid ${T.border}`,
                     borderRadius: 6,
                     padding: "10px 12px",
                   }}
                 >
                   <div
                     style={{
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontSize: 10,
                       fontWeight: 700,
                       letterSpacing: "0.1em",
@@ -674,7 +645,7 @@ function HowItWorksBanner() {
                   </div>
                   <div
                     style={{
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontSize: 11,
                       color: T.ink500,
                       lineHeight: 1.6,
@@ -730,7 +701,7 @@ function SetPricePanel({ items, onRefresh }) {
       style={{
         ...sCard,
         border: `1px solid ${T.accentBd}`,
-        background: T.accentLit,
+        background: T.accentLight,
       }}
     >
       <div style={sLabel}>Set Sell Prices — Website Shop</div>
@@ -739,7 +710,7 @@ function SetPricePanel({ items, onRefresh }) {
           fontSize: "12px",
           color: T.accentMid,
           margin: "6px 0 12px",
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
           lineHeight: "1.7",
         }}
       >
@@ -753,8 +724,8 @@ function SetPricePanel({ items, onRefresh }) {
             marginBottom: 10,
             borderRadius: 4,
             fontSize: 12,
-            fontFamily: T.fontUi,
-            background: toast.type === "success" ? T.successBg : T.dangerBg,
+            fontFamily: T.font,
+            background: toast.type === "success" ? T.successLight : T.dangerLight,
             color: toast.type === "success" ? T.success : T.danger,
             border: `1px solid ${toast.type === "success" ? T.successBd : T.dangerBd}`,
           }}
@@ -764,7 +735,7 @@ function SetPricePanel({ items, onRefresh }) {
         </div>
       )}
       {finished.length === 0 ? (
-        <p style={{ fontSize: "12px", color: T.ink500, fontFamily: T.fontUi }}>
+        <p style={{ fontSize: "12px", color: T.ink500, fontFamily: T.font }}>
           No finished products in inventory yet.
         </p>
       ) : (
@@ -773,7 +744,7 @@ function SetPricePanel({ items, onRefresh }) {
             width: "100%",
             borderCollapse: "collapse",
             fontSize: "12px",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
           }}
         >
           <thead>
@@ -798,9 +769,9 @@ function SetPricePanel({ items, onRefresh }) {
                 warning: T.warning,
               };
               const semBg = {
-                success: T.successBg,
-                danger: T.dangerBg,
-                warning: T.warningBg,
+                success: T.successLight,
+                danger: T.dangerLight,
+                warning: T.warningLight,
               };
               return (
                 <tr key={i.id}>
@@ -808,7 +779,7 @@ function SetPricePanel({ items, onRefresh }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: "11px",
                       color: T.ink500,
                     }}
@@ -819,7 +790,7 @@ function SetPricePanel({ items, onRefresh }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       color: qty <= 0 ? T.danger : T.success,
                       fontWeight: 600,
                     }}
@@ -1029,8 +1000,8 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
     width: "100%",
     padding: "7px 10px",
     fontSize: "12px",
-    fontFamily: T.fontUi,
-    border: `1px solid ${T.ink150}`,
+    fontFamily: T.font,
+    border: `1px solid ${T.border}`,
     borderRadius: "3px",
     color: T.ink700,
     background: "#fff",
@@ -1041,7 +1012,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
-    color: T.ink400,
+    color: T.ink500,
     marginBottom: "4px",
     display: "block",
   };
@@ -1059,14 +1030,14 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
     alignItems: "center",
     gap: "6px",
     fontSize: "12px",
-    color: on ? T.accent : T.ink400,
+    color: on ? T.accent : T.ink500,
     cursor: "pointer",
-    fontFamily: T.fontUi,
+    fontFamily: T.font,
   });
 
   return (
     <div style={{ maxWidth: "860px" }}>
-      <p style={{ fontSize: "12px", color: T.ink400, marginBottom: "20px" }}>
+      <p style={{ fontSize: "12px", color: T.ink500, marginBottom: "20px" }}>
         Create new product formats without Supabase dashboard access. New
         formats appear immediately in the Production Run selector.
       </p>
@@ -1238,7 +1209,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
                 borderRadius: "3px",
                 fontSize: "12px",
                 marginBottom: "12px",
-                background: msg.type === "error" ? T.dangerBg : T.successBg,
+                background: msg.type === "error" ? T.dangerLight : T.successLight,
                 border: `1px solid ${msg.type === "error" ? T.dangerBd : T.successBd}`,
                 color: msg.type === "error" ? T.danger : T.success,
               }}
@@ -1322,7 +1293,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
                       <span
                         style={{
                           ...sBadge,
-                          background: T.accentLit,
+                          background: T.accentLight,
                           color: T.accentMid,
                           border: `1px solid ${T.accentBd}`,
                         }}
@@ -1334,7 +1305,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
                       <span
                         style={{
                           ...sBadge,
-                          background: T.infoBg,
+                          background: T.infoLight,
                           color: T.info,
                           border: `1px solid ${T.infoBd}`,
                         }}
@@ -1346,9 +1317,9 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
                       <span
                         style={{
                           ...sBadge,
-                          background: T.ink075,
+                          background: T.bg,
                           color: T.ink500,
-                          border: `1px solid ${T.ink150}`,
+                          border: `1px solid ${T.border}`,
                         }}
                       >
                         {f.chambers}ch
@@ -1359,7 +1330,7 @@ function FormatCreatorPanel({ productFormats, industryProfile, onRefresh }) {
                 <div
                   style={{
                     fontSize: "11px",
-                    color: T.ink400,
+                    color: T.ink500,
                     marginTop: "4px",
                   }}
                 >
@@ -1525,8 +1496,8 @@ function BOMEditorPanel({
     width: "100%",
     padding: "7px 10px",
     fontSize: "12px",
-    fontFamily: T.fontUi,
-    border: `1px solid ${T.ink150}`,
+    fontFamily: T.font,
+    border: `1px solid ${T.border}`,
     borderRadius: "3px",
     color: T.ink700,
     background: "#fff",
@@ -1537,14 +1508,14 @@ function BOMEditorPanel({
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
-    color: T.ink400,
+    color: T.ink500,
     marginBottom: "4px",
     display: "block",
   };
 
   return (
     <div style={{ maxWidth: "860px" }}>
-      <p style={{ fontSize: "12px", color: T.ink400, marginBottom: "20px" }}>
+      <p style={{ fontSize: "12px", color: T.ink500, marginBottom: "20px" }}>
         Define the materials consumed per finished unit for each product format.
         Used by Production Run to calculate stock deductions and validate
         available stock.
@@ -1608,14 +1579,14 @@ function BOMEditorPanel({
               gridTemplateColumns: "2fr 2fr 80px 80px 1fr 60px",
               gap: "8px",
               padding: "6px 10px",
-              background: T.ink075,
+              background: T.bg,
               borderRadius: "3px 3px 0 0",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               fontSize: "10px",
               fontWeight: 700,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: T.ink400,
+              color: T.ink500,
             }}
           >
             <span>{matLabel} Type</span>
@@ -1630,7 +1601,7 @@ function BOMEditorPanel({
             <div
               style={{
                 padding: "16px 10px",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderTop: "none",
                 fontSize: "12px",
                 color: T.ink300,
@@ -1649,8 +1620,8 @@ function BOMEditorPanel({
                 gridTemplateColumns: "2fr 2fr 80px 80px 1fr 60px",
                 gap: "8px",
                 padding: "8px 10px",
-                background: idx % 2 === 0 ? "#fff" : T.ink050,
-                border: `1px solid ${T.ink150}`,
+                background: idx % 2 === 0 ? "#fff" : T.surface,
+                border: `1px solid ${T.border}`,
                 borderTop: "none",
                 alignItems: "center",
               }}
@@ -1683,7 +1654,7 @@ function BOMEditorPanel({
               >
                 {b.quantity_per_unit}
               </span>
-              <span style={{ fontSize: "11px", color: T.ink400 }}>
+              <span style={{ fontSize: "11px", color: T.ink500 }}>
                 {b.unit}
               </span>
               <span style={{ fontSize: "11px", color: T.ink300 }}>
@@ -1697,7 +1668,7 @@ function BOMEditorPanel({
                   padding: "3px 8px",
                   border: `1px solid ${T.dangerBd}`,
                   borderRadius: "2px",
-                  background: T.dangerBg,
+                  background: T.dangerLight,
                   color: T.danger,
                   cursor: "pointer",
                   opacity: deleting === b.id ? 0.5 : 1,
@@ -1713,7 +1684,7 @@ function BOMEditorPanel({
             <div
               style={{
                 padding: "10px",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderTop: "none",
                 borderRadius: "0 0 3px 3px",
               }}
@@ -1729,10 +1700,10 @@ function BOMEditorPanel({
             <div
               style={{
                 padding: "14px",
-                border: `1px solid ${T.ink150}`,
+                border: `1px solid ${T.border}`,
                 borderTop: "none",
                 borderRadius: "0 0 3px 3px",
-                background: T.ink050,
+                background: T.surface,
               }}
             >
               <div
@@ -1830,7 +1801,7 @@ function BOMEditorPanel({
                     borderRadius: "3px",
                     fontSize: "12px",
                     marginBottom: "10px",
-                    background: msg.type === "error" ? T.dangerBg : T.successBg,
+                    background: msg.type === "error" ? T.dangerLight : T.successLight,
                     border: `1px solid ${msg.type === "error" ? T.dangerBd : T.successBd}`,
                     color: msg.type === "error" ? T.danger : T.success,
                   }}
@@ -2032,7 +2003,7 @@ export default function HQProduction() {
     );
 
   return (
-    <div style={{ fontFamily: T.fontUi }}>
+    <div style={{ fontFamily: T.font }}>
       {/* ── Action Centre — stock alerts + workflow warnings (collapsible, session-dismissible) ── */}
       {/* WorkflowGuide hidden on this tab (Option A): ctx.warnings now flow into ActionCentre below */}
       {!loading &&
@@ -2084,7 +2055,7 @@ export default function HQProduction() {
         style={{
           display: "flex",
           gap: 0,
-          borderBottom: `1px solid ${T.ink150}`,
+          borderBottom: `1px solid ${T.border}`,
           marginBottom: "24px",
           flexWrap: "nowrap",
         }}
@@ -2101,7 +2072,7 @@ export default function HQProduction() {
                 subTab === t.id
                   ? `2px solid ${T.accent}`
                   : "2px solid transparent",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: "11px",
               fontWeight: subTab === t.id ? 700 : 400,
               letterSpacing: "0.06em",
@@ -2154,7 +2125,7 @@ export default function HQProduction() {
             style={{
               width: 28,
               height: 28,
-              border: `2px solid ${T.ink150}`,
+              border: `2px solid ${T.border}`,
               borderTopColor: T.accent,
               borderRadius: "50%",
               animation: "spin 0.8s linear infinite",
@@ -2534,7 +2505,7 @@ function OverviewPanel({
         style={{
           ...sCard,
           border: `1px solid ${T.accentBd}`,
-          background: T.accentLit,
+          background: T.accentLight,
         }}
       >
         <div style={{ ...sLabel, marginBottom: 10 }}>
@@ -2612,7 +2583,7 @@ function OverviewPanel({
                       letterSpacing: "0.15em",
                       textTransform: "uppercase",
                       color: s.color,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontWeight: 700,
                     }}
                   >
@@ -2621,7 +2592,7 @@ function OverviewPanel({
                   <div
                     style={{
                       fontSize: 12,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontWeight: 600,
                       color: T.ink900,
                       marginTop: 2,
@@ -2633,7 +2604,7 @@ function OverviewPanel({
                     style={{
                       fontSize: 10,
                       color: T.ink500,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {s.desc}
@@ -2651,11 +2622,11 @@ function OverviewPanel({
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         {metrics.map((c) => (
@@ -2681,9 +2652,9 @@ function OverviewPanel({
                 fontSize: "10px",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: "6px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 fontWeight: 700,
               }}
             >
@@ -2691,7 +2662,7 @@ function OverviewPanel({
             </div>
             <div
               style={{
-                fontFamily: T.fontData,
+                fontFamily: T.font,
                 fontSize: "24px",
                 fontWeight: 400,
                 color: c.semantic ? semC[c.semantic] : T.ink900,
@@ -2706,7 +2677,7 @@ function OverviewPanel({
                 fontSize: "11px",
                 color: T.ink500,
                 marginTop: "2px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               {c.sub}
@@ -2763,12 +2734,12 @@ function OverviewPanel({
                     <CartesianGrid
                       horizontal
                       vertical={false}
-                      stroke={T.ink150}
+                      stroke={T.border}
                       strokeWidth={0.5}
                     />
                     <XAxis
                       dataKey="run"
-                      tick={{ fill: T.ink400, fontSize: 9, fontFamily: T.font }}
+                      tick={{ fill: T.ink500, fontSize: 9, fontFamily: T.font }}
                       axisLine={false}
                       tickLine={false}
                       dy={6}
@@ -2776,7 +2747,7 @@ function OverviewPanel({
                     <YAxis
                       domain={[80, 100]}
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -2825,13 +2796,13 @@ function OverviewPanel({
                     <CartesianGrid
                       horizontal
                       vertical={false}
-                      stroke={T.ink150}
+                      stroke={T.border}
                       strokeWidth={0.5}
                     />
                     <XAxis
                       dataKey="month"
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -2841,7 +2812,7 @@ function OverviewPanel({
                     />
                     <YAxis
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -2909,7 +2880,7 @@ function OverviewPanel({
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "12px",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             <thead>
@@ -2955,7 +2926,7 @@ function OverviewPanel({
                     <td
                       style={{
                         ...sTd,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: "11px",
                         color: T.ink500,
                       }}
@@ -3007,7 +2978,7 @@ function OverviewPanel({
                             Fail
                           </span>
                         ) : (
-                          <span style={{ color: T.ink400 }}>—</span>
+                          <span style={{ color: T.ink500 }}>—</span>
                         )}
                       </td>
                     )}
@@ -3015,7 +2986,7 @@ function OverviewPanel({
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 600,
                       }}
                     >
@@ -3031,11 +3002,11 @@ function OverviewPanel({
                     <td
                       style={{
                         ...sTd,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 600,
                         color:
                           qty === null
-                            ? T.ink400
+                            ? T.ink500
                             : qty <= 0
                               ? T.danger
                               : qty <= 10
@@ -3052,7 +3023,7 @@ function OverviewPanel({
                       {b.lab_certified ? (
                         <span style={{ color: T.success }}>✓</span>
                       ) : (
-                        <span style={{ color: T.ink400 }}>—</span>
+                        <span style={{ color: T.ink500 }}>—</span>
                       )}
                     </td>
                   </tr>
@@ -3081,7 +3052,7 @@ function OverviewPanel({
                   fontSize: "12px",
                   color: T.ink500,
                   marginTop: "8px",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 None in inventory
@@ -3092,7 +3063,7 @@ function OverviewPanel({
                   width: "100%",
                   borderCollapse: "collapse",
                   fontSize: "12px",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   marginTop: "10px",
                 }}
               >
@@ -3113,7 +3084,7 @@ function OverviewPanel({
                         style={{
                           ...sTd,
                           textAlign: "right",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 600,
                           color:
                             parseFloat(i.quantity_on_hand || 0) <= 0
@@ -3133,7 +3104,7 @@ function OverviewPanel({
                           style={{
                             ...sTd,
                             textAlign: "right",
-                            fontFamily: T.fontData,
+                            fontFamily: T.font,
                             color:
                               parseFloat(i.sell_price || 0) > 0
                                 ? T.ink900
@@ -3381,9 +3352,9 @@ function BatchesPanel({
             padding: "10px 16px",
             borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             fontWeight: 500,
-            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            background: toast.type === "error" ? T.dangerLight : T.successLight,
             color: toast.type === "error" ? T.danger : T.success,
             border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
@@ -3399,11 +3370,11 @@ function BatchesPanel({
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
         }}
       >
         {[
@@ -3453,9 +3424,9 @@ function BatchesPanel({
                   fontSize: "10px",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: T.ink400,
+                  color: T.ink500,
                   marginBottom: "6px",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   fontWeight: 700,
                 }}
               >
@@ -3463,7 +3434,7 @@ function BatchesPanel({
               </div>
               <div
                 style={{
-                  fontFamily: T.fontData,
+                  fontFamily: T.font,
                   fontSize: "24px",
                   fontWeight: 400,
                   color: col,
@@ -3548,11 +3519,11 @@ function BatchesPanel({
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: "6px",
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
-              boxShadow: T.shadow,
+              border: `1px solid ${T.border}`,
+              boxShadow: T.shadow.sm,
             }}
           >
             {kpis.map((k) => {
@@ -3573,9 +3544,9 @@ function BatchesPanel({
                       fontSize: "10px",
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      color: T.ink400,
+                      color: T.ink500,
                       marginBottom: "6px",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       fontWeight: 700,
                     }}
                   >
@@ -3583,7 +3554,7 @@ function BatchesPanel({
                   </div>
                   <div
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: "22px",
                       fontWeight: 400,
                       color: col,
@@ -3616,13 +3587,13 @@ function BatchesPanel({
               padding: "6px 14px",
               background: filter === f.id ? T.accent : "#fff",
               color: filter === f.id ? "#fff" : f.alert ? T.warning : T.ink500,
-              border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.warningBd : T.ink150}`,
+              border: `1px solid ${filter === f.id ? T.accent : f.alert ? T.warningBd : T.border}`,
               borderRadius: "4px",
               fontSize: "9px",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
               cursor: "pointer",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontWeight: filter === f.id ? 700 : 400,
             }}
           >
@@ -3649,7 +3620,7 @@ function BatchesPanel({
             style={{ textAlign: "center", padding: "60px", color: T.ink500 }}
           >
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>📦</div>
-            <p style={{ fontFamily: T.fontUi, fontSize: "14px" }}>
+            <p style={{ fontFamily: T.font, fontSize: "14px" }}>
               No batches found.
             </p>
           </div>
@@ -3662,7 +3633,7 @@ function BatchesPanel({
                   "140px 1fr 110px 100px 55px 80px 95px 95px 45px 100px 75px 80px",
                 gap: 0,
                 padding: "0 0 6px 0",
-                borderBottom: `2px solid ${T.ink150}`,
+                borderBottom: `2px solid ${T.border}`,
               }}
             >
               {[
@@ -3709,21 +3680,21 @@ function BatchesPanel({
                       gridTemplateColumns:
                         "140px 1fr 110px 100px 55px 80px 95px 95px 45px 100px 75px 80px",
                       gap: 0,
-                      borderBottom: `1px solid ${T.ink075}`,
+                      borderBottom: `1px solid ${T.bg}`,
                       alignItems: "center",
                       background: isDepleted
-                        ? T.dangerBg
+                        ? T.dangerLight
                         : isLow
-                          ? T.warningBg
+                          ? T.warningLight
                           : isEditing
-                            ? T.accentLit
+                            ? T.accentLight
                             : "transparent",
                     }}
                   >
                     <div
                       style={{
                         ...sTd,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: "10px",
                         color: T.ink500,
                         paddingLeft: "8px",
@@ -3746,22 +3717,22 @@ function BatchesPanel({
                               marginTop: "3px",
                               padding: "1px 6px",
                               borderRadius: "3px",
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                               background:
                                 linkedRun.industry_profile_snapshot ===
                                 "food_beverage"
-                                  ? T.infoBg
+                                  ? T.infoLight
                                   : linkedRun.industry_profile_snapshot ===
                                       "general_retail"
-                                    ? T.ink075
-                                    : T.accentLit,
+                                    ? T.bg
+                                    : T.accentLight,
                               color:
                                 linkedRun.industry_profile_snapshot ===
                                 "food_beverage"
                                   ? T.info
                                   : linkedRun.industry_profile_snapshot ===
                                       "general_retail"
-                                    ? T.ink400
+                                    ? T.ink500
                                     : T.accentMid,
                               border: `1px solid ${
                                 linkedRun.industry_profile_snapshot ===
@@ -3769,7 +3740,7 @@ function BatchesPanel({
                                   ? T.infoBd
                                   : linkedRun.industry_profile_snapshot ===
                                       "general_retail"
-                                    ? T.ink150
+                                    ? T.border
                                     : T.accentBd
                               }`,
                             }}
@@ -3808,7 +3779,7 @@ function BatchesPanel({
                                   <div key={k} style={{ color: T.accentMid }}>
                                     <span
                                       style={{
-                                        color: T.ink400,
+                                        color: T.ink500,
                                         textTransform: "uppercase",
                                         fontSize: "9px",
                                       }}
@@ -3831,7 +3802,7 @@ function BatchesPanel({
                       style={{
                         ...sTd,
                         textAlign: "right",
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 600,
                       }}
                     >
@@ -3840,11 +3811,11 @@ function BatchesPanel({
                     <div
                       style={{
                         ...sTd,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontWeight: 700,
                         color:
                           qty === null
-                            ? T.ink400
+                            ? T.ink500
                             : isDepleted
                               ? T.danger
                               : isLow
@@ -3853,7 +3824,7 @@ function BatchesPanel({
                       }}
                     >
                       {qty === null ? (
-                        <span style={{ color: T.ink400, fontSize: 10 }}>
+                        <span style={{ color: T.ink500, fontSize: 10 }}>
                           not linked
                         </span>
                       ) : (
@@ -3884,21 +3855,21 @@ function BatchesPanel({
                               marginTop: "3px",
                               padding: "1px 5px",
                               borderRadius: "3px",
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                               background:
                                 linkedRun.temperature_zone === "Frozen"
                                   ? "#e0f0ff"
                                   : linkedRun.temperature_zone ===
                                       "Refrigerated"
                                     ? "#e8f5e9"
-                                    : T.ink075,
+                                    : T.bg,
                               color:
                                 linkedRun.temperature_zone === "Frozen"
                                   ? "#1565c0"
                                   : linkedRun.temperature_zone ===
                                       "Refrigerated"
                                     ? "#2e7d32"
-                                    : T.ink400,
+                                    : T.ink500,
                             }}
                           >
                             {linkedRun.temperature_zone === "Frozen"
@@ -3915,13 +3886,13 @@ function BatchesPanel({
                           ✓
                         </span>
                       ) : (
-                        <span style={{ color: T.ink400 }}>—</span>
+                        <span style={{ color: T.ink500 }}>—</span>
                       )}
                     </div>
                     <div style={{ ...sTd, fontSize: "10px" }}>
                       {linkedRun ? (
                         <span
-                          style={{ color: T.success, fontFamily: T.fontData }}
+                          style={{ color: T.success, fontFamily: T.font }}
                         >
                           {linkedRun.run_number || "✓"}
                         </span>
@@ -3931,7 +3902,7 @@ function BatchesPanel({
                             fontSize: "9px",
                             padding: "2px 6px",
                             borderRadius: "3px",
-                            background: T.warningBg,
+                            background: T.warningLight,
                             color: T.warning,
                             fontWeight: 600,
                             letterSpacing: "0.1em",
@@ -3962,8 +3933,8 @@ function BatchesPanel({
                           ...sBtn("outline"),
                           padding: "3px 8px",
                           fontSize: "9px",
-                          color: isEditing ? T.ink400 : T.accentMid,
-                          borderColor: isEditing ? T.ink150 : T.accentBd,
+                          color: isEditing ? T.ink500 : T.accentMid,
+                          borderColor: isEditing ? T.border : T.accentBd,
                         }}
                       >
                         {isEditing ? "✕" : "✎"}
@@ -3991,8 +3962,8 @@ function BatchesPanel({
                             ...sBtn("outline"),
                             padding: "3px 8px",
                             fontSize: "9px",
-                            color: T.ink400,
-                            borderColor: T.ink150,
+                            color: T.ink500,
+                            borderColor: T.border,
                           }}
                         >
                           ▣
@@ -4052,7 +4023,7 @@ function BatchesPanel({
                     <div
                       style={{
                         padding: "16px 12px",
-                        background: T.accentLit,
+                        background: T.accentLight,
                         borderBottom: `1px solid ${T.accentBd}`,
                       }}
                     >
@@ -4086,7 +4057,7 @@ function BatchesPanel({
                                 color: T.ink500,
                                 display: "block",
                                 marginBottom: "3px",
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                               }}
                             >
                               {lbl}
@@ -4112,7 +4083,7 @@ function BatchesPanel({
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                             }}
                           >
                             Status
@@ -4141,7 +4112,7 @@ function BatchesPanel({
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                             }}
                           >
                             Units
@@ -4166,7 +4137,7 @@ function BatchesPanel({
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                             }}
                           >
                             Expiry Date
@@ -4190,7 +4161,7 @@ function BatchesPanel({
                               color: T.ink500,
                               display: "block",
                               marginBottom: "3px",
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                             }}
                           >
                             Low Stock Alert
@@ -4229,7 +4200,7 @@ function BatchesPanel({
                                   color: T.ink500,
                                   display: "block",
                                   marginBottom: "3px",
-                                  fontFamily: T.fontUi,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 Section 21 Number
@@ -4254,7 +4225,7 @@ function BatchesPanel({
                                   color: T.ink500,
                                   display: "block",
                                   marginBottom: "3px",
-                                  fontFamily: T.fontUi,
+                                  fontFamily: T.font,
                                 }}
                               >
                                 Cannabinoid Profile
@@ -4288,7 +4259,7 @@ function BatchesPanel({
                             gap: "6px",
                             cursor: "pointer",
                             fontSize: "12px",
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                             color: T.ink900,
                           }}
                         >
@@ -4331,7 +4302,7 @@ function BatchesPanel({
       {batches.filter((b) => !runByBatch[b.id]).length > 0 && (
         <div
           style={{
-            background: T.warningBg,
+            background: T.warningLight,
             border: `1px solid ${T.warningBd}`,
             borderRadius: "6px",
             padding: "16px 18px",
@@ -4346,7 +4317,7 @@ function BatchesPanel({
                 fontSize: "11px",
                 fontWeight: 700,
                 color: T.warning,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginBottom: 6,
@@ -4359,7 +4330,7 @@ function BatchesPanel({
                 fontSize: "13px",
                 color: T.ink700,
                 margin: "0",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 lineHeight: "1.7",
               }}
             >
@@ -4751,7 +4722,7 @@ function NewRunPanel({
         color: T.ink500,
         display: "block",
         marginBottom: "4px",
-        fontFamily: T.fontUi,
+        fontFamily: T.font,
       }}
     >
       {text}
@@ -5100,13 +5071,13 @@ function NewRunPanel({
           style={{
             ...sCard,
             border: `1px solid ${T.successBd}`,
-            background: T.successBg,
+            background: T.successLight,
             marginBottom: 20,
           }}
         >
           <div
             style={{
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: 22,
               fontWeight: 600,
               color: T.success,
@@ -5117,7 +5088,7 @@ function NewRunPanel({
           </div>
           <div
             style={{
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: 13,
               color: T.accentMid,
               marginBottom: 12,
@@ -5131,8 +5102,8 @@ function NewRunPanel({
             Run reference:{" "}
             <code
               style={{
-                fontFamily: T.fontData,
-                background: T.ink075,
+                fontFamily: T.font,
+                background: T.bg,
                 padding: "2px 6px",
                 borderRadius: 3,
               }}
@@ -5144,7 +5115,7 @@ function NewRunPanel({
             <div
               style={{
                 padding: "14px 16px",
-                background: T.warningBg,
+                background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
                 borderRadius: 6,
                 marginBottom: 16,
@@ -5152,7 +5123,7 @@ function NewRunPanel({
             >
               <div
                 style={{
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   fontSize: 12,
                   fontWeight: 700,
                   color: T.warning,
@@ -5163,7 +5134,7 @@ function NewRunPanel({
               </div>
               <div
                 style={{
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   fontSize: 12,
                   color: T.ink700,
                   lineHeight: 1.6,
@@ -5178,7 +5149,7 @@ function NewRunPanel({
             <div
               style={{
                 padding: "12px 16px",
-                background: T.successBg,
+                background: T.successLight,
                 border: `1px solid ${T.successBd}`,
                 borderRadius: 6,
                 marginBottom: 16,
@@ -5186,7 +5157,7 @@ function NewRunPanel({
             >
               <div
                 style={{
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   fontSize: 12,
                   fontWeight: 700,
                   color: T.success,
@@ -5269,10 +5240,10 @@ function NewRunPanel({
             <div
               style={{
                 padding: "10px 14px",
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: "4px",
                 fontSize: "12px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 color: T.ink700,
                 display: "flex",
                 alignItems: "center",
@@ -5351,10 +5322,10 @@ function NewRunPanel({
                         borderRadius: "4px",
                         cursor: "pointer",
                         fontSize: "12px",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         fontWeight: 700,
-                        border: `1px solid ${active ? T.accentBd : T.ink150}`,
-                        background: active ? T.accentLit : T.ink075,
+                        border: `1px solid ${active ? T.accentBd : T.border}`,
+                        background: active ? T.accentLight : T.bg,
                         color: active ? T.accentMid : T.ink500,
                       }}
                     >
@@ -5390,7 +5361,7 @@ function NewRunPanel({
                     fontSize: "10px",
                     color: T.accentMid,
                     margin: "4px 0 0",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   {terpPct}% = {terpNeeded.toFixed(3)}ml for {planned} unit
@@ -5410,7 +5381,7 @@ function NewRunPanel({
                   textTransform: "uppercase",
                   letterSpacing: "0.08em",
                   color: T.info,
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                   marginBottom: "16px",
                 }}
               >
@@ -5472,9 +5443,9 @@ function NewRunPanel({
                   <p
                     style={{
                       fontSize: "10px",
-                      color: T.ink400,
+                      color: T.ink500,
                       margin: "3px 0 0",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     // AVCO_PLACEHOLDER — wire in future session
@@ -5526,7 +5497,7 @@ function NewRunPanel({
                       fontSize: "11px",
                       color: T.danger,
                       margin: "4px 0 0",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Mandatory for food & beverage
@@ -5571,7 +5542,7 @@ function NewRunPanel({
                         fontSize: "11px",
                         color: T.warning,
                         margin: "4px 0 0",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       Below 85% — add a deviation note
@@ -5591,7 +5562,7 @@ function NewRunPanel({
               {/* WP-PROD-MASTER: 14-allergen declaration — SA R638 mandatory */}
               <div
                 style={{
-                  background: T.warningBg,
+                  background: T.warningLight,
                   border: `1px solid ${T.warningBd}`,
                   borderRadius: "4px",
                   padding: "14px 16px",
@@ -5612,7 +5583,7 @@ function NewRunPanel({
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
                       color: T.warning,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Allergen Declaration * (SA R638)
@@ -5622,7 +5593,7 @@ function NewRunPanel({
                       style={{
                         fontSize: "10px",
                         color: T.success,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       Declared ✓
@@ -5632,7 +5603,7 @@ function NewRunPanel({
                       style={{
                         fontSize: "10px",
                         color: T.danger,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       Not yet declared
@@ -5655,7 +5626,7 @@ function NewRunPanel({
                         alignItems: "center",
                         gap: "6px",
                         fontSize: "12px",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         color: form.allergen_flags[allergen]
                           ? T.danger
                           : T.ink500,
@@ -5682,13 +5653,13 @@ function NewRunPanel({
                     fontSize: "11px",
                     padding: "5px 12px",
                     background: form.allergens_declared
-                      ? T.successBg
-                      : T.ink075,
+                      ? T.successLight
+                      : T.bg,
                     border: `1px solid ${form.allergens_declared ? T.successBd : T.ink200}`,
                     borderRadius: "3px",
                     color: form.allergens_declared ? T.success : T.ink500,
                     cursor: "pointer",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   {form.allergens_declared
@@ -5699,8 +5670,8 @@ function NewRunPanel({
               {/* WP-PROD-MASTER: QC passed toggle */}
               <div
                 style={{
-                  background: T.ink050,
-                  border: `1px solid ${T.ink150}`,
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
                   borderRadius: "4px",
                   padding: "14px 16px",
                 }}
@@ -5712,7 +5683,7 @@ function NewRunPanel({
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
                     color: T.ink500,
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                     marginBottom: "10px",
                   }}
                 >
@@ -5727,12 +5698,12 @@ function NewRunPanel({
                       border: `2px solid ${form.qc_passed === true ? T.successBd : T.ink200}`,
                       borderRadius: "3px",
                       background:
-                        form.qc_passed === true ? T.successBg : "#fff",
+                        form.qc_passed === true ? T.successLight : "#fff",
                       color: form.qc_passed === true ? T.success : T.ink500,
                       fontSize: "12px",
                       fontWeight: 600,
                       cursor: "pointer",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     QC Passed ✓
@@ -5745,12 +5716,12 @@ function NewRunPanel({
                       border: `2px solid ${form.qc_passed === false ? T.dangerBd : T.ink200}`,
                       borderRadius: "3px",
                       background:
-                        form.qc_passed === false ? T.dangerBg : "#fff",
+                        form.qc_passed === false ? T.dangerLight : "#fff",
                       color: form.qc_passed === false ? T.danger : T.ink500,
                       fontSize: "12px",
                       fontWeight: 600,
                       cursor: "pointer",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     QC Failed ✗
@@ -5762,7 +5733,7 @@ function NewRunPanel({
                       fontSize: "11px",
                       color: T.danger,
                       margin: "8px 0 0",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Failed batch recorded — no stock movement created.
@@ -5774,7 +5745,7 @@ function NewRunPanel({
                       fontSize: "11px",
                       color: T.danger,
                       margin: "8px 0 0",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     QC status mandatory before confirming.
@@ -5850,7 +5821,7 @@ function NewRunPanel({
                       fontSize: "11px",
                       color: T.danger,
                       margin: "4px 0 0",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Add distillate via Supply Chain first
@@ -5902,7 +5873,7 @@ function NewRunPanel({
                     marginBottom: "14px",
                     paddingBottom: "12px",
                     borderBottom:
-                      ch.ci < chambers - 1 ? `1px solid ${T.ink150}` : "none",
+                      ch.ci < chambers - 1 ? `1px solid ${T.border}` : "none",
                   }}
                 >
                   <div
@@ -5913,7 +5884,7 @@ function NewRunPanel({
                       textTransform: "uppercase",
                       color: T.accentMid,
                       marginBottom: "10px",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Chamber {ch.ci + 1}
@@ -5939,7 +5910,7 @@ function NewRunPanel({
                         style={{
                           ...sSelect,
                           borderColor:
-                            ch.mediumId && !ch.medOk ? T.danger : T.ink150,
+                            ch.mediumId && !ch.medOk ? T.danger : T.border,
                         }}
                         value={ch.mediumId}
                         onChange={(e) =>
@@ -5960,7 +5931,7 @@ function NewRunPanel({
                             fontSize: "11px",
                             color: T.danger,
                             margin: "4px 0 0",
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                           }}
                         >
                           Need {ch.cMedNeeded}ml -- only{" "}
@@ -5977,7 +5948,7 @@ function NewRunPanel({
                         style={{
                           ...sSelect,
                           borderColor:
-                            ch.terpeneId && !ch.terpOk ? T.danger : T.ink150,
+                            ch.terpeneId && !ch.terpOk ? T.danger : T.border,
                         }}
                         value={ch.terpeneId}
                         onChange={(e) =>
@@ -5998,7 +5969,7 @@ function NewRunPanel({
                             fontSize: "11px",
                             color: T.danger,
                             margin: "4px 0 0",
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                           }}
                         >
                           Need {ch.cTerpNeeded}ml -- only{" "}
@@ -6017,8 +5988,8 @@ function NewRunPanel({
                         <span
                           style={{
                             fontSize: "10px",
-                            color: T.ink400,
-                            fontFamily: T.fontUi,
+                            color: T.ink500,
+                            fontFamily: T.font,
                           }}
                         >
                           Terp %:
@@ -6041,10 +6012,10 @@ function NewRunPanel({
                                 borderRadius: "3px",
                                 cursor: "pointer",
                                 fontSize: "11px",
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                                 fontWeight: 700,
-                                border: `1px solid ${active ? T.accentBd : T.ink150}`,
-                                background: active ? T.accentLit : T.ink075,
+                                border: `1px solid ${active ? T.accentBd : T.border}`,
+                                background: active ? T.accentLight : T.bg,
                                 color: active ? T.accentMid : T.ink500,
                               }}
                             >
@@ -6057,7 +6028,7 @@ function NewRunPanel({
                             style={{
                               fontSize: "10px",
                               color: T.accentMid,
-                              fontFamily: T.fontUi,
+                              fontFamily: T.font,
                               marginLeft: "4px",
                             }}
                           >
@@ -6093,7 +6064,7 @@ function NewRunPanel({
                 style={{
                   marginTop: "6px",
                   paddingTop: "12px",
-                  borderTop: `1px solid ${T.ink150}`,
+                  borderTop: `1px solid ${T.border}`,
                 }}
               >
                 {fLabel(
@@ -6104,7 +6075,7 @@ function NewRunPanel({
                   style={{
                     ...sSelect,
                     borderColor:
-                      hwSelId && hwSelAvail < planned ? T.danger : T.ink150,
+                      hwSelId && hwSelAvail < planned ? T.danger : T.border,
                   }}
                   value={hwSelId}
                   onChange={(e) => setBomSel("hw", e.target.value)}
@@ -6123,7 +6094,7 @@ function NewRunPanel({
                       fontSize: "11px",
                       color: T.danger,
                       margin: "4px 0 0",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Need {planned} pcs -- only {hwSelAvail} available
@@ -6167,7 +6138,7 @@ function NewRunPanel({
                   <select
                     style={{
                       ...sSelect,
-                      borderColor: selItemId && !ok ? T.danger : T.ink150,
+                      borderColor: selItemId && !ok ? T.danger : T.border,
                     }}
                     value={selItemId}
                     onChange={(e) => setBomSel(line.id, e.target.value)}
@@ -6187,7 +6158,7 @@ function NewRunPanel({
                         fontSize: "11px",
                         color: T.danger,
                         margin: "4px 0 0",
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       Need {needed.toFixed(3)}
@@ -6208,7 +6179,7 @@ function NewRunPanel({
           style={{
             ...sCard,
             borderLeft: `3px solid ${T.accentMid}`,
-            background: T.accentLit,
+            background: T.accentLight,
           }}
         >
           <div style={{ ...sLabel, color: T.accentMid, marginBottom: "16px" }}>
@@ -6221,7 +6192,7 @@ function NewRunPanel({
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: "12px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               <thead>
@@ -6256,7 +6227,7 @@ function NewRunPanel({
                   return (
                     <tr
                       key={idx}
-                      style={{ background: idx % 2 === 0 ? "#fff" : T.ink050 }}
+                      style={{ background: idx % 2 === 0 ? "#fff" : T.surface }}
                     >
                       <td
                         style={{ ...sTd, padding: "6px 10px", fontWeight: 500 }}
@@ -6267,7 +6238,7 @@ function NewRunPanel({
                         style={{
                           ...sTd,
                           padding: "6px 10px",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                         }}
                       >
                         {bl.needed.toFixed(3)} {bl.line.unit}
@@ -6276,7 +6247,7 @@ function NewRunPanel({
                         style={{
                           ...sTd,
                           padding: "6px 10px",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           color: avco > 0 ? T.ink700 : T.warning,
                         }}
                       >
@@ -6286,7 +6257,7 @@ function NewRunPanel({
                         style={{
                           ...sTd,
                           padding: "6px 10px",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontWeight: 600,
                           color: T.accentMid,
                         }}
@@ -6297,7 +6268,7 @@ function NewRunPanel({
                         style={{
                           ...sTd,
                           padding: "6px 10px",
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           color: T.ink500,
                         }}
                       >
@@ -6316,10 +6287,10 @@ function NewRunPanel({
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: "4px",
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
             }}
           >
             {[
@@ -6343,7 +6314,7 @@ function NewRunPanel({
                     : parseFloat(foodWastePct) > 5
                       ? T.warning
                       : T.success
-                  : T.ink400,
+                  : T.ink500,
               ],
             ].map(([lbl, val, color]) => (
               <div
@@ -6355,8 +6326,8 @@ function NewRunPanel({
                     fontSize: "9px",
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: T.ink400,
-                    fontFamily: T.fontUi,
+                    color: T.ink500,
+                    fontFamily: T.font,
                     fontWeight: 700,
                     marginBottom: "4px",
                   }}
@@ -6365,7 +6336,7 @@ function NewRunPanel({
                 </div>
                 <div
                   style={{
-                    fontFamily: T.fontData,
+                    fontFamily: T.font,
                     fontSize: "18px",
                     fontWeight: 400,
                     color,
@@ -6385,12 +6356,12 @@ function NewRunPanel({
               style={{
                 marginTop: "10px",
                 padding: "8px 12px",
-                background: T.warningBg,
+                background: T.warningLight,
                 border: `1px solid ${T.warningBd}`,
                 borderRadius: "4px",
                 fontSize: "11px",
                 color: T.warning,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               Some ingredients have no AVCO cost set — cost calculation is
@@ -6405,7 +6376,7 @@ function NewRunPanel({
           style={{
             ...sCard,
             border: `1px solid ${T.warningBd}`,
-            background: T.warningBg,
+            background: T.warningLight,
           }}
         >
           <div style={{ ...sLabel, color: T.warning, marginBottom: "8px" }}>
@@ -6418,7 +6389,7 @@ function NewRunPanel({
               fontSize: "12px",
               color: T.ink700,
               margin: 0,
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               lineHeight: "1.7",
             }}
           >
@@ -6439,7 +6410,7 @@ function NewRunPanel({
             style={{
               ...sCard,
               borderLeft: `3px solid ${multiChamberMatsOk ? T.success : T.warning}`,
-              background: multiChamberMatsOk ? T.successBg : T.warningBg,
+              background: multiChamberMatsOk ? T.successLight : T.warningLight,
             }}
           >
             <div
@@ -6464,7 +6435,7 @@ function NewRunPanel({
                     marginBottom: "6px",
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   Chamber {ch.ci + 1}
@@ -6495,7 +6466,7 @@ function NewRunPanel({
             />
             <div
               style={{
-                borderTop: `1px solid ${T.ink150}`,
+                borderTop: `1px solid ${T.border}`,
                 paddingTop: "14px",
                 marginTop: "8px",
                 display: "flex",
@@ -6514,9 +6485,9 @@ function NewRunPanel({
                       fontSize: "9px",
                       letterSpacing: "0.2em",
                       textTransform: "uppercase",
-                      color: T.ink400,
+                      color: T.ink500,
                       marginBottom: "4px",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {lbl}
@@ -6525,7 +6496,7 @@ function NewRunPanel({
                     style={{
                       fontSize: lbl === "Run Number" ? "13px" : "18px",
                       fontWeight: 600,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       color,
                     }}
                   >
@@ -6549,7 +6520,7 @@ function NewRunPanel({
             style={{
               ...sCard,
               borderLeft: `3px solid ${canRun ? T.success : T.danger}`,
-              background: canRun ? T.successBg : T.dangerBg,
+              background: canRun ? T.successLight : T.dangerLight,
             }}
           >
             <div
@@ -6587,7 +6558,7 @@ function NewRunPanel({
             />
             <div
               style={{
-                borderTop: `1px solid ${T.ink150}`,
+                borderTop: `1px solid ${T.border}`,
                 paddingTop: "14px",
                 marginTop: "8px",
                 display: "flex",
@@ -6608,9 +6579,9 @@ function NewRunPanel({
                       fontSize: "9px",
                       letterSpacing: "0.2em",
                       textTransform: "uppercase",
-                      color: T.ink400,
+                      color: T.ink500,
                       marginBottom: "4px",
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     {lbl}
@@ -6619,7 +6590,7 @@ function NewRunPanel({
                     style={{
                       fontSize: lbl === "Run Number" ? "13px" : "18px",
                       fontWeight: 600,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       color,
                     }}
                   >
@@ -6662,7 +6633,7 @@ function NewRunPanel({
                     fontSize: "11px",
                     color: T.warning,
                     margin: "4px 0 0",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   Yield {yieldPct}% -- below 95% threshold
@@ -6683,11 +6654,11 @@ function NewRunPanel({
             <div
               style={{
                 padding: "14px 16px",
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: "4px",
                 marginBottom: "14px",
                 fontSize: "13px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 color: T.ink700,
               }}
             >
@@ -6790,7 +6761,7 @@ function NewRunPanel({
                   disabled={saving}
                   style={{
                     ...sBtn(),
-                    background: saving ? T.ink400 : T.accent,
+                    background: saving ? T.ink500 : T.accent,
                     minWidth: "180px",
                   }}
                 >
@@ -6930,9 +6901,9 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
             marginBottom: "12px",
             borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             fontWeight: 500,
-            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            background: toast.type === "error" ? T.dangerLight : T.successLight,
             color: toast.type === "error" ? T.danger : T.success,
             border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
@@ -6950,7 +6921,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
         }}
       >
         <div
-          style={{ fontSize: "11px", color: T.ink500, fontFamily: T.fontUi }}
+          style={{ fontSize: "11px", color: T.ink500, fontFamily: T.font }}
         >
           {runs.length} production runs
         </div>
@@ -6970,7 +6941,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
             color: T.ink500,
           }}
         >
-          <p style={{ fontFamily: T.fontUi, fontSize: "14px" }}>
+          <p style={{ fontFamily: T.font, fontSize: "14px" }}>
             {industryProfile === "food_beverage"
               ? `No recipe runs yet. Use "Start Recipe Run" to log your first batch.`
               : industryProfile === "general_retail"
@@ -7017,7 +6988,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       style={{
                         fontSize: "16px",
                         fontWeight: 600,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                         color: T.ink900,
                       }}
                     >
@@ -7027,7 +6998,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       style={{
                         fontSize: "11px",
                         color: T.ink500,
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         marginTop: "2px",
                       }}
                     >
@@ -7047,7 +7018,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       style={{
                         fontSize: "11px",
                         color: T.ink500,
-                        fontFamily: T.fontUi,
+                        fontFamily: T.font,
                       }}
                     >
                       {new Date(run.created_at).toLocaleDateString("en-ZA")}
@@ -7082,7 +7053,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           style={{
                             fontSize: "11px",
                             color: T.warning,
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                           }}
                         >
                           Cancel?
@@ -7159,15 +7130,15 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           fontSize: "9px",
                           letterSpacing: "0.2em",
                           textTransform: "uppercase",
-                          color: T.ink400,
-                          fontFamily: T.fontUi,
+                          color: T.ink500,
+                          fontFamily: T.font,
                         }}
                       >
                         {lbl}
                       </div>
                       <div
                         style={{
-                          fontFamily: T.fontData,
+                          fontFamily: T.font,
                           fontSize: "20px",
                           fontWeight: 400,
                           color:
@@ -7181,7 +7152,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                         <span
                           style={{
                             fontSize: "12px",
-                            color: T.ink400,
+                            color: T.ink500,
                             marginLeft: "2px",
                           }}
                         >
@@ -7196,12 +7167,12 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                     style={{
                       marginTop: "10px",
                       padding: "8px 12px",
-                      background: T.warningBg,
+                      background: T.warningLight,
                       border: `1px solid ${T.warningBd}`,
                       borderRadius: "4px",
                       fontSize: "12px",
                       color: T.warning,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                     }}
                   >
                     Yield {yp}% — below 95% threshold.
@@ -7211,7 +7182,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                   <div
                     style={{
                       marginTop: "14px",
-                      borderTop: `1px solid ${T.ink150}`,
+                      borderTop: `1px solid ${T.border}`,
                       paddingTop: "14px",
                     }}
                   >
@@ -7219,7 +7190,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       <div
                         style={{
                           padding: "16px",
-                          background: T.dangerBg,
+                          background: T.dangerLight,
                           border: `1px solid ${T.dangerBd}`,
                           borderRadius: "4px",
                           marginBottom: "14px",
@@ -7230,7 +7201,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             fontSize: "12px",
                             fontWeight: 600,
                             color: T.danger,
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                             marginBottom: "10px",
                           }}
                         >
@@ -7244,7 +7215,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             cursor: "pointer",
                             marginBottom: "14px",
                             fontSize: "12px",
-                            fontFamily: T.fontUi,
+                            fontFamily: T.font,
                             color: T.ink900,
                           }}
                         >
@@ -7280,7 +7251,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                       <div
                         style={{
                           padding: "16px",
-                          background: T.accentLit,
+                          background: T.accentLight,
                           border: `1px solid ${T.accentBd}`,
                           borderRadius: "4px",
                           marginBottom: "14px",
@@ -7304,7 +7275,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 color: T.ink500,
                                 display: "block",
                                 marginBottom: "4px",
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                               }}
                             >
                               Actual Units
@@ -7329,7 +7300,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 color: T.ink500,
                                 display: "block",
                                 marginBottom: "4px",
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                               }}
                             >
                               Status
@@ -7359,7 +7330,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 color: T.ink500,
                                 display: "block",
                                 marginBottom: "4px",
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                               }}
                             >
                               Notes
@@ -7408,8 +7379,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             key={inp.id}
                             style={{
                               padding: "10px 14px",
-                              background: T.ink075,
-                              border: `1px solid ${T.ink150}`,
+                              background: T.bg,
+                              border: `1px solid ${T.border}`,
                               borderRadius: "4px",
                             }}
                           >
@@ -7418,8 +7389,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 fontSize: "9px",
                                 letterSpacing: "0.15em",
                                 textTransform: "uppercase",
-                                color: T.ink400,
-                                fontFamily: T.fontUi,
+                                color: T.ink500,
+                                fontFamily: T.font,
                                 fontWeight: 700,
                               }}
                             >
@@ -7427,7 +7398,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             </div>
                             <div
                               style={{
-                                fontFamily: T.fontData,
+                                fontFamily: T.font,
                                 fontSize: "16px",
                                 fontWeight: 400,
                                 color: T.ink900,
@@ -7442,7 +7413,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               <span
                                 style={{
                                   fontSize: "11px",
-                                  color: T.ink400,
+                                  color: T.ink500,
                                   marginLeft: "3px",
                                 }}
                               >
@@ -7460,7 +7431,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                           color: T.ink500,
                           fontStyle: "italic",
                           margin: "10px 0 0",
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         {run.notes}
@@ -7482,9 +7453,9 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             gap: "24px",
                             flexWrap: "wrap",
                             padding: "12px 14px",
-                            background: T.ink075,
+                            background: T.bg,
                             borderRadius: "4px",
-                            border: `1px solid ${T.ink150}`,
+                            border: `1px solid ${T.border}`,
                           }}
                         >
                           {[
@@ -7513,8 +7484,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                   fontSize: "9px",
                                   letterSpacing: "0.15em",
                                   textTransform: "uppercase",
-                                  color: T.ink400,
-                                  fontFamily: T.fontUi,
+                                  color: T.ink500,
+                                  fontFamily: T.font,
                                   fontWeight: 700,
                                   marginBottom: "3px",
                                 }}
@@ -7524,7 +7495,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               <div
                                 style={{
                                   fontSize: "13px",
-                                  fontFamily: T.fontData,
+                                  fontFamily: T.font,
                                   color: T.ink900,
                                   fontWeight: 500,
                                 }}
@@ -7540,8 +7511,8 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 fontSize: "9px",
                                 letterSpacing: "0.15em",
                                 textTransform: "uppercase",
-                                color: T.ink400,
-                                fontFamily: T.fontUi,
+                                color: T.ink500,
+                                fontFamily: T.font,
                                 fontWeight: 700,
                                 marginBottom: "3px",
                               }}
@@ -7554,20 +7525,20 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 padding: "2px 10px",
                                 borderRadius: "3px",
                                 fontWeight: 700,
-                                fontFamily: T.fontUi,
+                                fontFamily: T.font,
                                 background:
                                   run.qc_passed === true
-                                    ? T.successBg
+                                    ? T.successLight
                                     : run.qc_passed === false
-                                      ? T.dangerBg
-                                      : T.ink075,
+                                      ? T.dangerLight
+                                      : T.bg,
                                 color:
                                   run.qc_passed === true
                                     ? T.success
                                     : run.qc_passed === false
                                       ? T.danger
-                                      : T.ink400,
-                                border: `1px solid ${run.qc_passed === true ? T.successBd : run.qc_passed === false ? T.dangerBd : T.ink150}`,
+                                      : T.ink500,
+                                border: `1px solid ${run.qc_passed === true ? T.successBd : run.qc_passed === false ? T.dangerBd : T.border}`,
                               }}
                             >
                               {run.qc_passed === true
@@ -7608,7 +7579,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                     padding: 0,
                                     cursor: "pointer",
                                     fontSize: "11px",
-                                    fontFamily: T.fontUi,
+                                    fontFamily: T.font,
                                     fontWeight: 700,
                                     color: T.accent,
                                     letterSpacing: "0.06em",
@@ -7624,7 +7595,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                   <div
                                     style={{
                                       marginTop: "8px",
-                                      border: `1px solid ${T.ink150}`,
+                                      border: `1px solid ${T.border}`,
                                       borderRadius: "4px",
                                       overflow: "hidden",
                                     }}
@@ -7634,13 +7605,13 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                         display: "grid",
                                         gridTemplateColumns: "1fr 1fr 1fr 1fr",
                                         padding: "6px 10px",
-                                        background: T.ink075,
+                                        background: T.bg,
                                         fontSize: "9px",
                                         fontWeight: 700,
                                         letterSpacing: "0.1em",
                                         textTransform: "uppercase",
-                                        color: T.ink400,
-                                        fontFamily: T.fontUi,
+                                        color: T.ink500,
+                                        fontFamily: T.font,
                                       }}
                                     >
                                       <span>Version</span>
@@ -7656,9 +7627,9 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                           gridTemplateColumns:
                                             "1fr 1fr 1fr 1fr",
                                           padding: "8px 10px",
-                                          borderTop: `1px solid ${T.ink150}`,
+                                          borderTop: `1px solid ${T.border}`,
                                           fontSize: "12px",
-                                          fontFamily: T.fontData,
+                                          fontFamily: T.font,
                                           color: T.ink700,
                                         }}
                                       >
@@ -7693,7 +7664,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                             <div
                               style={{
                                 padding: "10px 14px",
-                                background: T.warningBg,
+                                background: T.warningLight,
                                 border: `1px solid ${T.warningBd}`,
                                 borderRadius: "4px",
                               }}
@@ -7704,7 +7675,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                   letterSpacing: "0.15em",
                                   textTransform: "uppercase",
                                   color: T.warning,
-                                  fontFamily: T.fontUi,
+                                  fontFamily: T.font,
                                   fontWeight: 700,
                                   marginBottom: "8px",
                                 }}
@@ -7727,11 +7698,11 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                         fontSize: "10px",
                                         padding: "2px 8px",
                                         borderRadius: "3px",
-                                        background: T.dangerBg,
+                                        background: T.dangerLight,
                                         color: T.danger,
                                         border: `1px solid ${T.dangerBd}`,
                                         fontWeight: 600,
-                                        fontFamily: T.fontUi,
+                                        fontFamily: T.font,
                                         textTransform: "capitalize",
                                       }}
                                     >
@@ -7751,7 +7722,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                               gap: "24px",
                               flexWrap: "wrap",
                               padding: "10px 14px",
-                              background: T.infoBg,
+                              background: T.infoLight,
                               border: `1px solid ${T.infoBd}`,
                               borderRadius: "4px",
                             }}
@@ -7764,7 +7735,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                     letterSpacing: "0.15em",
                                     textTransform: "uppercase",
                                     color: T.info,
-                                    fontFamily: T.fontUi,
+                                    fontFamily: T.font,
                                     fontWeight: 700,
                                     marginBottom: "3px",
                                   }}
@@ -7774,7 +7745,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 <div
                                   style={{
                                     fontSize: "12px",
-                                    fontFamily: T.fontData,
+                                    fontFamily: T.font,
                                     color: T.ink700,
                                   }}
                                 >
@@ -7790,7 +7761,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                     letterSpacing: "0.15em",
                                     textTransform: "uppercase",
                                     color: T.info,
-                                    fontFamily: T.fontUi,
+                                    fontFamily: T.font,
                                     fontWeight: 700,
                                     marginBottom: "3px",
                                   }}
@@ -7800,7 +7771,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 <div
                                   style={{
                                     fontSize: "12px",
-                                    fontFamily: T.fontData,
+                                    fontFamily: T.font,
                                     color: T.ink700,
                                   }}
                                 >
@@ -7816,7 +7787,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                     letterSpacing: "0.15em",
                                     textTransform: "uppercase",
                                     color: T.info,
-                                    fontFamily: T.fontUi,
+                                    fontFamily: T.font,
                                     fontWeight: 700,
                                     marginBottom: "3px",
                                   }}
@@ -7826,7 +7797,7 @@ function HistoryPanel({ runs, onRefresh, industryProfile }) {
                                 <div
                                   style={{
                                     fontSize: "12px",
-                                    fontFamily: T.fontUi,
+                                    fontFamily: T.font,
                                     color: T.ink700,
                                   }}
                                 >
@@ -7951,8 +7922,8 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             style={{
               ...sCard,
               cursor: "pointer",
-              borderLeft: `3px solid ${form.channel === ch.id ? T.accent : T.ink150}`,
-              background: form.channel === ch.id ? T.accentLit : "#fff",
+              borderLeft: `3px solid ${form.channel === ch.id ? T.accent : T.border}`,
+              background: form.channel === ch.id ? T.accentLight : "#fff",
               transition: "all 0.15s",
             }}
           >
@@ -7960,7 +7931,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               style={{
                 fontSize: "13px",
                 fontWeight: 600,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 color: T.ink900,
               }}
             >
@@ -7970,7 +7941,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               style={{
                 fontSize: "11px",
                 color: T.ink500,
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 marginTop: "3px",
               }}
             >
@@ -7987,7 +7958,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               fontSize: "13px",
               color: T.ink500,
               marginTop: "10px",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
             }}
           >
             No finished products in stock.
@@ -7998,7 +7969,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "12px",
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               marginTop: "10px",
             }}
           >
@@ -8018,7 +7989,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                   style={{
                     cursor: "pointer",
                     background:
-                      form.item_id === i.id ? T.accentLit : "transparent",
+                      form.item_id === i.id ? T.accentLight : "transparent",
                   }}
                 >
                   <td style={{ ...sTd, fontWeight: 500 }}>
@@ -8032,7 +8003,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                   <td
                     style={{
                       ...sTd,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: "11px",
                       color: T.ink500,
                     }}
@@ -8043,7 +8014,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontWeight: 600,
                       color: T.success,
                     }}
@@ -8054,7 +8025,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                     style={{
                       ...sTd,
                       textAlign: "right",
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                     }}
                   >
                     R{parseFloat(i.sell_price || 0).toFixed(0)}
@@ -8085,7 +8056,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                   color: T.ink500,
                   display: "block",
                   marginBottom: "4px",
-                  fontFamily: T.fontUi,
+                  fontFamily: T.font,
                 }}
               >
                 Quantity *
@@ -8109,7 +8080,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                     color: T.ink500,
                     display: "block",
                     marginBottom: "4px",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   Wholesale Partner
@@ -8136,7 +8107,7 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
                 color: T.ink500,
                 display: "block",
                 marginBottom: "4px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
               }}
             >
               Notes
@@ -8152,11 +8123,11 @@ function AllocatePanel({ items, partners, batches, onRefresh }) {
             <div
               style={{
                 padding: "12px 14px",
-                background: T.ink075,
+                background: T.bg,
                 borderRadius: "4px",
                 marginBottom: "12px",
                 fontSize: "12px",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 color: T.ink700,
               }}
             >
@@ -8339,9 +8310,9 @@ function AuditPanel({ batches }) {
             padding: "10px 16px",
             borderRadius: "4px",
             fontSize: "12px",
-            fontFamily: T.fontUi,
+            fontFamily: T.font,
             fontWeight: 500,
-            background: toast.type === "error" ? T.dangerBg : T.successBg,
+            background: toast.type === "error" ? T.dangerLight : T.successLight,
             color: toast.type === "error" ? T.danger : T.success,
             border: `1px solid ${toast.type === "error" ? T.dangerBd : T.successBd}`,
           }}
@@ -8375,7 +8346,7 @@ function AuditPanel({ batches }) {
                 fontSize: "13px",
                 color: T.ink500,
                 margin: "6px 0 0",
-                fontFamily: T.fontUi,
+                fontFamily: T.font,
                 lineHeight: "1.6",
               }}
             >
@@ -8390,7 +8361,7 @@ function AuditPanel({ batches }) {
                 disabled={loading}
                 style={{
                   ...sBtn(),
-                  background: loading ? T.ink400 : T.info,
+                  background: loading ? T.ink500 : T.info,
                   minWidth: "140px",
                 }}
               >
@@ -8422,10 +8393,10 @@ function AuditPanel({ batches }) {
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))",
               gap: "1px",
-              background: T.ink150,
+              background: T.border,
               borderRadius: 4,
               overflow: "hidden",
-              border: `1px solid ${T.ink150}`,
+              border: `1px solid ${T.border}`,
               marginTop: "16px",
             }}
           >
@@ -8466,7 +8437,7 @@ function AuditPanel({ batches }) {
                 >
                   <div
                     style={{
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       fontSize: "20px",
                       fontWeight: 400,
                       color: col,
@@ -8479,8 +8450,8 @@ function AuditPanel({ batches }) {
                       fontSize: "9px",
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      color: T.ink400,
-                      fontFamily: T.fontUi,
+                      color: T.ink500,
+                      fontFamily: T.font,
                       marginTop: 2,
                       fontWeight: 700,
                     }}
@@ -8526,7 +8497,7 @@ function AuditPanel({ batches }) {
                     style={{
                       fontSize: "16px",
                       fontWeight: 600,
-                      fontFamily: T.fontUi,
+                      fontFamily: T.font,
                       color: T.accent,
                     }}
                   >
@@ -8536,7 +8507,7 @@ function AuditPanel({ batches }) {
                     style={{
                       fontSize: "11px",
                       color: T.ink500,
-                      fontFamily: T.fontData,
+                      fontFamily: T.font,
                       marginTop: "2px",
                     }}
                   >
@@ -8556,12 +8527,12 @@ function AuditPanel({ batches }) {
                           fontSize: "9px",
                           padding: "2px 8px",
                           borderRadius: "3px",
-                          background: T.successBg,
+                          background: T.successLight,
                           color: T.success,
                           fontWeight: 700,
                           letterSpacing: "0.1em",
                           textTransform: "uppercase",
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         Lab Certified
@@ -8572,7 +8543,7 @@ function AuditPanel({ batches }) {
                         style={{
                           fontSize: "10px",
                           color: T.ink500,
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         {batch.strain}
@@ -8583,7 +8554,7 @@ function AuditPanel({ batches }) {
                         style={{
                           fontSize: "10px",
                           color: isExpired ? T.danger : T.ink500,
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                           fontWeight: isExpired ? 600 : 400,
                         }}
                       >
@@ -8622,7 +8593,7 @@ function AuditPanel({ batches }) {
                         style={{
                           fontSize: "11px",
                           color: T.warning,
-                          fontFamily: T.fontUi,
+                          fontFamily: T.font,
                         }}
                       >
                         Flag all QRs inactive?
@@ -8666,7 +8637,7 @@ function AuditPanel({ batches }) {
                   ["QR Codes", qrs.length, T.info],
                   ["Claimed", claimed, T.success],
                   ["Total Scans", totalScans, "#b5935a"],
-                  ["Inactive", inactive, inactive > 0 ? T.warning : T.ink400],
+                  ["Inactive", inactive, inactive > 0 ? T.warning : T.ink500],
                 ].map(([lbl, val, color]) => (
                   <div key={lbl}>
                     <div
@@ -8674,15 +8645,15 @@ function AuditPanel({ batches }) {
                         fontSize: "9px",
                         letterSpacing: "0.2em",
                         textTransform: "uppercase",
-                        color: T.ink400,
-                        fontFamily: T.fontUi,
+                        color: T.ink500,
+                        fontFamily: T.font,
                       }}
                     >
                       {lbl}
                     </div>
                     <div
                       style={{
-                        fontFamily: T.fontData,
+                        fontFamily: T.font,
                         fontSize: "20px",
                         fontWeight: 400,
                         color,
@@ -8699,7 +8670,7 @@ function AuditPanel({ batches }) {
                     width: "100%",
                     borderCollapse: "collapse",
                     fontSize: "11px",
-                    fontFamily: T.fontUi,
+                    fontFamily: T.font,
                   }}
                 >
                   <thead>
@@ -8731,14 +8702,14 @@ function AuditPanel({ batches }) {
                       <tr
                         key={r.id}
                         style={{
-                          background: !r.is_active ? T.ink050 : "transparent",
+                          background: !r.is_active ? T.surface : "transparent",
                           opacity: r.is_active ? 1 : 0.6,
                         }}
                       >
                         <td
                           style={{
                             ...sTd,
-                            fontFamily: T.fontData,
+                            fontFamily: T.font,
                             fontSize: "10px",
                             color: T.ink500,
                             padding: "6px 8px",
@@ -8762,8 +8733,8 @@ function AuditPanel({ batches }) {
                               fontSize: "9px",
                               padding: "1px 6px",
                               borderRadius: "3px",
-                              background: r.is_active ? T.successBg : T.ink075,
-                              color: r.is_active ? T.success : T.ink400,
+                              background: r.is_active ? T.successLight : T.bg,
+                              color: r.is_active ? T.success : T.ink500,
                               fontWeight: 700,
                             }}
                           >
@@ -8776,8 +8747,8 @@ function AuditPanel({ batches }) {
                               fontSize: "9px",
                               padding: "1px 6px",
                               borderRadius: "3px",
-                              background: r.claimed ? T.successBg : T.ink075,
-                              color: r.claimed ? T.success : T.ink400,
+                              background: r.claimed ? T.successLight : T.bg,
+                              color: r.claimed ? T.success : T.ink500,
                               fontWeight: 700,
                             }}
                           >
@@ -8789,7 +8760,7 @@ function AuditPanel({ batches }) {
                             ...sTd,
                             padding: "6px 8px",
                             textAlign: "right",
-                            fontFamily: T.fontData,
+                            fontFamily: T.font,
                             fontWeight: 600,
                           }}
                         >
@@ -8838,7 +8809,7 @@ function AuditPanel({ batches }) {
         >
           <p
             style={{
-              fontFamily: T.fontUi,
+              fontFamily: T.font,
               fontSize: "14px",
               marginBottom: "16px",
             }}
@@ -8847,7 +8818,7 @@ function AuditPanel({ batches }) {
             traceability chain.
           </p>
           <p
-            style={{ fontFamily: T.fontUi, fontSize: "12px", color: T.ink500 }}
+            style={{ fontFamily: T.font, fontSize: "12px", color: T.ink500 }}
           >
             Data loads on demand to keep the page fast. Export as CSV for
             regulatory submissions.
