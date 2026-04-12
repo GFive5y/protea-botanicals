@@ -734,9 +734,26 @@ that doesn't feel like it was designed in the same room on the same day.
 | AdminProductionModule.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
 | AdminQRCodes.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
 | AdminShipments.js | COMPLETE | 5ba14e6 | 13 Apr 2026 |
-| 14 HR modules + 1 Staff | NOT STARTED | — | — |
-| **P5: Consumer pages** | | | |
-| Shop.js + Loyalty.js + Account.js + CheckoutPage.js | NOT STARTED | — | — |
+| HRStaffDirectory.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRLeave.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRRoster.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRCalendar.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRContracts.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRDisciplinary.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRComms.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRLoans.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRPayroll.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRPerformance.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRSettings.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRStockView.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRTimesheets.js | COMPLETE | 1d77666 | 13 Apr 2026 |
+| HRStaffProfile.js | NOT IN SCOPE (no T block) | — | 13 Apr 2026 |
+| StaffPortal.js (pages) | NOT IN SCOPE (C+FONTS) | — | 13 Apr 2026 |
+| **P5: Consumer pages (UNIFY-6 — different register)** | | | |
+| Shop.js | NOT IN SCOPE (CSS class + hardcoded hex) | — | 13 Apr 2026 |
+| Loyalty.js | NOT IN SCOPE (const C + F) | — | 13 Apr 2026 |
+| CheckoutPage.js | COMPLETE (already migrated) | — | 13 Apr 2026 |
+| Account.js | NOT IN SCOPE (const C + F) | — | 13 Apr 2026 |
 
 ---
 *WP-UNIFY v1.0 · NuAi · 13 April 2026*

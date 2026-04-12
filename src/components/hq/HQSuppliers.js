@@ -284,7 +284,7 @@ function EditProductPanel({ product, suppliers, onClose, onSaved }) {
               color: C.text,
               fontWeight: 700,
               fontSize: 18,
-              fontFamily: "'Cormorant Garamond', serif",
+              fontFamily: "T.font",
             }}
           >
             Edit Product
@@ -569,7 +569,7 @@ function AddSupplierPanel({ onClose, onSaved }) {
               color: C.text,
               fontWeight: 700,
               fontSize: 18,
-              fontFamily: "'Cormorant Garamond', serif",
+              fontFamily: "T.font",
             }}
           >
             Add New Supplier
@@ -821,7 +821,7 @@ function AddProductPanel({ suppliers, onClose, onSaved }) {
             color: C.text,
             fontWeight: 700,
             fontSize: 18,
-            fontFamily: "'Cormorant Garamond', serif",
+            fontFamily: "T.font",
           }}
         >
           Add Supplier Product
@@ -1035,7 +1035,7 @@ function AddLocalInputPanel({ onClose, onSaved }) {
             color: C.text,
             fontWeight: 700,
             fontSize: 18,
-            fontFamily: "'Cormorant Garamond', serif",
+            fontFamily: "T.font",
           }}
         >
           Add Local Input
@@ -2264,7 +2264,7 @@ export default function HQSuppliers() {
                           color: C.text,
                           fontWeight: 700,
                           fontSize: 15,
-                          fontFamily: "'Cormorant Garamond', serif",
+                          fontFamily: "T.font",
                         }}
                       >
                         {s.name}
@@ -2301,7 +2301,7 @@ export default function HQSuppliers() {
                           color: C.accent,
                           fontWeight: 700,
                           fontSize: 20,
-                          fontFamily: "'Cormorant Garamond', serif",
+                          fontFamily: "T.font",
                         }}
                       >
                         {sProds.length}
