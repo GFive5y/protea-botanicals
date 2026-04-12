@@ -8,7 +8,7 @@ import { supabase } from "../../services/supabaseClient";
 import { getScanGeoAnalytics } from "../../services/scanService";
 
 // ── Tokens (match system design) ─────────────────────────────────────────────
-const T = {
+const GEO_T = {
   bg: "#faf9f6",
   surface: "#ffffff",
   border: "#e8e0d4",
@@ -40,8 +40,8 @@ const PROVINCE_COLORS = {
 
 // ── Shared card styles ────────────────────────────────────────────────────────
 const card = (extra = {}) => ({
-  background: T.surface,
-  border: `1px solid ${T.border}`,
+  background: GEO_T.surface,
+  border: `1px solid ${GEO_T.border}`,
   borderRadius: 10,
   padding: "20px 22px",
   boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.03)",
@@ -49,7 +49,7 @@ const card = (extra = {}) => ({
 });
 
 const label = (extra = {}) => ({
-  fontFamily: T.font,
+  fontFamily: GEO_T.font,
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: "0.07em",
@@ -59,8 +59,8 @@ const label = (extra = {}) => ({
   ...extra,
 });
 
-const bigNum = (color = T.green, extra = {}) => ({
-  fontFamily: T.serif,
+const bigNum = (color = GEO_T.green, extra = {}) => ({
+  fontFamily: GEO_T.serif,
   fontSize: 32,
   fontWeight: 600,
   color,
@@ -72,7 +72,7 @@ const bigNum = (color = T.green, extra = {}) => ({
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatCard({ title, value, sub, color = T.green, accent, loading }) {
+function StatCard({ title, value, sub, color = GEO_T.green, accent, loading }) {
   return (
     <div style={card()}>
       <p style={label()}>{title}</p>
@@ -80,7 +80,7 @@ function StatCard({ title, value, sub, color = T.green, accent, loading }) {
         <div
           style={{
             height: 36,
-            background: T.faint,
+            background: GEO_T.faint,
             borderRadius: 2,
             animation: "pulse 1.5s infinite",
           }}
@@ -91,9 +91,9 @@ function StatCard({ title, value, sub, color = T.green, accent, loading }) {
       {sub && (
         <p
           style={{
-            fontFamily: T.font,
+            fontFamily: GEO_T.font,
             fontSize: 11,
-            color: accent || T.muted,
+            color: accent || GEO_T.muted,
             marginTop: 6,
             fontWeight: 300,
           }}
@@ -110,9 +110,9 @@ function BarChart({ data, total, colorFn }) {
     return (
       <p
         style={{
-          fontFamily: T.font,
+          fontFamily: GEO_T.font,
           fontSize: 12,
-          color: T.muted,
+          color: GEO_T.muted,
           fontWeight: 300,
         }}
       >
@@ -139,9 +139,9 @@ function BarChart({ data, total, colorFn }) {
             >
               <span
                 style={{
-                  fontFamily: T.font,
+                  fontFamily: GEO_T.font,
                   fontSize: 12,
-                  color: T.text,
+                  color: GEO_T.text,
                   fontWeight: 400,
                 }}
               >
@@ -149,19 +149,19 @@ function BarChart({ data, total, colorFn }) {
               </span>
               <span
                 style={{
-                  fontFamily: T.font,
+                  fontFamily: GEO_T.font,
                   fontSize: 11,
-                  color: T.muted,
+                  color: GEO_T.muted,
                   fontWeight: 400,
                 }}
               >
-                {count} <span style={{ color: T.faint }}>·</span> {pct}%
+                {count} <span style={{ color: GEO_T.faint }}>·</span> {pct}%
               </span>
             </div>
             <div
               style={{
                 height: 4,
-                background: T.faint,
+                background: GEO_T.faint,
                 borderRadius: 2,
                 overflow: "hidden",
               }}
@@ -170,7 +170,7 @@ function BarChart({ data, total, colorFn }) {
                 style={{
                   height: "100%",
                   width: `${barPct}%`,
-                  background: colorFn ? colorFn(name) : T.green,
+                  background: colorFn ? colorFn(name) : GEO_T.green,
                   borderRadius: 2,
                   transition: "width 0.6s ease",
                 }}
@@ -205,7 +205,7 @@ function DonutChart({ segments, size = 80 }) {
           borderRadius: "50%",
           flexShrink: 0,
           background: `conic-gradient(${gradient})`,
-          boxShadow: "inset 0 0 0 22px " + T.surface,
+          boxShadow: "inset 0 0 0 22px " + GEO_T.surface,
         }}
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -223,14 +223,14 @@ function DonutChart({ segments, size = 80 }) {
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontFamily: T.font, fontSize: 12, color: T.text }}>
+            <span style={{ fontFamily: GEO_T.font, fontSize: 12, color: GEO_T.text }}>
               {s.label}
             </span>
             <span
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 11,
-                color: T.muted,
+                color: GEO_T.muted,
                 fontWeight: 300,
               }}
             >
@@ -248,9 +248,9 @@ function ChurnTable({ users }) {
     return (
       <p
         style={{
-          fontFamily: T.font,
+          fontFamily: GEO_T.font,
           fontSize: 12,
-          color: T.muted,
+          color: GEO_T.muted,
           fontWeight: 300,
         }}
       >
@@ -268,7 +268,7 @@ function ChurnTable({ users }) {
             justifyContent: "space-between",
             padding: "10px 0",
             borderBottom:
-              i < users.length - 1 ? `1px solid ${T.border}` : "none",
+              i < users.length - 1 ? `1px solid ${GEO_T.border}` : "none",
             gap: 12,
             flexWrap: "wrap",
           }}
@@ -276,9 +276,9 @@ function ChurnTable({ users }) {
           <div>
             <p
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 13,
-                color: T.text,
+                color: GEO_T.text,
                 fontWeight: 400,
                 marginBottom: 2,
               }}
@@ -287,9 +287,9 @@ function ChurnTable({ users }) {
             </p>
             <p
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 11,
-                color: T.muted,
+                color: GEO_T.muted,
                 fontWeight: 300,
               }}
             >
@@ -300,14 +300,14 @@ function ChurnTable({ users }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 9,
                 letterSpacing: "0.15em",
                 textTransform: "uppercase",
                 padding: "3px 8px",
                 borderRadius: 2,
                 background: "rgba(245,158,11,0.1)",
-                color: T.amber,
+                color: GEO_T.amber,
                 border: `1px solid rgba(245,158,11,0.2)`,
               }}
             >
@@ -317,9 +317,9 @@ function ChurnTable({ users }) {
             </span>
             <span
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 11,
-                color: T.muted,
+                color: GEO_T.muted,
                 fontWeight: 300,
               }}
             >
@@ -337,9 +337,9 @@ function RetailerHealthTable({ retailers }) {
     return (
       <p
         style={{
-          fontFamily: T.font,
+          fontFamily: GEO_T.font,
           fontSize: 12,
-          color: T.muted,
+          color: GEO_T.muted,
           fontWeight: 300,
         }}
       >
@@ -347,7 +347,7 @@ function RetailerHealthTable({ retailers }) {
       </p>
     );
   const scoreColor = (s) =>
-    s >= 70 ? T.greenLight : s >= 40 ? T.amber : T.red;
+    s >= 70 ? GEO_T.greenLight : s >= 40 ? GEO_T.amber : GEO_T.red;
   return (
     <div>
       <div
@@ -356,7 +356,7 @@ function RetailerHealthTable({ retailers }) {
           gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
           gap: "0 12px",
           padding: "0 0 8px",
-          borderBottom: `1px solid ${T.border}`,
+          borderBottom: `1px solid ${GEO_T.border}`,
           marginBottom: 4,
         }}
       >
@@ -375,18 +375,18 @@ function RetailerHealthTable({ retailers }) {
             gap: "0 12px",
             padding: "10px 0",
             borderBottom:
-              i < retailers.length - 1 ? `1px solid ${T.border}` : "none",
+              i < retailers.length - 1 ? `1px solid ${GEO_T.border}` : "none",
             alignItems: "center",
           }}
         >
-          <span style={{ fontFamily: T.font, fontSize: 13, color: T.text }}>
+          <span style={{ fontFamily: GEO_T.font, fontSize: 13, color: GEO_T.text }}>
             {r.retailer_name}
           </span>
           <span
             style={{
-              fontFamily: T.font,
+              fontFamily: GEO_T.font,
               fontSize: 12,
-              color: T.muted,
+              color: GEO_T.muted,
               fontWeight: 300,
             }}
           >
@@ -394,11 +394,11 @@ function RetailerHealthTable({ retailers }) {
           </span>
           <span
             style={{
-              fontFamily: T.font,
+              fontFamily: GEO_T.font,
               fontSize: 9,
               letterSpacing: "0.15em",
               textTransform: "uppercase",
-              color: T.gold,
+              color: GEO_T.gold,
               padding: "2px 6px",
               background: "rgba(181,147,90,0.1)",
               borderRadius: 2,
@@ -412,7 +412,7 @@ function RetailerHealthTable({ retailers }) {
               style={{
                 flex: 1,
                 height: 3,
-                background: T.faint,
+                background: GEO_T.faint,
                 borderRadius: 2,
                 overflow: "hidden",
               }}
@@ -428,7 +428,7 @@ function RetailerHealthTable({ retailers }) {
             </div>
             <span
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 11,
                 color: scoreColor(r.health_score || 0),
                 fontWeight: 500,
@@ -438,7 +438,7 @@ function RetailerHealthTable({ retailers }) {
               {r.health_score || 0}
             </span>
           </div>
-          <span style={{ fontFamily: T.font, fontSize: 12, color: T.text }}>
+          <span style={{ fontFamily: GEO_T.font, fontSize: 12, color: GEO_T.text }}>
             {r.activation_rate
               ? `${Math.round(r.activation_rate * 100)}%`
               : "—"}
@@ -515,9 +515,9 @@ export default function GeoAnalyticsDashboard() {
     if (!analytics?.byDevice) return [];
     const d = analytics.byDevice;
     return [
-      { label: "Mobile", value: d.mobile || 0, color: T.green },
-      { label: "Desktop", value: d.desktop || 0, color: T.gold },
-      { label: "Tablet", value: d.tablet || 0, color: T.greenLight },
+      { label: "Mobile", value: d.mobile || 0, color: GEO_T.green },
+      { label: "Desktop", value: d.desktop || 0, color: GEO_T.gold },
+      { label: "Tablet", value: d.tablet || 0, color: GEO_T.greenLight },
     ].filter((s) => s.value > 0);
   }, [analytics]);
 
@@ -547,17 +547,17 @@ export default function GeoAnalyticsDashboard() {
 
   // ── Period selector + tabs header ──────────────────────────────────────────
   return (
-    <div style={{ fontFamily: T.font }}>
+    <div style={{ fontFamily: GEO_T.font }}>
       <style>{`
         
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        .geo-tab-btn { background:none; border:none; cursor:pointer; padding:8px 14px; font-family:${T.font}; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; transition:all 0.2s; border-bottom: 2px solid transparent; }
-        .geo-tab-btn:hover { color: ${T.green}; }
-        .geo-tab-active { color: ${T.green}; border-bottom-color: ${T.green}; font-weight:500; }
-        .geo-tab-inactive { color: ${T.muted}; }
-        .period-btn { background:none; border:1px solid ${T.border}; border-radius:2px; padding:5px 12px; font-family:${T.font}; font-size:10px; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
-        .period-active { background:${T.green}; color:white; border-color:${T.green}; }
-        .period-inactive { color:${T.muted}; }
+        .geo-tab-btn { background:none; border:none; cursor:pointer; padding:8px 14px; font-family:${GEO_T.font}; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; transition:all 0.2s; border-bottom: 2px solid transparent; }
+        .geo-tab-btn:hover { color: ${GEO_T.green}; }
+        .geo-tab-active { color: ${GEO_T.green}; border-bottom-color: ${GEO_T.green}; font-weight:500; }
+        .geo-tab-inactive { color: ${GEO_T.muted}; }
+        .period-btn { background:none; border:1px solid ${GEO_T.border}; border-radius:2px; padding:5px 12px; font-family:${GEO_T.font}; font-size:10px; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+        .period-active { background:${GEO_T.green}; color:white; border-color:${GEO_T.green}; }
+        .period-inactive { color:${GEO_T.muted}; }
         .geo-grid { display:grid; gap:16px; }
         @media(min-width:700px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } .two-col { grid-template-columns: 1fr 1fr; } }
         @media(max-width:699px) { .stat-grid { grid-template-columns: repeat(2,1fr); } .two-col { grid-template-columns: 1fr; } }
@@ -578,17 +578,17 @@ export default function GeoAnalyticsDashboard() {
           <div>
             <h2
               style={{
-                fontFamily: T.serif,
+                fontFamily: GEO_T.serif,
                 fontSize: 22,
                 fontWeight: 600,
-                color: T.text,
+                color: GEO_T.text,
                 marginBottom: 4,
                 letterSpacing: "-0.01em",
               }}
             >
               Geo & Analytics
             </h2>
-            <p style={{ fontSize: 12, color: T.muted, fontWeight: 300 }}>
+            <p style={{ fontSize: 12, color: GEO_T.muted, fontWeight: 300 }}>
               Real-time scan intelligence · {analytics?.total || 0} scans in
               last {period} days
             </p>
@@ -611,7 +611,7 @@ export default function GeoAnalyticsDashboard() {
           style={{
             display: "flex",
             gap: 0,
-            borderBottom: `1px solid ${T.border}`,
+            borderBottom: `1px solid ${GEO_T.border}`,
             overflowX: "auto",
           }}
         >
@@ -641,21 +641,21 @@ export default function GeoAnalyticsDashboard() {
               title="First Scans"
               value={analytics?.firstScans?.toLocaleString() || "0"}
               sub="Unique product verifications"
-              color={T.greenMid}
+              color={GEO_T.greenMid}
               loading={loading}
             />
             <StatCard
               title="GPS Consent"
               value={`${analytics?.gpsConsent || 0}%`}
               sub="Users sharing precise location"
-              color={T.gold}
+              color={GEO_T.gold}
               loading={loading}
             />
             <StatCard
               title="Flagged Scans"
               value={analytics?.flagged?.toLocaleString() || "0"}
               sub="Anomaly detections"
-              color={analytics?.flagged > 0 ? T.amber : T.muted}
+              color={analytics?.flagged > 0 ? GEO_T.amber : GEO_T.muted}
               loading={loading}
             />
           </div>
@@ -665,7 +665,7 @@ export default function GeoAnalyticsDashboard() {
               <p style={label({ marginBottom: 16 })}>Device Split</p>
               {loading ? (
                 <div
-                  style={{ height: 80, background: T.faint, borderRadius: 2 }}
+                  style={{ height: 80, background: GEO_T.faint, borderRadius: 2 }}
                 />
               ) : (
                 <DonutChart segments={deviceSegments} />
@@ -675,16 +675,16 @@ export default function GeoAnalyticsDashboard() {
               <p style={label({ marginBottom: 16 })}>Top Province</p>
               {loading ? (
                 <div
-                  style={{ height: 80, background: T.faint, borderRadius: 2 }}
+                  style={{ height: 80, background: GEO_T.faint, borderRadius: 2 }}
                 />
               ) : (
                 <>
                   <p
                     style={{
-                      fontFamily: T.serif,
+                      fontFamily: GEO_T.serif,
                       fontSize: 24,
                       fontWeight: 600,
-                      color: T.green,
+                      color: GEO_T.green,
                       marginBottom: 6,
                       letterSpacing: "-0.02em",
                     }}
@@ -693,9 +693,9 @@ export default function GeoAnalyticsDashboard() {
                   </p>
                   <p
                     style={{
-                      fontFamily: T.font,
+                      fontFamily: GEO_T.font,
                       fontSize: 12,
-                      color: T.muted,
+                      color: GEO_T.muted,
                       fontWeight: 300,
                     }}
                   >
@@ -715,10 +715,10 @@ export default function GeoAnalyticsDashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <p
                   style={{
-                    fontFamily: T.serif,
+                    fontFamily: GEO_T.serif,
                     fontSize: 36,
                     fontWeight: 300,
-                    color: churnUsers.length > 0 ? T.amber : T.green,
+                    color: churnUsers.length > 0 ? GEO_T.amber : GEO_T.green,
                     lineHeight: 1,
                   }}
                 >
@@ -726,9 +726,9 @@ export default function GeoAnalyticsDashboard() {
                 </p>
                 <p
                   style={{
-                    fontFamily: T.font,
+                    fontFamily: GEO_T.font,
                     fontSize: 12,
-                    color: T.muted,
+                    color: GEO_T.muted,
                     fontWeight: 300,
                     lineHeight: 1.6,
                   }}
@@ -744,10 +744,10 @@ export default function GeoAnalyticsDashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <p
                   style={{
-                    fontFamily: T.serif,
+                    fontFamily: GEO_T.serif,
                     fontSize: 36,
                     fontWeight: 300,
-                    color: demandGaps.length > 0 ? T.gold : T.green,
+                    color: demandGaps.length > 0 ? GEO_T.gold : GEO_T.green,
                     lineHeight: 1,
                   }}
                 >
@@ -755,9 +755,9 @@ export default function GeoAnalyticsDashboard() {
                 </p>
                 <p
                   style={{
-                    fontFamily: T.font,
+                    fontFamily: GEO_T.font,
                     fontSize: 12,
-                    color: T.muted,
+                    color: GEO_T.muted,
                     fontWeight: 300,
                     lineHeight: 1.6,
                   }}
@@ -780,7 +780,7 @@ export default function GeoAnalyticsDashboard() {
             <BarChart
               data={analytics?.byProvince}
               total={analytics?.total}
-              colorFn={(name) => PROVINCE_COLORS[name] || T.green}
+              colorFn={(name) => PROVINCE_COLORS[name] || GEO_T.green}
             />
           </div>
           <div style={card()}>
@@ -803,21 +803,21 @@ export default function GeoAnalyticsDashboard() {
                   value:
                     analytics?.raw?.filter((s) => s.location_source === "gps")
                       .length || 0,
-                  color: T.green,
+                  color: GEO_T.green,
                 },
                 {
                   label: "IP (city-level)",
                   value:
                     analytics?.raw?.filter((s) => s.location_source === "ip")
                       .length || 0,
-                  color: T.gold,
+                  color: GEO_T.gold,
                 },
                 {
                   label: "No location",
                   value:
                     analytics?.raw?.filter((s) => s.location_source === "none")
                       .length || 0,
-                  color: T.border,
+                  color: GEO_T.border,
                 },
               ].map((row) => {
                 const pct = analytics?.total
@@ -834,18 +834,18 @@ export default function GeoAnalyticsDashboard() {
                     >
                       <span
                         style={{
-                          fontFamily: T.font,
+                          fontFamily: GEO_T.font,
                           fontSize: 12,
-                          color: T.text,
+                          color: GEO_T.text,
                         }}
                       >
                         {row.label}
                       </span>
                       <span
                         style={{
-                          fontFamily: T.font,
+                          fontFamily: GEO_T.font,
                           fontSize: 11,
-                          color: T.muted,
+                          color: GEO_T.muted,
                           fontWeight: 300,
                         }}
                       >
@@ -855,7 +855,7 @@ export default function GeoAnalyticsDashboard() {
                     <div
                       style={{
                         height: 4,
-                        background: T.faint,
+                        background: GEO_T.faint,
                         borderRadius: 2,
                       }}
                     >
@@ -895,9 +895,9 @@ export default function GeoAnalyticsDashboard() {
             <p style={label()}>Retailer Health — {retailers.length} accounts</p>
             <span
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 10,
-                color: T.muted,
+                color: GEO_T.muted,
                 fontWeight: 300,
               }}
             >
@@ -931,7 +931,7 @@ export default function GeoAnalyticsDashboard() {
                 return acc;
               }, {})}
               total={acquisition.reduce((a, r) => a + (r.signups || 0), 0)}
-              colorFn={(name) => PROVINCE_COLORS[name] || T.green}
+              colorFn={(name) => PROVINCE_COLORS[name] || GEO_T.green}
             />
           </div>
           <div style={card()}>
@@ -963,10 +963,10 @@ export default function GeoAnalyticsDashboard() {
                 <>
                   <p
                     style={{
-                      fontFamily: T.serif,
+                      fontFamily: GEO_T.serif,
                       fontSize: 40,
                       fontWeight: 300,
-                      color: T.green,
+                      color: GEO_T.green,
                       lineHeight: 1,
                       marginBottom: 10,
                     }}
@@ -976,7 +976,7 @@ export default function GeoAnalyticsDashboard() {
                   <div
                     style={{
                       height: 4,
-                      background: T.faint,
+                      background: GEO_T.faint,
                       borderRadius: 2,
                       marginBottom: 8,
                     }}
@@ -985,7 +985,7 @@ export default function GeoAnalyticsDashboard() {
                       style={{
                         height: "100%",
                         width: `${pct}%`,
-                        background: T.green,
+                        background: GEO_T.green,
                         borderRadius: 2,
                         transition: "width 0.5s",
                       }}
@@ -993,9 +993,9 @@ export default function GeoAnalyticsDashboard() {
                   </div>
                   <p
                     style={{
-                      fontFamily: T.font,
+                      fontFamily: GEO_T.font,
                       fontSize: 11,
-                      color: T.muted,
+                      color: GEO_T.muted,
                       fontWeight: 300,
                     }}
                   >
@@ -1003,9 +1003,9 @@ export default function GeoAnalyticsDashboard() {
                   </p>
                   <p
                     style={{
-                      fontFamily: T.font,
+                      fontFamily: GEO_T.font,
                       fontSize: 11,
-                      color: T.muted,
+                      color: GEO_T.muted,
                       fontWeight: 300,
                       marginTop: 4,
                     }}
@@ -1039,7 +1039,7 @@ export default function GeoAnalyticsDashboard() {
           >
             <p
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 13,
                 color: "#92400e",
                 fontWeight: 400,
@@ -1051,9 +1051,9 @@ export default function GeoAnalyticsDashboard() {
             </p>
             <p
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 12,
-                color: T.muted,
+                color: GEO_T.muted,
                 fontWeight: 300,
               }}
             >
@@ -1063,7 +1063,7 @@ export default function GeoAnalyticsDashboard() {
               <code
                 style={{
                   fontSize: 11,
-                  background: T.faint,
+                  background: GEO_T.faint,
                   padding: "1px 4px",
                   borderRadius: 2,
                 }}
@@ -1092,7 +1092,7 @@ export default function GeoAnalyticsDashboard() {
           >
             <p
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 13,
                 color: "#78350f",
                 fontWeight: 400,
@@ -1103,9 +1103,9 @@ export default function GeoAnalyticsDashboard() {
             </p>
             <p
               style={{
-                fontFamily: T.font,
+                fontFamily: GEO_T.font,
                 fontSize: 12,
-                color: T.muted,
+                color: GEO_T.muted,
                 fontWeight: 300,
               }}
             >
@@ -1118,9 +1118,9 @@ export default function GeoAnalyticsDashboard() {
             <div style={card()}>
               <p
                 style={{
-                  fontFamily: T.font,
+                  fontFamily: GEO_T.font,
                   fontSize: 13,
-                  color: T.muted,
+                  color: GEO_T.muted,
                   fontWeight: 300,
                 }}
               >
@@ -1136,7 +1136,7 @@ export default function GeoAnalyticsDashboard() {
                   gridTemplateColumns: "2fr 1fr 1fr",
                   gap: "0 16px",
                   padding: "0 0 8px",
-                  borderBottom: `1px solid ${T.border}`,
+                  borderBottom: `1px solid ${GEO_T.border}`,
                   marginBottom: 4,
                 }}
               >
@@ -1156,16 +1156,16 @@ export default function GeoAnalyticsDashboard() {
                     padding: "10px 0",
                     borderBottom:
                       i < demandGaps.length - 1
-                        ? `1px solid ${T.border}`
+                        ? `1px solid ${GEO_T.border}`
                         : "none",
                     alignItems: "center",
                   }}
                 >
                   <span
                     style={{
-                      fontFamily: T.font,
+                      fontFamily: GEO_T.font,
                       fontSize: 13,
-                      color: T.text,
+                      color: GEO_T.text,
                       fontWeight: 400,
                     }}
                   >
@@ -1173,21 +1173,21 @@ export default function GeoAnalyticsDashboard() {
                   </span>
                   <span
                     style={{
-                      fontFamily: T.serif,
+                      fontFamily: GEO_T.serif,
                       fontSize: 20,
                       fontWeight: 300,
-                      color: T.gold,
+                      color: GEO_T.gold,
                     }}
                   >
                     {count}
                   </span>
                   <span
                     style={{
-                      fontFamily: T.font,
+                      fontFamily: GEO_T.font,
                       fontSize: 10,
                       letterSpacing: "0.15em",
                       textTransform: "uppercase",
-                      color: T.green,
+                      color: GEO_T.green,
                       padding: "3px 8px",
                       background: "rgba(27,67,50,0.06)",
                       borderRadius: 2,

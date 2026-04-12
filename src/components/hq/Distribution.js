@@ -38,48 +38,20 @@ import { supabase } from "../../services/supabaseClient";
 import WorkflowGuide from "../WorkflowGuide";
 import { usePageContext } from "../../hooks/usePageContext";
 import { ChartCard, ChartTooltip } from "../viz";
+import { T } from "../../styles/tokens";
 
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#5A5A5A",
-  ink400: "#474747",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontUi: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// ── Design Tokens (migrated to shared tokens.js) ─────────────────────────
 // Legacy C/F aliases — preserve all internal logic
 const C = {
-  bg: T.ink050,
-  warmBg: T.ink075,
+  bg: T.surface,
+  warmBg: T.bg,
   primaryDark: T.accent,
   primaryMid: T.accentMid,
   accentGreen: "#52b788",
   gold: "#b5935a",
   text: T.ink900,
   muted: T.ink500,
-  border: T.ink150,
+  border: T.border,
   white: "#fff",
   red: T.danger,
   blue: T.info,
@@ -391,11 +363,11 @@ export default function Distribution() {
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: "1px",
-          background: T.ink150,
+          background: T.border,
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${T.ink150}`,
-          boxShadow: T.shadow,
+          border: `1px solid ${T.border}`,
+          boxShadow: T.shadow.sm,
           marginBottom: "24px",
         }}
       >
@@ -481,13 +453,13 @@ export default function Distribution() {
                     <CartesianGrid
                       horizontal
                       vertical={false}
-                      stroke={T.ink150}
+                      stroke={T.border}
                       strokeWidth={0.5}
                     />
                     <XAxis
                       dataKey="status"
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -497,7 +469,7 @@ export default function Distribution() {
                     />
                     <YAxis
                       tick={{
-                        fill: T.ink400,
+                        fill: T.ink500,
                         fontSize: 10,
                         fontFamily: T.font,
                       }}
@@ -541,13 +513,13 @@ export default function Distribution() {
                       <CartesianGrid
                         horizontal
                         vertical={false}
-                        stroke={T.ink150}
+                        stroke={T.border}
                         strokeWidth={0.5}
                       />
                       <XAxis
                         type="number"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 10,
                           fontFamily: T.font,
                         }}
@@ -559,7 +531,7 @@ export default function Distribution() {
                         type="category"
                         dataKey="name"
                         tick={{
-                          fill: T.ink400,
+                          fill: T.ink500,
                           fontSize: 10,
                           fontFamily: T.font,
                         }}
@@ -590,7 +562,7 @@ export default function Distribution() {
                       alignItems: "center",
                       justifyContent: "center",
                       fontSize: 12,
-                      color: T.ink400,
+                      color: T.ink500,
                       fontFamily: T.font,
                     }}
                   >
@@ -2039,7 +2011,7 @@ function FlowStep({ label, done, active }) {
     return (
       <span
         style={{
-          background: T.accentLit,
+          background: T.accentLight,
           color: T.accent,
           padding: "4px 12px",
           borderRadius: "3px",
@@ -2058,12 +2030,12 @@ function FlowStep({ label, done, active }) {
     return (
       <span
         style={{
-          background: T.ink075,
-          color: T.ink400,
+          background: T.bg,
+          color: T.ink500,
           padding: "4px 12px",
           borderRadius: "3px",
           fontWeight: 400,
-          border: `1px solid ${T.ink150}`,
+          border: `1px solid ${T.border}`,
           letterSpacing: "0.06em",
           textTransform: "uppercase",
           fontSize: "11px",
@@ -2097,16 +2069,16 @@ function MiniStat({ label, value, color }) {
           fontWeight: 700,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: T.ink400,
+          color: T.ink500,
           marginBottom: "6px",
-          fontFamily: T.fontUi,
+          fontFamily: T.font,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontFamily: T.fontData,
+          fontFamily: T.font,
           fontSize: "26px",
           fontWeight: 600,
           color,

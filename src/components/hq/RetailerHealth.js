@@ -12,56 +12,28 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../services/supabaseClient";
+import { T } from "../../styles/tokens";
 
-// ── Design Tokens ─────────────────────────────────────────────────────────
-const T = {
-  ink900: "#0D0D0D",
-  ink700: "#2C2C2C",
-  ink500: "#474747",
-  ink400: "#6B6B6B",
-  ink300: "#999999",
-  ink150: "#E2E2E2",
-  ink075: "#F4F4F3",
-  ink050: "#FAFAF9",
-  accent: "#1A3D2B",
-  accentMid: "#2D6A4F",
-  accentLit: "#E8F5EE",
-  accentBd: "#A7D9B8",
-  success: "#166534",
-  successBg: "#F0FDF4",
-  successBd: "#BBF7D0",
-  warning: "#92400E",
-  warningBg: "#FFFBEB",
-  warningBd: "#FDE68A",
-  danger: "#991B1B",
-  dangerBg: "#FEF2F2",
-  dangerBd: "#FECACA",
-  info: "#1E3A5F",
-  infoBg: "#EFF6FF",
-  infoBd: "#BFDBFE",
-  font: "'Inter','Helvetica Neue',Arial,sans-serif",
-  fontData: "'Inter','Helvetica Neue',Arial,sans-serif",
-  shadow: "0 1px 3px rgba(0,0,0,0.07)",
-};
+// ── Design Tokens (migrated to shared tokens.js) ─────────────────────────
 // Legacy aliases — preserve all internal logic
 const C = {
-  bg: T.ink050,
+  bg: T.surface,
   primaryDark: T.accent,
   primaryMid: T.accentMid,
   accent: "#52b788",
   gold: "#b5935a",
   text: T.ink900,
   muted: T.ink500,
-  border: T.ink150,
+  border: T.border,
   white: "#fff",
   red: T.danger,
-  lightRed: T.dangerBg,
+  lightRed: T.dangerLight,
   orange: T.warning,
-  lightOrange: T.warningBg,
+  lightOrange: T.warningLight,
   blue: T.info,
-  lightBlue: T.infoBg,
+  lightBlue: T.infoLight,
   platinum: T.info,
-  lightPlatinum: T.infoBg,
+  lightPlatinum: T.infoLight,
 };
 const F = { heading: T.font, body: T.font };
 
@@ -1550,7 +1522,7 @@ export default function RetailerHealth() {
               borderLeft: `3px solid ${k.color}`,
               borderRadius: 4,
               padding: "14px 18px",
-              boxShadow: T.shadow,
+              boxShadow: T.shadow.sm,
             }}
           >
             <div
@@ -1559,7 +1531,7 @@ export default function RetailerHealth() {
                 fontWeight: 700,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: T.ink400,
+                color: T.ink500,
                 marginBottom: 6,
                 fontFamily: T.font,
               }}
@@ -1568,7 +1540,7 @@ export default function RetailerHealth() {
             </div>
             <div
               style={{
-                fontFamily: T.fontData,
+                fontFamily: T.font,
                 fontSize: 24,
                 fontWeight: 400,
                 color: k.color,
